@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { LocationColors } from '@/constants/locations-theme';
+import AdminLayout from '@/components/admin-layout';
 
 type DetailTab = 'overview' | 'states' | 'cities' | 'areas' | 'pincodes';
 type RowStatus = 'Active' | 'Inactive';
@@ -487,154 +488,156 @@ export default function LocationsScreen() {
   useEffect(() => setQuery(''), [detailTab]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}
-        showsVerticalScrollIndicator={false}>
-        <ThemedText type="small" style={[styles.breadcrumbs, isMobile && styles.breadcrumbsMobile]} numberOfLines={1}>
-          Dashboard {'>'} Locations {'>'} Countries {'>'} {COUNTRY.name}
-        </ThemedText>
+    <AdminLayout>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}
+          showsVerticalScrollIndicator={false}>
+          <ThemedText type="small" style={[styles.breadcrumbs, isMobile && styles.breadcrumbsMobile]} numberOfLines={1}>
+            Dashboard {'>'} Locations {'>'} Countries {'>'} {COUNTRY.name}
+          </ThemedText>
 
-        <View style={[styles.entityCard, isMobile && styles.entityCardMobile]}>
-          <View style={[styles.entityLeft, isMobile && styles.entityLeftMobile]}>
-            <ThemedText style={{ fontSize: isMobile ? 32 : 36 }}>{COUNTRY.flag}</ThemedText>
-            <View style={isMobile ? styles.entityTextMobile : undefined}>
-              <View style={styles.entityTitleRow}>
-                <ThemedText type="smallBold" style={{ fontSize: isMobile ? 20 : 22 }}>
-                  {COUNTRY.name}
+          <View style={[styles.entityCard, isMobile && styles.entityCardMobile]}>
+            <View style={[styles.entityLeft, isMobile && styles.entityLeftMobile]}>
+              <ThemedText style={{ fontSize: isMobile ? 32 : 36 }}>{COUNTRY.flag}</ThemedText>
+              <View style={isMobile ? styles.entityTextMobile : undefined}>
+                <View style={styles.entityTitleRow}>
+                  <ThemedText type="smallBold" style={{ fontSize: isMobile ? 20 : 22 }}>
+                    {COUNTRY.name}
+                  </ThemedText>
+                  <StatusBadge status={COUNTRY.status} />
+                </View>
+                <ThemedText type="small" style={{ color: LocationColors.textMuted, marginTop: 4 }}>
+                  Country Code: {COUNTRY.code}
                 </ThemedText>
-                <StatusBadge status={COUNTRY.status} />
               </View>
-              <ThemedText type="small" style={{ color: LocationColors.textMuted, marginTop: 4 }}>
-                Country Code: {COUNTRY.code}
-              </ThemedText>
+            </View>
+            <View style={[styles.entityActions, isMobile && styles.entityActionsMobile]}>
+              <Pressable style={[styles.editBtn, isMobile && styles.entityBtnMobile]}>
+                <Icon name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' }} size={14} color={LocationColors.accentStrong} />
+                <ThemedText type="smallBold" style={{ color: LocationColors.accentStrong }}>
+                  {isMobile ? 'Edit' : 'Edit Country'}
+                </ThemedText>
+              </Pressable>
+              <Pressable style={[styles.deleteBtn, isMobile && styles.entityBtnMobile]}>
+                <Icon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={14} color={LocationColors.inactiveText} />
+                <ThemedText type="smallBold" style={{ color: LocationColors.inactiveText }}>
+                  Delete
+                </ThemedText>
+              </Pressable>
             </View>
           </View>
-          <View style={[styles.entityActions, isMobile && styles.entityActionsMobile]}>
-            <Pressable style={[styles.editBtn, isMobile && styles.entityBtnMobile]}>
-              <Icon name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' }} size={14} color={LocationColors.accentStrong} />
-              <ThemedText type="smallBold" style={{ color: LocationColors.accentStrong }}>
-                {isMobile ? 'Edit' : 'Edit Country'}
-              </ThemedText>
-            </Pressable>
-            <Pressable style={[styles.deleteBtn, isMobile && styles.entityBtnMobile]}>
-              <Icon name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={14} color={LocationColors.inactiveText} />
-              <ThemedText type="smallBold" style={{ color: LocationColors.inactiveText }}>
-                Delete
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+            <View style={styles.tabsRow}>
+              {DETAIL_TABS.map((tab) => (
+                <Pressable key={tab.key} onPress={() => setDetailTab(tab.key)} style={styles.tab}>
+                  <ThemedText
+                    type="smallBold"
+                    style={[styles.tabText, detailTab === tab.key && styles.tabTextActive]}>
+                    {tab.label}
+                    {tab.count ? ` (${tab.count})` : ''}
+                  </ThemedText>
+                  {detailTab === tab.key && <View style={styles.tabLine} />}
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* ── FIRST IMAGE: table section below tabs ── */}
+          <View style={[styles.listHeader, isMobile && styles.listHeaderMobile]}>
+            <ThemedText type="subtitle" style={[styles.listTitle, isMobile && styles.listTitleMobile]}>
+              {meta.title}
+            </ThemedText>
+            <Pressable style={[styles.addBtn, isMobile && styles.addBtnMobile]} onPress={() => setModalOpen(true)}>
+              <Icon name={{ ios: 'plus', android: 'add', web: 'add' }} size={14} color="#fff" />
+              <ThemedText type="smallBold" style={{ color: '#fff' }}>
+                Add New {meta.singular}
               </ThemedText>
             </Pressable>
           </View>
-        </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
-          <View style={styles.tabsRow}>
-            {DETAIL_TABS.map((tab) => (
-              <Pressable key={tab.key} onPress={() => setDetailTab(tab.key)} style={styles.tab}>
-                <ThemedText
-                  type="smallBold"
-                  style={[styles.tabText, detailTab === tab.key && styles.tabTextActive]}>
-                  {tab.label}
-                  {tab.count ? ` (${tab.count})` : ''}
+          <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
+            <View style={[styles.searchBox, isMobile && styles.searchBoxMobile]}>
+              <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={16} color={LocationColors.textLight} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={`Search ${meta.plural}...`}
+                placeholderTextColor={LocationColors.textLight}
+                style={styles.searchInput}
+              />
+            </View>
+            <View style={[styles.viewToggle, isMobile && styles.viewToggleMobile]}>
+              {!isMobile && (
+                <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
+                  View:
                 </ThemedText>
-                {detailTab === tab.key && <View style={styles.tabLine} />}
+              )}
+              <Pressable
+                style={[styles.viewBtn, viewMode === 'grid' && styles.viewBtnActive]}
+                onPress={() => setViewMode('grid')}>
+                <Icon
+                  name={{ ios: 'square.grid.2x2', android: 'grid-view', web: 'grid-view' }}
+                  size={15}
+                  color={viewMode === 'grid' ? '#fff' : LocationColors.textMuted}
+                />
               </Pressable>
-            ))}
+              <Pressable
+                style={[styles.viewBtn, viewMode === 'list' && styles.viewBtnActive]}
+                onPress={() => setViewMode('list')}>
+                <Icon
+                  name={{ ios: 'list.bullet', android: 'view-list', web: 'view-list' }}
+                  size={15}
+                  color={viewMode === 'list' ? '#fff' : LocationColors.textMuted}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {viewMode === 'list' ? (
+            isWeb ? (
+              <ListViewTable rows={filtered} nameCol={meta.nameCol} />
+            ) : (
+              <MobileListCards rows={filtered} />
+            )
+          ) : (
+            <GridViewCards rows={filtered} columns={gridColumns} />
+          )}
+
+          <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
+            <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
+              Showing 1 to {Math.min(5, filtered.length)} of {meta.total} {meta.plural}
+            </ThemedText>
+            <View style={styles.pages}>
+              <Pressable style={styles.pageArrow}>
+                <Icon name={{ ios: 'chevron.left', android: 'chevron-left', web: 'chevron-left' }} size={14} color={LocationColors.textMuted} />
+              </Pressable>
+              {[1, 2, 3].map((p) => (
+                <Pressable key={p} style={[styles.pageNum, p === 1 && styles.pageNumActive]}>
+                  <ThemedText type="smallBold" style={{ color: p === 1 ? '#fff' : LocationColors.textMuted }}>{p}</ThemedText>
+                </Pressable>
+              ))}
+              <ThemedText type="small" style={{ color: LocationColors.textMuted }}>...</ThemedText>
+              <Pressable style={styles.pageNum}>
+                <ThemedText type="smallBold" style={{ color: LocationColors.textMuted }}>39</ThemedText>
+              </Pressable>
+              <Pressable style={styles.pageArrow}>
+                <Icon name={{ ios: 'chevron.right', android: 'chevron-right', web: 'chevron-right' }} size={14} color={LocationColors.textMuted} />
+              </Pressable>
+            </View>
           </View>
         </ScrollView>
 
-        {/* ── FIRST IMAGE: table section below tabs ── */}
-        <View style={[styles.listHeader, isMobile && styles.listHeaderMobile]}>
-          <ThemedText type="subtitle" style={[styles.listTitle, isMobile && styles.listTitleMobile]}>
-            {meta.title}
-          </ThemedText>
-          <Pressable style={[styles.addBtn, isMobile && styles.addBtnMobile]} onPress={() => setModalOpen(true)}>
-            <Icon name={{ ios: 'plus', android: 'add', web: 'add' }} size={14} color="#fff" />
-            <ThemedText type="smallBold" style={{ color: '#fff' }}>
-              Add New {meta.singular}
-            </ThemedText>
-          </Pressable>
-        </View>
-
-        <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
-          <View style={[styles.searchBox, isMobile && styles.searchBoxMobile]}>
-            <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={16} color={LocationColors.textLight} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={`Search ${meta.plural}...`}
-              placeholderTextColor={LocationColors.textLight}
-              style={styles.searchInput}
-            />
-          </View>
-          <View style={[styles.viewToggle, isMobile && styles.viewToggleMobile]}>
-            {!isMobile && (
-              <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-                View:
-              </ThemedText>
-            )}
-            <Pressable
-              style={[styles.viewBtn, viewMode === 'grid' && styles.viewBtnActive]}
-              onPress={() => setViewMode('grid')}>
-              <Icon
-                name={{ ios: 'square.grid.2x2', android: 'grid-view', web: 'grid-view' }}
-                size={15}
-                color={viewMode === 'grid' ? '#fff' : LocationColors.textMuted}
-              />
-            </Pressable>
-            <Pressable
-              style={[styles.viewBtn, viewMode === 'list' && styles.viewBtnActive]}
-              onPress={() => setViewMode('list')}>
-              <Icon
-                name={{ ios: 'list.bullet', android: 'view-list', web: 'view-list' }}
-                size={15}
-                color={viewMode === 'list' ? '#fff' : LocationColors.textMuted}
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {viewMode === 'list' ? (
-          isWeb ? (
-            <ListViewTable rows={filtered} nameCol={meta.nameCol} />
-          ) : (
-            <MobileListCards rows={filtered} />
-          )
-        ) : (
-          <GridViewCards rows={filtered} columns={gridColumns} />
-        )}
-
-        <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-          <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-            Showing 1 to {Math.min(5, filtered.length)} of {meta.total} {meta.plural}
-          </ThemedText>
-          <View style={styles.pages}>
-            <Pressable style={styles.pageArrow}>
-              <Icon name={{ ios: 'chevron.left', android: 'chevron-left', web: 'chevron-left' }} size={14} color={LocationColors.textMuted} />
-            </Pressable>
-            {[1, 2, 3].map((p) => (
-              <Pressable key={p} style={[styles.pageNum, p === 1 && styles.pageNumActive]}>
-                <ThemedText type="smallBold" style={{ color: p === 1 ? '#fff' : LocationColors.textMuted }}>{p}</ThemedText>
-              </Pressable>
-            ))}
-            <ThemedText type="small" style={{ color: LocationColors.textMuted }}>...</ThemedText>
-            <Pressable style={styles.pageNum}>
-              <ThemedText type="smallBold" style={{ color: LocationColors.textMuted }}>39</ThemedText>
-            </Pressable>
-            <Pressable style={styles.pageArrow}>
-              <Icon name={{ ios: 'chevron.right', android: 'chevron-right', web: 'chevron-right' }} size={14} color={LocationColors.textMuted} />
-            </Pressable>
-          </View>
-        </View>
-      </ScrollView>
-
-      <AddModal
-        visible={modalOpen}
-        onClose={() => setModalOpen(false)}
-        tab={detailTab}
-        isMobile={isMobile}
-      />
-    </SafeAreaView>
+        <AddModal
+          visible={modalOpen}
+          onClose={() => setModalOpen(false)}
+          tab={detailTab}
+          isMobile={isMobile}
+        />
+      </SafeAreaView>
+    </AdminLayout>
   );
 }
 
