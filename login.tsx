@@ -1,24 +1,23 @@
-
-//export { default } from '../../login';
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  useWindowDimensions,
+  Image,
 } from "react-native";
-import { useAuth } from "../context/auth-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useAuth } from "./src/context/auth-context";
 
 // --- MOBILE LOGIN SCREEN ---
 function MobileLoginScreen() {
@@ -124,7 +123,7 @@ function MobileLoginScreen() {
             {/* Logo Section */}
             <View style={stylesMobile.logoContainer}>
               <Image
-                source={require("../assets/images/logo.jpg")}
+                source={require("./assets/images/logo.jpg")}
                 style={stylesMobile.logo}
                 resizeMode="contain"
               />
@@ -944,4 +943,3 @@ const stylesWeb = StyleSheet.create({
     borderRadius: 12,
   },
 });
-
