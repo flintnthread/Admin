@@ -5,10 +5,12 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "expo": "~54.0.0",
+    "expo-checkbox": "~5.0.8",
     "expo-constants": "~18.0.0",
     "expo-device": "~8.0.0",
     "expo-font": "~14.0.0",
     "expo-image": "~3.0.0",
+    "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.0",
     "expo-router": "~6.0.0",
     "expo-splash-screen": "~31.0.0",
@@ -29,6 +31,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
   },
   "scripts": {
