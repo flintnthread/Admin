@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native';
-import React from 'react';
+import { useNavigation } from "@react-navigation/native";
+import React from "react";
 import {
   Platform,
   ScrollView,
@@ -9,47 +9,42 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from "react-native";
 
-// Bootstrap Icons via react-native-vector-icons
-// Install: npm install react-native-vector-icons
+// Bootstrap Icons via @expo/vector-icons
 // For Expo: npx expo install @expo/vector-icons
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-// Bootstrap icon names mapped to MaterialCommunityIcons equivalents:
-//   bi bi-arrow-left-circle   → arrow-left-circle
-//   bi bi-file-earmark-text   → file-document-outline
-//   bi bi-clock-history       → history
-//   bi bi-calendar-x          → calendar-remove-outline
-//   bi bi-bank                → bank-outline
+import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 
 // ─── Breakpoints ───────────────────────────────────────────────────────────────
 const BP = { mobile: 480, tablet: 768, laptop: 1024, desktop: 1280 };
 
-function useBreakpoint() {
+type Breakpoint = "mobile" | "tablet" | "laptop" | "desktop";
+
+function useBreakpoint(): Breakpoint {
   const { width } = useWindowDimensions();
-  if (width < BP.mobile) return 'mobile';
-  if (width < BP.tablet) return 'tablet';
-  if (width < BP.laptop) return 'laptop';
-  return 'desktop';
+  if (width < BP.mobile) return "mobile";
+  if (width < BP.tablet) return "tablet";
+  if (width < BP.laptop) return "laptop";
+  return "desktop";
 }
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 const BANK_DATA = {
-  name: 'Sanju Sandhya',
-  email: 'flintandthread.hr@gmail.com',
-  status: 'Not requested',
-  bank: 'Canara Bank',
-  branch: 'DARSI',
-  accountHolder: 'MANAM RAMYA',
-  account: 'XXXX1022',
-  ifsc: 'CNRB0013641',
-  adminNote: '-',
-  sellerNote: '-',
+  name: "Sanju Sandhya",
+  email: "flintandthread.hr@gmail.com",
+  status: "Not requested",
+  bank: "Canara Bank",
+  branch: "DARSI",
+  accountHolder: "MANAM RAMYA",
+  account: "XXXX1022",
+  ifsc: "CNRB0013641",
+  adminNote: "-",
+  sellerNote: "-",
 };
 
 // ─── Header Banner ─────────────────────────────────────────────────────────────
-function Header({ bp }) {
-  const isMobile = bp === 'mobile';
+function Header({ bp }: { bp: Breakpoint }) {
+  const isMobile = bp === "mobile";
   return (
     <View style={styles.headerBanner}>
       <View style={styles.headerCircle1} />
@@ -57,20 +52,16 @@ function Header({ bp }) {
       <View style={styles.headerCircle3} />
       {/* Bootstrap icon: bi-clock-history → history */}
       <View style={styles.headerIconBox}>
-        <Icon
-          name="history"
-          size={isMobile ? 22 : 26}
-          color={ORANGE}
-        />
+        <Icon name="history" size={isMobile ? 22 : 26} color={ORANGE} />
       </View>
     </View>
   );
 }
 
 // ─── Title + Action Buttons ────────────────────────────────────────────────────
-function TitleSection({ bp }) {
-  const isMobile = bp === 'mobile' || bp === 'tablet';
-  const navigation = useNavigation();
+function TitleSection({ bp }: { bp: Breakpoint }) {
+  const isMobile = bp === "mobile" || bp === "tablet";
+  const navigation = useNavigation<any>();
 
   return (
     <View style={[styles.titleSection, isMobile && styles.titleSectionMobile]}>
@@ -83,20 +74,32 @@ function TitleSection({ bp }) {
         </View>
       </View>
 
-      <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
+      <View
+        style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}
+      >
         {/* Bootstrap icon: bi-arrow-left-circle → arrow-left-circle */}
         <TouchableOpacity
           style={styles.backBtn}
           activeOpacity={0.8}
-          onPress={() => navigation.navigate('sellerbankapproval')}
+          onPress={() => navigation.navigate("sellerbankapproval")}
         >
-          <Icon name="arrow-left-circle" size={16} color={ORANGE} style={styles.btnIcon} />
+          <Icon
+            name="arrow-left-circle"
+            size={16}
+            color={ORANGE}
+            style={styles.btnIcon}
+          />
           <Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
 
         {/* Bootstrap icon: bi-file-earmark-text → file-document-outline */}
         <TouchableOpacity style={styles.proofBtn} activeOpacity={0.8}>
-          <Icon name="file-document-outline" size={16} color="#fff" style={styles.btnIcon} />
+          <Icon
+            name="file-document-outline"
+            size={16}
+            color="#fff"
+            style={styles.btnIcon}
+          />
           <Text style={styles.proofBtnText}>Bank Proof</Text>
         </TouchableOpacity>
       </View>
@@ -105,7 +108,7 @@ function TitleSection({ bp }) {
 }
 
 // ─── Bank Detail Row ───────────────────────────────────────────────────────────
-function BankDetailRow({ label, value }) {
+function BankDetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -121,7 +124,12 @@ function CurrentBankDetails() {
     <View style={styles.card}>
       <View style={styles.cardTitleRow}>
         {/* Bootstrap icon: bi-bank → bank-outline */}
-        <Icon name="bank-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+        <Icon
+          name="bank-outline"
+          size={18}
+          color={ORANGE}
+          style={{ marginRight: 8 }}
+        />
         <Text style={styles.cardTitle}>Current Bank Details</Text>
       </View>
 
@@ -143,19 +151,28 @@ function CurrentBankDetails() {
 }
 
 // ─── History / Timeline Card ───────────────────────────────────────────────────
-function HistoryTimeline({ compact }) {
+function HistoryTimeline({ compact }: { compact?: boolean }) {
   return (
     <View style={[styles.card, compact && styles.historyCardCompact]}>
       <View style={styles.cardTitleRow}>
         {/* Bootstrap icon: bi-clock-history → history */}
-        <Icon name="history" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+        <Icon
+          name="history"
+          size={18}
+          color={ORANGE}
+          style={{ marginRight: 8 }}
+        />
         <Text style={styles.cardTitle}>History / Timeline</Text>
       </View>
 
       <View style={styles.emptyHistory}>
         <View style={styles.emptyIconCircle}>
           {/* Bootstrap icon: bi-calendar-x → calendar-remove-outline */}
-          <Icon name="calendar-remove-outline" size={compact ? 24 : 30} color={GRAY} />
+          <Icon
+            name="calendar-remove-outline"
+            size={compact ? 24 : 30}
+            color={GRAY}
+          />
         </View>
         <Text style={styles.emptyTitle}>No history found.</Text>
         {!compact && (
@@ -172,11 +189,17 @@ function HistoryTimeline({ compact }) {
 export default function BankApprovalHistory() {
   const { width } = useWindowDimensions();
   const bp = useBreakpoint();
-  const isMobile = bp === 'mobile';
-  const isDesktopWide = bp === 'laptop' || bp === 'desktop';
+  const isMobile = bp === "mobile";
+  const isDesktopWide = bp === "laptop" || bp === "desktop";
 
   const contentMaxWidth =
-    bp === 'desktop' ? 1200 : bp === 'laptop' ? 960 : bp === 'tablet' ? 700 : '100%';
+    bp === "desktop"
+      ? 1200
+      : bp === "laptop"
+        ? 960
+        : bp === "tablet"
+          ? 700
+          : "100%";
 
   return (
     <View style={styles.root}>
@@ -184,12 +207,16 @@ export default function BankApprovalHistory() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          !isMobile && { alignItems: 'center' },
+          !isMobile && { alignItems: "center" },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.outerContainer, { maxWidth: contentMaxWidth, width: '100%' }]}>
-
+        <View
+          style={[
+            styles.outerContainer,
+            { maxWidth: contentMaxWidth, width: "100%" },
+          ]}
+        >
           {/* Top card: header banner + title section */}
           <View style={styles.topCard}>
             <Header bp={bp} />
@@ -197,7 +224,9 @@ export default function BankApprovalHistory() {
           </View>
 
           {/* Body: side-by-side on desktop, stacked on mobile/tablet */}
-          <View style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}>
+          <View
+            style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}
+          >
             {isDesktopWide ? (
               <>
                 <View style={styles.leftCol}>
@@ -214,7 +243,6 @@ export default function BankApprovalHistory() {
               </>
             )}
           </View>
-
         </View>
       </ScrollView>
     </View>
@@ -222,22 +250,32 @@ export default function BankApprovalHistory() {
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
-const ORANGE      = '#C05E1A';
-const ORANGE_LIGHT = '#E8892F';
-const DARK        = '#2C3E50';
-const GRAY        = '#8492A6';
-const BG          = '#F4F6F9';
+const ORANGE = "#C05E1A";
+const ORANGE_LIGHT = "#E8892F";
+const DARK = "#2C3E50";
+const GRAY = "#8492A6";
+const BG = "#F4F6F9";
 
-const shadow = Platform.select({
-  ios:     { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+const shadow: any = Platform.select({
+  ios: {
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
   android: { elevation: 4 },
-  default: { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
+  default: { boxShadow: "0 4px 16px rgba(0,0,0,0.08)" },
 });
 
-const shadowSm = Platform.select({
-  ios:     { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 } },
+const shadowSm: any = Platform.select({
+  ios: {
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
   android: { elevation: 3 },
-  default: { boxShadow: '0 3px 12px rgba(0,0,0,0.07)' },
+  default: { boxShadow: "0 3px 12px rgba(0,0,0,0.07)" },
 });
 
 const styles = StyleSheet.create({
@@ -250,7 +288,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   outerContainer: {
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingHorizontal: 12,
     paddingTop: 12,
     gap: 16,
@@ -258,9 +296,9 @@ const styles = StyleSheet.create({
 
   // ── Top card ────────────────────────────────────
   topCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...shadow,
   },
 
@@ -268,55 +306,71 @@ const styles = StyleSheet.create({
   headerBanner: {
     backgroundColor: ORANGE,
     height: 100,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
     paddingBottom: 12,
     paddingHorizontal: 20,
-    position: 'relative',
-    overflow: 'hidden',
+    position: "relative",
+    overflow: "hidden",
   },
   headerCircle1: {
-    position: 'absolute',
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    right: 80, top: -30,
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    right: 80,
+    top: -30,
   },
   headerCircle2: {
-    position: 'absolute',
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    right: -10, top: 10,
+    position: "absolute",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    right: -10,
+    top: 10,
   },
   headerCircle3: {
-    position: 'absolute',
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    right: 200, top: 30,
+    position: "absolute",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    right: 200,
+    top: 30,
   },
   headerIconBox: {
-    width: 52, height: 52, borderRadius: 12,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
     ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+      },
       android: { elevation: 4 },
-      default: { boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
+      default: { boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
     }),
   },
 
   // ── Title section ────────────────────────────────
   titleSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 20,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
     gap: 16,
   },
   titleSectionMobile: {
-    flexDirection: 'column',
+    flexDirection: "column",
   },
   titleLeft: {
     flex: 1,
@@ -325,13 +379,13 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     color: DARK,
     letterSpacing: -0.3,
   },
   userName: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: DARK,
     marginTop: 6,
   },
@@ -342,39 +396,39 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: '#4A5568',
+    alignSelf: "flex-start",
+    backgroundColor: "#4A5568",
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   statusText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 
   // ── Action buttons ───────────────────────────────
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
-    alignItems: 'center',
+    alignItems: "center",
     flexShrink: 0,
   },
   actionButtonsMobile: {
-    width: '100%',
+    width: "100%",
   },
   btnIcon: {
     marginRight: 6,
   },
   backBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1.5,
     borderColor: ORANGE_LIGHT,
-    backgroundColor: '#FFF5EB',
+    backgroundColor: "#FFF5EB",
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -383,23 +437,23 @@ const styles = StyleSheet.create({
   backBtnText: {
     color: ORANGE,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   proofBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4A5568',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4A5568",
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
     minWidth: 110,
   },
   proofBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   // ── Body section ─────────────────────────────────
@@ -407,15 +461,15 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   bodySectionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
-  leftCol:  { flex: 1 },
+  leftCol: { flex: 1 },
   rightCol: { flex: 1 },
 
   // ── Card ─────────────────────────────────────────
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     ...shadowSm,
@@ -424,13 +478,13 @@ const styles = StyleSheet.create({
     minHeight: 140,
   },
   cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: DARK,
     letterSpacing: -0.2,
   },
@@ -441,15 +495,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   detailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     paddingVertical: 8,
   },
   detailLabel: {
     flex: 1,
     fontSize: 14,
     color: GRAY,
-    fontWeight: '400',
+    fontWeight: "400",
     minWidth: 110,
   },
   detailColon: {
@@ -462,38 +516,40 @@ const styles = StyleSheet.create({
     flex: 1.5,
     fontSize: 14,
     color: DARK,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   divider: {
     height: 1,
-    backgroundColor: '#EDF2F7',
+    backgroundColor: "#EDF2F7",
     marginVertical: 12,
   },
 
   // ── Empty history ─────────────────────────────────
   emptyHistory: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 24,
     gap: 10,
   },
   emptyIconCircle: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: '#F0F4F8',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#F0F4F8",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 4,
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     color: DARK,
   },
   emptySubtitle: {
     fontSize: 13,
     color: GRAY,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: 16,
   },
-});
+} as any);
