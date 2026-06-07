@@ -17,7 +17,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../context/auth-context";
+import { useAuth } from "./src/context/auth-context";
 
 // --- MOBILE LOGIN SCREEN ---
 function MobileLoginScreen() {
