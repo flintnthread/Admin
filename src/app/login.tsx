@@ -123,7 +123,7 @@ function MobileLoginScreen() {
             {/* Logo Section */}
             <View style={stylesMobile.logoContainer}>
               <Image
-                source={require("./assets/images/logo.jpg")}
+                source={require("../../assets/images/logo.jpg")}
                 style={stylesMobile.logo}
                 resizeMode="contain"
               />
@@ -385,7 +385,7 @@ function WebLoginScreen() {
               {/* Top Logo Section */}
               <View style={stylesWeb.webLogoContainer}>
                 <Image
-                  source={require("./assets/images/logo.jpg")}
+                  source={require("../../assets/images/logo.jpg")}
                   style={stylesWeb.webLogo}
                   resizeMode="contain"
                 />
@@ -403,7 +403,7 @@ function WebLoginScreen() {
 
               {/* Illustration Section */}
               <Image
-                source={require("./assets/images/web_illustration.png")}
+                source={require("../../assets/images/web_illustration.png")}
                 style={stylesWeb.webIllustration}
                 resizeMode="contain"
               />
