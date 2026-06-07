@@ -34,19 +34,85 @@ const NAV_ITEMS = {
     label: "Ecommerce",
     icon: "shopping-bag",
     children: [
+      { label: "Products", icon: "package", path: null },
+      { label: "Customers", icon: "users", path: null },
+      { label: "Sellers", icon: "user-check", path: null },
+      { label: "Sellers Graph", icon: "trending-up", path: null },
+      { label: "Seller Bank Approval", icon: "credit-card", path: null },
+      { label: "Orphaned Products", icon: "alert-circle", path: null },
+      { label: "Orders", icon: "shopping-cart", path: null },
+      { label: "Refund Management", icon: "rotate-ccw", path: null },
+      { label: "Delivery Charges", icon: "truck", path: null },
+    ],
+    standalone: [
       { label: "Pending Sellers", icon: "user-plus", path: null },
-      { label: "Approved Sellers", icon: "users", path: "/approveseller" },
+      { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
       { label: "Customer Support", icon: "headphones", path: null },
-      { label: "Category Requests", icon: "layers", path: null },
+      { label: "Category Requests", icon: "grid", path: null },
       { label: "Seller Support", icon: "message-square", path: null },
     ],
   },
   "EMAIL MANAGEMENT": [
     { label: "Customer Emails", icon: "mail", path: null },
+    { label: "Seller Emails", icon: "mail", path: null },
   ],
-  LOCATIONS: [
-    { label: "Locations", icon: "map-pin", path: "/locations" },
+  "PAYMENTS & PRODUCTS": [
+    { label: "Commission rates (B2B/B2C)", icon: "percent", path: null },
+    { label: "Seller Payments", icon: "dollar-sign", path: null },
+    { label: "Product Approvals", icon: "check-square", path: null },
+    { label: "Add Sellers", icon: "user-plus", path: null },
+    { label: "Ads Admin Users", icon: "user", path: null },
+    { label: "Admin Panel Users", icon: "shield", path: null },
   ],
+  CUSTOM: [
+    {
+      label: "Categories",
+      icon: "grid",
+      children: [
+        { label: "Main Categories", icon: "layers", path: null },
+        { label: "Subcategories", icon: "git-branch", path: null },
+        { label: "Colors", icon: "droplet", path: null },
+        { label: "Sizes", icon: "maximize", path: null },
+      ]
+    },
+    {
+      label: "FAQs",
+      icon: "help-circle",
+      children: [
+        { label: "FAQ Categories", icon: "layers", path: "/faq-categories" },
+        { label: "FAQ Questions", icon: "help-circle", path: null }
+      ]
+    },
+    { label: "Contact Messages", icon: "mail", path: null },
+    { label: "Logos", icon: "image", path: null },
+    {
+      label: "Banners",
+      icon: "image",
+      children: [
+        { label: "Banner List", icon: "list", path: null }
+      ]
+    },
+    {
+      label: "Locations",
+      icon: "map-pin",
+      children: [
+        { label: "Countries", icon: "globe", path: "/locations" },
+        { label: "States", icon: "map", path: null },
+        { label: "Cities", icon: "navigation", path: null },
+        { label: "Areas", icon: "compass", path: null },
+        { label: "Pincodes", icon: "hash", path: null }
+      ]
+    },
+    {
+      label: "Careers Management",
+      icon: "briefcase",
+      children: [
+        { label: "Departments", icon: "layers", path: null },
+        { label: "Job Openings", icon: "briefcase", path: null },
+        { label: "Applications", icon: "file-text", path: null }
+      ]
+    }
+  ]
 } as const;
 
 export default function AdminSidebar({
@@ -56,6 +122,11 @@ export default function AdminSidebar({
 }: Props) {
   const pathname = usePathname();
   const [ecommerceExpanded, setEcommerceExpanded] = React.useState(true);
+  const [expandedItems, setExpandedItems] = React.useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (label: string) => {
+    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const isActive = (path: string | null) =>
     !!path && (pathname === path || pathname.startsWith(path + "/"));
@@ -198,6 +269,31 @@ export default function AdminSidebar({
               ))}
             </View>
           )}
+
+          {/* Standalone menu items below Ecommerce dropdown */}
+          {NAV_ITEMS.APPS.standalone.map((item) => (
+            <TouchableOpacity
+              key={item.label}
+              style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
+              onPress={() => navigate(item.path)}
+            >
+              <Feather
+                name={item.icon as any}
+                size={18}
+                color={isActive(item.path) ? "#EA580C" : "#6B7280"}
+              />
+              {!collapsed && (
+                <Text
+                  style={[
+                    styles.menuItemText,
+                    isActive(item.path) && styles.menuItemTextActive,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* EMAIL MANAGEMENT */}
@@ -230,10 +326,12 @@ export default function AdminSidebar({
           ))}
         </View>
 
-        {/* LOCATIONS */}
-        <View style={[styles.section, { marginBottom: 30 }]}>
-          {!collapsed && <Text style={styles.sectionTitle}>LOCATIONS</Text>}
-          {NAV_ITEMS.LOCATIONS.map((item) => (
+        {/* PAYMENTS & PRODUCTS */}
+        <View style={styles.section}>
+          {!collapsed && (
+            <Text style={styles.sectionTitle}>PAYMENTS & PRODUCTS</Text>
+          )}
+          {NAV_ITEMS["PAYMENTS & PRODUCTS"].map((item) => (
             <TouchableOpacity
               key={item.label}
               style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
@@ -256,6 +354,87 @@ export default function AdminSidebar({
               )}
             </TouchableOpacity>
           ))}
+        </View>
+
+        {/* CUSTOM */}
+        <View style={[styles.section, { marginBottom: 30 }]}>
+          {!collapsed && <Text style={styles.sectionTitle}>CUSTOM</Text>}
+          {NAV_ITEMS.CUSTOM.map((item) => {
+            const hasChildren = 'children' in item;
+            const isExpanded = hasChildren ? !!expandedItems[item.label] : false;
+
+            return (
+              <View key={item.label}>
+                <TouchableOpacity
+                  style={[styles.menuItem, !hasChildren && isActive(item.path) && styles.menuItemActive]}
+                  onPress={() => {
+                    if (hasChildren) {
+                      toggleExpanded(item.label);
+                    } else {
+                      navigate(item.path);
+                    }
+                  }}
+                >
+                  <Feather
+                    name={item.icon as any}
+                    size={18}
+                    color={!hasChildren && isActive(item.path) ? "#EA580C" : "#6B7280"}
+                  />
+                  {!collapsed && (
+                    <>
+                      <Text
+                        style={[
+                          styles.menuItemText,
+                          !hasChildren && isActive(item.path) && styles.menuItemTextActive,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                      {hasChildren && (
+                        <Feather
+                          name={isExpanded ? "chevron-down" : "chevron-right"}
+                          size={14}
+                          color="#6B7280"
+                          style={styles.chevron}
+                        />
+                      )}
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {hasChildren && isExpanded && (
+                  <View style={[styles.subMenu, collapsed && styles.subMenuCollapsed]}>
+                    {item.children.map((child) => (
+                      <TouchableOpacity
+                        key={child.label}
+                        style={[
+                          styles.subMenuItem,
+                          isActive(child.path) && styles.subMenuItemActive,
+                        ]}
+                        onPress={() => navigate(child.path)}
+                      >
+                        <Feather
+                          name={child.icon as any}
+                          size={14}
+                          color={isActive(child.path) ? "#EA580C" : "#6B7280"}
+                        />
+                        {!collapsed && (
+                          <Text
+                            style={[
+                              styles.subMenuItemText,
+                              isActive(child.path) && styles.subMenuItemTextActive,
+                            ]}
+                          >
+                            {child.label}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
