@@ -270,7 +270,7 @@ const SellerPaymentsScreen: React.FC = () => {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 250 }]} showsVerticalScrollIndicator={false}>
 
                 {/* Stats */}
                 <View style={[styles.statsCardSingle, !isWeb && { flexDirection: "column", gap: 16 }, isWeb && { justifyContent: "space-between" }]}>
@@ -473,7 +473,7 @@ const SellerPaymentsScreen: React.FC = () => {
                         <Text style={styles.emptyTitle}>No orders found</Text>
                     </View>
                 ) : isWeb ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
                         <View style={styles.tableContainer}>
                             <View style={styles.tableHeaderRow}>
                                 <Text style={[styles.tableHeaderCell, { width: 140 }]}>Order</Text>
@@ -594,7 +594,7 @@ export default SellerPaymentsScreen;
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: BG_PAGE, paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 },
-    webLayout: { flex: 1, backgroundColor: BG_PAGE, height: "100%" },
+    webLayout: { flex: 1, backgroundColor: BG_PAGE, height: "100vh" as any },
     webColumn: { flex: 1 },
 
     main: { flex: 1, backgroundColor: BG_PAGE },
