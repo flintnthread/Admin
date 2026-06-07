@@ -410,9 +410,12 @@ export default function BankApproval() {
                     <div style={{ position: "relative" }}>
                       <select className="select-input" style={{ width: "100%", paddingRight: 32 }}>
                         <option>All</option>
-                        <option>Pending</option>
-                        <option>Approved</option>
                         <option>Not Requested</option>
+                        <option>Pending Seller</option>
+                        <option>Pending Admin</option>
+                        <option>Needs Edit </option>
+                        <option>Approved</option>
+                        <option>Rejected</option>
                       </select>
                       <i className="bi bi-chevron-down" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 13, pointerEvents: "none" }} />
                     </div>
