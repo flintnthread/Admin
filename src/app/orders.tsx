@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import AdminLayout from "../components/admin-layout";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 
@@ -761,7 +762,8 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <AdminLayout>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
       <ScrollView
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
@@ -776,6 +778,7 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
           />
         ))}
       </ScrollView>
-    </View>
+      </View>
+    </AdminLayout>
   );
 }

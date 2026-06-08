@@ -13,6 +13,7 @@ import {
   Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import AdminLayout from "@/components/admin-layout";
 
 const PRIMARY_ORANGE = "#ef7b1a";
 const TITLE_DARK = "#1d324e";
@@ -83,21 +84,15 @@ const CommissionRatesScreen: React.FC = () => {
     </ScrollView>
   );
 
-  if (isWeb) {
-    return (
+  return (
+    <AdminLayout>
       <View style={styles.webLayout}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.webMainColumn}>
           {MainContent}
         </View>
       </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      {MainContent}
-    </SafeAreaView>
+    </AdminLayout>
   );
 };
 
