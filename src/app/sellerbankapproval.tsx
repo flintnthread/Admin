@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 
 const sellers = [
@@ -84,22 +85,6 @@ const stats = [
   { icon: "bi-graph-up-arrow", label: "Approval Rate", value: "88.5%", sub: "This month", color: "#00BCD4", bg: "#EEF9FB" },
 ];
 
-const navItems = [
-  { icon: "bi-grid", label: "Dashboard", section: "GENERAL" },
-  { icon: "bi-search", label: "SEO Engine", section: null },
-  { icon: "bi-people", label: "Employee Management", section: "EMPLOYEE MANAGEMENT" },
-  { icon: "bi-shield", label: "Role Management", section: null },
-  { icon: "bi-activity", label: "Activity Dashboard", section: null },
-  { icon: "bi-bag", label: "Ecommerce", section: "APPS", hasArrow: true },
-  { icon: "bi-person-clock", label: "Pending Sellers", section: null },
-  { icon: "bi-person-check", label: "Approved Sellers", section: null },
-  { icon: "bi-headset", label: "Customer Support", section: null },
-  { icon: "bi-grid-3x3-gap", label: "Category Requests", section: null },
-  { icon: "bi-person-lines-fill", label: "Seller Support", section: null },
-  { icon: "bi-envelope", label: "Customer Emails", section: "EMAIL MANAGEMENT" },
-  { icon: "bi-send", label: "Seller Emails", section: null },
-];
-
 function StatusBadge({ status, label }: { status: string; label: string }) {
   const styles: Record<string, { bg: string; color: string; dot: string }> = {
     pending: { bg: "#FF6B35", color: "#fff", dot: "#FF6B35" },
@@ -149,7 +134,7 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 }
 
 export default function BankApproval() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
   const [activeNav, setActiveNav] = useState("Pending Sellers");
   const [activeTab, setActiveTab] = useState("Dashboard");
 
@@ -225,35 +210,16 @@ export default function BankApproval() {
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', sans-serif; background: #f4f6fa; }
-        .sidebar { width: 220px; min-height: 100vh; background: #0f1923; position: fixed; left: 0; top: 0; z-index: 200; transition: transform 0.3s; overflow-y: auto; }
-        .sidebar-overlay { display: none; }
         @media (max-width: 767px) {
-          .sidebar { transform: translateX(-100%); }
-          .sidebar.open { transform: translateX(0); }
-          .sidebar-overlay { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; }
-          .main-content { margin-left: 0 !important; }
-          .desktop-header { display: none !important; }
-          .mobile-header { display: flex !important; }
-          .mobile-bottom-nav { display: flex !important; }
           .desktop-table { display: none !important; }
           .mobile-cards { display: block !important; }
           .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
         }
         @media (min-width: 768px) {
-          .mobile-header { display: none !important; }
-          .mobile-bottom-nav { display: none !important; }
           .mobile-cards { display: none !important; }
           .desktop-table { display: block !important; }
         }
-        .mobile-bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e7eb; z-index: 100; padding: 8px 0 4px; }
         .mobile-cards { display: none; }
-        .nav-section { font-size: 10px; font-weight: 700; color: #FF6B35; letter-spacing: 1px; padding: 18px 20px 6px; }
-        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8fa0b3; font-size: 13.5px; cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
-        .nav-item:hover, .nav-item.active { background: rgba(255,107,53,0.08); color: #fff; border-left-color: #FF6B35; }
-        .nav-item i { font-size: 16px; }
-        .logo { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-        .logo span { font-size: 22px; font-weight: 800; color: #FF6B35; }
-        .logo span.and { color: #fff; }
         .stat-card { background: #fff; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
         .stat-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
         .page-header { background: #fff; padding: 18px 28px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -278,86 +244,17 @@ export default function BankApproval() {
         .page-btn:hover:not(.active) { background: #f5f5f5; }
         .mobile-seller-card { background: #fff; border-radius: 12px; margin-bottom: 14px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
         .progress-line { display: flex; align-items: center; gap: 0; margin: 12px 0 4px; }
-        .progress-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .progress-dot { width: 12px; height: 12px; border-radius: 50%; flexShrink: 0; }
         .progress-connector { flex: 1; height: 2px; background: #e5e7eb; }
         .progress-connector.filled { background: #4CAF50; }
-        .mobile-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; font-size: 11px; color: #8fa0b3; cursor: pointer; padding: 2px 0; }
-        .mobile-tab.active { color: #FF6B35; }
-        .mobile-tab i { font-size: 20px; }
       `}</style>
 
       <div style={{ display: "flex", minHeight: "100vh", background: "#f4f6fa" }}>
-        {/* Sidebar */}
-        {isMobile && sidebarOpen && (
-          <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
-        )}
-        <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
-          <div className="logo">
-            <span>FF</span>
-            <span className="and">&T</span>
-          </div>
-          {(() => {
-            let lastSection: string | null = "";
-            return navItems.map((item, i) => (
-              <React.Fragment key={i}>
-                {item.section && item.section !== lastSection && (() => { lastSection = item.section; return (
-                  <div className="nav-section">{item.section}</div>
-                ); })()}
-                <div
-                  className={`nav-item${activeNav === item.label ? " active" : ""}`}
-                  onClick={() => { setActiveNav(item.label); if (isMobile) setSidebarOpen(false); }}
-                >
-                  <i className={`bi ${item.icon}`} />
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                  {item.hasArrow && <i className="bi bi-chevron-down" style={{ fontSize: 12 }} />}
-                </div>
-              </React.Fragment>
-            ));
-          })()}
-        </aside>
-
         {/* Main */}
-        <div className="main-content" style={{ marginLeft: isMobile ? 0 : 220, flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", overflowY: "auto" }}>
-
-          {/* Desktop Header */}
-          <header className="desktop-header" style={{ background: "#fff", padding: "10px 28px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0", position: "sticky", top: 0, zIndex: 100 }}>
-            <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#555" }} onClick={() => setSidebarOpen(!sidebarOpen)}>
-              <i className="bi bi-list" />
-            </button>
-            <div style={{ flex: 1, position: "relative", maxWidth: 400 }}>
-              <i className="bi bi-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#aaa", fontSize: 14 }} />
-              <input style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "9px 14px 9px 36px", fontSize: 13.5, outline: "none", color: "#555" }} placeholder="Search..." />
-            </div>
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ position: "relative", cursor: "pointer" }}>
-                <i className="bi bi-bell" style={{ fontSize: 22, color: "#555" }} />
-                <span style={{ position: "absolute", top: -4, right: -4, background: "#FF6B35", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>1</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#FF6B35", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>FL</div>
-                <i className="bi bi-chevron-down" style={{ fontSize: 13, color: "#555" }} />
-              </div>
-            </div>
-          </header>
-
-          {/* Mobile Header */}
-          <header className="mobile-header" style={{ background: "#0f1923", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 100 }}>
-            <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#fff" }} onClick={() => setSidebarOpen(true)}>
-              <i className="bi bi-list" />
-            </button>
-            <span style={{ fontSize: 20, fontWeight: 800, color: "#FF6B35", flex: 1 }}>FF<span style={{ color: "#fff" }}>&T</span></span>
-            <div style={{ position: "relative", cursor: "pointer" }}>
-              <i className="bi bi-bell" style={{ fontSize: 20, color: "#fff" }} />
-              <span style={{ position: "absolute", top: -4, right: -4, background: "#FF6B35", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>3</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#FF6B35", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>FL</div>
-              <i className="bi bi-chevron-down" style={{ fontSize: 12, color: "#fff" }} />
-            </div>
-          </header>
+        <div className="main-content" style={{ marginLeft: 0, flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", overflowY: "auto" }}>
 
           {/* Page Content */}
-          <div style={{ flex: 1, padding: isMobile ? "16px 14px 80px" : "0 0 32px" }}>
+          <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "0 0 32px" }}>
 
             {/* Desktop Page Title Bar */}
             {!isMobile && (
@@ -373,8 +270,8 @@ export default function BankApproval() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button className="btn-outline"><i className="bi bi-shield-check" /> Bank Verifications</button>
-                  <button className="btn-dark"><i className="bi bi-headset" /> Seller Support</button>
+                  <button className="btn-outline" onClick={() => router.push('/bankverification')}><i className="bi bi-shield-check" /> Bank Verifications</button>
+                  <button className="btn-dark" onClick={() => router.push('/supportticket')}><i className="bi bi-headset" /> Seller Support</button>
                 </div>
               </div>
             )}
@@ -396,8 +293,8 @@ export default function BankApproval() {
             {/* Mobile action buttons */}
             {isMobile && (
               <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button className="btn-outline" style={{ flex: 1, justifyContent: "center" }}><i className="bi bi-shield-check" /> Bank Verifications</button>
-                <button className="btn-dark" style={{ flex: 1, justifyContent: "center" }}><i className="bi bi-headset" /> Seller Support</button>
+                <button className="btn-outline" style={{ flex: 1, justifyContent: "center" }} onClick={() => router.push('/bankverification')}><i className="bi bi-shield-check" /> Bank Verifications</button>
+                <button className="btn-dark" style={{ flex: 1, justifyContent: "center" }} onClick={() => router.push('/supportticket')}><i className="bi bi-headset" /> Seller Support</button>
               </div>
             )}
 
@@ -540,7 +437,7 @@ export default function BankApproval() {
                       <td style={{ fontSize: 12, color: "#555" }}>{s.sellerConfirm}</td>
                       <td style={{ fontSize: 12, color: "#555" }}>{s.adminApprove}</td>
                       <td>
-                        <button style={{ border: "1.5px solid #FF6B35", color: "#FF6B35", background: "#fff", borderRadius: 7, padding: "6px 14px", fontSize: 12.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }}>
+                        <button style={{ border: "1.5px solid #FF6B35", color: "#FF6B35", background: "#fff", borderRadius: 7, padding: "6px 14px", fontSize: 12.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }} onClick={() => router.push('/viewbankdetails')}>
                           <i className="bi bi-eye" /> View
                         </button>
                       </td>
@@ -579,7 +476,7 @@ export default function BankApproval() {
                         <div style={{ fontSize: 11.5, color: "#888" }}>{s.email}</div>
                         <div style={{ fontSize: 11.5, color: "#888" }}>{s.phone}</div>
                       </div>
-                      <button style={{ border: "1.5px solid #FF6B35", color: "#FF6B35", background: "#fff", borderRadius: 7, padding: "5px 12px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, height: "fit-content", fontWeight: 600 }}>
+                      <button style={{ border: "1.5px solid #FF6B35", color: "#FF6B35", background: "#fff", borderRadius: 7, padding: "5px 12px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, height: "fit-content", fontWeight: 600 }} onClick={() => router.push('/viewbankdetails')}>
                         <i className="bi bi-eye" /> View
                       </button>
                     </div>
@@ -653,27 +550,6 @@ export default function BankApproval() {
               </div>
             </div>
           </div>
-
-          {/* Mobile Bottom Nav */}
-          <nav className="mobile-bottom-nav">
-            {[
-              { icon: "bi-house-door-fill", label: "Dashboard" },
-              { icon: "bi-people", label: "Sellers" },
-              { icon: "bi-clock", label: "Pending" },
-              { icon: "bi-shield-check", label: "Approved" },
-              { icon: "bi-headset", label: "Support" },
-              { icon: "bi-three-dots", label: "More" },
-            ].map((t, i) => (
-              <div
-                key={i}
-                className={`mobile-tab${activeTab === t.label ? " active" : ""}`}
-                onClick={() => setActiveTab(t.label)}
-              >
-                <i className={`bi ${t.icon}`} />
-                <span>{t.label}</span>
-              </div>
-            ))}
-          </nav>
         </div>
       </div>
     </>

@@ -93,7 +93,11 @@ function TitleSection({ bp }: { bp: Breakpoint }) {
         </TouchableOpacity>
 
         {/* Bootstrap icon: bi-file-earmark-text → file-document-outline */}
-        <TouchableOpacity style={styles.proofBtn} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.proofBtn}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate("bankproof", { sellerId: BANK_DATA.name })}
+        >
           <Icon
             name="file-document-outline"
             size={16}

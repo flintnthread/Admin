@@ -1,19 +1,18 @@
+import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    SafeAreaView,
-    StatusBar,
-    Platform,
-    useWindowDimensions,
-    Modal,
-    TextInput,
     Alert,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type PaymentStatus = "Pending" | "Paid";

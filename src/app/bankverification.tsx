@@ -2,6 +2,7 @@
 // <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 
 /* ─── Theme ─────────────────────────────────────────────────────────── */
 const BLUE   = "#2563EB";
@@ -35,7 +36,7 @@ const STATUS_CONFIG = {
 };
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
-function Avatar({ initials, color, size = 36 }) {
+function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: color + "22", border: `2px solid ${color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.32, color, flexShrink: 0, letterSpacing: 0.5 }}>
       {initials}
@@ -43,8 +44,8 @@ function Avatar({ initials, color, size = 36 }) {
   );
 }
 
-function StatusBadge({ status, size = "normal" }) {
-  const c = STATUS_CONFIG[status] || { bg: "#F1F5F9", color: "#64748B", border: "#CBD5E1", icon: "bi-circle" };
+function StatusBadge({ status, size = "normal" }: { status: string; size?: string }) {
+  const c = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { bg: "#F1F5F9", color: "#64748B", border: "#CBD5E1", icon: "bi-circle" };
   const small = size === "small";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 20, padding: small ? "2px 8px" : "4px 10px", fontSize: small ? 10 : 12, fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -54,7 +55,7 @@ function StatusBadge({ status, size = "normal" }) {
 }
 
 /* Stat card icon box */
-function StatIconBox({ icon, iconBg, iconColor, spinning }) {
+function StatIconBox({ icon, iconBg, iconColor, spinning }: { icon: string; iconBg: string; iconColor: string; spinning?: boolean }) {
   return (
     <div style={{ width: 44, height: 44, borderRadius: 10, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
       <i className={`bi ${icon}`} style={{ fontSize: 22, color: iconColor, animation: spinning ? "spin 1.5s linear infinite" : "none" }} />
@@ -63,12 +64,12 @@ function StatIconBox({ icon, iconBg, iconColor, spinning }) {
 }
 
 /* Custom dropdown using Bootstrap Icon */
-function CustomSelect({ value, onChange, options }) {
+function CustomSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -84,7 +85,7 @@ function CustomSelect({ value, onChange, options }) {
       </div>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 200, overflow: "hidden", minWidth: 180 }}>
-          {options.map(opt => (
+          {options.map((opt: string) => (
             <div
               key={opt}
               onClick={() => { onChange(opt); setOpen(false); }}
@@ -103,6 +104,7 @@ function CustomSelect({ value, onChange, options }) {
 
 /* ─── Main Component ─────────────────────────────────────────────────── */
 export default function BankVerifications() {
+  const router = useRouter();
   const [windowW, setWindowW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [searchInput,  setSearchInput]  = useState("");
@@ -150,10 +152,10 @@ export default function BankVerifications() {
   const paginated  = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   const doFilter = () => { setSearchQuery(searchInput); setPage(1); };
-  const handleKey = e => { if (e.key === "Enter") doFilter(); };
+  const handleKey = (e: React.KeyboardEvent) => { if (e.key === "Enter") doFilter(); };
 
   /* When status changes, reset page */
-  const handleStatusChange = (v) => { setStatusFilter(v); setPage(1); };
+  const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
 
   /* Pagination numbers */
   const pageNums = (() => {
@@ -186,7 +188,7 @@ export default function BankVerifications() {
         ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
       `}</style>
 
-      <div style={{ flex: 1, maxWidth: isDesktop ? 1300 : "100%", width: "100%", margin: "0 auto", padding: pad }}>
+      <div style={{ flex: 1, maxWidth: isDesktop ? 1300 : "100%", width: "100%", margin: "0 auto", padding: pad, overflowY: "auto" }}>
 
         {/* ── Page Title ── */}
         <div style={{ marginBottom: isMobile ? 16 : 22 }}>
@@ -279,7 +281,7 @@ export default function BankVerifications() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 12, color: "#64748B" }}>Per page</span>
-              <CustomSelect value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={["5","10","20","50"]} />
+              <CustomSelect value={String(perPage)} onChange={(v: string) => { setPerPage(Number(v)); setPage(1); }} options={["5","10","20","50"]} />
             </div>
           </div>
 
@@ -356,7 +358,7 @@ export default function BankVerifications() {
                       <td style={{ padding: "13px 14px", fontSize: 12, color: v.verified === "—" ? "#CBD5E1" : "#475569", whiteSpace: "nowrap" }}>{v.verified}</td>
                       <td style={{ padding: "13px 14px" }}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={{ background: "#EFF6FF", color: BLUE, border: `1px solid #BFDBFE`, borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <button style={{ background: "#EFF6FF", color: BLUE, border: `1px solid #BFDBFE`, borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }} onClick={() => router.push('/viewbankdetails')}>
                             <i className="bi bi-eye-fill" /> View
                           </button>
                           {v.status === "Pending" && (
@@ -429,7 +431,7 @@ export default function BankVerifications() {
                   </div>
                   {/* Actions */}
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button style={{ flex: 1, background: "#EFF6FF", color: BLUE, border: "1px solid #BFDBFE", borderRadius: 8, padding: "8px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                    <button style={{ flex: 1, background: "#EFF6FF", color: BLUE, border: "1px solid #BFDBFE", borderRadius: 8, padding: "8px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }} onClick={() => router.push('/viewbankdetails')}>
                       <i className="bi bi-eye-fill" /> View
                     </button>
                     {v.status === "Pending" && (
@@ -455,7 +457,7 @@ export default function BankVerifications() {
                 {pageNums.map((p, i) => p === "..." ? (
                   <span key={"e" + i} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#94A3B8" }}>…</span>
                 ) : (
-                  <button key={p} onClick={() => setPage(p)}
+                  <button key={p} onClick={() => setPage(p as number)}
                     style={{ width: 32, height: 32, border: `1px solid ${safePage === p ? BLUE : BORDER}`, borderRadius: 8, background: safePage === p ? BLUE : "#fff", color: safePage === p ? "#fff" : "#374151", fontWeight: 700, cursor: "pointer", fontSize: 13, transition: "all 0.12s" }}>
                     {p}
                   </button>
@@ -477,7 +479,7 @@ export default function BankVerifications() {
   );
 }
 
-function PagBtn({ icon, onClick, disabled }) {
+function PagBtn({ icon, onClick, disabled }: { icon: string; onClick: () => void; disabled: boolean }) {
   return (
     <button onClick={onClick} disabled={disabled}
       style={{ width: 32, height: 32, border: `1px solid #E2E8F0`, borderRadius: 8, background: "#fff", cursor: disabled ? "not-allowed" : "pointer", color: disabled ? "#CBD5E1" : "#374151", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}
