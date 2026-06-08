@@ -1,0 +1,989 @@
+/**
+ * CustomerDetails.tsx
+ * Full customer detail screen — mobile / tablet / 1024 / 1440 / desktop
+ * React Native + Expo + TypeScript
+ * No external icon libraries — Bootstrap SVG paths only
+ *
+ * Usage:  <CustomerDetailScreen customer={customerObj} onBack={() => navigation.goBack()} />
+ */
+
+import AdminLayout from "@/components/admin-layout";
+import React, { useState } from "react";
+import {
+  Dimensions,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import Svg, { Path, Rect } from "react-native-svg";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPE  (mirrors CustomerManagement.tsx)
+// ─────────────────────────────────────────────────────────────────────────────
+export type Customer = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  orders: number;
+  totalSpent: number;
+  lastOrder: string | null;
+  status: "Active" | "Inactive";
+  // optional extras (pre-fill defaults if absent)
+  registeredOn?: string;
+  lastLogin?: string;
+  billingAddress?: Address;
+  shippingAddress?: Address;
+  orderHistory?: Order[];
+  monthlySpending?: MonthlyData[];
+};
+
+type Address = {
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country?: string;
+};
+
+type Order = {
+  id: string;
+  date: string;
+  items: number;
+  amount: number;
+  payment: string;
+  status: "Completed" | "Pending" | "Cancelled" | "Processing";
+};
+
+type MonthlyData = { month: string; amount: number };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PALETTE  (matches CustomerManagement)
+// ─────────────────────────────────────────────────────────────────────────────
+const C = {
+  bg:            "#FFFFFF",
+  surface:       "#FFFFFF",
+  cardBg:        "#FFF8F4",
+  primary:       "#E8571A",
+  primaryLight:  "#FFF0EA",
+  navy:          "#1C2B4A",
+  text:          "#1C2B4A",
+  sub:           "#6B7280",
+  border:        "#E8E2D9",
+  active:        "#10B981",
+  activeLight:   "#ECFDF5",
+  inactive:      "#EF4444",
+  inactiveLight: "#FEF2F2",
+  green:         "#10B981",
+  red:           "#EF4444",
+  avatarPalette: ["#E8571A", "#1C2B4A", "#10B981", "#8B5CF6", "#F59E0B", "#3B82F6"],
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return C.avatarPalette[Math.abs(h) % C.avatarPalette.length];
+}
+function rupee(n: number) { return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 }); }
+function useLayout(w: number) {
+  return {
+    isMobile:  w < 480,
+    isTablet:  w >= 480 && w < 1024,
+    isDesktop: w >= 1024,
+    cols: w < 768 ? 1 : w < 1280 ? 2 : 3,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SAMPLE DETAIL DATA  (replace with real API)
+// ─────────────────────────────────────────────────────────────────────────────
+export const SAMPLE_CUSTOMER: Customer = {
+  id: 251,
+  name: "Sana shaikh",
+  email: "attusanshaikh@gmail.com",
+  phone: "8197481081",
+  orders: 1,
+  totalSpent: 2318,
+  lastOrder: "13 May 2026",
+  status: "Active",
+  registeredOn: "13 May 2026",
+  lastLogin: "Never",
+  billingAddress: {
+    line1: "Plot 12, Banjara Hills",
+    line2: "Road No. 2",
+    city: "Hyderabad",
+    state: "Telangana",
+    pincode: "500034",
+    country: "India",
+  },
+  shippingAddress: {
+    line1: "Plot 12, Banjara Hills",
+    line2: "Road No. 2",
+    city: "Hyderabad",
+    state: "Telangana",
+    pincode: "500034",
+    country: "India",
+  },
+  orderHistory: [
+    { id: "#FNT202605137181", date: "13 May 2026", items: 1, amount: 2318, payment: "COD", status: "Completed" },
+  ],
+  monthlySpending: [
+    { month: "Jan", amount: 0 },
+    { month: "Feb", amount: 0 },
+    { month: "Mar", amount: 0 },
+    { month: "Apr", amount: 0 },
+    { month: "May", amount: 2318 },
+    { month: "Jun", amount: 0 },
+    { month: "Jul", amount: 0 },
+    { month: "Aug", amount: 0 },
+    { month: "Sep", amount: 0 },
+    { month: "Oct", amount: 0 },
+    { month: "Nov", amount: 0 },
+    { month: "Dec", amount: 0 },
+  ],
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SVG ICONS
+// ─────────────────────────────────────────────────────────────────────────────
+type IP = { size?: number; color?: string };
+
+const BackIcon       = ({ size = 20, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/></Svg>
+);
+const PersonIcon     = ({ size = 20, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.029 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/></Svg>
+);
+const InfoIcon       = ({ size = 18, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/></Svg>
+);
+const EnvelopeIcon   = ({ size = 16, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-1.897L1 6.383z"/></Svg>
+);
+const PhoneIcon      = ({ size = 16, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.6 17.6 0 0 0 4.168 6.608 17.6 17.6 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.68.68 0 0 0-.58-.122l-2.19.547a1.75 1.75 0 0 1-1.657-.459L5.482 8.062a1.75 1.75 0 0 1-.46-1.657l.548-2.19a.68.68 0 0 0-.122-.58z"/></Svg>
+);
+const CalendarIcon   = ({ size = 16, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></Svg>
+);
+const MemberIcon     = ({ size = 16, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a2 2 0 1 1 0-4 2 2 0 0 1 0 4M11 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1zm2 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1zm0 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1z"/></Svg>
+);
+const LoginIcon      = ({ size = 16, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M6 3.5a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 0-1 0v2A1.5 1.5 0 0 0 6.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-8A1.5 1.5 0 0 0 5 3.5v2a.5.5 0 0 0 1 0z"/><Path fill={color} d="M11.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H1.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/></Svg>
+);
+const MapPinIcon     = ({ size = 16, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"/></Svg>
+);
+const WalletIcon     = ({ size = 18, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M0 3a2 2 0 0 1 2-2h13.5a.5.5 0 0 1 0 1H15v2a1 1 0 0 1 1 1v8.5a1.5 1.5 0 0 1-1.5 1.5h-12A2.5 2.5 0 0 1 0 12.5zm1 1.732V12.5A1.5 1.5 0 0 0 2.5 14h12a.5.5 0 0 0 .5-.5V5H2a2 2 0 0 1-1-.268M1 3a1 1 0 0 0 1 1h12V2H2a1 1 0 0 0-1 1"/></Svg>
+);
+const CartIcon       = ({ size = 18, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l1.313 7h8.17l1.313-7zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4m7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4m-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></Svg>
+);
+const EyeIcon        = ({ size = 15, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/><Path fill={color} d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/></Svg>
+);
+const BarChartIcon   = ({ size = 18, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M4 11H2v3h2zm5-4H7v7h2zm5-5h-2v12h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/></Svg>
+);
+const BagIcon        = ({ size = 18, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M14 10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h1.5a.5.5 0 0 0 0-1H3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1.5a.5.5 0 0 0 0 1H13a1 1 0 0 1 1 1zM8.5 1a.5.5 0 0 0-1 0V4H6a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H8.5z"/></Svg>
+);
+const BackupIcon     = ({ size = 15, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><Path fill={color} d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></Svg>
+);
+const DeleteIcon     = ({ size = 15, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><Path fill={color} d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></Svg>
+);
+const ViewAllIcon    = ({ size = 15, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5zm1 .5v1.308l4.372 4.858A.5.5 0 0 1 7 8.5v5.306l2-.666V8.5a.5.5 0 0 1 .128-.334L13.5 3.308V2z"/></Svg>
+);
+const CheckIcon      = ({ size = 14, color = C.green }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></Svg>
+);
+const CodIcon        = ({ size = 14, color = C.sub }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/><Path fill={color} d="M0 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V6a2 2 0 0 1-2-2z"/></Svg>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REUSABLE CARD WRAPPER
+// ─────────────────────────────────────────────────────────────────────────────
+function Card({ children, style }: { children: React.ReactNode; style?: object }) {
+  return <View style={[s.card, style]}>{children}</View>;
+}
+
+function CardHeader({ icon, title, right }: { icon: React.ReactNode; title: string; right?: React.ReactNode }) {
+  return (
+    <View style={s.cardHeader}>
+      <View style={s.cardHeaderLeft}>
+        <View style={s.cardIconBox}>{icon}</View>
+        <Text style={s.cardTitle}>{title}</Text>
+      </View>
+      {right && <View>{right}</View>}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AVATAR
+// ─────────────────────────────────────────────────────────────────────────────
+function Avatar({ name, size = 72 }: { name: string; size?: number }) {
+  const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  return (
+    <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: avatarColor(name) }]}>
+      <Text style={[s.avatarTxt, { fontSize: size * 0.36 }]}>{initials}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATUS PILL
+// ─────────────────────────────────────────────────────────────────────────────
+function StatusPill({ status }: { status: "Active" | "Inactive" }) {
+  const on = status === "Active";
+  return (
+    <View style={[s.pill, { backgroundColor: on ? C.activeLight : C.inactiveLight }]}>
+      <View style={[s.pillDot, { backgroundColor: on ? C.active : C.inactive }]} />
+      <Text style={[s.pillTxt, { color: on ? C.active : C.inactive }]}>{status}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORDER STATUS PILL
+// ─────────────────────────────────────────────────────────────────────────────
+function OrderStatusPill({ status }: { status: Order["status"] }) {
+  const map: Record<Order["status"], { bg: string; color: string }> = {
+    Completed:  { bg: C.activeLight,   color: C.green    },
+    Pending:    { bg: "#FEF9C3",       color: "#CA8A04"  },
+    Processing: { bg: "#EFF6FF",       color: "#3B82F6"  },
+    Cancelled:  { bg: C.inactiveLight, color: C.red      },
+  };
+  const { bg, color } = map[status];
+  return (
+    <View style={[s.orderStatus, { backgroundColor: bg, borderColor: color }]}>
+      <CheckIcon size={12} color={color} />
+      <Text style={[s.orderStatusTxt, { color }]}>{status}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INFO ROW (contact card)
+// ─────────────────────────────────────────────────────────────────────────────
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <View style={s.infoRow}>
+      <View style={s.infoIconBox}>{icon}</View>
+      <View style={s.infoText}>
+        <Text style={s.infoLabel}>{label}</Text>
+        <Text style={s.infoValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPENDING BAR
+// ─────────────────────────────────────────────────────────────────────────────
+function SpendingBar({ label, amount, max }: { label: string; amount: number; max: number }) {
+  const pct = max > 0 ? Math.round((amount / max) * 100) : 0;
+  return (
+    <View style={s.spendBar}>
+      <View style={s.spendBarTop}>
+        <Text style={s.spendBarLabel}>{label}</Text>
+        <Text style={s.spendBarAmt}>{rupee(amount)}</Text>
+      </View>
+      <View style={s.spendTrack}>
+        <View style={[s.spendFill, { width: `${pct}%` as any }]} />
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CREATIVE SVG LINE CHART (Monthly Spending Analysis)
+// ─────────────────────────────────────────────────────────────────────────────
+function MiniBarChart({ data }: { data: MonthlyData[] }) {
+  const W = 340;   // SVG canvas width
+  const H = 160;   // SVG canvas height
+  const padL = 8;
+  const padR = 8;
+  const padT = 18;
+  const padB = 32;
+
+  const maxVal  = Math.max(...data.map((d) => d.amount), 1);
+  const n       = data.length;
+  const colW    = (W - padL - padR) / (n - 1);
+  const peakIdx = data.reduce((pi, d, i) => d.amount > data[pi].amount ? i : pi, 0);
+
+  // x/y for each data point
+  const pts = data.map((d, i) => ({
+    x: padL + i * colW,
+    y: padT + (1 - d.amount / maxVal) * (H - padT - padB),
+    amount: d.amount,
+    month: d.month,
+    isActive: d.amount > 0,
+  }));
+
+  // Smooth cubic bezier path
+  function smoothPath(points: typeof pts) {
+    if (points.length < 2) return "";
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const cp1x = points[i].x + (points[i + 1].x - points[i].x) / 3;
+      const cp1y = points[i].y;
+      const cp2x = points[i + 1].x - (points[i + 1].x - points[i].x) / 3;
+      const cp2y = points[i + 1].y;
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${points[i+1].x} ${points[i+1].y}`;
+    }
+    return d;
+  }
+
+  // Area fill path (close at bottom)
+  function areaPath(points: typeof pts) {
+    const line = smoothPath(points);
+    return `${line} L ${points[points.length-1].x} ${H - padB} L ${points[0].x} ${H - padB} Z`;
+  }
+
+  const linePath = smoothPath(pts);
+  const fillPath = areaPath(pts);
+
+  // Horizontal grid lines
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map((frac) => ({
+    y: padT + frac * (H - padT - padB),
+    val: Math.round(maxVal * (1 - frac)),
+  }));
+
+  const peak = pts[peakIdx];
+  const { Svg: SvgEl, Path: PathEl, Circle, Defs, LinearGradient, Stop, Line, Text: SvgText } = require("react-native-svg");
+
+  return (
+    <View style={s.chartOuter}>
+      {/* Summary pills row */}
+      <View style={s.chartPillRow}>
+        {data.filter(d => d.amount > 0).slice(0, 3).map((d, i) => (
+          <View key={i} style={s.chartPill}>
+            <View style={s.chartPillDot} />
+            <Text style={s.chartPillTxt}>{d.month}: {rupee(d.amount)}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* SVG chart */}
+      <SvgEl width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%"   stopColor={C.primary} stopOpacity="0.22" />
+            <Stop offset="100%" stopColor={C.primary} stopOpacity="0.02" />
+          </LinearGradient>
+          <LinearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%"   stopColor="#F59E0B" />
+            <Stop offset="50%"  stopColor={C.primary} />
+            <Stop offset="100%" stopColor="#8B5CF6" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Horizontal grid lines */}
+        {gridLines.map((g, i) => (
+          <Line
+            key={i}
+            x1={padL} y1={g.y}
+            x2={W - padR} y2={g.y}
+            stroke="#E8E2D9"
+            strokeWidth="0.8"
+            strokeDasharray={i === 4 ? "0" : "3,3"}
+          />
+        ))}
+
+        {/* Area fill */}
+        <PathEl d={fillPath} fill="url(#areaGrad)" />
+
+        {/* Line stroke */}
+        <PathEl
+          d={linePath}
+          fill="none"
+          stroke="url(#lineGrad)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Dots on all months */}
+        {pts.map((p, i) => (
+          p.isActive ? (
+            <Circle key={i} cx={p.x} cy={p.y} r="4" fill="#fff" stroke={C.primary} strokeWidth="2" />
+          ) : (
+            <Circle key={i} cx={p.x} cy={H - padB} r="2.5" fill="#E8E2D9" />
+          )
+        ))}
+
+        {/* Peak highlight */}
+        {peak.isActive && (
+          <>
+            {/* Vertical drop line */}
+            <Line
+              x1={peak.x} y1={peak.y + 6}
+              x2={peak.x} y2={H - padB}
+              stroke={C.primary}
+              strokeWidth="1.5"
+              strokeDasharray="4,3"
+              strokeOpacity="0.5"
+            />
+            {/* Outer glow ring */}
+            <Circle cx={peak.x} cy={peak.y} r="9" fill={C.primary} fillOpacity="0.15" />
+            {/* Inner dot */}
+            <Circle cx={peak.x} cy={peak.y} r="5" fill={C.primary} />
+            <Circle cx={peak.x} cy={peak.y} r="2.5" fill="#fff" />
+
+            {/* Tooltip bubble */}
+            <PathEl
+              d={`M${peak.x - 30} ${peak.y - 34} Q${peak.x - 30} ${peak.y - 42} ${peak.x - 22} ${peak.y - 42} L${peak.x + 22} ${peak.y - 42} Q${peak.x + 30} ${peak.y - 42} ${peak.x + 30} ${peak.y - 34} L${peak.x + 5} ${peak.y - 34} L${peak.x} ${peak.y - 28} L${peak.x - 5} ${peak.y - 34} L${peak.x - 30} ${peak.y - 34} Z`}
+              fill={C.navy}
+            />
+            <SvgText
+              x={peak.x}
+              y={peak.y - 34}
+              textAnchor="middle"
+              fill="#fff"
+              fontSize="9"
+              fontWeight="700"
+              dy="1"
+            >
+              {rupee(peak.amount)}
+            </SvgText>
+          </>
+        )}
+
+        {/* Month labels */}
+        {pts.map((p, i) => (
+          <SvgText
+            key={i}
+            x={p.x}
+            y={H - 4}
+            textAnchor="middle"
+            fill={p.isActive ? C.primary : "#9CA3AF"}
+            fontSize="8.5"
+            fontWeight={p.isActive ? "700" : "400"}
+          >
+            {p.month}
+          </SvgText>
+        ))}
+      </SvgEl>
+
+      {/* Bottom stat strip */}
+      <View style={s.chartStatStrip}>
+        <View style={s.chartStatItem}>
+          <Text style={s.chartStatVal}>{data.filter(d => d.amount > 0).length}</Text>
+          <Text style={s.chartStatLbl}>Active Months</Text>
+        </View>
+        <View style={s.chartStatDiv} />
+        <View style={s.chartStatItem}>
+          <Text style={s.chartStatVal}>{rupee(Math.max(...data.map(d => d.amount)))}</Text>
+          <Text style={s.chartStatLbl}>Peak Month</Text>
+        </View>
+        <View style={s.chartStatDiv} />
+        <View style={s.chartStatItem}>
+          <Text style={s.chartStatVal}>{rupee(data.reduce((s, d) => s + d.amount, 0))}</Text>
+          <Text style={s.chartStatLbl}>Year Total</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TREND CHIP (simple up/flat/down)
+// ─────────────────────────────────────────────────────────────────────────────
+function TrendBadge({ data }: { data: MonthlyData[] }) {
+  const recent  = data.slice(-2);
+  const diff    = recent[1]?.amount - recent[0]?.amount;
+  const up      = diff > 0;
+  const flat    = diff === 0;
+  const arrow   = flat ? "→" : up ? "↑" : "↓";
+  const color   = flat ? C.sub : up ? C.green : C.red;
+  const label   = flat ? "Stable" : up ? "Trending Up" : "Trending Down";
+  return (
+    <View style={[s.trendBadge, { backgroundColor: flat ? "#F3F4F6" : up ? C.activeLight : C.inactiveLight }]}>
+      <Text style={[s.trendArrow, { color }]}>{arrow}</Text>
+      <Text style={[s.trendLabel, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADDRESS BLOCK
+// ─────────────────────────────────────────────────────────────────────────────
+function AddressBlock({ title, addr }: { title: string; addr?: Address }) {
+  return (
+    <View style={s.addrBlock}>
+      <Text style={s.addrTitle}>{title}</Text>
+      {addr ? (
+        <View style={s.addrBody}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+            <MapPinIcon size={14} color={C.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.addrLine}>{addr.line1}</Text>
+              {addr.line2 ? <Text style={s.addrLine}>{addr.line2}</Text> : null}
+              <Text style={s.addrLine}>{addr.city}, {addr.state} — {addr.pincode}</Text>
+              {addr.country ? <Text style={s.addrLine}>{addr.country}</Text> : null}
+            </View>
+          </View>
+        </View>
+      ) : (
+        <Text style={s.addrEmpty}>No address on file</Text>
+      )}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+type Props = {
+  customer?: Customer;
+  onBack?: () => void;
+};
+
+export default function CustomerDetailScreen({ customer = SAMPLE_CUSTOMER, onBack }: Props) {
+  const { width }                        = useWindowDimensions();
+  const { isMobile, isTablet, isDesktop, cols } = useLayout(width);
+
+  const px  = isMobile ? 14 : isTablet ? 20 : 28;
+  const c   = customer;
+
+  // Derived spending values
+  const weekly   = 0;
+  const monthly  = c.totalSpent;
+  const yearly   = c.totalSpent;
+  const maxSpend = Math.max(weekly, monthly, yearly, 1);
+  const avgOrder = c.orders > 0 ? c.totalSpent / c.orders : 0;
+  const monthlyData: MonthlyData[] = c.monthlySpending ?? [];
+
+  // Member-for calculation (days since registeredOn)
+  const memberDays = (() => {
+    if (!c.registeredOn) return "N/A";
+    const parts = c.registeredOn.split(" ");
+    if (parts.length < 3) return "N/A";
+    const d = new Date(`${parts[1]} ${parts[0]} ${parts[2]}`);
+    const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
+    return `${diff} day${diff !== 1 ? "s" : ""}`;
+  })();
+
+  // 2-column layout helpers
+  const isWide = width >= 768;
+
+  return (
+    <AdminLayout>
+      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+
+      {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
+      <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
+        <View style={[s.headerInner, { paddingHorizontal: px }]}>
+          <View style={s.headerLeft}>
+            {onBack && (
+              <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.8}>
+                <BackIcon size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
+            <View>
+              <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>Customer Details</Text>
+              <Text style={s.hSub}>#{c.id} · {c.name}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* ══ BODY ════════════════════════════════════════════════════════════ */}
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%" }]}>
+
+          {/* ── ROW 1: Profile card (full width) ─────────────────────────── */}
+          <Card style={s.profileCard}>
+            {/* Top: avatar left, name/id/pill right */}
+            <View style={s.profileInner}>
+              <Avatar name={c.name} size={isMobile ? 68 : 84} />
+              <View style={s.profileInfo}>
+                <Text style={s.profileName} numberOfLines={1}>{c.name}</Text>
+                <View style={s.profileMeta}>
+                  <Text style={s.profileId}>Customer #{c.id}</Text>
+                  <View style={s.metaDot} />
+                  <StatusPill status={c.status} />
+                </View>
+              </View>
+            </View>
+
+            {/* Bottom: full-width stat strip */}
+            <View style={s.profileStatRow}>
+              <View style={s.profileStat}>
+                <Text style={[s.profileStatVal, { color: c.orders > 0 ? C.primary : C.sub }]}>{c.orders}</Text>
+                <Text style={s.profileStatLbl}>Orders</Text>
+              </View>
+              <View style={s.profileStatDiv} />
+              <View style={s.profileStat}>
+                <Text style={s.profileStatVal}>{rupee(c.totalSpent)}</Text>
+                <Text style={s.profileStatLbl}>Total Spent</Text>
+              </View>
+              <View style={s.profileStatDiv} />
+              <View style={s.profileStat}>
+                <Text style={[s.profileStatVal, { fontSize: isMobile ? 12 : 15 }]}>{c.lastOrder ?? "N/A"}</Text>
+                <Text style={s.profileStatLbl}>Last Order</Text>
+              </View>
+            </View>
+          </Card>
+
+          {/* ── ROW 2: Contact Info + Address (side by side on wide) ────── */}
+          <View style={[s.row, !isWide && { flexDirection: "column" }]}>
+
+            {/* CARD 2 — Contact Information */}
+            <Card style={{ flex: 1 }}>
+              <CardHeader icon={<InfoIcon />} title="Contact Information" />
+              <View style={s.cardBody}>
+                <InfoRow icon={<EnvelopeIcon />} label="Email"         value={c.email} />
+                <InfoRow icon={<PhoneIcon />}    label="Phone"         value={c.phone} />
+                <InfoRow icon={<CalendarIcon />} label="Registered On" value={c.registeredOn ?? "N/A"} />
+                <InfoRow icon={<MemberIcon />}   label="Member For"    value={memberDays} />
+                <InfoRow icon={<LoginIcon />}    label="Last Login"    value={c.lastLogin ?? "Never"} />
+              </View>
+            </Card>
+
+            {/* CARD 3 — Addresses */}
+            <Card style={{ flex: 1 }}>
+              <CardHeader icon={<MapPinIcon />} title="Customer Addresses" />
+              <View style={[s.cardBody, { gap: 16 }]}>
+                <AddressBlock title="Billing Address"  addr={c.billingAddress} />
+                <View style={s.addrDivider} />
+                <AddressBlock title="Shipping Address" addr={c.shippingAddress} />
+              </View>
+            </Card>
+          </View>
+
+          {/* ── ROW 3: Spending Stats + Chart (side by side on wide) ─────── */}
+          <View style={[s.row, !isWide && { flexDirection: "column" }]}>
+
+            {/* CARD 4 — Spending Statistics */}
+            <Card style={{ flex: 1 }}>
+              <CardHeader icon={<WalletIcon />} title="Spending Statistics" />
+              <View style={s.cardBody}>
+                {/* Stat chips row */}
+                <View style={s.spendChipRow}>
+                  <View style={s.spendChip}>
+                    <CartIcon size={15} color={C.primary} />
+                    <View>
+                      <Text style={s.spendChipVal}>{c.orders}</Text>
+                      <Text style={s.spendChipLbl}>Total Orders</Text>
+                    </View>
+                  </View>
+                  <View style={[s.spendChip, { flex: 1.3 }]}>
+                    <WalletIcon size={15} color={C.primary} />
+                    <View>
+                      <Text style={s.spendChipVal}>{rupee(c.totalSpent)}</Text>
+                      <Text style={s.spendChipLbl}>Total Spent</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Spending bars */}
+                <View style={{ gap: 12, marginTop: 4 }}>
+                  <SpendingBar label="Weekly Spending"  amount={weekly}  max={maxSpend} />
+                  <SpendingBar label="Monthly Spending" amount={monthly} max={maxSpend} />
+                  <SpendingBar label="Yearly Spending"  amount={yearly}  max={maxSpend} />
+                </View>
+
+                {/* Average order value */}
+                <View style={s.avgBox}>
+                  <Text style={s.avgLabel}>Average Order Value</Text>
+                  <Text style={s.avgVal}>{rupee(avgOrder)}</Text>
+                </View>
+              </View>
+            </Card>
+
+            {/* CARD 5 — Monthly Spending Analysis */}
+            <Card style={{ flex: 1 }}>
+              <CardHeader
+                icon={<BarChartIcon />}
+                title="Monthly Spending Analysis"
+                right={<TrendBadge data={monthlyData} />}
+              />
+              <View style={[s.cardBody, { paddingHorizontal: 12, paddingBottom: 12 }]}>
+                {monthlyData.length > 0
+                  ? <MiniBarChart data={monthlyData} />
+                  : <Text style={s.noData}>No spending data available</Text>
+                }
+              </View>
+            </Card>
+          </View>
+
+          {/* ── CARD 6 — Order History (full width) ─────────────────────── */}
+          <Card>
+            <CardHeader
+              icon={<BagIcon />}
+              title="Order History"
+              right={
+                <View style={s.orderActions}>
+                  <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.green }]} activeOpacity={0.8}>
+                    <BackupIcon size={13} /><Text style={s.orderActionTxt}>Backup Orders</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.red }]} activeOpacity={0.8}>
+                    <DeleteIcon size={13} /><Text style={s.orderActionTxt}>Delete All</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.primary }]} activeOpacity={0.8}>
+                    <ViewAllIcon size={13} /><Text style={s.orderActionTxt}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+
+            <View style={s.cardBody}>
+              {c.orderHistory && c.orderHistory.length > 0 ? (
+                isMobile ? (
+                  // Mobile: stacked cards
+                  c.orderHistory.map((o) => (
+                    <View key={o.id} style={s.orderMobileCard}>
+                      <View style={s.orderMobileTop}>
+                        <Text style={s.orderIdText}>{o.id}</Text>
+                        <OrderStatusPill status={o.status} />
+                      </View>
+                      <View style={s.orderMobileRow}>
+                        <View style={s.orderMobileItem}>
+                          <Text style={s.orderMobileLbl}>Date</Text>
+                          <Text style={s.orderMobileVal}>{o.date}</Text>
+                        </View>
+                        <View style={s.orderMobileItem}>
+                          <Text style={s.orderMobileLbl}>Items</Text>
+                          <Text style={s.orderMobileVal}>{o.items} item{o.items !== 1 ? "s" : ""}</Text>
+                        </View>
+                        <View style={s.orderMobileItem}>
+                          <Text style={s.orderMobileLbl}>Amount</Text>
+                          <Text style={[s.orderMobileVal, { color: C.text, fontWeight: "700" }]}>{rupee(o.amount)}</Text>
+                        </View>
+                        <View style={s.orderMobileItem}>
+                          <Text style={s.orderMobileLbl}>Payment</Text>
+                          <Text style={s.orderMobileVal}>{o.payment}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity style={s.orderViewBtn} activeOpacity={0.8}>
+                        <EyeIcon size={14} /><Text style={s.orderViewTxt}>View Order</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                ) : (
+                  // Tablet / Desktop: table
+                  <View style={s.orderTable}>
+                    {/* Table header */}
+                    <View style={[s.orderTableRow, s.orderTableHead]}>
+                      <Text style={[s.orderTableHdr, { flex: 2.5 }]}>Order #</Text>
+                      <Text style={s.orderTableHdr}>Date</Text>
+                      <Text style={s.orderTableHdr}>Items</Text>
+                      <Text style={s.orderTableHdr}>Amount</Text>
+                      <Text style={s.orderTableHdr}>Payment</Text>
+                      <Text style={[s.orderTableHdr, { flex: 1.3 }]}>Status</Text>
+                      <Text style={[s.orderTableHdr, { flex: 0.7, textAlign: "center" }]}>Action</Text>
+                    </View>
+                    {/* Table rows */}
+                    {c.orderHistory.map((o) => (
+                      <View key={o.id} style={s.orderTableRow}>
+                        {/* Order # */}
+                        <Text style={[s.orderIdText, { flex: 2.5 }]}>{o.id}</Text>
+                        {/* Date */}
+                        <Text style={s.orderTableCell}>{o.date}</Text>
+                        {/* Items badge */}
+                        <View style={{ flex: 1 }}>
+                          <View style={s.itemsBadge}>
+                            <CartIcon size={12} color={C.primary} />
+                            <Text style={s.itemsBadgeTxt}>{o.items} item{o.items !== 1 ? "s" : ""}</Text>
+                          </View>
+                        </View>
+                        {/* Amount */}
+                        <Text style={[s.orderTableCell, { fontWeight: "700", color: C.text }]}>{rupee(o.amount)}</Text>
+                        {/* Payment badge */}
+                        <View style={{ flex: 1 }}>
+                          <View style={s.codBadge}>
+                            <CodIcon size={13} /><Text style={s.codTxt}>{o.payment}</Text>
+                          </View>
+                        </View>
+                        {/* Status */}
+                        <View style={{ flex: 1.3 }}>
+                          <OrderStatusPill status={o.status} />
+                        </View>
+                        {/* Eye action */}
+                        <View style={{ flex: 0.7, alignItems: "center" }}>
+                          <TouchableOpacity style={s.eyeBtn} activeOpacity={0.8}>
+                            <EyeIcon size={15} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )
+              ) : (
+                <View style={s.noOrders}>
+                  <Text style={{ fontSize: 32 }}>📦</Text>
+                  <Text style={s.noOrdersTxt}>No orders yet</Text>
+                </View>
+              )}
+            </View>
+          </Card>
+
+          <View style={{ height: 40 }} />
+        </View>
+      </ScrollView>
+    </AdminLayout>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  scroll:        { flex: 1, backgroundColor: C.bg },
+  scrollContent: { paddingTop: 20 },
+  body:          { gap: 16 },
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  header:      { backgroundColor: C.navy, paddingBottom: 14 },
+  headerInner: { flexDirection: "row", alignItems: "center" },
+  headerLeft:  { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  hTitle:      { color: "#fff", fontWeight: "700", letterSpacing: -0.3 },
+  hSub:        { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
+
+  // ── Card ───────────────────────────────────────────────────────────────────
+  card:       { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, overflow: "hidden" },
+  cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14, backgroundColor: C.cardBg, borderBottomWidth: 1, borderBottomColor: C.border, flexWrap: "wrap", gap: 10 },
+  cardHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cardIconBox:    { width: 32, height: 32, borderRadius: 9, backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center" },
+  cardTitle:      { fontSize: 15, fontWeight: "700", color: C.text },
+  cardBody:       { padding: 18, gap: 10 },
+
+  // ── Layout rows ────────────────────────────────────────────────────────────
+  row: { flexDirection: "row", gap: 16 },
+
+  // ── Avatar ─────────────────────────────────────────────────────────────────
+  avatar:    { alignItems: "center", justifyContent: "center" },
+  avatarTxt: { color: "#fff", fontWeight: "700" },
+
+  // ── Pills ──────────────────────────────────────────────────────────────────
+  pill:    { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+  pillTxt: { fontSize: 11, fontWeight: "700" },
+
+  // ── Profile card ─────────────────────────────────────────────
+  profileCard:      { padding: 20, gap: 16 },
+  profileInner:     { flexDirection: "row", alignItems: "center", gap: 18 },
+  profileInfo:      { flex: 1 },
+  profileName:      { fontSize: 20, fontWeight: "800", color: C.text },
+  profileMeta:      { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 },
+  profileId:        { fontSize: 13, color: C.sub },
+  metaDot:          { width: 4, height: 4, borderRadius: 2, backgroundColor: C.border },
+  profileStatRow:   { flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: C.border, paddingTop: 14 },
+  profileStat:      { flex: 1, alignItems: "center", paddingVertical: 4 },
+  profileStatVal:   { fontSize: 16, fontWeight: "700", color: C.text },
+  profileStatLbl:   { fontSize: 11, color: C.sub, marginTop: 3 },
+  profileStatDiv:   { width: 1, height: 36, backgroundColor: C.border },
+
+  // ── Info rows (contact card) ────────────────────────────────────────────────
+  infoRow:    { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F5F0EA" },
+  infoIconBox:{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center" },
+  infoText:   { flex: 1 },
+  infoLabel:  { fontSize: 12, color: C.sub },
+  infoValue:  { fontSize: 13, fontWeight: "600", color: C.text, marginTop: 1 },
+
+  // ── Address ────────────────────────────────────────────────────────────────
+  addrBlock:  { gap: 8 },
+  addrTitle:  { fontSize: 13, fontWeight: "700", color: C.text },
+  addrBody:   { backgroundColor: C.cardBg, borderRadius: 10, padding: 12 },
+  addrLine:   { fontSize: 13, color: C.sub, lineHeight: 20 },
+  addrEmpty:  { fontSize: 13, color: C.sub, fontStyle: "italic" },
+  addrDivider:{ height: 1, backgroundColor: C.border },
+
+  // ── Spending statistics ────────────────────────────────────────────────────
+  spendChipRow: { flexDirection: "row", gap: 10, marginBottom: 6 },
+  spendChip:    { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.cardBg, borderRadius: 12, padding: 12 },
+  spendChipVal: { fontSize: 15, fontWeight: "700", color: C.text },
+  spendChipLbl: { fontSize: 11, color: C.sub },
+
+  spendBar:      { gap: 6 },
+  spendBarTop:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  spendBarLabel: { fontSize: 12, color: C.sub },
+  spendBarAmt:   { fontSize: 13, fontWeight: "700", color: C.text },
+  spendTrack:    { height: 8, backgroundColor: "#F0EBE3", borderRadius: 4, overflow: "hidden" },
+  spendFill:     { height: "100%", backgroundColor: C.primary, borderRadius: 4 },
+
+  avgBox:   { backgroundColor: C.cardBg, borderRadius: 12, padding: 14, marginTop: 8, alignItems: "center" },
+  avgLabel: { fontSize: 12, color: C.sub },
+  avgVal:   { fontSize: 22, fontWeight: "800", color: C.primary, marginTop: 4 },
+
+  // ── SVG Line Chart ─────────────────────────────────────────────────────────
+  chartOuter:      { gap: 12 },
+  // Summary pills above chart
+  chartPillRow:    { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chartPill:       { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  chartPillDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: C.primary },
+  chartPillTxt:    { fontSize: 11, fontWeight: "600", color: C.primary },
+  // Bottom stat strip
+  chartStatStrip:  { flexDirection: "row", alignItems: "center", backgroundColor: C.cardBg, borderRadius: 12, paddingVertical: 10, marginTop: 4 },
+  chartStatItem:   { flex: 1, alignItems: "center" },
+  chartStatVal:    { fontSize: 13, fontWeight: "700", color: C.text },
+  chartStatLbl:    { fontSize: 10, color: C.sub, marginTop: 2 },
+  chartStatDiv:    { width: 1, height: 24, backgroundColor: C.border },
+  noData:          { fontSize: 13, color: C.sub, textAlign: "center", paddingVertical: 24 },
+  // (kept for compat, unused now)
+  chartWrap: {}, chartCol: {}, chartBarBg: {}, chartBar: {}, chartLabel: {},
+  chartLegend: {}, chartLegendLabel: {}, chartLegendSub: {},
+
+  // ── Trend badge ────────────────────────────────────────────────────────────
+  trendBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  trendArrow:  { fontSize: 14, fontWeight: "700" },
+  trendLabel:  { fontSize: 12, fontWeight: "600" },
+
+  // ── Order actions (header right) ───────────────────────────────────────────
+  orderActions:    { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  orderActionBtn:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  orderActionTxt:  { color: "#fff", fontSize: 12, fontWeight: "600" },
+
+  // ── Order table (tablet/desktop) ───────────────────────────────────────────
+  orderTable:    { borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: C.border },
+  orderTableHead:{ backgroundColor: C.cardBg },
+  orderTableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border },
+  orderTableHdr: { flex: 1, fontSize: 11, fontWeight: "700", color: C.sub, textTransform: "uppercase", letterSpacing: 0.4 },
+  orderTableCell:{ flex: 1, fontSize: 13, color: C.sub },
+  orderIdText:   { fontSize: 13, fontWeight: "700", color: C.primary },
+  itemsBadge:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.primaryLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" },
+  itemsBadgeTxt: { fontSize: 12, color: C.primary, fontWeight: "600" },
+  codBadge:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F3F4F6", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" },
+  codTxt:        { fontSize: 12, color: C.sub, fontWeight: "600" },
+  eyeBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: C.navy, alignItems: "center", justifyContent: "center" },
+
+  // ── Order status pill ──────────────────────────────────────────────────────
+  orderStatus:    { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, alignSelf: "flex-start" },
+  orderStatusTxt: { fontSize: 11, fontWeight: "700" },
+
+  // ── Order mobile cards ─────────────────────────────────────────────────────
+  orderMobileCard:{ backgroundColor: C.cardBg, borderRadius: 12, padding: 14, gap: 10 },
+  orderMobileTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  orderMobileRow: { flexDirection: "row", justifyContent: "space-between" },
+  orderMobileItem:{ alignItems: "center", gap: 3 },
+  orderMobileLbl: { fontSize: 11, color: C.sub },
+  orderMobileVal: { fontSize: 12, fontWeight: "600", color: C.sub },
+  orderViewBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: C.navy, borderRadius: 8, paddingVertical: 9 },
+  orderViewTxt:   { color: "#fff", fontSize: 13, fontWeight: "600" },
+
+  // ── Empty states ───────────────────────────────────────────────────────────
+  noOrders:    { alignItems: "center", paddingVertical: 32, gap: 8 },
+  noOrdersTxt: { fontSize: 14, color: C.sub },
+});
