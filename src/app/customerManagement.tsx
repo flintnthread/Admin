@@ -21,6 +21,7 @@ import {
     View,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import AdminLayout from "../components/admin-layout";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -620,7 +621,8 @@ export default function CustomerManagementScreen() {
             : "19.5%";
 
   return (
-    <View style={s.root}>
+    <AdminLayout>
+      <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
       {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
@@ -789,6 +791,7 @@ export default function CustomerManagementScreen() {
         </View>
       </ScrollView>
     </View>
+    </AdminLayout>
   );
 }
 

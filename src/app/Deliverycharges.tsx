@@ -15,6 +15,7 @@ import {
   Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import AdminLayout from "@/components/admin-layout";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type SlabStatus = "Active" | "Inactive";
@@ -563,9 +564,10 @@ const DeliveryChargesScreen: React.FC = () => {
     </View>
   );
 
-  if (isWeb) {
-    return (
+  return (
+    <AdminLayout>
       <View style={styles.webLayout}>
+        <StatusBar barStyle="light-content" backgroundColor="#000080" />
         <View style={styles.webMainColumn}>
           {MainContent}
         </View>
@@ -582,26 +584,7 @@ const DeliveryChargesScreen: React.FC = () => {
           isWeb={isWeb}
         />
       </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      {MainContent}
-      <DeliveryChargeModal
-        visible={editingSlabId !== null}
-        onClose={() => setEditingSlabId(null)}
-        slab={slabs.find((s) => s.id === editingSlabId) || null}
-        isWeb={isWeb}
-      />
-      <DeliveryChargeModal
-        visible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
-        slab={null}
-        isWeb={isWeb}
-      />
-    </SafeAreaView>
+    </AdminLayout>
   );
 };
 
@@ -679,7 +662,7 @@ const styles = StyleSheet.create({
   viewSwitcher: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F4F2FB",
+    backgroundColor: "#e6e6f2",
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -700,7 +683,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   viewButtonActive: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#000080",
   },
   viewButtonText: {
     fontSize: 12,
@@ -1121,13 +1104,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   webHeader: {
-    backgroundColor: "transparent",
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: "#E5E7EB",
     elevation: 0,
     shadowOpacity: 0,
     paddingTop: 24,
     paddingHorizontal: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
 
   // ── Modal ──
