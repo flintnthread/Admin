@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AdminLayout from '../components/admin-layout';
 
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
@@ -419,7 +420,8 @@ export default function FaqCategoriesScreen() {
   }, [query]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <AdminLayout>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <AppHeader />
       <ScrollView
         style={styles.screen}
@@ -527,7 +529,8 @@ export default function FaqCategoriesScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AdminLayout>
   );
 }
 

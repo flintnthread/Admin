@@ -14,6 +14,7 @@ import {
   Alert,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import AdminLayout from "@/components/admin-layout";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type MessageStatus = "Replied" | "Not Replied";
@@ -1083,9 +1084,10 @@ const ContactMessagesScreen: React.FC = () => {
     </View>
   );
 
-  if (isWeb) {
-    return (
+  return (
+    <AdminLayout>
       <View style={styles.webLayout}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.webMainColumn}>
           {MainContent}
         </View>
@@ -1111,35 +1113,7 @@ const ContactMessagesScreen: React.FC = () => {
           isWeb={isWeb}
         />
       </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      {MainContent}
-      <ViewDetailModal
-        visible={!!viewMsg}
-        onClose={() => setViewMsg(null)}
-        msg={viewMsg}
-        onMarkReplied={markReplied}
-        onReply={setReplyMsg}
-        isWeb={isWeb}
-      />
-      <ReplyMessageModal
-        visible={!!replyMsg}
-        onClose={() => setReplyMsg(null)}
-        onSend={handleSendReply}
-        msg={replyMsg}
-        isWeb={isWeb}
-      />
-      <AddMessageModal
-        visible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
-        onSave={addMessage}
-        isWeb={isWeb}
-      />
-    </SafeAreaView>
+    </AdminLayout>
   );
 };
 
@@ -1212,13 +1186,15 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   webHeader: {
-    backgroundColor: "transparent",
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: "#E5E7EB",
     elevation: 0,
     shadowOpacity: 0,
     paddingTop: 24,
     paddingHorizontal: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   headerTextContainer: {
     flex: 1,
