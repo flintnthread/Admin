@@ -35,14 +35,14 @@ const NAV_ITEMS = {
     icon: "shopping-bag",
     children: [
       { label: "Products", icon: "package", path: null },
-      { label: "Customers", icon: "users", path: null },
+      { label: "Customers", icon: "users", path: "/customerManagement" },
       { label: "Sellers", icon: "user-check", path: null },
       { label: "Sellers Graph", icon: "trending-up", path: null },
       { label: "Seller Bank Approval", icon: "credit-card", path: null },
       { label: "Orphaned Products", icon: "alert-circle", path: null },
-      { label: "Orders", icon: "shopping-cart", path: null },
+      { label: "Orders", icon: "shopping-cart", path: "/orders" },
       { label: "Refund Management", icon: "rotate-ccw", path: null },
-      { label: "Delivery Charges", icon: "truck", path: null },
+      { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges" },
     ],
     standalone: [
       { label: "Pending Sellers", icon: "user-plus", path: null },
@@ -57,8 +57,8 @@ const NAV_ITEMS = {
     { label: "Seller Emails", icon: "mail", path: null },
   ],
   "PAYMENTS & PRODUCTS": [
-    { label: "Commission rates (B2B/B2C)", icon: "percent", path: null },
-    { label: "Seller Payments", icon: "dollar-sign", path: null },
+    { label: "Commission rates (B2B/B2C)", icon: "percent", path: "/commissionrates" },
+    { label: "Seller Payments", icon: "dollar-sign", path: "/Sellerpayments" },
     { label: "Product Approvals", icon: "check-square", path: null },
     { label: "Add Sellers", icon: "user-plus", path: null },
     { label: "Ads Admin Users", icon: "user", path: null },
@@ -83,7 +83,7 @@ const NAV_ITEMS = {
         { label: "FAQ Questions", icon: "help-circle", path: null }
       ]
     },
-    { label: "Contact Messages", icon: "mail", path: null },
+    { label: "Contact Messages", icon: "mail", path: "/Contactmessages" },
     { label: "Logos", icon: "image", path: null },
     {
       label: "Banners",
@@ -107,7 +107,7 @@ const NAV_ITEMS = {
       label: "Careers Management",
       icon: "briefcase",
       children: [
-        { label: "Departments", icon: "layers", path: null },
+        { label: "Departments", icon: "layers", path: "/Departments" },
         { label: "Job Openings", icon: "briefcase", path: null },
         { label: "Applications", icon: "file-text", path: null }
       ]

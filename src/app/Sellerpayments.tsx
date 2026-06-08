@@ -1,10 +1,10 @@
+import AdminLayout from "@/components/admin-layout";
 import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
     Alert,
     Modal,
     Platform,
-    SafeAreaView,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -568,24 +568,17 @@ const SellerPaymentsScreen: React.FC = () => {
         </View>
     );
 
-    if (isWeb) {
-        return (
-            <View style={styles.webLayout}>
-                <View style={styles.webColumn}>
-                    {MainContent}
-                </View>
-                <PayModal visible={!!payModalOrder} order={payModalOrder} onClose={() => setPayModalOrder(null)} onConfirm={handleConfirmPay} isWeb={isWeb} />
-            </View>
-        );
-    }
-
-    return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor={BG_PAGE} />
-            {MainContent}
-            <PayModal visible={!!payModalOrder} order={payModalOrder} onClose={() => setPayModalOrder(null)} onConfirm={handleConfirmPay} isWeb={isWeb} />
-        </SafeAreaView>
-    );
+  return (
+    <AdminLayout>
+      <View style={styles.webLayout}>
+        <StatusBar barStyle="dark-content" backgroundColor={BG_PAGE} />
+        <View style={styles.webColumn}>
+          {MainContent}
+        </View>
+        <PayModal visible={!!payModalOrder} order={payModalOrder} onClose={() => setPayModalOrder(null)} onConfirm={handleConfirmPay} isWeb={isWeb} />
+      </View>
+    </AdminLayout>
+  );
 };
 
 export default SellerPaymentsScreen;
