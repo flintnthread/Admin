@@ -1,20 +1,18 @@
+import AdminLayout from "@/components/admin-layout";
+import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    SafeAreaView,
-    StatusBar,
-    Platform,
-    useWindowDimensions,
-    Modal,
-    TextInput,
     Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import AdminLayout from "@/components/admin-layout";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type PaymentStatus = "Pending" | "Paid";
