@@ -37,8 +37,8 @@ const NAV_ITEMS = {
       { label: "Products", icon: "package", path: null },
       { label: "Customers", icon: "users", path: "/customerManagement" },
       { label: "Sellers", icon: "user-check", path: null },
-      { label: "Sellers Graph", icon: "trending-up", path: null },
-      { label: "Seller Bank Approval", icon: "credit-card", path: null },
+      { label: "Sellers Graph", icon: "trending-up", path: "/sellergraphs" },
+      { label: "Seller Bank Approval", icon: "credit-card", path: "/sellerbankapproval" },
       { label: "Orphaned Products", icon: "alert-circle", path: null },
       { label: "Orders", icon: "shopping-cart", path: "/orders" },
       { label: "Refund Management", icon: "rotate-ccw", path: null },
@@ -62,7 +62,7 @@ const NAV_ITEMS = {
     { label: "Product Approvals", icon: "check-square", path: "/productApproval" },
     { label: "Add Sellers", icon: "user-plus", path: null },
     { label: "Ads Admin Users", icon: "user", path: null },
-    { label: "Admin Panel Users", icon: "shield", path: null },
+    { label: "Admin Panel Users", icon: "shield", path: "/adminpanel" },
   ],
   CUSTOM: [
     {

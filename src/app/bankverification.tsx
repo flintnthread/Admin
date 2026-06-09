@@ -1,13 +1,35 @@
-// Add to index.html:
-// <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+/**
+ * BankVerifications.tsx
+ * React Native (Expo Router) – full conversion of the Bank Verifications web screen.
+ *
+ * Dependencies (add to package.json if not present):
+ *   expo-router, react-native (core), @expo/vector-icons
+ *
+ * Usage (Expo Router):  app/bankverifications.tsx  → this file
+ */
 
-import { useEffect, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
 
 /* ─── Theme ─────────────────────────────────────────────────────────── */
 const BLUE   = "#2563EB";
 const LIGHT  = "#F8FAFC";
 const BORDER = "#E8EDF5";
+const DARK   = "#0F172A";
 
 /* ─── Mock Data ─────────────────────────────────────────────────────── */
 const MOCK_VERIFICATIONS = [
@@ -25,104 +47,349 @@ const MOCK_VERIFICATIONS = [
   { id: "BV-012", sellerName: "Manoj Tiwari",      email: "manoj.tiwari@gmail.com",    phone: "+91 89876 54321", business: "Tiwari General Store", account: "XXXX XXXX 8901", ifsc: "PUNB0012345", bank: "PNB",        status: "Expired",    attempts: 2, created: "12 Apr, 2025", verified: "—",           initials: "MT", color: "#9333EA" },
 ];
 
-const STATUS_OPTIONS = ["All Status","Pending","Processing","Verified","Failed","Expired"];
+const STATUS_OPTIONS = ["All Status", "Pending", "Processing", "Verified", "Failed", "Expired"];
+const PER_PAGE_OPTIONS = ["5", "10", "20", "50"];
 
-const STATUS_CONFIG = {
-  Pending:    { bg:"#FEF9C3", color:"#854D0E", border:"#FDE047", icon:"bi-clock",          iconBg:"#FEF08A", iconColor:"#CA8A04" },
-  Processing: { bg:"#CFFAFE", color:"#155E75", border:"#67E8F9", icon:"bi-arrow-repeat",   iconBg:"#A5F3FC", iconColor:"#0891B2" },
-  Verified:   { bg:"#DCFCE7", color:"#14532D", border:"#86EFAC", icon:"bi-check-circle",   iconBg:"#BBF7D0", iconColor:"#16A34A" },
-  Failed:     { bg:"#FEE2E2", color:"#7F1D1D", border:"#FCA5A5", icon:"bi-x-circle",       iconBg:"#FECACA", iconColor:"#DC2626" },
-  Expired:    { bg:"#F1F5F9", color:"#334155", border:"#CBD5E1", icon:"bi-hourglass-split", iconBg:"#E2E8F0", iconColor:"#64748B" },
+type StatusKey = "Pending" | "Processing" | "Verified" | "Failed" | "Expired";
+
+const STATUS_CONFIG: Record<StatusKey, {
+  bg: string; color: string; border: string;
+  iconName: string; iconLib: string; iconBg: string; iconColor: string;
+}> = {
+  Pending:    { bg: "#FEF9C3", color: "#854D0E", border: "#FDE047", iconName: "time-outline",           iconLib: "Ionicons",   iconBg: "#FEF08A", iconColor: "#CA8A04" },
+  Processing: { bg: "#CFFAFE", color: "#155E75", border: "#67E8F9", iconName: "refresh-outline",        iconLib: "Ionicons",   iconBg: "#A5F3FC", iconColor: "#0891B2" },
+  Verified:   { bg: "#DCFCE7", color: "#14532D", border: "#86EFAC", iconName: "checkmark-circle-outline",iconLib: "Ionicons",  iconBg: "#BBF7D0", iconColor: "#16A34A" },
+  Failed:     { bg: "#FEE2E2", color: "#7F1D1D", border: "#FCA5A5", iconName: "close-circle-outline",   iconLib: "Ionicons",   iconBg: "#FECACA", iconColor: "#DC2626" },
+  Expired:    { bg: "#F1F5F9", color: "#334155", border: "#CBD5E1", iconName: "hourglass-outline",       iconLib: "Ionicons",   iconBg: "#E2E8F0", iconColor: "#64748B" },
 };
+
+type Verification = typeof MOCK_VERIFICATIONS[0];
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
 function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: color + "22", border: `2px solid ${color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.32, color, flexShrink: 0, letterSpacing: 0.5 }}>
-      {initials}
-    </div>
+    <View style={{
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: color + "22",
+      borderWidth: 2, borderColor: color + "55",
+      alignItems: "center", justifyContent: "center",
+    }}>
+      <Text style={{ fontWeight: "700", fontSize: size * 0.32, color, letterSpacing: 0.5 }}>
+        {initials}
+      </Text>
+    </View>
   );
 }
 
-function StatusBadge({ status, size = "normal" }: { status: string; size?: string }) {
-  const c = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { bg: "#F1F5F9", color: "#64748B", border: "#CBD5E1", icon: "bi-circle" };
-  const small = size === "small";
+function StatusBadge({ status, small = false }: { status: string; small?: boolean }) {
+  const cfg = STATUS_CONFIG[status as StatusKey] ?? {
+    bg: "#F1F5F9", color: "#64748B", border: "#CBD5E1", iconName: "ellipse-outline", iconLib: "Ionicons",
+  };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 20, padding: small ? "2px 8px" : "4px 10px", fontSize: small ? 10 : 12, fontWeight: 600, whiteSpace: "nowrap" }}>
-      <i className={`bi ${c.icon}`} style={{ fontSize: small ? 10 : 12 }} /> {status}
-    </span>
+    <View style={{
+      flexDirection: "row", alignItems: "center", gap: 4,
+      backgroundColor: cfg.bg,
+      borderWidth: 1, borderColor: cfg.border,
+      borderRadius: 20,
+      paddingVertical: small ? 2 : 4,
+      paddingHorizontal: small ? 7 : 10,
+      alignSelf: "flex-start",
+    }}>
+      <Ionicons name={cfg.iconName as any} size={small ? 10 : 12} color={cfg.color} />
+      <Text style={{ fontSize: small ? 10 : 12, fontWeight: "600", color: cfg.color }}>{status}</Text>
+    </View>
   );
 }
 
-/* Stat card icon box */
-function StatIconBox({ icon, iconBg, iconColor, spinning }: { icon: string; iconBg: string; iconColor: string; spinning?: boolean }) {
+function AttemptsRow({ attempts, status }: { attempts: number; status: string }) {
+  const dotColor = status === "Failed" ? "#EF4444" : status === "Verified" ? "#22C55E" : "#F59E0B";
   return (
-    <div style={{ width: 44, height: 44, borderRadius: 10, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      <i className={`bi ${icon}`} style={{ fontSize: 22, color: iconColor, animation: spinning ? "spin 1.5s linear infinite" : "none" }} />
-    </div>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      {[0, 1, 2].map(i => (
+        <View key={i} style={{
+          width: 8, height: 8, borderRadius: 4,
+          backgroundColor: i < attempts ? dotColor : "#E2E8F0",
+        }} />
+      ))}
+      <Text style={{ fontSize: 12, color: "#64748B", marginLeft: 2, fontWeight: "600" }}>{attempts}/3</Text>
+    </View>
   );
 }
 
-/* Custom dropdown using Bootstrap Icon */
-function CustomSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+/* ─── Dropdown ──────────────────────────────────────────────────────── */
+function Dropdown({
+  value, onChange, options, placeholder, minWidth = 160,
+}: {
+  value: string; onChange: (v: string) => void; options: string[];
+  placeholder?: string; minWidth?: number;
+}) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = Dimensions.get("window");
+  const isDesktop = screenW >= 1024;
+
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const { width: screenWidth } = Dimensions.get("window");
+        const menuWidth = Math.min(width, screenWidth - 32);
+        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <View style={{ minWidth, zIndex: 10 }}>
+      <TouchableOpacity
+        ref={triggerRef as any}
+        onPress={handlePress}
+        activeOpacity={0.8}
+        style={{
+          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+          borderWidth: 1, borderColor: BORDER, borderRadius: 8,
+          paddingVertical: 10, paddingHorizontal: 14,
+          backgroundColor: "#fff",
+        }}
+      >
+        <Text style={{ fontSize: 14, color: "#374151", flex: 1 }}>{value || placeholder}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color="#94A3B8" />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={{
+            position: "absolute",
+            top: menuPosition.top,
+            left: menuPosition.left,
+            width: menuPosition.width,
+            zIndex: 9999,
+          }}>
+            <View style={{
+              backgroundColor: "#fff", borderRadius: 12,
+              borderWidth: 1, borderColor: BORDER,
+              shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12, shadowRadius: 20,
+              elevation: 12, overflow: "hidden", width: "100%",
+              maxWidth: isDesktop ? 400 : 320,
+              zIndex: 10000,
+            }}>
+              {options.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => { onChange(opt); setOpen(false); }}
+                  style={{
+                    paddingVertical: 12, paddingHorizontal: 18,
+                    backgroundColor: value === opt ? BLUE : "#fff",
+                    borderBottomWidth: 1, borderBottomColor: BORDER,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: value === opt ? "#fff" : "#374151", fontWeight: value === opt ? "700" : "400" }}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+}
+
+/* ─── Stat Card ─────────────────────────────────────────────────────── */
+function StatCard({
+  label, value, iconName, iconBg, iconColor, spinning, onPress,
+}: {
+  label: string; value: number; iconName: string;
+  iconBg: string; iconColor: string; spinning?: boolean; onPress?: () => void;
+}) {
+  const rotation = useRef(new Animated.Value(0)).current;
+  const { width } = Dimensions.get("window");
+  const isDesktop = width >= 1024;
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+    if (!spinning) return;
+    const anim = Animated.loop(
+      Animated.timing(rotation, { toValue: 1, duration: 1500, useNativeDriver: true })
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spinning]);
+
+  const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   return (
-    <div ref={ref} style={{ position: "relative", userSelect: "none" }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px", fontSize: 14, color: "#374151", background: "#fff", cursor: "pointer", minWidth: 160 }}
-      >
-        <span>{value}</span>
-        <i className={`bi bi-chevron-${open ? "up" : "down"}`} style={{ fontSize: 12, color: "#94A3B8", marginLeft: 8 }} />
-      </div>
-      {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 200, overflow: "hidden", minWidth: 180 }}>
-          {options.map((opt: string) => (
-            <div
-              key={opt}
-              onClick={() => { onChange(opt); setOpen(false); }}
-              style={{ padding: "10px 16px", fontSize: 14, color: value === opt ? "#fff" : "#374151", background: value === opt ? BLUE : "#fff", cursor: "pointer", transition: "background 0.12s", fontWeight: value === opt ? 700 : 400 }}
-              onMouseEnter={e => { if (value !== opt) e.currentTarget.style.background = "#F1F5F9"; }}
-              onMouseLeave={e => { if (value !== opt) e.currentTarget.style.background = "#fff"; }}
-            >
-              {opt}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      style={{
+        borderWidth: 1, borderColor: BORDER, borderRadius: 12,
+        padding: isDesktop ? 10 : 14, backgroundColor: "#fff",
+        flexDirection: "row", alignItems: "center",
+        justifyContent: "space-between", gap: 8,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: isDesktop ? 9 : 10, fontWeight: "700", color: "#94A3B8", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: isDesktop ? 4 : 6 }}>
+          {label}
+        </Text>
+        <Text style={{ fontSize: isDesktop ? 20 : 26, fontWeight: "800", color: DARK, lineHeight: isDesktop ? 22 : 28 }}>{value}</Text>
+      </View>
+      <View style={{ width: isDesktop ? 36 : 44, height: isDesktop ? 36 : 44, borderRadius: 10, backgroundColor: iconBg, alignItems: "center", justifyContent: "center" }}>
+        {spinning ? (
+          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <Ionicons name={iconName as any} size={isDesktop ? 18 : 22} color={iconColor} />
+          </Animated.View>
+        ) : (
+          <Ionicons name={iconName as any} size={isDesktop ? 18 : 22} color={iconColor} />
+        )}
+      </View>
+    </TouchableOpacity>
   );
 }
 
-/* ─── Main Component ─────────────────────────────────────────────────── */
+/* ─── Pagination Button ─────────────────────────────────────────────── */
+function PagBtn({ iconName, onPress, disabled }: { iconName: string; onPress: () => void; disabled: boolean }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+      style={{
+        width: 32, height: 32, borderRadius: 8,
+        borderWidth: 1, borderColor: BORDER,
+        backgroundColor: "#fff",
+        alignItems: "center", justifyContent: "center",
+        opacity: disabled ? 0.4 : 1,
+        zIndex: 10,
+      }}
+    >
+      <Ionicons name={iconName as any} size={13} color={disabled ? "#CBD5E1" : "#374151"} />
+    </TouchableOpacity>
+  );
+}
+
+/* ─── Verification Card (mobile row) ───────────────────────────────── */
+function VerificationCard({ item, onViewPress }: { item: Verification; onViewPress: () => void }) {
+  return (
+    <View style={{
+      borderWidth: 1, borderColor: BORDER, borderRadius: 12,
+      padding: 14, backgroundColor: "#FAFBFD", marginBottom: 10,
+    }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <Avatar initials={item.initials} color={item.color} size={44} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontWeight: "700", color: DARK, fontSize: 15 }} numberOfLines={1}>{item.sellerName}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 }}>
+            <Ionicons name="mail-outline" size={11} color="#94A3B8" />
+            <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>
+              {item.email}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name="call-outline" size={11} color="#94A3B8" />
+            <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end", gap: 4 }}>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>{item.id}</Text>
+          <StatusBadge status={item.status} small />
+        </View>
+      </View>
+
+      {/* Account info */}
+      <View style={{
+        backgroundColor: "#F8FAFC", borderRadius: 8,
+        padding: 10, marginBottom: 10,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <Ionicons name="card-outline" size={14} color="#64748B" />
+          <Text style={{ fontWeight: "700", color: "#374151", fontSize: 13 }}>{item.account}</Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="business-outline" size={12} color="#94A3B8" />
+          <Text style={{ fontSize: 12, color: "#94A3B8" }}>
+            {item.bank}  ·  IFSC: {item.ifsc}
+          </Text>
+        </View>
+      </View>
+
+      {/* Meta grid */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        {[
+          { label: "Attempts", val: null, attemptsData: { attempts: item.attempts, status: item.status } },
+          { label: "Created",  val: item.created, attemptsData: null },
+          { label: "Verified", val: item.verified, attemptsData: null },
+        ].map(({ label, val, attemptsData }) => (
+          <View key={label} style={{
+            flex: 1, backgroundColor: "#fff",
+            borderWidth: 1, borderColor: BORDER,
+            borderRadius: 8, padding: 8,
+          }}>
+            <Text style={{ fontSize: 9, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>
+              {label}
+            </Text>
+            {attemptsData ? (
+              <AttemptsRow attempts={attemptsData.attempts} status={attemptsData.status} />
+            ) : (
+              <Text style={{ fontSize: 11, color: val === "—" ? "#CBD5E1" : "#374151", fontWeight: "600" }}>{val}</Text>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {/* Actions */}
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <TouchableOpacity
+          onPress={onViewPress}
+          style={{
+            flex: 1, backgroundColor: "#EFF6FF",
+            borderWidth: 1, borderColor: "#BFDBFE",
+            borderRadius: 8, paddingVertical: 9,
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+          }}
+        >
+          <Ionicons name="eye-outline" size={15} color={BLUE} />
+          <Text style={{ fontSize: 13, fontWeight: "700", color: BLUE }}>View</Text>
+        </TouchableOpacity>
+        {item.status === "Pending" && (
+          <TouchableOpacity
+            style={{
+              flex: 1, backgroundColor: "#F0FDF4",
+              borderWidth: 1, borderColor: "#BBF7D0",
+              borderRadius: 8, paddingVertical: 9,
+              flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            <Ionicons name="checkmark-outline" size={15} color="#16A34A" />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#16A34A" }}>Verify</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+/* ─── Main Screen ───────────────────────────────────────────────────── */
 export default function BankVerifications() {
   const router = useRouter();
-  const [windowW, setWindowW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [searchInput,  setSearchInput]  = useState("");
   const [searchQuery,  setSearchQuery]  = useState("");
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(10);
 
-  useEffect(() => {
-    const onResize = () => setWindowW(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const { width } = Dimensions.get("window");
+  const isMobile = width < 768;
+  const isTablet = width >= 768;
+  const isDesktop = width >= 1024;
 
-  const isMobile  = windowW < 640;
-  const isTablet  = windowW >= 640 && windowW < 1024;
-  const isDesktop = windowW >= 1024;
-
-  /* Counts per status */
+  /* Counts */
   const counts = {
     total:      MOCK_VERIFICATIONS.length,
     pending:    MOCK_VERIFICATIONS.filter(v => v.status === "Pending").length,
@@ -132,7 +399,7 @@ export default function BankVerifications() {
     expired:    MOCK_VERIFICATIONS.filter(v => v.status === "Expired").length,
   };
 
-  /* Filter + search */
+  /* Filter */
   const filtered = MOCK_VERIFICATIONS.filter(v => {
     const matchStatus = statusFilter === "All Status" || v.status === statusFilter;
     const q = searchQuery.toLowerCase().trim();
@@ -152,340 +419,506 @@ export default function BankVerifications() {
   const paginated  = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   const doFilter = () => { setSearchQuery(searchInput); setPage(1); };
-  const handleKey = (e: React.KeyboardEvent) => { if (e.key === "Enter") doFilter(); };
 
-  /* When status changes, reset page */
   const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
 
-  /* Pagination numbers */
-  const pageNums = (() => {
-    if (totalPages <= 7) return [...Array(totalPages)].map((_, i) => i + 1);
-    if (safePage <= 4)   return [1, 2, 3, 4, 5, "...", totalPages];
-    if (safePage >= totalPages - 3) return [1, "...", totalPages-4, totalPages-3, totalPages-2, totalPages-1, totalPages];
-    return [1, "...", safePage - 1, safePage, safePage + 1, "...", totalPages];
+  const pageNums: (number | string)[] = (() => {
+    if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
+    if (safePage <= 3)   return [1, 2, 3, "...", totalPages];
+    if (safePage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
+    return [1, "...", safePage, "...", totalPages];
   })();
 
   const STAT_CARDS = [
-    { label: "TOTAL",      value: counts.total,      icon: "bi-list-ul",        iconBg: "#EFF6FF", iconColor: "#3B82F6", spinning: false },
-    { label: "PENDING",    value: counts.pending,    icon: "bi-clock",          iconBg: "#FEF9C3", iconColor: "#CA8A04", spinning: false },
-    { label: "PROCESSING", value: counts.processing, icon: "bi-arrow-repeat",   iconBg: "#CFFAFE", iconColor: "#0891B2", spinning: true  },
-    { label: "VERIFIED",   value: counts.verified,   icon: "bi-check-circle",   iconBg: "#DCFCE7", iconColor: "#16A34A", spinning: false },
-    { label: "FAILED",     value: counts.failed,     icon: "bi-x-circle",       iconBg: "#FEE2E2", iconColor: "#DC2626", spinning: false },
-    { label: "EXPIRED",    value: counts.expired,    icon: "bi-hourglass-split",iconBg: "#F1F5F9", iconColor: "#64748B", spinning: false },
+    { label: "TOTAL",      value: counts.total,      iconName: "list-outline",           iconBg: "#EFF6FF", iconColor: "#3B82F6", spinning: false, filterVal: "All Status" },
+    { label: "PENDING",    value: counts.pending,    iconName: "time-outline",            iconBg: "#FEF9C3", iconColor: "#CA8A04", spinning: false, filterVal: "Pending" },
+    { label: "PROCESSING", value: counts.processing, iconName: "refresh-outline",         iconBg: "#CFFAFE", iconColor: "#0891B2", spinning: true,  filterVal: "Processing" },
+    { label: "VERIFIED",   value: counts.verified,   iconName: "checkmark-circle-outline",iconBg: "#DCFCE7", iconColor: "#16A34A", spinning: false, filterVal: "Verified" },
+    { label: "FAILED",     value: counts.failed,     iconName: "close-circle-outline",    iconBg: "#FEE2E2", iconColor: "#DC2626", spinning: false, filterVal: "Failed" },
+    { label: "EXPIRED",    value: counts.expired,    iconName: "hourglass-outline",       iconBg: "#F1F5F9", iconColor: "#64748B", spinning: false, filterVal: "Expired" },
   ];
 
-  const pad = isMobile ? "14px 12px" : isTablet ? "18px 20px" : "24px 32px";
-
   return (
-    <div style={{ background: LIGHT, minHeight: "100vh", fontFamily: "'Inter','Segoe UI',sans-serif", display: "flex", flexDirection: "column" }}>
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        * { box-sizing: border-box; }
-        input:focus, select:focus { outline: none; }
-        button:focus { outline: none; }
-        ::-webkit-scrollbar { height: 4px; width: 4px; }
-        ::-webkit-scrollbar-track { background: #F1F5F9; }
-        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-      `}</style>
+    <View style={{ flex: 1, backgroundColor: LIGHT }}>
+      {isMobile ? (
+        <FlatList
+          data={paginated}
+          keyExtractor={item => item.id}
+          contentContainerStyle={{ padding: isTablet ? 24 : 14, paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+          <View>
+            {/* ── Page Title (Orange Container) ── */}
+            <View style={{ backgroundColor: "#FF6B35", borderRadius: 16, padding: 16, marginBottom: 20 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Ionicons name="business-outline" size={24} color="#fff" />
+                <Text style={{ fontSize: isTablet ? 24 : 20, fontWeight: "800", color: "#fff" }}>
+                  Bank Verifications
+                </Text>
+              </View>
+            </View>
 
-      <div style={{ flex: 1, maxWidth: isDesktop ? 1300 : "100%", width: "100%", margin: "0 auto", padding: pad, overflowY: "auto" }}>
+            {/* ── Stat Cards (Mobile/Tablet) ── */}
+            {isMobile && (
+              <View style={{
+                backgroundColor: "#fff", borderRadius: 14,
+                borderWidth: 1, borderColor: BORDER,
+                padding: 14, marginBottom: 14,
+              }}>
+                <View style={{
+                  flexDirection: "row", flexWrap: "wrap", gap: 10,
+                }}>
+                  {STAT_CARDS.map((c, idx) => (
+                    <View key={c.label} style={{ width: "47%" }}>
+                      <StatCard
+                        label={c.label}
+                        value={c.value}
+                        iconName={c.iconName}
+                        iconBg={c.iconBg}
+                        iconColor={c.iconColor}
+                        spinning={c.spinning}
+                        onPress={() => handleStatusChange(c.filterVal)}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
-        {/* ── Page Title ── */}
-        <div style={{ marginBottom: isMobile ? 16 : 22 }}>
-          <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 800, color: "#0F172A", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="bi bi-bank" style={{ fontSize: isMobile ? 18 : 22, color: BLUE }} />
-            Bank Verifications
-          </h1>
-        </div>
+            {/* ── Filters ── */}
+            <View style={{
+              backgroundColor: "#fff", borderRadius: 14,
+              borderWidth: 1, borderColor: BORDER,
+              padding: isTablet ? 20 : 14, marginBottom: 14,
+            }}>
+              {/* Status */}
+              <Text style={styles.filterLabel}>
+                Status
+              </Text>
+              <View style={{ marginBottom: 12 }}>
+                <Dropdown
+                  value={statusFilter}
+                  onChange={handleStatusChange}
+                  options={STATUS_OPTIONS}
+                  minWidth={160}
+                />
+              </View>
 
-        {/* ── Stat Cards ── */}
-        <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${BORDER}`, padding: isMobile ? "16px 12px" : "20px 24px", marginBottom: isMobile ? 14 : 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : isTablet ? "repeat(3,1fr)" : "repeat(6,1fr)", gap: isMobile ? 10 : 16 }}>
-            {STAT_CARDS.map(c => (
-              <div
-                key={c.label}
-                onClick={() => handleStatusChange(c.label === "TOTAL" ? "All Status" : c.label.charAt(0) + c.label.slice(1).toLowerCase())}
-                style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: isMobile ? "12px 10px" : "14px 16px", cursor: "pointer", transition: "all 0.15s", background: "#fff" }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = "#CBD5E1"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = BORDER; }}
+              {/* Search */}
+              <Text style={styles.filterLabel}>Search</Text>
+              <View style={{ position: "relative", marginBottom: 14 }}>
+                <View style={{
+                  flexDirection: "row", alignItems: "center",
+                  borderWidth: 1, borderColor: BORDER, borderRadius: 8,
+                  backgroundColor: "#fff", paddingHorizontal: 12,
+                }}>
+                  <Ionicons name="search-outline" size={16} color="#94A3B8" />
+                  <TextInput
+                    value={searchInput}
+                    onChangeText={setSearchInput}
+                    onSubmitEditing={doFilter}
+                    returnKeyType="search"
+                    placeholder="Search by email, name, account, IFSC..."
+                    placeholderTextColor="#94A3B8"
+                    style={{
+                      flex: 1, fontSize: 14, color: "#374151",
+                      paddingVertical: 10, paddingLeft: 8,
+                    }}
+                  />
+                  {searchInput.length > 0 && (
+                    <TouchableOpacity onPress={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Filter button */}
+              <TouchableOpacity
+                onPress={doFilter}
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: BLUE, borderRadius: 9,
+                  paddingVertical: 12,
+                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                }}
               >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <div>
-                    <div style={{ fontSize: isMobile ? 9 : 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{c.label}</div>
-                    <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{c.value}</div>
-                  </div>
-                  <StatIconBox icon={c.icon} iconBg={c.iconBg} iconColor={c.iconColor} spinning={c.spinning} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                <Ionicons name="search-outline" size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Filter</Text>
+              </TouchableOpacity>
+            </View>
 
-        {/* ── Filters ── */}
-        <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${BORDER}`, padding: isMobile ? "14px 12px" : "18px 24px", marginBottom: isMobile ? 14 : 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "200px 1fr auto", gap: isMobile ? 10 : 14, alignItems: "end" }}>
+            {/* ── Results Header (Mobile/Tablet) ── */}
+            {isMobile && (
+              <View style={{
+                backgroundColor: "#fff", borderRadius: 14,
+                borderWidth: 1, borderColor: BORDER,
+                paddingHorizontal: isTablet ? 20 : 14,
+                paddingTop: isTablet ? 16 : 12,
+                paddingBottom: 4,
+                marginBottom: 0,
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "500" }}>
+                    {filtered.length > 0
+                      ? `Showing ${(safePage - 1) * perPage + 1}–${Math.min(safePage * perPage, filtered.length)} of ${filtered.length}`
+                      : "No results"}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={{ fontSize: 12, color: "#64748B" }}>Per page</Text>
+                    <Dropdown
+                      value={String(perPage)}
+                      onChange={v => { setPerPage(Number(v)); setPage(1); }}
+                      options={PER_PAGE_OPTIONS}
+                      minWidth={80}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        }
+        renderItem={({ item }) => (
+          <View style={{
+            backgroundColor: "#fff",
+            borderLeftWidth: 1, borderRightWidth: 1, borderColor: BORDER,
+            paddingHorizontal: isTablet ? 20 : 14,
+          }}>
+            <VerificationCard
+              item={item}
+              onViewPress={() => router.push("/viewbankdetails")}
+            />
+          </View>
+        )}
+        ListEmptyComponent={
+          <View style={{
+            backgroundColor: "#fff",
+            borderLeftWidth: 1, borderRightWidth: 1, borderColor: BORDER,
+            paddingVertical: 60, alignItems: "center",
+          }}>
+            <Ionicons name="information-circle-outline" size={44} color="#CBD5E1" />
+            <Text style={{ fontSize: 15, fontWeight: "500", color: "#94A3B8", marginTop: 12 }}>
+              No verifications found
+            </Text>
+            {(searchQuery || statusFilter !== "All Status") && (
+              <TouchableOpacity
+                onPress={() => { setSearchInput(""); setSearchQuery(""); setStatusFilter("All Status"); setPage(1); }}
+                style={{
+                  marginTop: 12, borderWidth: 1, borderColor: BORDER,
+                  borderRadius: 8, paddingVertical: 6, paddingHorizontal: 16,
+                }}
+              >
+                <Text style={{ fontSize: 13, color: BLUE, fontWeight: "600" }}>Clear filters</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        }
+        ListFooterComponent={
+          <View>
+            {/* bottom border of card */}
+            <View style={{
+              backgroundColor: "#fff",
+              borderWidth: 1, borderTopWidth: 0, borderColor: BORDER,
+              borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
+              paddingHorizontal: isTablet ? 20 : 14,
+              paddingBottom: 4,
+            }} />
 
+            {/* ── Pagination ── */}
+            {filtered.length > 0 && (
+              <View style={{
+                backgroundColor: "#fff", borderRadius: 14,
+                borderWidth: 1, borderColor: BORDER,
+                paddingHorizontal: isTablet ? 20 : 14,
+                paddingVertical: 12,
+                flexDirection: "row", alignItems: "center",
+                justifyContent: "space-between", flexWrap: "wrap", gap: 8,
+                marginTop: 10,
+              }}>
+                <Text style={{ fontSize: 12, color: "#64748B" }}>
+                  Page {safePage} of {totalPages}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
+                  <PagBtn iconName="play-skip-back-outline" onPress={() => setPage(1)} disabled={safePage === 1} />
+                  <PagBtn iconName="chevron-back-outline"   onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
+                  {pageNums.map((p, i) =>
+                    p === "..." ? (
+                      <View key={"e" + i} style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
+                        <Text style={{ color: "#94A3B8", fontSize: 14 }}>…</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        key={p}
+                        onPress={() => setPage(p as number)}
+                        style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: safePage === p ? BLUE : BORDER,
+                          backgroundColor: safePage === p ? BLUE : "#fff",
+                          alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{
+                          fontSize: 13, fontWeight: "700",
+                          color: safePage === p ? "#fff" : "#374151",
+                        }}>{p}</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                  <PagBtn iconName="chevron-forward-outline" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+                  <PagBtn iconName="play-skip-forward-outline" onPress={() => setPage(totalPages)} disabled={safePage === totalPages} />
+                </View>
+              </View>
+            )}
+
+            {/* ── Footer ── */}
+            <View style={{
+              marginTop: 16, paddingVertical: 16,
+              borderTopWidth: 1, borderTopColor: BORDER,
+              backgroundColor: "#fff", borderRadius: 8,
+              alignItems: "center",
+            }}>
+              <Text style={{ fontSize: 13, color: "#94A3B8", textAlign: "center" }}>
+                2026 © Flintnthread India Pvt. Ltd.{"\n"}Crafted by{" "}
+                <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
+              </Text>
+            </View>
+          </View>
+        }
+      />
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ padding: 32, paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Page Title (Orange Container) ── */}
+          <View style={{ backgroundColor: "#FF6B35", borderRadius: 16, padding: 16, marginBottom: 20 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Ionicons name="business-outline" size={24} color="#fff" />
+              <Text style={{ fontSize: 24, fontWeight: "800", color: "#fff" }}>
+                Bank Verifications
+              </Text>
+            </View>
+          </View>
+
+          {/* ── Filters ── */}
+          <View style={{
+            backgroundColor: "#fff", borderRadius: 14,
+            borderWidth: 1, borderColor: BORDER,
+            padding: 20, marginBottom: 14,
+          }}>
             {/* Status */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 }}>
-                <i className="bi bi-funnel" style={{ marginRight: 4 }} />Status
-              </label>
-              <CustomSelect value={statusFilter} onChange={handleStatusChange} options={STATUS_OPTIONS} />
-            </div>
+            <Text style={styles.filterLabel}>
+              Status
+            </Text>
+            <View style={{ marginBottom: 12 }}>
+              <Dropdown
+                value={statusFilter}
+                onChange={handleStatusChange}
+                options={STATUS_OPTIONS}
+                minWidth={160}
+              />
+            </View>
 
             {/* Search */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 }}>
-                <i className="bi bi-search" style={{ marginRight: 4 }} />Search
-              </label>
-              <div style={{ position: "relative" }}>
-                <i className="bi bi-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#94A3B8" }} />
-                <input
-                  type="text"
+            <Text style={styles.filterLabel}>Search</Text>
+            <View style={{ position: "relative", marginBottom: 14 }}>
+              <View style={{
+                flexDirection: "row", alignItems: "center",
+                borderWidth: 1, borderColor: BORDER, borderRadius: 8,
+                backgroundColor: "#fff", paddingHorizontal: 12,
+              }}>
+                <Ionicons name="search-outline" size={16} color="#94A3B8" />
+                <TextInput
                   value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  onKeyDown={handleKey}
+                  onChangeText={setSearchInput}
+                  onSubmitEditing={doFilter}
+                  returnKeyType="search"
                   placeholder="Search by email, name, account, IFSC..."
-                  style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 12px 10px 36px", fontSize: 14, color: "#374151", background: "#fff" }}
+                  placeholderTextColor="#94A3B8"
+                  style={{
+                    flex: 1, fontSize: 14, color: "#374151",
+                    paddingVertical: 10, paddingLeft: 8,
+                  }}
                 />
-                {searchInput && (
-                  <i className="bi bi-x-circle-fill"
-                    onClick={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}
-                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#94A3B8", cursor: "pointer" }} />
+                {searchInput.length > 0 && (
+                  <TouchableOpacity onPress={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}>
+                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                  </TouchableOpacity>
                 )}
-              </div>
-            </div>
+              </View>
+            </View>
 
             {/* Filter button */}
-            <button
-              onClick={doFilter}
-              style={{ background: BLUE, color: "#fff", border: "none", borderRadius: 9, padding: "10px 24px", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, justifyContent: "center", height: 42, whiteSpace: "nowrap" }}
-              onMouseEnter={e => e.currentTarget.style.background = "#1D4ED8"}
-              onMouseLeave={e => e.currentTarget.style.background = BLUE}
+            <TouchableOpacity
+              onPress={doFilter}
+              activeOpacity={0.85}
+              style={{
+                backgroundColor: BLUE, borderRadius: 9,
+                paddingVertical: 12,
+                flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+              }}
             >
-              <i className="bi bi-search" style={{ fontSize: 14 }} /> Filter
-            </button>
-          </div>
-        </div>
+              <Ionicons name="search-outline" size={16} color="#fff" />
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Filter</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* ── Table / Cards ── */}
-        <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${BORDER}`, overflow: "hidden", marginBottom: isMobile ? 14 : 20 }}>
+          {/* ── Desktop Table ── */}
+          <View style={{
+            backgroundColor: "#fff", borderRadius: 14,
+            borderWidth: 1, borderColor: BORDER,
+            marginBottom: 14,
+            overflow: "hidden",
+          }}>
+            {/* Table Header */}
+            <View style={{
+              flexDirection: "row",
+              backgroundColor: "#1a2332",
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}>
+              <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>ID</Text>
+              <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Seller</Text>
+              <Text style={{ flex: 1, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
+              <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
+              <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Attempts</Text>
+              <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Created</Text>
+              <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Verified</Text>
+              <Text style={{ flex: 0.7, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
+            </View>
 
-          {/* Per-page selector */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "12px 12px 0" : "14px 20px 0", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontSize: 13, color: "#64748B", fontWeight: 500 }}>
-              <i className="bi bi-table" style={{ marginRight: 5, color: BLUE }} />
-              {filtered.length > 0
-                ? `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage,filtered.length)} of ${filtered.length}`
-                : "No results"}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: "#64748B" }}>Per page</span>
-              <CustomSelect value={String(perPage)} onChange={(v: string) => { setPerPage(Number(v)); setPage(1); }} options={["5","10","20","50"]} />
-            </div>
-          </div>
-
-          {/* Desktop Table */}
-          {!isMobile ? (
-            <div style={{ overflowX: "auto", padding: "0 0 4px" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#F8FAFC", borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, marginTop: 12 }}>
-                    {[
-                      { label: "ID",              icon: "bi-hash" },
-                      { label: "Seller",          icon: "bi-person" },
-                      { label: "Account Details", icon: "bi-credit-card" },
-                      { label: "Status",          icon: "bi-circle-half" },
-                      { label: "Attempts",        icon: "bi-arrow-repeat" },
-                      { label: "Created",         icon: "bi-calendar3" },
-                      { label: "Verified",        icon: "bi-calendar-check" },
-                      { label: "Actions",         icon: "bi-gear" },
-                    ].map(h => (
-                      <th key={h.label} style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "#64748B", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                        <i className={`bi ${h.icon}`} style={{ marginRight: 5 }} />{h.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={8}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 20px", color: "#94A3B8" }}>
-                          <i className="bi bi-info-circle" style={{ fontSize: 40, marginBottom: 12, color: "#CBD5E1" }} />
-                          <span style={{ fontSize: 15, fontWeight: 500 }}>No verifications found</span>
-                          {(searchQuery || statusFilter !== "All Status") && (
-                            <button onClick={() => { setSearchInput(""); setSearchQuery(""); setStatusFilter("All Status"); setPage(1); }}
-                              style={{ marginTop: 10, background: "none", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 14px", fontSize: 12, color: BLUE, cursor: "pointer", fontWeight: 600 }}>
-                              Clear filters
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ) : paginated.map((v, idx) => (
-                    <tr key={v.id}
-                      style={{ borderBottom: `1px solid #F1F5F9`, background: idx % 2 === 0 ? "#fff" : "#FAFBFD", transition: "background 0.1s" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#F0F7FF"}
-                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "#fff" : "#FAFBFD"}
+            {/* Table Rows */}
+            {paginated.map((item, idx) => (
+              <View key={item.id} style={{
+                flexDirection: "row",
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: BORDER,
+                backgroundColor: idx % 2 === 0 ? "#fff" : "#F8FAFC",
+              }}>
+                <Text style={{ flex: 0.6, fontSize: 12, color: "#555", fontWeight: "600" }}>{item.id}</Text>
+                <View style={{ flex: 1.2 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.sellerName}</Text>
+                  <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
+                  <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}}</Text>
+                </View>
+                <View style={{ flex: 0.8 }}>
+                  <StatusBadge status={item.status} small />
+                </View>
+                <View style={{ flex: 0.6 }}>
+                  <AttemptsRow attempts={item.attempts} status={item.status} />
+                </View>
+                <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.created}</Text>
+                <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
+                <View style={{ flex: 0.7, flexDirection: "row", gap: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => router.push("/viewbankdetails")}
+                    style={{
+                      backgroundColor: "#EFF6FF",
+                      borderWidth: 1,
+                      borderColor: "#BFDBFE",
+                      borderRadius: 6,
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Ionicons name="eye-outline" size={12} color={BLUE} />
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: BLUE }}>View</Text>
+                  </TouchableOpacity>
+                  {item.status === "Pending" && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: "#F0FDF4",
+                        borderWidth: 1,
+                        borderColor: "#BBF7D0",
+                        borderRadius: 6,
+                        paddingVertical: 6,
+                        paddingHorizontal: 10,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
                     >
-                      <td style={{ padding: "13px 14px", fontWeight: 700, color: "#94A3B8", fontSize: 12 }}>{v.id}</td>
-                      <td style={{ padding: "13px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <Avatar initials={v.initials} color={v.color} size={34} />
-                          <div>
-                            <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 13 }}>{v.sellerName}</div>
-                            <div style={{ fontSize: 11, color: "#94A3B8" }}><i className="bi bi-envelope" style={{ marginRight: 3 }} />{v.email}</div>
-                            <div style={{ fontSize: 11, color: "#94A3B8" }}><i className="bi bi-telephone" style={{ marginRight: 3 }} />{v.phone}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "13px 14px" }}>
-                        <div style={{ fontSize: 12, color: "#374151", fontWeight: 600 }}>{v.account}</div>
-                        <div style={{ fontSize: 11, color: "#94A3B8" }}><i className="bi bi-bank" style={{ marginRight: 3 }} />{v.bank}</div>
-                        <div style={{ fontSize: 11, color: "#94A3B8" }}>IFSC: {v.ifsc}</div>
-                      </td>
-                      <td style={{ padding: "13px 14px" }}><StatusBadge status={v.status} /></td>
-                      <td style={{ padding: "13px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                          {[...Array(3)].map((_, i) => (
-                            <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: i < v.attempts ? (v.status === "Failed" ? "#EF4444" : v.status === "Verified" ? "#22C55E" : "#F59E0B") : "#E2E8F0" }} />
-                          ))}
-                          <span style={{ fontSize: 12, color: "#64748B", marginLeft: 2, fontWeight: 600 }}>{v.attempts}/3</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "13px 14px", fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>{v.created}</td>
-                      <td style={{ padding: "13px 14px", fontSize: 12, color: v.verified === "—" ? "#CBD5E1" : "#475569", whiteSpace: "nowrap" }}>{v.verified}</td>
-                      <td style={{ padding: "13px 14px" }}>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={{ background: "#EFF6FF", color: BLUE, border: `1px solid #BFDBFE`, borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }} onClick={() => router.push('/viewbankdetails')}>
-                            <i className="bi bi-eye-fill" /> View
-                          </button>
-                          {v.status === "Pending" && (
-                            <button style={{ background: "#F0FDF4", color: "#16A34A", border: "1px solid #BBF7D0", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                              <i className="bi bi-check-lg" /> Verify
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            /* Mobile Cards */
-            <div style={{ padding: "12px 10px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {paginated.length === 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", color: "#94A3B8" }}>
-                  <i className="bi bi-info-circle" style={{ fontSize: 36, marginBottom: 10 }} />
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>No verifications found</span>
-                  {(searchQuery || statusFilter !== "All Status") && (
-                    <button onClick={() => { setSearchInput(""); setSearchQuery(""); setStatusFilter("All Status"); setPage(1); }}
-                      style={{ marginTop: 10, background: "none", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 14px", fontSize: 12, color: BLUE, cursor: "pointer", fontWeight: 600 }}>
-                      Clear filters
-                    </button>
+                      <Ionicons name="checkmark-outline" size={12} color="#16A34A" />
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#16A34A" }}>Verify</Text>
+                    </TouchableOpacity>
                   )}
-                </div>
-              ) : paginated.map(v => (
-                <div key={v.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, background: "#FAFBFD" }}>
-                  {/* Header row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                    <Avatar initials={v.initials} color={v.color} size={42} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }}>{v.sellerName}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        <i className="bi bi-envelope" style={{ marginRight: 3 }} />{v.email}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>
-                        <i className="bi bi-telephone" style={{ marginRight: 3 }} />{v.phone}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textAlign: "right" }}>{v.id}</div>
-                      <StatusBadge status={v.status} size="small" />
-                    </div>
-                  </div>
-                  {/* Account info */}
-                  <div style={{ background: "#F8FAFC", borderRadius: 8, padding: "10px 12px", marginBottom: 10, fontSize: 12 }}>
-                    <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 3 }}>
-                      <i className="bi bi-credit-card" style={{ color: "#64748B" }} />
-                      <span style={{ fontWeight: 700, color: "#374151" }}>{v.account}</span>
-                    </div>
-                    <div style={{ color: "#94A3B8" }}><i className="bi bi-bank" style={{ marginRight: 3 }} />{v.bank} · IFSC: {v.ifsc}</div>
-                  </div>
-                  {/* Meta grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-                    {[
-                      { icon: "bi-arrow-repeat", label: "Attempts", val: `${v.attempts}/3` },
-                      { icon: "bi-calendar3",    label: "Created",  val: v.created },
-                      { icon: "bi-calendar-check",label:"Verified", val: v.verified },
-                    ].map(({ icon, label, val }) => (
-                      <div key={label} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 8px" }}>
-                        <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>
-                          <i className={`bi ${icon}`} style={{ marginRight: 3 }} />{label}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#374151", fontWeight: 600 }}>{val}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Actions */}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button style={{ flex: 1, background: "#EFF6FF", color: BLUE, border: "1px solid #BFDBFE", borderRadius: 8, padding: "8px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }} onClick={() => router.push('/viewbankdetails')}>
-                      <i className="bi bi-eye-fill" /> View
-                    </button>
-                    {v.status === "Pending" && (
-                      <button style={{ flex: 1, background: "#F0FDF4", color: "#16A34A", border: "1px solid #BBF7D0", borderRadius: 8, padding: "8px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                        <i className="bi bi-check-lg" /> Verify
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                </View>
+              </View>
+            ))}
 
-          {/* ── Pagination ── */}
-          {filtered.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "12px 10px" : "14px 20px", borderTop: `1px solid ${BORDER}`, flexWrap: "wrap", gap: 8 }}>
-              <span style={{ fontSize: 12, color: "#64748B" }}>
-                Page {safePage} of {totalPages}
-              </span>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                <PagBtn icon="bi-chevron-double-left"  onClick={() => setPage(1)}          disabled={safePage === 1} />
-                <PagBtn icon="bi-chevron-left"         onClick={() => setPage(p => Math.max(1, p-1))} disabled={safePage === 1} />
-                {pageNums.map((p, i) => p === "..." ? (
-                  <span key={"e" + i} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#94A3B8" }}>…</span>
-                ) : (
-                  <button key={p} onClick={() => setPage(p as number)}
-                    style={{ width: 32, height: 32, border: `1px solid ${safePage === p ? BLUE : BORDER}`, borderRadius: 8, background: safePage === p ? BLUE : "#fff", color: safePage === p ? "#fff" : "#374151", fontWeight: 700, cursor: "pointer", fontSize: 13, transition: "all 0.12s" }}>
-                    {p}
-                  </button>
+            {/* Table Footer */}
+            <View style={{
+              flexDirection: "row",
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              backgroundColor: "#fff",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}>
+              <Text style={{ fontSize: 12, color: "#666" }}>
+                Showing {(safePage - 1) * perPage + 1} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} entries
+              </Text>
+              <View style={{ flexDirection: "row", gap: 4 }}>
+                <PagBtn iconName="chevron-back" onPress={() => setPage(safePage - 1)} disabled={safePage === 1} />
+                {pageNums.map((p, i) => (
+                  typeof p === "number" ? (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => setPage(p)}
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: p === safePage ? BLUE : "#fff",
+                        borderWidth: 1, borderColor: BORDER,
+                        alignItems: "center", justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: p === safePage ? "#fff" : "#374151" }}>{p}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text key={i} style={{ fontSize: 12, color: "#94A3B8", paddingHorizontal: 4 }}>{p}</Text>
+                  )
                 ))}
-                <PagBtn icon="bi-chevron-right"        onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={safePage === totalPages} />
-                <PagBtn icon="bi-chevron-double-right" onClick={() => setPage(totalPages)} disabled={safePage === totalPages} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+                <PagBtn iconName="chevron-forward" onPress={() => setPage(safePage + 1)} disabled={safePage === totalPages} />
+              </View>
+            </View>
+          </View>
 
-      {/* ── Footer ── */}
-      <div style={{ textAlign: "center", padding: "16px 20px", fontSize: 13, color: "#94A3B8", borderTop: `1px solid ${BORDER}`, background: "#fff" }}>
-        2026 © Flintnthread India Pvt. Ltd. Crafted by{" "}
-        <a href="#" style={{ color: "#16A34A", fontWeight: 700, textDecoration: "none" }}>Flinththread India Pvt. Ltd.</a>
-      </div>
-    </div>
+          {/* ── Footer ── */}
+          <View style={{
+            marginTop: 16, paddingVertical: 16,
+            borderTopWidth: 1, borderTopColor: BORDER,
+            backgroundColor: "#fff", borderRadius: 8,
+            alignItems: "center",
+          }}>
+            <Text style={{ fontSize: 13, color: "#94A3B8", textAlign: "center" }}>
+              2026 © Flintnthread India Pvt. Ltd.{"\n"}Crafted by{" "}
+              <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
+            </Text>
+          </View>
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
-function PagBtn({ icon, onClick, disabled }: { icon: string; onClick: () => void; disabled: boolean }) {
-  return (
-    <button onClick={onClick} disabled={disabled}
-      style={{ width: 32, height: 32, border: `1px solid #E2E8F0`, borderRadius: 8, background: "#fff", cursor: disabled ? "not-allowed" : "pointer", color: disabled ? "#CBD5E1" : "#374151", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = "#F1F5F9"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
-      <i className={`bi ${icon}`} style={{ fontSize: 11 }} />
-    </button>
-  );
-}
+const styles = StyleSheet.create({
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 6,
+  },
+});

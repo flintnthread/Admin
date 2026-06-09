@@ -1,13 +1,64 @@
-// Bootstrap Icons CDN — add to your index.html:
-// <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+/**
+ * SupportTicketManagement.tsx
+ * React Native — exact port of the web version
+ *
+ * Dependencies (add to your project):
+ *   npm install @expo/vector-icons
+ *   -- OR --
+ *   npm install react-native-vector-icons
+ *   (icons used: MaterialCommunityIcons + Ionicons as Bootstrap-icon substitutes)
+ *
+ * Bootstrap Icons are web-only (SVG font). The closest RN approach is
+ * @expo/vector-icons (MaterialCommunityIcons / Ionicons). Every icon is
+ * mapped 1-to-1 to a visually identical alternative below.
+ */
 
-import { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+import {
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View, 
+  useWindowDimensions,
+} from "react-native";
 
-/* ═══════════════════════════════════════════
+// ─── icon shim ───────────────────────────────────────────────────────────────
+// If you use Expo: import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+// If you use bare RN: import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+//                     import Ionicons from "react-native-vector-icons/Ionicons";
+//
+// For demonstration this file uses a tiny fallback so it compiles without the
+// package. Replace the two lines below with the real imports once installed.
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { width: SCREEN_W } = Dimensions.get("window");
+
+/* ══════════════════════════════════════════════
+   THEME
+══════════════════════════════════════════════ */
+const ORANGE  = "#F97316";
+const DARK_BG = "#7B3F00";
+
+/* ══════════════════════════════════════════════
    TYPES
-═══════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 type TicketStatus   = "Open" | "In Progress" | "Waiting" | "Resolved" | "Urgent";
 type TicketPriority = "General" | "High" | "Low" | "Critical";
+
+interface Message {
+  from:    string;
+  content: string;
+  time:    string;
+  isAdmin: boolean;
+}
 
 interface Ticket {
   id:       string;
@@ -20,16 +71,9 @@ interface Ticket {
   messages: Message[];
 }
 
-interface Message {
-  from:    string;
-  content: string;
-  time:    string;
-  isAdmin: boolean;
-}
-
-/* ═══════════════════════════════════════════
+/* ══════════════════════════════════════════════
    SAMPLE DATA
-═══════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 const TICKETS: Ticket[] = [
   {
     id: "1",
@@ -102,12 +146,9 @@ const TICKETS: Ticket[] = [
   },
 ];
 
-/* ═══════════════════════════════════════════
-   CONSTANTS
-═══════════════════════════════════════════ */
-const ORANGE  = "#F97316";
-const DARK_BG = "#7B3F00";
-
+/* ══════════════════════════════════════════════
+   BADGE CONFIGS
+══════════════════════════════════════════════ */
 const PRIORITY_BADGE: Record<TicketPriority, { bg: string; color: string }> = {
   "General":  { bg: "#1F2937", color: "#fff" },
   "High":     { bg: "#F59E0B", color: "#fff" },
@@ -123,314 +164,366 @@ const STATUS_BADGE: Record<TicketStatus, { bg: string; color: string }> = {
   "Urgent":      { bg: "#EF4444", color: "#fff" },
 };
 
-const ALL_STATUSES:   (TicketStatus   | "All Status")[]     = ["All Status",     "Open", "In Progress", "Waiting", "Resolved", "Urgent"];
+const ALL_STATUSES:   (TicketStatus   | "All Status")[]     = ["All Status", "Open", "In Progress", "Waiting", "Resolved", "Urgent"];
 const ALL_PRIORITIES: (TicketPriority | "All Priorities")[] = ["All Priorities", "General", "High", "Low", "Critical"];
 
-/* ═══════════════════════════════════════════
-   BADGES
-═══════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   ICON MAP  (Bootstrap → MaterialCommunityIcons / Ionicons)
+══════════════════════════════════════════════ */
+// Each helper renders an icon matching the original Bootstrap icon
+const Icon = {
+  headset:        (size: number, color: string) => <MaterialCommunityIcons name="headset" size={size} color={color} />,
+  ticket:         (size: number, color: string) => <MaterialCommunityIcons name="ticket-outline" size={size} color={color} />,
+  envelopeOpen:   (size: number, color: string) => <MaterialCommunityIcons name="email-open-outline" size={size} color={color} />,
+  refresh:        (size: number, color: string) => <MaterialCommunityIcons name="refresh" size={size} color={color} />,
+  clock:          (size: number, color: string) => <MaterialCommunityIcons name="clock-outline" size={size} color={color} />,
+  checkCircle:    (size: number, color: string) => <MaterialCommunityIcons name="check-circle-outline" size={size} color={color} />,
+  exclamation:    (size: number, color: string) => <MaterialCommunityIcons name="alert-circle-outline" size={size} color={color} />,
+  person:         (size: number, color: string) => <MaterialCommunityIcons name="account-circle-outline" size={size} color={color} />,
+  personFill:     (size: number, color: string) => <MaterialCommunityIcons name="account-circle" size={size} color={color} />,
+  send:           (size: number, color: string) => <MaterialCommunityIcons name="send" size={size} color={color} />,
+  chat:           (size: number, color: string) => <MaterialCommunityIcons name="chat-outline" size={size} color={color} />,
+  inbox:          (size: number, color: string) => <MaterialCommunityIcons name="inbox" size={size} color={color} />,
+  home:           (size: number, color: string) => <MaterialCommunityIcons name="home" size={size} color={color} />,
+  chevronRight:   (size: number, color: string) => <MaterialCommunityIcons name="chevron-right" size={size} color={color} />,
+  chevronDown:    (size: number, color: string) => <MaterialCommunityIcons name="chevron-down" size={size} color={color} />,
+  chevronUp:      (size: number, color: string) => <MaterialCommunityIcons name="chevron-up" size={size} color={color} />,
+  arrowLeft:      (size: number, color: string) => <MaterialCommunityIcons name="arrow-left" size={size} color={color} />,
+};
+
+/* ══════════════════════════════════════════════
+   PRIORITY & STATUS BADGES
+══════════════════════════════════════════════ */
 function PriorityBadge({ priority }: { priority: TicketPriority }) {
   const cfg = PRIORITY_BADGE[priority];
   return (
-    <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700, display: "inline-block" }}>
-      {priority}
-    </span>
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{priority}</Text>
+    </View>
   );
 }
 
 function StatusBadge({ status }: { status: TicketStatus }) {
   const cfg = STATUS_BADGE[status];
   return (
-    <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 5, padding: "2px 9px", fontSize: 11, fontWeight: 700, display: "inline-block" }}>
-      {status}
-    </span>
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{status}</Text>
+    </View>
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ══════════════════════════════════════════════
    CUSTOM DROPDOWN
-═══════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 function Dropdown<T extends string>({
-  value, onChange, options, style = {}
+  value, onChange, options,
 }: {
-  value: T; onChange: (v: T) => void; options: T[]; style?: React.CSSProperties;
+  value: T; onChange: (v: T) => void; options: T[];
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = Dimensions.get("window");
+  const isDesktop = screenW >= 1024;
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const { width: screenWidth } = Dimensions.get("window");
+        const menuWidth = Math.min(width, screenWidth - 32);
+        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      });
+    }
+    setOpen(o => !o);
+  };
 
   return (
-    <div ref={ref} style={{ position: "relative", ...style }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          border: "1px solid #D1D5DB", borderRadius: 8,
-          padding: "9px 36px 9px 14px", fontSize: 13,
-          color: "#374151", background: "#fff", cursor: "pointer",
-          display: "flex", alignItems: "center",
-          userSelect: "none", position: "relative"
-        }}
+    <View style={{ position: "relative", zIndex: 10 }}>
+      <TouchableOpacity
+        ref={triggerRef as any}
+        onPress={handlePress}
+        style={styles.dropdownTrigger}
+        activeOpacity={0.8}
       >
-        <span style={{ flex: 1 }}>{value}</span>
-        <i className={`bi bi-chevron-${open ? "up" : "down"}`} style={{ fontSize: 12, color: "#6B7280" }} />
-      </div>
-      {open && (
-        <div style={{
-          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-          background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.12)", zIndex: 9999, overflow: "hidden"
-        }}>
-          {options.map(opt => (
-            <div
-              key={opt}
-              onClick={() => { onChange(opt); setOpen(false); }}
-              style={{
-                padding: "9px 14px", fontSize: 13, cursor: "pointer",
-                background: value === opt ? "#FFF7ED" : "#fff",
-                color: value === opt ? ORANGE : "#374151",
-                fontWeight: value === opt ? 700 : 400,
-                borderBottom: "1px solid #F3F4F6",
-                transition: "background 0.12s",
-              }}
-              onMouseEnter={e => { if (value !== opt) (e.currentTarget as HTMLElement).style.background = "#F9FAFB"; }}
-              onMouseLeave={e => { if (value !== opt) (e.currentTarget as HTMLElement).style.background = "#fff"; }}
-            >
-              {opt}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        <Text style={styles.dropdownValue}>{value}</Text>
+        {open ? Icon.chevronUp(12, "#6B7280") : Icon.chevronDown(12, "#6B7280")}
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={{
+            position: "absolute",
+            top: menuPosition.top,
+            left: menuPosition.left,
+            width: menuPosition.width,
+            zIndex: 9999,
+          }}>
+            <View style={{
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 10,
+              overflow: "hidden",
+              width: "100%",
+              maxWidth: isDesktop ? 400 : 320,
+              zIndex: 10000,
+            }}>
+              {options.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => { onChange(opt); setOpen(false); }}
+                  style={[
+                    styles.dropdownItem,
+                    value === opt && styles.dropdownItemSelected,
+                  ]}
+                >
+                  <Text style={[
+                    styles.dropdownItemText,
+                    value === opt && styles.dropdownItemTextSelected,
+                  ]}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+      </Modal>
+    </View>
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ══════════════════════════════════════════════
    STAT CARD
-═══════════════════════════════════════════ */
+══════════════════════════════════════════════ */
+type StatIconKey = keyof typeof STAT_ICONS;
+const STAT_ICONS = {
+  "bi-ticket-perforated-fill":  () => Icon.ticket(24, "#fff"),
+  "bi-envelope-open-fill":      () => Icon.envelopeOpen(24, "#fff"),
+  "bi-arrow-clockwise":         () => Icon.refresh(24, "#fff"),
+  "bi-clock-fill":              () => Icon.clock(24, "#fff"),
+  "bi-check-circle-fill":       () => Icon.checkCircle(24, "#fff"),
+  "bi-exclamation-circle-fill": () => Icon.exclamation(24, "#fff"),
+};
+
 function StatCard({ label, count, bg, icon }: { label: string; count: number; bg: string; icon: string }) {
+  const renderIcon = STAT_ICONS[icon as StatIconKey];
   return (
-    <div style={{
-      background: bg, borderRadius: 12, padding: "18px 12px",
-      display: "flex", flexDirection: "column", alignItems: "center",
-      justifyContent: "center", gap: 6, color: "#fff",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-      minHeight: 100,
-    }}>
-      <i className={`bi ${icon}`} style={{ fontSize: 24, opacity: 0.95 }} />
-      <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{count}</div>
-      <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.92, textAlign: "center", lineHeight: 1.3 }}>{label}</div>
-    </div>
+    <View style={[styles.statCard, { backgroundColor: bg }]}>
+      {renderIcon?.()}
+      <Text style={styles.statCount}>{count}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ══════════════════════════════════════════════
    TICKET ROW
-═══════════════════════════════════════════ */
-function TicketRow({ ticket, selected, onClick }: { ticket: Ticket; selected: boolean; onClick: () => void }) {
+══════════════════════════════════════════════ */
+function TicketRow({
+  ticket, selected, onPress,
+}: {
+  ticket: Ticket; selected: boolean; onPress: () => void;
+}) {
   return (
-    <div
-      onClick={onClick}
-      style={{
-        padding: "14px 16px", borderBottom: "1px solid #F3F4F6",
-        cursor: "pointer",
-        background: selected ? "#FFF7ED" : "#fff",
-        borderLeft: selected ? `3px solid ${ORANGE}` : "3px solid transparent",
-        transition: "all 0.15s",
-      }}
-      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = "#FAFAFA"; }}
-      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = "#fff"; }}
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[
+        styles.ticketRow,
+        selected && styles.ticketRowSelected,
+      ]}
     >
-      <div style={{ fontWeight: 700, fontSize: 13, color: "#111827", marginBottom: 5, lineHeight: 1.4 }}>
-        {ticket.subject}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7, color: "#6B7280", fontSize: 12 }}>
-        <i className="bi bi-person-circle" style={{ fontSize: 13 }} />
-        <span>{ticket.user}</span>
-      </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-        <PriorityBadge priority={ticket.priority} />
-        <StatusBadge   status={ticket.status}   />
-      </div>
-      <div style={{ fontSize: 11, color: "#9CA3AF" }}>
-        {ticket.ticketNo} | {ticket.date}
-      </div>
-    </div>
+      {/* left accent bar */}
+      <View style={[
+        styles.ticketAccent,
+        { backgroundColor: selected ? ORANGE : "transparent" },
+      ]} />
+
+      <View style={{ flex: 1, paddingLeft: 12 }}>
+        <Text style={styles.ticketSubject} numberOfLines={2}>{ticket.subject}</Text>
+        <View style={styles.ticketUserRow}>
+          {Icon.person(13, "#6B7280")}
+          <Text style={styles.ticketUser}>{ticket.user}</Text>
+        </View>
+        <View style={styles.ticketBadgeRow}>
+          <PriorityBadge priority={ticket.priority} />
+          <View style={{ width: 6 }} />
+          <StatusBadge status={ticket.status} />
+        </View>
+        <Text style={styles.ticketMeta}>{ticket.ticketNo}  |  {ticket.date}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ══════════════════════════════════════════════
    CONVERSATION PANEL
-═══════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 function ConversationPanel({
-  ticket, onBack, isMobile
-}: { ticket: Ticket | null; onBack?: () => void; isMobile: boolean }) {
+  ticket, onBack, onSendMessage,
+}: {
+  ticket: Ticket | null; onBack: () => void; onSendMessage: (message: string) => void;
+}) {
   const [replyText, setReplyText] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [ticket]);
-
-  /* Empty state — shows chat icon exactly like the screenshot */
   if (!ticket) {
     return (
-      <div style={{
-        flex: 1, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        gap: 14, color: "#9CA3AF",
-        padding: 40, background: "#fff",
-        minHeight: isMobile ? 320 : "auto",
-      }}>
-        {/* Chat bubble icon matching screenshot */}
-        <div style={{
-          width: 72, height: 72, borderRadius: "50%",
-          background: "#F3F4F6",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <i className="bi bi-chat-square-dots" style={{ fontSize: 34, color: "#D1D5DB" }} />
-        </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#374151", textAlign: "center" }}>
-          Select a ticket to view conversation
-        </div>
-        <div style={{ fontSize: 13, color: "#9CA3AF", textAlign: "center", maxWidth: 260, lineHeight: 1.6 }}>
-          Choose from the list on the left to start helping users
-        </div>
-      </div>
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIconCircle}>
+          {Icon.chat(34, "#D1D5DB")}
+        </View>
+        <Text style={styles.emptyTitle}>Select a ticket to view conversation</Text>
+        <Text style={styles.emptySubtitle}>Choose from the list to start helping users</Text>
+      </View>
     );
   }
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+    <View style={styles.chatContainer}>
       {/* Header */}
-      <div style={{
-        padding: "14px 20px", borderBottom: "1px solid #E5E7EB",
-        background: "#fff", display: "flex", alignItems: "flex-start", gap: 10,
-        flexShrink: 0,
-      }}>
-        {isMobile && onBack && (
-          <button
-            onClick={onBack}
-            style={{
-              border: "none", background: "#F3F4F6", borderRadius: 8,
-              width: 34, height: 34, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
-            }}
-          >
-            <i className="bi bi-arrow-left" style={{ fontSize: 15, color: "#374151" }} />
-          </button>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 4 }}>{ticket.subject}</div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: "#6B7280" }}>
-              <i className="bi bi-person-circle" style={{ marginRight: 4 }} />{ticket.user}
-            </span>
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>|</span>
+      <View style={styles.chatHeader}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          {Icon.arrowLeft(15, "#374151")}
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={styles.chatHeaderTitle} numberOfLines={2}>{ticket.subject}</Text>
+          <View style={styles.chatHeaderMeta}>
+            <View style={{ marginRight: 4 }}>{Icon.person(11, "#6B7280")}</View>
+            <Text style={styles.chatHeaderUser}>{ticket.user}</Text>
+            <Text style={styles.chatHeaderSep}> | </Text>
             <PriorityBadge priority={ticket.priority} />
-            <StatusBadge   status={ticket.status}   />
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>{ticket.ticketNo}</span>
-          </div>
-        </div>
-      </div>
+            <View style={{ width: 4 }} />
+            <StatusBadge status={ticket.status} />
+          </View>
+          <Text style={styles.ticketMeta}>{ticket.ticketNo}</Text>
+        </View>
+      </View>
 
       {/* Messages */}
-      <div style={{
-        flex: 1, overflowY: "auto", padding: "16px 20px",
-        background: "#F9FAFB", display: "flex", flexDirection: "column", gap: 14,
-      }}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.messageList}
+        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      >
         {ticket.messages.map((msg, idx) => (
-          <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: msg.isAdmin ? "flex-end" : "flex-start" }}>
-            <div style={{
-              maxWidth: "78%", padding: "11px 14px",
-              borderRadius: msg.isAdmin ? "14px 4px 14px 14px" : "4px 14px 14px 14px",
-              background: msg.isAdmin ? ORANGE : "#fff",
-              color: msg.isAdmin ? "#fff" : "#1F2937",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-              fontSize: 13, lineHeight: 1.55
-            }}>
-              <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 4, opacity: 0.85 }}>
+          <View
+            key={idx}
+            style={[
+              styles.messageBubbleWrapper,
+              msg.isAdmin ? styles.messageBubbleRight : styles.messageBubbleLeft,
+            ]}
+          >
+            <View style={[
+              styles.messageBubble,
+              { backgroundColor: msg.isAdmin ? ORANGE : "#fff" },
+              msg.isAdmin ? styles.bubbleAdmin : styles.bubbleUser,
+            ]}>
+              <View style={styles.messageFrom}>
                 {msg.isAdmin
-                  ? <><i className="bi bi-headset" style={{ marginRight: 4 }} /></>
-                  : <><i className="bi bi-person-fill" style={{ marginRight: 4 }} /></>}
-                {msg.from}
-              </div>
-              {msg.content}
-            </div>
-            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4, paddingInline: 4 }}>{msg.time}</div>
-          </div>
+                  ? Icon.headset(11, "rgba(255,255,255,0.85)")
+                  : Icon.personFill(11, "#6B7280")}
+                <Text style={[
+                  styles.messageFromText,
+                  { color: msg.isAdmin ? "rgba(255,255,255,0.85)" : "#6B7280" },
+                ]}>
+                  {"  "}{msg.from}
+                </Text>
+              </View>
+              <Text style={[
+                styles.messageContent,
+                { color: msg.isAdmin ? "#fff" : "#1F2937" },
+              ]}>
+                {msg.content}
+              </Text>
+            </View>
+            <Text style={[
+              styles.messageTime,
+              { alignSelf: msg.isAdmin ? "flex-end" : "flex-start" },
+            ]}>
+              {msg.time}
+            </Text>
+          </View>
         ))}
-        <div ref={messagesEndRef} />
-      </div>
+      </ScrollView>
 
       {/* Reply box */}
-      <div style={{
-        padding: "12px 16px", borderTop: "1px solid #E5E7EB",
-        background: "#fff", display: "flex", gap: 10, alignItems: "flex-end",
-        flexShrink: 0,
-      }}>
-        <textarea
+      <View style={styles.replyBox}>
+        <TextInput
           value={replyText}
-          onChange={e => setReplyText(e.target.value)}
+          onChangeText={setReplyText}
           placeholder="Type your reply..."
-          rows={2}
-          style={{
-            flex: 1, resize: "none", border: "1px solid #D1D5DB",
-            borderRadius: 10, padding: "10px 12px", fontSize: 13,
-            fontFamily: "inherit", color: "#374151", outline: "none"
-          }}
+          placeholderTextColor="#9CA3AF"
+          multiline
+          numberOfLines={2}
+          style={styles.replyInput}
         />
-        <button
-          onClick={() => setReplyText("")}
-          style={{
-            background: ORANGE, color: "#fff", border: "none",
-            borderRadius: 10, padding: "10px 18px", fontWeight: 700,
-            fontSize: 13, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 6,
-            height: 44, whiteSpace: "nowrap"
+        <TouchableOpacity
+          onPress={() => {
+            if (replyText.trim()) {
+              onSendMessage(replyText);
+              setReplyText("");
+            }
           }}
+          style={styles.sendBtn}
+          activeOpacity={0.85}
         >
-          <i className="bi bi-send-fill" /> Send
-        </button>
-      </div>
-    </div>
+          {Icon.send(14, "#fff")}
+          <Text style={styles.sendBtnText}>Send</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ══════════════════════════════════════════════
    MAIN COMPONENT
-═══════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 export default function SupportTicketManagement() {
-  const [windowW, setWindowW] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1200
-  );
   const [statusFilter,   setStatusFilter]   = useState<TicketStatus | "All Status">("All Status");
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority | "All Priorities">("All Priorities");
   const [selectedId,     setSelectedId]     = useState<string | null>(null);
-  const [mobileView,     setMobileView]     = useState<"list" | "chat">("list");
+  const [view,           setView]           = useState<"list" | "chat">("list");
+  const [tickets,        setTickets]        = useState(TICKETS);
 
-  useEffect(() => {
-    const onResize = () => setWindowW(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const isDesktop = width >= 1024;
 
-  const isMobile  = windowW < 640;
-  const isTablet  = windowW >= 640  && windowW < 1024;
-  const isDesktop = windowW >= 1024;
+  const handleSendMessage = (message: string) => {
+    if (selectedId) {
+      setTickets(prev => prev.map(t => {
+        if (t.id === selectedId) {
+          return {
+            ...t,
+            messages: [
+              ...t.messages,
+              { from: "Support Team", content: message, time: new Date().toLocaleString(), isAdmin: true }
+            ]
+          };
+        }
+        return t;
+      }));
+    }
+  };
 
-  /* Stat counts */
-  const total   = TICKETS.length;
-  const countOf = (s: TicketStatus) => TICKETS.filter(t => t.status === s).length;
+  const countOf = (s: TicketStatus) => tickets.filter(t => t.status === s).length;
 
   const STATS = [
-    { label: "Total Tickets", count: total,                  bg: ORANGE,    icon: "bi-ticket-perforated-fill"   },
+    { label: "Total Tickets", count: tickets.length,        bg: ORANGE,    icon: "bi-ticket-perforated-fill"   },
     { label: "Open",          count: countOf("Open"),        bg: "#10B981", icon: "bi-envelope-open-fill"       },
     { label: "In Progress",   count: countOf("In Progress"), bg: "#F59E0B", icon: "bi-arrow-clockwise"          },
     { label: "Waiting",       count: countOf("Waiting"),     bg: "#0D9488", icon: "bi-clock-fill"               },
@@ -438,245 +531,688 @@ export default function SupportTicketManagement() {
     { label: "Urgent",        count: countOf("Urgent"),      bg: "#EF4444", icon: "bi-exclamation-circle-fill"  },
   ];
 
-  /* Filtered tickets */
-  const filtered = TICKETS.filter(t => {
-    const matchStatus   = statusFilter   === "All Status"      || t.status   === statusFilter;
-    const matchPriority = priorityFilter === "All Priorities"  || t.priority === priorityFilter;
-    return matchStatus && matchPriority;
+  const filtered = tickets.filter(t => {
+    const okStatus   = statusFilter   === "All Status"     || t.status   === statusFilter;
+    const okPriority = priorityFilter === "All Priorities" || t.priority === priorityFilter;
+    return okStatus && okPriority;
   });
 
-  const selectedTicket = TICKETS.find(t => t.id === selectedId) ?? null;
+  const selectedTicket = tickets.find(t => t.id === selectedId) ?? null;
 
-  /* Layout helpers */
-  const statGridCols = isMobile ? "1fr 1fr" : isTablet ? "repeat(3,1fr)" : "repeat(6,1fr)";
-  const sidebarW     = isDesktop ? 340 : isTablet ? 280 : "100%";
-  const contentPad   = isMobile ? "14px 12px" : isTablet ? "20px 18px" : "24px 32px";
+  // ── Chat screen ──────────────────────────────────────────────────────────
+  if (view === "chat") {
+    return (
+      <View style={styles.screen}>
+        <StatusBar barStyle="light-content" backgroundColor={ORANGE} />
+        <ConversationPanel
+          ticket={selectedTicket}
+          onBack={() => { setView("list"); setSelectedId(null); }}
+          onSendMessage={handleSendMessage}
+        />
+      </View>
+    );
+  }
 
-  /* ── Chat panel height on desktop/tablet ── */
-  const chatPanelHeight = isMobile ? "auto" : 560;
-
+  // ── List screen ──────────────────────────────────────────────────────────
   return (
-    <div style={{
-      background: "#F3F4F6",
-      minHeight: "100vh",
-      fontFamily: "'Segoe UI', 'Inter', sans-serif",
-      /* FIX: enable scroll on all viewports */
-      overflowY: "auto",
-      overflowX: "hidden",
-    }}>
-      <style>{`
-        * { box-sizing: border-box; }
-        textarea:focus, input:focus, button:focus { outline: none; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #F1F5F9; }
-        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-        html, body { height: 100%; overflow-y: auto; }
-      `}</style>
+    <View style={styles.screen}>
+      <StatusBar barStyle="light-content" backgroundColor={ORANGE} />
 
-      {/* ════════════════════════════════
-          ORANGE HEADER BANNER
-      ════════════════════════════════ */}
-      <div style={{
-        background: `linear-gradient(135deg, ${ORANGE} 0%, ${DARK_BG} 100%)`,
-        /* FIX: no negative overlap on mobile — use consistent padding */
-        padding: isMobile ? "20px 16px 24px" : "22px 32px 36px",
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* Decorative circles */}
-        {[
-          { size: 130, right: "6%",  top: "-35px",   opacity: 0.12 },
-          { size: 85,  right: "21%", top: "8px",     opacity: 0.09 },
-          { size: 65,  right: "14%", top: "50px",    opacity: 0.07 },
-        ].map((c, i) => (
-          <div key={i} style={{
-            position: "absolute", width: c.size, height: c.size, borderRadius: "50%",
-            background: "#fff", opacity: c.opacity,
-            right: c.right, top: c.top, pointerEvents: "none",
-          }} />
-        ))}
+      <ScrollView
+        style={{ flex: 1 }}
+        stickyHeaderIndices={[0]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── Orange Header ── */}
+        <View style={styles.header}>
+          {/* Decorative circles */}
+          <View style={[styles.deco, { width: 130, height: 130, right: -20, top: -35, opacity: 0.12 }]} />
+          <View style={[styles.deco, { width: 85,  height: 85,  right: 60, top: 8, opacity: 0.09 }]} />
+          <View style={[styles.deco, { width: 65,  height: 65,  right: 40, top: 50, opacity: 0.07 }]} />
 
-        {/* White icon box */}
-        <div style={{
-          width: 46, height: 46, background: "#fff", borderRadius: 12,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginBottom: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
-          position: "relative", zIndex: 1,
-        }}>
-          <i className="bi bi-headset" style={{ fontSize: 22, color: ORANGE }} />
-        </div>
+          {/* Icon box */}
+          <View style={styles.headerIconBox}>
+            {Icon.headset(22, ORANGE)}
+          </View>
+          <Text style={styles.headerTitle}>Support Ticket Management</Text>
 
-        <h1 style={{
-          color: "#fff", margin: 0, fontWeight: 800,
-          fontSize: isMobile ? 20 : 26, marginBottom: 6,
-          position: "relative", zIndex: 1,
-        }}>
-          Support Ticket Management
-        </h1>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          fontSize: 13, color: "rgba(255,255,255,0.85)",
-          position: "relative", zIndex: 1,
-        }}>
-          <i className="bi bi-house-door-fill" style={{ fontSize: 13 }} />
-          <span style={{ color: "#FFD89B", fontWeight: 600, cursor: "pointer" }}>Dashboard</span>
-          <i className="bi bi-chevron-right" style={{ fontSize: 11 }} />
-          <span>Support Management</span>
-        </div>
-      </div>
+          {/* Breadcrumb */}
+          <View style={styles.breadcrumb}>
+            {Icon.home(13, "rgba(255,255,255,0.85)")}
+            <Text style={styles.breadcrumbActive}>  Dashboard</Text>
+            {Icon.chevronRight(11, "rgba(255,255,255,0.7)")}
+            <Text style={styles.breadcrumbCurrent}>Support Management</Text>
+          </View>
+        </View>
 
-      {/* ════════════════════════════════
-          MAIN CONTENT AREA
-          FIX: positive marginTop for mobile — no overlap
-      ════════════════════════════════ */}
-      <div style={{
-        maxWidth: isDesktop ? 1320 : "100%",
-        margin: "0 auto",
-        padding: contentPad,
-        /* FIX: no negative margin. Use consistent positive top spacing */
-        paddingTop: isMobile ? 16 : isTablet ? 20 : 24,
-      }}>
+        <View style={[styles.content, { padding: isDesktop ? 32 : isMobile ? 14 : 20 }]}>
+          {/* ── Stat Cards (responsive grid) ── */}
+          <View style={styles.statGrid}>
+            {STATS.map((s, i) => (
+              <View key={s.label} style={[styles.statGridItem, isMobile && styles.statGridItemMobile, isDesktop && styles.statGridItemDesktop]}>
+                <StatCard {...s} />
+              </View>
+            ))}
+          </View>
 
-        {/* ── Stat Cards ── */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: statGridCols,
-          gap: isMobile ? 10 : 14,
-          marginBottom: isMobile ? 16 : 22,
-        }}>
-          {STATS.map(s => (
-            <StatCard key={s.label} {...s} />
-          ))}
-        </div>
+          {/* ── Filters ── */}
+          <View style={styles.filterCard}>
+            <View style={styles.filterRow}>
+              <View style={styles.filterCol}>
+                <Text style={styles.filterLabel}>Filter by Status</Text>
+                <Dropdown
+                  value={statusFilter as any}
+                  onChange={v => setStatusFilter(v as any)}
+                  options={ALL_STATUSES as any}
+                />
+              </View>
+              <View style={{ width: 14 }} />
+              <View style={styles.filterCol}>
+                <Text style={styles.filterLabel}>Filter by Priority</Text>
+                <Dropdown
+                  value={priorityFilter as any}
+                  onChange={v => setPriorityFilter(v as any)}
+                  options={ALL_PRIORITIES as any}
+                />
+              </View>
+            </View>
+          </View>
 
-        {/* ── Filters ── */}
-        <div style={{
-          background: "#fff",
-          borderRadius: 12,
-          border: "1px solid #E5E7EB",
-          padding: isMobile ? "14px" : "16px 20px",
-          marginBottom: isMobile ? 16 : 20,
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-          gap: 14,
-        }}>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-              Filter by Status
-            </label>
-            <Dropdown
-              value={statusFilter as any}
-              onChange={(v) => setStatusFilter(v as any)}
-              options={ALL_STATUSES as any}
-              style={{ width: "100%" }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-              Filter by Priority
-            </label>
-            <Dropdown
-              value={priorityFilter as any}
-              onChange={(v) => setPriorityFilter(v as any)}
-              options={ALL_PRIORITIES as any}
-              style={{ width: "100%" }}
-            />
-          </div>
-        </div>
+          {/* ── Desktop Two-Column Layout ── */}
+          {!isMobile && (
+            <View style={styles.desktopTwoColumnLayout}>
+              {/* Left Panel - Ticket List */}
+              <View style={styles.desktopLeftPanel}>
+                <View style={styles.ticketCard}>
+                  {/* List header */}
+                  <View style={styles.ticketListHeader}>
+                    {Icon.ticket(16, "#fff")}
+                    <Text style={styles.ticketListHeaderText}>Support Tickets</Text>
+                    <View style={styles.ticketCountBadge}>
+                      <Text style={styles.ticketCountText}>{filtered.length}</Text>
+                    </View>
+                  </View>
 
-        {/* ════════════════════════════════
-            TICKETS + CONVERSATION
-        ════════════════════════════════ */}
-        <div style={{
-          background: "#fff",
-          borderRadius: 14,
-          border: "1px solid #E5E7EB",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: isDesktop || isTablet ? "row" : "column",
-          /* FIX: on mobile, height is natural (auto) so it can expand and scroll.
-             On desktop/tablet, use a fixed height so conversation panel scrolls inside. */
-          height: isMobile ? "auto" : chatPanelHeight,
-        }}>
+                  {/* Rows */}
+                  {filtered.length === 0 ? (
+                    <View style={styles.noTickets}>
+                      {Icon.inbox(36, "#D1D5DB")}
+                      <Text style={styles.noTicketsText}>No tickets match the filters</Text>
+                    </View>
+                  ) : (
+                    filtered.map(t => (
+                      <TicketRow
+                        key={t.id}
+                        ticket={t}
+                        selected={selectedId === t.id}
+                        onPress={() => {
+                          setSelectedId(t.id);
+                        }}
+                      />
+                    ))
+                  )}
+                </View>
+              </View>
 
-          {/* ── LEFT: Ticket List ── */}
-          {(!isMobile || mobileView === "list") && (
-            <div style={{
-              width: isDesktop ? sidebarW : isTablet ? sidebarW : "100%",
-              borderRight: isDesktop || isTablet ? "1px solid #E5E7EB" : "none",
-              borderBottom: isMobile ? "1px solid #E5E7EB" : "none",
-              display: "flex",
-              flexDirection: "column",
-              flexShrink: 0,
-              /* on desktop it fills the fixed height and scrolls internally */
-              overflow: "hidden",
-              height: isMobile ? "auto" : "100%",
-            }}>
-              {/* Sidebar header */}
-              <div style={{
-                background: `linear-gradient(90deg, ${ORANGE} 0%, ${DARK_BG} 100%)`,
-                padding: "13px 16px",
-                display: "flex", alignItems: "center", gap: 8,
-                flexShrink: 0,
-              }}>
-                <i className="bi bi-ticket-perforated-fill" style={{ color: "#fff", fontSize: 16 }} />
-                <span style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>Support Tickets</span>
-                <span style={{
-                  marginLeft: "auto", background: "rgba(255,255,255,0.22)",
-                  color: "#fff", borderRadius: 20, padding: "1px 10px",
-                  fontSize: 11, fontWeight: 700,
-                }}>
-                  {filtered.length}
-                </span>
-              </div>
+              {/* Right Panel - Conversation Area */}
+              <View style={styles.desktopRightPanel}>
+                {selectedTicket ? (
+                  <ConversationPanel
+                    ticket={selectedTicket}
+                    onBack={() => setSelectedId(null)}
+                    onSendMessage={handleSendMessage}
+                  />
+                ) : (
+                  <View style={styles.desktopEmptyState}>
+                    <View style={styles.desktopEmptyIcon}>
+                      {Icon.chat(48, "#D1D5DB")}
+                    </View>
+                    <Text style={styles.desktopEmptyTitle}>Select a ticket to view conversation</Text>
+                    <Text style={styles.desktopEmptySubtitle}>Choose from the list on the left to start helping users</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
 
-              {/* Ticket rows */}
-              <div style={{
-                flex: 1,
-                overflowY: "auto",
-                /* mobile: show full list, no fixed height cap */
-              }}>
-                {filtered.length === 0 ? (
-                  <div style={{ padding: 40, textAlign: "center", color: "#9CA3AF" }}>
-                    <i className="bi bi-inbox" style={{ fontSize: 36, display: "block", marginBottom: 10, opacity: 0.4 }} />
-                    No tickets match the filters
-                  </div>
-                ) : filtered.map(t => (
+          {/* ── Mobile Ticket List ── */}
+          {isMobile && (
+            <View style={styles.ticketCard}>
+              {/* List header */}
+              <View style={styles.ticketListHeader}>
+                {Icon.ticket(16, "#fff")}
+                <Text style={styles.ticketListHeaderText}>Support Tickets</Text>
+                <View style={styles.ticketCountBadge}>
+                  <Text style={styles.ticketCountText}>{filtered.length}</Text>
+                </View>
+              </View>
+
+              {/* Rows */}
+              {filtered.length === 0 ? (
+                <View style={styles.noTickets}>
+                  {Icon.inbox(36, "#D1D5DB")}
+                  <Text style={styles.noTicketsText}>No tickets match the filters</Text>
+                </View>
+              ) : (
+                filtered.map(t => (
                   <TicketRow
                     key={t.id}
                     ticket={t}
                     selected={selectedId === t.id}
-                    onClick={() => {
+                    onPress={() => {
                       setSelectedId(t.id);
-                      if (isMobile) setMobileView("chat");
+                      setView("chat");
                     }}
                   />
-                ))}
-              </div>
-            </div>
+                ))
+              )}
+            </View>
           )}
 
-          {/* ── RIGHT: Conversation Panel ── */}
-          {(!isMobile || mobileView === "chat") && (
-            <div style={{
-              flex: 1, display: "flex", flexDirection: "column",
-              overflow: "hidden",
-              /* mobile chat: tall enough to show content */
-              minHeight: isMobile && mobileView === "chat" ? 500 : "auto",
-            }}>
-              <ConversationPanel
-                ticket={selectedTicket}
-                isMobile={isMobile}
-                onBack={() => { setMobileView("list"); setSelectedId(null); }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* ── Footer ── */}
-        <div style={{ textAlign: "center", padding: "20px 0 12px", fontSize: 12, color: "#9CA3AF" }}>
-          2026 © Flintnthread India Pvt. Ltd. — Support System
-        </div>
-      </div>
-    </div>
+          {/* Footer */}
+          <Text style={styles.footer}>
+            2026 © Flintnthread India Pvt. Ltd. — Support System
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
+
+/* ══════════════════════════════════════════════
+   STYLES
+══════════════════════════════════════════════ */
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+
+  /* ── Header ── */
+  header: {
+    backgroundColor: ORANGE,
+    paddingTop: (Platform.OS === "android" ? StatusBar.currentHeight ?? 24 : 44) + 16,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
+    overflow: "hidden",
+    position: "relative",
+  },
+  deco: {
+    position: "absolute",
+    borderRadius: 9999,
+    backgroundColor: "#fff",
+  },
+  headerIconBox: {
+    width: 46, height: 46,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 20,
+    marginBottom: 6,
+  },
+  breadcrumb: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  breadcrumbActive: {
+    color: "#FFD89B",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  breadcrumbCurrent: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 13,
+  },
+
+  /* ── Content ── */
+  content: {
+    padding: 14,
+  },
+
+  /* ── Stat Grid ── */
+  statGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -5,
+    marginBottom: 16,
+  },
+  statGridItem: {
+    width: "50%",
+    paddingHorizontal: 5,
+    marginBottom: 10,
+  },
+  statGridItemMobile: {
+    width: "32%",
+  },
+  statGridItemDesktop: {
+    width: "16.66%",
+  },
+
+  /* Desktop Two-Column Layout */
+  desktopTwoColumnLayout: {
+    flexDirection: "row",
+    gap: 20,
+    marginTop: 20,
+  },
+  desktopLeftPanel: {
+    width: "43%",
+  },
+  desktopRightPanel: {
+    width: "57%",
+  },
+  desktopEmptyState: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
+  desktopEmptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  desktopEmptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1a2332",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  desktopEmptySubtitle: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+  },
+  statCard: {
+    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 4,
+    minHeight: 100,
+  },
+  statCount: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 30,
+  },
+  statLabel: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    opacity: 0.92,
+    textAlign: "center",
+    lineHeight: 16,
+  },
+
+  /* ── Filter Card ── */
+  filterCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 14,
+    marginBottom: 16,
+    zIndex: 200,
+  },
+  filterRow: {
+    flexDirection: "row",
+  },
+  filterCol: {
+    flex: 1,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 6,
+  },
+
+  /* ── Dropdown ── */
+  dropdownTrigger: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  dropdownValue: {
+    flex: 1,
+    fontSize: 13,
+    color: "#374151",
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    zIndex: 9999,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 20,
+    elevation: 10,
+    marginTop: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#FFF7ED",
+  },
+  dropdownItemText: {
+    fontSize: 13,
+    color: "#374151",
+  },
+  dropdownItemTextSelected: {
+    color: ORANGE,
+    fontWeight: "700",
+  },
+
+  /* ── Ticket Card / List ── */
+  ticketCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    marginBottom: 16,
+  },
+  ticketListHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    backgroundColor: ORANGE,
+  },
+  ticketListHeaderText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+    flex: 1,
+  },
+  ticketCountBadge: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 1,
+  },
+  ticketCountText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  noTickets: {
+    padding: 40,
+    alignItems: "center",
+    gap: 10,
+  },
+  noTicketsText: {
+    color: "#9CA3AF",
+    fontSize: 13,
+  },
+
+  /* ── Ticket Row ── */
+  ticketRow: {
+    flexDirection: "row",
+    paddingVertical: 14,
+    paddingRight: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    backgroundColor: "#fff",
+  },
+  ticketRowSelected: {
+    backgroundColor: "#FFF7ED",
+  },
+  ticketAccent: {
+    width: 3,
+    borderRadius: 2,
+    alignSelf: "stretch",
+  },
+  ticketSubject: {
+    fontWeight: "700",
+    fontSize: 13,
+    color: "#111827",
+    marginBottom: 5,
+    lineHeight: 18,
+  },
+  ticketUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 7,
+  },
+  ticketUser: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  ticketBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 6,
+  },
+  ticketMeta: {
+    fontSize: 11,
+    color: "#9CA3AF",
+  },
+
+  /* ── Badge ── */
+  badge: {
+    borderRadius: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  /* ── Chat / Conversation ── */
+  chatContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+    flexDirection: "column",
+  },
+  chatHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 14,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) + 14 : 50,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    backgroundColor: "#fff",
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  chatHeaderTitle: {
+    fontWeight: "700",
+    fontSize: 14,
+    color: "#111827",
+    marginBottom: 4,
+  },
+  chatHeaderMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 4,
+    gap: 4,
+  },
+  chatHeaderUser: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
+  chatHeaderSep: {
+    fontSize: 11,
+    color: "#9CA3AF",
+  },
+  messageList: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+  },
+  messageBubbleWrapper: {
+    marginBottom: 14,
+  },
+  messageBubbleLeft: {
+    alignItems: "flex-start",
+  },
+  messageBubbleRight: {
+    alignItems: "flex-end",
+  },
+  messageBubble: {
+    maxWidth: "78%",
+    padding: 11,
+    paddingHorizontal: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  bubbleAdmin: {
+    borderRadius: 14,
+    borderTopRightRadius: 4,
+  },
+  bubbleUser: {
+    borderRadius: 14,
+    borderTopLeftRadius: 4,
+  },
+  messageFrom: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  messageFromText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  messageContent: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  messageTime: {
+    fontSize: 10,
+    color: "#9CA3AF",
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  replyBox: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    padding: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    backgroundColor: "#fff",
+    gap: 10,
+  },
+  replyInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: "#374151",
+    maxHeight: 80,
+    textAlignVertical: "top",
+  },
+  sendBtn: {
+    backgroundColor: ORANGE,
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sendBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  /* ── Empty State ── */
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+    backgroundColor: "#fff",
+    gap: 14,
+  },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#374151",
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
+    maxWidth: 260,
+    lineHeight: 21,
+  },
+
+  /* ── Footer ── */
+  footer: {
+    textAlign: "center",
+    fontSize: 12,
+    color: "#9CA3AF",
+    paddingVertical: 20,
+  },
+});

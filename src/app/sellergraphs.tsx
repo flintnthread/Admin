@@ -1,489 +1,710 @@
-// Bootstrap Icons loaded via CDN — add this to your index.html:
-// <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+/**
+ * SellersDashboard.native.tsx
+ * React Native (Expo) — full conversion of the Sellers Graph / Analysis web screen.
+ *
+ * Required packages:
+ *   expo install react-native-svg
+ *   npx expo install @expo/vector-icons
+ *   expo install expo-router
+ *
+ * Place at: app/sellersdashboard.tsx  (Expo Router)
+ */
 
-import { useEffect, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
+import Svg, {
+  Circle,
+  G, Line, Path,
+  Polygon,
+  Rect,
+  Text as SvgText
+} from "react-native-svg";
 
-const ORANGE = "#F97316";
+/* ─── Theme ─────────────────────────────────────────────────────────── */
+const ORANGE   = "#F97316";
 const DARK_NAV = "#1B2332";
-
-type Seller = {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  business: string;
-  onboard: string;
-  status: string;
-  profile: string;
-  kyc: string;
-  supplement: string;
-  shiprocket: string;
-  shipDate: string | null;
-  products: number;
-  initials: string;
-  color: string;
-};
-
-type ChartData = {
-  labels: string[];
-  registered: number[];
-  profileCompleted: number[];
-  approved: number[];
-  productsAdded: number[];
-  shiprocketUploaded: number[];
-  [key: string]: string[] | number[];
-};
+const BORDER   = "#E8EDF5";
+const LIGHT_BG = "#F8FAFC";
 
 /* ─── Data ─────────────────────────────────────────────────────────── */
 const ALL_SELLERS = [
-  { id: 286, name: "Sanju Sandilya",    email: "sanju.sandilya@gmail.com",  phone: "+91 98765 43210", business: "SG Creations",          onboard: "05 Jun, 2025", status: "Pending",           profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SS", color: "#F97316" },
-  { id: 285, name: "Khajaer Mohammed",  email: "khater2025@gmail.com",      phone: "+91 96158 43215", business: "ZOYA ALL BAGS CENTER",   onboard: "29 May, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 May, 2025", products: 2,  initials: "KM", color: "#10B981" },
-  { id: 284, name: "Sandhya Gudisa",    email: "sandhya.gm@gmail.com",      phone: "+91 98760 12349", business: "—",                     onboard: "28 May, 2025", status: "Awaiting Approval", profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SG", color: "#8B5CF6" },
-  { id: 283, name: "Rahul Sharma",      email: "rahul.sharma@gmail.com",    phone: "+91 97654 32109", business: "RS Traders",            onboard: "20 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "18 May, 2025", products: 5,  initials: "RS", color: "#3B82F6" },
-  { id: 282, name: "Priya Mehta",       email: "priya.mehta@gmail.com",     phone: "+91 96543 21098", business: "PM Boutique",           onboard: "15 May, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 3,  initials: "PM", color: "#EC4899" },
-  { id: 281, name: "Amit Verma",        email: "amit.verma@gmail.com",      phone: "+91 95432 10987", business: "Verma Electronics",     onboard: "10 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "08 May, 2025", products: 12, initials: "AV", color: "#06B6D4" },
-  { id: 280, name: "Neha Joshi",        email: "neha.joshi@gmail.com",      phone: "+91 94321 09876", business: "Joshi Handcrafts",      onboard: "05 May, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "NJ", color: "#F59E0B" },
-  { id: 279, name: "Vikram Singh",      email: "vikram.singh@gmail.com",    phone: "+91 93210 98765", business: "Singh Organics",        onboard: "01 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "28 Apr, 2025", products: 7,  initials: "VS", color: "#EF4444" },
-  { id: 278, name: "Deepa Nair",        email: "deepa.nair@gmail.com",      phone: "+91 92109 87654", business: "Nair Silks",            onboard: "28 Apr, 2025", status: "Awaiting Approval", profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 4,  initials: "DN", color: "#7C3AED" },
-  { id: 277, name: "Suresh Babu",       email: "suresh.babu@gmail.com",     phone: "+91 91098 76543", business: "Babu Enterprises",      onboard: "22 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 Apr, 2025", products: 9,  initials: "SB", color: "#059669" },
-  { id: 276, name: "Ananya Krishnan",   email: "ananya.k@gmail.com",        phone: "+91 90987 65432", business: "AK Fashion Studio",     onboard: "18 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "15 Apr, 2025", products: 15, initials: "AK", color: "#DC2626" },
-  { id: 275, name: "Manoj Tiwari",      email: "manoj.tiwari@gmail.com",    phone: "+91 89876 54321", business: "Tiwari General Store",  onboard: "12 Apr, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "MT", color: "#9333EA" },
-  { id: 274, name: "Rekha Pillai",      email: "rekha.pillai@gmail.com",    phone: "+91 88765 43210", business: "Pillai Naturals",       onboard: "08 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "05 Apr, 2025", products: 6,  initials: "RP", color: "#0891B2" },
-  { id: 273, name: "Arun Mishra",       email: "arun.mishra@gmail.com",     phone: "+91 87654 32109", business: "Mishra Kirana",         onboard: "03 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "01 Apr, 2025", products: 11, initials: "AM", color: "#16A34A" },
-  { id: 272, name: "Kavya Reddy",       email: "kavya.reddy@gmail.com",     phone: "+91 86543 21098", business: "Reddy Textiles",        onboard: "28 Mar, 2025", status: "Awaiting Approval", profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "KR", color: "#B45309" },
-  { id: 271, name: "Ravi Kumar",        email: "ravi.kumar@gmail.com",      phone: "+91 85432 10987", business: "Kumar Spices",          onboard: "22 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 Mar, 2025", products: 8,  initials: "RK", color: "#F97316" },
-  { id: 270, name: "Sunita Patel",      email: "sunita.patel@gmail.com",    phone: "+91 84321 09876", business: "Patel Groceries",       onboard: "18 Mar, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SP", color: "#10B981" },
-  { id: 269, name: "Arjun Nambiar",     email: "arjun.nambiar@gmail.com",   phone: "+91 83210 98765", business: "Nambiar Exports",       onboard: "14 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "12 Mar, 2025", products: 20, initials: "AN", color: "#8B5CF6" },
-  { id: 268, name: "Divya Menon",       email: "divya.menon@gmail.com",     phone: "+91 82109 87654", business: "Menon Crafts",          onboard: "10 Mar, 2025", status: "Awaiting Approval", profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 2,  initials: "DM", color: "#3B82F6" },
-  { id: 267, name: "Gopal Das",         email: "gopal.das@gmail.com",       phone: "+91 81098 76543", business: "Das Furniture",         onboard: "05 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "03 Mar, 2025", products: 14, initials: "GD", color: "#EC4899" },
+  { id: 286, name: "Sanju Sandilya",   email: "sanju.sandilya@gmail.com",  phone: "+91 98765 43210", business: "SG Creations",         onboard: "05 Jun, 2025", status: "Pending",           profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SS", color: "#F97316" },
+  { id: 285, name: "Khajaer Mohammed", email: "khater2025@gmail.com",      phone: "+91 96158 43215", business: "ZOYA ALL BAGS CENTER",  onboard: "29 May, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 May, 2025", products: 2,  initials: "KM", color: "#10B981" },
+  { id: 284, name: "Sandhya Gudisa",   email: "sandhya.gm@gmail.com",      phone: "+91 98760 12349", business: "—",                    onboard: "28 May, 2025", status: "Awaiting Approval", profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SG", color: "#8B5CF6" },
+  { id: 283, name: "Rahul Sharma",     email: "rahul.sharma@gmail.com",    phone: "+91 97654 32109", business: "RS Traders",            onboard: "20 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "18 May, 2025", products: 5,  initials: "RS", color: "#3B82F6" },
+  { id: 282, name: "Priya Mehta",      email: "priya.mehta@gmail.com",     phone: "+91 96543 21098", business: "PM Boutique",           onboard: "15 May, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 3,  initials: "PM", color: "#EC4899" },
+  { id: 281, name: "Amit Verma",       email: "amit.verma@gmail.com",      phone: "+91 95432 10987", business: "Verma Electronics",     onboard: "10 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "08 May, 2025", products: 12, initials: "AV", color: "#06B6D4" },
+  { id: 280, name: "Neha Joshi",       email: "neha.joshi@gmail.com",      phone: "+91 94321 09876", business: "Joshi Handcrafts",      onboard: "05 May, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "NJ", color: "#F59E0B" },
+  { id: 279, name: "Vikram Singh",     email: "vikram.singh@gmail.com",    phone: "+91 93210 98765", business: "Singh Organics",        onboard: "01 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "28 Apr, 2025", products: 7,  initials: "VS", color: "#EF4444" },
+  { id: 278, name: "Deepa Nair",       email: "deepa.nair@gmail.com",      phone: "+91 92109 87654", business: "Nair Silks",            onboard: "28 Apr, 2025", status: "Awaiting Approval", profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 4,  initials: "DN", color: "#7C3AED" },
+  { id: 277, name: "Suresh Babu",      email: "suresh.babu@gmail.com",     phone: "+91 91098 76543", business: "Babu Enterprises",      onboard: "22 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 Apr, 2025", products: 9,  initials: "SB", color: "#059669" },
+  { id: 276, name: "Ananya Krishnan",  email: "ananya.k@gmail.com",        phone: "+91 90987 65432", business: "AK Fashion Studio",     onboard: "18 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "15 Apr, 2025", products: 15, initials: "AK", color: "#DC2626" },
+  { id: 275, name: "Manoj Tiwari",     email: "manoj.tiwari@gmail.com",    phone: "+91 89876 54321", business: "Tiwari General Store",  onboard: "12 Apr, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "MT", color: "#9333EA" },
+  { id: 274, name: "Rekha Pillai",     email: "rekha.pillai@gmail.com",    phone: "+91 88765 43210", business: "Pillai Naturals",       onboard: "08 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "05 Apr, 2025", products: 6,  initials: "RP", color: "#0891B2" },
+  { id: 273, name: "Arun Mishra",      email: "arun.mishra@gmail.com",     phone: "+91 87654 32109", business: "Mishra Kirana",         onboard: "03 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "01 Apr, 2025", products: 11, initials: "AM", color: "#16A34A" },
+  { id: 272, name: "Kavya Reddy",      email: "kavya.reddy@gmail.com",     phone: "+91 86543 21098", business: "Reddy Textiles",        onboard: "28 Mar, 2025", status: "Awaiting Approval", profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "KR", color: "#B45309" },
+  { id: 271, name: "Ravi Kumar",       email: "ravi.kumar@gmail.com",      phone: "+91 85432 10987", business: "Kumar Spices",          onboard: "22 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 Mar, 2025", products: 8,  initials: "RK", color: "#F97316" },
+  { id: 270, name: "Sunita Patel",     email: "sunita.patel@gmail.com",    phone: "+91 84321 09876", business: "Patel Groceries",       onboard: "18 Mar, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SP", color: "#10B981" },
+  { id: 269, name: "Arjun Nambiar",    email: "arjun.nambiar@gmail.com",   phone: "+91 83210 98765", business: "Nambiar Exports",       onboard: "14 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "12 Mar, 2025", products: 20, initials: "AN", color: "#8B5CF6" },
+  { id: 268, name: "Divya Menon",      email: "divya.menon@gmail.com",     phone: "+91 82109 87654", business: "Menon Crafts",          onboard: "10 Mar, 2025", status: "Awaiting Approval", profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 2,  initials: "DM", color: "#3B82F6" },
+  { id: 267, name: "Gopal Das",        email: "gopal.das@gmail.com",       phone: "+91 81098 76543", business: "Das Furniture",         onboard: "05 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "03 Mar, 2025", products: 14, initials: "GD", color: "#EC4899" },
 ];
 
-const chartData: ChartData = {
-  labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-  registered:         [10,  20,  28,  50,  90, 160, 300, 450, 580, 680, 760, 880],
-  profileCompleted:   [ 0,   2,   5,  10,  20,  50, 120, 220, 320, 430, 500, 590],
-  approved:           [ 0,   1,   3,   8,  18,  55, 140, 250, 310, 380, 430, 440],
-  productsAdded:      [ 0,   0,   2,   5,  10,  28,  90, 195, 285, 345, 255, 280],
-  shiprocketUploaded: [ 0,   0,   0,   2,   5,  10,  25,  50,  70, 100, 115, 140],
+const chartData: Record<string, string[] | number[]> = {
+  labels:             ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+  registered:         [10, 20, 28, 50, 90, 160, 300, 450, 580, 680, 760, 880],
+  profileCompleted:   [ 0,  2,  5, 10, 20,  50, 120, 220, 320, 430, 500, 590],
+  approved:           [ 0,  1,  3,  8, 18,  55, 140, 250, 310, 380, 430, 440],
+  productsAdded:      [ 0,  0,  2,  5, 10,  28,  90, 195, 285, 345, 255, 280],
+  shiprocketUploaded: [ 0,  0,  0,  2,  5,  10,  25,  50,  70, 100, 115, 140],
 };
 
-// dash: strokeDasharray, marker: circle|square|triangle|diamond|star
 const SERIES = [
-  { key: "registered",         label: "Registered",          color: "#2563EB", dash: "",           marker: "circle"   },
-  { key: "profileCompleted",   label: "Profile Completed",   color: "#16A34A", dash: "8 4",        marker: "square"   },
-  { key: "approved",           label: "Approved",            color: "#F97316", dash: "6 3 2 3",    marker: "triangle" },
-  { key: "productsAdded",      label: "Products Added",      color: "#7C3AED", dash: "4 4",        marker: "diamond"  },
-  { key: "shiprocketUploaded", label: "Shiprocket Uploaded", color: "#0891B2", dash: "",           marker: "star"     },
+  { key: "registered",         label: "Registered",          color: "#2563EB", dashArray: [],          marker: "circle"   },
+  { key: "profileCompleted",   label: "Profile Completed",   color: "#16A34A", dashArray: [8, 4],      marker: "square"   },
+  { key: "approved",           label: "Approved",            color: "#F97316", dashArray: [6, 3, 2, 3],marker: "triangle" },
+  { key: "productsAdded",      label: "Products Added",      color: "#7C3AED", dashArray: [4, 4],      marker: "diamond"  },
+  { key: "shiprocketUploaded", label: "Shiprocket Uploaded", color: "#0891B2", dashArray: [],          marker: "star"     },
 ];
 
-const YEAR_OPTIONS    = ["2027","2026","2025","2024","2023","2022","2021","2020","2019","2018","2017","2016"];
-const FILTER_OPTIONS  = ["Overall","Monthly","Weekly","Quarterly"];
-const PERPAGE_OPTIONS = [10, 25, 50, 100];
-const SELLER_OPTIONS  = ["All Sellers", ...ALL_SELLERS.map(s => s.name)];
-const METRIC_OPTIONS  = ["All Metrics","Registered","Profile Completed","Approved","Products Added","Shiprocket Uploaded"];
+const YEAR_OPTIONS   = ["2027","2026","2025","2024","2023","2022","2021","2020","2019","2018","2017","2016"];
+const FILTER_OPTIONS = ["Overall","Monthly","Weekly","Quarterly"];
+const PERPAGE_OPTIONS = ["10","25","50","100"];
+const SELLER_OPTIONS = ["All Sellers", ...ALL_SELLERS.map(s => s.name)];
+const METRIC_OPTIONS = ["All Metrics","Registered","Profile Completed","Approved","Products Added","Shiprocket Uploaded"];
 
-/* ─── Helpers ───────────────────────────────────────────────────────── */
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { bg: string; color: string; border: string }> = {
-    "Pending":           { bg:"#FEF3C7", color:"#92400E", border:"#FCD34D" },
-    "Active":            { bg:"#D1FAE5", color:"#065F46", border:"#34D399" },
-    "Awaiting Approval": { bg:"#EDE9FE", color:"#4C1D95", border:"#A78BFA" },
-    "Complete":          { bg:"#D1FAE5", color:"#065F46", border:"#34D399" },
-    "Incomplete":        { bg:"#FEE2E2", color:"#7F1D1D", border:"#FCA5A5" },
-    "Not Uploaded":      { bg:"#F3F4F6", color:"#374151", border:"#D1D5DB" },
-    "Uploaded":          { bg:"#D1FAE5", color:"#065F46", border:"#34D399" },
-    "Provided":          { bg:"#D1FAE5", color:"#065F46", border:"#34D399" },
-    "Not Provided":      { bg:"#F3F4F6", color:"#374151", border:"#D1D5DB" },
-    "Not done":          { bg:"#1F2937", color:"#F9FAFB", border:"#374151" },
-  };
-  const s = map[status] || { bg:"#F3F4F6", color:"#374151", border:"#D1D5DB" };
-  return (
-    <span style={{
-      background: s.bg, color: s.color,
-      border: `1px solid ${s.border}`,
-      borderRadius: 6, padding: "2px 8px",
-      fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
-    }}>
-      {status}
-    </span>
-  );
-}
+type Seller = typeof ALL_SELLERS[0];
 
+/* ─── Status config ─────────────────────────────────────────────────── */
+const STATUS_MAP: Record<string, { bg: string; color: string; border: string }> = {
+  "Pending":           { bg: "#FEF3C7", color: "#92400E", border: "#FCD34D" },
+  "Active":            { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
+  "Awaiting Approval": { bg: "#EDE9FE", color: "#4C1D95", border: "#A78BFA" },
+  "Complete":          { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
+  "Incomplete":        { bg: "#FEE2E2", color: "#7F1D1D", border: "#FCA5A5" },
+  "Not Uploaded":      { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" },
+  "Uploaded":          { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
+  "Provided":          { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
+  "Not Provided":      { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" },
+  "Not done":          { bg: "#1F2937", color: "#F9FAFB", border: "#374151" },
+};
+
+const STAT_CARDS = [
+  { iconName: "person-add",        label: "Registered",           value: "141", sub: "in 2025",          iconBg: "#FFF7ED", iconColor: ORANGE    },
+  { iconName: "person-done",       label: "Profile Completed",    value: "74",  sub: "in 2025",          iconBg: "#F0FDF4", iconColor: "#10B981" },
+  { iconName: "shield-checkmark",  label: "Approved",             value: "71",  sub: "Active + Profile", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
+  { iconName: "cube",              label: "Products Added",       value: "707", sub: "in 2025",          iconBg: "#F5F3FF", iconColor: "#8B5CF6" },
+  { iconName: "cloud-upload",      label: "Ship Rocket",          value: "70",  sub: "CSV uploaded",     iconBg: "#ECFDF5", iconColor: "#06B6D4" },
+  { iconName: "sync",              label: "Shiprocket Sync",      value: "On",  sub: "Seller sync",      iconBg: "#FFF7ED", iconColor: ORANGE    },
+];
+
+const INSIGHTS = [
+  { iconName: "trending-up",       text: "Registered sellers increased by 85% vs previous period.", color: "#2563EB", bg: "#EFF6FF" },
+  { iconName: "checkmark-circle",  text: "71 sellers are fully approved and active.",               color: "#16A34A", bg: "#F0FDF4" },
+  { iconName: "cube",              text: "707 products added in 2025.",                             color: "#7C3AED", bg: "#F5F3FF" },
+  { iconName: "sync",              text: "Shiprocket sync is currently running smoothly.",          color: ORANGE,    bg: "#FFF7ED" },
+];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HELPER COMPONENTS
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Avatar ────────────────────────────────────────────────────────── */
 function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: color + "22", border: `2px solid ${color}40`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontWeight: 700, fontSize: size * 0.33, color, flexShrink: 0
+    <View style={{
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: color + "22",
+      borderWidth: 2, borderColor: color + "55",
+      alignItems: "center", justifyContent: "center",
     }}>
-      {initials}
-    </div>
+      <Text style={{ fontWeight: "700", fontSize: size * 0.33, color }}>{initials}</Text>
+    </View>
   );
 }
 
-function BSSelect({ value, onChange, options, style = {} }: { value: string; onChange: (v: string) => void; options: string[]; style?: React.CSSProperties }) {
+/* ─── StatusBadge ───────────────────────────────────────────────────── */
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_MAP[status] || { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" };
   return (
-    <div style={{ position: "relative", ...style }}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{
-          width: "100%", border: "1px solid #E2E8F0", borderRadius: 8,
-          padding: "9px 32px 9px 12px", fontSize: 13, color: "#374151",
-          background: "#fff", cursor: "pointer", appearance: "none", WebkitAppearance: "none"
-        }}
-      >
-        {options.map(o => <option key={String(o)} value={o}>{o}</option>)}
-      </select>
-      <i className="bi bi-chevron-down" style={{
-        position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-        fontSize: 12, color: "#94A3B8", pointerEvents: "none"
-      }} />
-    </div>
+    <View style={{
+      backgroundColor: s.bg, borderWidth: 1, borderColor: s.border,
+      borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
+      alignSelf: "flex-start",
+    }}>
+      <Text style={{ fontSize: 11, fontWeight: "600", color: s.color }}>{status}</Text>
+    </View>
   );
 }
 
-/* ─── Marker renderer ───────────────────────────────────────────────── */
-function Marker({ type, cx, cy, color, size = 6 }: { type: string; cx: number; cy: number; color: string; size?: number }) {
+/* ─── Dropdown ──────────────────────────────────────────────────────── */
+function Dropdown({
+  value, onChange, options, style,
+}: {
+  value: string; onChange: (v: string) => void;
+  options: string[]; style?: object;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = Dimensions.get("window");
+  const isDesktop = screenW >= 1024;
+
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const { width: screenWidth } = Dimensions.get("window");
+        const menuWidth = Math.min(width, screenWidth - 32);
+        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <View style={[{ minWidth: 120 }, style]}>
+      <TouchableOpacity
+        ref={triggerRef as any}
+        activeOpacity={0.8}
+        onPress={handlePress}
+        style={styles.dropdownTrigger}
+      >
+        <Text style={styles.dropdownText} numberOfLines={1}>{value}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
+            <View style={[styles.dropdownMenu, isDesktop && styles.dropdownMenuDesktop]}>
+              <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+                {options.map(opt => (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => { onChange(opt); setOpen(false); }}
+                    style={[
+                      styles.dropdownItem,
+                      value === opt && { backgroundColor: ORANGE },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 13, color: value === opt ? "#fff" : "#374151", fontWeight: value === opt ? "700" : "400" }}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+}
+
+/* ─── Pagination Button ─────────────────────────────────────────────── */
+function PagBtn({ iconName, onPress, disabled, active }: {
+  iconName: keyof typeof Ionicons.glyphMap;
+  onPress: () => void; disabled?: boolean; active?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress} disabled={disabled}
+      style={[styles.pagBtn, active && { backgroundColor: ORANGE, borderColor: ORANGE }]}
+    >
+      <Ionicons name={iconName} size={12}
+        color={disabled ? "#CBD5E1" : active ? "#fff" : "#374151"} />
+    </TouchableOpacity>
+  );
+}
+
+/* ─── DatePicker Component ───────────────────────────────────────────── */
+function DatePicker({ value, onChange, placeholder }: {
+  value: string; onChange: (date: string) => void; placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(value);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+
+  const days = [];
+  for (let i = 0; i < firstDayOfMonth; i++) { days.push(null); }
+  for (let i = 1; i <= daysInMonth; i++) { days.push(i); }
+
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const handleDateSelect = (day: number) => {
+    const dateStr = `${String(day).padStart(2,'0')}/${String(currentMonth+1).padStart(2,'0')}/${currentYear}`;
+    setSelectedDate(dateStr);
+    onChange(dateStr);
+    setOpen(false);
+  };
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
+    else { setCurrentMonth(currentMonth - 1); }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); }
+    else { setCurrentMonth(currentMonth + 1); }
+  };
+
+  return (
+    <View>
+      <TouchableOpacity onPress={() => setOpen(true)} style={styles.dateInputContainer}>
+        <TextInput
+          value={value} editable={false} placeholder={placeholder}
+          placeholderTextColor="#94A3B8" style={styles.dateInput}
+        />
+        <Ionicons name="calendar" size={16} color="#64748B" />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.datePickerOverlay} onPress={() => setOpen(false)}>
+          <View style={styles.datePickerModal}>
+            <View style={styles.datePickerHeader}>
+              <TouchableOpacity onPress={handlePrevMonth}>
+                <Ionicons name="chevron-back" size={20} color="#374151" />
+              </TouchableOpacity>
+              <Text style={styles.datePickerTitle}>{monthNames[currentMonth]} {currentYear}</Text>
+              <TouchableOpacity onPress={handleNextMonth}>
+                <Ionicons name="chevron-forward" size={20} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.datePickerWeekHeader}>
+              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(day => (
+                <Text key={day} style={styles.datePickerWeekDay}>{day}</Text>
+              ))}
+            </View>
+            <View style={styles.datePickerDays}>
+              {days.map((day, index) => (
+                <TouchableOpacity
+                  key={index} onPress={() => day && handleDateSelect(day)} disabled={!day}
+                  style={[
+                    styles.datePickerDay,
+                    !day && styles.datePickerDayEmpty,
+                    selectedDate === `${String(day).padStart(2,'0')}/${String(currentMonth+1).padStart(2,'0')}/${currentYear}` && styles.datePickerDaySelected,
+                  ]}
+                >
+                  <Text style={[
+                    styles.datePickerDayText,
+                    !day && styles.datePickerDayTextEmpty,
+                    selectedDate === `${String(day).padStart(2,'0')}/${String(currentMonth+1).padStart(2,'0')}/${currentYear}` && styles.datePickerDayTextSelected,
+                  ]}>{day || ""}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.datePickerCloseBtn} onPress={() => setOpen(false)}>
+              <Text style={styles.datePickerCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SVG CHART HELPERS
+═══════════════════════════════════════════════════════════════════════ */
+function ChartMarker({ type, cx, cy, color, size = 5 }: {
+  type: string; cx: number; cy: number; color: string; size?: number;
+}) {
   const s = size;
   if (type === "circle")
-    return <circle cx={cx} cy={cy} r={s * 0.7} fill={color} stroke="#fff" strokeWidth={1.5} />;
+    return <Circle cx={cx} cy={cy} r={s * 0.7} fill={color} stroke="white" strokeWidth={1.5} />;
   if (type === "square")
-    return <rect x={cx - s * 0.65} y={cy - s * 0.65} width={s * 1.3} height={s * 1.3}
-      fill={color} stroke="#fff" strokeWidth={1.5} />;
+    return <Rect x={cx - s * 0.65} y={cy - s * 0.65} width={s * 1.3} height={s * 1.3}
+      fill={color} stroke="white" strokeWidth={1.5} />;
   if (type === "triangle") {
     const h = s * 1.3;
-    return <polygon
+    return <Polygon
       points={`${cx},${cy - h} ${cx - h * 0.87},${cy + h * 0.5} ${cx + h * 0.87},${cy + h * 0.5}`}
-      fill={color} stroke="#fff" strokeWidth={1.5} />;
+      fill={color} stroke="white" strokeWidth={1.5} />;
   }
   if (type === "diamond")
-    return <polygon
+    return <Polygon
       points={`${cx},${cy - s} ${cx + s * 0.75},${cy} ${cx},${cy + s} ${cx - s * 0.75},${cy}`}
-      fill={color} stroke="#fff" strokeWidth={1.5} />;
+      fill={color} stroke="white" strokeWidth={1.5} />;
   if (type === "star") {
-    const pts = [];
+    const pts: string[] = [];
     for (let i = 0; i < 5; i++) {
       const ao = (Math.PI * 2 * i) / 5 - Math.PI / 2;
       const ai = ao + Math.PI / 5;
       pts.push(`${cx + s * Math.cos(ao)},${cy + s * Math.sin(ao)}`);
       pts.push(`${cx + s * 0.4 * Math.cos(ai)},${cy + s * 0.4 * Math.sin(ai)}`);
     }
-    return <polygon points={pts.join(" ")} fill={color} stroke="#fff" strokeWidth={1} />;
+    return <Polygon points={pts.join(" ")} fill={color} stroke="white" strokeWidth={1} />;
   }
   return null;
 }
 
-/* ─── Legend swatch ─────────────────────────────────────────────────── */
-function LegendSwatch({ series, active }: { series: typeof SERIES[0]; active: boolean }) {
-  const { color, dash, marker } = series;
-  const dim = active ? 1 : 0.35;
-  return (
-    <svg width={36} height={14} style={{ opacity: dim, flexShrink: 0 }}>
-      <line x1={0} y1={7} x2={36} y2={7}
-        stroke={color} strokeWidth={2}
-        strokeDasharray={dash || undefined} />
-      <Marker type={marker} cx={18} cy={7} color={color} size={5} />
-    </svg>
-  );
-}
-
 /* ─── Line Chart ────────────────────────────────────────────────────── */
-function LineChart({ width, height, activeSeries }: { width: number; height: number; activeSeries: string }) {
-  const pad = { top: 24, right: 24, bottom: 44, left: 52 };
-  const W = Math.max(1, width - pad.left - pad.right);
-  const H = height - pad.top - pad.bottom;
+function LineChart({ width, activeSeries }: { width: number; activeSeries: string }) {
+  const height   = 240;
+  const padL = 44, padR = 16, padT = 20, padB = 38;
+  const W = width - padL - padR;
+  const H = height - padT - padB;
   const maxY = 900;
   const yTicks = [0, 150, 300, 450, 600, 750, 900];
-  const [hovered, setHovered] = useState<number | null>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
+  const labels  = chartData.labels as string[];
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  const xScale = (i: number) => (i / (chartData.labels.length - 1)) * W;
+  const xScale = (i: number) => (i / (labels.length - 1)) * W;
   const yScale = (v: number) => H - (v / maxY) * H;
 
+  const visibleSeries = activeSeries === "All Metrics"
+    ? SERIES : SERIES.filter(s => s.label === activeSeries);
+
   const getPath = (key: string) =>
-    (chartData[key] as number[]).map((v: number, i: number) =>
+    (chartData[key] as number[]).map((v, i) =>
       `${i === 0 ? "M" : "L"}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`
     ).join(" ");
 
-  const visibleSeries = activeSeries === "All Metrics"
-    ? SERIES
-    : SERIES.filter(s => s.label === activeSeries);
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const mx = e.clientX - rect.left - pad.left;
-    const idx = Math.round((mx / W) * (chartData.labels.length - 1));
-    setHovered(Math.max(0, Math.min(chartData.labels.length - 1, idx)));
+  const handleTouch = (evt: any) => {
+    const touchX = evt.nativeEvent.locationX - padL;
+    const idx = Math.round((touchX / W) * (labels.length - 1));
+    setHoveredIdx(Math.max(0, Math.min(labels.length - 1, idx)));
   };
 
-  const tooltipX = hovered !== null ? xScale(hovered) : 0;
-  const tooltipRight = hovered !== null && tooltipX > W * 0.55;
-  const MARKER_EVERY = 1; // show marker at every point
+  const ttX = hoveredIdx !== null ? xScale(hoveredIdx) : 0;
+  const ttRight = ttX > W * 0.55;
+  const ttW = 155, ttLineH = 20, ttPad = 28;
 
   return (
-    <svg ref={svgRef} width={width} height={height}
-      style={{ overflow: "visible", cursor: "crosshair", display: "block" }}
-      onMouseMove={handleMouseMove} onMouseLeave={() => setHovered(null)}>
-      <g transform={`translate(${pad.left},${pad.top})`}>
-
-        {/* Grid lines + Y labels */}
+    <Svg
+      width={width} height={height}
+      onPress={handleTouch}
+      onResponderMove={(e: any) => {
+        const x = e.nativeEvent.locationX - padL;
+        const idx = Math.round((x / W) * (labels.length - 1));
+        setHoveredIdx(Math.max(0, Math.min(labels.length - 1, idx)));
+      }}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderRelease={() => setHoveredIdx(null)}
+    >
+      <G x={padL} y={padT}>
         {yTicks.map(t => (
-          <g key={t}>
-            <line x1={0} x2={W} y1={yScale(t)} y2={yScale(t)}
+          <G key={t}>
+            <Line x1={0} x2={W} y1={yScale(t)} y2={yScale(t)}
               stroke="#E5E7EB" strokeWidth={t === 0 ? 1 : 0.75} />
-            <text x={-10} y={yScale(t) + 4} textAnchor="end"
-              fontSize={11} fill="#9CA3AF" fontFamily="inherit">{t}</text>
-          </g>
+            <SvgText x={-6} y={yScale(t) + 4} textAnchor="end"
+              fontSize={10} fill="#9CA3AF">{t}</SvgText>
+          </G>
         ))}
-
-        {/* X labels */}
-        {chartData.labels.map((l, i) => (
-          <text key={l} x={xScale(i)} y={H + 18}
-            textAnchor="middle" fontSize={11} fill="#6B7280" fontFamily="inherit">{l}</text>
+        {labels.map((l, i) => (
+          <SvgText key={l} x={xScale(i)} y={H + 16} textAnchor="middle"
+            fontSize={9} fill="#6B7280">{l}</SvgText>
         ))}
-
-        {/* Lines */}
         {visibleSeries.map(s => (
-          <path key={s.key}
-            d={getPath(s.key)}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={2.2}
-            strokeDasharray={s.dash || undefined}
-            strokeLinejoin="round"
-            strokeLinecap="round" />
+          <Path key={s.key} d={getPath(s.key)} fill="none" stroke={s.color}
+            strokeWidth={2} strokeDasharray={s.dashArray.join(" ") || undefined}
+            strokeLinejoin="round" strokeLinecap="round" />
         ))}
-
-        {/* Markers at every data point */}
         {visibleSeries.map(s =>
-          (chartData[s.key] as number[]).map((v: number, i: number) => (
-            <Marker key={`${s.key}-${i}`}
-              type={s.marker} cx={xScale(i)} cy={yScale(v)}
-              color={s.color} size={5} />
+          (chartData[s.key] as number[]).map((v, i) => (
+            <ChartMarker key={`${s.key}-${i}`}
+              type={s.marker} cx={xScale(i)} cy={yScale(v)} color={s.color} size={4} />
           ))
         )}
-
-        {/* Hover crosshair */}
-        {hovered !== null && (
+        {hoveredIdx !== null && (
           <>
-            <line x1={xScale(hovered)} x2={xScale(hovered)} y1={0} y2={H}
-              stroke="#94A3B8" strokeWidth={1} strokeDasharray="5 3" />
-
-            {/* Highlighted markers on hover */}
+            <Line x1={xScale(hoveredIdx)} x2={xScale(hoveredIdx)} y1={0} y2={H}
+              stroke="#94A3B8" strokeWidth={1} strokeDasharray="4 3" />
             {visibleSeries.map(s => (
-              <Marker key={s.key}
-                type={s.marker}
-                cx={xScale(hovered)}
-                cy={yScale((chartData[s.key] as number[])[hovered] as number)}
+              <ChartMarker key={`h-${s.key}`} type={s.marker}
+                cx={xScale(hoveredIdx)}
+                cy={yScale((chartData[s.key] as number[])[hoveredIdx])}
                 color={s.color} size={7} />
             ))}
-
-            {/* Tooltip box */}
-            {(() => {
-              const tw = 160;
-              const th = visibleSeries.length * 20 + 28;
-              const tx = tooltipRight ? xScale(hovered) - tw - 10 : xScale(hovered) + 12;
-              const ty = 4;
-              return (
-                <g>
-                  <rect x={tx} y={ty} width={tw} height={th}
-                    rx={8} fill="white"
-                    stroke="#E2E8F0" strokeWidth={1}
-                    style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.10))" }} />
-                  <text x={tx + 10} y={ty + 16}
-                    fontSize={11} fontWeight="700" fill="#1B2332" fontFamily="inherit">
-                    {chartData.labels[hovered]} 2025
-                  </text>
-                  {visibleSeries.map((s, i) => (
-                    <text key={s.key}
-                      x={tx + 10} y={ty + 30 + i * 20}
-                      fontSize={11} fill={s.color} fontFamily="inherit">
-                      {s.label}: {(chartData[s.key] as number[])[hovered] as number}
-                    </text>
-                  ))}
-                </g>
-              );
-            })()}
+            <Rect
+              x={ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8}
+              y={2} width={ttW} height={visibleSeries.length * ttLineH + ttPad}
+              rx={8} fill="white" stroke="#E2E8F0" strokeWidth={1} />
+            <SvgText
+              x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
+              y={17} fontSize={11} fontWeight="bold" fill="#1B2332">
+              {labels[hoveredIdx]} 2025
+            </SvgText>
+            {visibleSeries.map((s, i) => (
+              <SvgText key={s.key}
+                x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
+                y={31 + i * ttLineH} fontSize={10} fill={s.color}>
+                {s.label}: {(chartData[s.key] as number[])[hoveredIdx]}
+              </SvgText>
+            ))}
           </>
         )}
-      </g>
-    </svg>
+      </G>
+    </Svg>
   );
 }
 
-/* ─── Stat Card ─────────────────────────────────────────────────────── */
-function StatCard({ biIcon, label, value, sub, iconBg, iconColor }: { biIcon: string; label: string; value: string; sub?: string; iconBg: string; iconColor: string }) {
+/* ─── Legend Swatch ─────────────────────────────────────────────────── */
+function LegendSwatch({ series, active }: { series: typeof SERIES[0]; active: boolean }) {
   return (
-    <div style={{
-      background: "#fff", border: "1px solid #F1F5F9", borderRadius: 12,
-      padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, minWidth: 0
-    }}>
-      <div style={{
-        width: 46, height: 46, borderRadius: 12, background: iconBg,
-        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
-      }}>
-        <i className={`bi ${biIcon}`} style={{ fontSize: 22, color: iconColor }} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{
-          fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: "0.05em",
-          textTransform: "uppercase", marginBottom: 2
-        }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: "#1B2332", lineHeight: 1 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{sub}</div>}
-      </div>
-    </div>
+    <Svg width={36} height={14} style={{ opacity: active ? 1 : 0.35 }}>
+      <Line x1={0} y1={7} x2={36} y2={7}
+        stroke={series.color} strokeWidth={2}
+        strokeDasharray={series.dashArray.join(" ") || undefined} />
+      <ChartMarker type={series.marker} cx={18} cy={7} color={series.color} size={5} />
+    </Svg>
   );
 }
 
-const STAT_CARDS = [
-  { biIcon: "bi-person-plus-fill",  label: "Registered",           value: "141", sub: "in 2025",          iconBg: "#FFF7ED", iconColor: ORANGE     },
-  { biIcon: "bi-person-check-fill", label: "Profile Completed",    value: "74",  sub: "in 2025",          iconBg: "#F0FDF4", iconColor: "#10B981"  },
-  { biIcon: "bi-shield-check",      label: "Approved",             value: "71",  sub: "Active + Profile", iconBg: "#EFF6FF", iconColor: "#3B82F6"  },
-  { biIcon: "bi-box-seam-fill",     label: "Products Added",       value: "707", sub: "in 2025",          iconBg: "#F5F3FF", iconColor: "#8B5CF6"  },
-  { biIcon: "bi-cloud-upload-fill", label: "Ship Rocket Uploaded", value: "70",  sub: "CSV uploaded",     iconBg: "#ECFDF5", iconColor: "#06B6D4"  },
-  { biIcon: "bi-arrow-repeat",      label: "Shiprocket Sync",      value: "On",  sub: "Seller sync",      iconBg: "#FFF7ED", iconColor: ORANGE     },
-];
+/* ═══════════════════════════════════════════════════════════════════════
+   SELLER MODAL
+═══════════════════════════════════════════════════════════════════════ */
+function SellerModal({ seller, onClose }: { seller: Seller | null; onClose: () => void }) {
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+  const { width: screenW } = Dimensions.get("window");
+  const isDesktop = screenW >= 1024;
 
-const INSIGHTS = [
-  { biIcon: "bi-graph-up-arrow",    text: "Registered sellers increased by 85% compared to the previous period.", color: "#2563EB", bg: "#EFF6FF" },
-  { biIcon: "bi-check-circle-fill", text: "71 sellers are fully approved and active.",                            color: "#16A34A", bg: "#F0FDF4" },
-  { biIcon: "bi-box-seam-fill",     text: "707 products added in 2025.",                                         color: "#7C3AED", bg: "#F5F3FF" },
-  { biIcon: "bi-arrow-repeat",      text: "Shiprocket sync is currently running smoothly.",                       color: ORANGE,    bg: "#FFF7ED" },
-];
+  useEffect(() => {
+    if (seller) {
+      Animated.parallel([
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 10, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [seller]);
 
-/* ─── Seller Detail Modal ────────────────────────────────────────────── */
-function SellerModal({ seller, onClose }: { seller: Seller; onClose: () => void }) {
   if (!seller) return null;
+
+  const statusFields = [
+    { label: "Status",     val: seller.status     },
+    { label: "Profile",    val: seller.profile    },
+    { label: "KYC",        val: seller.kyc        },
+    { label: "Supplement", val: seller.supplement },
+    { label: "Shiprocket", val: seller.shiprocket },
+  ];
+
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(0,0,0,0.45)",
-        padding: "16px"
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          position: "relative",
-          background: "#fff", borderRadius: 20,
-          width: "100%", maxWidth: 560, maxHeight: "88vh", overflowY: "auto",
-          padding: 0, boxShadow: "0 24px 60px rgba(0,0,0,0.22)",
-          animation: "modalIn 0.26s cubic-bezier(0.32,0.72,0,1)"
-        }}
-      >
-        <style>{`@keyframes modalIn { from { transform:scale(0.94) translateY(12px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }`}</style>
-
-        {/* ── Floating close button – top-right corner ── */}
-        <button
-          onClick={onClose}
-          title="Close"
-          style={{
-            position: "absolute", top: 12, right: 12, zIndex: 10,
-            width: 34, height: 34, borderRadius: "50%", border: "none",
-            background: "#E2E8F0", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.15s, transform 0.15s"
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = "#CBD5E1"; e.currentTarget.style.transform = "scale(1.1)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "#E2E8F0"; e.currentTarget.style.transform = "scale(1)"; }}
-        >
-          <i className="bi bi-x-circle-fill" style={{ fontSize: 20, color: "#475569" }} />
-        </button>
-
-        <div style={{
-          display: "flex", alignItems: "center",
-          padding: "20px 56px 16px 20px", borderBottom: "1px solid #F1F5F9"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <Modal visible={!!seller} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View style={[
+          styles.modalSheet,
+          isDesktop && styles.modalSheetDesktop,
+          { transform: [{ translateY: slideAnim }] }
+        ]}>
+          <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+            <Ionicons name="close-circle" size={22} color="#475569" />
+          </TouchableOpacity>
+          <View style={[styles.modalHeader, { borderBottomColor: "#F1F5F9" }]}>
             <Avatar initials={seller.initials} color={seller.color} size={50} />
-            <div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: "#1B2332" }}>{seller.name}</div>
-              <div style={{ fontSize: 12, color: "#94A3B8" }}>{seller.business}</div>
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: "20px" }}>
-          <div style={{
-            fontSize: 11, fontWeight: 700, color: "#94A3B8",
-            textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10
-          }}>
-            <i className="bi bi-person-lines-fill" style={{ marginRight: 5, color: ORANGE }} />Contact
-          </div>
-          {[
-            { icon: "bi-envelope",  label: "Email",     val: seller.email   },
-            { icon: "bi-telephone", label: "Phone",     val: seller.phone   },
-            { icon: "bi-calendar3", label: "Onboarded", val: seller.onboard },
-          ].map(r => (
-            <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <i className={`bi ${r.icon}`} style={{ fontSize: 14, color: "#94A3B8", width: 18 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#64748B", minWidth: 76 }}>{r.label}:</span>
-              <span style={{ fontSize: 13, color: "#374151" }}>{r.val}</span>
-            </div>
-          ))}
-          <div style={{
-            fontSize: 11, fontWeight: 700, color: "#94A3B8",
-            textTransform: "uppercase", letterSpacing: "0.07em", margin: "16px 0 10px"
-          }}>
-            <i className="bi bi-shield-check" style={{ marginRight: 5, color: ORANGE }} />Status
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+            <View style={{ marginLeft: 12 }}>
+              <Text style={styles.modalSellerName}>{seller.name}</Text>
+              <Text style={styles.modalBusiness}>{seller.business}</Text>
+            </View>
+          </View>
+          <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionLabel}>
+              <Ionicons name="person" size={11} color={ORANGE} />{"  "}CONTACT
+            </Text>
             {[
-              { label: "Status",     val: seller.status     },
-              { label: "Profile",    val: seller.profile    },
-              { label: "KYC",        val: seller.kyc        },
-              { label: "Supplement", val: seller.supplement },
-              { label: "Shiprocket", val: seller.shiprocket },
-            ].map(b => (
-              <div key={b.label}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", marginBottom: 4 }}>{b.label}</div>
-                <StatusBadge status={b.val} />
-              </div>
+              { iconName: "mail-outline"     as keyof typeof Ionicons.glyphMap, label: "Email",     val: seller.email   },
+              { iconName: "call-outline"     as keyof typeof Ionicons.glyphMap, label: "Phone",     val: seller.phone   },
+              { iconName: "calendar-outline" as keyof typeof Ionicons.glyphMap, label: "Onboarded", val: seller.onboard },
+            ].map(r => (
+              <View key={r.label} style={styles.contactRow}>
+                <Ionicons name={r.iconName} size={14} color="#94A3B8" style={{ width: 18 }} />
+                <Text style={styles.contactLabel}>{r.label}:</Text>
+                <Text style={styles.contactVal} numberOfLines={1}>{r.val}</Text>
+              </View>
             ))}
-          </div>
-          <div style={{
-            fontSize: 11, fontWeight: 700, color: "#94A3B8",
-            textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10
-          }}>
-            <i className="bi bi-box-seam" style={{ marginRight: 5, color: ORANGE }} />Products
-          </div>
-          <div style={{
-            background: "#F8FAFC", borderRadius: 10, padding: 16,
-            textAlign: "center", border: "1px solid #E8EDF5"
-          }}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "#1B2332" }}>{seller.products}</div>
-            <div style={{ fontSize: 12, color: "#94A3B8" }}>Total Products Listed</div>
-          </div>
-          {seller.shipDate && (
-            <div style={{
-              marginTop: 12, background: "#ECFDF5", borderRadius: 8,
-              padding: "10px 14px", display: "flex", alignItems: "center", gap: 8
-            }}>
-              <i className="bi bi-cloud-check-fill" style={{ color: "#10B981", fontSize: 15 }} />
-              <span style={{ fontSize: 13, color: "#065F46" }}>Shiprocket uploaded: {seller.shipDate}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+            <Text style={[styles.sectionLabel, { marginTop: 16 }]}>
+              <Ionicons name="shield-checkmark-outline" size={11} color={ORANGE} />{"  "}STATUS
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+              {statusFields.map(b => (
+                <View key={b.label}>
+                  <Text style={styles.badgeLabel}>{b.label}</Text>
+                  <StatusBadge status={b.val} />
+                </View>
+              ))}
+            </View>
+            <Text style={styles.sectionLabel}>
+              <Ionicons name="cube-outline" size={11} color={ORANGE} />{"  "}PRODUCTS
+            </Text>
+            <View style={styles.productsBox}>
+              <Text style={styles.productsCount}>{seller.products}</Text>
+              <Text style={styles.productsLabel}>Total Products Listed</Text>
+            </View>
+            {seller.shipDate && (
+              <View style={styles.shiprocketBox}>
+                <Ionicons name="cloud-done-outline" size={15} color="#10B981" />
+                <Text style={styles.shiprocketText}>Shiprocket uploaded: {seller.shipDate}</Text>
+              </View>
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
   );
 }
 
-/* ─── Seller List Container ──────────────────────────────────────────── */
-function SellerListContainer({ isMobile, sellerFilter, setSellerFilter }: { isMobile: boolean; sellerFilter: string; setSellerFilter: (v: string) => void }) {
-  const [search, setSearch]     = useState("");
-  const [searchQ, setSearchQ]   = useState("");
-  const [page, setPage]         = useState(1);
-  const [perPage, setPerPage]   = useState(10);
+/* ═══════════════════════════════════════════════════════════════════════
+   SELLER CARD (mobile list item)
+═══════════════════════════════════════════════════════════════════════ */
+function SellerCard({ item, onView, isDesktop }: { item: Seller; onView: () => void; isDesktop?: boolean }) {
+  return (
+    <View style={[styles.sellerCard, isDesktop && styles.sellerCardDesktop]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <Avatar initials={item.initials} color={item.color} size={46} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.sellerCardName}>{item.name}</Text>
+          <Text style={styles.sellerCardSub} numberOfLines={1}>✉  {item.email}</Text>
+          <Text style={styles.sellerCardSub}>📞 {item.phone}</Text>
+        </View>
+        <View style={styles.idBadge}>
+          <Text style={styles.idBadgeText}>#{item.id}</Text>
+        </View>
+      </View>
+      <View style={styles.sellerMetaGrid}>
+        {[
+          { label: "Business", val: item.business  },
+          { label: "Onboard",  val: item.onboard   },
+          { label: "Products", val: String(item.products) },
+        ].map(({ label, val }) => (
+          <View key={label} style={{ flex: 1 }}>
+            <Text style={styles.metaLabel}>{label}</Text>
+            <Text style={styles.metaVal} numberOfLines={1}>{val}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+        {[
+          { label: "Status",     val: item.status     },
+          { label: "Profile",    val: item.profile    },
+          { label: "KYC",        val: item.kyc === "Pending" ? "Not done" : item.kyc },
+          { label: "Supplement", val: item.supplement },
+        ].map(b => (
+          <View key={b.label}>
+            <Text style={styles.badgeLabel}>{b.label}</Text>
+            <StatusBadge status={b.val} />
+          </View>
+        ))}
+      </View>
+      {item.shipDate && (
+        <Text style={styles.shipDateText}>☁  Shiprocket uploaded: {item.shipDate}</Text>
+      )}
+      <TouchableOpacity onPress={onView} style={styles.viewBtn}>
+        <Ionicons name="eye-outline" size={14} color="#fff" />
+        <Text style={styles.viewBtnText}>View Details</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DESKTOP SELLER TABLE ROW
+═══════════════════════════════════════════════════════════════════════ */
+function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onView: () => void }) {
+  return (
+    <View style={[
+      styles.tableRow,
+      idx % 2 === 0 ? { backgroundColor: "#fff" } : { backgroundColor: "#F8FAFC" },
+    ]}>
+      <Text style={[styles.tableCell, { flex: 0.5, fontWeight: "700", color: "#64748B" }]}>#{item.id}</Text>
+      <View style={{ flex: 1.6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Avatar initials={item.initials} color={item.color} size={32} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: DARK_NAV }} numberOfLines={1}>{item.name}</Text>
+            <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>{item.email}</Text>
+            <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>{item.business}</Text>
+      <Text style={[styles.tableCell, { flex: 0.9 }]}>{item.onboard}</Text>
+      <View style={{ flex: 0.7, justifyContent: "center" }}>
+        <StatusBadge status={item.status} />
+      </View>
+      <View style={{ flex: 0.7, justifyContent: "center" }}>
+        <StatusBadge status={item.profile} />
+      </View>
+      <View style={{ flex: 0.65, justifyContent: "center" }}>
+        <StatusBadge status={item.kyc === "Pending" ? "Not done" : item.kyc} />
+      </View>
+      <View style={{ flex: 0.9, justifyContent: "center" }}>
+        {item.shipDate ? (
+          <View>
+            <StatusBadge status="Uploaded" />
+            <Text style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>{item.shipDate}</Text>
+          </View>
+        ) : (
+          <StatusBadge status="Not Uploaded" />
+        )}
+      </View>
+      <Text style={[styles.tableCell, { flex: 0.5, textAlign: "center", fontWeight: "700" }]}>{item.products}</Text>
+      <View style={{ flex: 0.6, alignItems: "flex-start" }}>
+        <TouchableOpacity
+          onPress={onView}
+          style={{
+            backgroundColor: DARK_NAV, borderRadius: 6,
+            paddingVertical: 6, paddingHorizontal: 12,
+            flexDirection: "row", alignItems: "center", gap: 4,
+          }}
+        >
+          <Ionicons name="eye-outline" size={12} color="#fff" />
+          <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>View</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MAIN SCREEN
+═══════════════════════════════════════════════════════════════════════ */
+export default function SellersDashboard() {
+  const router = useRouter();
+  const { width: screenW } = Dimensions.get("window");
+  const isTablet  = screenW >= 768;
+  const isDesktop = screenW >= 1024;
+
+  const [sellerFilter, setSellerFilter] = useState("All Sellers");
+  const [filterType,   setFilterType]   = useState("Overall");
+  const [filterYear,   setFilterYear]   = useState("2025");
+  const [activeSeries, setActiveSeries] = useState("All Metrics");
+  const [fromDate,     setFromDate]     = useState("");
+  const [toDate,       setToDate]       = useState("");
+
+  const [chartWidth, setChartWidth] = useState(
+    isDesktop ? screenW - 64 : isTablet ? screenW - 48 : screenW - 28
+  );
+
+  const [search,   setSearch]   = useState("");
+  const [searchQ,  setSearchQ]  = useState("");
+  const [page,     setPage]     = useState(1);
+  const [perPage,  setPerPage]  = useState(10);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
 
-  const filtered = ALL_SELLERS.filter(s => {
+  const filteredSellers = ALL_SELLERS.filter(s => {
     const q = searchQ.toLowerCase();
     const matchQ = !q
       || s.name.toLowerCase().includes(q)
@@ -494,652 +715,834 @@ function SellerListContainer({ isMobile, sellerFilter, setSellerFilter }: { isMo
     return matchQ && matchSeller;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const totalPages = Math.max(1, Math.ceil(filteredSellers.length / perPage));
   const safePage   = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safePage - 1) * perPage, safePage * perPage);
+  const paginated  = filteredSellers.slice((safePage - 1) * perPage, safePage * perPage);
 
   const doSearch = () => { setSearchQ(search); setPage(1); };
   const doReset  = () => { setSearch(""); setSearchQ(""); setPage(1); setPerPage(10); };
+  const applyFilters = () => {
+    console.log("Applying filters:", { filterType, sellerFilter, filterYear, fromDate, toDate });
+  };
 
-  const pageNums = (() => {
-    if (totalPages <= 7) return [...Array(totalPages)].map((_, i) => i + 1);
-    if (safePage <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
-    if (safePage >= totalPages - 3) return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", safePage - 1, safePage, safePage + 1, "...", totalPages];
+  const pageNums: (number | string)[] = (() => {
+    if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
+    if (safePage <= 3)   return [1, 2, 3, "...", totalPages];
+    if (safePage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
+    return [1, "...", safePage, "...", totalPages];
   })();
 
-  const pageBtnBase = (active: boolean, disabled: boolean) => ({
-    width: 32, height: 32,
-    border: `1px solid ${active ? ORANGE : "#E2E8F0"}`,
-    borderRadius: 8,
-    background: active ? ORANGE : "#fff",
-    color: disabled ? "#CBD5E1" : active ? "#fff" : "#374151",
-    fontWeight: 700,
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 13,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    flexShrink: 0,
-  });
+  /* ────────────────────────────────────────────────────────────────────
+     DESKTOP LAYOUT
+  ──────────────────────────────────────────────────────────────────── */
+  if (isDesktop) {
+    return (
+      <View style={styles.root}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 32, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Header ── */}
+          <View style={styles.headerContainer}>
+            <View style={styles.pageHeader}>
+              <View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                  <Ionicons name="home" size={12} color={ORANGE} />
+                  <Text style={styles.breadcrumb}>Dashboard</Text>
+                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
+                  <Text style={styles.breadcrumb}>Sellers</Text>
+                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
+                  <Text style={{ fontSize: 12, color: "#94A3B8" }}>Sellers Graph</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="bar-chart" size={20} color={ORANGE} />
+                  <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={13} color="#475569" />
+                <Text style={styles.backBtnText}>Back</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-  const TABLE_COLS = [
-    { label: "ID",         icon: "bi-hash"         },
-    { label: "Seller",     icon: "bi-person"       },
-    { label: "Business",   icon: "bi-briefcase"    },
-    { label: "Onboard",    icon: "bi-calendar3"    },
-    { label: "Status",     icon: "bi-circle-half"  },
-    { label: "Profile",    icon: "bi-person-badge" },
-    { label: "KYC",        icon: "bi-shield-check" },
-    { label: "Supplement", icon: "bi-capsule"      },
-    { label: "Products",   icon: "bi-box-seam"     },
-    { label: "Action",     icon: "bi-gear"         },
-  ];
+          {/* ── DESKTOP: All Filters in ONE Row ── */}
+          <View style={[styles.card, { marginBottom: 14 }]}>
+            <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "nowrap" }}>
+              {/* Seller */}
+              <View style={{ flex: 2, minWidth: 160 }}>
+                <View style={styles.filterLabel}>
+                  <Ionicons name="person-outline" size={13} color="#64748B" />
+                  <Text style={styles.filterLabelText}>Seller</Text>
+                </View>
+                <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }} options={SELLER_OPTIONS} />
+              </View>
+              {/* Filter type */}
+              <View style={{ flex: 1, minWidth: 110 }}>
+                <View style={styles.filterLabel}>
+                  <Ionicons name="funnel-outline" size={13} color="#64748B" />
+                  <Text style={styles.filterLabelText}>Filter</Text>
+                </View>
+                <Dropdown value={filterType} onChange={setFilterType} options={FILTER_OPTIONS} />
+              </View>
+              {/* Year */}
+              <View style={{ flex: 0.8, minWidth: 90 }}>
+                <View style={styles.filterLabel}>
+                  <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                  <Text style={styles.filterLabelText}>Year</Text>
+                </View>
+                <Dropdown value={filterYear} onChange={setFilterYear} options={YEAR_OPTIONS} />
+              </View>
+              {/* From */}
+              <View style={{ flex: 1, minWidth: 130 }}>
+                <View style={styles.filterLabel}>
+                  <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                  <Text style={styles.filterLabelText}>From</Text>
+                </View>
+                <DatePicker value={fromDate} onChange={setFromDate} placeholder="DD/MM/YYYY" />
+              </View>
+              {/* To */}
+              <View style={{ flex: 1, minWidth: 130 }}>
+                <View style={styles.filterLabel}>
+                  <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                  <Text style={styles.filterLabelText}>To</Text>
+                </View>
+                <DatePicker value={toDate} onChange={setToDate} placeholder="DD/MM/YYYY" />
+              </View>
+              {/* Apply button */}
+              <TouchableOpacity
+                style={[styles.applyBtn, { paddingHorizontal: 20, alignSelf: "flex-end", height: 40, justifyContent: "center" }]}
+                onPress={applyFilters}
+              >
+                <Ionicons name="funnel" size={14} color="#fff" />
+                <Text style={styles.applyBtnText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.filterCaption}>
+              Showing analytics for {filterType} · {sellerFilter} · {filterYear}
+              {fromDate && ` · From: ${fromDate}`}
+              {toDate && ` · To: ${toDate}`}
+            </Text>
+          </View>
 
-  return (
-    <>
-      <div style={{
-        background: "#fff", borderRadius: 14, border: "1px solid #E8EDF5",
-        padding: isMobile ? 14 : 20, marginTop: isMobile ? 12 : 18
-      }}>
-        <div style={{
-          display: "flex", alignItems: isMobile ? "flex-start" : "center",
-          justifyContent: "space-between", marginBottom: 14,
-          flexDirection: isMobile ? "column" : "row", gap: 6
-        }}>
-          <div>
-            <div style={{
-              fontSize: 15, fontWeight: 700, color: "#1B2332",
-              display: "flex", alignItems: "center", gap: 6
-            }}>
-              <i className="bi bi-people-fill" style={{ color: ORANGE }} /> Seller List
-            </div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>
-              Browse all sellers onboarded on our platform
-            </div>
-          </div>
-          <div style={{
-            fontSize: 12, color: "#64748B", fontWeight: 700,
-            background: "#F1F5F9", borderRadius: 8, padding: "4px 10px", flexShrink: 0
-          }}>
-            <i className="bi bi-person-lines-fill" style={{ marginRight: 4 }} />
-            Total {filtered.length}
-          </div>
-        </div>
-
-        <div style={{
-          display: "flex", gap: 10, alignItems: "flex-end",
-          flexWrap: "wrap", marginBottom: 14,
-          flexDirection: isMobile ? "column" : "row"
-        }}>
-          <div style={{ flex: 1, minWidth: isMobile ? "100%" : 220 }}>
-            <label style={{
-              fontSize: 12, fontWeight: 600, color: "#64748B",
-              display: "block", marginBottom: 6
-            }}>
-              <i className="bi bi-search" style={{ marginRight: 4 }} />Search
-            </label>
-            <div style={{ position: "relative" }}>
-              <i className="bi bi-search" style={{
-                position: "absolute", left: 10, top: "50%",
-                transform: "translateY(-50%)", fontSize: 14, color: "#94A3B8"
-              }} />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && doSearch()}
-                placeholder="Search name / email / mobile / business..."
-                style={{
-                  width: "100%", border: "1px solid #E2E8F0", borderRadius: 9,
-                  padding: "9px 36px 9px 34px", fontSize: 13, color: "#374151",
-                  background: "#fff"
-                }}
-              />
-              {search && (
-                <i className="bi bi-x-circle-fill"
-                  onClick={() => { setSearch(""); setSearchQ(""); setPage(1); }}
-                  style={{
-                    position: "absolute", right: 10, top: "50%",
-                    transform: "translateY(-50%)", fontSize: 14,
-                    color: "#94A3B8", cursor: "pointer"
-                  }} />
-              )}
-            </div>
-          </div>
-
-          <div style={{ flexShrink: 0, width: isMobile ? "100%" : "auto" }}>
-            <label style={{
-              fontSize: 12, fontWeight: 600, color: "#64748B",
-              display: "block", marginBottom: 6
-            }}>
-              <i className="bi bi-list-ol" style={{ marginRight: 4 }} />Per page
-            </label>
-            <BSSelect
-              value={String(perPage)}
-              onChange={(v: string) => { setPerPage(Number(v)); setPage(1); }}
-              options={PERPAGE_OPTIONS.map(String)}
-              style={{ minWidth: 90 }}
-            />
-          </div>
-
-          <div style={{
-            display: "flex", gap: 8, alignItems: "flex-end",
-            flexShrink: 0, width: isMobile ? "100%" : "auto"
-          }}>
-            <button
-              onClick={doSearch}
-              style={{
-                background: ORANGE, color: "#fff", border: "none",
-                borderRadius: 9, padding: "9px 20px", fontWeight: 700, fontSize: 13,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                height: 40, whiteSpace: "nowrap",
-                flex: isMobile ? 1 : "none"
-              }}
-            >
-              <i className="bi bi-search" /> Search
-            </button>
-            <button
-              onClick={doReset}
-              style={{
-                background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0",
-                borderRadius: 9, padding: "9px 18px", fontWeight: 700, fontSize: 13,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                height: 40, whiteSpace: "nowrap",
-                flex: isMobile ? 1 : "none"
-              }}
-            >
-              <i className="bi bi-arrow-counterclockwise" /> Reset
-            </button>
-          </div>
-        </div>
-
-        <div style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
-          <i className="bi bi-list-check" style={{ marginRight: 4 }} />
-          {filtered.length === 0
-            ? "No results found"
-            : `Showing ${(safePage - 1) * perPage + 1}–${Math.min(safePage * perPage, filtered.length)} of ${filtered.length} entries`}
-        </div>
-
-        {!isMobile ? (
-          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <table style={{
-              width: "100%", borderCollapse: "collapse",
-              fontSize: 13, minWidth: 980
-            }}>
-              <thead>
-                <tr style={{ background: "#F8FAFC" }}>
-                  {TABLE_COLS.map(h => (
-                    <th key={h.label} style={{
-                      padding: "11px 12px", textAlign: "left",
-                      fontWeight: 700, fontSize: 11, color: "#64748B",
-                      letterSpacing: "0.04em", textTransform: "uppercase",
-                      borderBottom: "2px solid #E8EDF5", whiteSpace: "nowrap"
-                    }}>
-                      <i className={`bi ${h.icon}`} style={{ marginRight: 4 }} />{h.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} style={{ textAlign: "center", padding: 48, color: "#94A3B8", fontSize: 14 }}>
-                      <i className="bi bi-inbox" style={{ fontSize: 36, display: "block", marginBottom: 10, color: "#CBD5E1" }} />
-                      No sellers found
-                      {(searchQ || sellerFilter !== "All Sellers") && (
-                        <div style={{ marginTop: 10 }}>
-                          <button onClick={doReset} style={{
-                            background: "none", border: "1px solid #E2E8F0",
-                            borderRadius: 8, padding: "6px 14px", fontSize: 12,
-                            color: ORANGE, cursor: "pointer", fontWeight: 600
-                          }}>Clear filters</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ) : paginated.map((s, idx) => (
-                  <tr key={s.id} style={{ borderBottom: "1px solid #F1F5F9" }}
-                    onMouseEnter={e => {
-                      e.currentTarget.querySelectorAll("td").forEach(td => { td.style.background = "#FFF7ED"; });
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.querySelectorAll("td").forEach(td => { td.style.background = idx % 2 === 0 ? "#fff" : "#FAFBFD"; });
-                    }}
-                  >
-                    <td style={{ padding: "12px", fontWeight: 700, color: "#94A3B8", fontSize: 12, background: idx % 2 === 0 ? "#fff" : "#FAFBFD", whiteSpace: "nowrap" }}>#{s.id}</td>
-                    <td style={{ padding: "12px", background: idx % 2 === 0 ? "#fff" : "#FAFBFD", minWidth: 200 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Avatar initials={s.initials} color={s.color} size={34} />
-                        <div>
-                          <div style={{ fontWeight: 700, color: "#1B2332", fontSize: 13 }}>{s.name}</div>
-                          <div style={{ fontSize: 11, color: "#94A3B8" }}>{s.email}</div>
-                          <div style={{ fontSize: 11, color: "#94A3B8" }}>{s.phone}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: "12px", color: "#475569", fontSize: 12, background: idx % 2 === 0 ? "#fff" : "#FAFBFD", maxWidth: 140 }}>
-                      <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.business}</span>
-                    </td>
-                    <td style={{ padding: "12px", color: "#475569", fontSize: 12, whiteSpace: "nowrap", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}>{s.onboard}</td>
-                    <td style={{ padding: "12px", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}><StatusBadge status={s.status} /></td>
-                    <td style={{ padding: "12px", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}><StatusBadge status={s.profile} /></td>
-                    <td style={{ padding: "12px", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}><StatusBadge status={s.kyc === "Pending" ? "Not done" : s.kyc} /></td>
-                    <td style={{ padding: "12px", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}><StatusBadge status={s.supplement} /></td>
-                    <td style={{ padding: "12px", fontWeight: 700, color: "#1B2332", textAlign: "center", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}>{s.products}</td>
-                    <td style={{ padding: "12px", background: idx % 2 === 0 ? "#fff" : "#FAFBFD" }}>
-                      <button onClick={() => setSelectedSeller(s)} style={{
-                        background: DARK_NAV, color: "#fff", border: "none",
-                        borderRadius: 8, padding: "7px 14px", fontSize: 12,
-                        fontWeight: 600, cursor: "pointer",
-                        display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap"
-                      }}>
-                        <i className="bi bi-eye-fill" /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {paginated.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px 20px", color: "#94A3B8" }}>
-                <i className="bi bi-inbox" style={{ fontSize: 36, display: "block", marginBottom: 10, color: "#CBD5E1" }} />
-                No sellers found
-                {(searchQ || sellerFilter !== "All Sellers") && (
-                  <div style={{ marginTop: 10 }}>
-                    <button onClick={doReset} style={{
-                      background: "none", border: "1px solid #E2E8F0",
-                      borderRadius: 8, padding: "6px 14px", fontSize: 12,
-                      color: ORANGE, cursor: "pointer", fontWeight: 600
-                    }}>Clear filters</button>
-                  </div>
-                )}
-              </div>
-            ) : paginated.map(s => (
-              <div key={s.id} style={{
-                background: "#fff", border: "1px solid #E8EDF5",
-                borderRadius: 14, padding: 16,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Avatar initials={s.initials} color={s.color} size={46} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: "#1B2332", fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "#94A3B8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      <i className="bi bi-envelope" style={{ marginRight: 3 }} />{s.email}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94A3B8" }}>
-                      <i className="bi bi-telephone" style={{ marginRight: 3 }} />{s.phone}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 11, fontWeight: 700, color: "#94A3B8",
-                    background: "#F1F5F9", borderRadius: 6, padding: "3px 8px", flexShrink: 0
-                  }}>#{s.id}</div>
-                </div>
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 8, background: "#F8FAFC", borderRadius: 8,
-                  padding: "10px 12px", margin: "10px 0"
-                }}>
-                  {[
-                    { icon: "bi-briefcase", label: "Business", val: s.business     },
-                    { icon: "bi-calendar3",  label: "Onboard",  val: s.onboard      },
-                    { icon: "bi-box-seam",   label: "Products", val: String(s.products) },
-                  ].map(({ icon, label, val }) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>
-                        <i className={`bi ${icon}`} style={{ marginRight: 2 }} />{label}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#374151", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "10px 0 0" }}>
-                  {[
-                    { label: "Status",     val: s.status     },
-                    { label: "Profile",    val: s.profile    },
-                    { label: "KYC",        val: s.kyc === "Pending" ? "Not done" : s.kyc },
-                    { label: "Supplement", val: s.supplement },
-                  ].map(b => (
-                    <div key={b.label}>
-                      <div style={{ fontSize: 9, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>{b.label}</div>
-                      <StatusBadge status={b.val} />
-                    </div>
-                  ))}
-                </div>
-                {s.shipDate && (
-                  <div style={{ fontSize: 11, color: "#94A3B8", margin: "8px 0" }}>
-                    <i className="bi bi-cloud-check-fill" style={{ marginRight: 4, color: "#10B981" }} />
-                    Shiprocket uploaded: {s.shipDate}
-                  </div>
-                )}
-                <button onClick={() => setSelectedSeller(s)} style={{
-                  width: "100%", background: DARK_NAV, color: "#fff",
-                  border: "none", borderRadius: 9, padding: "10px",
-                  fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  gap: 6, marginTop: 10
-                }}>
-                  <i className="bi bi-eye-fill" /> View Details
-                </button>
-              </div>
+          {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
+          <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
+            {STAT_CARDS.map(c => (
+              <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                  <Text style={styles.statValue}>{c.value}</Text>
+                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                </View>
+                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                  <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                </View>
+              </View>
             ))}
-          </div>
-        )}
+          </View>
 
-        {filtered.length > 0 && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            marginTop: 16, flexWrap: "wrap", gap: 10,
-            borderTop: "1px solid #F1F5F9", paddingTop: 14
-          }}>
-            <span style={{ fontSize: 12, color: "#64748B" }}>Page {safePage} of {totalPages}</span>
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              <button onClick={() => setPage(1)} disabled={safePage === 1} style={pageBtnBase(false, safePage === 1)}>
-                <i className="bi bi-chevron-double-left" style={{ fontSize: 11 }} />
-              </button>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} style={pageBtnBase(false, safePage === 1)}>
-                <i className="bi bi-chevron-left" style={{ fontSize: 11 }} />
-              </button>
-              {pageNums.map((p, i) => p === "..." ? (
-                <span key={"e" + i} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#94A3B8" }}>…</span>
-              ) : (
-                <button key={p} onClick={() => setPage(Number(p))} style={pageBtnBase(safePage === p, false)}>{p}</button>
+          {/* ── DESKTOP: Chart + Key Insights side by side ── */}
+          <View style={{ flexDirection: "row", gap: 14, marginBottom: 14 }}>
+            {/* Yearly Overview (left, larger) */}
+            <View style={[styles.card, { flex: 2, marginBottom: 0 }]}>
+              <View style={styles.chartHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.chartTitle}>Yearly Overview</Text>
+                  <Text style={styles.chartSubtitle}>Performance overview of all sellers for the selected period</Text>
+                </View>
+                <Dropdown value={activeSeries} onChange={setActiveSeries}
+                  options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
+              </View>
+              <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)} style={{ width: "100%" }}>
+                {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} />}
+              </View>
+              <View style={styles.legendRow}>
+                {SERIES.map(s => {
+                  const isActive = activeSeries === "All Metrics" || activeSeries === s.label;
+                  return (
+                    <TouchableOpacity
+                      key={s.key}
+                      onPress={() => setActiveSeries(activeSeries === s.label ? "All Metrics" : s.label)}
+                      style={[styles.legendItem, { opacity: isActive ? 1 : 0.35 }]}
+                    >
+                      <LegendSwatch series={s} active={isActive} />
+                      <Text style={styles.legendLabel}>{s.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Key Insights (right, smaller) */}
+            <View style={[styles.card, { flex: 1, marginBottom: 0 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14 }}>
+                <Ionicons name="bulb" size={18} color="#F59E0B" />
+                <Text style={styles.chartTitle}>Key Insights</Text>
+              </View>
+              {INSIGHTS.map((ins, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+                  <View style={[styles.insightIcon, { backgroundColor: ins.bg }]}>
+                    <Ionicons name={ins.iconName as any} size={18} color={ins.color} />
+                  </View>
+                  <Text style={styles.insightText}>{ins.text}</Text>
+                </View>
               ))}
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={pageBtnBase(false, safePage === totalPages)}>
-                <i className="bi bi-chevron-right" style={{ fontSize: 11 }} />
-              </button>
-              <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages} style={pageBtnBase(false, safePage === totalPages)}>
-                <i className="bi bi-chevron-double-right" style={{ fontSize: 11 }} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+            </View>
+          </View>
 
-      {selectedSeller && (
+          {/* ── DESKTOP: Seller Table ── */}
+          <View style={[styles.card, { marginBottom: 14 }]}>
+            {/* List header */}
+            <View style={styles.listHeaderRow}>
+              <View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="people" size={16} color={ORANGE} />
+                  <Text style={styles.chartTitle}>Seller List</Text>
+                </View>
+                <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
+              </View>
+              <View style={styles.totalBadge}>
+                <Ionicons name="person" size={11} color="#64748B" />
+                <Text style={styles.totalBadgeText}>Total {filteredSellers.length}</Text>
+              </View>
+            </View>
+
+            {/* Search row */}
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 14, alignItems: "center" }}>
+              <View style={[styles.searchRow, { flex: 1 }]}>
+                <Ionicons name="search-outline" size={15} color="#94A3B8" />
+                <TextInput
+                  value={search} onChangeText={setSearch}
+                  onSubmitEditing={doSearch} returnKeyType="search"
+                  placeholder="Search name / email / mobile / business..."
+                  placeholderTextColor="#94A3B8" style={styles.searchInput}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
+                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={{ minWidth: 100 }}>
+                <Text style={[styles.filterLabelText, { marginBottom: 4 }]}>Per page</Text>
+                <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
+              </View>
+              <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
+                <Ionicons name="search" size={13} color="#fff" />
+                <Text style={styles.applyBtnText}>Search</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
+                <Ionicons name="refresh" size={13} color="#475569" />
+                <Text style={styles.resetBtnText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.showingText}>
+              {filteredSellers.length === 0
+                ? "No results found"
+                : `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage, filteredSellers.length)} of ${filteredSellers.length} entries`}
+            </Text>
+
+            {/* Table */}
+            <View style={styles.tableContainer}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>ID</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Seller</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Business</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Onboard</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Status</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Profile</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.65 }]}>KYC</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Shiprocket</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>Products</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>Action</Text>
+              </View>
+
+              {/* Table Rows */}
+              {paginated.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                  <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
+                  <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
+                  <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
+                    <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                paginated.map((s, idx) => (
+                  <DesktopTableRow key={s.id} item={s} idx={idx} onView={() => setSelectedSeller(s)} />
+                ))
+              )}
+            </View>
+
+            {/* Pagination */}
+            {filteredSellers.length > 0 && (
+              <View style={styles.paginationRow}>
+                <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  <PagBtn iconName="play-skip-back"   onPress={() => setPage(1)}                              disabled={safePage === 1} />
+                  <PagBtn iconName="chevron-back"     onPress={() => setPage(p => Math.max(1, p - 1))}       disabled={safePage === 1} />
+                  {pageNums.map((p, i) =>
+                    p === "..." ? (
+                      <View key={"e"+i} style={styles.pagBtn}>
+                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        key={`n${p}`}
+                        onPress={() => setPage(p as number)}
+                        style={[styles.pagBtn, safePage === p && { backgroundColor: ORANGE, borderColor: ORANGE }]}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                  <PagBtn iconName="chevron-forward"  onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+                  <PagBtn iconName="play-skip-forward" onPress={() => setPage(totalPages)}                      disabled={safePage === totalPages} />
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* ── Footer ── */}
+          <Text style={styles.footer}>
+            2026 © Flintnthread India Pvt. Ltd.{"\n"}
+            Crafted by <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
+          </Text>
+        </ScrollView>
+
         <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
-      )}
-    </>
-  );
-}
+      </View>
+    );
+  }
 
-/* ─── Main Component ─────────────────────────────────────────────────── */
-export default function SellersDashboard() {
-  const [windowW, setWindowW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
-  const [chartW, setChartW]   = useState(600);
-  const chartRef = useRef(null);
-
-  const [sellerFilter, setSellerFilter] = useState("All Sellers");
-  const [filterType,   setFilterType]   = useState("Overall");
-  const [filterYear,   setFilterYear]   = useState("2025");
-  const [fromDate,     setFromDate]     = useState("");
-  const [toDate,       setToDate]       = useState("");
-  const [activeSeries, setActiveSeries] = useState("All Metrics");
-
-  useEffect(() => {
-    const onResize = () => setWindowW(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    const ro = new ResizeObserver(entries => {
-      for (const e of entries) setChartW(e.contentRect.width);
-    });
-    ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  const isMobile  = windowW < 640;
-  const isTablet  = windowW >= 640 && windowW < 1024;
-  const isDesktop = windowW >= 1024;
-
+  /* ────────────────────────────────────────────────────────────────────
+     MOBILE / TABLET LAYOUT  (unchanged)
+  ──────────────────────────────────────────────────────────────────── */
   return (
-    /*
-      ── SCROLL FIX ──────────────────────────────────────────────────────
-      The outer wrapper uses height:100vh + overflowY:auto so the page
-      scrolls inside the artifact iframe on desktop. Without this the
-      iframe never gets a scrollbar because the child content pushes the
-      height past 100vh but the container has no overflow set.
-    ────────────────────────────────────────────────────────────────── */
-    <div style={{
-      height: "100vh",
-      overflowY: "auto",
-      overflowX: "hidden",
-      background: "#F8FAFC",
-      fontFamily: "'Inter','Segoe UI',sans-serif"
-    }}>
-      <style>{`
-        * { box-sizing:border-box; }
-        input:focus, select:focus, button:focus { outline:none; }
-        ::-webkit-scrollbar { height:4px; width:4px; }
-        ::-webkit-scrollbar-track { background:#F1F5F9; }
-        ::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:4px; }
-      `}</style>
-
-      <div style={{
-        maxWidth: isDesktop ? 1320 : "100%", margin: "0 auto",
-        padding: isMobile ? "16px 12px" : isTablet ? "20px 20px" : "28px 36px"
-      }}>
-
-        {/* ── Page Header ── */}
-        <div style={{
-          display: "flex", alignItems: isMobile ? "flex-start" : "center",
-          justifyContent: "space-between", marginBottom: isMobile ? 14 : 22,
-          flexDirection: isMobile ? "column" : "row", gap: 10
-        }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#94A3B8", marginBottom: 4 }}>
-              <i className="bi bi-house-door-fill" style={{ color: ORANGE, fontSize: 13 }} />
-              <span style={{ color: ORANGE, fontWeight: 600 }}>Dashboard</span>
-              <i className="bi bi-chevron-right" style={{ fontSize: 10 }} />
-              <span style={{ color: ORANGE, fontWeight: 600 }}>Sellers</span>
-              <i className="bi bi-chevron-right" style={{ fontSize: 10 }} />
-              <span>Sellers Graph</span>
-            </div>
-            <h1 style={{
-              fontSize: isMobile ? 20 : 26, fontWeight: 800, color: "#1B2332",
-              margin: 0, display: "flex", alignItems: "center", gap: 8
-            }}>
-              <i className="bi bi-bar-chart-line-fill" style={{ color: ORANGE, fontSize: isMobile ? 18 : 22 }} />
-              Sellers Graph / Analysis
-            </h1>
-          </div>
-          <button style={{
-            background: "#fff", border: "1px solid #E2E8F0", borderRadius: 10,
-            padding: "8px 18px", fontSize: 13, fontWeight: 600, color: "#475569",
-            cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0
-          }}>
-            <i className="bi bi-chevron-left" style={{ fontSize: 12 }} /> Back
-          </button>
-        </div>
+    <View style={styles.root}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: isTablet ? 24 : 14, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Header Container (Dark Blue) ── */}
+        <View style={styles.headerContainer}>
+          <View style={styles.pageHeader}>
+            <View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                <Ionicons name="home" size={12} color={ORANGE} />
+                <Text style={styles.breadcrumb}>Dashboard</Text>
+                <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
+                <Text style={styles.breadcrumb}>Sellers</Text>
+                <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
+                <Text style={{ fontSize: 12, color: "#94A3B8" }}>Sellers Graph</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="bar-chart" size={20} color={ORANGE} />
+                <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={13} color="#475569" />
+              <Text style={styles.backBtnText}>Back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* ── Filters Card ── */}
-        <div style={{
-          background: "#fff", borderRadius: 14, border: "1px solid #E8EDF5",
-          padding: isMobile ? "14px" : "18px 22px", marginBottom: isMobile ? 12 : 18
-        }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr 1fr" : "1fr 1fr 1fr auto",
-            gap: 12, alignItems: "end"
-          }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 }}>
-                <i className="bi bi-person" style={{ marginRight: 5 }} />Seller
-              </label>
-              <BSSelect value={sellerFilter} onChange={(v: string) => setSellerFilter(String(v))} options={SELLER_OPTIONS} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 }}>
-                <i className="bi bi-funnel" style={{ marginRight: 5 }} />Filter
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <BSSelect value={filterType} onChange={setFilterType} options={FILTER_OPTIONS} style={{ flex: 1 }} />
-                <BSSelect value={filterYear} onChange={setFilterYear} options={YEAR_OPTIONS}   style={{ flex: 1 }} />
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 }}>
-                <i className="bi bi-calendar3" style={{ marginRight: 5 }} />Date Range
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                  style={{ flex: 1, border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: fromDate ? "#374151" : "#94A3B8", width: "100%" }} />
-                <span style={{ color: "#94A3B8", fontWeight: 600 }}>–</span>
-                <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                  style={{ flex: 1, border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: toDate ? "#374151" : "#94A3B8", width: "100%" }} />
-              </div>
-            </div>
-            <button style={{
-              background: ORANGE, color: "#fff", border: "none", borderRadius: 9,
-              padding: "10px 22px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 7, justifyContent: "center",
-              whiteSpace: "nowrap", height: 40
-            }}>
-              <i className="bi bi-funnel-fill" style={{ fontSize: 13 }} /> Apply
-            </button>
-          </div>
-          <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 10, marginBottom: 0 }}>
-            <i className="bi bi-info-circle" style={{ marginRight: 4 }} />
-            Showing analytics for <strong>{filterType}</strong> · <strong>{sellerFilter}</strong> · <strong>{filterYear}</strong>
-            {fromDate && toDate && ` · ${fromDate} → ${toDate}`}
-          </p>
-        </div>
+        <View style={styles.card}>
+          <View style={styles.filterLabel}>
+            <Ionicons name="person-outline" size={13} color="#64748B" />
+            <Text style={styles.filterLabelText}>Seller</Text>
+          </View>
+          <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }}
+            options={SELLER_OPTIONS} style={{ marginBottom: 12 }} />
 
-        {/* ── Stat Cards ── */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr 1fr" : isTablet ? "repeat(3,1fr)" : "repeat(6,1fr)",
-          gap: isMobile ? 10 : 14, marginBottom: isMobile ? 12 : 18
-        }}>
-          {STAT_CARDS.map(c => <StatCard key={c.label} {...c} />)}
-        </div>
+          <View style={[styles.filterRow]}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.filterLabel}>
+                <Ionicons name="funnel-outline" size={13} color="#64748B" />
+                <Text style={styles.filterLabelText}>Filter</Text>
+              </View>
+              <Dropdown value={filterType} onChange={setFilterType} options={FILTER_OPTIONS} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.filterLabel}>
+                <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                <Text style={styles.filterLabelText}>Year</Text>
+              </View>
+              <Dropdown value={filterYear} onChange={setFilterYear} options={YEAR_OPTIONS} />
+            </View>
+          </View>
 
-        {/* ── Chart + Insights ── */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: isMobile || isTablet ? "1fr" : "1fr 320px",
-          gap: isMobile ? 12 : 18, marginBottom: isMobile ? 12 : 18
-        }}>
-          {/* ── Chart Card ── */}
-          <div style={{
-            background: "#fff", borderRadius: 14, border: "1px solid #E8EDF5",
-            padding: isMobile ? "16px 12px" : "24px"
-          }}>
-            {/* Card header */}
-            <div style={{
-              display: "flex", alignItems: isMobile ? "flex-start" : "center",
-              justifyContent: "space-between", marginBottom: 20,
-              flexWrap: "wrap", gap: 10
-            }}>
-              <div>
-                <div style={{
-                  fontSize: isMobile ? 15 : 18, fontWeight: 800, color: "#1B2332",
-                  marginBottom: 2
-                }}>
-                  Yearly Overview
-                </div>
-                <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.4 }}>
-                  Performance overview of all sellers{isMobile ? " /" : " /"}<br style={{ display: isMobile ? "block" : "none" }} />
-                  {" "}overall sellers for the selected period
-                </div>
-              </div>
-              {/* Dropdown */}
-              <BSSelect
-                value={activeSeries}
-                onChange={setActiveSeries}
-                options={METRIC_OPTIONS}
-                style={{ minWidth: 160 }}
+          <View style={[styles.filterRow]}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.filterLabel}>
+                <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                <Text style={styles.filterLabelText}>From</Text>
+              </View>
+              <DatePicker value={fromDate} onChange={setFromDate} placeholder="DD/MM/YYYY" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.filterLabel}>
+                <Ionicons name="calendar-outline" size={13} color="#64748B" />
+                <Text style={styles.filterLabelText}>To</Text>
+              </View>
+              <DatePicker value={toDate} onChange={setToDate} placeholder="DD/MM/YYYY" />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
+            <Ionicons name="funnel" size={14} color="#fff" />
+            <Text style={styles.applyBtnText}>Apply Filters</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.filterCaption}>
+            Showing analytics for {filterType} · {sellerFilter} · {filterYear}
+            {fromDate && ` · From: ${fromDate}`}
+            {toDate && ` · To: ${toDate}`}
+          </Text>
+        </View>
+
+        {/* ── Stat Cards (mobile: 2-col grid) ── */}
+        <View style={[styles.statGrid, { marginBottom: 14 }]}>
+          {STAT_CARDS.map(c => (
+            <View key={c.label} style={[styles.statCard]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                <Text style={styles.statValue}>{c.value}</Text>
+                {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+              </View>
+              <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Chart Card ── */}
+        <View style={[styles.card, { marginBottom: 14 }]}>
+          <View style={styles.chartHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chartTitle}>Yearly Overview</Text>
+              <Text style={styles.chartSubtitle}>Performance overview of all sellers for the selected period</Text>
+            </View>
+            <Dropdown value={activeSeries} onChange={setActiveSeries}
+              options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
+          </View>
+          <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)} style={{ width: "100%" }}>
+            {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} />}
+          </View>
+          <View style={styles.legendRow}>
+            {SERIES.map(s => {
+              const isActive = activeSeries === "All Metrics" || activeSeries === s.label;
+              return (
+                <TouchableOpacity
+                  key={s.key}
+                  onPress={() => setActiveSeries(activeSeries === s.label ? "All Metrics" : s.label)}
+                  style={[styles.legendItem, { opacity: isActive ? 1 : 0.35 }]}
+                >
+                  <LegendSwatch series={s} active={isActive} />
+                  <Text style={styles.legendLabel}>{s.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ── Key Insights ── */}
+        <View style={[styles.card, { marginBottom: 14 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14 }}>
+            <Ionicons name="bulb" size={18} color="#F59E0B" />
+            <Text style={styles.chartTitle}>Key Insights</Text>
+          </View>
+          {INSIGHTS.map((ins, i) => (
+            <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+              <View style={[styles.insightIcon, { backgroundColor: ins.bg }]}>
+                <Ionicons name={ins.iconName as any} size={18} color={ins.color} />
+              </View>
+              <Text style={styles.insightText}>{ins.text}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Seller List (mobile cards) ── */}
+        <View style={styles.card}>
+          <View style={styles.listHeaderRow}>
+            <View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="people" size={16} color={ORANGE} />
+                <Text style={styles.chartTitle}>Seller List</Text>
+              </View>
+              <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
+            </View>
+            <View style={styles.totalBadge}>
+              <Ionicons name="person" size={11} color="#64748B" />
+              <Text style={styles.totalBadgeText}>Total {filteredSellers.length}</Text>
+            </View>
+          </View>
+
+          <View style={{ marginBottom: 12 }}>
+            <View style={styles.searchRow}>
+              <Ionicons name="search-outline" size={15} color="#94A3B8" />
+              <TextInput
+                value={search} onChangeText={setSearch} onSubmitEditing={doSearch}
+                returnKeyType="search"
+                placeholder="Search name / email / mobile / business..."
+                placeholderTextColor="#94A3B8" style={styles.searchInput}
               />
-            </div>
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
+                  <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
 
-            {/* Chart SVG */}
-            <div ref={chartRef} style={{ width: "100%" }}>
-              <LineChart
-                width={chartW || 600}
-                height={isMobile ? 220 : 320}
-                activeSeries={activeSeries}
-              />
-            </div>
+          <View style={[styles.searchControlsRow]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.filterLabelText}>Per page</Text>
+              <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
+            </View>
+            <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { flex: 1, marginTop: 18 }]}>
+              <Ionicons name="search" size={13} color="#fff" />
+              <Text style={styles.applyBtnText}>Search</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { flex: 1, marginTop: 18 }]}>
+              <Ionicons name="refresh" size={13} color="#475569" />
+              <Text style={styles.resetBtnText}>Reset</Text>
+            </TouchableOpacity>
+          </View>
 
-            {/* Legend – bottom, matching image style */}
-            <div style={{
-              display: "flex", flexWrap: "wrap",
-              gap: isMobile ? "8px 14px" : "10px 24px",
-              marginTop: 18,
-              justifyContent: "center",
-              borderTop: "1px solid #F1F5F9",
-              paddingTop: 14
-            }}>
-              {SERIES.map(s => {
-                const isActive = activeSeries === "All Metrics" || activeSeries === s.label;
-                return (
-                  <button
-                    key={s.key}
-                    onClick={() => setActiveSeries(activeSeries === s.label ? "All Metrics" : s.label)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 7,
-                      background: "none", border: "none", cursor: "pointer",
-                      padding: "3px 6px", borderRadius: 6,
-                      opacity: isActive ? 1 : 0.35,
-                      transition: "opacity 0.18s",
-                      fontSize: 12, color: "#374151", fontWeight: 500,
-                      whiteSpace: "nowrap"
-                    }}
-                  >
-                    <LegendSwatch series={s} active={isActive} />
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <Text style={styles.showingText}>
+            {filteredSellers.length === 0
+              ? "No results found"
+              : `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage, filteredSellers.length)} of ${filteredSellers.length} entries`}
+          </Text>
 
-          <div style={{
-            background: "#fff", borderRadius: 14, border: "1px solid #E8EDF5",
-            padding: isMobile ? 14 : 20
-          }}>
-            <div style={{
-              fontSize: 15, fontWeight: 700, color: "#1B2332", marginBottom: 14,
-              display: "flex", alignItems: "center", gap: 6
-            }}>
-              <i className="bi bi-lightbulb-fill" style={{ color: "#F59E0B" }} /> Key Insights
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {INSIGHTS.map((ins, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <div style={{
-                    width: 38, height: 38, borderRadius: 10, background: ins.bg,
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
-                  }}>
-                    <i className={`bi ${ins.biIcon}`} style={{ fontSize: 18, color: ins.color }} />
-                  </div>
-                  <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.55, margin: 0 }}>{ins.text}</p>
-                </div>
+          {paginated.length === 0 ? (
+            <View style={{ alignItems: "center", paddingVertical: 48 }}>
+              <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
+              <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
+              <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
+                <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.sellerCardsContainer}>
+              {paginated.map(s => (
+                <SellerCard key={s.id} item={s} onView={() => setSelectedSeller(s)} />
               ))}
-            </div>
-          </div>
-        </div>
+            </View>
+          )}
 
-        <SellerListContainer
-          isMobile={isMobile}
-          sellerFilter={sellerFilter}
-          setSellerFilter={setSellerFilter}
-        />
+          {filteredSellers.length > 0 && (
+            <View style={styles.paginationRow}>
+              <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
+              <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
+                <PagBtn iconName="play-skip-back"   onPress={() => setPage(1)}                              disabled={safePage === 1} />
+                <PagBtn iconName="chevron-back"     onPress={() => setPage(p => Math.max(1, p - 1))}       disabled={safePage === 1} />
+                {pageNums.map((p, i) =>
+                  p === "..." ? (
+                    <View key={"e"+i} style={styles.pagBtn}>
+                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      key={`n${p}`}
+                      onPress={() => setPage(p as number)}
+                      style={[styles.pagBtn, safePage === p && { backgroundColor: ORANGE, borderColor: ORANGE }]}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                    </TouchableOpacity>
+                  )
+                )}
+                <PagBtn iconName="chevron-forward"  onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+                <PagBtn iconName="play-skip-forward" onPress={() => setPage(totalPages)}                      disabled={safePage === totalPages} />
+              </View>
+            </View>
+          )}
+        </View>
 
-        <div style={{ textAlign: "center", padding: "20px 0 8px", fontSize: 12, color: "#94A3B8" }}>
-          2026 © Flintnthread India Pvt. Ltd. Crafted by{" "}
-          <a href="#" style={{ color: "#16A34A", fontWeight: 700, textDecoration: "none" }}>
-            Flinththread India Pvt. Ltd.
-          </a>
-        </div>
+        {/* ── Footer ── */}
+        <Text style={styles.footer}>
+          2026 © Flintnthread India Pvt. Ltd.{"\n"}
+          Crafted by <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
+        </Text>
+      </ScrollView>
 
-      </div>
-    </div>
+      <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
+    </View>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STYLES
+═══════════════════════════════════════════════════════════════════════ */
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: LIGHT_BG,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif",
+  },
+
+  headerContainer: {
+    backgroundColor: DARK_NAV,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    marginBottom: 14,
+  },
+
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 0,
+    gap: 10,
+  },
+  breadcrumb: { fontSize: 12, color: ORANGE, fontWeight: "600" },
+  pageTitle:  { fontSize: 20, fontWeight: "800", color: "#fff" },
+  backBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10,
+    paddingVertical: 7, paddingHorizontal: 14, backgroundColor: "#fff",
+  },
+  backBtnText: { fontSize: 13, fontWeight: "600", color: "#475569" },
+
+  filterLabel: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 6 },
+  filterLabelText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  filterRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+
+  applyBtn: {
+    backgroundColor: ORANGE, borderRadius: 9, paddingVertical: 11,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+  },
+  applyBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  resetBtn: {
+    backgroundColor: "#F1F5F9", borderRadius: 9, paddingVertical: 11,
+    borderWidth: 1, borderColor: "#E2E8F0",
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+  },
+  resetBtnText: { color: "#475569", fontWeight: "700", fontSize: 14 },
+  filterCaption: { fontSize: 11, color: "#94A3B8", marginTop: 10 },
+
+  /* Stat Cards */
+  statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  statCard: {
+    width: "47%", flexGrow: 1,
+    backgroundColor: "#fff", borderWidth: 1, borderColor: "#F1F5F9",
+    borderRadius: 12, padding: 14,
+    flexDirection: "row", alignItems: "center", gap: 10,
+  },
+  statLabel:   { fontSize: 10, color: "#94A3B8", fontWeight: "600", letterSpacing: 0.5, marginBottom: 2 },
+  statValue:   { fontSize: 22, fontWeight: "800", color: DARK_NAV, lineHeight: 24 },
+  statSub:     { fontSize: 10, color: "#94A3B8", marginTop: 2 },
+  statIconBox: { width: 44, height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+
+  /* Chart */
+  chartHeader: {
+    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+    marginBottom: 16, gap: 10, flexWrap: "wrap",
+  },
+  chartTitle:    { fontSize: 16, fontWeight: "800", color: DARK_NAV, marginBottom: 2 },
+  chartSubtitle: { fontSize: 11, color: "#94A3B8", lineHeight: 16 },
+  legendRow: {
+    flexDirection: "row", flexWrap: "wrap", gap: 10,
+    marginTop: 16, paddingTop: 14,
+    borderTopWidth: 1, borderTopColor: "#F1F5F9",
+    justifyContent: "center",
+  },
+  legendItem:  { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendLabel: { fontSize: 11, color: "#374151", fontWeight: "500" },
+
+  /* Insights */
+  insightIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  insightText: { flex: 1, fontSize: 13, color: "#475569", lineHeight: 20 },
+
+  /* Seller list */
+  listHeaderRow: {
+    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+    marginBottom: 14, flexWrap: "wrap", gap: 6,
+  },
+  totalBadge: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "#F1F5F9", borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10,
+  },
+  totalBadgeText: { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  searchRow: {
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 9,
+    paddingHorizontal: 10, backgroundColor: "#fff", gap: 6,
+  },
+  searchInput: { flex: 1, fontSize: 13, color: "#374151", paddingVertical: 9 },
+  searchControlsRow: { flexDirection: "row", gap: 8, marginBottom: 12, alignItems: "center" },
+  showingText: { fontSize: 12, color: "#64748B", marginBottom: 12 },
+  clearBtn: {
+    marginTop: 10, borderWidth: 1, borderColor: "#E2E8F0",
+    borderRadius: 8, paddingVertical: 6, paddingHorizontal: 14,
+  },
+  sellerCardsContainer: { gap: 12 },
+
+  /* Desktop Table */
+  tableContainer: {
+    borderWidth: 1, borderColor: BORDER, borderRadius: 10, overflow: "hidden",
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: DARK_NAV,
+    paddingVertical: 12, paddingHorizontal: 14,
+  },
+  tableHeaderCell: {
+    fontSize: 12, fontWeight: "700", color: "#fff",
+  },
+  tableRow: {
+    flexDirection: "row",
+    paddingVertical: 12, paddingHorizontal: 14,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
+    alignItems: "center",
+  },
+  tableCell: { fontSize: 12, color: "#374151" },
+
+  /* Seller card (mobile) */
+  sellerCard: {
+    backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER,
+    borderRadius: 14, padding: 14, marginBottom: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  sellerCardDesktop: { marginBottom: 0 },
+  sellerCardName:    { fontWeight: "700", color: DARK_NAV, fontSize: 14 },
+  sellerCardSub:     { fontSize: 11, color: "#94A3B8", marginTop: 1 },
+  idBadge: { backgroundColor: "#F1F5F9", borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0 },
+  idBadgeText: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
+  sellerMetaGrid: {
+    flexDirection: "row", backgroundColor: "#F8FAFC",
+    borderRadius: 8, padding: 10, marginTop: 10, gap: 4,
+  },
+  metaLabel: { fontSize: 9, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: 3 },
+  metaVal:   { fontSize: 12, color: "#374151", fontWeight: "600" },
+  badgeLabel: { fontSize: 9, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", marginBottom: 3 },
+  shipDateText: { fontSize: 11, color: "#94A3B8", marginTop: 8 },
+  viewBtn: {
+    backgroundColor: DARK_NAV, borderRadius: 9, paddingVertical: 10,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10,
+  },
+  viewBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+
+  /* Pagination */
+  paginationRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: "#F1F5F9",
+    flexWrap: "wrap", gap: 8,
+  },
+  pageText: { fontSize: 12, color: "#64748B" },
+  pagBtn: {
+    width: 32, height: 32, borderWidth: 1, borderColor: "#E2E8F0",
+    borderRadius: 8, backgroundColor: "#fff",
+    alignItems: "center", justifyContent: "center",
+  },
+
+  /* Dropdown */
+  dropdownTrigger: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    borderWidth: 1, borderColor: BORDER, borderRadius: 8,
+    paddingVertical: 9, paddingHorizontal: 12, backgroundColor: "#fff", zIndex: 10,
+  },
+  dropdownText: { fontSize: 13, color: "#374151", flex: 1, marginRight: 6 },
+  dropdownOverlay: { position: "absolute", paddingHorizontal: 0, zIndex: 9999 },
+  dropdownMenu: {
+    backgroundColor: "#fff", borderRadius: 12,
+    borderWidth: 1, borderColor: BORDER,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
+    overflow: "hidden", width: "100%", maxWidth: 340, zIndex: 10000,
+  },
+  dropdownMenuDesktop: { maxWidth: 400 },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: BORDER },
+
+  /* Date Input */
+  dateInputContainer: {
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 1, borderColor: BORDER, borderRadius: 8,
+    backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 9,
+  },
+  dateInput: { flex: 1, fontSize: 13, color: "#374151" },
+
+  /* DatePicker Modal */
+  datePickerOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center", alignItems: "center",
+  },
+  datePickerModal: {
+    backgroundColor: "#fff", borderRadius: 12, padding: 16,
+    width: "90%", maxWidth: 350,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 8,
+  },
+  datePickerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  datePickerTitle:  { fontSize: 16, fontWeight: "700", color: "#1a2332" },
+  datePickerWeekHeader: { flexDirection: "row", marginBottom: 8 },
+  datePickerWeekDay: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600", color: "#64748B" },
+  datePickerDays:    { flexDirection: "row", flexWrap: "wrap", marginBottom: 16 },
+  datePickerDay:     { width: "14.28%", aspectRatio: 1, justifyContent: "center", alignItems: "center", borderRadius: 8, marginBottom: 4 },
+  datePickerDayEmpty:    { backgroundColor: "transparent" },
+  datePickerDaySelected: { backgroundColor: ORANGE },
+  datePickerDayText:         { fontSize: 13, color: "#374151" },
+  datePickerDayTextEmpty:    { color: "transparent" },
+  datePickerDayTextSelected: { color: "#fff", fontWeight: "700" },
+  datePickerCloseBtn:     { backgroundColor: ORANGE, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+  datePickerCloseBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+
+  /* Modal */
+  modalOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center", alignItems: "center", padding: 16,
+  },
+  modalSheet: {
+    backgroundColor: "#fff", borderRadius: 20,
+    width: "100%", maxWidth: 520, maxHeight: "88%",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.22, shadowRadius: 40, elevation: 20, overflow: "hidden",
+  },
+  modalSheetDesktop: { maxWidth: 700 },
+  modalCloseBtn: {
+    position: "absolute", top: 12, right: 12, zIndex: 10,
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "#E2E8F0", alignItems: "center", justifyContent: "center",
+  },
+  modalHeader: {
+    flexDirection: "row", alignItems: "center",
+    padding: 20, paddingRight: 56,
+    borderBottomWidth: 1, borderBottomColor: "#F1F5F9",
+  },
+  modalSellerName: { fontSize: 17, fontWeight: "800", color: DARK_NAV },
+  modalBusiness:   { fontSize: 12, color: "#94A3B8", marginTop: 2 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: "700", color: "#94A3B8",
+    textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 10,
+  },
+  contactRow:   { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  contactLabel: { fontSize: 13, fontWeight: "600", color: "#64748B", minWidth: 76 },
+  contactVal:   { fontSize: 13, color: "#374151", flex: 1 },
+  productsBox: {
+    backgroundColor: "#F8FAFC", borderRadius: 10, padding: 16,
+    alignItems: "center", borderWidth: 1, borderColor: "#E8EDF5", marginBottom: 12,
+  },
+  productsCount:  { fontSize: 32, fontWeight: "800", color: DARK_NAV },
+  productsLabel:  { fontSize: 12, color: "#94A3B8", marginTop: 4 },
+  shiprocketBox:  { backgroundColor: "#ECFDF5", borderRadius: 8, padding: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+  shiprocketText: { fontSize: 13, color: "#065F46" },
+
+  footer: { textAlign: "center", paddingVertical: 20, fontSize: 12, color: "#94A3B8", lineHeight: 20 },
+});

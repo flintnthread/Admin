@@ -1,5 +1,18 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import {
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions
+} from "react-native";
 
 const sellers = [
   {
@@ -77,13 +90,79 @@ const sellers = [
 ];
 
 const stats = [
-  { icon: "bi-people", label: "Total Sellers", value: "1,248", sub: "All time", color: "#FF6B35", bg: "#FFF3EE" },
-  { icon: "bi-clock", label: "Pending Sellers", value: "86", sub: "Pending approval", color: "#4CAF50", bg: "#F0FBF0" },
-  { icon: "bi-shield-check", label: "Approved Sellers", value: "1,102", sub: "This year", color: "#2196F3", bg: "#EEF5FF" },
-  { icon: "bi-bank", label: "Banks Integrated", value: "12", sub: "Total banks", color: "#FF6B35", bg: "#FFF3EE" },
-  { icon: "bi-hourglass-split", label: "Avg. Approval Time", value: "2.4 Days", sub: "This month", color: "#9C27B0", bg: "#F5EEF8" },
-  { icon: "bi-graph-up-arrow", label: "Approval Rate", value: "88.5%", sub: "This month", color: "#00BCD4", bg: "#EEF9FB" },
+  { icon: "people", label: "Total Sellers", value: "1,248", sub: "All time", color: "#FF6B35", bg: "#FFF3EE" },
+  { icon: "time", label: "Pending Sellers", value: "86", sub: "Pending approval", color: "#4CAF50", bg: "#F0FBF0" },
+  { icon: "shield-checkmark", label: "Approved Sellers", value: "1,102", sub: "This year", color: "#2196F3", bg: "#EEF5FF" },
+  { icon: "business", label: "Banks Integrated", value: "12", sub: "Total banks", color: "#FF6B35", bg: "#FFF3EE" },
+  { icon: "hourglass", label: "Avg. Approval Time", value: "2.4 Days", sub: "This month", color: "#9C27B0", bg: "#F5EEF8" },
+  { icon: "trending-up", label: "Approval Rate", value: "88.5%", sub: "This month", color: "#00BCD4", bg: "#EEF9FB" },
 ];
+
+/* ─── Dropdown Component ─────────────────────────────────────────────────── */
+function Dropdown({
+  value, onChange, options, style,
+}: {
+  value: string; onChange: (v: string) => void;
+  options: string[]; style?: object;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = Dimensions.get("window");
+  const isDesktop = screenW >= 1024;
+
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const { width: screenWidth } = Dimensions.get("window");
+        const menuWidth = Math.min(width, screenWidth - 32);
+        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <View style={[{ minWidth: 120 }, style]}>
+      <TouchableOpacity
+        ref={triggerRef as any}
+        activeOpacity={0.8}
+        onPress={handlePress}
+        style={styles.dropdownTrigger}
+      >
+        <Text style={styles.dropdownText} numberOfLines={1}>{value}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
+            <View style={[styles.dropdownMenu, isDesktop && styles.dropdownMenuDesktop]}>
+              <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+                {options.map(opt => (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => { onChange(opt); setOpen(false); }}
+                    style={[
+                      styles.dropdownItem,
+                      value === opt && { backgroundColor: "#FF6B35" },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 13, color: value === opt ? "#fff" : "#374151", fontWeight: value === opt ? "700" : "400" }}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+}
 
 function StatusBadge({ status, label }: { status: string; label: string }) {
   const styles: Record<string, { bg: string; color: string; dot: string }> = {
@@ -93,72 +172,96 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
   };
   const s = styles[status] || styles.not_requested;
   return (
-    <span
-      style={{
-        background: s.bg,
+    <View style={{
+      backgroundColor: s.bg,
+      borderRadius: 2,
+      paddingHorizontal: 3,
+      paddingVertical: 1,
+    }}>
+      <Text style={{
         color: s.color,
-        borderRadius: 6,
-        padding: "4px 10px",
-        fontSize: 12,
-        fontWeight: 600,
-        display: "inline-block",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </span>
+        fontSize: 9,
+        fontWeight: "600",
+      }}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
 function Avatar({ initials, color }: { initials: string; color: string }) {
   return (
-    <div
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: "50%",
-        background: color + "22",
-        color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontWeight: 700,
-        fontSize: 14,
-        flexShrink: 0,
-        border: `1.5px solid ${color}44`,
-      }}
-    >
-      {initials}
-    </div>
+    // <View
+    //   style={{
+    //     width: 40,
+    //     height: 40,
+    //     borderRadius: 20,
+    //     backgroundColor: color + "22",
+    //     alignItems: "center",
+    //     justifyContent: "center",
+    //     fontWeight: "700",
+    //     borderWidth: 1.5,
+    //     borderColor: color + "44",
+    //   }}
+    // >
+    //   <Text style={{ color, fontWeight: "700", fontSize: 14 }}>{initials}</Text>
+    // </View>
+    <View
+  style={{
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: color + "22",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: color + "44",
+  }}
+>
+  <Text
+    style={{
+      color,
+      fontWeight: "700",
+      fontSize: 14,
+    }}
+  >
+    {initials}
+  </Text>
+</View>
   );
 }
 
-export default function BankApproval() {
+// export default function BankApproval(){
+ 
+
+  // const router = useRouter();
+  // const [activeNav, setActiveNav] = useState("Pending Sellers");
+  // const [activeTab, setActiveTab] = useState("Dashboard");
+
+  // Detect mobile via window width using state
+  // const [isMobile, setIsMobile] = useState(
+  //   typeof window !== "undefined" ? window.innerWidth < 768 : false
+  // );
+  // const [searchQuery, setSearchQuery] = useState("");
+
+  // React.useEffect(() => {
+  //   const handle = () => setIsMobile(window.innerWidth < 768);
+  //   window.addEventListener("resize", handle);
+  //   return () => window.removeEventListener("resize", handle);
+  // }, []);
+  export default function BankApproval() {
   const router = useRouter();
   const [activeNav, setActiveNav] = useState("Pending Sellers");
   const [activeTab, setActiveTab] = useState("Dashboard");
 
-  // Detect mobile via window width using state
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 768 : false
-  );
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const isDesktop = width >= 1024;
+
   const [searchQuery, setSearchQuery] = useState("");
-
-  React.useEffect(() => {
-    const handle = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handle);
-    return () => window.removeEventListener("resize", handle);
-  }, []);
-
-  React.useEffect(() => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css";
-    document.head.appendChild(link);
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, []);
+  const [statusFilter, setStatusFilter] = useState("All");
+  const STATUS_OPTIONS = ["All", "Pending", "Approved", "Not Requested"];
+  
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredSellers = normalizedQuery
@@ -206,352 +309,700 @@ export default function BankApproval() {
   }
 
   return (
-    <>
-      <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f6fa; }
-        @media (max-width: 767px) {
-          .desktop-table { display: none !important; }
-          .mobile-cards { display: block !important; }
-          .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
-        }
-        @media (min-width: 768px) {
-          .mobile-cards { display: none !important; }
-          .desktop-table { display: block !important; }
-        }
-        .mobile-cards { display: none; }
-        .stat-card { background: #fff; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-        .stat-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-        .page-header { background: #fff; padding: 18px 28px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #999; margin-top: 4px; }
-        .breadcrumb a { color: #FF6B35; text-decoration: none; }
-        .page-title { font-size: 24px; font-weight: 700; color: #1a2332; }
-        .btn-outline { border: 1.5px solid #FF6B35; color: #FF6B35; background: #fff; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-        .btn-dark { background: #1a2332; color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-        .filter-btn { background: #FF6B35; color: #fff; border: none; border-radius: 8px; padding: 11px 28px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-        .search-input { border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; font-size: 13.5px; outline: none; width: 100%; color: #555; }
-        .search-input:focus { border-color: #FF6B35; }
-        .select-input { border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; font-size: 13.5px; outline: none; background: #fff; color: #555; appearance: none; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; }
-        thead tr { background: #1a2332; }
-        thead th { color: #fff; font-size: 12.5px; font-weight: 600; padding: 14px 16px; text-align: left; white-space: nowrap; }
-        tbody tr { border-bottom: 1px solid #f0f2f5; background: #fff; }
-        tbody tr:hover { background: #fafbfc; }
-        tbody td { padding: 14px 16px; font-size: 13px; color: #333; vertical-align: middle; }
-        .pagination { display: flex; align-items: center; gap: 4px; }
-        .page-btn { width: 34px; height: 34px; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; color: #555; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .page-btn.active { background: #FF6B35; color: #fff; border-color: #FF6B35; }
-        .page-btn:hover:not(.active) { background: #f5f5f5; }
-        .mobile-seller-card { background: #fff; border-radius: 12px; margin-bottom: 14px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .progress-line { display: flex; align-items: center; gap: 0; margin: 12px 0 4px; }
-        .progress-dot { width: 12px; height: 12px; border-radius: 50%; flexShrink: 0; }
-        .progress-connector { flex: 1; height: 2px; background: #e5e7eb; }
-        .progress-connector.filled { background: #4CAF50; }
-      `}</style>
-
-      <div style={{ display: "flex", minHeight: "100vh", background: "#f4f6fa" }}>
-        {/* Main */}
-        <div className="main-content" style={{ marginLeft: 0, flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", overflowY: "auto" }}>
-
-          {/* Page Content */}
-          <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "0 0 32px" }}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Main */}
+      <View style={styles.mainContent}>
+        {/* Page Content */}
+        <View style={[styles.pageContent, { padding: isDesktop ? 32 : isMobile ? 16 : 24 }]}>
 
             {/* Desktop Page Title Bar */}
             {!isMobile && (
-              <div style={{ background: "#fff", padding: "18px 28px 16px", borderBottom: "1px solid #f0f2f5", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                <div>
-                  <div className="page-title">Seller Bank Approval</div>
-                  <div className="breadcrumb">
-                    <a href="#">Dashboard</a>
-                    <i className="bi bi-chevron-right" style={{ fontSize: 11 }} />
-                    <a href="#">Sellers</a>
-                    <i className="bi bi-chevron-right" style={{ fontSize: 11 }} />
-                    <span>Bank Approval</span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button className="btn-outline" onClick={() => router.push('/bankverification')}><i className="bi bi-shield-check" /> Bank Verifications</button>
-                  <button className="btn-dark" onClick={() => router.push('/supportticket')}><i className="bi bi-headset" /> Seller Support</button>
-                </div>
-              </div>
+              <View style={styles.desktopHeader}>
+                <View style={styles.desktopHeaderLeft}>
+                  <Text style={styles.desktopTitle}>Seller Bank Approval</Text>
+                  <View style={styles.desktopBreadcrumb}>
+                    <Text style={styles.desktopBreadcrumbItem}>Dashboard</Text>
+                    <Text style={styles.desktopBreadcrumbSeparator}>•</Text>
+                    <Text style={styles.desktopBreadcrumbItem}>Sellers</Text>
+                    <Text style={styles.desktopBreadcrumbSeparator}>•</Text>
+                    <Text style={styles.desktopBreadcrumbItemActive}>Bank Approval</Text>
+                  </View>
+                </View>
+                <View style={styles.desktopHeaderTabs}>
+                  <TouchableOpacity style={styles.desktopTabActive} onPress={() => router.push('/bankverification')}>
+                    <Text style={styles.desktopTabTextActive}>Bank Verifications</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.desktopTab} onPress={() => router.push('/supportticket')}>
+                    <Text style={styles.desktopTabText}>Seller Support</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
 
             {/* Mobile Page Title */}
             {isMobile && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#1a2332", marginBottom: 4 }}>Seller Bank Approval</div>
-                <div className="breadcrumb">
-                  <a href="#" style={{ color: "#FF6B35", textDecoration: "none", fontSize: 12 }}>Dashboard</a>
-                  <i className="bi bi-chevron-right" style={{ fontSize: 10, color: "#999" }} />
-                  <a href="#" style={{ color: "#FF6B35", textDecoration: "none", fontSize: 12 }}>Sellers</a>
-                  <i className="bi bi-chevron-right" style={{ fontSize: 10, color: "#999" }} />
-                  <span style={{ fontSize: 12, color: "#999" }}>Bank Approval</span>
-                </div>
-              </div>
+              <View style={{ backgroundColor: "#1B2332", padding: 16, borderRadius: 12, marginBottom: 14 }}>
+                <Text style={{ fontSize: 20, fontWeight: "700", color: "#fff", marginBottom: 4 }}>Seller Bank Approval</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 12, color: "#FF6B35" }}>Dashboard</Text>
+                  <Text style={{ fontSize: 10, color: "#999" }}>›</Text>
+                  <Text style={{ fontSize: 12, color: "#FF6B35" }}>Sellers</Text>
+                  <Text style={{ fontSize: 10, color: "#999" }}>›</Text>
+                  <Text style={{ fontSize: 12, color: "#999" }}>Bank Approval</Text>
+                </View>
+              </View>
             )}
 
             {/* Mobile action buttons */}
             {isMobile && (
-              <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-                <button className="btn-outline" style={{ flex: 1, justifyContent: "center" }} onClick={() => router.push('/bankverification')}><i className="bi bi-shield-check" /> Bank Verifications</button>
-                <button className="btn-dark" style={{ flex: 1, justifyContent: "center" }} onClick={() => router.push('/supportticket')}><i className="bi bi-headset" /> Seller Support</button>
-              </div>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+                <TouchableOpacity style={[styles.btnOutline, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/bankverification')}>
+                  <Text style={styles.btnOutlineText}>Bank Verifications</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/supportticket')}>
+                  <Text style={styles.btnDarkText}>Seller Support</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Desktop Stats Section */}
+            {!isMobile && (
+              <View style={styles.desktopStatsContainer}>
+                {stats.map((stat, index) => (
+                  <View key={index} style={styles.desktopStatCard}>
+                    <View style={styles.desktopStatIconContainer}>
+                      <Ionicons name={stat.icon as any} size={20} color={stat.color} />
+                    </View>
+                    <View style={styles.desktopStatContent}>
+                      <Text style={styles.desktopStatValue}>{stat.value}</Text>
+                      <Text style={styles.desktopStatLabel}>{stat.label}</Text>
+                      <Text style={styles.desktopStatSub}>{stat.sub}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
             )}
 
             {/* Filters */}
-            <div style={{ background: isMobile ? "transparent" : "#fff", padding: isMobile ? "0" : "20px 28px", borderBottom: isMobile ? "none" : "1px solid #f0f2f5", marginBottom: isMobile ? 0 : 0 }}>
+            <View style={{ backgroundColor: isMobile ? "transparent" : "#fff", paddingHorizontal: isMobile ? 0 : 28, paddingTop: isMobile ? 0 : 20, paddingBottom: isMobile ? 0 : 20, borderBottomWidth: isMobile ? 0 : 1, borderBottomColor: isMobile ? "transparent" : "#f0f2f5", marginBottom: isMobile ? 0 : 0 }}>
               {!isMobile ? (
-                <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
-                  <div style={{ flex: "0 0 200px" }}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: "#333", display: "block", marginBottom: 8 }}>Status</label>
-                    <div style={{ position: "relative" }}>
-                      <select className="select-input" style={{ width: "100%", paddingRight: 32 }}>
-                        <option>All</option>
-                        <option>Not Requested</option>
-                        <option>Pending Seller</option>
-                        <option>Pending Admin</option>
-                        <option>Needs Edit </option>
-                        <option>Approved</option>
-                        <option>Rejected</option>
-                      </select>
-                      <i className="bi bi-chevron-down" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 13, pointerEvents: "none" }} />
-                    </div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: "#333", display: "block", marginBottom: 8 }}>Search</label>
-                    <input
-                      className="search-input"
+                <View style={styles.desktopFilterRow}>
+                  <View style={styles.desktopFilterItem}>
+                    <Text style={styles.desktopFilterLabel}>Status</Text>
+                    <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+                  </View>
+                  <View style={styles.desktopFilterItem}>
+                    <Text style={styles.desktopFilterLabel}>Search</Text>
+                    <TextInput
+                      style={styles.desktopSearchInput}
                       placeholder="Seller name / email / mobile / business"
                       value={searchQuery}
-                      onChange={(event) => {
-                        setSearchQuery(event.target.value);
+                      onChangeText={(text) => {
+                        setSearchQuery(text);
                         setCurrentPage(1);
                       }}
                     />
-                  </div>
-                  <button className="filter-btn"><i className="bi bi-funnel" /> Filter</button>
-                </div>
+                  </View>
+                  <TouchableOpacity style={styles.desktopFilterBtn}>
+                    <Text style={styles.desktopFilterBtnText}>Filter</Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: "#333", display: "block", marginBottom: 6 }}>Status</label>
-                      <div style={{ position: "relative" }}>
-                        <select className="select-input" style={{ width: "100%", paddingRight: 28 }}>
-                          <option>All</option>
-                          <option>Pending</option>
-                          <option>Approved</option>
-                        </select>
-                        <i className="bi bi-chevron-down" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 12, pointerEvents: "none" }} />
-                      </div>
-                    </div>
-                    <div style={{ flex: 2 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: "#333", display: "block", marginBottom: 6 }}>Search</label>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          className="search-input"
-                          placeholder="Seller name / email / mobile / business"
-                          style={{ paddingRight: 36, fontSize: 12 }}
-                          value={searchQuery}
-                          onChange={(event) => {
-                            setSearchQuery(event.target.value);
-                            setCurrentPage(1);
-                          }}
-                        />
-                        <i className="bi bi-search" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#aaa", fontSize: 13 }} />
-                      </div>
-                    </div>
-                  </div>
-                  <button className="filter-btn" style={{ width: "100%", justifyContent: "center" }}><i className="bi bi-funnel" /> Filter</button>
-                </div>
+                <View style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Status</Text>
+                      <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+                    </View>
+                    <View style={{ flex: 2 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Search</Text>
+                      <TextInput
+                        style={[styles.searchInput, { paddingRight: 36, fontSize: 12 }]}
+                        placeholder="Seller name / email / mobile / business"
+                        value={searchQuery}
+                        onChangeText={(text) => {
+                          setSearchQuery(text);
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </View>
+                  </View>
+                  <TouchableOpacity style={[styles.filterBtn, { width: "100%", justifyContent: "center" }]}>
+                    <Text style={styles.filterBtnText}>Filter</Text>
+                  </TouchableOpacity>
+                </View>
               )}
-            </div>
+            </View>
 
-            {/* Stats */}
-            <div style={{ padding: isMobile ? "0" : "24px 28px", background: isMobile ? "transparent" : "#fff", borderBottom: isMobile ? "none" : "1px solid #f0f2f5", marginBottom: isMobile ? 14 : 24 }}>
-              <div
-                className="stats-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
-                  gap: isMobile ? 10 : 16,
-                }}
-              >
-                {stats.map((s, i) => (
-                  <div className="stat-card" key={i} style={{ padding: isMobile ? "12px 10px" : "16px", gap: isMobile ? 8 : 14, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }}>
-                    <div className="stat-icon" style={{ background: s.bg, color: s.color, width: isMobile ? 36 : 48, height: isMobile ? 36 : 48, fontSize: isMobile ? 16 : 20 }}>
-                      <i className={`bi ${s.icon}`} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: isMobile ? 10 : 11, color: "#888", fontWeight: 500, marginBottom: 2 }}>{s.label}</div>
-                      <div style={{ fontSize: isMobile ? 15 : 20, fontWeight: 800, color: "#1a2332", lineHeight: 1.1 }}>{s.value}</div>
-                      <div style={{ fontSize: isMobile ? 9 : 11, color: "#aaa", marginTop: 2 }}>{s.sub}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Stats (Mobile/Tablet only) */}
+            {isMobile && (
+              <View style={{ paddingHorizontal: isMobile ? 0 : 28, paddingTop: isMobile ? 0 : 24, paddingBottom: isMobile ? 0 : 24, backgroundColor: isMobile ? "transparent" : "#fff", borderBottomWidth: isMobile ? 0 : 1, borderBottomColor: isMobile ? "transparent" : "#f0f2f5", marginBottom: isMobile ? 14 : 24 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: isMobile ? 10 : isDesktop ? 14 : 16,
+                  }}
+                >
+                  {stats.map((s, i) => (
+                    <View style={[styles.statCard, isMobile && styles.statCardMobile, isDesktop && styles.statCardDesktop, { padding: isMobile ? 12 : 16, gap: isMobile ? 8 : 14, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }]} key={i}>
+                      <View style={[styles.statIcon, { backgroundColor: s.bg, width: isMobile ? 36 : 48, height: isMobile ? 36 : 48 }]}>
+                        <Ionicons name={s.icon as any} size={isMobile ? 18 : 22} color={s.color} />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: isMobile ? 10 : 11, color: "#888", fontWeight: "500", marginBottom: 2 }}>{s.label}</Text>
+                        <Text style={{ fontSize: isMobile ? 15 : 20, fontWeight: "800", color: "#1a2332", lineHeight: 14 }}>{s.value}</Text>
+                        <Text style={{ fontSize: isMobile ? 9 : 11, color: "#aaa", marginTop: 2 }}>{s.sub}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Desktop Table */}
-            <div className="desktop-table" style={{ margin: "0 28px", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Seller</th>
-                    <th>Business</th>
-                    <th>Bank</th>
-                    <th>Account</th>
-                    <th>Status</th>
-                    <th>Requested</th>
-                    <th>Seller Confirm</th>
-                    <th>Admin Approve</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedSellers.map((s, i) => (
-                    <tr key={startIndex + i}>
-                      <td style={{ color: "#555", fontWeight: 600 }}>{s.id}</td>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <Avatar initials={s.initials} color={s.color} />
-                          <div>
-                            <div style={{ fontWeight: 600, color: "#1a2332", fontSize: 13 }}>{s.name}</div>
-                            <div style={{ color: "#888", fontSize: 12 }}>{s.email}</div>
-                            <div style={{ color: "#888", fontSize: 12 }}>{s.phone}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ fontWeight: 600, fontSize: 12 }}>{s.business}</td>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{s.bank}</div>
-                        <div style={{ color: "#888", fontSize: 11 }}>{s.branch}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: 13 }}>{s.account}</div>
-                        <div style={{ color: "#888", fontSize: 11 }}>{s.ifsc}</div>
-                      </td>
-                      <td><StatusBadge status={s.status} label={s.statusLabel} /></td>
-                      <td style={{ fontSize: 12, color: "#555", whiteSpace: "pre-line" }}>{s.requested}</td>
-                      <td style={{ fontSize: 12, color: "#555" }}>{s.sellerConfirm}</td>
-                      <td style={{ fontSize: 12, color: "#555" }}>{s.adminApprove}</td>
-                      <td>
-                        <button style={{ border: "1.5px solid #FF6B35", color: "#FF6B35", background: "#fff", borderRadius: 7, padding: "6px 14px", fontSize: 12.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontWeight: 600 }} onClick={() => router.push('/viewbankdetails')}>
-                          <i className="bi bi-eye" /> View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ background: "#fff", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #f0f2f5" }}>
-                <span style={{ fontSize: 13, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</span>
-                <div className="pagination">
-                  <button className="page-btn" onClick={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}><i className="bi bi-chevron-left" /></button>
-                  {makePageList().map((p, i) => (
-                    typeof p === 'number' ? (
-                      <button key={i} className={`page-btn${p === currentPage ? " active" : ""}`} onClick={() => gotoPage(p as number)}>{p}</button>
-                    ) : (
-                      <button key={i} className="page-btn" disabled style={{ cursor: 'default' }}>{p}</button>
-                    )
-                  ))}
-                  <button className="page-btn" onClick={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}><i className="bi bi-chevron-right" /></button>
-                </div>
-              </div>
-            </div>
+            {!isMobile && (
+              <View style={styles.desktopTable}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>ID</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Seller</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Business</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Bank</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Account</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Requested</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Seller Confirm</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Admin Approve</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>Actions</Text>
+                </View>
+                {pagedSellers.map((s, i) => (
+                  <View key={startIndex + i} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { color: "#555", fontWeight: "600", flex: 0.5 }]}>{s.id}</Text>
+                    <View style={[styles.tableCell, { flex: 1.5 }]}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Avatar initials={s.initials} color={s.color} />
+                        <View>
+                          <Text style={{ fontWeight: "600", color: "#1a2332", fontSize: 12 }}>{s.name}</Text>
+                          <Text style={{ color: "#888", fontSize: 11 }}>{s.email}</Text>
+                          <Text style={{ color: "#888", fontSize: 11 }}>{s.phone}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={[styles.tableCell, { fontWeight: "600", fontSize: 11, flex: 1 }]}>{s.business}</Text>
+                    <View style={[styles.tableCell, { flex: 0.7 }]}><StatusBadge status={s.status} label={s.statusLabel} /></View>
+                    <View style={[styles.tableCell, { flex: 1 }]}>
+                      <Text style={{ fontWeight: "600", fontSize: 12 }}>{s.bank}</Text>
+                      <Text style={{ color: "#888", fontSize: 10 }}>{s.branch}</Text>
+                    </View>
+                    <View style={[styles.tableCell, { flex: 1 }]}>
+                      <Text style={{ fontSize: 12 }}>{s.account}</Text>
+                      <Text style={{ color: "#888", fontSize: 10 }}>{s.ifsc}</Text>
+                    </View>
+                    <Text style={[styles.tableCell, { fontSize: 10, color: "#555", flex: 0.7 }]}>{s.requested}</Text>
+                    <Text style={[styles.tableCell, { fontSize: 10, color: "#555", flex: 0.7 }]}>{s.sellerConfirm}</Text>
+                    <Text style={[styles.tableCell, { fontSize: 10, color: "#555", flex: 0.7 }]}>{s.adminApprove}</Text>
+                    <View style={[styles.tableCell, { flex: 0.6 }]}>
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => router.push('/viewbankdetails')}>
+                        <Text style={{ color: "#FF6B35", fontWeight: "600", fontSize: 11 }}>View</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+                <View style={styles.tableFooter}>
+                  <Text style={{ fontSize: 13, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</Text>
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}>
+                      <Text>←</Text>
+                    </TouchableOpacity>
+                    {makePageList().map((p, i) => (
+                      typeof p === 'number' ? (
+                        <TouchableOpacity key={i} style={[styles.pageBtn, p === currentPage && styles.pageBtnActive]} onPress={() => gotoPage(p as number)}>
+                          <Text>{p}</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View key={i} style={styles.pageBtn}>
+                          <Text>{p}</Text>
+                        </View>
+                      )
+                    ))}
+                    <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                      <Text>→</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Mobile Cards */}
-            <div className="mobile-cards">
+            <View style={isMobile ? styles.mobileCards : styles.desktopCards}>
               {pagedSellers.map((s, i) => {
                 const isApproved = s.status === "approved";
                 const isPending = s.status === "pending";
                 const dotColor = isApproved ? "#4CAF50" : isPending ? "#FF6B35" : "#1a2332";
                 return (
-                  <div className="mobile-seller-card" key={i}>
-                    <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  <View style={styles.mobileSellerCard} key={i}>
+                    <View style={{ flexDirection: "row", gap: 12, marginBottom: 10 }}>
                       <Avatar initials={s.initials} color={s.color} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: "#1a2332" }}>{s.name}</div>
-                        <div style={{ fontSize: 11.5, color: "#888" }}>{s.email}</div>
-                        <div style={{ fontSize: 11.5, color: "#888" }}>{s.phone}</div>
-                      </div>
-                      <button style={{ border: "1.5px solid #FF6B35", color: "#FF6B35", background: "#fff", borderRadius: 7, padding: "5px 12px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, height: "fit-content", fontWeight: 600 }} onClick={() => router.push('/viewbankdetails')}>
-                        <i className="bi bi-eye" /> View
-                      </button>
-                    </div>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: "700", fontSize: 14, color: "#1a2332" }}>{s.name}</Text>
+                        <Text style={{ fontSize: 11.5, color: "#888" }}>{s.email}</Text>
+                        <Text style={{ fontSize: 11.5, color: "#888" }}>{s.phone}</Text>
+                      </View>
+                      <TouchableOpacity style={{ borderWidth: 1.5, borderColor: "#FF6B35", backgroundColor: "#fff", borderRadius: 7, padding: 5, flexDirection: "row", alignItems: "center", gap: 4 }} onPress={() => router.push('/viewbankdetails')}>
+                        <Text style={{ color: "#FF6B35", fontWeight: "600", fontSize: 12 }}>View</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, marginBottom: 2 }}>Business</div>
-                        <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1a2332" }}>{s.business}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, marginBottom: 2 }}>Bank</div>
-                        <div style={{ fontSize: 11.5, fontWeight: 700, color: "#1a2332" }}>{s.bank}</div>
-                        <div style={{ fontSize: 10, color: "#888" }}>{s.branch}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, marginBottom: 2 }}>Account</div>
-                        <div style={{ fontSize: 11.5, color: "#1a2332" }}>{s.account}</div>
-                        <div style={{ fontSize: 10, color: "#888" }}>{s.ifsc}</div>
-                      </div>
-                    </div>
+                    <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", fontWeight: "600", marginBottom: 2 }}>Business</Text>
+                        <Text style={{ fontSize: 11.5, fontWeight: "600", color: "#1a2332" }}>{s.business}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", fontWeight: "600", marginBottom: 2 }}>Bank</Text>
+                        <Text style={{ fontSize: 11.5, fontWeight: "700", color: "#1a2332" }}>{s.bank}</Text>
+                        <Text style={{ fontSize: 10, color: "#888" }}>{s.branch}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", fontWeight: "600", marginBottom: 2 }}>Account</Text>
+                        <Text style={{ fontSize: 11.5, color: "#1a2332" }}>{s.account}</Text>
+                        <Text style={{ fontSize: 10, color: "#888" }}>{s.ifsc}</Text>
+                      </View>
+                    </View>
 
                     {/* Progress Timeline */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 8 }}>
-                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                      <div style={{ flex: 1, height: 2, background: isApproved ? "#4CAF50" : "#e5e7eb" }} />
-                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#e5e7eb", flexShrink: 0, border: "2px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <i className="bi bi-person" style={{ fontSize: 7, color: "#999" }} />
-                      </div>
-                      <div style={{ flex: 1, height: 2, background: isApproved ? "#4CAF50" : "#e5e7eb" }} />
-                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#e5e7eb", flexShrink: 0, border: "2px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <i className="bi bi-shield" style={{ fontSize: 7, color: "#999" }} />
-                      </div>
-                    </div>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 0, marginBottom: 8 }}>
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: dotColor }} />
+                      <View style={{ flex: 1, height: 2, backgroundColor: isApproved ? "#4CAF50" : "#e5e7eb" }} />
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: "#e5e7eb", borderWidth: 2, borderColor: "#ccc", alignItems: "center", justifyContent: "center" }}>
+                        <Text style={{ fontSize: 7, color: "#999" }}>👤</Text>
+                      </View>
+                      <View style={{ flex: 1, height: 2, backgroundColor: isApproved ? "#4CAF50" : "#e5e7eb" }} />
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: "#e5e7eb", borderWidth: 2, borderColor: "#ccc", alignItems: "center", justifyContent: "center" }}>
+                        <Text style={{ fontSize: 7, color: "#999" }}>🛡️</Text>
+                      </View>
+                    </View>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Status</div>
+                    <View style={{ flexDirection: "row", gap: 4 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Status</Text>
                         <StatusBadge status={s.status} label={s.statusLabel} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Requested</div>
-                        <div style={{ fontSize: 10.5, color: "#555", whiteSpace: "pre-line" }}>{s.requested}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Seller Confirm</div>
-                        <div style={{ fontSize: 10.5, color: "#555", whiteSpace: "pre-line" }}>{s.sellerConfirm}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Admin Approve</div>
-                        <div style={{ fontSize: 10.5, color: "#555", whiteSpace: "pre-line" }}>{s.adminApprove}</div>
-                      </div>
-                    </div>
-                  </div>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Requested</Text>
+                        <Text style={{ fontSize: 10.5, color: "#555" }}>{s.requested}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Seller Confirm</Text>
+                        <Text style={{ fontSize: 10.5, color: "#555" }}>{s.sellerConfirm}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: "#aaa", marginBottom: 3 }}>Admin Approve</Text>
+                        <Text style={{ fontSize: 10.5, color: "#555" }}>{s.adminApprove}</Text>
+                      </View>
+                    </View>
+                  </View>
                 );
               })}
 
               {/* Mobile Pagination */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-                <span style={{ fontSize: 12, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</span>
-                <div className="pagination">
-                  <button className="page-btn" style={{ width: 30, height: 30, fontSize: 12 }} onClick={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}><i className="bi bi-chevron-left" /></button>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+                <Text style={{ fontSize: 12, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</Text>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}>
+                    <Text>←</Text>
+                  </TouchableOpacity>
                   {makePageList().map((p, i) => (
                     typeof p === 'number' ? (
-                      <button key={i} className={`page-btn${p === currentPage ? " active" : ""}`} style={{ width: 30, height: 30, fontSize: 12 }} onClick={() => gotoPage(p as number)}>{p}</button>
+                      <TouchableOpacity key={i} style={[styles.pageBtn, p === currentPage && styles.pageBtnActive]} onPress={() => gotoPage(p as number)}>
+                        <Text>{p}</Text>
+                      </TouchableOpacity>
                     ) : (
-                      <button key={i} className="page-btn" style={{ width: 30, height: 30, fontSize: 12 }} disabled>{p}</button>
+                      <View key={i} style={styles.pageBtn}>
+                        <Text>{p}</Text>
+                      </View>
                     )
                   ))}
-                  <button className="page-btn" style={{ width: 30, height: 30, fontSize: 12 }} onClick={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}><i className="bi bi-chevron-right" /></button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+                  <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                    <Text>→</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f4f6fa",
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  mainContent: {
+    flex: 1,
+  },
+  pageContent: {
+    flex: 1,
+    padding: 16,
+  },
+  mobileCards: {
+    display: "flex",
+  },
+  desktopCards: {
+    display: "none",
+  },
+  mobileSellerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    marginBottom: 14,
+    padding: 16,
+  },
+  desktopTable: {
+    marginHorizontal: 28,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+
+  /* Desktop Header Styles */
+  desktopHeader: {
+    backgroundColor: "#1B2332",
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    paddingBottom: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  desktopHeaderLeft: {
+    flex: 1,
+  },
+  desktopTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  desktopBreadcrumb: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  desktopBreadcrumbItem: {
+    fontSize: 13,
+    color: "#FF6B35",
+    fontWeight: "500",
+  },
+  desktopBreadcrumbSeparator: {
+    fontSize: 13,
+    color: "#666",
+  },
+  desktopBreadcrumbItemActive: {
+    fontSize: 13,
+    color: "#fff",
+    fontWeight: "500",
+  },
+  desktopHeaderTabs: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  desktopTabActive: {
+    backgroundColor: "#FF6B35",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  desktopTab: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  desktopTabTextActive: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  desktopTabText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  /* Desktop Stats Styles */
+  desktopStatsContainer: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 20,
+  },
+  desktopStatCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    borderWidth: 1,
+    borderColor: "#E8EDF5",
+  },
+  desktopStatIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  desktopStatContent: {
+    flex: 1,
+  },
+  desktopStatValue: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1a2332",
+    marginBottom: 4,
+  },
+  desktopStatLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 2,
+  },
+  desktopStatSub: {
+    fontSize: 12,
+    color: "#94A3B8",
+  },
+
+  /* Desktop Filter Styles */
+  desktopFilterRow: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "flex-end",
+  },
+  desktopFilterItem: {
+    flexBasis: 200,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  desktopFilterLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  desktopSearchInput: {
+    borderWidth: 1,
+    borderColor: "#E8EDF5",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    backgroundColor: "#fff",
+  },
+  desktopFilterBtn: {
+    backgroundColor: "#FF6B35",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  desktopFilterBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  tableHeader: {
+    backgroundColor: "#1a2332",
+    flexDirection: "row",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  tableHeaderCell: {
+    color: "#fff",
+    fontSize: 12.5,
+    fontWeight: "600",
+    flex: 1,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f2f5",
+    backgroundColor: "#fff",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  tableCell: {
+    flex: 1,
+    fontSize: 13,
+    color: "#333",
+  },
+  tableFooter: {
+    backgroundColor: "#fff",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#f0f2f5",
+  },
+  pageBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageBtnActive: {
+    backgroundColor: "#FF6B35",
+    borderColor: "#FF6B35",
+  },
+  viewBtn: {
+    borderWidth: 1.5,
+    borderColor: "#FF6B35",
+    borderRadius: 7,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    alignItems: "center",
+  },
+  btnOutline: {
+    borderWidth: 1.5,
+    borderColor: "#FF6B35",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  btnOutlineText: {
+    color: "#FF6B35",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  btnDark: {
+    backgroundColor: "#1a2332",
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  btnDarkText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  filterBtn: {
+    backgroundColor: "#FF6B35",
+    borderRadius: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 28,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  filterBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  searchInput: {
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 13.5,
+    color: "#555",
+  },
+  selectInput: {
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 13.5,
+    backgroundColor: "#fff",
+    color: "#555",
+  },
+  statCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  statCardMobile: {
+    flex: 1,
+    minWidth: "45%",
+  },
+  statCardDesktop: {
+    width: "23%",
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* Dropdown */
+  dropdownTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: "#fff",
+    zIndex: 10,
+  },
+  dropdownText: {
+    fontSize: 13.5,
+    color: "#555",
+    flex: 1,
+    marginRight: 6,
+  },
+  dropdownOverlay: {
+    position: "absolute",
+    paddingHorizontal: 0,
+    zIndex: 9999,
+  },
+  dropdownMenu: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
+    overflow: "hidden",
+    width: "100%",
+    maxWidth: 340,
+    zIndex: 10000,
+  },
+  dropdownMenuDesktop: {
+    maxWidth: 400,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+});
