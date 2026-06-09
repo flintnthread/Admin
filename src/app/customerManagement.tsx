@@ -8,17 +8,17 @@
  * Requires: react-native-svg  →  npx expo install react-native-svg
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import AdminLayout from "../components/admin-layout";
@@ -124,11 +124,12 @@ const SAMPLE_CUSTOMERS: Customer[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PALETTE
+// PALETTE  — white background
 // ─────────────────────────────────────────────────────────────────────────────
 const C = {
-  bg: "#F7F3EE",
+  bg: "#FFFFFF",
   surface: "#FFFFFF",
+  cardBg: "#F7F3EE",
   primary: "#E8571A",
   primaryLight: "#FFF0EA",
   navy: "#1C2B4A",
@@ -198,7 +199,7 @@ const SearchIcon = ({ size = 18, color = C.sub }: IP) => (
     />
   </Svg>
 );
-const GridIcon = ({ size = 18, color = C.sub }: IP) => (
+const GridIcon = ({ size = 16, color = C.sub }: IP) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
     <Path
       fill={color}
@@ -206,7 +207,7 @@ const GridIcon = ({ size = 18, color = C.sub }: IP) => (
     />
   </Svg>
 );
-const ListIcon = ({ size = 18, color = C.sub }: IP) => (
+const ListIcon = ({ size = 16, color = C.sub }: IP) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
     <Path
       fill={color}
@@ -250,22 +251,6 @@ const PhoneIcon = ({ size = 13, color = C.sub }: IP) => (
     />
   </Svg>
 );
-const CartIcon = ({ size = 13, color = C.sub }: IP) => (
-  <Svg width={size} height={size} viewBox="0 0 16 16">
-    <Path
-      fill={color}
-      d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l1.313 7h8.17l1.313-7zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4m7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4m-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2"
-    />
-  </Svg>
-);
-const CalendarIcon = ({ size = 13, color = C.sub }: IP) => (
-  <Svg width={size} height={size} viewBox="0 0 16 16">
-    <Path
-      fill={color}
-      d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"
-    />
-  </Svg>
-);
 const PeopleIcon = ({ size = 20, color = "#fff" }: IP) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
     <Path
@@ -279,7 +264,6 @@ const PeopleIcon = ({ size = 20, color = "#fff" }: IP) => (
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Circular avatar with initials */
 function Avatar({ name, size = 42 }: { name: string; size?: number }) {
   const initials = name
     .split(" ")
@@ -304,7 +288,6 @@ function Avatar({ name, size = 42 }: { name: string; size?: number }) {
   );
 }
 
-/** Active / Inactive pill badge */
 function StatusPill({ status }: { status: "Active" | "Inactive" }) {
   const on = status === "Active";
   return (
@@ -324,15 +307,151 @@ function StatusPill({ status }: { status: "Active" | "Inactive" }) {
   );
 }
 
+// ─── STAT CHIP (toolbar row) ──────────────────────────────────────────────────
+function StatChip({
+  label,
+  value,
+  valueColor = C.text,
+}: {
+  label: string;
+  value: string | number;
+  valueColor?: string;
+}) {
+  return (
+    <View style={s.statChip}>
+      <Text style={[s.statChipVal, { color: valueColor }]}>
+        {String(value)}
+      </Text>
+      <Text style={s.statChipLbl}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── PAGINATION ───────────────────────────────────────────────────────────────
+function Pagination({
+  current,
+  total,
+  onChange,
+}: {
+  current: number;
+  total: number;
+  onChange: (p: number) => void;
+}) {
+  if (total <= 1) return null;
+
+  const pages: (number | "...")[] = [];
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (current > 3) pages.push("...");
+    for (
+      let i = Math.max(2, current - 1);
+      i <= Math.min(total - 1, current + 1);
+      i++
+    )
+      pages.push(i);
+    if (current < total - 2) pages.push("...");
+    pages.push(total);
+  }
+
+  return (
+    <View style={pg.wrap}>
+      {/* Prev */}
+      <TouchableOpacity
+        style={[pg.btn, current === 1 && pg.btnDisabled]}
+        onPress={() => current > 1 && onChange(current - 1)}
+        activeOpacity={0.7}
+      >
+        <Svg width={14} height={14} viewBox="0 0 16 16">
+          <Path
+            fill={current === 1 ? C.border : C.sub}
+            d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"
+          />
+        </Svg>
+      </TouchableOpacity>
+
+      {/* Page numbers */}
+      {pages.map((p, i) =>
+        p === "..." ? (
+          <Text key={`dots-${i}`} style={pg.dots}>
+            …
+          </Text>
+        ) : (
+          <TouchableOpacity
+            key={p}
+            style={[pg.btn, current === p && pg.btnActive]}
+            onPress={() => onChange(p as number)}
+            activeOpacity={0.7}
+          >
+            <Text style={[pg.btnTxt, current === p && pg.btnTxtActive]}>
+              {p}
+            </Text>
+          </TouchableOpacity>
+        ),
+      )}
+
+      {/* Next */}
+      <TouchableOpacity
+        style={[pg.btn, current === total && pg.btnDisabled]}
+        onPress={() => current < total && onChange(current + 1)}
+        activeOpacity={0.7}
+      >
+        <Svg width={14} height={14} viewBox="0 0 16 16">
+          <Path
+            fill={current === total ? C.border : C.sub}
+            d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"
+          />
+        </Svg>
+      </TouchableOpacity>
+
+      {/* Page info */}
+      <Text style={pg.info}>
+        Page {current} of {total}
+      </Text>
+    </View>
+  );
+}
+
+const pg = StyleSheet.create({
+  wrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  btn: {
+    minWidth: 36,
+    height: 36,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  btnActive: { backgroundColor: C.navy, borderColor: C.navy },
+  btnDisabled: { opacity: 0.35 },
+  btnTxt: { fontSize: 13, fontWeight: "600", color: C.sub },
+  btnTxtActive: { color: "#fff" },
+  dots: { fontSize: 15, color: C.sub, paddingHorizontal: 2 },
+  info: { fontSize: 12, color: C.sub, marginLeft: 8 },
+});
+
 // ─── GRID CARD ────────────────────────────────────────────────────────────────
 function GridCard({ c, onToggle }: { c: Customer; onToggle: () => void }) {
   return (
     <View style={s.gCard}>
+      {/* Top: status + id */}
       <View style={s.gCardTop}>
         <StatusPill status={c.status} />
         <Text style={s.gCardId}>#{c.id}</Text>
       </View>
 
+      {/* Avatar + name */}
       <View style={s.gCardCenter}>
         <Avatar name={c.name} size={52} />
         <Text style={s.gCardName} numberOfLines={1}>
@@ -340,37 +459,43 @@ function GridCard({ c, onToggle }: { c: Customer; onToggle: () => void }) {
         </Text>
       </View>
 
-      <View style={s.infoRow}>
+      {/* Email + phone — CENTERED */}
+      <View style={s.infoRowCenter}>
         <EnvelopeIcon />
-        <Text style={s.infoTxt} numberOfLines={1}>
+        <Text style={s.infoTxtCenter} numberOfLines={1}>
           {c.email}
         </Text>
       </View>
-      <View style={s.infoRow}>
+      <View style={s.infoRowCenter}>
         <PhoneIcon />
-        <Text style={s.infoTxt}>{c.phone}</Text>
+        <Text style={s.infoTxtCenter}>{c.phone}</Text>
       </View>
 
-      <View style={s.gStats}>
-        <View style={s.gStatItem}>
-          <View style={s.infoRow}>
-            <CartIcon size={13} color={C.primary} />
-            <Text style={[s.gStatVal, { color: C.primary }]}>
-              {c.orders} {c.orders === 1 ? "order" : "orders"}
-            </Text>
-          </View>
+      {/* Single-row stats: Orders | Spent | Last Order */}
+      <View style={s.gStatsRow}>
+        <View style={[s.gStatCell, { flex: 0.7 }]}>
+          <Text
+            style={[s.gStatVal, { color: c.orders > 0 ? C.primary : C.sub }]}
+          >
+            {c.orders}
+          </Text>
+          <Text style={s.gStatLbl}>Orders</Text>
         </View>
-        <View style={s.gStatItem}>
+        <View style={s.gStatDivider} />
+        <View style={[s.gStatCell, { flex: 0.9 }]}>
           <Text style={s.gStatVal}>{rupee(c.totalSpent)}</Text>
           <Text style={s.gStatLbl}>Spent</Text>
         </View>
+        <View style={s.gStatDivider} />
+        <View style={[s.gStatCell, { flex: 1.4 }]}>
+          <Text style={s.gStatVal} numberOfLines={1}>
+            {c.lastOrder ?? "N/A"}
+          </Text>
+          <Text style={s.gStatLbl}>Last Order</Text>
+        </View>
       </View>
 
-      <View style={s.infoRow}>
-        <CalendarIcon />
-        <Text style={s.infoTxt}>{c.lastOrder ?? "N/A"}</Text>
-      </View>
-
+      {/* Actions */}
       <View style={s.gActions}>
         <TouchableOpacity style={s.btnView} activeOpacity={0.8}>
           <EyeIcon />
@@ -391,7 +516,7 @@ function GridCard({ c, onToggle }: { c: Customer; onToggle: () => void }) {
   );
 }
 
-// ─── LIST ROW (tablet / laptop / desktop) ────────────────────────────────────
+// ─── LIST ROW (tablet / desktop) ─────────────────────────────────────────────
 function ListRow({
   c,
   onToggle,
@@ -532,7 +657,7 @@ function MobileListCard({
           <Text
             style={[s.mStatVal, { color: c.orders > 0 ? C.primary : C.sub }]}
           >
-            {c.orders} {c.orders === 1 ? "order" : "orders"}
+            {c.orders}
           </Text>
           <Text style={s.mStatLbl}>Orders</Text>
         </View>
@@ -543,7 +668,9 @@ function MobileListCard({
         </View>
         <View style={s.mDivider} />
         <View style={s.mStatBox}>
-          <Text style={s.mStatVal}>{c.lastOrder ?? "N/A"}</Text>
+          <Text style={s.mStatVal} numberOfLines={1}>
+            {c.lastOrder ?? "N/A"}
+          </Text>
           <Text style={s.mStatLbl}>Last Order</Text>
         </View>
       </View>
@@ -581,6 +708,8 @@ export default function CustomerManagementScreen() {
   const [customers, setCustomers] = useState<Customer[]>(SAMPLE_CUSTOMERS);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
 
   const filtered = useMemo(
     () =>
@@ -592,6 +721,17 @@ export default function CustomerManagementScreen() {
       ),
     [customers, search],
   );
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginated = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
+  // Reset to page 1 whenever search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const toggle = (id: number) =>
     setCustomers((prev) =>
@@ -608,7 +748,6 @@ export default function CustomerManagementScreen() {
   const inactive = total - active;
   const revenue = customers.reduce((n, c) => n + c.totalSpent, 0);
 
-  // grid column widths as %
   const colPct =
     gridCols === 1
       ? "100%"
@@ -623,174 +762,179 @@ export default function CustomerManagementScreen() {
   return (
     <AdminLayout>
       <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+        <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
-      <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
-        <View style={[s.headerInner, { paddingHorizontal: px }]}>
-          {/* Left: icon + title */}
-          <View style={s.hLeft}>
-            <View style={s.hIcon}>
-              <PeopleIcon size={isMobile ? 17 : 21} />
-            </View>
-            <View>
-              <Text style={[s.hTitle, { fontSize: isMobile ? 16 : 20 }]}>
-                Customer Management
-              </Text>
-              <Text style={s.hSub}>Manage and track all your customers</Text>
+        {/* ══ HEADER — title only, no stats ═══════════════════════════════════ */}
+        <View
+          style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}
+        >
+          <View style={[s.headerInner, { paddingHorizontal: px }]}>
+            <View style={s.hLeft}>
+              <View style={s.hIcon}>
+                <PeopleIcon size={isMobile ? 17 : 21} />
+              </View>
+              <View>
+                <Text style={[s.hTitle, { fontSize: isMobile ? 16 : 20 }]}>
+                  Customer Management
+                </Text>
+                <Text style={s.hSub}>Manage and track all your customers</Text>
+              </View>
             </View>
           </View>
-          {/* Right: stat chips (hidden on mobile) */}
-          {!isMobile && (
-            <View style={s.hStats}>
-              {[
-                ["Total", total, "#fff"],
-                ["Active", active, "#6EE7B7"],
-                ["Inactive", inactive, "#FCA5A5"],
-                ["Revenue", rupee(revenue), "#fff"],
-              ].map(([lbl, val, clr]) => (
-                <React.Fragment key={String(lbl)}>
-                  <View style={s.hStatItem}>
-                    <Text style={[s.hStatVal, { color: String(clr) }]}>
-                      {String(val)}
-                    </Text>
-                    <Text style={s.hStatLbl}>{String(lbl)}</Text>
-                  </View>
-                  {lbl !== "Revenue" && <View style={s.hStatDiv} />}
-                </React.Fragment>
-              ))}
-            </View>
-          )}
         </View>
-      </View>
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600 }}>
-          {/* Mobile stat row */}
-          {isMobile && (
-            <View style={s.mobileStatRow}>
-              {[
-                ["Total", total, C.text],
-                ["Active", active, C.active],
-                ["Inactive", inactive, C.inactive],
-              ].map(([lbl, val, clr]) => (
-                <View key={String(lbl)} style={s.mobileStatChip}>
-                  <Text style={[s.mobileStatVal, { color: String(clr) }]}>
-                    {String(val)}
-                  </Text>
-                  <Text style={s.mobileStatLbl}>{String(lbl)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600 }}>
+            {/* ══ TOOLBAR: search + stat chips + toggle ═══════════════════════ */}
+            <View style={s.toolbar}>
+              {/* Search */}
+              <View style={s.searchBox}>
+                <SearchIcon />
+                <TextInput
+                  style={s.searchInput}
+                  placeholder="Search by name, email or phone…"
+                  placeholderTextColor={C.sub}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setSearch("")}
+                    style={{ padding: 4 }}
+                  >
+                    <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-          {/* ══ TOOLBAR ═════════════════════════════════════════════════════ */}
-          <View style={s.toolbar}>
-            {/* Search */}
-            <View style={s.searchBox}>
-              <SearchIcon />
-              <TextInput
-                style={s.searchInput}
-                placeholder="Search by name, email or phone…"
-                placeholderTextColor={C.sub}
-                value={search}
-                onChangeText={setSearch}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setSearch("")}
-                  style={{ padding: 4 }}
-                >
-                  <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {/* View toggle */}
-            <View style={s.toggle}>
-              {(["grid", "list"] as const).map((mode) => (
-                <TouchableOpacity
-                  key={mode}
-                  style={[s.toggleBtn, view === mode && s.toggleActive]}
-                  onPress={() => setView(mode)}
-                  activeOpacity={0.8}
-                >
-                  {mode === "grid" ? (
-                    <GridIcon color={view === "grid" ? "#fff" : C.sub} />
-                  ) : (
-                    <ListIcon color={view === "list" ? "#fff" : C.sub} />
-                  )}
-                  {!isMobile && (
-                    <Text
-                      style={[s.toggleLbl, view === mode && { color: "#fff" }]}
-                    >
-                      {mode === "grid" ? "Grid" : "List"}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <Text style={s.resultInfo}>
-            Showing {filtered.length} of {total} customers
-            {search ? ` for "${search}"` : ""}
-          </Text>
-
-          {/* ══ GRID VIEW ═══════════════════════════════════════════════════ */}
-          {view === "grid" && (
-            <View style={[s.gridWrap, { gap: isMobile ? 12 : 14 }]}>
-              {filtered.map((c) => (
-                <View key={c.id} style={{ width: colPct }}>
-                  <GridCard c={c} onToggle={() => toggle(c.id)} />
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* ══ LIST VIEW ═══════════════════════════════════════════════════ */}
-          {view === "list" && (
-            <>
-              {isMobile ? (
-                filtered.map((c) => (
-                  <MobileListCard
-                    key={c.id}
-                    c={c}
-                    onToggle={() => toggle(c.id)}
+              {/* Stat chips — hidden on mobile */}
+              {!isMobile && (
+                <View style={s.statChipsRow}>
+                  <StatChip label="Total" value={total} valueColor={C.text} />
+                  <View style={s.statDivider} />
+                  <StatChip
+                    label="Active"
+                    value={active}
+                    valueColor={C.active}
                   />
-                ))
-              ) : (
-                <View style={s.listWrap}>
-                  <ListHeader isDesktop={isDesktop} />
-                  {filtered.map((c) => (
-                    <ListRow
+                  <View style={s.statDivider} />
+                  <StatChip
+                    label="Inactive"
+                    value={inactive}
+                    valueColor={C.inactive}
+                  />
+                  <View style={s.statDivider} />
+                  <StatChip
+                    label="Revenue"
+                    value={rupee(revenue)}
+                    valueColor={C.primary}
+                  />
+                </View>
+              )}
+
+              {/* Grid / List toggle — compact icon-only */}
+              <View style={s.toggle}>
+                {(["grid", "list"] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[s.toggleBtn, view === mode && s.toggleActive]}
+                    onPress={() => setView(mode)}
+                    activeOpacity={0.8}
+                  >
+                    {mode === "grid" ? (
+                      <GridIcon
+                        color={view === "grid" ? "#fff" : C.sub}
+                        size={16}
+                      />
+                    ) : (
+                      <ListIcon
+                        color={view === "list" ? "#fff" : C.sub}
+                        size={16}
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Mobile stat row */}
+            {isMobile && (
+              <View style={s.mobileStatRow}>
+                {(
+                  [
+                    ["Total", total, C.text],
+                    ["Active", active, C.active],
+                    ["Inactive", inactive, C.inactive],
+                  ] as [string, number, string][]
+                ).map(([lbl, val, clr]) => (
+                  <View key={lbl} style={s.mobileStatChip}>
+                    <Text style={[s.mobileStatVal, { color: clr }]}>{val}</Text>
+                    <Text style={s.mobileStatLbl}>{lbl}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* ══ GRID VIEW ═══════════════════════════════════════════════════ */}
+            {view === "grid" && (
+              <View style={[s.gridWrap, { gap: isMobile ? 12 : 14 }]}>
+                {paginated.map((c) => (
+                  <View key={c.id} style={{ width: colPct }}>
+                    <GridCard c={c} onToggle={() => toggle(c.id)} />
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* ══ LIST VIEW ═══════════════════════════════════════════════════ */}
+            {view === "list" && (
+              <>
+                {isMobile ? (
+                  paginated.map((c) => (
+                    <MobileListCard
                       key={c.id}
                       c={c}
                       onToggle={() => toggle(c.id)}
-                      isDesktop={isDesktop}
                     />
-                  ))}
-                </View>
-              )}
-            </>
-          )}
+                  ))
+                ) : (
+                  <View style={s.listWrap}>
+                    <ListHeader isDesktop={isDesktop} />
+                    {paginated.map((c) => (
+                      <ListRow
+                        key={c.id}
+                        c={c}
+                        onToggle={() => toggle(c.id)}
+                        isDesktop={isDesktop}
+                      />
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
 
-          {/* Empty state */}
-          {filtered.length === 0 && (
-            <View style={s.empty}>
-              <Text style={{ fontSize: 38, marginBottom: 10 }}>🔍</Text>
-              <Text style={s.emptyTitle}>No customers found</Text>
-              <Text style={s.emptySub}>Try adjusting your search term</Text>
-            </View>
-          )}
+            {/* Empty state */}
+            {filtered.length === 0 && (
+              <View style={s.empty}>
+                <Text style={{ fontSize: 38, marginBottom: 10 }}>🔍</Text>
+                <Text style={s.emptyTitle}>No customers found</Text>
+                <Text style={s.emptySub}>Try adjusting your search term</Text>
+              </View>
+            )}
 
-          <View style={{ height: 36 }} />
-        </View>
-      </ScrollView>
-    </View>
+            {/* ══ PAGINATION ══════════════════════════════════════════════════ */}
+            <Pagination
+              current={currentPage}
+              total={totalPages}
+              onChange={setCurrentPage}
+            />
+          </View>
+        </ScrollView>
+      </View>
     </AdminLayout>
   );
 }
@@ -799,18 +943,16 @@ export default function CustomerManagementScreen() {
 // STYLES
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  // ── Root ───────────────────────────────────────────────────────────────────
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 18 },
 
-  // Header
+  // ── Header ─────────────────────────────────────────────────────────────────
   header: { backgroundColor: C.navy, paddingBottom: 14 },
   headerInner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 10,
   },
   hLeft: { flexDirection: "row", alignItems: "center", gap: 11 },
   hIcon: {
@@ -823,21 +965,71 @@ const s = StyleSheet.create({
   },
   hTitle: { color: "#fff", fontWeight: "700", letterSpacing: -0.3 },
   hSub: { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
-  hStats: {
+  root: { flex: 1, backgroundColor: C.bg },
+
+  // ── Toolbar ────────────────────────────────────────────────────────────────
+  toolbar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    gap: 14,
+    gap: 10,
+    marginBottom: 10,
   },
-  hStatItem: { alignItems: "center" },
-  hStatVal: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  hStatLbl: { color: "rgba(255,255,255,0.45)", fontSize: 10, marginTop: 1 },
-  hStatDiv: { width: 1, height: 26, backgroundColor: "rgba(255,255,255,0.12)" },
 
-  // Mobile stats
+  searchBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    paddingHorizontal: 12,
+    height: 42,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: C.text, height: "100%" },
+
+  // Stat chips strip
+  statChipsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    paddingHorizontal: 12,
+    height: 42,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  statChip: { alignItems: "center", paddingHorizontal: 2 },
+  statChipVal: { fontSize: 14, fontWeight: "700" },
+  statChipLbl: { fontSize: 10, color: C.sub, marginTop: 1 },
+  statDivider: { width: 1, height: 22, backgroundColor: C.border },
+
+  // Grid/List toggle — icon-only, compact
+  toggle: {
+    flexDirection: "row",
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    overflow: "hidden",
+    height: 42,
+  },
+  toggleBtn: { width: 38, alignItems: "center", justifyContent: "center" },
+  toggleActive: { backgroundColor: C.navy },
+
+  // ── Mobile stats ───────────────────────────────────────────────────────────
   mobileStatRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
   mobileStatChip: {
     flex: 1,
@@ -854,51 +1046,7 @@ const s = StyleSheet.create({
   mobileStatVal: { fontSize: 17, fontWeight: "700" },
   mobileStatLbl: { fontSize: 11, color: C.sub, marginTop: 1 },
 
-  // Toolbar
-  toolbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
-  },
-  searchBox: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    paddingHorizontal: 12,
-    height: 46,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: C.text, height: "100%" },
-  toggle: {
-    flexDirection: "row",
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    overflow: "hidden",
-    height: 46,
-  },
-  toggleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    gap: 6,
-  },
-  toggleActive: { backgroundColor: C.navy },
-  toggleLbl: { fontSize: 13, fontWeight: "600", color: C.sub },
-  resultInfo: { fontSize: 12, color: C.sub, marginBottom: 12 },
-
-  // Shared infoRow
+  // ── Shared info rows ───────────────────────────────────────────────────────
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -906,12 +1054,20 @@ const s = StyleSheet.create({
     marginBottom: 5,
   },
   infoTxt: { fontSize: 12, color: C.sub, flex: 1 },
+  infoRowCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 5,
+  },
+  infoTxtCenter: { fontSize: 12, color: C.sub, textAlign: "center" },
 
-  // Avatar
+  // ── Avatar ─────────────────────────────────────────────────────────────────
   avatar: { alignItems: "center", justifyContent: "center" },
   avatarTxt: { color: "#fff", fontWeight: "700" },
 
-  // Status pill
+  // ── Status pill ────────────────────────────────────────────────────────────
   pill: {
     flexDirection: "row",
     alignItems: "center",
@@ -923,7 +1079,7 @@ const s = StyleSheet.create({
   pillDot: { width: 6, height: 6, borderRadius: 3 },
   pillTxt: { fontSize: 11, fontWeight: "700" },
 
-  // Grid
+  // ── Grid cards ─────────────────────────────────────────────────────────────
   gridWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -956,18 +1112,22 @@ const s = StyleSheet.create({
     color: C.text,
     textAlign: "center",
   },
-  gStats: {
+
+  gStatsRow: {
     flexDirection: "row",
-    backgroundColor: C.bg,
+    backgroundColor: C.cardBg,
     borderRadius: 10,
-    padding: 9,
-    marginVertical: 7,
-    justifyContent: "space-around",
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    marginVertical: 8,
+    alignItems: "center",
   },
-  gStatItem: { alignItems: "center", gap: 2 },
-  gStatVal: { fontSize: 13, fontWeight: "700", color: C.text },
-  gStatLbl: { fontSize: 11, color: C.sub },
-  gActions: { flexDirection: "row", gap: 8, marginTop: 11 },
+  gStatCell: { flex: 1, alignItems: "center" },
+  gStatVal: { fontSize: 12, fontWeight: "700", color: C.text },
+  gStatLbl: { fontSize: 10, color: C.sub, marginTop: 2 },
+  gStatDivider: { width: 1, height: 24, backgroundColor: C.border },
+
+  gActions: { flexDirection: "row", gap: 8, marginTop: 4 },
   btnView: {
     flex: 1,
     flexDirection: "row",
@@ -990,7 +1150,7 @@ const s = StyleSheet.create({
   },
   btnTxt: { color: "#fff", fontSize: 13, fontWeight: "600" },
 
-  // List (wide)
+  // ── List (wide screens) ────────────────────────────────────────────────────
   listWrap: {
     backgroundColor: C.surface,
     borderRadius: 16,
@@ -1006,7 +1166,7 @@ const s = StyleSheet.create({
   lHdrRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: C.bg,
+    backgroundColor: C.cardBg,
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderBottomWidth: 1,
@@ -1052,7 +1212,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Mobile list cards
+  // ── Mobile list cards ──────────────────────────────────────────────────────
   mCard: {
     backgroundColor: C.surface,
     borderRadius: 14,
@@ -1077,7 +1237,7 @@ const s = StyleSheet.create({
   mId: { fontSize: 11, color: C.sub },
   mStats: {
     flexDirection: "row",
-    backgroundColor: C.bg,
+    backgroundColor: C.cardBg,
     borderRadius: 10,
     padding: 10,
     marginBottom: 11,
@@ -1098,7 +1258,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
   },
 
-  // Empty
+  // ── Empty state ────────────────────────────────────────────────────────────
   empty: { alignItems: "center", paddingVertical: 60 },
   emptyTitle: { fontSize: 17, fontWeight: "700", color: C.text },
   emptySub: { fontSize: 13, color: C.sub, marginTop: 4 },

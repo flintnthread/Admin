@@ -59,7 +59,7 @@ const NAV_ITEMS = {
   "PAYMENTS & PRODUCTS": [
     { label: "Commission rates (B2B/B2C)", icon: "percent", path: "/commissionrates" },
     { label: "Seller Payments", icon: "dollar-sign", path: "/Sellerpayments" },
-    { label: "Product Approvals", icon: "check-square", path: null },
+    { label: "Product Approvals", icon: "check-square", path: "/productApproval" },
     { label: "Add Sellers", icon: "user-plus", path: null },
     { label: "Ads Admin Users", icon: "user", path: null },
     { label: "Admin Panel Users", icon: "shield", path: null },
