@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapContactRow } from "@/lib/mappers";
+import { fetchContacts, replyContact, updateContactStatus } from "@/services/contactApi";
 import {
   View,
   Text,
@@ -35,113 +38,29 @@ interface ContactMessage {
   isRead?: boolean;
 }
 
-// ─── DATA ─────────────────────────────────────────────────────────────────────
-const initialMessages: ContactMessage[] = [
-  {
-    id: 1,
-    name: "Denise Stevens",
-    email: "dstevens73@aol.com",
-    phone: "242-735-9739",
-    subject: "Wording fix suggested",
-    content:
-      "Hi, Thought I'd mention \"Water\" as possibly misspelled. Quickly checking with spellpros.com might clarify things. Thanks, Denise",
-    date: "10 May, 2026 05:45",
-    status: "Not Replied",
-    avatarColor: "#7C3AED",
-    avatarBg: "#EDE9FE",
-  },
-  {
-    id: 2,
-    name: "DavidBes David B.",
-    email: "david.bes@gmail.com",
-    phone: "310-892-4421",
-    subject: "Support Request",
-    content:
-      "Hello, I'm having trouble accessing my account dashboard after the recent update. The page keeps loading indefinitely. Please help.",
-    date: "28 Apr, 2026 11:30",
-    status: "Not Replied",
-    avatarColor: "#2563EB",
-    avatarBg: "#DBEAFE",
-  },
-  {
-    id: 3,
-    name: "Guddanti Venkatesh",
-    email: "venkatesh.g@email.com",
-    phone: "998-231-7766",
-    subject: "Partnership Proposal",
-    content:
-      "Dear Team, We are looking to collaborate on a joint venture for our upcoming project. Would love to schedule a call to discuss details.",
-    date: "27 Apr, 2026 09:15",
-    status: "Replied",
-    avatarColor: "#059669",
-    avatarBg: "#D1FAE5",
-  },
-  {
-    id: 4,
-    name: "Nick Harrison",
-    email: "nick.h@outlook.com",
-    phone: "541-673-2298",
-    subject: "General Feedback",
-    content:
-      "Just wanted to say the new UI update is fantastic! Really improved the workflow. The dark mode especially is a huge plus. Keep it up.",
-    date: "25 Mar, 2026 14:00",
-    status: "Not Replied",
-    avatarColor: "#D97706",
-    avatarBg: "#FEF3C7",
-  },
-  {
-    id: 5,
-    name: "Nick Romano",
-    email: "nick.romano@webmail.com",
-    phone: "714-882-3310",
-    subject: "Bug Report",
-    content:
-      "Found a critical bug in the checkout flow that causes the cart to reset when switching between payment methods. Reproducible every time.",
-    date: "10 Mar, 2026 08:45",
-    status: "Not Replied",
-    avatarColor: "#DC2626",
-    avatarBg: "#FEE2E2",
-  },
-  {
-    id: 6,
-    name: "Madison Calley",
-    email: "madison.c@yahoo.com",
-    phone: "603-441-9982",
-    subject: "Subscription Query",
-    content:
-      "Hi, I'd like to know more about upgrading my current plan and what additional benefits come with the premium tier. Student discount?",
-    date: "24 Feb, 2026 16:20",
-    status: "Not Replied",
-    avatarColor: "#7C3AED",
-    avatarBg: "#EDE9FE",
-  },
-  {
-    id: 7,
-    name: "Sarah Thompson",
-    email: "sarah.t@company.io",
-    phone: "889-213-6670",
-    subject: "Invoice Discrepancy",
-    content:
-      "Hello, I noticed a discrepancy in my last invoice. I was charged for 3 licenses but I only have 2 active users. Please review.",
-    date: "18 Feb, 2026 10:00",
-    status: "Replied",
-    avatarColor: "#059669",
-    avatarBg: "#D1FAE5",
-  },
-  {
-    id: 8,
-    name: "Raj Patel",
-    email: "raj.patel@techfirm.in",
-    phone: "091-987-5544",
-    subject: "API Integration Help",
-    content:
-      "We are integrating your API into our mobile app but keep hitting CORS errors on POST requests. Our backend is Node.js. Sample code?",
-    date: "12 Feb, 2026 13:35",
-    status: "Not Replied",
-    avatarColor: "#2563EB",
-    avatarBg: "#DBEAFE",
-  },
+const AVATAR_PALETTE = [
+  { color: "#7C3AED", bg: "#EDE9FE" },
+  { color: "#2563EB", bg: "#DBEAFE" },
+  { color: "#059669", bg: "#D1FAE5" },
+  { color: "#D97706", bg: "#FEF3C7" },
+  { color: "#DC2626", bg: "#FEE2E2" },
 ];
+
+function toUiContact(row: ReturnType<typeof mapContactRow>, index: number): ContactMessage {
+  const av = AVATAR_PALETTE[index % AVATAR_PALETTE.length];
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone || "—",
+    subject: row.subject,
+    content: row.message,
+    date: row.date,
+    status: row.status === "read" ? "Replied" : "Not Replied",
+    avatarColor: av.color,
+    avatarBg: av.bg,
+  };
+}
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
@@ -691,7 +610,20 @@ const ContactMessagesScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
 
-  const [messages, setMessages] = useState<ContactMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+
+  const loadMessages = useCallback(async () => {
+    try {
+      const res = await fetchContacts(0, 100);
+      setMessages((res.items ?? []).map((item, i) => toUiContact(mapContactRow(item), i)));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [filter, setFilter] = useState<FilterType>("All");
   const [search, setSearch] = useState("");
@@ -723,19 +655,32 @@ const ContactMessagesScreen: React.FC = () => {
     setViewMsg(msg);
   };
 
-  const markReplied = (id: number) =>
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: "Replied" } : m))
-    );
+  const markReplied = async (id: number) => {
+    try {
+      await updateContactStatus(id, true);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, status: "Replied" } : m))
+      );
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Error", msg);
+    }
+  };
 
-  const handleSendReply = (id: number, text: string) => {
-    markReplied(id);
-    setReplyMsg(null);
-    const successMsg = "Reply sent successfully!";
-    if (Platform.OS === "web") {
-      window.alert(successMsg);
-    } else {
-      Alert.alert("Success", successMsg);
+  const handleSendReply = async (id: number, text: string) => {
+    try {
+      await replyContact(id, text);
+      await markReplied(id);
+      setReplyMsg(null);
+      await loadMessages();
+      const successMsg = "Reply sent successfully!";
+      if (Platform.OS === "web") window.alert(successMsg);
+      else Alert.alert("Success", successMsg);
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Error", msg);
     }
   };
 

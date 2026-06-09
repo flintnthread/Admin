@@ -5,7 +5,16 @@
 // Uses @expo/vector-icons (Ionicons) – swap with react-native-vector-icons if not using Expo
 
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDateTime } from "@/lib/format";
+import type { AdminUserRow } from "@/lib/api/types";
+import {
+  createAdminUser,
+  deleteAdminUser,
+  fetchAdminUsers,
+  updateAdminUser,
+} from "@/services/adminUserApi";
 import {
   Dimensions,
   Modal,
@@ -59,25 +68,24 @@ const AVATAR_BG = [
   "#4f46e5","#7c3aed",
 ];
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-const INITIAL_USERS: User[] = [
-  { id: 13, name: "Sri Raj",          username: "sriraj",          email: "srirajdodda@gmail.com",      role: "Admin",              status: "Active",   lastLogin: "Never" },
-  { id: 12, name: "Flintnthread",     username: "Flint & Thread",  email: "admin@flintnthread.in",      role: "Admin",              status: "Active",   lastLogin: "Jun 05, 2026 16:50" },
-  { id: 11, name: "Gopi Chand",       username: "gopichand",       email: "gopichand93667@gmail.com",   role: "Super admin",        status: "Active",   lastLogin: "Jun 05, 2026 14:40" },
-  { id: 4,  name: "Super Admin",      username: "superadmin",      email: "admin@gmail.com",            role: "Super admin",        status: "Active",   lastLogin: "Sep 25, 2025 12:38" },
-  { id: 5,  name: "General Admin",    username: "generaladmin",    email: "generaladmin@gmail.com",     role: "Admin",              status: "Active",   lastLogin: "Never" },
-  { id: 6,  name: "Product Manager",  username: "productmanager",  email: "productmanager@gmail.com",   role: "Super admin",        status: "Active",   lastLogin: "Sep 25, 2025 13:43" },
-  { id: 7,  name: "Order Manager",    username: "ordermanager",    email: "ordermanager@gmail.com",     role: "Order management",   status: "Active",   lastLogin: "Never" },
-  { id: 8,  name: "Sellers Manager",  username: "sellersmanager",  email: "sellersmanager@gmail.com",   role: "Sellers management", status: "Active",   lastLogin: "Never" },
-  { id: 9,  name: "Category Manager", username: "categorymanager", email: "categorymanager@gmail.com",  role: "Category management",status: "Active",   lastLogin: "Never" },
-  { id: 10, name: "Finance Manager",  username: "financemanager",  email: "financemanager@gmail.com",   role: "Finance management", status: "Active",   lastLogin: "Never" },
-];
-
 const ROLES    = ["Admin", "Super admin", "Order management", "Sellers management", "Category management", "Finance management"] as const;
 const STATUSES = ["Active", "Inactive"] as const;
 
 type Role = typeof ROLES[number];
 type Status = typeof STATUSES[number];
+
+function mapAdminRow(u: AdminUserRow): User {
+  const role = (ROLES.includes((u.role ?? "Admin") as Role) ? u.role : "Admin") as Role;
+  return {
+    id: u.id,
+    name: u.fullName ?? u.email ?? "Admin",
+    username: u.email?.split("@")[0] ?? "user",
+    email: u.email ?? "",
+    role,
+    status: u.active !== false ? "Active" : "Inactive",
+    lastLogin: u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "Never",
+  };
+}
 
 type User = {
   id: number;
@@ -515,7 +523,7 @@ function Pagination({ total }: { total: number }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function AdminUsersScreen() {
-  const [users, setUsers]           = useState<User[]>(INITIAL_USERS);
+  const [users, setUsers]           = useState<User[]>([]);
   const [sortBy, setSortBy]         = useState<"Last Login" | "Name">("Last Login");
   const [sortOpen, setSortOpen]     = useState(false);
   const [viewMode, setViewMode]     = useState<"list" | "grid">("list");
@@ -526,6 +534,19 @@ export default function AdminUsersScreen() {
 
   const isWide = IS_WEB_WIDE;
 
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await fetchAdminUsers(0, 100);
+      setUsers((res.items ?? []).map(mapAdminRow));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
   const sorted = [...users].sort((a, b) => {
     if (sortBy === "Last Login") {
       if (a.lastLogin === "Never") return 1;
@@ -535,26 +556,47 @@ export default function AdminUsersScreen() {
     return a.name.localeCompare(b.name);
   });
 
-  function handleAdd(form: UserForm) {
-    const newId = Math.max(...users.map(u => u.id)) + 1;
-    setUsers([{ ...form, id: newId, lastLogin: "Never" }, ...users]);
-    setAddVisible(false);
+  async function handleAdd(form: UserForm) {
+    try {
+      await createAdminUser({
+        email: form.email,
+        fullName: form.name,
+        role: form.role,
+        active: form.status === "Active",
+        password: form.password,
+      });
+      await loadUsers();
+      setAddVisible(false);
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
   }
 
-  function handleEdit(form: UserForm) {
-    if (!editUser) {
-      return;
+  async function handleEdit(form: UserForm) {
+    if (!editUser) return;
+    try {
+      await updateAdminUser(editUser.id, {
+        fullName: form.name,
+        role: form.role,
+        active: form.status === "Active",
+        ...(form.password ? { password: form.password } : {}),
+      });
+      await loadUsers();
+      setEditUser(null);
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
     }
-    setUsers(users.map(u => u.id === editUser.id ? { ...editUser, ...form } : u));
-    setEditUser(null);
   }
 
-  function handleDelete() {
-    if (!deleteUser) {
-      return;
+  async function handleDelete() {
+    if (!deleteUser) return;
+    try {
+      await deleteAdminUser(deleteUser.id);
+      await loadUsers();
+      setDeleteUser(null);
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
     }
-    setUsers(users.filter(u => u.id !== deleteUser.id));
-    setDeleteUser(null);
   }
 
   // ── Mobile Layout ────────────────────────────────────────────────────────

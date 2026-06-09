@@ -1,7 +1,15 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+  fetchCities,
+  fetchCountries,
+  fetchPincodes,
+  fetchStates,
+  type LocationRow,
+} from '@/services/locationApi';
 import {
   Modal,
   Platform,
@@ -70,43 +78,19 @@ const TAB_META: Record<
   pincodes: { title: 'Pincodes Management', singular: 'Pincode', plural: 'pincodes', total: 19000, nameCol: 'Pincode' },
 };
 
-const ROWS: Record<DetailTab, ListRow[]> = {
-  overview: [
-    { id: 1, name: 'India', flag: '🇮🇳', code: 'IN', status: 'Active' },
-    { id: 2, name: 'United States', flag: '🇺🇸', code: 'US', status: 'Active' },
-    { id: 3, name: 'United Kingdom', flag: '🇬🇧', code: 'GB', status: 'Active' },
-    { id: 4, name: 'Canada', flag: '🇨🇦', code: 'CA', status: 'Inactive' },
-    { id: 5, name: 'Australia', flag: '🇦🇺', code: 'AU', status: 'Active' },
-  ],
-  states: [
-    { id: 1, name: 'Maharashtra', code: 'MH', count: 44, status: 'Active' },
-    { id: 2, name: 'Karnataka', code: 'KA', count: 31, status: 'Active' },
-    { id: 3, name: 'Gujarat', code: 'GJ', count: 29, status: 'Active' },
-    { id: 4, name: 'Tamil Nadu', code: 'TN', count: 38, status: 'Active' },
-    { id: 5, name: 'Uttar Pradesh', code: 'UP', count: 75, status: 'Active' },
-  ],
-  cities: [
-    { id: 1, name: 'Mumbai', code: 'MH', count: 12, status: 'Active' },
-    { id: 2, name: 'Bengaluru', code: 'KA', count: 8, status: 'Active' },
-    { id: 3, name: 'Ahmedabad', code: 'GJ', count: 6, status: 'Active' },
-    { id: 4, name: 'Chennai', code: 'TN', count: 9, status: 'Active' },
-    { id: 5, name: 'Lucknow', code: 'UP', count: 7, status: 'Active' },
-  ],
-  areas: [
-    { id: 1, name: 'Andheri', code: 'Mumbai', count: 4, status: 'Active' },
-    { id: 2, name: 'Indiranagar', code: 'Bengaluru', count: 3, status: 'Active' },
-    { id: 3, name: 'Navrangpura', code: 'Ahmedabad', count: 2, status: 'Active' },
-    { id: 4, name: 'Guindy', code: 'Chennai', count: 5, status: 'Inactive' },
-    { id: 5, name: 'Gomti Nagar', code: 'Lucknow', count: 3, status: 'Active' },
-  ],
-  pincodes: [
-    { id: 1, name: '400001', status: 'Active' },
-    { id: 2, name: '560001', status: 'Active' },
-    { id: 3, name: '380001', status: 'Active' },
-    { id: 4, name: '600001', status: 'Inactive' },
-    { id: 5, name: '226001', status: 'Active' },
-  ],
-};
+function mapLocationRow(row: LocationRow, index: number, tab: DetailTab): ListRow {
+  const theme = ROW_ICON_THEMES[index % ROW_ICON_THEMES.length];
+  const name = String(row.name ?? row.pincode ?? row.id ?? '—');
+  return {
+    id: row.id,
+    name,
+    status: row.active === false ? 'Inactive' : 'Active',
+    code: row.code ? String(row.code) : row.stateName ? String(row.stateName) : undefined,
+    count: typeof row.cityCount === 'number' ? row.cityCount : undefined,
+    iconBg: theme.iconBg,
+    iconColor: theme.iconColor,
+  };
+}
 
 type MaterialIconName = keyof typeof MaterialIcons.glyphMap;
 
@@ -770,10 +754,28 @@ export default function LocationsScreen() {
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [modalOpen, setModalOpen] = useState(false);
+  const [rows, setRows] = useState<ListRow[]>([]);
 
   const meta = TAB_META[detailTab];
-  const rows = ROWS[detailTab];
   const gridColumns = isWeb ? (width < 960 ? 2 : 3) : 1;
+
+  const loadRows = useCallback(async () => {
+    try {
+      let data: LocationRow[] = [];
+      if (detailTab === 'overview') data = await fetchCountries();
+      else if (detailTab === 'states') data = await fetchStates();
+      else if (detailTab === 'cities' || detailTab === 'areas') data = await fetchCities();
+      else if (detailTab === 'pincodes') data = await fetchPincodes();
+      setRows(data.map((r, i) => mapLocationRow(r, i, detailTab)));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+      setRows([]);
+    }
+  }, [detailTab]);
+
+  useEffect(() => {
+    loadRows();
+  }, [loadRows]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

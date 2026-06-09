@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -15,10 +16,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  APPROVAL_PRODUCTS,
   type ApprovalProduct,
   type ProductStatus,
 } from '@/constants/product-approval-data';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapProductToApprovalRow } from '@/lib/mappers';
+import { fetchPendingProducts, fetchProductStats } from '@/services/productApi';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
 
@@ -52,13 +55,37 @@ const BREAKPOINTS = {
 
 type Product = ApprovalProduct;
 
-const STATS = {
-  pending: 20,
-  review: 8,
-  approved: 677,
-  rejected: 3,
-  all: 708,
+type ProductStats = {
+  pending: number;
+  review: number;
+  approved: number;
+  rejected: number;
+  all: number;
 };
+
+const DEFAULT_STATS: ProductStats = {
+  pending: 0,
+  review: 0,
+  approved: 0,
+  rejected: 0,
+  all: 0,
+};
+
+const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/96?text=Product';
+
+function toApprovalProduct(row: ReturnType<typeof mapProductToApprovalRow>): ApprovalProduct {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
+    image: row.image || PLACEHOLDER_IMAGE,
+    seller: row.seller,
+    email: '',
+    category: row.category,
+    status: row.status as ProductStatus,
+    submittedOn: row.submittedAt,
+  };
+}
 
 const STATUS_CONFIG: Record<
   ProductStatus,
@@ -332,9 +359,11 @@ function PageHeader({ isWide }: { isWide: boolean }) {
 // ─── Stats & Filters ─────────────────────────────────────────────────────────
 
 function StatsRow({
+  stats,
   onFilter,
   isWide,
 }: {
+  stats: ProductStats;
   onFilter: (f: FilterKey) => void;
   isWide: boolean;
 }) {
@@ -344,7 +373,7 @@ function StatsRow({
     <>
       <StatCard
         {...cardProps}
-        count={STATS.pending}
+        count={stats.pending}
         label="Pending Products"
         color={PALETTE.orange}
         bg={PALETTE.orangeLight}
@@ -353,7 +382,7 @@ function StatsRow({
       />
       <StatCard
         {...cardProps}
-        count={STATS.review}
+        count={stats.review}
         label="Under Review Products"
         color={PALETTE.blue}
         bg={PALETTE.blueLight}
@@ -362,7 +391,7 @@ function StatsRow({
       />
       <StatCard
         {...cardProps}
-        count={STATS.approved}
+        count={stats.approved}
         label="Approved Products"
         color={PALETTE.green}
         bg={PALETTE.greenLight}
@@ -371,7 +400,7 @@ function StatsRow({
       />
       <StatCard
         {...cardProps}
-        count={STATS.rejected}
+        count={stats.rejected}
         label="Rejected Products"
         color={PALETTE.red}
         bg={PALETTE.redLight}
@@ -389,20 +418,22 @@ function StatsRow({
 }
 
 function StatusTabs({
+  stats,
   active,
   onChange,
   isMobile,
 }: {
+  stats: ProductStats;
   active: FilterKey;
   onChange: (f: FilterKey) => void;
   isMobile: boolean;
 }) {
   const tabs: { key: FilterKey; label: string; count: number; color: string; bg: string }[] = [
-    { key: 'all', label: 'All', count: STATS.all, color: '#FFF', bg: PALETTE.purple },
-    { key: 'pending', label: 'Pending', count: STATS.pending, color: PALETTE.orange, bg: PALETTE.orangeLight },
-    { key: 'review', label: 'Review', count: STATS.review, color: PALETTE.blue, bg: PALETTE.blueLight },
-    { key: 'approved', label: 'Approved', count: STATS.approved, color: PALETTE.green, bg: PALETTE.greenLight },
-    { key: 'rejected', label: 'Rejected', count: STATS.rejected, color: PALETTE.red, bg: PALETTE.redLight },
+    { key: 'all', label: 'All', count: stats.all, color: '#FFF', bg: PALETTE.purple },
+    { key: 'pending', label: 'Pending', count: stats.pending, color: PALETTE.orange, bg: PALETTE.orangeLight },
+    { key: 'review', label: 'Review', count: stats.review, color: PALETTE.blue, bg: PALETTE.blueLight },
+    { key: 'approved', label: 'Approved', count: stats.approved, color: PALETTE.green, bg: PALETTE.greenLight },
+    { key: 'rejected', label: 'Rejected', count: stats.rejected, color: PALETTE.red, bg: PALETTE.redLight },
   ];
 
   const content = tabs.map((tab) => {
@@ -445,6 +476,7 @@ function StatusTabs({
 }
 
 function FilterSection({
+  stats,
   search,
   onSearchChange,
   activeFilter,
@@ -453,6 +485,7 @@ function FilterSection({
   isTablet,
   isWide,
 }: {
+  stats: ProductStats;
   search: string;
   onSearchChange: (v: string) => void;
   activeFilter: FilterKey;
@@ -501,14 +534,14 @@ function FilterSection({
           <View style={styles.mobileStatusDropdown}>
             <Text style={styles.filterLabel}>Status</Text>
             <Pressable style={styles.filterSelect}>
-              <Text style={styles.filterSelectText}>All ({STATS.all})</Text>
+              <Text style={styles.filterSelectText}>All ({stats.all})</Text>
               <MaterialCommunityIcons name="chevron-down" size={18} color={PALETTE.textSecondary} />
             </Pressable>
           </View>
         )}
       </View>
 
-      <StatusTabs active={activeFilter} onChange={onFilterChange} isMobile={isMobile} />
+      <StatusTabs stats={stats} active={activeFilter} onChange={onFilterChange} isMobile={isMobile} />
     </View>
   );
 }
@@ -643,12 +676,22 @@ function ProductTable({
   );
 }
 
-function Pagination({ isMobile }: { isMobile: boolean }) {
+function Pagination({
+  isMobile,
+  total,
+  showing,
+}: {
+  isMobile: boolean;
+  total: number;
+  showing: number;
+}) {
   const pages = [1, 2, 3];
 
   return (
     <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-      <Text style={styles.paginationInfo}>Showing 1 to 10 of 708 products</Text>
+      <Text style={styles.paginationInfo}>
+        Showing {showing > 0 ? 1 : 0} to {showing} of {total} products
+      </Text>
       <View style={styles.paginationControls}>
         <Pressable style={styles.pageBtn}>
           <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
@@ -679,9 +722,39 @@ export default function ProductApprovalScreen() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [products, setProducts] = useState<ApprovalProduct[]>([]);
+  const [stats, setStats] = useState<ProductStats>(DEFAULT_STATS);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [page, apiStats] = await Promise.all([fetchPendingProducts(0, 50), fetchProductStats()]);
+      setProducts(page.items.map((p) => toApprovalProduct(mapProductToApprovalRow(p))));
+      setTotalProducts(page.totalElements);
+      setStats({
+        pending: Number(apiStats.pending ?? 0),
+        review: 0,
+        approved: Number(apiStats.approved ?? 0),
+        rejected: Number(apiStats.rejected ?? 0),
+        all: Number(apiStats.total ?? 0),
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to load products.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredProducts = useMemo(() => {
-    let list = APPROVAL_PRODUCTS;
+    let list = products;
     if (activeFilter !== 'all') {
       list = list.filter((p) => p.status === activeFilter);
     }
@@ -695,7 +768,7 @@ export default function ProductApprovalScreen() {
       );
     }
     return list;
-  }, [activeFilter, search]);
+  }, [activeFilter, products, search]);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -730,9 +803,10 @@ export default function ProductApprovalScreen() {
           showsVerticalScrollIndicator={false}>
           <PageHeader isWide={isWide} />
 
-          <StatsRow onFilter={setActiveFilter} isWide={isWide} />
+          <StatsRow stats={stats} onFilter={setActiveFilter} isWide={isWide} />
 
           <FilterSection
+            stats={stats}
             search={search}
             onSearchChange={setSearch}
             activeFilter={activeFilter}
@@ -742,7 +816,19 @@ export default function ProductApprovalScreen() {
             isWide={isWide}
           />
 
-          {isWide ? (
+          {loading ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator size="large" color={PALETTE.purple} />
+              <Text style={styles.stateText}>Loading products…</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.stateBox}>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable style={styles.retryBtn} onPress={loadData}>
+                <Text style={styles.retryBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : isWide ? (
             <ProductTable
               products={filteredProducts}
               selected={selected}
@@ -757,7 +843,9 @@ export default function ProductApprovalScreen() {
             </View>
           )}
 
-          <Pagination isMobile={isMobile} />
+          {!loading && !error && (
+            <Pagination isMobile={isMobile} total={totalProducts} showing={filteredProducts.length} />
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -1548,5 +1636,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: PALETTE.textMuted,
     paddingHorizontal: 4,
+  },
+  stateBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 12,
+    backgroundColor: PALETTE.cardBg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+  },
+  stateText: {
+    fontSize: 14,
+    color: PALETTE.textSecondary,
+  },
+  errorText: {
+    fontSize: 14,
+    color: PALETTE.red,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  retryBtn: {
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: PALETTE.purple,
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

@@ -1,4 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDate } from "@/lib/format";
+import type { JobOpening as ApiJob } from "@/lib/api/types";
+import { createJob, deleteJob, fetchDepartments, fetchJobs, updateJob } from "@/services/hrApi";
 import {
     View,
     Text,
@@ -65,101 +69,29 @@ interface Job {
     urgent?: boolean;
 }
 
-// ─── SEED DATA ────────────────────────────────────────────────────────────────
-const SEED: Job[] = [
-    {
-        id: 1,
-        title: "Telemarketing Executive – E-Commerce Platform",
-        department: "Marketing",
-        location: "Hyderabad",
-        type: "Full Time",
+function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
+    const statusRaw = (j.status ?? "active").toLowerCase();
+    const status: JobStatus =
+        statusRaw === "paused" ? "Paused" : statusRaw === "closed" ? "Closed" : "Active";
+    const typeRaw = (j.employmentType ?? "full time").toLowerCase();
+    const type: JobType =
+        typeRaw.includes("part") ? "Part Time" :
+        typeRaw.includes("contract") ? "Contract" :
+        typeRaw.includes("intern") ? "Internship" : "Full Time";
+    return {
+        id: j.id,
+        title: j.title ?? "Job",
+        department: j.departmentId != null ? (deptNames[j.departmentId] ?? `Dept #${j.departmentId}`) : "—",
+        location: j.location ?? "—",
+        type,
         positions: 1,
         applications: 0,
-        postedAt: "05 Apr, 2026",
-        status: "Active",
-        urgent: true,
-    },
-    {
-        id: 2,
-        title: "Digital Marketing Executive",
-        department: "Marketing",
-        location: "Hyderabad",
-        type: "Full Time",
-        positions: 1,
-        applications: 3,
-        postedAt: "05 Apr, 2026",
-        status: "Active",
-    },
-    {
-        id: 3,
-        title: "Field Marketing Executive – E-commerce",
-        department: "Marketing",
-        location: "Hyderabad",
-        type: "Full Time",
-        positions: 1,
-        applications: 0,
-        postedAt: "05 Apr, 2026",
-        status: "Active",
-    },
-    {
-        id: 4,
-        title: "Senior Graphic Designer & Video Editor",
-        department: "Marketing",
-        location: "Patancheruvu, Hyderabad",
-        type: "Full Time",
-        positions: 1,
-        applications: 5,
-        postedAt: "05 Apr, 2026",
-        status: "Active",
-        urgent: true,
-    },
-    {
-        id: 5,
-        title: "Accounts Executive / Accounts Assistant",
-        department: "Finance",
-        location: "Villa no.168, Krushi Defence Colony, Patancheru, Hyderabad, Telangana",
-        type: "Full Time",
-        positions: 2,
-        applications: 0,
-        postedAt: "29 Dec, 2025",
-        status: "Active",
-    },
-    {
-        id: 6,
-        title: "Frontend Developer – React Native",
-        department: "Technology",
-        location: "Remote / Hyderabad",
-        type: "Full Time",
-        positions: 2,
-        applications: 12,
-        postedAt: "01 Apr, 2026",
-        status: "Active",
-    },
-    {
-        id: 7,
-        title: "Customer Support Specialist",
-        department: "Customer Support",
-        location: "Hyderabad",
-        type: "Full Time",
-        positions: 3,
-        applications: 7,
-        postedAt: "10 Mar, 2026",
-        status: "Paused",
-    },
-    {
-        id: 8,
-        title: "HR Recruiter – Talent Acquisition",
-        department: "Human Resources",
-        location: "Hyderabad",
-        type: "Contract",
-        positions: 1,
-        applications: 2,
-        postedAt: "15 Mar, 2026",
-        status: "Closed",
-    },
-];
+        postedAt: formatDate(j.createdAt),
+        status,
+    };
+}
 
-const DEPARTMENTS = ["All Departments", "Marketing", "Finance", "Technology", "Customer Support", "Human Resources", "Sales", "Operations"];
+const DEFAULT_DEPARTMENTS = ["All Departments"];
 const STATUSES: ("All Status" | JobStatus)[] = ["All Status", "Active", "Paused", "Closed"];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1257,7 +1189,9 @@ const cm = StyleSheet.create({
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 const JobOpeningsScreen: React.FC = () => {
-    const [jobs, setJobs]                           = useState<Job[]>(SEED);
+    const [jobs, setJobs]                           = useState<Job[]>([]);
+    const [deptOptions, setDeptOptions]             = useState<string[]>(DEFAULT_DEPARTMENTS);
+    const [deptIdByName, setDeptIdByName]         = useState<Record<string, number>>({});
     const [search, setSearch]                       = useState("");
     const [deptFilter, setDeptFilter]               = useState("All Departments");
     const [statusFilter, setStatusFilter]           = useState<"All Status" | JobStatus>("All Status");
@@ -1284,6 +1218,31 @@ const JobOpeningsScreen: React.FC = () => {
         return matchSearch && matchDept && matchStatus;
     });
 
+    const loadJobs = useCallback(async () => {
+        try {
+            const [jobRows, deptRows] = await Promise.all([fetchJobs(), fetchDepartments()]);
+            const names: Record<number, string> = {};
+            const idByName: Record<string, number> = {};
+            const deptList = ["All Departments"];
+            deptRows.forEach((d) => {
+                if (d.id && d.name) {
+                    names[d.id] = d.name;
+                    idByName[d.name] = d.id;
+                    deptList.push(d.name);
+                }
+            });
+            setDeptOptions(deptList);
+            setDeptIdByName(idByName);
+            setJobs(jobRows.map((j) => mapApiJob(j, names)));
+        } catch (e) {
+            console.warn(getApiErrorMessage(e));
+        }
+    }, []);
+
+    useEffect(() => {
+        loadJobs();
+    }, [loadJobs]);
+
     useEffect(() => {
         setPage(1);
     }, [search, deptFilter, statusFilter]);
@@ -1296,23 +1255,40 @@ const JobOpeningsScreen: React.FC = () => {
         setEditModalVisible(true);
     };
 
-    const handleSave = (updated: Job) => {
-        if (jobs.find(j => j.id === updated.id)) {
-            setJobs(prev => prev.map(j => j.id === updated.id ? updated : j));
-            setAlertConfig({ visible: true, title: "Updated!", message: "Job opening updated successfully." });
-        } else {
-            setJobs(prev => [updated, ...prev]);
-            setAlertConfig({ visible: true, title: "Added!", message: "New job opening added successfully." });
+    const handleSave = async (updated: Job) => {
+        try {
+            const payload = {
+                title: updated.title,
+                location: updated.location,
+                employmentType: updated.type,
+                status: updated.status.toLowerCase(),
+                departmentId: deptIdByName[updated.department],
+            };
+            if (jobs.find((j) => j.id === updated.id)) {
+                await updateJob(updated.id, payload);
+                setAlertConfig({ visible: true, title: "Updated!", message: "Job opening updated successfully." });
+            } else {
+                await createJob(payload);
+                setAlertConfig({ visible: true, title: "Added!", message: "New job opening added successfully." });
+            }
+            await loadJobs();
+            setEditModalVisible(false);
+            setEditingJob(null);
+        } catch (e) {
+            console.warn(getApiErrorMessage(e));
         }
-        setEditModalVisible(false);
-        setEditingJob(null);
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!deleteTarget) return;
-        setJobs(prev => prev.filter(j => j.id !== deleteTarget.id));
-        setAlertConfig({ visible: true, title: "Deleted!", message: "Job opening has been deleted." });
-        setDeleteTarget(null);
+        try {
+            await deleteJob(deleteTarget.id);
+            await loadJobs();
+            setAlertConfig({ visible: true, title: "Deleted!", message: "Job opening has been deleted." });
+            setDeleteTarget(null);
+        } catch (e) {
+            console.warn(getApiErrorMessage(e));
+        }
     };
 
     const totalJobs   = jobs.length;
@@ -1442,7 +1418,7 @@ const JobOpeningsScreen: React.FC = () => {
                     {isWeb ? (
                         <WebSelect
                             value={deptFilter}
-                            options={DEPARTMENTS}
+                            options={deptOptions}
                             onChange={setDeptFilter}
                         />
                     ) : (
@@ -1564,7 +1540,7 @@ const JobOpeningsScreen: React.FC = () => {
                 <>
                     <DropdownModal
                         visible={deptDropdownOpen}
-                        options={DEPARTMENTS}
+                        options={deptOptions}
                         selected={deptFilter}
                         onSelect={setDeptFilter}
                         onClose={() => setDeptDropdownOpen(false)}

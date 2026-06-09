@@ -1,4 +1,12 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapDeliverySlabRow } from "@/lib/mappers";
+import {
+  createDeliverySlab,
+  deleteDeliverySlab,
+  fetchDeliverySlabs,
+  updateDeliverySlab,
+} from "@/services/deliveryApi";
 import {
   View,
   Text,
@@ -52,59 +60,31 @@ interface WeightSlab {
   status: SlabStatus;
 }
 
-// ─── DATA ─────────────────────────────────────────────────────────────────────
-const initialSlabs: WeightSlab[] = [
-  {
-    id: 1,
-    label: "0 – 500 gms",
-    range: "0 – 500g",
-    iconColor: "#7C3AED",
-    iconBg: "#EDE9FE",
-    intracity: "₹0.00",
-    metroMetro: "₹25.00",
-    status: "Inactive",
-  },
-  {
-    id: 2,
-    label: "500 gms – 1 kg",
-    range: "0.500kg – 1.000kg",
-    iconColor: "#059669",
-    iconBg: "#D1FAE5",
-    intracity: "₹20.00",
-    metroMetro: "₹25.00",
-    status: "Active",
-  },
-  {
-    id: 3,
-    label: "1 – 2 kg",
-    range: "1.000kg – 2.000kg",
-    iconColor: "#D97706",
-    iconBg: "#FEF3C7",
-    intracity: "₹80.00",
-    metroMetro: "₹95.00",
-    status: "Active",
-  },
-  {
-    id: 4,
-    label: "2 – 5 kg",
-    range: "2.000kg – 5.000kg",
-    iconColor: "#2563EB",
-    iconBg: "#DBEAFE",
-    intracity: "₹175.00",
-    metroMetro: "₹205.00",
-    status: "Active",
-  },
-  {
-    id: 5,
-    label: "Above 5 kg",
-    range: "Above 5.000kg",
-    iconColor: "#7C3AED",
-    iconBg: "#EDE9FE",
-    intracity: "₹400.00",
-    metroMetro: "₹499.99",
-    status: "Active",
-  },
+const SLAB_ICON_STYLES = [
+  { iconColor: "#7C3AED", iconBg: "#EDE9FE" },
+  { iconColor: "#059669", iconBg: "#D1FAE5" },
+  { iconColor: "#D97706", iconBg: "#FEF3C7" },
+  { iconColor: "#2563EB", iconBg: "#DBEAFE" },
 ];
+
+function mapSlabToUi(row: ReturnType<typeof mapDeliverySlabRow>, index: number): WeightSlab {
+  const icons = SLAB_ICON_STYLES[index % SLAB_ICON_STYLES.length];
+  const range =
+    row.maxKg > 0
+      ? `${row.minKg} – ${row.maxKg}kg`
+      : row.minKg > 0
+        ? `Above ${row.minKg}kg`
+        : `${row.minKg} – ${row.maxKg}g`;
+  return {
+    id: row.id,
+    label: row.label,
+    range,
+    ...icons,
+    intracity: `₹${row.intraCity.toFixed(2)}`,
+    metroMetro: `₹${row.metroMetro.toFixed(2)}`,
+    status: row.active ? "Active" : "Inactive",
+  };
+}
 
 // ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
 
@@ -412,21 +392,44 @@ const StatsFooter: React.FC<{ slabs: WeightSlab[], isWeb: boolean }> = ({ slabs,
 const DeliveryChargeModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-  slab: WeightSlab | null; // null means it's "Add New", otherwise "Edit"
+  slab: WeightSlab | null;
   isWeb: boolean;
-}> = ({ visible, onClose, slab, isWeb }) => {
+  onSave: (data: {
+    label: string;
+    minKg: number;
+    maxKg: number;
+    intraCity: number;
+    metroMetro: number;
+    active: boolean;
+  }) => void;
+}> = ({ visible, onClose, slab, isWeb, onSave }) => {
   const isEditing = !!slab;
   const [isCustomPricing, setIsCustomPricing] = React.useState(false);
   const [isActiveStatus, setIsActiveStatus] = React.useState(false);
+  const [label, setLabel] = React.useState("");
+  const [minKg, setMinKg] = React.useState("");
+  const [maxKg, setMaxKg] = React.useState("");
+  const [intraCity, setIntraCity] = React.useState("");
+  const [metroMetro, setMetroMetro] = React.useState("");
 
   React.useEffect(() => {
     if (visible) {
       if (slab) {
         setIsActiveStatus(slab.status === "Active");
         setIsCustomPricing(false);
+        setLabel(slab.label);
+        setMinKg("0");
+        setMaxKg("0");
+        setIntraCity(slab.intracity.replace("₹", ""));
+        setMetroMetro(slab.metroMetro.replace("₹", ""));
       } else {
         setIsActiveStatus(true);
         setIsCustomPricing(false);
+        setLabel("");
+        setMinKg("");
+        setMaxKg("");
+        setIntraCity("");
+        setMetroMetro("");
       }
     }
   }, [slab, visible]);
@@ -434,12 +437,14 @@ const DeliveryChargeModal: React.FC<{
   if (!visible) return null;
 
   const handleSave = () => {
-    const msg = isEditing ? 'Delivery charge updated successfully!' : 'Delivery charge added successfully!';
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Success', msg);
-    }
+    onSave({
+      label: label.trim() || "Slab",
+      minKg: Number(minKg) || 0,
+      maxKg: Number(maxKg) || 0,
+      intraCity: Number(intraCity) || 0,
+      metroMetro: Number(metroMetro) || 0,
+      active: isActiveStatus,
+    });
     onClose();
   };
 
@@ -457,16 +462,16 @@ const DeliveryChargeModal: React.FC<{
 
       <ScrollView style={styles.modalBody}>
         <Text style={styles.inputLabel}>Weight Slab Description <Text style={styles.textAsterisk}>*</Text></Text>
-        <TextInput style={styles.textInput} defaultValue={slab?.label || ""} placeholder="e.g., 0-500 gms, 1-2 kg" />
+        <TextInput style={styles.textInput} value={label} onChangeText={setLabel} placeholder="e.g., 0-500 gms, 1-2 kg" />
 
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
             <Text style={styles.inputLabel}>Minimum Weight (kg) <Text style={styles.textAsterisk}>*</Text></Text>
-            <TextInput style={styles.textInput} defaultValue={slab ? "0.000" : ""} keyboardType="numeric" />
+            <TextInput style={styles.textInput} value={minKg} onChangeText={setMinKg} keyboardType="numeric" />
           </View>
           <View style={[styles.inputGroup, { flex: 1 }]}>
             <Text style={styles.inputLabel}>Maximum Weight (kg) <Text style={styles.textAsterisk}>*</Text></Text>
-            <TextInput style={styles.textInput} defaultValue={slab ? "0.500" : ""} keyboardType="numeric" />
+            <TextInput style={styles.textInput} value={maxKg} onChangeText={setMaxKg} keyboardType="numeric" />
           </View>
         </View>
 
@@ -491,14 +496,14 @@ const DeliveryChargeModal: React.FC<{
               <Text style={styles.inputLabel}>Intra-City Charge (₹) <Text style={styles.textAsterisk}>*</Text></Text>
               <View style={styles.inputWithPrefix}>
                 <View style={styles.inputPrefix}><Text style={styles.inputPrefixText}>₹</Text></View>
-                <TextInput style={styles.textInputNoLeftBorder} defaultValue={slab ? slab.intracity.replace("₹", "") : ""} keyboardType="numeric" />
+                <TextInput style={styles.textInputNoLeftBorder} value={intraCity} onChangeText={setIntraCity} keyboardType="numeric" />
               </View>
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Metro-Metro Charge (₹) <Text style={styles.textAsterisk}>*</Text></Text>
               <View style={styles.inputWithPrefix}>
                 <View style={styles.inputPrefix}><Text style={styles.inputPrefixText}>₹</Text></View>
-                <TextInput style={styles.textInputNoLeftBorder} defaultValue={slab ? slab.metroMetro.replace("₹", "") : ""} keyboardType="numeric" />
+                <TextInput style={styles.textInputNoLeftBorder} value={metroMetro} onChangeText={setMetroMetro} keyboardType="numeric" />
               </View>
             </View>
           </View>
@@ -552,14 +557,65 @@ const DeliveryChargesScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [slabs, setSlabs] = useState<WeightSlab[]>(initialSlabs);
+  const [slabs, setSlabs] = useState<WeightSlab[]>([]);
   const [editingSlabId, setEditingSlabId] = useState<number | null>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
-  const handleActivate = (id: number) => {
-    setSlabs((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "Active" as SlabStatus } : s))
-    );
+  const loadSlabs = useCallback(async () => {
+    try {
+      const rows = await fetchDeliverySlabs();
+      setSlabs(rows.map((r, i) => mapSlabToUi(mapDeliverySlabRow(r), i)));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSlabs();
+  }, [loadSlabs]);
+
+  const saveSlab = async (data: {
+    label: string;
+    minKg: number;
+    maxKg: number;
+    intraCity: number;
+    metroMetro: number;
+    active: boolean;
+  }) => {
+    try {
+      const payload = {
+        label: data.label,
+        minWeightKg: data.minKg,
+        maxWeightKg: data.maxKg,
+        intraCityCharge: data.intraCity,
+        metroMetroCharge: data.metroMetro,
+        active: data.active,
+      };
+      if (editingSlabId != null) {
+        await updateDeliverySlab(editingSlabId, payload);
+      } else {
+        await createDeliverySlab(payload);
+      }
+      await loadSlabs();
+      const msg = editingSlabId != null ? "Delivery charge updated successfully!" : "Delivery charge added successfully!";
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Success", msg);
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Error", msg);
+    }
+  };
+
+  const handleActivate = async (id: number) => {
+    const slab = slabs.find((s) => s.id === id);
+    if (!slab) return;
+    try {
+      await updateDeliverySlab(id, { active: true });
+      await loadSlabs();
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
   };
 
   const handleEdit = (id: number) => {
@@ -567,12 +623,14 @@ const DeliveryChargesScreen: React.FC = () => {
   };
 
   const handleDelete = (id: number) => {
-    const confirmDelete = () => {
-      setSlabs((prev) => prev.filter((s) => s.id !== id));
-      if (Platform.OS === "web") {
-        window.alert("Delivery charge deleted successfully!");
-      } else {
-        Alert.alert("Deleted", "Delivery charge deleted successfully!");
+    const confirmDelete = async () => {
+      try {
+        await deleteDeliverySlab(id);
+        await loadSlabs();
+        if (Platform.OS === "web") window.alert("Delivery charge deleted successfully!");
+        else Alert.alert("Deleted", "Delivery charge deleted successfully!");
+      } catch (e) {
+        console.warn(getApiErrorMessage(e));
       }
     };
 
@@ -739,12 +797,14 @@ const DeliveryChargesScreen: React.FC = () => {
           onClose={() => setEditingSlabId(null)}
           slab={slabs.find((s) => s.id === editingSlabId) || null}
           isWeb={isWeb}
+          onSave={saveSlab}
         />
         <DeliveryChargeModal
           visible={isAddModalVisible}
           onClose={() => setIsAddModalVisible(false)}
           slab={null}
           isWeb={isWeb}
+          onSave={saveSlab}
         />
       </View>
     </AdminLayout>
