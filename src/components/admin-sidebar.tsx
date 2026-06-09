@@ -1,14 +1,14 @@
-import React from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
+import React from "react";
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 type Props = {
   /** Whether the sidebar is in collapsed (icon-only) mode – desktop only */
@@ -45,7 +45,7 @@ const NAV_ITEMS = {
       { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges" },
     ],
     standalone: [
-      { label: "Pending Sellers", icon: "user-plus", path: null },
+      { label: "Pending Sellers", icon: "user-plus", path: "/pendingsellers" },
       { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
       { label: "Customer Support", icon: "headphones", path: null },
       { label: "Category Requests", icon: "grid", path: null },
@@ -108,8 +108,8 @@ const NAV_ITEMS = {
       icon: "briefcase",
       children: [
         { label: "Departments", icon: "layers", path: "/Departments" },
-        { label: "Job Openings", icon: "briefcase", path: null },
-        { label: "Applications", icon: "file-text", path: null }
+        { label: "Job Openings", icon: "briefcase", path: "/jobopenings" },
+        { label: "Applications", icon: "file-text", path: "/jobApplications" }
       ]
     }
   ]
@@ -158,7 +158,11 @@ export default function AdminSidebar({
       </View>
 
       {/* Scrollable nav items */}
-      <ScrollView style={styles.navScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.navScroll} 
+        contentContainerStyle={{ paddingBottom: 80 }} 
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* GENERAL */}
         <View style={styles.section}>
