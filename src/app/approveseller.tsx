@@ -9,269 +9,29 @@ import {
   Image,
   useWindowDimensions,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { useAsyncLoad } from "@/hooks/useAsyncLoad";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapSellerToApprovedRow } from "@/lib/mappers";
+import { blockSeller, fetchSellers, unblockSeller } from "@/services/sellerApi";
 
-// --- MOCK DATA TYPE ---
-type Seller = {
-  id: number;
-  name: string;
-  email: string;
-  avatar: string;
-  businessName: string;
-  businessType: string;
-  products: number;
-  walletBalance: number;
-  joinDate: string;
-  revenue: number;
-  state: string;
-  city: string;
-  status: "Active" | "Blocked";
-};
-
-// --- THE 10 EXACT SELLERS FROM SCREENSHOTS ---
-const EXACT_SELLERS: Seller[] = [
-  {
-    id: 1,
-    name: "Khaiser Mohammed",
-    email: "mkhaiser0786@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    businessName: "ZOYA ALL BAGS CENTER",
-    businessType: "Sole Proprietorship",
-    products: 2,
-    walletBalance: 0,
-    joinDate: "May 29, 2026",
-    revenue: 0,
-    state: "Telangana",
-    city: "Sangareddy",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Gone Mahender",
-    email: "saineeshopingmall@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-    businessName: "SAINEE SHOPPING MALL",
-    businessType: "Sole Proprietorship",
-    products: 1,
-    walletBalance: 0,
-    joinDate: "May 14, 2026",
-    revenue: 0,
-    state: "Telangana",
-    city: "Hyderabad",
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Malathi Devulapalli",
-    email: "9032893883malathi@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    businessName: "PRAHARSHI CREATIONS",
-    businessType: "Sole Proprietorship",
-    products: 0,
-    walletBalance: 0,
-    joinDate: "May 11, 2026",
-    revenue: 0,
-    state: "Andhra Pradesh",
-    city: "Vijayawada",
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Panwar Chair Compay",
-    email: "myidea702@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/4.jpg",
-    businessName: "ANIL RETAILS",
-    businessType: "Sole Proprietorship",
-    products: 1,
-    walletBalance: 0,
-    joinDate: "Apr 28, 2026",
-    revenue: 0,
-    state: "Karnataka",
-    city: "Bangalore",
-    status: "Active",
-  },
-  {
-    id: 5,
-    name: "Smart Fashions",
-    email: "syedlucky129@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/women/5.jpg",
-    businessName: "SMART FASHIONS",
-    businessType: "Sole Proprietorship",
-    products: 8,
-    walletBalance: 0,
-    joinDate: "Apr 22, 2026",
-    revenue: 689,
-    state: "Maharashtra",
-    city: "Mumbai",
-    status: "Active",
-  },
-  {
-    id: 6,
-    name: "Arhaan Collection",
-    email: "arhaancollection1355@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/6.jpg",
-    businessName: "ARHAAN COLLECTIONS",
-    businessType: "Sole Proprietorship",
-    products: 0,
-    walletBalance: 0,
-    joinDate: "Apr 22, 2026",
-    revenue: 0,
-    state: "Gujarat",
-    city: "Surat",
-    status: "Active",
-  },
-  {
-    id: 7,
-    name: "Ahmad Expoters",
-    email: "ahmadexpoters900@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/7.jpg",
-    businessName: "AHMAD EXPORTERS",
-    businessType: "Sole Proprietorship",
-    products: 0,
-    walletBalance: 0,
-    joinDate: "Apr 21, 2026",
-    revenue: 0,
-    state: "West Bengal",
-    city: "Kolkata",
-    status: "Active",
-  },
-  {
-    id: 8,
-    name: "Lakshmi Sumana",
-    email: "ubstore2025@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/women/8.jpg",
-    businessName: "UNIVERSAL BAGS",
-    businessType: "Partnership",
-    products: 12,
-    walletBalance: 0,
-    joinDate: "Apr 19, 2026",
-    revenue: 0,
-    state: "Tamil Nadu",
-    city: "Chennai",
-    status: "Active",
-  },
-  {
-    id: 9,
-    name: "Finn Brooks",
-    email: "brandshoppe789@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/9.jpg",
-    businessName: "BRAND SHOPPE",
-    businessType: "Sole Proprietorship",
-    products: 5,
-    walletBalance: 0,
-    joinDate: "Apr 17, 2026",
-    revenue: 3068,
-    state: "Telangana",
-    city: "Rangareddy",
-    status: "Active",
-  },
-  {
-    id: 10,
-    name: "Satya Retailer",
-    email: "satyaretailer@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/10.jpg",
-    businessName: "Satya Retail Corporation",
-    businessType: "Sole Proprietorship",
-    products: 9,
-    walletBalance: 0,
-    joinDate: "Apr 13, 2026",
-    revenue: 3927,
-    state: "Andhra Pradesh",
-    city: "Sri Sathya Sai",
-    status: "Active",
-  },
-];
-
-// --- PROGRAMMATIC MOCK SELLER LIST GENERATOR (TOTAL 71) ---
-const generateAllSellers = (): Seller[] => {
-  const sellers = [...EXACT_SELLERS];
-
-  const statePool = [
-    ...Array(14).fill({ state: "Telangana", city: "Sangareddy" }),
-    ...Array(12).fill({ state: "Telangana", city: "Hyderabad" }),
-    ...Array(1).fill({ state: "Telangana", city: "Rangareddy" }),
-    ...Array(6).fill({ state: "Telangana", city: "Warangal" }),
-    ...Array(3).fill({ state: "Maharashtra", city: "Mumbai" }),
-    ...Array(3).fill({ state: "Maharashtra", city: "Pune" }),
-    ...Array(1).fill({ state: "Andhra Pradesh", city: "Sri Sathya Sai" }),
-    ...Array(4).fill({ state: "Andhra Pradesh", city: "Vijayawada" }),
-    ...Array(2).fill({ state: "Karnataka", city: "Bangalore" }),
-    ...Array(1).fill({ state: "Karnataka", city: "Mysore" }),
-    ...Array(2).fill({ state: "Gujarat", city: "Surat" }),
-    ...Array(1).fill({ state: "Gujarat", city: "Ahmedabad" }),
-    ...Array(2).fill({ state: "West Bengal", city: "Kolkata" }),
-    ...Array(2).fill({ state: "Uttar Pradesh", city: "Agra" }),
-    ...Array(1).fill({ state: "Uttar Pradesh", city: "Lucknow" }),
-    ...Array(2).fill({ state: "Tamil Nadu", city: "Chennai" }),
-    ...Array(2).fill({ state: "Rajasthan", city: "Jaipur" }),
-    ...Array(1).fill({ state: "Unknown", city: "Unknown" }),
-    ...Array(1).fill({ state: "Kerala", city: "Kochi" }),
-  ];
-
-  const firstNames = [
-    "Rahul", "Amit", "Priya", "Sneha", "Karan", "Anjali", "Vikram", "Deepa",
-    "Sanjay", "Neha", "Arjun", "Ritu", "Manish", "Kiran", "Vijay", "Aisha",
-    "Rohan", "Pooja", "Rajesh", "Divya", "Suresh", "Swati", "Anil", "Meera",
-  ];
-  const lastNames = [
-    "Sharma", "Verma", "Gupta", "Patel", "Reddy", "Rao", "Nair", "Joshi",
-    "Singh", "Kumar", "Mehta", "Sen", "Das", "Roy", "Chawla", "Bose",
-    "Pillai", "Naidu", "Deshmukh", "Kulkarni", "Shenoy", "Shetty", "Gowda",
-  ];
-  const businessWords = [
-    "Retails", "Enterprises", "Stores", "Bazaar", "Fashions", "Creations",
-    "Bags", "Footwear", "Apparels", "Textiles", "Electronics", "Mart",
-  ];
-  const businessTypes = ["Sole Proprietorship", "Partnership", "Private Limited"];
-
-  for (let i = 0; i < 61; i++) {
-    const id = 11 + i;
-    const fName = firstNames[(i + 3) % firstNames.length];
-    const lName = lastNames[(i + 7) % lastNames.length];
-    const name = `${fName} ${lName}`;
-    const email = `${fName.toLowerCase()}.${lName.toLowerCase()}${id}@gmail.com`;
-    const busWord = businessWords[i % businessWords.length];
-    const businessName = `${fName.toUpperCase()} ${busWord.toUpperCase()}`;
-    const businessType = businessTypes[i % businessTypes.length];
-    const products = (i * 3 + 1) % 15;
-    const walletBalance = i % 5 === 0 ? parseFloat((i * 120.5).toFixed(2)) : 0;
-    const revenue = i % 3 === 0 ? parseFloat((i * 850.75).toFixed(2)) : 0;
-
-    const month = ["Jan", "Feb", "Mar", "Apr", "May"][i % 5];
-    const day = ((i * 7 + 1) % 28) + 1;
-    const joinDate = `${month} ${day}, 2026`;
-
-    const { state, city } = statePool[i];
-
-    sellers.push({
-      id,
-      name,
-      email,
-      avatar: `https://randomuser.me/api/portraits/${i % 2 === 0 ? "men" : "women"}/${id}.jpg`,
-      businessName,
-      businessType,
-      products,
-      walletBalance,
-      joinDate,
-      revenue,
-      state,
-      city,
-      status: "Active",
-    });
-  }
-
-  return sellers;
-};
-
-const ALL_MOCK_SELLERS = generateAllSellers();
+type Seller = ReturnType<typeof mapSellerToApprovedRow>;
 
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
 
-  const [sellers, setSellers] = useState<Seller[]>(ALL_MOCK_SELLERS);
+  const { data, loading, error, reload, setData } = useAsyncLoad(
+    async () => {
+      const page = await fetchSellers({ status: "active", size: 100 });
+      return (page.items ?? []).map(mapSellerToApprovedRow);
+    },
+    []
+  );
+  const sellers: Seller[] = data ?? [];
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [sortBy, setSortBy] = useState("Name");
@@ -362,14 +122,17 @@ export default function ApprovedSellersScreen() {
         {
           text: actionText,
           style: "destructive",
-          onPress: () => {
-            setSellers((prev) =>
-              prev.map((s) =>
-                s.id === id
-                  ? { ...s, status: s.status === "Active" ? "Blocked" : "Active" }
-                  : s
-              )
-            );
+          onPress: async () => {
+            try {
+              if (seller.status === "Active") {
+                await blockSeller(id);
+              } else {
+                await unblockSeller(id);
+              }
+              await reload();
+            } catch (e) {
+              Alert.alert("Error", getApiErrorMessage(e));
+            }
           },
         },
       ]
@@ -389,7 +152,7 @@ export default function ApprovedSellersScreen() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            setSellers((prev) => prev.filter((s) => s.id !== id));
+            setData((prev) => (prev ?? []).filter((s) => s.id !== id));
           },
         },
       ]
@@ -409,6 +172,13 @@ export default function ApprovedSellersScreen() {
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
       >
+            {loading && (
+              <ActivityIndicator size="large" color="#EA580C" style={{ marginVertical: 24 }} />
+            )}
+            {error ? (
+              <Text style={styles.loadErrorText}>{error}</Text>
+            ) : null}
+
             {/* --- PAGE HEADER BANNER CARD --- */}
             <View style={styles.pageHeaderCard}>
               {/* Banner Top Portion (Orange Gradient) */}
@@ -840,6 +610,12 @@ const styles = StyleSheet.create({
   scrollBodyContent: {
     padding: 24,
     paddingBottom: 60,
+  },
+  loadErrorText: {
+    fontSize: 14,
+    color: "#DC2626",
+    marginBottom: 16,
+    textAlign: "center",
   },
   rowLayout: {
     flexDirection: "row",

@@ -1,15 +1,3 @@
-/**
- * Minimal auth context for the admin app.
- *
- * Strategy:
- *  - sessionStorage is used on web so the session survives page refresh
- *    but is cleared when the browser tab is closed.
- *  - On native, we fall back to a React ref (in-memory, cleared on app restart).
- *
- * To plug in a real backend, replace the `signIn` mock with an API call and
- * store the JWT token returned by the server instead of the placeholder string.
- */
-
 import React, {
   createContext,
   useCallback,
@@ -17,42 +5,19 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { Platform } from "react-native";
-
-const SESSION_KEY = "admin_auth_token";
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function saveToken(token: string) {
-  if (Platform.OS === "web") {
-    try {
-      sessionStorage.setItem(SESSION_KEY, token);
-    } catch {}
-  }
-}
-
-function loadToken(): string | null {
-  if (Platform.OS === "web") {
-    try {
-      return sessionStorage.getItem(SESSION_KEY);
-    } catch {}
-  }
-  return null;
-}
-
-function clearToken() {
-  if (Platform.OS === "web") {
-    try {
-      sessionStorage.removeItem(SESSION_KEY);
-    } catch {}
-  }
-}
-
-// ─── context ────────────────────────────────────────────────────────────────
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  clearAdminSession,
+  getAdminToken,
+  getAdminUser,
+  saveAdminSession,
+  type AdminSessionUser,
+} from "@/lib/api/session";
+import { fetchCurrentAdmin, loginAdmin, toSessionUser } from "@/services/authApi";
 
 type AuthState = {
-  /** null = not yet resolved, false = logged-out, string = token / user-id */
   token: string | null | false;
+  user: AdminSessionUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => void;
@@ -60,39 +25,72 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState>({
   token: null,
+  user: null,
   isLoading: true,
   signIn: async () => {},
   signOut: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // null = resolving, false = no session, string = authenticated
   const [token, setToken] = useState<string | null | false>(null);
+  const [user, setUser] = useState<AdminSessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session on mount
   useEffect(() => {
-    const stored = loadToken();
-    setToken(stored ?? false);
-    setIsLoading(false);
+    let cancelled = false;
+
+    async function restore() {
+      const storedToken = getAdminToken();
+      if (!storedToken) {
+        if (!cancelled) {
+          setToken(false);
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const me = await fetchCurrentAdmin();
+        if (!cancelled) {
+          const sessionUser = toSessionUser(me);
+          saveAdminSession(storedToken, sessionUser);
+          setToken(storedToken);
+          setUser(sessionUser);
+        }
+      } catch {
+        clearAdminSession();
+        if (!cancelled) {
+          setToken(false);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const signIn = useCallback(async (email: string, _password: string) => {
-    // Replace this block with a real API call:
-    // const res = await fetch('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    // const { token } = await res.json();
-    const mockToken = `mock-token-${email}-${Date.now()}`;
-    saveToken(mockToken);
-    setToken(mockToken);
+  const signIn = useCallback(async (email: string, password: string) => {
+    const response = await loginAdmin(email.trim(), password);
+    const sessionUser = toSessionUser(response);
+    saveAdminSession(response.accessToken, sessionUser);
+    setToken(response.accessToken);
+    setUser(sessionUser);
   }, []);
 
   const signOut = useCallback(() => {
-    clearToken();
+    clearAdminSession();
     setToken(false);
+    setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ token, user, isLoading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
@@ -101,3 +99,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+/** Plain helper (not a React hook) — safe to call with error state each render. */
+export function getAuthErrorMessage(error: unknown): string {
+  return getApiErrorMessage(error, "Login failed. Check your credentials.");
+}
+
+/** @deprecated Use getAuthErrorMessage */
+export const useAuthErrorMessage = getAuthErrorMessage;

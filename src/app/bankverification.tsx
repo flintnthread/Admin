@@ -10,7 +10,11 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { initialsFromName, maskAccount } from "@/lib/format";
+import { fetchPendingBankSellers } from "@/services/sellerApi";
+import type { SellerSummary } from "@/lib/api/types";
 import {
   Animated,
   Dimensions,
@@ -31,26 +35,53 @@ const LIGHT  = "#F8FAFC";
 const BORDER = "#E8EDF5";
 const DARK   = "#0F172A";
 
-/* ─── Mock Data ─────────────────────────────────────────────────────── */
-const MOCK_VERIFICATIONS = [
-  { id: "BV-001", sellerName: "Sanju Sandilya",   email: "sanju.sandilya@gmail.com",  phone: "+91 98765 43210", business: "SG Creations",        account: "XXXX XXXX 4321", ifsc: "HDFC0001234", bank: "HDFC Bank",  status: "Pending",    attempts: 1, created: "05 Jun, 2025", verified: "—",           initials: "SS", color: "#F97316" },
-  { id: "BV-002", sellerName: "Khajaer Mohammed",  email: "khater2025@gmail.com",      phone: "+91 96158 43215", business: "ZOYA ALL BAGS CENTER", account: "XXXX XXXX 8765", ifsc: "ICIC0002345", bank: "ICICI Bank", status: "Verified",   attempts: 2, created: "29 May, 2025", verified: "01 Jun, 2025", initials: "KM", color: "#10B981" },
-  { id: "BV-003", sellerName: "Sandhya Gudisa",    email: "sandhya.gm@gmail.com",      phone: "+91 98760 12349", business: "Sandhya Boutique",     account: "XXXX XXXX 1234", ifsc: "SBIN0003456", bank: "SBI",        status: "Processing", attempts: 1, created: "28 May, 2025", verified: "—",           initials: "SG", color: "#8B5CF6" },
-  { id: "BV-004", sellerName: "Rahul Sharma",      email: "rahul.sharma@gmail.com",    phone: "+91 97654 32109", business: "RS Traders",           account: "XXXX XXXX 5678", ifsc: "PUNB0004567", bank: "PNB",        status: "Failed",     attempts: 3, created: "20 May, 2025", verified: "—",           initials: "RS", color: "#3B82F6" },
-  { id: "BV-005", sellerName: "Priya Mehta",       email: "priya.mehta@gmail.com",     phone: "+91 96543 21098", business: "PM Boutique",          account: "XXXX XXXX 9012", ifsc: "AXIS0005678", bank: "Axis Bank",  status: "Expired",    attempts: 2, created: "15 May, 2025", verified: "—",           initials: "PM", color: "#EC4899" },
-  { id: "BV-006", sellerName: "Amit Verma",        email: "amit.verma@gmail.com",      phone: "+91 95432 10987", business: "Verma Electronics",    account: "XXXX XXXX 3456", ifsc: "HDFC0006789", bank: "HDFC Bank",  status: "Verified",   attempts: 1, created: "10 May, 2025", verified: "12 May, 2025", initials: "AV", color: "#06B6D4" },
-  { id: "BV-007", sellerName: "Neha Joshi",        email: "neha.joshi@gmail.com",      phone: "+91 94321 09876", business: "Joshi Handcrafts",     account: "XXXX XXXX 7890", ifsc: "KOTAK0007890", bank: "Kotak",      status: "Pending",    attempts: 1, created: "05 May, 2025", verified: "—",           initials: "NJ", color: "#F59E0B" },
-  { id: "BV-008", sellerName: "Vikram Singh",      email: "vikram.singh@gmail.com",    phone: "+91 93210 98765", business: "Singh Organics",       account: "XXXX XXXX 2345", ifsc: "SBIN0008901", bank: "SBI",        status: "Verified",   attempts: 1, created: "01 May, 2025", verified: "03 May, 2025", initials: "VS", color: "#EF4444" },
-  { id: "BV-009", sellerName: "Deepa Nair",        email: "deepa.nair@gmail.com",      phone: "+91 92109 87654", business: "Nair Silks",           account: "XXXX XXXX 6789", ifsc: "ICIC0009012", bank: "ICICI Bank", status: "Processing", attempts: 2, created: "28 Apr, 2025", verified: "—",           initials: "DN", color: "#7C3AED" },
-  { id: "BV-010", sellerName: "Suresh Babu",       email: "suresh.babu@gmail.com",     phone: "+91 91098 76543", business: "Babu Enterprises",     account: "XXXX XXXX 0123", ifsc: "AXIS0010123", bank: "Axis Bank",  status: "Failed",     attempts: 3, created: "22 Apr, 2025", verified: "—",           initials: "SB", color: "#059669" },
-  { id: "BV-011", sellerName: "Ananya Krishnan",   email: "ananya.k@gmail.com",        phone: "+91 90987 65432", business: "AK Fashion Studio",    account: "XXXX XXXX 4567", ifsc: "HDFC0011234", bank: "HDFC Bank",  status: "Verified",   attempts: 1, created: "18 Apr, 2025", verified: "20 Apr, 2025", initials: "AK", color: "#DC2626" },
-  { id: "BV-012", sellerName: "Manoj Tiwari",      email: "manoj.tiwari@gmail.com",    phone: "+91 89876 54321", business: "Tiwari General Store", account: "XXXX XXXX 8901", ifsc: "PUNB0012345", bank: "PNB",        status: "Expired",    attempts: 2, created: "12 Apr, 2025", verified: "—",           initials: "MT", color: "#9333EA" },
-];
+type StatusKey = "Pending" | "Processing" | "Verified" | "Failed" | "Expired";
+
+type Verification = {
+  id: string;
+  sellerId: number;
+  sellerName: string;
+  email: string;
+  phone: string;
+  business: string;
+  account: string;
+  ifsc: string;
+  bank: string;
+  status: StatusKey;
+  attempts: number;
+  created: string;
+  verified: string;
+  initials: string;
+  color: string;
+};
+
+const COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4"];
+
+function mapSellerToVerification(s: SellerSummary, index: number): Verification {
+  const verified = Boolean(s.bankVerified);
+  const status: StatusKey = verified ? "Verified" : "Pending";
+  const created = s.updatedAt ?? s.createdAt;
+  return {
+    id: `#S${s.id}`,
+    sellerId: s.id,
+    sellerName: s.fullName ?? "Seller",
+    email: s.email ?? "",
+    phone: s.mobile ?? "",
+    business: s.businessName ?? "—",
+    account: maskAccount(undefined),
+    ifsc: "—",
+    bank: s.bankName ?? "—",
+    status,
+    attempts: 1,
+    created: created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+    verified: verified && created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+    initials: initialsFromName(s.fullName),
+    color: COLORS[index % COLORS.length],
+  };
+}
 
 const STATUS_OPTIONS = ["All Status", "Pending", "Processing", "Verified", "Failed", "Expired"];
 const PER_PAGE_OPTIONS = ["5", "10", "20", "50"];
-
-type StatusKey = "Pending" | "Processing" | "Verified" | "Failed" | "Expired";
 
 const STATUS_CONFIG: Record<StatusKey, {
   bg: string; color: string; border: string;
@@ -62,8 +93,6 @@ const STATUS_CONFIG: Record<StatusKey, {
   Failed:     { bg: "#FEE2E2", color: "#7F1D1D", border: "#FCA5A5", iconName: "close-circle-outline",   iconLib: "Ionicons",   iconBg: "#FECACA", iconColor: "#DC2626" },
   Expired:    { bg: "#F1F5F9", color: "#334155", border: "#CBD5E1", iconName: "hourglass-outline",       iconLib: "Ionicons",   iconBg: "#E2E8F0", iconColor: "#64748B" },
 };
-
-type Verification = typeof MOCK_VERIFICATIONS[0];
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
 function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
@@ -274,7 +303,7 @@ function PagBtn({ iconName, onPress, disabled }: { iconName: string; onPress: ()
 }
 
 /* ─── Verification Card (mobile row) ───────────────────────────────── */
-function VerificationCard({ item, onViewPress }: { item: Verification; onViewPress: () => void }) {
+function VerificationCard({ item, onViewPress }: { item: Verification; onViewPress: (sellerId: number) => void }) {
   return (
     <View style={{
       borderWidth: 1, borderColor: BORDER, borderRadius: 12,
@@ -346,7 +375,7 @@ function VerificationCard({ item, onViewPress }: { item: Verification; onViewPre
       {/* Actions */}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <TouchableOpacity
-          onPress={onViewPress}
+          onPress={() => onViewPress(item.sellerId)}
           style={{
             flex: 1, backgroundColor: "#EFF6FF",
             borderWidth: 1, borderColor: "#BFDBFE",
@@ -383,24 +412,43 @@ export default function BankVerifications() {
   const [searchQuery,  setSearchQuery]  = useState("");
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [verifications, setVerifications] = useState<Verification[]>([]);
 
   const { width } = Dimensions.get("window");
   const isMobile = width < 768;
   const isTablet = width >= 768;
   const isDesktop = width >= 1024;
 
+  const loadVerifications = useCallback(async () => {
+    try {
+      const res = await fetchPendingBankSellers(0, 200);
+      setVerifications((res.items ?? []).map(mapSellerToVerification));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+      setVerifications([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadVerifications();
+  }, [loadVerifications]);
+
+  const goToDetails = (sellerId: number) => {
+    router.push({ pathname: "/viewbankdetails", params: { sellerId: String(sellerId) } });
+  };
+
   /* Counts */
   const counts = {
-    total:      MOCK_VERIFICATIONS.length,
-    pending:    MOCK_VERIFICATIONS.filter(v => v.status === "Pending").length,
-    processing: MOCK_VERIFICATIONS.filter(v => v.status === "Processing").length,
-    verified:   MOCK_VERIFICATIONS.filter(v => v.status === "Verified").length,
-    failed:     MOCK_VERIFICATIONS.filter(v => v.status === "Failed").length,
-    expired:    MOCK_VERIFICATIONS.filter(v => v.status === "Expired").length,
+    total:      verifications.length,
+    pending:    verifications.filter(v => v.status === "Pending").length,
+    processing: verifications.filter(v => v.status === "Processing").length,
+    verified:   verifications.filter(v => v.status === "Verified").length,
+    failed:     verifications.filter(v => v.status === "Failed").length,
+    expired:    verifications.filter(v => v.status === "Expired").length,
   };
 
   /* Filter */
-  const filtered = MOCK_VERIFICATIONS.filter(v => {
+  const filtered = verifications.filter(v => {
     const matchStatus = statusFilter === "All Status" || v.status === statusFilter;
     const q = searchQuery.toLowerCase().trim();
     const matchSearch = !q ||
@@ -588,7 +636,7 @@ export default function BankVerifications() {
           }}>
             <VerificationCard
               item={item}
-              onViewPress={() => router.push("/viewbankdetails")}
+              onViewPress={goToDetails}
             />
           </View>
         )}
@@ -807,7 +855,7 @@ export default function BankVerifications() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
-                  <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}}</Text>
+                  <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
                 </View>
                 <View style={{ flex: 0.8 }}>
                   <StatusBadge status={item.status} small />
@@ -819,7 +867,7 @@ export default function BankVerifications() {
                 <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
                 <View style={{ flex: 0.7, flexDirection: "row", gap: 6 }}>
                   <TouchableOpacity
-                    onPress={() => router.push("/viewbankdetails")}
+                    onPress={() => goToDetails(item.sellerId)}
                     style={{
                       backgroundColor: "#EFF6FF",
                       borderWidth: 1,

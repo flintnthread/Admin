@@ -6,9 +6,13 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapCustomerRow } from "@/lib/mappers";
+import { fetchCustomers } from "@/services/customerApi";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   ScrollView,
   StatusBar,
@@ -34,20 +38,6 @@ type Customer = {
   lastOrder: string | null;
   status: "Active" | "Inactive";
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SAMPLE DATA
-// ─────────────────────────────────────────────────────────────────────────────
-const SAMPLE_CUSTOMERS: Customer[] = [
-  { id: 255, name: "Sai Kiran",            email: "saikiran95730@gmail.com",  phone: "6304797436", orders: 0, totalSpent: 0,    lastOrder: null,          status: "Active"   },
-  { id: 254, name: "Ajay Singani",         email: "ajaysingani56@gmail.com",  phone: "9912137150", orders: 0, totalSpent: 0,    lastOrder: null,          status: "Active"   },
-  { id: 253, name: "Aruna bharati kumari", email: "akhilabobby204@gmail.com", phone: "8897941659", orders: 1, totalSpent: 364,  lastOrder: "26 May 2026", status: "Active"   },
-  { id: 251, name: "Sana shaikh",          email: "attusanshaikh@gmail.com",  phone: "8197481081", orders: 1, totalSpent: 2318, lastOrder: "13 May 2026", status: "Active"   },
-  { id: 250, name: "Prateek Awasthi",      email: "techgeek1809@gmail.com",   phone: "9532369294", orders: 0, totalSpent: 0,    lastOrder: null,          status: "Active"   },
-  { id: 249, name: "Dodda Akhila",         email: "dodda.akhi@gmail.com",     phone: "9959353663", orders: 1, totalSpent: 296,  lastOrder: "04 May 2026", status: "Active"   },
-  { id: 248, name: "Ravi Teja",            email: "raviteja.k@gmail.com",     phone: "9876543210", orders: 3, totalSpent: 5840, lastOrder: "01 Jun 2026", status: "Active"   },
-  { id: 247, name: "Meena Reddy",          email: "meena.reddy@gmail.com",    phone: "9988776655", orders: 2, totalSpent: 1200, lastOrder: "28 May 2026", status: "Inactive" },
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PALETTE
@@ -459,25 +449,38 @@ export default function CustomerManagementScreen() {
   const { isMobile, isTablet, isDesktop, gridCols } = useLayout(width);
   const router = useRouter();
 
-  const [customers, setCustomers] = useState<Customer[]>(SAMPLE_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch]       = useState("");
   const [view, setView]           = useState<"grid" | "list">("grid");
   const [page, setPage]           = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
 
   const PAGE_SIZE = 12;
 
-  const filtered = useMemo(() => {
-    setPage(1);
-    return customers.filter((c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
-    );
-  }, [customers, search]);
+  const loadCustomers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const safePage = Math.max(1, page);
+      const response = await fetchCustomers(search.trim() || undefined, safePage - 1, PAGE_SIZE);
+      setCustomers(response.items.map((c) => mapCustomerRow(c) as Customer));
+      setTotalPages(Math.max(1, response.totalPages));
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load customers."));
+      setCustomers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  const safePage = Math.min(page, totalPages);
+  const paginated = customers;
 
   const toggle = (id: number) =>
     setCustomers((prev) =>
@@ -545,7 +548,10 @@ export default function CustomerManagementScreen() {
                 placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
                 placeholderTextColor={C.sub}
                 value={search}
-                onChangeText={setSearch}
+                onChangeText={(text) => {
+                  setSearch(text);
+                  setPage(1);
+                }}
                 numberOfLines={1}
               />
               {search.length > 0 && (
@@ -597,8 +603,22 @@ export default function CustomerManagementScreen() {
             </View>
           )}
 
+          {loading ? (
+            <View style={s.stateBox}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <Text style={s.stateText}>Loading customers…</Text>
+            </View>
+          ) : error ? (
+            <View style={s.stateBox}>
+              <Text style={s.errorText}>{error}</Text>
+              <TouchableOpacity style={s.retryBtn} onPress={loadCustomers} activeOpacity={0.8}>
+                <Text style={s.retryBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {/* ══ GRID VIEW ═══════════════════════════════════════════════════ */}
-          {view === "grid" && (
+          {!loading && !error && view === "grid" && (
             isMobile ? (
               // Mobile grid → stacked cards
               <View>
@@ -619,7 +639,7 @@ export default function CustomerManagementScreen() {
           )}
 
           {/* ══ LIST VIEW ═══════════════════════════════════════════════════ */}
-          {view === "list" && (
+          {!loading && !error && view === "list" && (
             isMobile ? (
               // ── MOBILE: horizontal-scroll table ───────────────────────────
               <View style={mt.outerCard}>
@@ -650,7 +670,7 @@ export default function CustomerManagementScreen() {
           )}
 
           {/* Empty state */}
-          {filtered.length === 0 && (
+          {!loading && !error && customers.length === 0 && (
             <View style={s.empty}>
               <Text style={{ fontSize: 38, marginBottom: 10 }}>🔍</Text>
               <Text style={s.emptyTitle}>No customers found</Text>
@@ -659,7 +679,7 @@ export default function CustomerManagementScreen() {
           )}
 
           {/* ══ PAGINATION ══════════════════════════════════════════════════ */}
-          {totalPages > 1 && (
+          {!loading && !error && totalPages > 1 && (
             <View style={s.pgWrap}>
               <TouchableOpacity
                 style={[s.pgBtn, safePage === 1 && s.pgBtnDisabled]}
@@ -813,4 +833,37 @@ const s = StyleSheet.create({
   empty:      { alignItems: "center", paddingVertical: 60 },
   emptyTitle: { fontSize: 17, fontWeight: "700", color: C.text },
   emptySub:   { fontSize: 13, color: C.sub, marginTop: 4 },
+
+  stateBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 12,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 14,
+  },
+  stateText: {
+    fontSize: 14,
+    color: C.sub,
+  },
+  errorText: {
+    fontSize: 14,
+    color: C.inactive,
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
+  retryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: C.navy,
+  },
+  retryBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
 });

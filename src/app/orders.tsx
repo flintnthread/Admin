@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StatusBar,
@@ -10,6 +11,10 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import AdminLayout from "../components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import type { OrderSummary } from "@/lib/api/types";
+import { mapOrderRow } from "@/lib/mappers";
+import { fetchOrders } from "@/services/orderApi";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 
@@ -166,6 +171,60 @@ interface Order {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtCur = (n: number) => `₹${n.toLocaleString("en-IN")}.00`;
+
+function toUiOrder(row: ReturnType<typeof mapOrderRow>, raw: OrderSummary): Order {
+  const createdAt = raw.createdAt ? new Date(raw.createdAt) : null;
+  const validDate = createdAt && !Number.isNaN(createdAt.getTime());
+
+  const statusMap: Record<string, OrderStatus> = {
+    processing: "Processing",
+    pending: "Pending",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    shipped: "Shipped",
+  };
+  const normalizedStatus = (raw.orderStatus ?? "").toLowerCase();
+  const status = statusMap[normalizedStatus] ?? "Pending";
+
+  const paymentMap: Record<string, PaymentType> = {
+    cod: "Cash on Delivery",
+    cash_on_delivery: "Cash on Delivery",
+    upi: "UPI",
+    card: "Card",
+    online: "Online Payment",
+  };
+  const payKey = (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase();
+  const paymentType = paymentMap[payKey] ?? "Cash on Delivery";
+
+  return {
+    id: String(row.id),
+    orderNumber: row.orderId.startsWith("#") ? row.orderId : `#${row.orderId}`,
+    date: validDate
+      ? createdAt!.toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : row.date,
+    time: validDate
+      ? createdAt!.toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "",
+    customer: { name: row.customer, email: row.email },
+    sellers: [],
+    products: [],
+    amount:
+      typeof raw.totalAmount === "number"
+        ? raw.totalAmount
+        : Number(raw.totalAmount ?? 0),
+    paymentType,
+    status,
+    gstStatus: row.gstStatus?.toLowerCase() === "filed" ? "Filed" : "Not Filed",
+    hasInvoice: false,
+  };
+}
 
 /** Returns up to 2 initials from a name */
 const getInitials = (name: string) =>
@@ -662,91 +721,62 @@ const ss = StyleSheet.create({
     fontWeight: "700",
     color: C.brand,
   },
+
+  stateBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    marginHorizontal: 14,
+    gap: 12,
+    backgroundColor: C.white,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: C.border,
+  },
+  stateText: {
+    fontSize: 14,
+    color: C.textSecondary,
+  },
+  errorText: {
+    fontSize: 14,
+    color: C.red,
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
+  retryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: C.brand,
+  },
+  retryBtnText: {
+    color: C.white,
+    fontWeight: "700",
+    fontSize: 13,
+  },
 });
 
-// ─── Mock Data + Screen (for testing) ────────────────────────────────────────
-
-const MOCK_ORDERS: Order[] = [
-  {
-    id: "1",
-    orderNumber: "#FNT250600270043",
-    date: "29 May 2024",
-    time: "10:34 AM",
-    customer: { name: "Sri Raj Dodda", email: "sriraj.dodda@gmail.com" },
-    sellers: [{ name: "MATHA THREAD ENTERPRISES", email: "matha@thread.com" }],
-    products: [
-      {
-        id: "p1",
-        name: "Brass Antique Vase",
-        image: "https://via.placeholder.com/48/d4a853/ffffff?text=V",
-        seller: "MATHA THREAD ENTERPRISES",
-        sellerEmail: "matha@thread.com",
-      },
-    ],
-    amount: 412,
-    paymentType: "Cash on Delivery",
-    status: "Processing",
-    gstStatus: "Not Filed",
-    hasInvoice: true,
-  },
-  {
-    id: "2",
-    orderNumber: "#FNT250600270314",
-    date: "27 May 2024",
-    time: "04:22 PM",
-    customer: {
-      name: "Rayapati Trinaventha Nadh",
-      email: "rayapati.t@sms.com",
-    },
-    sellers: [{ name: "SMS DMG HOUSE", email: "sms@dmghouse.com" }],
-    products: [
-      {
-        id: "p2",
-        name: "Smart Speaker",
-        image: "https://via.placeholder.com/48/2d2d2d/ffffff?text=S",
-        seller: "SMS DMG HOUSE",
-        sellerEmail: "sms@dmghouse.com",
-      },
-      {
-        id: "p3",
-        name: "Wireless Charger",
-        image: "https://via.placeholder.com/48/444/ffffff?text=W",
-        seller: "SMS DMG HOUSE",
-        sellerEmail: "sms@dmghouse.com",
-      },
-    ],
-    amount: 634,
-    paymentType: "Cash on Delivery",
-    status: "Pending",
-    gstStatus: "Filed",
-    hasInvoice: true,
-  },
-  {
-    id: "3",
-    orderNumber: "#FNT250600270872",
-    date: "26 May 2024",
-    time: "12:32 PM",
-    customer: { name: "Aruna Bharati Bommi", email: "aruna.bommi@sahithi.com" },
-    sellers: [{ name: "SAHITHI GIFT ARTICLES", email: "info@sahithi.com" }],
-    products: [
-      {
-        id: "p4",
-        name: "Gift Hamper Set",
-        image: "https://via.placeholder.com/48/e74c3c/ffffff?text=G",
-        seller: "SAHITHI GIFT ARTICLES",
-        sellerEmail: "info@sahithi.com",
-      },
-    ],
-    amount: 364,
-    paymentType: "Cash on Delivery",
-    status: "Completed",
-    gstStatus: "Not Filed",
-    hasInvoice: true,
-  },
-];
-
 export default function OrdersScreen({ navigation }: { navigation?: any }) {
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await fetchOrders({ page: 0, size: 50 });
+      setOrders(page.items.map((item) => toUiOrder(mapOrderRow(item), item)));
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load orders."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   const handleView = useCallback(
     (o: Order) => {
@@ -769,14 +799,32 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       >
-        {orders.map((o) => (
-          <OrderCard
-            key={o.id}
-            order={o}
-            onView={handleView}
-            onGST={handleGST}
-          />
-        ))}
+        {loading ? (
+          <View style={ss.stateBox}>
+            <ActivityIndicator size="large" color={C.brand} />
+            <Text style={ss.stateText}>Loading orders…</Text>
+          </View>
+        ) : error ? (
+          <View style={ss.stateBox}>
+            <Text style={ss.errorText}>{error}</Text>
+            <TouchableOpacity style={ss.retryBtn} onPress={loadOrders} activeOpacity={0.8}>
+              <Text style={ss.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : orders.length === 0 ? (
+          <View style={ss.stateBox}>
+            <Text style={ss.stateText}>No orders found</Text>
+          </View>
+        ) : (
+          orders.map((o) => (
+            <OrderCard
+              key={o.id}
+              order={o}
+              onView={handleView}
+              onGST={handleGST}
+            />
+          ))
+        )}
       </ScrollView>
       </View>
     </AdminLayout>

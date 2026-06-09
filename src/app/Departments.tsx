@@ -1,4 +1,12 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import type { Department as ApiDepartment } from "@/lib/api/types";
+import {
+    createDepartment,
+    deleteDepartment,
+    fetchDepartments,
+    updateDepartment,
+} from "@/services/hrApi";
 import {
     View,
     Text,
@@ -84,16 +92,16 @@ interface Department {
     status: "Active" | "Inactive";
 }
 
-// ─── SEED DATA ────────────────────────────────────────────────────────────────
-const SEED: Department[] = [
-    { id: 1, name: "Finance", description: "Detail-oriented financial management and accounting.", jobs: 1, createdAt: "29 Dec, 2025", status: "Active" },
-    { id: 2, name: "Technology", description: "Software development, IT infrastructure & technical roles.", jobs: 0, createdAt: "19 Nov, 2025", status: "Active" },
-    { id: 3, name: "Marketing", description: "Digital marketing, branding and growth strategies.", jobs: 4, createdAt: "19 Nov, 2025", status: "Active" },
-    { id: 4, name: "Sales", description: "Business development and customer relations.", jobs: 0, createdAt: "19 Nov, 2025", status: "Active" },
-    { id: 5, name: "Operations", description: "Operations management and logistics.", jobs: 0, createdAt: "19 Nov, 2025", status: "Active" },
-    { id: 6, name: "Human Resources", description: "Talent acquisition and employee management.", jobs: 0, createdAt: "19 Nov, 2025", status: "Active" },
-    { id: 7, name: "Customer Support", description: "Customer service and support roles.", jobs: 2, createdAt: "19 Nov, 2025", status: "Active" },
-];
+function mapApiDepartment(d: ApiDepartment): Department {
+    return {
+        id: d.id,
+        name: d.name ?? "",
+        description: d.description ?? "",
+        jobs: 0,
+        createdAt: "—",
+        status: d.active !== false ? "Active" : "Inactive",
+    };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE CONFIRM MODAL
@@ -719,7 +727,20 @@ const dc = StyleSheet.create({
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 const DepartmentsScreen: React.FC = () => {
-    const [departments, setDepartments] = useState<Department[]>(SEED);
+    const [departments, setDepartments] = useState<Department[]>([]);
+
+    const loadDepartments = useCallback(async () => {
+        try {
+            const rows = await fetchDepartments();
+            setDepartments(rows.map(mapApiDepartment));
+        } catch (e) {
+            console.warn(getApiErrorMessage(e));
+        }
+    }, []);
+
+    useEffect(() => {
+        loadDepartments();
+    }, [loadDepartments]);
     const [search, setSearch] = useState("");
     const [editTarget, setEditTarget] = useState<Department | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
@@ -749,22 +770,37 @@ const DepartmentsScreen: React.FC = () => {
     const totalJobs = departments.reduce((s, d) => s + d.jobs, 0);
     const activeCount = departments.filter(d => d.status === "Active").length;
 
-    const handleSave = (updated: Department) => {
-        if (departments.find(d => d.id === updated.id)) {
-            setDepartments(prev => prev.map(d => d.id === updated.id ? updated : d));
-            setAlertConfig({ visible: true, title: "Updated!", message: "Department updated successfully." });
-        } else {
-            setDepartments(prev => [...prev, updated]);
-            setAlertConfig({ visible: true, title: "Added!", message: "Department added successfully." });
+    const handleSave = async (updated: Department) => {
+        try {
+            const payload = {
+                name: updated.name,
+                description: updated.description,
+                active: updated.status === "Active",
+            };
+            if (departments.find((d) => d.id === updated.id)) {
+                await updateDepartment(updated.id, payload);
+                setAlertConfig({ visible: true, title: "Updated!", message: "Department updated successfully." });
+            } else {
+                await createDepartment(payload);
+                setAlertConfig({ visible: true, title: "Added!", message: "Department added successfully." });
+            }
+            await loadDepartments();
+            setEditTarget(null);
+            setAddOpen(false);
+        } catch (e) {
+            console.warn(getApiErrorMessage(e));
         }
-        setEditTarget(null);
-        setAddOpen(false);
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!deleteTarget) return;
-        setDepartments(prev => prev.filter(d => d.id !== deleteTarget.id));
-        setDeleteTarget(null);
+        try {
+            await deleteDepartment(deleteTarget.id);
+            await loadDepartments();
+            setDeleteTarget(null);
+        } catch (e) {
+            console.warn(getApiErrorMessage(e));
+        }
     };
 
     const Container = isWeb ? View : SafeAreaView;
