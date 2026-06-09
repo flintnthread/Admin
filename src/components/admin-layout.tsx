@@ -43,13 +43,13 @@ export default function AdminLayout({ children }: Props) {
             activeOpacity={1}
             onPress={() => setMobileMenuOpen(false)}
           >
-            <View
+            <TouchableOpacity
               style={styles.drawerPanel}
-              onStartShouldSetResponder={() => true}
+              activeOpacity={1}
             >
               {/* Close button at top of drawer */}
               <View style={styles.drawerCloseBar}>
-                <TouchableOpacity onPress={() => setMobileMenuOpen(false)}>
+                <TouchableOpacity onPress={() => setMobileMenuOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Feather name="x" size={24} color="#1F2937" />
                 </TouchableOpacity>
               </View>
@@ -59,7 +59,7 @@ export default function AdminLayout({ children }: Props) {
                 onToggleCollapse={() => {}}
                 isLargeScreen={false}
               />
-            </View>
+            </TouchableOpacity>
           </TouchableOpacity>
         )}
 

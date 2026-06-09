@@ -17,6 +17,27 @@ import {
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  orange: "#E8631A",
+  orangeLight: "#FEF0E6",
+  orangeMid: "#FDDBB9",
+  navy: "#1F2937",
+  navyLight: "#E8EBF7",
+  bg: "#F7F5F2",
+  card: "#FFFFFF",
+  border: "#EAE5DC",
+  textH: "#1A1208",
+  textB: "#5A4433",
+  textM: "#7A6858",
+  textHint: "#B5A898",
+  red: "#DC2626",
+  redBg: "#FEF2F2",
+  green: "#15803D",
+  greenBg: "#F0FDF4",
+  white: "#FFFFFF",
+};
+
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type SlabStatus = "Active" | "Inactive";
 
@@ -126,104 +147,262 @@ const FixedRateBadge: React.FC = () => (
 );
 
 // ─── SLAB CARD ────────────────────────────────────────────────────────────────
+const dc = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: T.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
+    overflow: "hidden",
+  },
+  stripe: {
+    height: 4,
+    width: "100%",
+  },
+  body: {
+    padding: 16,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  actBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: T.textH,
+    marginBottom: 4,
+  },
+  desc: {
+    fontSize: 12,
+    color: T.textM,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  priceRow: {
+    flexDirection: "row",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 14,
+    alignItems: "center",
+  },
+  priceBlock: {
+    flex: 1,
+  },
+  priceDivider: {
+    width: 1,
+    height: "80%",
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 10,
+  },
+  priceLabel: {
+    fontSize: 10,
+    color: T.textHint,
+    marginBottom: 2,
+    textTransform: "uppercase",
+  },
+  priceValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: T.textB,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaTxt: {
+    fontSize: 11,
+    color: T.textM,
+    fontWeight: "500",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusTxt: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+});
+
 const SlabCard: React.FC<{
   slab: WeightSlab;
   onActivate: (id: number) => void;
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
-}> = ({ slab, onActivate, onEdit, onDelete }) => (
-  <View style={styles.card}>
-    {/* Card Header */}
-    <View style={styles.cardHeader}>
-      <View style={styles.cardHeaderLeft}>
-        <BagIcon color={slab.iconColor} bg={slab.iconBg} />
-        <View style={styles.cardTitleBlock}>
-          <Text style={styles.cardTitle}>{slab.label}</Text>
-          <Text style={styles.cardRange}>{slab.range}</Text>
+}> = ({ slab, onActivate, onEdit, onDelete }) => {
+  return (
+    <View style={dc.card}>
+      {/* Top color stripe */}
+      <View style={[dc.stripe, { backgroundColor: slab.iconColor }]} />
+
+      <View style={dc.body}>
+        {/* Icon + actions row */}
+        <View style={dc.topRow}>
+          <View style={[dc.iconWrap, { backgroundColor: slab.iconBg }]}>
+            <Feather name="truck" size={20} color={slab.iconColor} />
+          </View>
+          <View style={dc.actions}>
+            <TouchableOpacity style={dc.actBtn} onPress={() => onEdit(slab.id)} activeOpacity={0.8}>
+              <Feather name="edit-2" size={13} color={T.textM} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[dc.actBtn, { borderColor: "#FCA5A5" }]}
+              onPress={() => onDelete(slab.id)}
+              activeOpacity={0.8}
+            >
+              <Feather name="trash-2" size={13} color={T.red} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Name & description */}
+        <Text style={dc.name}>{slab.label}</Text>
+        <Text style={dc.desc} numberOfLines={2}>{slab.range}</Text>
+
+        {/* Price Row */}
+        <View style={dc.priceRow}>
+          <View style={dc.priceBlock}>
+            <Text style={dc.priceLabel}>Intra-City</Text>
+            <Text style={dc.priceValue}>{slab.intracity}</Text>
+          </View>
+          <View style={dc.priceDivider} />
+          <View style={dc.priceBlock}>
+            <Text style={dc.priceLabel}>Metro-Metro</Text>
+            <Text style={dc.priceValue}>{slab.metroMetro}</Text>
+          </View>
+        </View>
+
+        {/* Footer meta */}
+        <View style={dc.footer}>
+          <View style={dc.metaItem}>
+            <Feather name="check-circle" size={11} color={T.textHint} />
+            <Text style={dc.metaTxt}>Fixed Rate</Text>
+          </View>
+          <View style={[
+            dc.statusBadge,
+            { backgroundColor: slab.status === "Active" ? T.greenBg : T.redBg }
+          ]}>
+            <View style={[
+              dc.statusDot,
+              { backgroundColor: slab.status === "Active" ? T.green : T.red }
+            ]} />
+            <Text style={[
+              dc.statusTxt,
+              { color: slab.status === "Active" ? T.green : T.red }
+            ]}>{slab.status}</Text>
+          </View>
         </View>
       </View>
-      <StatusBadge status={slab.status} />
     </View>
-
-    {/* Price Row */}
-    <View style={styles.priceRow}>
-      <View style={styles.priceBlock}>
-        <Text style={styles.priceLabel}>Intra-City</Text>
-        <Text style={styles.priceValue}>{slab.intracity}</Text>
-      </View>
-      <View style={styles.priceDivider} />
-      <View style={styles.priceBlock}>
-        <Text style={styles.priceLabel}>Metro-Metro</Text>
-        <Text style={styles.priceValue}>{slab.metroMetro}</Text>
-      </View>
-    </View>
-
-    <FixedRateBadge />
-
-    {/* Divider */}
-    <View style={styles.cardDivider} />
-
-    {/* Action Buttons */}
-    <View style={styles.actionRow}>
-      <TouchableOpacity
-        style={styles.btnOutline}
-        onPress={() => onDelete(slab.id)}
-        activeOpacity={0.75}
-      >
-        <Feather name="trash-2" size={13} color="#ef7b1a" />
-        <Text style={styles.btnOutlineText}>Delete</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.btnEdit}
-        onPress={() => onEdit(slab.id)}
-        activeOpacity={0.75}
-      >
-        <Feather name="edit-2" size={13} color="#ef7b1a" />
-        <Text style={styles.btnEditText}>Edit</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-);
+  );
+};
 
 // ─── STATS FOOTER ─────────────────────────────────────────────────────────────
-const StatsFooter: React.FC<{ slabs: WeightSlab[] }> = ({ slabs }) => {
+const StatCard: React.FC<{ label: string; value: string | number; icon: any; colorKey: "orange" | "navy" | "green" | "red" }> = ({ label, value, icon, colorKey }) => {
+  let tint, txtColor;
+  if (colorKey === "orange") { tint = T.orangeLight; txtColor = T.orange; }
+  else if (colorKey === "green") { tint = T.greenBg; txtColor = T.green; }
+  else if (colorKey === "red") { tint = T.redBg; txtColor = T.red; }
+  else { tint = T.navyLight; txtColor = T.navy; }
+
+  return (
+    <View style={sc.card}>
+      <View style={[sc.iconWrap, { backgroundColor: tint }]}>
+        <Feather name={icon} size={16} color={txtColor} />
+      </View>
+      <Text style={sc.value}>{value}</Text>
+      <Text style={sc.label}>{label}</Text>
+    </View>
+  );
+};
+
+const sc = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: T.card,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  value: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: T.textH,
+    letterSpacing: -0.5,
+  },
+  label: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#000",
+    marginTop: 3,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+});
+
+const StatsFooter: React.FC<{ slabs: WeightSlab[], isWeb: boolean }> = ({ slabs, isWeb }) => {
   const total = slabs.length;
   const active = slabs.filter((s) => s.status === "Active").length;
   const inactive = slabs.filter((s) => s.status === "Inactive").length;
 
-  const highestIntra = slabs.reduce((max, s) => {
-    const val = parseFloat(s.intracity.replace("₹", ""));
-    return val > max.val ? { val, display: s.intracity } : max;
-  }, { val: 0, display: "₹0.00" });
-
-  const highestMetro = slabs.reduce((max, s) => {
-    const val = parseFloat(s.metroMetro.replace("₹", ""));
-    return val > max.val ? { val, display: s.metroMetro } : max;
-  }, { val: 0, display: "₹0.00" });
-
-  const statsData = [
-    { icon: "layers" as any, value: String(total), label: "Total Slabs", sub: "Configured", tint: "#EDE9FE", textColor: "#7C3AED" },
-    { icon: "check" as any, value: String(active), label: "Active Slabs", sub: "Currently active", tint: "#D1FAE5", textColor: "#059669" },
-    { icon: "x" as any, value: String(inactive), label: "Inactive Slabs", sub: "Not active", tint: "#FEE2E2", textColor: "#DC2626" },
-    { icon: "dollar-sign" as any, value: highestIntra.display, label: "Highest Intra-City", sub: "Above 5 kg", tint: "#EDE9FE", textColor: "#7C3AED" },
-    { icon: "dollar-sign" as any, value: highestMetro.display, label: "Highest Metro-Metro", sub: "Above 5 kg", tint: "#EDE9FE", textColor: "#7C3AED" },
-  ];
-
   return (
-    <View style={styles.statsContainer}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-        {statsData.map((stat, index) => (
-          <View key={index} style={styles.statItem}>
-            <View style={[styles.statIconCircle, { backgroundColor: stat.tint }]}>
-              <Feather name={stat.icon} size={14} color={stat.textColor} />
-            </View>
-            <Text style={[styles.statValue, { color: stat.textColor }]}>{stat.value}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-            <Text style={styles.statSub}>{stat.sub}</Text>
-          </View>
-        ))}
-      </ScrollView>
+    <View style={styles.statsRow}>
+      <StatCard label="Total Slabs" value={total} icon="layers" colorKey="navy" />
+      <StatCard label="Active Slabs" value={active} icon="check-circle" colorKey="green" />
+      <StatCard label="Inactive Slabs" value={inactive} icon="x-circle" colorKey="red" />
     </View>
   );
 };
@@ -414,105 +593,89 @@ const DeliveryChargesScreen: React.FC = () => {
   };
 
   const MainContent = (
-    <View style={[styles.mainContentContainer, isWeb && styles.webMainContentContainer]}>
-      {/* ── Header ── */}
-      <View style={[styles.header, isWeb && styles.webHeader]}>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>Delivery Charges</Text>
-          <Text style={styles.headerSubtitle}>Manage delivery charges based on weight slabs and location.</Text>
-        </View>
-        <View style={styles.headerActions}>
-          {isWeb && (
-            <View style={styles.viewSwitcher}>
-              <Text style={styles.viewLabel}>View:</Text>
-              <TouchableOpacity
-                style={[
-                  styles.viewButton,
-                  viewMode === "grid" && styles.viewButtonActive,
-                ]}
-                onPress={() => setViewMode("grid")}
-                activeOpacity={0.8}
-              >
-                <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.viewButton,
-                  viewMode === "list" && styles.viewButtonActive,
-                ]}
-                onPress={() => setViewMode("list")}
-                activeOpacity={0.8}
-              >
-                <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED} />
+    <View style={{ flex: 1 }}>
+
+      {/* ── Page Header (sticky outside ScrollView) ── */}
+      <View style={[styles.pageHead, !isWeb && { flexDirection: "column", alignItems: "stretch", padding: 16, borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
+        {!isWeb ? (
+          <>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <View style={[styles.pageTag, { marginBottom: 0 }]}>
+                <Feather name="truck" size={11} color={T.orange} />
+                <Text style={styles.pageTagTxt}>Delivery</Text>
+              </View>
+              <TouchableOpacity style={[styles.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+                <Feather name="plus" size={14} color="#fff" />
+                <Text style={[styles.addBtnTxt, { fontSize: 12 }]}>Add</Text>
               </TouchableOpacity>
             </View>
-          )}
-          <TouchableOpacity style={styles.addButton} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
-            <Feather name="plus" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.addButtonText}>Add New Charge</Text>
-          </TouchableOpacity>
-        </View>
+            <View>
+              <Text style={[styles.pageTitle, { fontSize: 20 }]}>Delivery Charges</Text>
+              <Text style={styles.pageSub}>Manage delivery charges based on weight slabs and location.</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.pageHeadLeft}>
+              <View style={styles.pageTag}>
+                <Feather name="truck" size={11} color={T.orange} />
+                <Text style={styles.pageTagTxt}>Delivery</Text>
+              </View>
+              <Text style={styles.pageTitle}>Delivery Charges</Text>
+              <Text style={styles.pageSub}>Manage delivery charges based on weight slabs and location.</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+              <Feather name="plus" size={15} color="#fff" />
+              <Text style={styles.addBtnTxt}>Add New Charge</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
-      {!isWeb && (
-        <View style={styles.mobileControlsContainer}>
-          <View style={styles.searchContainerMobile}>
-            <Feather name="search" size={16} color={TEXT_MUTED} style={styles.searchIcon} />
+      <ScrollView
+        style={styles.listContent}
+        contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <StatsFooter slabs={slabs} isWeb={isWeb} />
+
+        {/* ── Toolbar (Search + Filter) ── */}
+        <View style={styles.toolBar}>
+          <View style={[styles.searchBox, !isWeb && { paddingHorizontal: 9, paddingVertical: 7 }]}>
+            <Feather name="search" size={16} color="#000" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search delivery charges..."
-              placeholderTextColor={TEXT_MUTED}
+              placeholderTextColor="#000"
             />
           </View>
-          <View style={styles.viewSwitcherMobile}>
-            <Text style={styles.viewLabelMobile}>View Format:</Text>
-            <View style={{ flexDirection: "row", gap: 4 }}>
+          <View style={styles.filterGroup}>
+            <View style={{ flexDirection: "row", gap: 8 }}>
               <TouchableOpacity
-                style={[
-                  styles.viewButton,
-                  viewMode === "grid" && styles.viewButtonActive,
-                ]}
+                style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
                 onPress={() => setViewMode("grid")}
-                activeOpacity={0.8}
               >
-                <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED} />
+                <Feather name="grid" size={16} color={viewMode === "grid" ? T.orange : T.textHint} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.viewButton,
-                  viewMode === "list" && styles.viewButtonActive,
-                ]}
+                style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
                 onPress={() => setViewMode("list")}
-                activeOpacity={0.8}
               >
-                <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED} />
+                <Feather name="list" size={16} color={viewMode === "list" ? T.orange : T.textHint} />
               </TouchableOpacity>
             </View>
           </View>
         </View>
-      )}
 
-      {/* ── Slab Cards ── */}
-      <ScrollView
-        style={styles.listContent}
-        contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <StatsFooter slabs={slabs} />
-        
         {viewMode === "grid" ? (
-          <View style={[
-            styles.cardGrid,
-            styles.cardGridGrid,
-            !isWeb && { marginHorizontal: 0 }
-          ]}>
+          <View style={isWeb
+            ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
+            : { gap: 12 }
+          }>
             {slabs.map((item) => (
               <View
                 key={item.id}
-                style={[
-                  styles.cardGridItem,
-                  !isWeb && { flexBasis: "100%", maxWidth: "100%", marginHorizontal: 0 }
-                ]}
+                style={isWeb ? { width: "calc(33.33% - 10px)" as any } : undefined}
               >
                 <SlabCard
                   slab={item}
@@ -524,41 +687,43 @@ const DeliveryChargesScreen: React.FC = () => {
             ))}
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={[styles.tableContainer, { width: 880 }]}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableHeaderCell, { width: 140 }]}>Weight Slab</Text>
-                <Text style={[styles.tableHeaderCell, { width: 160 }]}>Weight Range</Text>
-                <Text style={[styles.tableHeaderCell, { width: 120 }]}>Intra-City (₹)</Text>
-                <Text style={[styles.tableHeaderCell, { width: 120 }]}>Metro-Metro (₹)</Text>
-                <Text style={[styles.tableHeaderCell, { width: 130 }]}>Type</Text>
-                <Text style={[styles.tableHeaderCell, { width: 90 }]}>Status</Text>
-                <Text style={[styles.tableHeaderCell, { width: 120, textAlign: 'center' }]}>Action</Text>
-              </View>
-              {slabs.map((slab) => (
-                <View key={slab.id} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, { width: 140, fontWeight: '700' }]}>{slab.label}</Text>
-                  <Text style={[styles.tableCell, { width: 160, color: TEXT_MUTED }]}>{slab.range}</Text>
-                  <Text style={[styles.tableCell, { width: 120, color: PURPLE, fontWeight: '700' }]}>{slab.intracity}</Text>
-                  <Text style={[styles.tableCell, { width: 120, color: "#79411c", fontWeight: '700' }]}>{slab.metroMetro}</Text>
-                  <View style={[{ width: 130 }]}>
-                    <FixedRateBadge />
-                  </View>
-                  <View style={[{ width: 90 }]}>
-                    <StatusBadge status={slab.status} />
-                  </View>
-                  <View style={[{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 6 }]}>
-                    <TouchableOpacity style={styles.tableBtnEdit} onPress={() => handleEdit(slab.id)}>
-                      <Feather name="edit-2" size={13} color="#FFFFFF" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.tableBtnDelete} onPress={() => handleDelete(slab.id)}>
-                      <Feather name="trash-2" size={13} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
+          <View style={styles.tableCard}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ minWidth: 880 }}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.th, { width: 140 }]}>Weight Slab</Text>
+                  <Text style={[styles.th, { width: 160 }]}>Weight Range</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Intra-City (₹)</Text>
+                  <Text style={[styles.th, { width: 120 }]}>Metro-Metro (₹)</Text>
+                  <Text style={[styles.th, { width: 130 }]}>Type</Text>
+                  <Text style={[styles.th, { width: 90 }]}>Status</Text>
+                  <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>Action</Text>
                 </View>
-              ))}
-            </View>
-          </ScrollView>
+                {slabs.map((slab, idx) => (
+                  <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
+                    <Text style={[styles.td, { width: 140, fontWeight: '700', color: T.textH }]}>{slab.label}</Text>
+                    <Text style={[styles.td, { width: 160 }]}>{slab.range}</Text>
+                    <Text style={[styles.td, { width: 120, color: T.orange, fontWeight: '700' }]}>{slab.intracity}</Text>
+                    <Text style={[styles.td, { width: 120, color: T.navy, fontWeight: '700' }]}>{slab.metroMetro}</Text>
+                    <View style={[{ width: 130 }]}>
+                      <FixedRateBadge />
+                    </View>
+                    <View style={[{ width: 90 }]}>
+                      <StatusBadge status={slab.status} />
+                    </View>
+                    <View style={[{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 6 }]}>
+                      <TouchableOpacity style={dc.actBtn} onPress={() => handleEdit(slab.id)}>
+                        <Feather name="edit-2" size={13} color={T.textM} />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[dc.actBtn, { borderColor: "#FCA5A5" }]} onPress={() => handleDelete(slab.id)}>
+                        <Feather name="trash-2" size={13} color={T.red} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -566,11 +731,9 @@ const DeliveryChargesScreen: React.FC = () => {
 
   return (
     <AdminLayout>
-      <View style={styles.webLayout}>
+      <View style={{ flex: 1 }}>
         <StatusBar barStyle="light-content" backgroundColor="#000080" />
-        <View style={styles.webMainColumn}>
-          {MainContent}
-        </View>
+        {MainContent}
         <DeliveryChargeModal
           visible={editingSlabId !== null}
           onClose={() => setEditingSlabId(null)}
@@ -604,7 +767,154 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
-  // ── Header ──
+  // ── NEW UI STYLES (MATCHING DEPARTMENTS) ──
+  pageHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    backgroundColor: T.navy,
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  pageHeadLeft: {
+    flex: 1,
+  },
+  pageTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(239, 123, 26, 0.15)",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  pageTagTxt: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: T.orange,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+    lineHeight: 26,
+  },
+  pageSub: {
+    fontSize: 12,
+    color: "#D1D5DB",
+    marginTop: 4,
+    fontWeight: "400",
+  },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: T.orange,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 11,
+    flexShrink: 0,
+  },
+  addBtnTxt: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 20,
+  },
+
+  toolBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: T.card,
+    borderRadius: 11,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderWidth: 1.5,
+    borderColor: T.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: "#000",
+  },
+  filterGroup: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  viewBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewBtnActive: {
+    borderColor: T.orange,
+    backgroundColor: T.orangeLight,
+  },
+  tableCard: {
+    backgroundColor: T.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: T.border,
+    overflow: "hidden",
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: T.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  th: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: T.textHint,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+  },
+  tableRowAlt: {
+    backgroundColor: "#fcfdfd",
+  },
+  td: {
+    fontSize: 13,
+    color: T.textM,
+  },
+
+  // ── Header (Old - might be used by other parts) ──
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -716,12 +1026,7 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     marginRight: 8,
   },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: TEXT_PRIMARY,
-  },
+
   viewSwitcherMobile: {
     flexDirection: "row",
     alignItems: "center",
@@ -741,8 +1046,9 @@ const styles = StyleSheet.create({
 
   // ── List ──
   listContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingTop: 8,
     paddingBottom: 80,
   },
   webListContent: {
@@ -1312,14 +1618,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: TEXT_PRIMARY,
   },
-  tableRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
+
   tableCell: {
     fontSize: 13,
     color: TEXT_PRIMARY,

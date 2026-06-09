@@ -108,8 +108,8 @@ const NAV_ITEMS = {
       icon: "briefcase",
       children: [
         { label: "Departments", icon: "layers", path: "/Departments" },
-        { label: "Job Openings", icon: "briefcase", path: null },
-        { label: "Applications", icon: "file-text", path: null }
+        { label: "Job Openings", icon: "briefcase", path: "/jobopenings" },
+        { label: "Applications", icon: "file-text", path: "/jobApplications" }
       ]
     }
   ]
@@ -158,7 +158,11 @@ export default function AdminSidebar({
       </View>
 
       {/* Scrollable nav items */}
-      <ScrollView style={styles.navScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.navScroll} 
+        contentContainerStyle={{ paddingBottom: 80 }} 
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* GENERAL */}
         <View style={styles.section}>
