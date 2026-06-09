@@ -293,27 +293,17 @@ const StatsHeader: React.FC<{ messages: ContactMessage[] }> = ({
   ];
 
   return (
-    <View style={styles.statsContainer}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.statsScroll}
-      >
-        {statsData.map((stat, index) => (
-          <View key={index} style={styles.statItem}>
-            <View
-              style={[styles.statIconCircle, { backgroundColor: stat.tint }]}
-            >
-              <Feather name={stat.icon} size={14} color={stat.textColor} />
-            </View>
-            <Text style={[styles.statValue, { color: stat.textColor }]}>
-              {stat.value}
-            </Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-            <Text style={styles.statSub}>{stat.sub}</Text>
+    <View style={styles.statsRow}>
+      {statsData.map((stat, index) => (
+        <View key={index} style={styles.statsContainer}>
+          <View style={[styles.statIconCircle, { backgroundColor: stat.tint }]}>
+            <Feather name={stat.icon} size={14} color={stat.textColor} />
           </View>
-        ))}
-      </ScrollView>
+          <Text style={[styles.statValue, { color: stat.textColor }]}>{stat.value}</Text>
+          <Text style={styles.statLabel}>{stat.label}</Text>
+          <Text style={styles.statSub}>{stat.sub}</Text>
+        </View>
+      ))}
     </View>
   );
 };
@@ -795,10 +785,10 @@ const ContactMessagesScreen: React.FC = () => {
       ]}
     >
       {/* ── Header ── */}
-      <View style={[styles.header, isWeb && styles.webHeader]}>
+      <View style={[styles.header, isWeb && styles.webHeader, !isWeb && { borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
         <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>Contact Messages</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerTitle, { color: "#FFFFFF" }]}>Contact Messages</Text>
+          <Text style={[styles.headerSubtitle, { color: "#D1D5DB" }]}>
             Manage and respond to incoming contact messages.
           </Text>
         </View>
@@ -1087,7 +1077,7 @@ const ContactMessagesScreen: React.FC = () => {
   return (
     <AdminLayout>
       <View style={styles.webLayout}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="light-content" backgroundColor="#1F2937" />
         <View style={styles.webMainColumn}>
           {MainContent}
         </View>
@@ -1173,28 +1163,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1F2937",
     paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
-    marginBottom: 0,
+    paddingVertical: 16,
+    borderBottomWidth: 0,
   },
   webHeader: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    elevation: 0,
-    shadowOpacity: 0,
+    backgroundColor: "#1F2937",
     paddingTop: 24,
     paddingHorizontal: 24,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
   headerTextContainer: {
     flex: 1,
@@ -1551,10 +1530,18 @@ const styles = StyleSheet.create({
   },
 
   // ── Stats ──
-  statsContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
     marginBottom: 18,
+  },
+  statsContainer: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,

@@ -17,7 +17,7 @@ type Props = {
 
 export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, showMenuButton && { marginBottom: 16 }]}>
       {/* Hamburger – shown on mobile only */}
       {showMenuButton && (
         <TouchableOpacity onPress={onMenuPress} style={styles.hamburgerBtn}>
