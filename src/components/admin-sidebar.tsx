@@ -59,7 +59,7 @@ const NAV_ITEMS = {
   "PAYMENTS & PRODUCTS": [
     { label: "Commission rates (B2B/B2C)", icon: "percent", path: "/commissionrates" },
     { label: "Seller Payments", icon: "dollar-sign", path: "/Sellerpayments" },
-    { label: "Product Approvals", icon: "check-square", path: null },
+    { label: "Product Approvals", icon: "check-square", path: "/productApproval" },
     { label: "Add Sellers", icon: "user-plus", path: null },
     { label: "Ads Admin Users", icon: "user", path: null },
     { label: "Admin Panel Users", icon: "shield", path: null },
@@ -108,8 +108,8 @@ const NAV_ITEMS = {
       icon: "briefcase",
       children: [
         { label: "Departments", icon: "layers", path: "/Departments" },
-        { label: "Job Openings", icon: "briefcase", path: null },
-        { label: "Applications", icon: "file-text", path: null }
+        { label: "Job Openings", icon: "briefcase", path: "/jobopenings" },
+        { label: "Applications", icon: "file-text", path: "/jobApplications" }
       ]
     }
   ]
@@ -158,7 +158,11 @@ export default function AdminSidebar({
       </View>
 
       {/* Scrollable nav items */}
-      <ScrollView style={styles.navScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.navScroll} 
+        contentContainerStyle={{ paddingBottom: 80 }} 
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* GENERAL */}
         <View style={styles.section}>
