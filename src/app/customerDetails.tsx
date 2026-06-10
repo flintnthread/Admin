@@ -6,8 +6,13 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
-import React, { useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDate } from "@/lib/format";
+import { fetchCustomerDetail } from "@/services/customerApi";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   LayoutChangeEvent,
   Platform,
   ScrollView,
@@ -84,31 +89,35 @@ function useLayout(w: number) {
   return { isMobile: w < 480, isTablet: w >= 480 && w < 1024, isDesktop: w >= 1024, cols: w < 768 ? 1 : w < 1280 ? 2 : 3 };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SAMPLE DATA
-// ─────────────────────────────────────────────────────────────────────────────
-export const SAMPLE_CUSTOMER: Customer = {
-  id: 251, name: "Sana shaikh", email: "attusanshaikh@gmail.com", phone: "8197481081",
-  orders: 1, totalSpent: 2318, lastOrder: "13 May 2026", status: "Active",
-  registeredOn: "13 May 2026", lastLogin: "Never",
-  billingAddress:  { line1: "Plot 12, Banjara Hills", line2: "Road No. 2", city: "Hyderabad", state: "Telangana", pincode: "500034", country: "India" },
-  shippingAddress: { line1: "Plot 12, Banjara Hills", line2: "Road No. 2", city: "Hyderabad", state: "Telangana", pincode: "500034", country: "India" },
-  orderHistory: [{ id: "#FNT202605137181", date: "13 May 2026", items: 1, amount: 2318, payment: "COD", status: "Completed" }],
-  monthlySpending: [
-    { month: "Jan", amount: 0    },
-    { month: "Feb", amount: 0    },
-    { month: "Mar", amount: 850  },
-    { month: "Apr", amount: 1200 },
-    { month: "May", amount: 2318 },
-    { month: "Jun", amount: 980  },
-    { month: "Jul", amount: 0    },
-    { month: "Aug", amount: 540  },
-    { month: "Sep", amount: 1750 },
-    { month: "Oct", amount: 620  },
-    { month: "Nov", amount: 0    },
-    { month: "Dec", amount: 300  },
-  ],
-};
+function mapApiCustomerDetail(data: Record<string, unknown>): Customer {
+  const address: Address | undefined = data.address1
+    ? {
+        line1: String(data.address1 ?? ""),
+        line2: data.address2 ? String(data.address2) : undefined,
+        city: String(data.city ?? ""),
+        state: String(data.state ?? ""),
+        pincode: String(data.pincode ?? ""),
+        country: data.country ? String(data.country) : undefined,
+      }
+    : undefined;
+
+  return {
+    id: Number(data.id ?? 0),
+    name: String(data.name ?? "Customer"),
+    email: String(data.email ?? ""),
+    phone: String(data.phone ?? ""),
+    orders: Number(data.orderCount ?? 0),
+    totalSpent: Number(data.totalSpent ?? 0),
+    lastOrder: data.lastOrderAt ? formatDate(String(data.lastOrderAt)) : null,
+    status: "Active",
+    registeredOn: data.firstOrderAt ? formatDate(String(data.firstOrderAt)) : undefined,
+    lastLogin: "Never",
+    billingAddress: address,
+    shippingAddress: address,
+    orderHistory: [],
+    monthlySpending: [],
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SVG ICONS
@@ -487,12 +496,77 @@ const ch = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 type Props = { customer?: Customer; onBack?: () => void };
 
-export default function CustomerDetailScreen({ customer = SAMPLE_CUSTOMER, onBack }: Props) {
+export default function CustomerDetailScreen({ customer: customerProp, onBack: onBackProp }: Props) {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { width }                               = useWindowDimensions();
   const { isMobile, isTablet, isDesktop, cols } = useLayout(width);
 
+  const [customer, setCustomer] = useState<Customer | null>(customerProp ?? null);
+  const [loading, setLoading] = useState(Boolean(id) && !customerProp);
+  const [error, setError] = useState<string | null>(null);
+
+  const onBack = onBackProp ?? (() => router.back());
+
+  const loadCustomer = useCallback(async () => {
+    const customerId = Number(id);
+    if (!id || Number.isNaN(customerId)) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchCustomerDetail(customerId);
+      setCustomer(mapApiCustomerDetail(data));
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load customer."));
+      setCustomer(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadCustomer();
+    } else if (customerProp) {
+      setCustomer(customerProp);
+    }
+  }, [id, customerProp, loadCustomer]);
+
   const px  = isMobile ? 14 : isTablet ? 20 : 28;
-  const c   = customer;
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <View style={[s.stateBox, { flex: 1 }]}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={s.stateText}>Loading customer…</Text>
+        </View>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !customer) {
+    return (
+      <AdminLayout>
+        <View style={[s.stateBox, { flex: 1 }]}>
+          <Text style={s.errorText}>{error ?? "Customer not found"}</Text>
+          <TouchableOpacity
+            style={s.retryBtn}
+            onPress={() => (error ? loadCustomer() : onBack())}
+            activeOpacity={0.8}
+          >
+            <Text style={s.retryBtnText}>{error ? "Retry" : "Go Back"}</Text>
+          </TouchableOpacity>
+        </View>
+      </AdminLayout>
+    );
+  }
+
+  const c = customer;
 
   const weekly   = 0;
   const monthly  = c.totalSpent;
@@ -533,11 +607,9 @@ export default function CustomerDetailScreen({ customer = SAMPLE_CUSTOMER, onBac
       <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
         <View style={[s.headerInner, { paddingHorizontal: px }]}>
           <View style={s.headerLeft}>
-            {onBack && (
-              <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.8}>
-                <BackIcon size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.8}>
+              <BackIcon size={18} color="#fff" />
+            </TouchableOpacity>
             <View>
               <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>Customer Details</Text>
               <Text style={s.hSub}>#{c.id} · {c.name}</Text>
@@ -844,4 +916,33 @@ const s = StyleSheet.create({
 
   noOrders:    { alignItems: "center", paddingVertical: 32, gap: 8 },
   noOrdersTxt: { fontSize: 14, color: C.sub },
+
+  stateBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 12,
+    backgroundColor: C.bg,
+  },
+  stateText: {
+    fontSize: 14,
+    color: C.sub,
+  },
+  errorText: {
+    fontSize: 14,
+    color: C.inactive,
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
+  retryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: C.navy,
+  },
+  retryBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
 });

@@ -12,7 +12,15 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import type { SellerSummary } from "@/lib/api/types";
+import { formatDate, initialsFromName } from "@/lib/format";
+import {
+  fetchSellerAnalyticsChart,
+  fetchSellerAnalyticsSummary,
+  fetchSellers,
+} from "@/services/sellerApi";
 import {
   Animated,
   Dimensions,
@@ -41,30 +49,51 @@ const BORDER   = "#E8EDF5";
 const LIGHT_BG = "#F8FAFC";
 
 /* ─── Data ─────────────────────────────────────────────────────────── */
-const ALL_SELLERS = [
-  { id: 286, name: "Sanju Sandilya",   email: "sanju.sandilya@gmail.com",  phone: "+91 98765 43210", business: "SG Creations",         onboard: "05 Jun, 2025", status: "Pending",           profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SS", color: "#F97316" },
-  { id: 285, name: "Khajaer Mohammed", email: "khater2025@gmail.com",      phone: "+91 96158 43215", business: "ZOYA ALL BAGS CENTER",  onboard: "29 May, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 May, 2025", products: 2,  initials: "KM", color: "#10B981" },
-  { id: 284, name: "Sandhya Gudisa",   email: "sandhya.gm@gmail.com",      phone: "+91 98760 12349", business: "—",                    onboard: "28 May, 2025", status: "Awaiting Approval", profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SG", color: "#8B5CF6" },
-  { id: 283, name: "Rahul Sharma",     email: "rahul.sharma@gmail.com",    phone: "+91 97654 32109", business: "RS Traders",            onboard: "20 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "18 May, 2025", products: 5,  initials: "RS", color: "#3B82F6" },
-  { id: 282, name: "Priya Mehta",      email: "priya.mehta@gmail.com",     phone: "+91 96543 21098", business: "PM Boutique",           onboard: "15 May, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 3,  initials: "PM", color: "#EC4899" },
-  { id: 281, name: "Amit Verma",       email: "amit.verma@gmail.com",      phone: "+91 95432 10987", business: "Verma Electronics",     onboard: "10 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "08 May, 2025", products: 12, initials: "AV", color: "#06B6D4" },
-  { id: 280, name: "Neha Joshi",       email: "neha.joshi@gmail.com",      phone: "+91 94321 09876", business: "Joshi Handcrafts",      onboard: "05 May, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "NJ", color: "#F59E0B" },
-  { id: 279, name: "Vikram Singh",     email: "vikram.singh@gmail.com",    phone: "+91 93210 98765", business: "Singh Organics",        onboard: "01 May, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "28 Apr, 2025", products: 7,  initials: "VS", color: "#EF4444" },
-  { id: 278, name: "Deepa Nair",       email: "deepa.nair@gmail.com",      phone: "+91 92109 87654", business: "Nair Silks",            onboard: "28 Apr, 2025", status: "Awaiting Approval", profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 4,  initials: "DN", color: "#7C3AED" },
-  { id: 277, name: "Suresh Babu",      email: "suresh.babu@gmail.com",     phone: "+91 91098 76543", business: "Babu Enterprises",      onboard: "22 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 Apr, 2025", products: 9,  initials: "SB", color: "#059669" },
-  { id: 276, name: "Ananya Krishnan",  email: "ananya.k@gmail.com",        phone: "+91 90987 65432", business: "AK Fashion Studio",     onboard: "18 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "15 Apr, 2025", products: 15, initials: "AK", color: "#DC2626" },
-  { id: 275, name: "Manoj Tiwari",     email: "manoj.tiwari@gmail.com",    phone: "+91 89876 54321", business: "Tiwari General Store",  onboard: "12 Apr, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "MT", color: "#9333EA" },
-  { id: 274, name: "Rekha Pillai",     email: "rekha.pillai@gmail.com",    phone: "+91 88765 43210", business: "Pillai Naturals",       onboard: "08 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Pending",  supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "05 Apr, 2025", products: 6,  initials: "RP", color: "#0891B2" },
-  { id: 273, name: "Arun Mishra",      email: "arun.mishra@gmail.com",     phone: "+91 87654 32109", business: "Mishra Kirana",         onboard: "03 Apr, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "01 Apr, 2025", products: 11, initials: "AM", color: "#16A34A" },
-  { id: 272, name: "Kavya Reddy",      email: "kavya.reddy@gmail.com",     phone: "+91 86543 21098", business: "Reddy Textiles",        onboard: "28 Mar, 2025", status: "Awaiting Approval", profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "KR", color: "#B45309" },
-  { id: 271, name: "Ravi Kumar",       email: "ravi.kumar@gmail.com",      phone: "+91 85432 10987", business: "Kumar Spices",          onboard: "22 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "20 Mar, 2025", products: 8,  initials: "RK", color: "#F97316" },
-  { id: 270, name: "Sunita Patel",     email: "sunita.patel@gmail.com",    phone: "+91 84321 09876", business: "Patel Groceries",       onboard: "18 Mar, 2025", status: "Pending",           profile: "Incomplete", kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 0,  initials: "SP", color: "#10B981" },
-  { id: 269, name: "Arjun Nambiar",    email: "arjun.nambiar@gmail.com",   phone: "+91 83210 98765", business: "Nambiar Exports",       onboard: "14 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "12 Mar, 2025", products: 20, initials: "AN", color: "#8B5CF6" },
-  { id: 268, name: "Divya Menon",      email: "divya.menon@gmail.com",     phone: "+91 82109 87654", business: "Menon Crafts",          onboard: "10 Mar, 2025", status: "Awaiting Approval", profile: "Complete",   kyc: "Pending",  supplement: "Not Provided", shiprocket: "Not Uploaded", shipDate: null,           products: 2,  initials: "DM", color: "#3B82F6" },
-  { id: 267, name: "Gopal Das",        email: "gopal.das@gmail.com",       phone: "+91 81098 76543", business: "Das Furniture",         onboard: "05 Mar, 2025", status: "Active",            profile: "Complete",   kyc: "Complete", supplement: "Provided",     shiprocket: "Uploaded",     shipDate: "03 Mar, 2025", products: 14, initials: "GD", color: "#EC4899" },
-];
+type Seller = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  business: string;
+  onboard: string;
+  status: string;
+  profile: string;
+  kyc: string;
+  supplement: string;
+  shiprocket: string;
+  shipDate: string | null;
+  products: number;
+  initials: string;
+  color: string;
+};
 
-const chartData: Record<string, string[] | number[]> = {
+const SELLER_COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4", "#F59E0B", "#EF4444", "#7C3AED", "#059669"];
+
+function mapSellerGraphRow(s: SellerSummary, index: number): Seller {
+  const statusRaw = (s.status ?? "").toLowerCase();
+  const status =
+    statusRaw === "active" ? "Active" :
+    statusRaw === "pending" ? "Pending" : "Awaiting Approval";
+  return {
+    id: s.id,
+    name: s.fullName ?? "Seller",
+    email: s.email ?? "",
+    phone: s.mobile ?? "",
+    business: s.businessName ?? "—",
+    onboard: formatDate(s.createdAt),
+    status,
+    profile: "Complete",
+    kyc: s.kycVerified ? "Complete" : "Pending",
+    supplement: "Not Provided",
+    shiprocket: "Not Uploaded",
+    shipDate: null,
+    products: 0,
+    initials: initialsFromName(s.fullName),
+    color: SELLER_COLORS[index % SELLER_COLORS.length],
+  };
+}
+
+const DEFAULT_CHART_DATA: Record<string, string[] | number[]> = {
   labels:             ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
   registered:         [10, 20, 28, 50, 90, 160, 300, 450, 580, 680, 760, 880],
   profileCompleted:   [ 0,  2,  5, 10, 20,  50, 120, 220, 320, 430, 500, 590],
@@ -84,10 +113,7 @@ const SERIES = [
 const YEAR_OPTIONS   = ["2027","2026","2025","2024","2023","2022","2021","2020","2019","2018","2017","2016"];
 const FILTER_OPTIONS = ["Overall","Monthly","Weekly","Quarterly"];
 const PERPAGE_OPTIONS = ["10","25","50","100"];
-const SELLER_OPTIONS = ["All Sellers", ...ALL_SELLERS.map(s => s.name)];
 const METRIC_OPTIONS = ["All Metrics","Registered","Profile Completed","Approved","Products Added","Shiprocket Uploaded"];
-
-type Seller = typeof ALL_SELLERS[0];
 
 /* ─── Status config ─────────────────────────────────────────────────── */
 const STATUS_MAP: Record<string, { bg: string; color: string; border: string }> = {
@@ -102,15 +128,6 @@ const STATUS_MAP: Record<string, { bg: string; color: string; border: string }> 
   "Not Provided":      { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" },
   "Not done":          { bg: "#1F2937", color: "#F9FAFB", border: "#374151" },
 };
-
-const STAT_CARDS = [
-  { iconName: "person-add",        label: "Registered",           value: "141", sub: "in 2025",          iconBg: "#FFF7ED", iconColor: ORANGE    },
-  { iconName: "person-done",       label: "Profile Completed",    value: "74",  sub: "in 2025",          iconBg: "#F0FDF4", iconColor: "#10B981" },
-  { iconName: "shield-checkmark",  label: "Approved",             value: "71",  sub: "Active + Profile", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
-  { iconName: "cube",              label: "Products Added",       value: "707", sub: "in 2025",          iconBg: "#F5F3FF", iconColor: "#8B5CF6" },
-  { iconName: "cloud-upload",      label: "Ship Rocket",          value: "70",  sub: "CSV uploaded",     iconBg: "#ECFDF5", iconColor: "#06B6D4" },
-  { iconName: "sync",              label: "Shiprocket Sync",      value: "On",  sub: "Seller sync",      iconBg: "#FFF7ED", iconColor: ORANGE    },
-];
 
 const INSIGHTS = [
   { iconName: "trending-up",       text: "Registered sellers increased by 85% vs previous period.", color: "#2563EB", bg: "#EFF6FF" },
@@ -359,7 +376,15 @@ function ChartMarker({ type, cx, cy, color, size = 5 }: {
 }
 
 /* ─── Line Chart ────────────────────────────────────────────────────── */
-function LineChart({ width, activeSeries }: { width: number; activeSeries: string }) {
+function LineChart({
+  width,
+  activeSeries,
+  chartData,
+}: {
+  width: number;
+  activeSeries: string;
+  chartData: Record<string, string[] | number[]>;
+}) {
   const height   = 240;
   const padL = 44, padR = 16, padT = 20, padB = 38;
   const W = width - padL - padR;
@@ -703,8 +728,53 @@ export default function SellersDashboard() {
   const [page,     setPage]     = useState(1);
   const [perPage,  setPerPage]  = useState(10);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [chartData, setChartData] = useState(DEFAULT_CHART_DATA);
 
-  const filteredSellers = ALL_SELLERS.filter(s => {
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const [sellerRes, summaryRes, chartRes] = await Promise.all([
+        fetchSellers({ page: 0, size: 100 }),
+        fetchSellerAnalyticsSummary(),
+        fetchSellerAnalyticsChart(),
+      ]);
+      setSellers((sellerRes.items ?? []).map(mapSellerGraphRow));
+      setSummary(summaryRes as Record<string, number>);
+      if (chartRes.length > 0) {
+        setChartData((prev) => ({
+          ...prev,
+          labels: chartRes.map((p) => String(p.month)),
+          registered: chartRes.map((p) => p.count),
+        }));
+      }
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
+
+  const sellerOptions = useMemo(
+    () => ["All Sellers", ...sellers.map((s) => s.name)],
+    [sellers]
+  );
+
+  const statCards = useMemo(
+    () => [
+      { iconName: "person-add", label: "Registered", value: String(summary.total ?? 0), sub: "All sellers", iconBg: "#FFF7ED", iconColor: ORANGE },
+      { iconName: "person-done", label: "Profile Completed", value: String(summary.active ?? 0), sub: "Active sellers", iconBg: "#F0FDF4", iconColor: "#10B981" },
+      { iconName: "shield-checkmark", label: "Approved", value: String(summary.active ?? 0), sub: "Active accounts", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
+      { iconName: "cube", label: "Pending", value: String(summary.pending ?? 0), sub: "Awaiting approval", iconBg: "#F5F3FF", iconColor: "#8B5CF6" },
+      { iconName: "cloud-upload", label: "Bank Verified", value: String(summary.bankVerified ?? 0), sub: "Verified banks", iconBg: "#ECFDF5", iconColor: "#06B6D4" },
+      { iconName: "sync", label: "Pending Bank", value: String(summary.pendingBank ?? 0), sub: "Bank review", iconBg: "#FFF7ED", iconColor: ORANGE },
+    ],
+    [summary]
+  );
+
+  const filteredSellers = sellers.filter(s => {
     const q = searchQ.toLowerCase();
     const matchQ = !q
       || s.name.toLowerCase().includes(q)
@@ -776,7 +846,7 @@ export default function SellersDashboard() {
                   <Ionicons name="person-outline" size={13} color="#64748B" />
                   <Text style={styles.filterLabelText}>Seller</Text>
                 </View>
-                <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }} options={SELLER_OPTIONS} />
+                <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }} options={sellerOptions} />
               </View>
               {/* Filter type */}
               <View style={{ flex: 1, minWidth: 110 }}>
@@ -828,7 +898,7 @@ export default function SellersDashboard() {
 
           {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
           <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
-            {STAT_CARDS.map(c => (
+            {statCards.map(c => (
               <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
@@ -855,7 +925,7 @@ export default function SellersDashboard() {
                   options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
               </View>
               <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)} style={{ width: "100%" }}>
-                {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} />}
+                {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} chartData={chartData} />}
               </View>
               <View style={styles.legendRow}>
                 {SERIES.map(s => {
@@ -1058,7 +1128,7 @@ export default function SellersDashboard() {
             <Text style={styles.filterLabelText}>Seller</Text>
           </View>
           <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }}
-            options={SELLER_OPTIONS} style={{ marginBottom: 12 }} />
+            options={sellerOptions} style={{ marginBottom: 12 }} />
 
           <View style={[styles.filterRow]}>
             <View style={{ flex: 1 }}>
@@ -1108,7 +1178,7 @@ export default function SellersDashboard() {
 
         {/* ── Stat Cards (mobile: 2-col grid) ── */}
         <View style={[styles.statGrid, { marginBottom: 14 }]}>
-          {STAT_CARDS.map(c => (
+          {statCards.map(c => (
             <View key={c.label} style={[styles.statCard]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
@@ -1133,7 +1203,7 @@ export default function SellersDashboard() {
               options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
           </View>
           <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)} style={{ width: "100%" }}>
-            {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} />}
+            {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} chartData={chartData} />}
           </View>
           <View style={styles.legendRow}>
             {SERIES.map(s => {

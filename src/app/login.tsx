@@ -16,7 +16,7 @@ import {
     useWindowDimensions,
     View,
 } from "react-native";
-import { useAuth } from "../context/auth-context";
+import { useAuth, useAuthErrorMessage } from "../context/auth-context";
 
 // --- MOBILE LOGIN SCREEN ---
 function MobileLoginScreen() {
@@ -26,6 +26,8 @@ function MobileLoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<unknown>(null);
+  const loginErrorMessage = useAuthErrorMessage(loginError);
 
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -38,30 +40,22 @@ function MobileLoginScreen() {
     return emailRegex.test(value);
   };
 
-  const validatePassword = (value: string) => {
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
-    return passwordRegex.test(value);
-  };
-
   const handleEmailChange = (text: string) => {
     setEmail(text);
-    if (emailError) {
-      setEmailError("");
-    }
+    if (emailError) setEmailError("");
+    if (loginError) setLoginError(null);
   };
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
-    if (passwordError) {
-      setPasswordError("");
-    }
+    if (passwordError) setPasswordError("");
+    if (loginError) setLoginError(null);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     let isValid = true;
     const trimmedEmail = email.trim();
 
-    // Email Validation Rules
     if (!trimmedEmail) {
       setEmailError("Email is required");
       isValid = false;
@@ -72,38 +66,28 @@ function MobileLoginScreen() {
       setEmailError("");
     }
 
-    // Password Validation Rules
     if (!password) {
       setPasswordError("Password is required");
       isValid = false;
     } else if (password.length < 8) {
       setPasswordError("Password must be at least 8 characters");
       isValid = false;
-    } else if (!validatePassword(password)) {
-      setPasswordError(
-        "Password must contain uppercase, lowercase, number and special character"
-      );
-      isValid = false;
     } else {
       setPasswordError("");
     }
 
-    if (!isValid) {
-      return;
-    }
+    if (!isValid) return;
 
     setLoading(true);
+    setLoginError(null);
 
-    // Simulate login API call
-    setTimeout(async () => {
-      try {
-        await signIn(trimmedEmail, password);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }, 1500);
+    try {
+      await signIn(trimmedEmail, password);
+    } catch (err) {
+      setLoginError(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -247,6 +231,10 @@ function MobileLoginScreen() {
                 <Text style={stylesMobile.rememberMeText}>Remember me</Text>
               </TouchableOpacity>
 
+              {loginError !== null ? (
+                <Text style={stylesMobile.errorText}>{loginErrorMessage}</Text>
+              ) : null}
+
               {/* Sign In Button */}
               <TouchableOpacity
                 style={[
@@ -282,6 +270,8 @@ function WebLoginScreen() {
   const [rememberMe, setRememberMe] = useState(true); // Default checked as shown in mockup
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<unknown>(null);
+  const loginErrorMessage = useAuthErrorMessage(loginError);
 
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -294,30 +284,22 @@ function WebLoginScreen() {
     return emailRegex.test(value);
   };
 
-  const validatePassword = (value: string) => {
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
-    return passwordRegex.test(value);
-  };
-
   const handleEmailChange = (text: string) => {
     setEmail(text);
-    if (emailError) {
-      setEmailError("");
-    }
+    if (emailError) setEmailError("");
+    if (loginError) setLoginError(null);
   };
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
-    if (passwordError) {
-      setPasswordError("");
-    }
+    if (passwordError) setPasswordError("");
+    if (loginError) setLoginError(null);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     let isValid = true;
     const trimmedEmail = email.trim();
 
-    // Email Validation Rules
     if (!trimmedEmail) {
       setEmailError("Email is required");
       isValid = false;
@@ -328,38 +310,28 @@ function WebLoginScreen() {
       setEmailError("");
     }
 
-    // Password Validation Rules
     if (!password) {
       setPasswordError("Password is required");
       isValid = false;
     } else if (password.length < 8) {
       setPasswordError("Password must be at least 8 characters");
       isValid = false;
-    } else if (!validatePassword(password)) {
-      setPasswordError(
-        "Password must contain uppercase, lowercase, number and special character"
-      );
-      isValid = false;
     } else {
       setPasswordError("");
     }
 
-    if (!isValid) {
-      return;
-    }
+    if (!isValid) return;
 
     setLoading(true);
+    setLoginError(null);
 
-    // Simulate login API call
-    setTimeout(async () => {
-      try {
-        await signIn(trimmedEmail, password);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }, 1500);
+    try {
+      await signIn(trimmedEmail, password);
+    } catch (err) {
+      setLoginError(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -544,6 +516,10 @@ function WebLoginScreen() {
                   </View>
                   <Text style={stylesWeb.webRememberText}>Remember me</Text>
                 </TouchableOpacity>
+
+                {loginError !== null ? (
+                  <Text style={stylesWeb.errorText}>{loginErrorMessage}</Text>
+                ) : null}
 
                 {/* Login Button */}
                 <TouchableOpacity

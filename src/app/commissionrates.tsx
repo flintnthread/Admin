@@ -1,19 +1,20 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Platform,
-  useWindowDimensions,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { fetchCommissionRates, updateCommissionRates } from "@/services/settingsApi";
 
 const PRIMARY_ORANGE = "#ef7b1a";
 const TITLE_DARK = "#1d324e";
@@ -23,16 +24,48 @@ const BORDER_COLOR = "#6c8494";
 
 const CommissionRatesScreen: React.FC = () => {
   const isWeb = Platform.OS === "web";
-  const { width } = useWindowDimensions();
 
-  const [b2cCommission, setB2cCommission] = useState("15");
-  const [b2bCommission, setB2bCommission] = useState("7");
+  const [b2cCommission, setB2cCommission] = useState("");
+  const [b2bCommission, setB2bCommission] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
-    if (isWeb) {
-      window.alert("Commission rates saved successfully!");
-    } else {
-      Alert.alert("Success", "Commission rates saved successfully!");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const rates = await fetchCommissionRates();
+        if (!cancelled) {
+          setB2cCommission(rates.b2c ?? "");
+          setB2bCommission(rates.b2b ?? "");
+        }
+      } catch (e) {
+        if (!cancelled) setError(getApiErrorMessage(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateCommissionRates(b2cCommission, b2bCommission);
+      const msg = "Commission rates saved successfully!";
+      if (isWeb) window.alert(msg);
+      else Alert.alert("Success", msg);
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      if (isWeb) window.alert(msg);
+      else Alert.alert("Error", msg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -50,6 +83,11 @@ const CommissionRatesScreen: React.FC = () => {
 
       {/* Main Card */}
       <View style={styles.card}>
+        {loading ? (
+          <ActivityIndicator size="large" color={PRIMARY_ORANGE} style={{ marginVertical: 24 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : null}
         <Text style={styles.infoText}>
           These percentages apply to <Text style={{ fontWeight: "700" }}>selling price including GST</Text> when sellers add products and in seller payment breakdowns. B2B vs B2C is taken from each seller's profile <Text style={{ color: "#e879f9" }}>(sellers.seller_category)</Text>.
         </Text>
@@ -76,9 +114,20 @@ const CommissionRatesScreen: React.FC = () => {
           <Text style={styles.inputHint}>Business sellers (wholesale).</Text>
         </View>
 
-        <TouchableOpacity style={styles.saveButton} activeOpacity={0.8} onPress={handleSave}>
-          <Feather name="save" size={14} color="#FFFFFF" />
-          <Text style={styles.saveButtonText}>Save rates</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, (loading || saving) && { opacity: 0.6 }]}
+          activeOpacity={0.8}
+          onPress={handleSave}
+          disabled={loading || saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Feather name="save" size={14} color="#FFFFFF" />
+              <Text style={styles.saveButtonText}>Save rates</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -223,6 +272,11 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+  errorText: {
+    fontSize: 13,
+    color: "#DC2626",
+    marginBottom: 16,
   },
 });
 

@@ -46,10 +46,12 @@ const NAV_ITEMS = {
     ],
     standalone: [
       { label: "Pending Sellers", icon: "user-plus", path: "/pendingsellers" },
+
+      { label: "Pending Sellers", icon: "user-plus", path: "/pendingSellers" },
       { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
       { label: "Customer Support", icon: "headphones", path: null },
-      { label: "Category Requests", icon: "grid", path: null },
-      { label: "Seller Support", icon: "message-square", path: null },
+      { label: "Category Requests", icon: "grid", path: "/categoryRequests" },
+      { label: "Seller Support", icon: "message-square", path: "/supportticket" },
     ],
   },
   "EMAIL MANAGEMENT": [

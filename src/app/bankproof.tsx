@@ -1,5 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { fetchSellerBankDetails } from "@/services/sellerApi";
 import {
   Image,
   Platform,
@@ -27,13 +29,35 @@ function useBreakpoint(): Breakpoint {
   return "desktop";
 }
 
-// ─── Mock Bank Proof Images ─────────────────────────────────────────────────────
-const BANK_PROOF_IMAGES: Record<string, string> = {
-  "Sanju Sandhya": "https://via.placeholder.com/800x600/4A90E2/FFFFFF?text=Bank+Proof+-+Sanju+Sandhya",
-  "Kancharla Raghu": "https://via.placeholder.com/800x600/50C878/FFFFFF?text=Bank+Proof+-+Kancharla+Raghu",
-  "Khajaer Mohammed": "https://via.placeholder.com/800x600/FF6B35/FFFFFF?text=Bank+Proof+-+Khajaer+Mohammed",
-  "default": "https://via.placeholder.com/800x600/8492A6/FFFFFF?text=Bank+Proof+Image",
-};
+function ProofImage({ uri, label }: { uri?: string; label: string }) {
+  const [imageError, setImageError] = useState(false);
+  if (!uri) {
+    return (
+      <View style={styles.errorContainer}>
+        <Icon name="image-off-outline" size={48} color={GRAY} />
+        <Text style={styles.errorText}>No {label} uploaded</Text>
+      </View>
+    );
+  }
+  if (imageError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Icon name="image-off-outline" size={48} color={GRAY} />
+        <Text style={styles.errorText}>Failed to load {label}</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.imageContainer}>
+      <Image
+        source={{ uri }}
+        style={styles.bankProofImage}
+        resizeMode="contain"
+        onError={() => setImageError(true)}
+      />
+    </View>
+  );
+}
 
 // ─── Header Banner ─────────────────────────────────────────────────────────────
 function Header({ bp }: { bp: Breakpoint }) {
@@ -58,10 +82,25 @@ export default function BankProof() {
   const bp = useBreakpoint();
   const isMobile = bp === "mobile";
 
-  const sellerId = (params.sellerId as string) || "Unknown";
-  const [imageError, setImageError] = useState(false);
+  const sellerId = Number(params.sellerId);
+  const [sellerName, setSellerName] = useState("—");
+  const [bankProofUrl, setBankProofUrl] = useState<string | undefined>();
+  const [cancelledChequeUrl, setCancelledChequeUrl] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
 
-  const bankProofImage = BANK_PROOF_IMAGES[sellerId] || BANK_PROOF_IMAGES["default"];
+  useEffect(() => {
+    if (!sellerId || Number.isNaN(sellerId)) return;
+    (async () => {
+      try {
+        const detail = await fetchSellerBankDetails(sellerId);
+        setSellerName(String(detail.fullName ?? "Seller"));
+        setBankProofUrl(detail.bankProofUrl as string | undefined);
+        setCancelledChequeUrl(detail.cancelledChequeUrl as string | undefined);
+      } catch (e) {
+        setError(getApiErrorMessage(e));
+      }
+    })();
+  }, [sellerId]);
 
   const contentMaxWidth =
     bp === "desktop"
@@ -94,7 +133,7 @@ export default function BankProof() {
             <View style={styles.titleSection}>
               <View style={styles.titleLeft}>
                 <Text style={styles.pageTitle}>Bank Proof</Text>
-                <Text style={styles.userName}>{sellerId}</Text>
+                <Text style={styles.userName}>{sellerName}</Text>
               </View>
 
               <TouchableOpacity
@@ -113,43 +152,30 @@ export default function BankProof() {
             </View>
           </View>
 
-          {/* Bank Proof Image Card */}
+          {error ? (
+            <View style={styles.card}>
+              <Text style={{ color: "#DC2626" }}>{error}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
-              <Icon
-                name="image-outline"
-                size={18}
-                color={ORANGE}
-                style={{ marginRight: 8 }}
-              />
+              <Icon name="image-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
               <Text style={styles.cardTitle}>Bank Proof Document</Text>
             </View>
-
-            {!imageError ? (
-              <View style={styles.imageContainer}>
-                <Image
-                  source={{ uri: bankProofImage }}
-                  style={styles.bankProofImage}
-                  resizeMode="contain"
-                  onError={() => setImageError(true)}
-                />
-              </View>
-            ) : (
-              <View style={styles.errorContainer}>
-                <Icon name="image-off-outline" size={48} color={GRAY} />
-                <Text style={styles.errorText}>Failed to load bank proof image</Text>
-                <Text style={styles.errorSubtext}>Please try again later</Text>
-              </View>
-            )}
-
+            <ProofImage uri={bankProofUrl} label="bank proof" />
             <View style={styles.imageInfo}>
               <Text style={styles.infoLabel}>Seller:</Text>
-              <Text style={styles.infoValue}>{sellerId}</Text>
+              <Text style={styles.infoValue}>{sellerName}</Text>
             </View>
-            <View style={styles.imageInfo}>
-              <Text style={styles.infoLabel}>Document Type:</Text>
-              <Text style={styles.infoValue}>Bank Passbook / Cheque</Text>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardTitleRow}>
+              <Icon name="file-document-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+              <Text style={styles.cardTitle}>Cancelled Cheque</Text>
             </View>
+            <ProofImage uri={cancelledChequeUrl} label="cancelled cheque" />
           </View>
         </View>
       </ScrollView>

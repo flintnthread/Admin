@@ -1,6 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapBankPendingRow } from "@/lib/mappers";
+import { fetchBankStats, fetchPendingBankSellers } from "@/services/sellerApi";
 import {
   Dimensions,
   Modal,
@@ -14,89 +17,16 @@ import {
   useWindowDimensions
 } from "react-native";
 
-const sellers = [
-  {
-    id: "#S1248",
-    initials: "KR",
-    color: "#FF6B35",
-    name: "Kancharla Raghu",
-    email: "kancharlatextiles@gmail.com",
-    phone: "+91 7780136846",
-    business: "KANCHARLA TEXTILES",
-    bank: "ICICI Bank",
-    branch: "NRI HOSPITAL",
-    account: "A/C: XXXX0177",
-    ifsc: "IFSC: ICIC0007700",
-    status: "pending",
-    statusLabel: "Pending seller",
-    requested: "06 Jun 2026\n10:15 AM",
-    sellerConfirm: "-",
-    adminApprove: "-",
-  },
-  {
-    id: "#S1247",
-    initials: "SS",
-    color: "#4CAF50",
-    name: "Sanju Sandhya",
-    email: "flintandthread.hr@gmail.com",
-    phone: "+91 9391939868",
-    business: "sg creations",
-    bank: "Canara Bank",
-    branch: "DARSI",
-    account: "A/C: XXXX1922",
-    ifsc: "IFSC: CNRB0013641",
-    status: "not_requested",
-    statusLabel: "Not requested",
-    requested: "05 Jun 2026\n04:30 PM",
-    sellerConfirm: "-",
-    adminApprove: "-",
-  },
-  {
-    id: "#S1246",
-    initials: "KM",
-    color: "#9C27B0",
-    name: "Khaiser Mohammed",
-    email: "mdkhaiser0786@gmail.com",
-    phone: "+91 9515848235",
-    business: "ZOYA ALL BAGS CENTER",
-    bank: "TELANGANA GRAMEENA BANK",
-    branch: "PATANCHERU MA",
-    account: "A/C: XXXX4942",
-    ifsc: "IFSC: TGRB0008191",
-    status: "not_requested",
-    statusLabel: "Not requested",
-    requested: "05 Jun 2026\n11:20 AM",
-    sellerConfirm: "-",
-    adminApprove: "-",
-  },
-  {
-    id: "#S1245",
-    initials: "AR",
-    color: "#FF9800",
-    name: "Arun Kumar",
-    email: "arun.kumar@gmail.com",
-    phone: "+91 9876543210",
-    business: "KUMAR FASHION",
-    bank: "HDFC Bank",
-    branch: "KPHB BRANCH",
-    account: "A/C: XXXX5623",
-    ifsc: "IFSC: HDFC0001234",
-    status: "approved",
-    statusLabel: "Approved",
-    requested: "04 Jun 2026\n02:10 PM",
-    sellerConfirm: "04 Jun 2026\n03:20 PM",
-    adminApprove: "04 Jun 2026\n04:20 PM",
-  },
-];
+type BankRow = ReturnType<typeof mapBankPendingRow>;
 
-const stats = [
-  { icon: "people", label: "Total Sellers", value: "1,248", sub: "All time", color: "#FF6B35", bg: "#FFF3EE" },
-  { icon: "time", label: "Pending Sellers", value: "86", sub: "Pending approval", color: "#4CAF50", bg: "#F0FBF0" },
-  { icon: "shield-checkmark", label: "Approved Sellers", value: "1,102", sub: "This year", color: "#2196F3", bg: "#EEF5FF" },
-  { icon: "business", label: "Banks Integrated", value: "12", sub: "Total banks", color: "#FF6B35", bg: "#FFF3EE" },
-  { icon: "hourglass", label: "Avg. Approval Time", value: "2.4 Days", sub: "This month", color: "#9C27B0", bg: "#F5EEF8" },
-  { icon: "trending-up", label: "Approval Rate", value: "88.5%", sub: "This month", color: "#00BCD4", bg: "#EEF9FB" },
-];
+const STAT_DEFS = [
+  { icon: "people", label: "Total Sellers", key: "total", sub: "Bank submissions", color: "#FF6B35", bg: "#FFF3EE" },
+  { icon: "time", label: "Pending Sellers", key: "pending", sub: "Pending approval", color: "#4CAF50", bg: "#F0FBF0" },
+  { icon: "shield-checkmark", label: "Approved Sellers", key: "verified", sub: "Verified banks", color: "#2196F3", bg: "#EEF5FF" },
+  { icon: "business", label: "Banks Integrated", key: "verified", sub: "Total verified", color: "#FF6B35", bg: "#FFF3EE" },
+  { icon: "hourglass", label: "Avg. Approval Time", key: "avgDays", sub: "This month", color: "#9C27B0", bg: "#F5EEF8" },
+  { icon: "trending-up", label: "Approval Rate", key: "rate", sub: "This month", color: "#00BCD4", bg: "#EEF9FB" },
+] as const;
 
 /* ─── Dropdown Component ─────────────────────────────────────────────────── */
 function Dropdown({
@@ -261,15 +191,55 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const STATUS_OPTIONS = ["All", "Pending", "Approved", "Not Requested"];
-  
+  const [sellers, setSellers] = useState<BankRow[]>([]);
+  const [bankStats, setBankStats] = useState<Record<string, number>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const [pendingRes, statsRes] = await Promise.all([
+        fetchPendingBankSellers(0, 200),
+        fetchBankStats(),
+      ]);
+      setSellers((pendingRes.items ?? []).map(mapBankPendingRow));
+      setBankStats(statsRes);
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredSellers = normalizedQuery
-    ? sellers.filter((seller) => {
-        return [seller.name, seller.business, seller.phone, seller.email]
-          .some((value) => value.toLowerCase().includes(normalizedQuery));
-      })
-    : sellers;
+  const filteredSellers = sellers.filter((seller) => {
+    const matchStatus =
+      statusFilter === "All" ||
+      (statusFilter === "Pending" && seller.status === "pending") ||
+      (statusFilter === "Approved" && seller.status === "approved") ||
+      (statusFilter === "Not Requested" && seller.status === "not_requested");
+    const matchSearch =
+      !normalizedQuery ||
+      [seller.name, seller.business, seller.phone, seller.email].some((value) =>
+        value.toLowerCase().includes(normalizedQuery)
+      );
+    return matchStatus && matchSearch;
+  });
+
+  const pending = bankStats.pending ?? 0;
+  const verified = bankStats.verified ?? 0;
+  const total = pending + verified;
+  const rate = total > 0 ? `${Math.round((verified / total) * 1000) / 10}%` : "—";
+  const stats = STAT_DEFS.map((s) => {
+    let value = "—";
+    if (s.key === "total") value = String(total);
+    else if (s.key === "pending") value = String(pending);
+    else if (s.key === "verified") value = String(verified);
+    else if (s.key === "rate") value = rate;
+    return { ...s, value };
+  });
 
   // Pagination state (defined after filter)
   const [currentPage, setCurrentPage] = useState(1);
@@ -502,7 +472,7 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
                     <Text style={[styles.tableCell, { fontSize: 10, color: "#555", flex: 0.7 }]}>{s.sellerConfirm}</Text>
                     <Text style={[styles.tableCell, { fontSize: 10, color: "#555", flex: 0.7 }]}>{s.adminApprove}</Text>
                     <View style={[styles.tableCell, { flex: 0.6 }]}>
-                      <TouchableOpacity style={styles.viewBtn} onPress={() => router.push('/viewbankdetails')}>
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => router.push({ pathname: '/viewbankdetails', params: { sellerId: String(s.sellerId) } })}>
                         <Text style={{ color: "#FF6B35", fontWeight: "600", fontSize: 11 }}>View</Text>
                       </TouchableOpacity>
                     </View>
@@ -548,7 +518,7 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
                         <Text style={{ fontSize: 11.5, color: "#888" }}>{s.email}</Text>
                         <Text style={{ fontSize: 11.5, color: "#888" }}>{s.phone}</Text>
                       </View>
-                      <TouchableOpacity style={{ borderWidth: 1.5, borderColor: "#FF6B35", backgroundColor: "#fff", borderRadius: 7, padding: 5, flexDirection: "row", alignItems: "center", gap: 4 }} onPress={() => router.push('/viewbankdetails')}>
+                      <TouchableOpacity style={{ borderWidth: 1.5, borderColor: "#FF6B35", backgroundColor: "#fff", borderRadius: 7, padding: 5, flexDirection: "row", alignItems: "center", gap: 4 }} onPress={() => router.push({ pathname: '/viewbankdetails', params: { sellerId: String(s.sellerId) } })}>
                         <Text style={{ color: "#FF6B35", fontWeight: "600", fontSize: 12 }}>View</Text>
                       </TouchableOpacity>
                     </View>
