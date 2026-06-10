@@ -36,7 +36,7 @@ const NAV_ITEMS = {
     children: [
       { label: "Products", icon: "package", path: null },
       { label: "Customers", icon: "users", path: "/customerManagement" },
-      { label: "Sellers", icon: "user-check", path: null },
+      { label: "Sellers", icon: "user-check", path: "/sellers" },
       { label: "Sellers Graph", icon: "trending-up", path: "/sellergraphs" },
       { label: "Seller Bank Approval", icon: "credit-card", path: "/sellerbankapproval" },
       { label: "Orphaned Products", icon: "alert-circle", path: null },
