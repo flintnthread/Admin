@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   Image,
@@ -745,14 +746,18 @@ const MOCK_ORDERS: Order[] = [
   },
 ];
 
-export default function OrdersScreen({ navigation }: { navigation?: any }) {
+export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const router = useRouter();
 
   const handleView = useCallback(
     (o: Order) => {
-      if (navigation) navigation.navigate("OrderDetails", { order: o });
+      router.push({
+        pathname: "/orderDetails",
+        params: { id: o.id },
+      });
     },
-    [navigation],
+    [router],
   );
 
   const handleGST = useCallback((id: string) => {
@@ -764,20 +769,20 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
   return (
     <AdminLayout>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      <ScrollView
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {orders.map((o) => (
-          <OrderCard
-            key={o.id}
-            order={o}
-            onView={handleView}
-            onGST={handleGST}
-          />
-        ))}
-      </ScrollView>
+        <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+        <ScrollView
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {orders.map((o) => (
+            <OrderCard
+              key={o.id}
+              order={o}
+              onView={handleView}
+              onGST={handleGST}
+            />
+          ))}
+        </ScrollView>
       </View>
     </AdminLayout>
   );
