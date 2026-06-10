@@ -9,9 +9,11 @@ import {
   Image,
   useWindowDimensions,
   Alert,
+  Modal
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { useLocalSearchParams, router } from "expo-router";
 
 // --- MOCK DATA TYPE ---
 type Seller = {
@@ -267,9 +269,125 @@ const generateAllSellers = (): Seller[] => {
 
 const ALL_MOCK_SELLERS = generateAllSellers();
 
+
+// --- PENDING SELLER TYPES ---
+type PendingSeller = {
+  id: number;
+  name: string;
+  businessName: string;
+  email: string;
+  mobile: string;
+  submittedOn: string;
+  businessType: string;
+  city: string;
+  state: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  holderName: string;
+};
+
+const INITIAL_PENDING_SELLERS: PendingSeller[] = [
+  {
+    id: 286,
+    name: "Sanju Sandhya",
+    businessName: "sg creations",
+    email: "flintandthread.hr@gmail.com",
+    mobile: "+919391939868",
+    submittedOn: "Jun 05, 2026",
+    businessType: "Sole Proprietorship",
+    city: "Hyderabad",
+    state: "Telangana",
+    bankName: "State Bank of India",
+    accountNumber: "38472948293",
+    ifscCode: "SBIN0020123",
+    holderName: "Sanju Sandhya",
+  }
+];
+
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const showPending = tab === "pending";
+
+  const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>(INITIAL_PENDING_SELLERS);
+  const [pendingSearchQuery, setPendingSearchQuery] = useState("");
+  const [selectedPendingSeller, setSelectedPendingSeller] = useState<PendingSeller | null>(null);
+  const [showPendingModal, setShowPendingModal] = useState(false);
+
+  const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
+  const [adminStatus, setAdminStatus] = useState<"Active" | "Blocked">("Active");
+  const [adminKycStatus, setAdminKycStatus] = useState<string>("Pending Verification");
+  const [kycRemarks, setKycRemarks] = useState("");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showKycDropdown, setShowKycDropdown] = useState(false);
+
+  const filteredPendingSellers = useMemo(() => {
+    const query = pendingSearchQuery.trim().toLowerCase();
+    if (!query) return pendingSellers;
+    return pendingSellers.filter(
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        s.businessName.toLowerCase().includes(query) ||
+        s.email.toLowerCase().includes(query) ||
+        s.mobile.toLowerCase().includes(query)
+    );
+  }, [pendingSellers, pendingSearchQuery]);
+
+  const handleApprovePending = (pending: PendingSeller) => {
+    Alert.alert(
+      "Approve Seller",
+      `Are you sure you want to approve ${pending.name} (${pending.businessName})?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Approve",
+          onPress: () => {
+            setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
+            const ApprovedSellerDetails: Seller = {
+              id: pending.id,
+              name: pending.name,
+              email: pending.email,
+              avatar: `https://randomuser.me/api/portraits/men/${pending.id % 100}.jpg`,
+              businessName: pending.businessName,
+              businessType: pending.businessType,
+              products: 0,
+              walletBalance: 0,
+              joinDate: pending.submittedOn,
+              revenue: 0,
+              state: pending.state,
+              city: pending.city,
+              status: "Active",
+            };
+            setSellers(prev => [ApprovedSellerDetails, ...prev]);
+            setShowPendingModal(false);
+            Alert.alert("Success", "Seller approved successfully!");
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRejectPending = (pending: PendingSeller) => {
+    Alert.alert(
+      "Reject Seller",
+      `Are you sure you want to reject ${pending.name} (${pending.businessName})?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reject",
+          style: "destructive",
+          onPress: () => {
+            setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
+            setShowPendingModal(false);
+            Alert.alert("Rejected", "Seller request has been rejected.");
+          }
+        }
+      ]
+    );
+  };
+
 
   const [sellers, setSellers] = useState<Seller[]>(ALL_MOCK_SELLERS);
   const [searchQuery, setSearchQuery] = useState("");
@@ -408,7 +526,623 @@ export default function ApprovedSellersScreen() {
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
-      >
+      >       {selectedSellerId !== null ? (
+          (() => {
+            const seller = sellers.find(s => s.id === selectedSellerId);
+            if (!seller) return null;
+
+            const handleUpdateSellerStatus = () => {
+              setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, status: adminStatus } : s));
+              Alert.alert("Success", `Seller status updated to ${adminStatus}!`);
+            };
+
+            return (
+              <View style={styles.detailsContainer}>
+                {/* --- HEADER BANNER --- */}
+                <View style={styles.detailsHeaderBanner}>
+                  <View style={styles.detailsHeaderLeft}>
+                    <View style={styles.avatarWrapper}>
+                      <Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />
+                      <View style={styles.statusDotActive} />
+                    </View>
+                    <View style={styles.detailsMeta}>
+                      <Text style={styles.detailsTitle}>{seller.name}</Text>
+                      <View style={styles.detailsMetaRow}>
+                        <Feather name="mail" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
+                        <Text style={styles.detailsSubtext}>{seller.email}</Text>
+                      </View>
+                      <View style={styles.detailsMetaRow}>
+                        <Feather name="calendar" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
+                        <Text style={styles.detailsSubtext}>Joined {seller.joinDate}</Text>
+                        <Feather name="briefcase" size={14} color="#F3F4F6" style={{ marginLeft: 12, marginRight: 6 }} />
+                        <Text style={styles.detailsSubtext}>{seller.businessName}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailsHeaderRight}>
+                    <View style={styles.currentStatusCard}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Feather name="check-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                        <Text style={styles.currentStatusVal}>{seller.status}</Text>
+                      </View>
+                      <Text style={styles.currentStatusLabel}>Current Status</Text>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.backBtn}
+                      onPress={() => setSelectedSellerId(null)}
+                    >
+                      <Feather name="arrow-left" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.backBtnText}>Back to Sellers</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* --- KYC VERIFICATION STATUS BAR --- */}
+                <View style={styles.kycBar}>
+                  <Text style={styles.kycBarTitle}>KYC Verification Status</Text>
+                  <View style={styles.kycNotCompletedBadge}>
+                    <Text style={styles.kycNotCompletedText}>Not Completed</Text>
+                  </View>
+                </View>
+
+                {/* --- 3x2 GRID OF KYC DETAILS --- */}
+                <View style={styles.kycGrid}>
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="check" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>KYC STATUS</Text>
+                      <View style={[styles.kycBadge, { backgroundColor: "#EF4444" }]}>
+                        <Text style={styles.kycBadgeText}>Not Completed</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="calendar" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>SUBMITTED ON</Text>
+                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="image" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>IMAGES CAPTURED</Text>
+                      <View style={styles.kycGridCircleCount}>
+                        <Text style={styles.kycGridCircleCountText}>0</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="check" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>VERIFICATION STATUS</Text>
+                      <View style={[styles.kycBadge, { backgroundColor: "#FBBF24" }]}>
+                        <Text style={[styles.kycBadgeText, { color: "#1F2937" }]}>Pending</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="user" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>VERIFIED BY</Text>
+                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="clock" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>VERIFIED ON</Text>
+                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* --- 2 COLUMN DETAILS INFO & DOCUMENT SECTION --- */}
+                <View style={[styles.detailsColumns, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                  {/* Left Column (2/3 width) - Info Tables */}
+                  <View style={[styles.detailsColumnLeft, { flex: isLargeScreen ? 2.3 : 1 }]}>
+                    <View style={styles.infoCard}>
+                      <View style={styles.infoCardHeader}>
+                        <Feather name="user" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Text style={styles.infoCardTitle}>Seller Information</Text>
+                      </View>
+
+                      <View style={styles.infoCardBody}>
+                        {/* Personal Details */}
+                        <Text style={styles.infoSectionTitle}>Personal Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>First Name</Text>
+                          <Text style={styles.infoValue}>{seller.name.split(" ")[0]}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Last Name</Text>
+                          <Text style={styles.infoValue}>{seller.name.split(" ").slice(1).join(" ") || "Collection"}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Email</Text>
+                          <Text style={styles.infoValue}>{seller.email}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Mobile</Text>
+                          <Text style={styles.infoValue}>+918466066939</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Registered On</Text>
+                          <Text style={styles.infoValue}>{seller.joinDate}</Text>
+                        </View>
+
+                        {/* Business Details */}
+                        <Text style={styles.infoSectionTitle}>Business Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Business Name</Text>
+                          <Text style={styles.infoValue}>{seller.businessName}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Seller Category</Text>
+                          <View style={styles.b2cBadge}>
+                            <Text style={styles.b2cBadgeText}>B2C</Text>
+                          </View>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Business Type</Text>
+                          <Text style={styles.infoValue}>{seller.businessType}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Address</Text>
+                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Sri Sathya Sai Dist, Andhra Pradesh, 515133.</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>GST</Text>
+                          <Text style={styles.infoValue}>No</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>PAN Number</Text>
+                          <Text style={styles.infoValue}>AJEP12353R</Text>
+                        </View>
+
+                        {/* Bank Details */}
+                        <Text style={styles.infoSectionTitle}>Bank Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Bank Name</Text>
+                          <Text style={styles.infoValue}>Canara Bank</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Branch Name</Text>
+                          <Text style={styles.infoValue}>HINDUPUR TEACHERS COLONY</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Account Number</Text>
+                          <Text style={styles.infoValue}>******4165</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>IFSC Code</Text>
+                          <Text style={styles.infoValue}>CNRB0013234</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Account Holder</Text>
+                          <Text style={styles.infoValue}>IRTANUM</Text>
+                        </View>
+
+                        {/* Location Details */}
+                        <Text style={styles.infoSectionTitle}>Location Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Country</Text>
+                          <Text style={styles.infoValue}>India</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>State</Text>
+                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>City</Text>
+                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Area</Text>
+                          <Text style={styles.infoValue}>Kothacheruvu</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Pincode</Text>
+                          <Text style={styles.infoValue}>515133</Text>
+                        </View>
+
+                        {/* Warehouse Details */}
+                        <Text style={styles.infoSectionTitle}>Warehouse Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Warehouse Address</Text>
+                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Near Indian oil petrol pump, Sri Sathya Sai Dist, Andhra Pradesh, 515133</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Country</Text>
+                          <Text style={styles.infoValue}>India</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>State</Text>
+                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>City</Text>
+                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Area</Text>
+                          <Text style={styles.infoValue}>Kothacheruvu</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Right Column (1/3 width) - Images & Documents */}
+                  <View style={[styles.detailsColumnRight, { flex: isLargeScreen ? 1.2 : 1, marginLeft: isLargeScreen ? 20 : 0, marginTop: isLargeScreen ? 0 : 20 }]}>
+                    {/* Profile Picture */}
+                    <View style={styles.sidebarCard}>
+                      <View style={styles.sidebarCardHeader}>
+                        <Text style={styles.sidebarCardTitle}>Profile Picture</Text>
+                      </View>
+                      <View style={styles.sidebarCardBody}>
+                        <Image source={{ uri: seller.avatar }} style={styles.sidebarProfileImg} />
+                      </View>
+                    </View>
+
+                    {/* Verification Documents */}
+                    <View style={[styles.sidebarCard, { marginTop: 20 }]}>
+                      <View style={styles.sidebarCardHeader}>
+                        <Text style={styles.sidebarCardTitle}>Verification Documents</Text>
+                      </View>
+                      <View style={styles.sidebarCardBodyDocs}>
+                        {[
+                          "Aadhaar Front",
+                          "Aadhaar Back",
+                          "PAN Card",
+                          "Cancelled Cheque",
+                          "Business Proof",
+                          "Bank Proof",
+                        ].map((docName) => (
+                          <View key={docName} style={styles.docRow}>
+                            <Text style={styles.docLabel}>{docName}</Text>
+                            <TouchableOpacity
+                              style={styles.docViewBtn}
+                              onPress={() => Alert.alert("Document View", `Opening preview for ${docName}...`)}
+                            >
+                              <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                              <Text style={styles.docViewBtnText}>View</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+
+                        <Text style={styles.docSectionSubTitle}>Business Proof Documents (Multiple)</Text>
+                        <View style={styles.docThumbnailRow}>
+                          <Image source={{ uri: seller.avatar }} style={styles.docThumbnail} />
+                        </View>
+
+                        <Text style={styles.docSectionSubTitle}>Live Selfie Documents</Text>
+                        <View style={styles.selfieThumbnailRow}>
+                          {[1, 2, 3, 4, 5].map((idx) => (
+                            <Image key={idx} source={{ uri: seller.avatar }} style={styles.selfieThumbnail} />
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* --- ADMIN ACTIONS SECTION --- */}
+                <View style={styles.adminActionsCard}>
+                  <View style={styles.adminActionsHeader}>
+                    <Feather name="settings" size={16} color="#1F2937" style={{ marginRight: 8 }} />
+                    <Text style={styles.adminActionsTitle}>Admin Actions</Text>
+                  </View>
+
+                  <View style={[styles.adminActionsBody, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                    {/* Left Form (2/3 width) */}
+                    <View style={{ flex: isLargeScreen ? 2 : 1 }}>
+                      <View style={[styles.rowLayout, { gap: 16, flexWrap: "wrap", marginBottom: 16 }]}>
+                        {/* Update Status Dropdown */}
+                        <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
+                          <Text style={styles.formLabel}>Update Status</Text>
+                          <TouchableOpacity
+                            style={styles.selectDropdown}
+                            onPress={() => {
+                              setShowStatusDropdown(!showStatusDropdown);
+                              setShowKycDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.selectDropdownText}>{adminStatus}</Text>
+                            <Feather name="chevron-down" size={14} color="#6B7280" />
+                          </TouchableOpacity>
+                          {showStatusDropdown && (
+                            <View style={styles.selectMenu}>
+                              {["Active", "Blocked"].map((opt) => (
+                                <TouchableOpacity
+                                  key={opt}
+                                  style={styles.selectMenuItem}
+                                  onPress={() => {
+                                    setAdminStatus(opt as any);
+                                    setShowStatusDropdown(false);
+                                  }}
+                                >
+                                  <Text style={styles.selectMenuText}>{opt}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+
+                        {/* KYC Status Dropdown */}
+                        <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
+                          <Text style={styles.formLabel}>KYC Verification Status</Text>
+                          <TouchableOpacity
+                            style={styles.selectDropdown}
+                            onPress={() => {
+                              setShowKycDropdown(!showKycDropdown);
+                              setShowStatusDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.selectDropdownText}>{adminKycStatus}</Text>
+                            <Feather name="chevron-down" size={14} color="#6B7280" />
+                          </TouchableOpacity>
+                          {showKycDropdown && (
+                            <View style={styles.selectMenu}>
+                              {["Pending Verification", "Active", "Rejected", "Inactive"].map((opt) => (
+                                <TouchableOpacity
+                                  key={opt}
+                                  style={styles.selectMenuItem}
+                                  onPress={() => {
+                                    setAdminKycStatus(opt);
+                                    setShowKycDropdown(false);
+                                  }}
+                                >
+                                  <Text style={styles.selectMenuText}>{opt}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Unique Seller ID */}
+                      <View style={{ marginBottom: 16 }}>
+                        <Text style={styles.formLabel}>Unique Seller ID (Auto-generated)</Text>
+                        <TextInput
+                          style={styles.formTextInputDisabled}
+                          value={`FNT-SELLER-0000${seller.id}`}
+                          editable={false}
+                        />
+                        <Text style={styles.formCaption}>Unique ID: FNT-SELLER-0000{seller.id}</Text>
+                      </View>
+
+                      {/* KYC Remarks */}
+                      <View style={{ marginBottom: 20 }}>
+                        <Text style={styles.formLabel}>KYC Verification Remarks</Text>
+                        <TextInput
+                          style={styles.formTextArea}
+                          placeholder="Provide any remarks or notes about the KYC verification process..."
+                          placeholderTextColor="#9CA3AF"
+                          value={kycRemarks}
+                          onChangeText={setKycRemarks}
+                          multiline={true}
+                          numberOfLines={4}
+                        />
+                        <Text style={styles.formCaption}>Optional notes about the verification process.</Text>
+                      </View>
+
+                      {/* Footer actions */}
+                      <View style={[styles.rowLayout, { gap: 12 }]}>
+                        <TouchableOpacity
+                          style={styles.updateStatusBtn}
+                          onPress={handleUpdateSellerStatus}
+                        >
+                          <Feather name="check" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.updateStatusBtnText}>Update Status</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.backBtnGrey}
+                          onPress={() => setSelectedSellerId(null)}
+                        >
+                          <Feather name="arrow-left" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.backBtnGreyText}>Back to Sellers</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Right Info (1/3 width) */}
+                    <View style={[styles.adminInfoPanel, { marginLeft: isLargeScreen ? 24 : 0, marginTop: isLargeScreen ? 0 : 24 }]}>
+                      <View style={styles.adminInfoPanelHeader}>
+                        <Feather name="info" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Text style={styles.adminInfoPanelTitle}>Status Information</Text>
+                      </View>
+
+                      <View style={styles.adminInfoPanelBody}>
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#FFFBEB" }]}>
+                            <Feather name="clock" size={14} color="#D97706" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Pending</Text>
+                            <Text style={styles.statusInfoDesc}>Seller has submitted profile but not yet reviewed</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#ECFDF5" }]}>
+                            <Feather name="check-circle" size={14} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Active</Text>
+                            <Text style={styles.statusInfoDesc}>Seller is approved and can sell products</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#FEF2F2" }]}>
+                            <Feather name="x-circle" size={14} color="#EF4444" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Rejected</Text>
+                            <Text style={styles.statusInfoDesc}>Seller application has been rejected</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#F3F4F6" }]}>
+                            <Feather name="pause-circle" size={14} color="#6B7280" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Inactive</Text>
+                            <Text style={styles.statusInfoDesc}>Seller account has been temporarily suspended</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            );
+          })()
+        ) : showPending ? (
+          <>
+            {/* --- PENDING HEADER BANNER CARD --- */}
+            <View style={styles.pageHeaderCard}>
+              <View style={styles.bannerTop} />
+              <View style={[styles.bannerBottom, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                <View style={styles.bannerBottomLeft}>
+                  <View style={styles.overlapBadgeContainer}>
+                    <View style={styles.overlapBadgeCircle}>
+                      <Feather name="map-pin" size={20} color="#FFFFFF" />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.bannerTitleContainer}>
+                    <Text style={styles.bannerTitle}>Pending Sellers</Text>
+                    <View style={styles.breadcrumbs}>
+                      <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
+                      <TouchableOpacity onPress={() => router.push("/approveseller")}>
+                        <Text style={styles.breadcrumbActive}>Dashboard</Text>
+                      </TouchableOpacity>
+                      <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
+                      <Text style={styles.breadcrumbText}>Pending Sellers</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.bannerPendingBadge}
+                  onPress={() => router.push("/approveseller")}
+                >
+                  <Feather name="clock" size={14} color="#1F2937" />
+                  <Text style={styles.bannerPendingBadgeText}>{pendingSellers.length} Pending</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* --- SEARCH TOOLBAR --- */}
+            <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <View style={[styles.searchContainer, { flex: 1, marginRight: 0 }]}>
+                <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search pending sellers..."
+                  placeholderTextColor="#9CA3AF"
+                  value={pendingSearchQuery}
+                  onChangeText={setPendingSearchQuery}
+                />
+                {pendingSearchQuery ? (
+                  <TouchableOpacity onPress={() => setPendingSearchQuery("")} style={styles.clearSearchBtn}>
+                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            {/* --- PENDING TABLE --- */}
+            <View style={styles.tableCard}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableTh, { flex: 0.8 }]}>ID</Text>
+                <Text style={[styles.tableTh, { flex: 1.8 }]}>Name</Text>
+                <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
+                <Text style={[styles.tableTh, { flex: 2.2 }]}>Email</Text>
+                <Text style={[styles.tableTh, { flex: 1.6 }]}>Mobile</Text>
+                <Text style={[styles.tableTh, { flex: 1.4 }]}>Submitted On</Text>
+                <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Actions</Text>
+              </View>
+
+              {filteredPendingSellers.map((seller) => (
+                <View key={seller.id} style={styles.tableRow}>
+                  <View style={[styles.tableCell, { flex: 0.8 }]}>
+                    <View style={styles.idBadge}>
+                      <Text style={styles.idBadgeText}>{seller.id}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.tableCellTextBold, { flex: 1.8 }]}>{seller.name}</Text>
+                  <Text style={[styles.tableCellText, { flex: 2 }]}>{seller.businessName}</Text>
+                  <Text style={[styles.tableCellText, { flex: 2.2 }]} numberOfLines={1}>{seller.email}</Text>
+                  <Text style={[styles.tableCellText, { flex: 1.6 }]}>{seller.mobile}</Text>
+                  <Text style={[styles.tableCellText, { flex: 1.4 }]}>{seller.submittedOn}</Text>
+                  <View style={[styles.tableCellActions, { flex: 1.2, justifyContent: "center" }]}>
+                    <TouchableOpacity
+                      style={styles.pendingViewBtn}
+                      onPress={() => {
+                        setSelectedPendingSeller(seller);
+                        setShowPendingModal(true);
+                      }}
+                    >
+                      <Text style={styles.pendingViewBtnText}>View</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {filteredPendingSellers.length === 0 && (
+                <View style={styles.emptyTable}>
+                  <Text style={styles.emptyText}>No pending sellers found.</Text>
+                </View>
+              )}
+            </View>
+
+            {/* --- FOOTER PAGINATION --- */}
+            <View style={[styles.pagination, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <Text style={styles.paginationText}>
+                Showing 1 - {filteredPendingSellers.length} of {filteredPendingSellers.length} pending sellers
+              </Text>
+
+              <View style={styles.pageSelectors}>
+                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
+                  <Ionicons name="chevron-back" size={16} color="#D1D5DB" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.pageNumber, styles.pageNumberActive]}>
+                  <Text style={[styles.pageNumberText, styles.pageNumberTextActive]}>1</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
+                  <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+
             {/* --- PAGE HEADER BANNER CARD --- */}
             <View style={styles.pageHeaderCard}>
               {/* Banner Top Portion (Orange Gradient) */}
@@ -439,7 +1173,7 @@ export default function ApprovedSellersScreen() {
                 {/* Right: Action button */}
                 <TouchableOpacity
                   style={styles.bannerActionBtn}
-                  onPress={() => Alert.alert("Navigate", "Go to Pending Sellers")}
+                  onPress={() => router.push("/approveseller?tab=pending")}
                 >
                   <Feather name="clock" size={14} color="#FFFFFF" style={styles.bannerActionIcon} />
                   <Text style={styles.bannerActionBtnText}>Pending Sellers</Text>
@@ -621,7 +1355,10 @@ export default function ApprovedSellersScreen() {
                     <View style={[styles.tableCellActions, { flex: 1.6 }]}>
                       <TouchableOpacity
                         style={styles.actionEyeBtn}
-                        onPress={() => Alert.alert("View Details", `${seller.name}\n${seller.businessName}`)}
+                        onPress={() => {
+                          setSelectedSellerId(seller.id);
+                          setAdminStatus(seller.status);
+                        }}
                       >
                         <Ionicons name="eye" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -716,7 +1453,10 @@ export default function ApprovedSellersScreen() {
                     <View style={styles.cardActions}>
                       <TouchableOpacity
                         style={[styles.cardActionBtn, styles.actionEyeBtn]}
-                        onPress={() => Alert.alert("View Details", `${seller.name}\n${seller.businessName}`)}
+                        onPress={() => {
+                          setSelectedSellerId(seller.id);
+                          setAdminStatus(seller.status);
+                        }}
                       >
                         <Ionicons name="eye" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -826,7 +1566,116 @@ export default function ApprovedSellersScreen() {
                 </View>
               </View>
             )}
+          </>
+        )}
+
+        {/* --- COPYRIGHT FOOTER --- */}
+        <View style={styles.footerCopyright}>
+          <Text style={styles.footerCopyrightText}>
+            2026 © Flintnthread India Pvt. Ltd. Crafted by{" "}
+            <Feather name="heart" size={12} color="#EF4444" /> Flintnthread India Pvt. Ltd.
+          </Text>
+        </View>
       </ScrollView>
+
+      {/* --- PENDING DETAILS MODAL --- */}
+      {showPendingModal && selectedPendingSeller && (
+        <Modal
+          visible={showPendingModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPendingModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Pending Seller Verification</Text>
+                <TouchableOpacity onPress={() => setShowPendingModal(false)}>
+                  <Feather name="x" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody}>
+                {/* Personal Information */}
+                <Text style={styles.modalSectionTitle}>Personal & Contact Details</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Full Name:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.name}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Email Address:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.email}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Mobile Number:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.mobile}</Text>
+                </View>
+
+                {/* Business Information */}
+                <Text style={styles.modalSectionTitle}>Business Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Business Name:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.businessName}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Business Type:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.businessType}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Location:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedPendingSeller.city}, {selectedPendingSeller.state}
+                  </Text>
+                </View>
+
+                {/* Bank Information */}
+                <Text style={styles.modalSectionTitle}>Bank Account Details</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Bank Name:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.bankName}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Account Number:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.accountNumber}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>IFSC Code:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.ifscCode}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Holder Name:</Text>
+                  <Text style={styles.detailValue}>{selectedPendingSeller.holderName}</Text>
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalFooterActions}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalRejectBtn]}
+                  onPress={() => handleRejectPending(selectedPendingSeller)}
+                >
+                  <Feather name="x-circle" size={14} color="#FFFFFF" style={styles.modalBtnIcon} />
+                  <Text style={styles.modalBtnText}>Reject</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalApproveBtn]}
+                  onPress={() => handleApprovePending(selectedPendingSeller)}
+                >
+                  <Feather name="check-circle" size={14} color="#FFFFFF" style={styles.modalBtnIcon} />
+                  <Text style={styles.modalBtnText}>Approve</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancelBtn]}
+                  onPress={() => setShowPendingModal(false)}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </AdminLayout>
   );
 }
@@ -1490,4 +2339,680 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     marginHorizontal: 4,
   },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    width: "100%",
+    maxWidth: 600,
+    maxHeight: "85%",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    flexDirection: "column",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+    flex: 1,
+  },
+  modalBody: {
+    padding: 16,
+  },
+  modalSectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#EA580C",
+    marginTop: 16,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingBottom: 4,
+  },
+  detailRow: {
+    flexDirection: "row",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F9FAFB",
+  },
+  detailLabel: {
+    width: 150,
+    fontWeight: "600",
+    color: "#4B5563",
+    fontSize: 13,
+  },
+  detailValue: {
+    flex: 1,
+    color: "#1F2937",
+    fontSize: 13,
+  },
+  modalFooterActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    gap: 10,
+  },
+  modalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  modalApproveBtn: {
+    backgroundColor: "#10B981",
+  },
+  modalRejectBtn: {
+    backgroundColor: "#EF4444",
+  },
+  modalCancelBtn: {
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+  },
+  modalBtnIcon: {
+    marginRight: 6,
+  },
+  modalBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  modalCancelBtnText: {
+    color: "#4B5563",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  idBadge: {
+    backgroundColor: "#3B82F6",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
+  idBadgeText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 11,
+  },
+  pendingViewBtn: {
+    backgroundColor: "#1F2937",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  pendingViewBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  footerCopyright: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    marginTop: 20,
+  },
+  footerCopyrightText: {
+    color: "#6B7280",
+    fontSize: 12,
+    textAlign: "center",
+  },
+  bannerPendingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FBBF24",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  bannerPendingBadgeText: {
+    color: "#1F2937",
+    fontWeight: "600",
+    fontSize: 12,
+    marginLeft: 6,
+  },
+  detailsContainer: {
+    width: "100%",
+  },
+  detailsHeaderBanner: {
+    backgroundColor: "#EA580C",
+    borderRadius: 12,
+    padding: 24,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 16,
+    marginBottom: 20,
+  },
+  detailsHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  avatarWrapper: {
+    position: "relative",
+  },
+  detailsAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  statusDotActive: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#10B981",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  detailsMeta: {
+    justifyContent: "center",
+  },
+  detailsTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  detailsMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  detailsSubtext: {
+    fontSize: 13,
+    color: "#F3F4F6",
+  },
+  detailsHeaderRight: {
+    alignItems: "flex-end",
+    gap: 12,
+  },
+  currentStatusCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "flex-end",
+  },
+  currentStatusVal: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  currentStatusLabel: {
+    color: "#F3F4F6",
+    fontSize: 10,
+    marginTop: 2,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+  },
+  backBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  kycBar: {
+    backgroundColor: "#EA580C",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  kycBarTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  kycNotCompletedBadge: {
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  kycNotCompletedText: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  kycGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    marginBottom: 20,
+  },
+  kycGridCard: {
+    flex: 1,
+    minWidth: 160,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  kycIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFF7ED",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  kycGridCardContent: {
+    flex: 1,
+  },
+  kycGridCardLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#4B5563",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  kycGridCardValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  kycBadge: {
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  kycBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  kycGridCircleCount: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#3B82F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  kycGridCircleCountText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  detailsColumns: {
+    gap: 20,
+    marginBottom: 20,
+  },
+  detailsColumnLeft: {
+    flex: 2.3,
+  },
+  detailsColumnRight: {
+    flex: 1.2,
+  },
+  infoCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  infoCardHeader: {
+    backgroundColor: "#1E293B",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  infoCardTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  infoCardBody: {
+    padding: 16,
+  },
+  infoSectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#EA580C",
+    marginTop: 12,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingBottom: 4,
+  },
+  infoRow: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F9FAFB",
+    alignItems: "center",
+  },
+  infoLabel: {
+    width: 140,
+    fontWeight: "600",
+    color: "#4B5563",
+    fontSize: 13,
+  },
+  infoValue: {
+    flex: 1,
+    color: "#1F2937",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  b2cBadge: {
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  b2cBadgeText: {
+    color: "#065F46",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  sidebarCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  sidebarCardHeader: {
+    backgroundColor: "#FDBA74",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  sidebarCardTitle: {
+    color: "#1F2937",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  sidebarCardBody: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sidebarCardBodyDocs: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  sidebarProfileImg: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+  },
+  docRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  docLabel: {
+    fontSize: 13,
+    color: "#374151",
+    fontWeight: "500",
+  },
+  docViewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#78350F",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  docViewBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  docSectionSubTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#4B5563",
+    marginTop: 32,
+    marginBottom: 16,
+  },
+  docThumbnailRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  docThumbnail: {
+    width: 160,
+    height: 160,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+  },
+  selfieThumbnailRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  selfieThumbnail: {
+    width: 62,
+    height: 62,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+  },
+  adminActionsCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    marginBottom: 20,
+  },
+  adminActionsHeader: {
+    backgroundColor: "#FDBA74",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  adminActionsTitle: {
+    color: "#1F2937",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  adminActionsBody: {
+    padding: 24,
+    gap: 20,
+  },
+  formLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 6,
+  },
+  selectDropdown: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFFFFF",
+    height: 40,
+  },
+  selectDropdownText: {
+    fontSize: 13,
+    color: "#1F2937",
+  },
+  selectMenu: {
+    position: "absolute",
+    top: 68,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 6,
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectMenuItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  selectMenuText: {
+    fontSize: 13,
+    color: "#374151",
+  },
+  formTextInputDisabled: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#F9FAFB",
+    color: "#9CA3AF",
+    height: 40,
+    fontSize: 13,
+  },
+  formCaption: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  formTextArea: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFFFFF",
+    fontSize: 13,
+    color: "#1F2937",
+    textAlignVertical: "top",
+    height: 100,
+  },
+  updateStatusBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#78350F",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 6,
+  },
+  updateStatusBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  backBtnGrey: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4B5563",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 6,
+  },
+  backBtnGreyText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  adminInfoPanel: {
+    flex: 1.2,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  adminInfoPanelHeader: {
+    backgroundColor: "#1E293B",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  adminInfoPanelTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  adminInfoPanelBody: {
+    padding: 16,
+    gap: 14,
+  },
+  statusInfoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  statusIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  statusInfoTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 2,
+  },
+  statusInfoDesc: {
+    fontSize: 11,
+    color: "#6B7280",
+    lineHeight: 15,
+  },
+
 });
