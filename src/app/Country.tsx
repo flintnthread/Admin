@@ -1,6 +1,5 @@
 import { Redirect } from 'expo-router';
 
 export default function Index() {
-  // Auth guard in _layout.tsx will redirect to /login if not authenticated.
-  return <Redirect href="/approveseller" />;
+  return <Redirect href="/sellerbankapproval" />;
 }

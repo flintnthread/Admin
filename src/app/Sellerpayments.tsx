@@ -1,20 +1,23 @@
+import AdminLayout from "@/components/admin-layout";
+import { useAsyncLoad } from "@/hooks/useAsyncLoad";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapPayoutToPaymentRow } from "@/lib/mappers";
+import { fetchPayouts, markPayoutPaid } from "@/services/payoutApi";
+import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    SafeAreaView,
-    StatusBar,
-    Platform,
-    useWindowDimensions,
-    Modal,
-    TextInput,
+    ActivityIndicator,
     Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import AdminLayout from "@/components/admin-layout";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type PaymentStatus = "Pending" | "Paid";
@@ -61,16 +64,6 @@ const getPaymentStyle = (status: PaymentStatus) =>
     status === "Paid"
         ? { bg: "#e8f7ee", color: "#1a7a45" }
         : { bg: PRIMARY_LIGHT, color: PRIMARY };
-
-// ─── DATA ─────────────────────────────────────────────────────────────────────
-const initialOrders: SellerOrder[] = [
-    { id: 1, orderId: "FNT202605263872", orderDate: "May 26, 2026", orderStatus: "Completed", sellerName: "G Naga Malleswara Rao", sellerEmail: "gnmallesh143@gmail.com", sellerPhone: "+918096025943", customerPaid: "₹364.00", deliveryDate: "Jun 06, 2026", deliveryTime: "11:08 AM", reminderLabel: "Green (0d)", reminderDays: 0, reminderBucket: "green", paymentStatus: "Pending", walletBalance: "₹0.00" },
-    { id: 2, orderId: "FNT202605186042", orderDate: "May 18, 2026", orderStatus: "Completed", sellerName: "The Legacy Closet India", sellerEmail: "mathatheresagroup@gmail.com", sellerPhone: "+919902589738", customerPaid: "₹417.00", deliveryDate: "Jun 05, 2026", deliveryTime: "05:10 PM", reminderLabel: "Green (1d)", reminderDays: 1, reminderBucket: "green", paymentStatus: "Pending", walletBalance: "₹0.00" },
-    { id: 3, orderId: "FNT202605186042", orderDate: "May 18, 2026", orderStatus: "Completed", sellerName: "Pickcell Pickcell", sellerEmail: "pickcellonlines@gmail.com", sellerPhone: "+919321502225", customerPaid: "₹925.00", deliveryDate: "Jun 05, 2026", deliveryTime: "05:10 PM", reminderLabel: "Green (1d)", reminderDays: 1, reminderBucket: "green", paymentStatus: "Pending", walletBalance: "₹465.00" },
-    { id: 4, orderId: "FNT202604112981", orderDate: "Apr 11, 2026", orderStatus: "Completed", sellerName: "FashionHub Store", sellerEmail: "fashionhub@store.com", sellerPhone: "+917654321098", customerPaid: "₹1,240.00", deliveryDate: "Jun 01, 2026", deliveryTime: "02:30 PM", reminderLabel: "Orange (3d)", reminderDays: 3, reminderBucket: "orange", paymentStatus: "Pending", walletBalance: "₹0.00" },
-    { id: 5, orderId: "FNT202603085431", orderDate: "Mar 08, 2026", orderStatus: "Completed", sellerName: "Kurta Kingdom", sellerEmail: "kurtaking@mail.com", sellerPhone: "+919876543210", customerPaid: "₹2,180.00", deliveryDate: "May 28, 2026", deliveryTime: "10:15 AM", reminderLabel: "Red (6d)", reminderDays: 6, reminderBucket: "red", paymentStatus: "Pending", walletBalance: "₹200.00" },
-    { id: 6, orderId: "FNT202602074321", orderDate: "Feb 07, 2026", orderStatus: "Completed", sellerName: "Silk Route Boutique", sellerEmail: "silkroute@boutique.in", sellerPhone: "+918877665544", customerPaid: "₹780.00", deliveryDate: "May 25, 2026", deliveryTime: "04:00 PM", reminderLabel: "Green (0d)", reminderDays: 0, reminderBucket: "green", paymentStatus: "Paid", walletBalance: "₹780.00" },
-];
 
 // ─── ORDER CARD ───────────────────────────────────────────────────────────────
 const OrderCard: React.FC<{
@@ -195,7 +188,14 @@ const PayModal: React.FC<{
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 const SellerPaymentsScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
-    const [orders, setOrders] = useState<SellerOrder[]>(initialOrders);
+    const { data, loading, error, reload } = useAsyncLoad(
+        async () => {
+            const page = await fetchPayouts(undefined, 0, 100);
+            return (page.items ?? []).map(mapPayoutToPaymentRow);
+        },
+        []
+    );
+    const orders: SellerOrder[] = data ?? [];
     const [search, setSearch] = useState("");
     const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Cancelled">("All");
     const [paymentDropdownOpen, setPaymentDropdownOpen] = useState(false);
@@ -232,12 +232,19 @@ const SellerPaymentsScreen: React.FC = () => {
     const pending = orders.filter(o => o.paymentStatus === "Pending").length;
     const totalAmt = orders.filter(o => o.paymentStatus === "Paid").reduce((s, o) => s + parseFloat(o.customerPaid.replace(/[₹,]/g, "")), 0);
 
-    const handleConfirmPay = (id: number) => {
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus: "Paid" } : o));
-        setPayModalOrder(null);
-        const msg = "Payment marked as paid!";
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Success", msg);
+    const handleConfirmPay = async (id: number) => {
+        try {
+            await markPayoutPaid(id);
+            setPayModalOrder(null);
+            const msg = "Payment marked as paid!";
+            if (Platform.OS === "web") window.alert(msg);
+            else Alert.alert("Success", msg);
+            await reload();
+        } catch (e) {
+            const msg = getApiErrorMessage(e);
+            if (Platform.OS === "web") window.alert(msg);
+            else Alert.alert("Error", msg);
+        }
     };
 
     const handleView = (id: number) => {
@@ -272,6 +279,13 @@ const SellerPaymentsScreen: React.FC = () => {
             </View>
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 250 }]} showsVerticalScrollIndicator={false}>
+
+                {loading && (
+                    <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 24 }} />
+                )}
+                {error ? (
+                    <Text style={{ color: "#DC2626", fontSize: 13, marginBottom: 12 }}>{error}</Text>
+                ) : null}
 
                 {/* Stats */}
                 <View style={[styles.statsCardSingle, !isWeb && { flexDirection: "column", gap: 16 }, isWeb && { justifyContent: "space-between" }]}>

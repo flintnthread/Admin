@@ -1,28 +1,135 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  getProductDetail,
   getVariantStats,
   PRODUCT_DELIVERY,
   PRODUCT_RETURNS,
   PRODUCT_SIZE_CHART,
   PRODUCT_SPECS,
-  PRODUCT_VARIANTS,
+  type ProductDetail,
+  type ProductStatus,
   type ProductVariant,
 } from '@/constants/product-approval-data';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { formatDate, formatDateTime } from '@/lib/format';
+import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
+
+const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/600?text=Product';
+
+type ApiImage = { url?: string };
+type ApiVariant = {
+  id?: number;
+  color?: string;
+  size?: string;
+  sku?: string;
+  stock?: number;
+  sellingPrice?: number;
+  finalPrice?: number;
+};
+
+function mapApiProductDetail(data: Record<string, unknown>): {
+  product: ProductDetail;
+  variants: ProductVariant[];
+} {
+  const images = (data.images as ApiImage[] | undefined) ?? [];
+  const gallery = images.map((img) => String(img.url ?? '')).filter(Boolean);
+  const primaryImage = gallery[0] ?? PLACEHOLDER_IMAGE;
+  const variantsRaw = (data.variants as ApiVariant[] | undefined) ?? [];
+  const gst = Number(data.gstPercentage ?? 18);
+  const statusRaw = String(data.status ?? 'pending').toLowerCase();
+  const status: ProductStatus =
+    statusRaw === 'approved'
+      ? 'approved'
+      : statusRaw === 'rejected'
+        ? 'rejected'
+        : statusRaw === 'review'
+          ? 'review'
+          : 'pending';
+
+  const variants: ProductVariant[] = variantsRaw.map((v) => {
+    const sellingWith = Number(v.finalPrice ?? v.sellingPrice ?? 0);
+    const sellingExcl = gst > 0 ? sellingWith / (1 + gst / 100) : sellingWith;
+    const gstAmount = sellingWith - sellingExcl;
+    return {
+      id: String(v.id ?? ''),
+      colorName: String(v.color ?? '—'),
+      colorHex: '#6B7280',
+      image: primaryImage,
+      size: String(v.size ?? '—'),
+      sku: String(v.sku ?? '—'),
+      stock: Number(v.stock ?? 0),
+      mrp: sellingWith,
+      discountPercent: 0,
+      sellingPriceExclGst: sellingExcl,
+      gstPercent: gst,
+      gstAmount,
+      sellingPriceWithGst: sellingWith,
+      commissionPercent: 0,
+      commissionAmount: 0,
+      intraCityDelivery: 0,
+      metroDelivery: 0,
+    };
+  });
+
+  const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+  const firstVariant = variants[0];
+
+  const product: ProductDetail = {
+    id: String(data.id ?? ''),
+    name: String(data.name ?? 'Product'),
+    description: String(data.shortDescription ?? data.description ?? ''),
+    image: primaryImage,
+    seller: String(data.sellerName ?? `Seller #${data.sellerId ?? '—'}`),
+    email: '',
+    category: `Category #${data.categoryId ?? '—'}`,
+    status,
+    submittedOn: formatDateTime(String(data.createdAt ?? '')),
+    sku: String(data.sku ?? '—'),
+    lastUpdated: formatDate(String(data.createdAt ?? '')),
+    categoryLabel: `Category #${data.categoryId ?? '—'}`,
+    subcategory: `Subcategory #${data.subcategoryId ?? '—'}`,
+    fullTitle: String(data.name ?? 'Product'),
+    price: firstVariant?.sellingPriceWithGst ?? 0,
+    mrp: firstVariant?.mrp ?? 0,
+    gst,
+    material: '—',
+    weight: '—',
+    hsnCode: '—',
+    warranty: '—',
+    returnPolicy: '—',
+    size: firstVariant?.size ?? '—',
+    delivery: '—',
+    stock: totalStock,
+    stockStatus: totalStock > 0 ? 'In Stock' : 'Out of Stock',
+    discount: 0,
+    color: firstVariant?.colorName ?? '—',
+    dbStatus: statusRaw,
+    createdAt: formatDate(String(data.createdAt ?? '')),
+    approvedAt: '—',
+    adminNote: String(data.adminNotes ?? '—'),
+    fullDescription: String(data.description ?? data.shortDescription ?? ''),
+    gallery: gallery.length > 0 ? gallery : [primaryImage],
+  };
+
+  return { product, variants };
+}
 
 const PALETTE = {
   navy: '#1E2A3B',
@@ -541,19 +648,116 @@ function SectionCard({
 
 export default function ProductDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const product = getProductDetail(id ?? '');
   const { isWide, width } = useBreakpoint();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeImage, setActiveImage] = useState(0);
-  const variants = PRODUCT_VARIANTS;
+  const [product, setProduct] = useState<ProductDetail | null>(null);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
 
-  if (!product) {
+  const loadProduct = useCallback(async () => {
+    const productId = Number(id);
+    if (!id || Number.isNaN(productId)) {
+      setLoading(false);
+      setProduct(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchProductDetail(productId);
+      const mapped = mapApiProductDetail(data);
+      setProduct(mapped.product);
+      setVariants(mapped.variants);
+      setActiveImage(0);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to load product.'));
+      setProduct(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadProduct();
+  }, [loadProduct]);
+
+  const canReview =
+    product?.status === 'pending' || product?.status === 'review' || product?.dbStatus === 'pending';
+
+  const handleApprove = async () => {
+    const productId = Number(id);
+    if (Number.isNaN(productId)) return;
+
+    const run = async () => {
+      setActionLoading(true);
+      try {
+        await approveProduct(productId);
+        if (Platform.OS === 'web') window.alert('Product approved.');
+        else Alert.alert('Success', 'Product approved.');
+        router.back();
+      } catch (err) {
+        const msg = getApiErrorMessage(err, 'Failed to approve product.');
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('Error', msg);
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Approve this product?')) void run();
+    } else {
+      Alert.alert('Approve product', 'Approve this product for listing?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Approve', onPress: () => void run() },
+      ]);
+    }
+  };
+
+  const handleReject = async () => {
+    const productId = Number(id);
+    if (Number.isNaN(productId)) return;
+    setActionLoading(true);
+    try {
+      await rejectProduct(productId, rejectNote.trim() || 'Product rejected.');
+      setShowRejectModal(false);
+      setRejectNote('');
+      if (Platform.OS === 'web') window.alert('Product rejected.');
+      else Alert.alert('Done', 'Product rejected.');
+      router.back();
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to reject product.');
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>Product not found</Text>
-          <Pressable style={styles.backBtnLight} onPress={() => router.back()}>
-            <Text style={styles.backBtnLightText}>Go Back</Text>
+          <ActivityIndicator size="large" color={PALETTE.purple} />
+          <Text style={styles.notFoundText}>Loading product…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.notFound}>
+          <Text style={styles.notFoundText}>{error ?? 'Product not found'}</Text>
+          <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : router.back())}>
+            <Text style={styles.backBtnLightText}>{error ? 'Retry' : 'Go Back'}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -580,7 +784,75 @@ export default function ProductDetailsScreen() {
             </Text>
           </View>
         </View>
+        {canReview && isWide ? (
+          <View style={styles.headerActions}>
+            <Pressable
+              style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
+              disabled={actionLoading}
+              onPress={() => void handleApprove()}
+            >
+              <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
+              <Text style={styles.approveActionText}>Approve</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.rejectActionBtn, actionLoading && { opacity: 0.6 }]}
+              disabled={actionLoading}
+              onPress={() => setShowRejectModal(true)}
+            >
+              <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
+              <Text style={styles.rejectActionText}>Reject</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
+
+      {canReview && !isWide ? (
+        <View style={styles.mobileHeaderActions}>
+          <Pressable
+            style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
+            disabled={actionLoading}
+            onPress={() => void handleApprove()}
+          >
+            <Text style={styles.approveActionText}>Approve</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
+            disabled={actionLoading}
+            onPress={() => setShowRejectModal(true)}
+          >
+            <Text style={styles.rejectActionText}>Reject</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <Modal visible={showRejectModal} transparent animationType="fade">
+        <View style={styles.rejectModalBackdrop}>
+          <View style={styles.rejectModalCard}>
+            <Text style={styles.rejectModalTitle}>Reject product</Text>
+            <Text style={styles.rejectModalSub}>{product.name}</Text>
+            <TextInput
+              style={styles.rejectModalInput}
+              placeholder="Reason / admin note"
+              placeholderTextColor={PALETTE.textMuted}
+              value={rejectNote}
+              onChangeText={setRejectNote}
+              multiline
+            />
+            <View style={styles.headerActions}>
+              <Pressable style={styles.rejectActionBtn} onPress={() => setShowRejectModal(false)}>
+                <Text style={styles.rejectActionText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.approveActionBtn}
+                disabled={actionLoading}
+                onPress={() => void handleReject()}
+              >
+                <Text style={styles.approveActionText}>Reject</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <ScrollView
         style={styles.scroll}
@@ -869,6 +1141,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editBtnText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
+  approveActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PALETTE.green,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  approveActionText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
+  rejectActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PALETTE.red,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  rejectActionText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
+  rejectModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  rejectModalCard: {
+    backgroundColor: PALETTE.cardBg,
+    borderRadius: 12,
+    padding: 20,
+    gap: 12,
+    maxWidth: 420,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  rejectModalTitle: { fontSize: 18, fontWeight: '800', color: PALETTE.textPrimary },
+  rejectModalSub: { fontSize: 13, color: PALETTE.textSecondary },
+  rejectModalInput: {
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 88,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    color: PALETTE.textPrimary,
+  },
 
   heroCard: {
     backgroundColor: PALETTE.cardBg,
