@@ -9,11 +9,9 @@ import {
   Image,
   useWindowDimensions,
   Alert,
-  Modal
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
-import { useLocalSearchParams, router } from "expo-router";
 
 // --- MOCK DATA TYPE ---
 type Seller = {
@@ -269,42 +267,6 @@ const generateAllSellers = (): Seller[] => {
 
 const ALL_MOCK_SELLERS = generateAllSellers();
 
-
-// --- PENDING SELLER TYPES ---
-type PendingSeller = {
-  id: number;
-  name: string;
-  businessName: string;
-  email: string;
-  mobile: string;
-  submittedOn: string;
-  businessType: string;
-  city: string;
-  state: string;
-  bankName: string;
-  accountNumber: string;
-  ifscCode: string;
-  holderName: string;
-};
-
-const INITIAL_PENDING_SELLERS: PendingSeller[] = [
-  {
-    id: 286,
-    name: "Sanju Sandhya",
-    businessName: "sg creations",
-    email: "flintandthread.hr@gmail.com",
-    mobile: "+919391939868",
-    submittedOn: "Jun 05, 2026",
-    businessType: "Sole Proprietorship",
-    city: "Hyderabad",
-    state: "Telangana",
-    bankName: "State Bank of India",
-    accountNumber: "38472948293",
-    ifscCode: "SBIN0020123",
-    holderName: "Sanju Sandhya",
-  }
-];
-
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
@@ -389,7 +351,14 @@ export default function ApprovedSellersScreen() {
   };
 
 
-  const [sellers, setSellers] = useState<Seller[]>(ALL_MOCK_SELLERS);
+  const { data, loading, error, reload, setData } = useAsyncLoad(
+    async () => {
+      const page = await fetchSellers({ status: "active", size: 100 });
+      return (page.items ?? []).map(mapSellerToApprovedRow);
+    },
+    []
+  );
+  const sellers: Seller[] = data ?? [];
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [sortBy, setSortBy] = useState("Name");
@@ -480,14 +449,17 @@ export default function ApprovedSellersScreen() {
         {
           text: actionText,
           style: "destructive",
-          onPress: () => {
-            setSellers((prev) =>
-              prev.map((s) =>
-                s.id === id
-                  ? { ...s, status: s.status === "Active" ? "Blocked" : "Active" }
-                  : s
-              )
-            );
+          onPress: async () => {
+            try {
+              if (seller.status === "Active") {
+                await blockSeller(id);
+              } else {
+                await unblockSeller(id);
+              }
+              await reload();
+            } catch (e) {
+              Alert.alert("Error", getApiErrorMessage(e));
+            }
           },
         },
       ]
@@ -507,7 +479,7 @@ export default function ApprovedSellersScreen() {
           text: "Delete",
           style: "destructive",
           onPress: () => {
-            setSellers((prev) => prev.filter((s) => s.id !== id));
+            setData((prev) => (prev ?? []).filter((s) => s.id !== id));
           },
         },
       ]
@@ -526,623 +498,7 @@ export default function ApprovedSellersScreen() {
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
-      >       {selectedSellerId !== null ? (
-          (() => {
-            const seller = sellers.find(s => s.id === selectedSellerId);
-            if (!seller) return null;
-
-            const handleUpdateSellerStatus = () => {
-              setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, status: adminStatus } : s));
-              Alert.alert("Success", `Seller status updated to ${adminStatus}!`);
-            };
-
-            return (
-              <View style={styles.detailsContainer}>
-                {/* --- HEADER BANNER --- */}
-                <View style={styles.detailsHeaderBanner}>
-                  <View style={styles.detailsHeaderLeft}>
-                    <View style={styles.avatarWrapper}>
-                      <Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />
-                      <View style={styles.statusDotActive} />
-                    </View>
-                    <View style={styles.detailsMeta}>
-                      <Text style={styles.detailsTitle}>{seller.name}</Text>
-                      <View style={styles.detailsMetaRow}>
-                        <Feather name="mail" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
-                        <Text style={styles.detailsSubtext}>{seller.email}</Text>
-                      </View>
-                      <View style={styles.detailsMetaRow}>
-                        <Feather name="calendar" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
-                        <Text style={styles.detailsSubtext}>Joined {seller.joinDate}</Text>
-                        <Feather name="briefcase" size={14} color="#F3F4F6" style={{ marginLeft: 12, marginRight: 6 }} />
-                        <Text style={styles.detailsSubtext}>{seller.businessName}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.detailsHeaderRight}>
-                    <View style={styles.currentStatusCard}>
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Feather name="check-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                        <Text style={styles.currentStatusVal}>{seller.status}</Text>
-                      </View>
-                      <Text style={styles.currentStatusLabel}>Current Status</Text>
-                    </View>
-                    
-                    <TouchableOpacity
-                      style={styles.backBtn}
-                      onPress={() => setSelectedSellerId(null)}
-                    >
-                      <Feather name="arrow-left" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={styles.backBtnText}>Back to Sellers</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* --- KYC VERIFICATION STATUS BAR --- */}
-                <View style={styles.kycBar}>
-                  <Text style={styles.kycBarTitle}>KYC Verification Status</Text>
-                  <View style={styles.kycNotCompletedBadge}>
-                    <Text style={styles.kycNotCompletedText}>Not Completed</Text>
-                  </View>
-                </View>
-
-                {/* --- 3x2 GRID OF KYC DETAILS --- */}
-                <View style={styles.kycGrid}>
-                  <View style={styles.kycGridCard}>
-                    <View style={styles.kycIconCircle}>
-                      <Feather name="check" size={16} color="#EA580C" />
-                    </View>
-                    <View style={styles.kycGridCardContent}>
-                      <Text style={styles.kycGridCardLabel}>KYC STATUS</Text>
-                      <View style={[styles.kycBadge, { backgroundColor: "#EF4444" }]}>
-                        <Text style={styles.kycBadgeText}>Not Completed</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.kycGridCard}>
-                    <View style={styles.kycIconCircle}>
-                      <Feather name="calendar" size={16} color="#EA580C" />
-                    </View>
-                    <View style={styles.kycGridCardContent}>
-                      <Text style={styles.kycGridCardLabel}>SUBMITTED ON</Text>
-                      <Text style={styles.kycGridCardValue}>N/A</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.kycGridCard}>
-                    <View style={styles.kycIconCircle}>
-                      <Feather name="image" size={16} color="#EA580C" />
-                    </View>
-                    <View style={styles.kycGridCardContent}>
-                      <Text style={styles.kycGridCardLabel}>IMAGES CAPTURED</Text>
-                      <View style={styles.kycGridCircleCount}>
-                        <Text style={styles.kycGridCircleCountText}>0</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.kycGridCard}>
-                    <View style={styles.kycIconCircle}>
-                      <Feather name="check" size={16} color="#EA580C" />
-                    </View>
-                    <View style={styles.kycGridCardContent}>
-                      <Text style={styles.kycGridCardLabel}>VERIFICATION STATUS</Text>
-                      <View style={[styles.kycBadge, { backgroundColor: "#FBBF24" }]}>
-                        <Text style={[styles.kycBadgeText, { color: "#1F2937" }]}>Pending</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.kycGridCard}>
-                    <View style={styles.kycIconCircle}>
-                      <Feather name="user" size={16} color="#EA580C" />
-                    </View>
-                    <View style={styles.kycGridCardContent}>
-                      <Text style={styles.kycGridCardLabel}>VERIFIED BY</Text>
-                      <Text style={styles.kycGridCardValue}>N/A</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.kycGridCard}>
-                    <View style={styles.kycIconCircle}>
-                      <Feather name="clock" size={16} color="#EA580C" />
-                    </View>
-                    <View style={styles.kycGridCardContent}>
-                      <Text style={styles.kycGridCardLabel}>VERIFIED ON</Text>
-                      <Text style={styles.kycGridCardValue}>N/A</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* --- 2 COLUMN DETAILS INFO & DOCUMENT SECTION --- */}
-                <View style={[styles.detailsColumns, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                  {/* Left Column (2/3 width) - Info Tables */}
-                  <View style={[styles.detailsColumnLeft, { flex: isLargeScreen ? 2.3 : 1 }]}>
-                    <View style={styles.infoCard}>
-                      <View style={styles.infoCardHeader}>
-                        <Feather name="user" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <Text style={styles.infoCardTitle}>Seller Information</Text>
-                      </View>
-
-                      <View style={styles.infoCardBody}>
-                        {/* Personal Details */}
-                        <Text style={styles.infoSectionTitle}>Personal Details</Text>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>First Name</Text>
-                          <Text style={styles.infoValue}>{seller.name.split(" ")[0]}</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Last Name</Text>
-                          <Text style={styles.infoValue}>{seller.name.split(" ").slice(1).join(" ") || "Collection"}</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Email</Text>
-                          <Text style={styles.infoValue}>{seller.email}</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Mobile</Text>
-                          <Text style={styles.infoValue}>+918466066939</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Registered On</Text>
-                          <Text style={styles.infoValue}>{seller.joinDate}</Text>
-                        </View>
-
-                        {/* Business Details */}
-                        <Text style={styles.infoSectionTitle}>Business Details</Text>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Business Name</Text>
-                          <Text style={styles.infoValue}>{seller.businessName}</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Seller Category</Text>
-                          <View style={styles.b2cBadge}>
-                            <Text style={styles.b2cBadgeText}>B2C</Text>
-                          </View>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Business Type</Text>
-                          <Text style={styles.infoValue}>{seller.businessType}</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Address</Text>
-                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Sri Sathya Sai Dist, Andhra Pradesh, 515133.</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>GST</Text>
-                          <Text style={styles.infoValue}>No</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>PAN Number</Text>
-                          <Text style={styles.infoValue}>AJEP12353R</Text>
-                        </View>
-
-                        {/* Bank Details */}
-                        <Text style={styles.infoSectionTitle}>Bank Details</Text>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Bank Name</Text>
-                          <Text style={styles.infoValue}>Canara Bank</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Branch Name</Text>
-                          <Text style={styles.infoValue}>HINDUPUR TEACHERS COLONY</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Account Number</Text>
-                          <Text style={styles.infoValue}>******4165</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>IFSC Code</Text>
-                          <Text style={styles.infoValue}>CNRB0013234</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Account Holder</Text>
-                          <Text style={styles.infoValue}>IRTANUM</Text>
-                        </View>
-
-                        {/* Location Details */}
-                        <Text style={styles.infoSectionTitle}>Location Details</Text>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Country</Text>
-                          <Text style={styles.infoValue}>India</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>State</Text>
-                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>City</Text>
-                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Area</Text>
-                          <Text style={styles.infoValue}>Kothacheruvu</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Pincode</Text>
-                          <Text style={styles.infoValue}>515133</Text>
-                        </View>
-
-                        {/* Warehouse Details */}
-                        <Text style={styles.infoSectionTitle}>Warehouse Details</Text>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Warehouse Address</Text>
-                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Near Indian oil petrol pump, Sri Sathya Sai Dist, Andhra Pradesh, 515133</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Country</Text>
-                          <Text style={styles.infoValue}>India</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>State</Text>
-                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>City</Text>
-                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Area</Text>
-                          <Text style={styles.infoValue}>Kothacheruvu</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Right Column (1/3 width) - Images & Documents */}
-                  <View style={[styles.detailsColumnRight, { flex: isLargeScreen ? 1.2 : 1, marginLeft: isLargeScreen ? 20 : 0, marginTop: isLargeScreen ? 0 : 20 }]}>
-                    {/* Profile Picture */}
-                    <View style={styles.sidebarCard}>
-                      <View style={styles.sidebarCardHeader}>
-                        <Text style={styles.sidebarCardTitle}>Profile Picture</Text>
-                      </View>
-                      <View style={styles.sidebarCardBody}>
-                        <Image source={{ uri: seller.avatar }} style={styles.sidebarProfileImg} />
-                      </View>
-                    </View>
-
-                    {/* Verification Documents */}
-                    <View style={[styles.sidebarCard, { marginTop: 20 }]}>
-                      <View style={styles.sidebarCardHeader}>
-                        <Text style={styles.sidebarCardTitle}>Verification Documents</Text>
-                      </View>
-                      <View style={styles.sidebarCardBodyDocs}>
-                        {[
-                          "Aadhaar Front",
-                          "Aadhaar Back",
-                          "PAN Card",
-                          "Cancelled Cheque",
-                          "Business Proof",
-                          "Bank Proof",
-                        ].map((docName) => (
-                          <View key={docName} style={styles.docRow}>
-                            <Text style={styles.docLabel}>{docName}</Text>
-                            <TouchableOpacity
-                              style={styles.docViewBtn}
-                              onPress={() => Alert.alert("Document View", `Opening preview for ${docName}...`)}
-                            >
-                              <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
-                              <Text style={styles.docViewBtnText}>View</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-
-                        <Text style={styles.docSectionSubTitle}>Business Proof Documents (Multiple)</Text>
-                        <View style={styles.docThumbnailRow}>
-                          <Image source={{ uri: seller.avatar }} style={styles.docThumbnail} />
-                        </View>
-
-                        <Text style={styles.docSectionSubTitle}>Live Selfie Documents</Text>
-                        <View style={styles.selfieThumbnailRow}>
-                          {[1, 2, 3, 4, 5].map((idx) => (
-                            <Image key={idx} source={{ uri: seller.avatar }} style={styles.selfieThumbnail} />
-                          ))}
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-
-                {/* --- ADMIN ACTIONS SECTION --- */}
-                <View style={styles.adminActionsCard}>
-                  <View style={styles.adminActionsHeader}>
-                    <Feather name="settings" size={16} color="#1F2937" style={{ marginRight: 8 }} />
-                    <Text style={styles.adminActionsTitle}>Admin Actions</Text>
-                  </View>
-
-                  <View style={[styles.adminActionsBody, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                    {/* Left Form (2/3 width) */}
-                    <View style={{ flex: isLargeScreen ? 2 : 1 }}>
-                      <View style={[styles.rowLayout, { gap: 16, flexWrap: "wrap", marginBottom: 16 }]}>
-                        {/* Update Status Dropdown */}
-                        <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
-                          <Text style={styles.formLabel}>Update Status</Text>
-                          <TouchableOpacity
-                            style={styles.selectDropdown}
-                            onPress={() => {
-                              setShowStatusDropdown(!showStatusDropdown);
-                              setShowKycDropdown(false);
-                            }}
-                          >
-                            <Text style={styles.selectDropdownText}>{adminStatus}</Text>
-                            <Feather name="chevron-down" size={14} color="#6B7280" />
-                          </TouchableOpacity>
-                          {showStatusDropdown && (
-                            <View style={styles.selectMenu}>
-                              {["Active", "Blocked"].map((opt) => (
-                                <TouchableOpacity
-                                  key={opt}
-                                  style={styles.selectMenuItem}
-                                  onPress={() => {
-                                    setAdminStatus(opt as any);
-                                    setShowStatusDropdown(false);
-                                  }}
-                                >
-                                  <Text style={styles.selectMenuText}>{opt}</Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          )}
-                        </View>
-
-                        {/* KYC Status Dropdown */}
-                        <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
-                          <Text style={styles.formLabel}>KYC Verification Status</Text>
-                          <TouchableOpacity
-                            style={styles.selectDropdown}
-                            onPress={() => {
-                              setShowKycDropdown(!showKycDropdown);
-                              setShowStatusDropdown(false);
-                            }}
-                          >
-                            <Text style={styles.selectDropdownText}>{adminKycStatus}</Text>
-                            <Feather name="chevron-down" size={14} color="#6B7280" />
-                          </TouchableOpacity>
-                          {showKycDropdown && (
-                            <View style={styles.selectMenu}>
-                              {["Pending Verification", "Active", "Rejected", "Inactive"].map((opt) => (
-                                <TouchableOpacity
-                                  key={opt}
-                                  style={styles.selectMenuItem}
-                                  onPress={() => {
-                                    setAdminKycStatus(opt);
-                                    setShowKycDropdown(false);
-                                  }}
-                                >
-                                  <Text style={styles.selectMenuText}>{opt}</Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          )}
-                        </View>
-                      </View>
-
-                      {/* Unique Seller ID */}
-                      <View style={{ marginBottom: 16 }}>
-                        <Text style={styles.formLabel}>Unique Seller ID (Auto-generated)</Text>
-                        <TextInput
-                          style={styles.formTextInputDisabled}
-                          value={`FNT-SELLER-0000${seller.id}`}
-                          editable={false}
-                        />
-                        <Text style={styles.formCaption}>Unique ID: FNT-SELLER-0000{seller.id}</Text>
-                      </View>
-
-                      {/* KYC Remarks */}
-                      <View style={{ marginBottom: 20 }}>
-                        <Text style={styles.formLabel}>KYC Verification Remarks</Text>
-                        <TextInput
-                          style={styles.formTextArea}
-                          placeholder="Provide any remarks or notes about the KYC verification process..."
-                          placeholderTextColor="#9CA3AF"
-                          value={kycRemarks}
-                          onChangeText={setKycRemarks}
-                          multiline={true}
-                          numberOfLines={4}
-                        />
-                        <Text style={styles.formCaption}>Optional notes about the verification process.</Text>
-                      </View>
-
-                      {/* Footer actions */}
-                      <View style={[styles.rowLayout, { gap: 12 }]}>
-                        <TouchableOpacity
-                          style={styles.updateStatusBtn}
-                          onPress={handleUpdateSellerStatus}
-                        >
-                          <Feather name="check" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                          <Text style={styles.updateStatusBtnText}>Update Status</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.backBtnGrey}
-                          onPress={() => setSelectedSellerId(null)}
-                        >
-                          <Feather name="arrow-left" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                          <Text style={styles.backBtnGreyText}>Back to Sellers</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Right Info (1/3 width) */}
-                    <View style={[styles.adminInfoPanel, { marginLeft: isLargeScreen ? 24 : 0, marginTop: isLargeScreen ? 0 : 24 }]}>
-                      <View style={styles.adminInfoPanelHeader}>
-                        <Feather name="info" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <Text style={styles.adminInfoPanelTitle}>Status Information</Text>
-                      </View>
-
-                      <View style={styles.adminInfoPanelBody}>
-                        <View style={styles.statusInfoRow}>
-                          <View style={[styles.statusIconCircle, { backgroundColor: "#FFFBEB" }]}>
-                            <Feather name="clock" size={14} color="#D97706" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.statusInfoTitle}>Pending</Text>
-                            <Text style={styles.statusInfoDesc}>Seller has submitted profile but not yet reviewed</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.statusInfoRow}>
-                          <View style={[styles.statusIconCircle, { backgroundColor: "#ECFDF5" }]}>
-                            <Feather name="check-circle" size={14} color="#10B981" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.statusInfoTitle}>Active</Text>
-                            <Text style={styles.statusInfoDesc}>Seller is approved and can sell products</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.statusInfoRow}>
-                          <View style={[styles.statusIconCircle, { backgroundColor: "#FEF2F2" }]}>
-                            <Feather name="x-circle" size={14} color="#EF4444" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.statusInfoTitle}>Rejected</Text>
-                            <Text style={styles.statusInfoDesc}>Seller application has been rejected</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.statusInfoRow}>
-                          <View style={[styles.statusIconCircle, { backgroundColor: "#F3F4F6" }]}>
-                            <Feather name="pause-circle" size={14} color="#6B7280" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.statusInfoTitle}>Inactive</Text>
-                            <Text style={styles.statusInfoDesc}>Seller account has been temporarily suspended</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            );
-          })()
-        ) : showPending ? (
-          <>
-            {/* --- PENDING HEADER BANNER CARD --- */}
-            <View style={styles.pageHeaderCard}>
-              <View style={styles.bannerTop} />
-              <View style={[styles.bannerBottom, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                <View style={styles.bannerBottomLeft}>
-                  <View style={styles.overlapBadgeContainer}>
-                    <View style={styles.overlapBadgeCircle}>
-                      <Feather name="map-pin" size={20} color="#FFFFFF" />
-                    </View>
-                  </View>
-                  
-                  <View style={styles.bannerTitleContainer}>
-                    <Text style={styles.bannerTitle}>Pending Sellers</Text>
-                    <View style={styles.breadcrumbs}>
-                      <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
-                      <TouchableOpacity onPress={() => router.push("/approveseller")}>
-                        <Text style={styles.breadcrumbActive}>Dashboard</Text>
-                      </TouchableOpacity>
-                      <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                      <Text style={styles.breadcrumbText}>Pending Sellers</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.bannerPendingBadge}
-                  onPress={() => router.push("/approveseller")}
-                >
-                  <Feather name="clock" size={14} color="#1F2937" />
-                  <Text style={styles.bannerPendingBadgeText}>{pendingSellers.length} Pending</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* --- SEARCH TOOLBAR --- */}
-            <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              <View style={[styles.searchContainer, { flex: 1, marginRight: 0 }]}>
-                <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search pending sellers..."
-                  placeholderTextColor="#9CA3AF"
-                  value={pendingSearchQuery}
-                  onChangeText={setPendingSearchQuery}
-                />
-                {pendingSearchQuery ? (
-                  <TouchableOpacity onPress={() => setPendingSearchQuery("")} style={styles.clearSearchBtn}>
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-
-            {/* --- PENDING TABLE --- */}
-            <View style={styles.tableCard}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableTh, { flex: 0.8 }]}>ID</Text>
-                <Text style={[styles.tableTh, { flex: 1.8 }]}>Name</Text>
-                <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
-                <Text style={[styles.tableTh, { flex: 2.2 }]}>Email</Text>
-                <Text style={[styles.tableTh, { flex: 1.6 }]}>Mobile</Text>
-                <Text style={[styles.tableTh, { flex: 1.4 }]}>Submitted On</Text>
-                <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Actions</Text>
-              </View>
-
-              {filteredPendingSellers.map((seller) => (
-                <View key={seller.id} style={styles.tableRow}>
-                  <View style={[styles.tableCell, { flex: 0.8 }]}>
-                    <View style={styles.idBadge}>
-                      <Text style={styles.idBadgeText}>{seller.id}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.tableCellTextBold, { flex: 1.8 }]}>{seller.name}</Text>
-                  <Text style={[styles.tableCellText, { flex: 2 }]}>{seller.businessName}</Text>
-                  <Text style={[styles.tableCellText, { flex: 2.2 }]} numberOfLines={1}>{seller.email}</Text>
-                  <Text style={[styles.tableCellText, { flex: 1.6 }]}>{seller.mobile}</Text>
-                  <Text style={[styles.tableCellText, { flex: 1.4 }]}>{seller.submittedOn}</Text>
-                  <View style={[styles.tableCellActions, { flex: 1.2, justifyContent: "center" }]}>
-                    <TouchableOpacity
-                      style={styles.pendingViewBtn}
-                      onPress={() => {
-                        setSelectedPendingSeller(seller);
-                        setShowPendingModal(true);
-                      }}
-                    >
-                      <Text style={styles.pendingViewBtnText}>View</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-
-              {filteredPendingSellers.length === 0 && (
-                <View style={styles.emptyTable}>
-                  <Text style={styles.emptyText}>No pending sellers found.</Text>
-                </View>
-              )}
-            </View>
-
-            {/* --- FOOTER PAGINATION --- */}
-            <View style={[styles.pagination, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              <Text style={styles.paginationText}>
-                Showing 1 - {filteredPendingSellers.length} of {filteredPendingSellers.length} pending sellers
-              </Text>
-
-              <View style={styles.pageSelectors}>
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
-                  <Ionicons name="chevron-back" size={16} color="#D1D5DB" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageNumber, styles.pageNumberActive]}>
-                  <Text style={[styles.pageNumberText, styles.pageNumberTextActive]}>1</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
-                  <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
-        ) : (
-          <>
-
+      >
             {/* --- PAGE HEADER BANNER CARD --- */}
             <View style={styles.pageHeaderCard}>
               {/* Banner Top Portion (Orange Gradient) */}
@@ -1689,6 +1045,12 @@ const styles = StyleSheet.create({
   scrollBodyContent: {
     padding: 24,
     paddingBottom: 60,
+  },
+  loadErrorText: {
+    fontSize: 14,
+    color: "#DC2626",
+    marginBottom: 16,
+    textAlign: "center",
   },
   rowLayout: {
     flexDirection: "row",

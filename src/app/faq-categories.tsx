@@ -1,7 +1,10 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapFaqCategoryRow } from '@/lib/mappers';
+import { createFaqCategory, fetchFaqCategories } from '@/services/faqApi';
 import {
   Platform,
   Pressable,
@@ -12,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AdminLayout from '../components/admin-layout';
 
 import { AppHeader } from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
@@ -41,80 +45,33 @@ type FaqCategory = {
   icon: MaterialIconName;
 };
 
-const FAQ_CATEGORIES: FaqCategory[] = [
-  {
-    id: 1,
-    name: 'About Flint & Thread',
-    description: 'Information about our company, mission and vision, and what makes us unique in the fashion and textile industry.',
-    sortOrder: 1,
-    status: 'Active',
-    createdDate: '18 Nov, 2025',
-    createdTime: '10:30 AM',
-    articleCount: 12,
-    theme: { border: '#EF7B1A', iconBg: '#FFF7ED', iconColor: '#EF7B1A', accent: '#EF7B1A' },
-    icon: 'groups',
-  },
-  {
-    id: 2,
-    name: 'Account & Profile',
-    description: 'Manage your account settings, profile information, and personal preferences.',
-    sortOrder: 2,
-    status: 'Active',
-    createdDate: '18 Nov, 2025',
-    createdTime: '10:30 AM',
-    articleCount: 8,
-    theme: { border: '#22C55E', iconBg: '#ECFDF5', iconColor: '#16A34A', accent: '#16A34A' },
-    icon: 'person',
-  },
-  {
-    id: 3,
-    name: 'Orders & Shopping',
-    description: 'Everything about placing orders, tracking purchases, and shopping on our platform.',
-    sortOrder: 3,
-    status: 'Active',
-    createdDate: '18 Nov, 2025',
-    createdTime: '10:30 AM',
-    articleCount: 15,
-    theme: { border: '#9333EA', iconBg: '#F3E8FF', iconColor: '#9333EA', accent: '#9333EA' },
-    icon: 'shopping-cart',
-  },
-  {
-    id: 4,
-    name: 'Shipping & Delivery',
-    description: 'Shipping options, delivery timelines, and tracking your orders to your doorstep.',
-    sortOrder: 4,
-    status: 'Active',
-    createdDate: '18 Nov, 2025',
-    createdTime: '10:30 AM',
-    articleCount: 10,
-    theme: { border: '#2563EB', iconBg: '#EFF6FF', iconColor: '#2563EB', accent: '#2563EB' },
-    icon: 'local-shipping',
-  },
-  {
-    id: 5,
-    name: 'Payments & Refunds',
-    description: 'Payment methods, billing questions, and refund policies explained clearly.',
-    sortOrder: 5,
-    status: 'Active',
-    createdDate: '18 Nov, 2025',
-    createdTime: '10:30 AM',
-    articleCount: 14,
-    theme: { border: '#CA8A04', iconBg: '#FEF9C3', iconColor: '#CA8A04', accent: '#CA8A04' },
-    icon: 'account-balance-wallet',
-  },
-  {
-    id: 6,
-    name: 'Returns & Exchanges',
-    description: 'How to return or exchange items, eligibility criteria, and processing timelines.',
-    sortOrder: 6,
-    status: 'Active',
-    createdDate: '18 Nov, 2025',
-    createdTime: '10:30 AM',
-    articleCount: 11,
-    theme: { border: '#EF4444', iconBg: '#FEF2F2', iconColor: '#EF4444', accent: '#EF4444' },
-    icon: 'autorenew',
-  },
+const THEME_CYCLE: CategoryTheme[] = [
+  { border: '#EF7B1A', iconBg: '#FFF7ED', iconColor: '#EF7B1A', accent: '#EF7B1A' },
+  { border: '#22C55E', iconBg: '#ECFDF5', iconColor: '#16A34A', accent: '#16A34A' },
+  { border: '#9333EA', iconBg: '#F3E8FF', iconColor: '#9333EA', accent: '#9333EA' },
+  { border: '#2563EB', iconBg: '#EFF6FF', iconColor: '#2563EB', accent: '#2563EB' },
+  { border: '#CA8A04', iconBg: '#FEF9C3', iconColor: '#CA8A04', accent: '#CA8A04' },
+  { border: '#EF4444', iconBg: '#FEF2F2', iconColor: '#EF4444', accent: '#EF4444' },
 ];
+
+const ICON_CYCLE: MaterialIconName[] = ['groups', 'person', 'shopping-cart', 'local-shipping', 'account-balance-wallet', 'autorenew'];
+
+function mapApiCategory(row: ReturnType<typeof mapFaqCategoryRow>, index: number): FaqCategory {
+  const theme = THEME_CYCLE[index % THEME_CYCLE.length];
+  const iconName = (row.icon as MaterialIconName) || ICON_CYCLE[index % ICON_CYCLE.length];
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.name,
+    sortOrder: row.sortOrder,
+    status: row.status ? 'Active' : 'Inactive',
+    createdDate: '—',
+    createdTime: '—',
+    articleCount: row.faqCount,
+    theme,
+    icon: iconName,
+  };
+}
 
 function Icon({
   name,
@@ -404,22 +361,50 @@ export default function FaqCategoriesScreen() {
 
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [categories, setCategories] = useState<FaqCategory[]>([]);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const rows = await fetchFaqCategories();
+      setCategories(rows.map((r, i) => mapApiCategory(mapFaqCategoryRow(r), i)));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  const handleAddCategory = async () => {
+    try {
+      await createFaqCategory({
+        categoryName: `New Category ${categories.length + 1}`,
+        sortOrder: categories.length + 1,
+        status: true,
+      });
+      await loadCategories();
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  };
 
   const gridColumns = isWeb ? (width < 768 ? 1 : width < 1100 ? 2 : 3) : 1;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return FAQ_CATEGORIES;
-    return FAQ_CATEGORIES.filter(
+    if (!q) return categories;
+    return categories.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.description.toLowerCase().includes(q) ||
         String(c.id).includes(q),
     );
-  }, [query]);
+  }, [query, categories]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <AdminLayout>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <AppHeader />
       <ScrollView
         style={styles.screen}
@@ -446,7 +431,7 @@ export default function FaqCategoriesScreen() {
               </View>
             </View>
           </View>
-          <Pressable style={[styles.addBtn, isMobile && styles.addBtnMobile]}>
+          <Pressable style={[styles.addBtn, isMobile && styles.addBtnMobile]} onPress={handleAddCategory}>
             <Icon name={{ ios: 'plus', android: 'add', web: 'add' }} size={14} color="#fff" />
             <ThemedText type="smallBold" style={{ color: '#fff' }}>
               Add New FAQ Category
@@ -527,7 +512,8 @@ export default function FaqCategoriesScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AdminLayout>
   );
 }
 

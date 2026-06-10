@@ -35,21 +35,21 @@ const NAV_ITEMS = {
     icon: "shopping-bag",
     children: [
       { label: "Products", icon: "package", path: null },
-      { label: "Customers", icon: "users", path: null },
+      { label: "Customers", icon: "users", path: "/customerManagement" },
       { label: "Sellers", icon: "user-check", path: null },
-      { label: "Sellers Graph", icon: "trending-up", path: null },
-      { label: "Seller Bank Approval", icon: "credit-card", path: null },
+      { label: "Sellers Graph", icon: "trending-up", path: "/sellergraphs" },
+      { label: "Seller Bank Approval", icon: "credit-card", path: "/sellerbankapproval" },
       { label: "Orphaned Products", icon: "alert-circle", path: null },
-      { label: "Orders", icon: "shopping-cart", path: null },
+      { label: "Orders", icon: "shopping-cart", path: "/orders" },
       { label: "Refund Management", icon: "rotate-ccw", path: null },
-      { label: "Delivery Charges", icon: "truck", path: null },
+      { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges" },
     ],
     standalone: [
-      { label: "Pending Sellers", icon: "user-plus", path: null },
+      { label: "Pending Sellers", icon: "user-plus", path: "/pendingSellers" },
       { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
       { label: "Customer Support", icon: "headphones", path: null },
-      { label: "Category Requests", icon: "grid", path: null },
-      { label: "Seller Support", icon: "message-square", path: null },
+      { label: "Category Requests", icon: "grid", path: "/categoryRequests" },
+      { label: "Seller Support", icon: "message-square", path: "/supportticket" },
     ],
   },
   "EMAIL MANAGEMENT": [
@@ -57,12 +57,12 @@ const NAV_ITEMS = {
     { label: "Seller Emails", icon: "mail", path: null },
   ],
   "PAYMENTS & PRODUCTS": [
-    { label: "Commission rates (B2B/B2C)", icon: "percent", path: null },
-    { label: "Seller Payments", icon: "dollar-sign", path: null },
-    { label: "Product Approvals", icon: "check-square", path: null },
+    { label: "Commission rates (B2B/B2C)", icon: "percent", path: "/commissionrates" },
+    { label: "Seller Payments", icon: "dollar-sign", path: "/Sellerpayments" },
+    { label: "Product Approvals", icon: "check-square", path: "/productApproval" },
     { label: "Add Sellers", icon: "user-plus", path: null },
     { label: "Ads Admin Users", icon: "user", path: null },
-    { label: "Admin Panel Users", icon: "shield", path: null },
+    { label: "Admin Panel Users", icon: "shield", path: "/adminpanel" },
   ],
   CUSTOM: [
     {
@@ -83,7 +83,7 @@ const NAV_ITEMS = {
         { label: "FAQ Questions", icon: "help-circle", path: null }
       ]
     },
-    { label: "Contact Messages", icon: "mail", path: null },
+    { label: "Contact Messages", icon: "mail", path: "/Contactmessages" },
     { label: "Logos", icon: "image", path: null },
     {
       label: "Banners",
@@ -107,9 +107,9 @@ const NAV_ITEMS = {
       label: "Careers Management",
       icon: "briefcase",
       children: [
-        { label: "Departments", icon: "layers", path: null },
-        { label: "Job Openings", icon: "briefcase", path: null },
-        { label: "Applications", icon: "file-text", path: null }
+        { label: "Departments", icon: "layers", path: "/Departments" },
+        { label: "Job Openings", icon: "briefcase", path: "/jobopenings" },
+        { label: "Applications", icon: "file-text", path: "/jobApplications" }
       ]
     }
   ]
@@ -158,7 +158,11 @@ export default function AdminSidebar({
       </View>
 
       {/* Scrollable nav items */}
-      <ScrollView style={styles.navScroll} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.navScroll} 
+        contentContainerStyle={{ paddingBottom: 80 }} 
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* GENERAL */}
         <View style={styles.section}>
