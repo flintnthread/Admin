@@ -1,767 +1,629 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Link } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getApiErrorMessage } from '@/lib/api/client';
-import { mapFaqCategoryRow } from '@/lib/mappers';
-import { createFaqCategory, fetchFaqCategories } from '@/services/faqApi';
+import React, { useState } from "react";
 import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import AdminLayout from '../components/admin-layout';
+    View,
+    Text,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet,
+    TextInput,
+    Platform,
+    Modal,
+    StatusBar,
+    Alert,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
+import AdminLayout from "@/components/admin-layout";
 
-import { AppHeader } from '@/components/app-header';
-import { ThemedText } from '@/components/themed-text';
-import { FaqColors } from '@/constants/faq-theme';
+// ─── THEME — Light / White ────────────────────────────────────────────────────
+const PRIMARY       = "#ef7b1a";
+const PRIMARY_LIGHT = "#fff4eb";
+const PRIMARY_DARK  = "#c4601a";
+const DARK_NAVY     = "#1a2b4a";
 
-type RowStatus = 'Active' | 'Inactive';
-type ViewMode = 'list' | 'grid';
-type MaterialIconName = keyof typeof MaterialIcons.glyphMap;
+const ACCENT_TEAL   = "#00b894";
+const ACCENT_PURPLE = "#6c5ce7";
+const ACCENT_SKY    = "#0984e3";
+const ACCENT_AMBER  = "#e17055";
+const ACCENT_PINK   = "#e84393";
+const ACCENT_RED    = "#d63031";
+const ACCENT_GREEN  = "#00b359";
+const ACCENT_VIOLET = "#8e44ad";
 
-type CategoryTheme = {
-  border: string;
-  iconBg: string;
-  iconColor: string;
-  accent: string;
-};
+const BG_PAGE  = "#f2f4f7";
+const BG_CARD  = "#ffffff";
+const BORDER   = "#e8ecf0";
 
-type FaqCategory = {
-  id: number;
-  name: string;
-  description: string;
-  sortOrder: number;
-  status: RowStatus;
-  createdDate: string;
-  createdTime: string;
-  articleCount: number;
-  theme: CategoryTheme;
-  icon: MaterialIconName;
-};
+const TEXT_HEAD  = "#1a2b4a";
+const TEXT_BODY  = "#4a5568";
+const TEXT_MUTED = "#a0aec0";
 
-const THEME_CYCLE: CategoryTheme[] = [
-  { border: '#EF7B1A', iconBg: '#FFF7ED', iconColor: '#EF7B1A', accent: '#EF7B1A' },
-  { border: '#22C55E', iconBg: '#ECFDF5', iconColor: '#16A34A', accent: '#16A34A' },
-  { border: '#9333EA', iconBg: '#F3E8FF', iconColor: '#9333EA', accent: '#9333EA' },
-  { border: '#2563EB', iconBg: '#EFF6FF', iconColor: '#2563EB', accent: '#2563EB' },
-  { border: '#CA8A04', iconBg: '#FEF9C3', iconColor: '#CA8A04', accent: '#CA8A04' },
-  { border: '#EF4444', iconBg: '#FEF2F2', iconColor: '#EF4444', accent: '#EF4444' },
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+type CategoryStatus = "Active" | "Inactive";
+
+interface FaqCategory {
+    id: number;
+    name: string;
+    description: string;
+    icon: string;
+    color: string;
+    faqCount: number;
+    status: CategoryStatus;
+    createdAt: string;
+    slug: string;
+}
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const initialCategories: FaqCategory[] = [
+    { id: 1, name: "About Flint & Thread", description: "Brand story, mission & values",     icon: "info",        color: ACCENT_TEAL,   faqCount: 8,  status: "Active",   createdAt: "18 Nov, 2025", slug: "about"    },
+    { id: 2, name: "Account & Profile",    description: "Login, settings, preferences",       icon: "user",        color: ACCENT_PURPLE, faqCount: 12, status: "Active",   createdAt: "18 Nov, 2025", slug: "account"  },
+    { id: 3, name: "Orders & Tracking",    description: "Order status, updates & history",    icon: "package",     color: ACCENT_SKY,    faqCount: 15, status: "Active",   createdAt: "18 Nov, 2025", slug: "orders"   },
+    { id: 4, name: "Shipping & Delivery",  description: "Timelines, zones & charges",         icon: "truck",       color: ACCENT_AMBER,  faqCount: 10, status: "Active",   createdAt: "18 Nov, 2025", slug: "shipping" },
+    { id: 5, name: "Payments & Wallet",    description: "Methods, wallet & transactions",     icon: "credit-card", color: ACCENT_PINK,   faqCount: 9,  status: "Active",   createdAt: "18 Nov, 2025", slug: "payments" },
+    { id: 6, name: "Returns & Refunds",    description: "Policy, process & timelines",        icon: "refresh-cw",  color: ACCENT_RED,    faqCount: 7,  status: "Active",   createdAt: "18 Nov, 2025", slug: "returns"  },
+    { id: 7, name: "Seller Support",       description: "Onboarding, listings & payouts",     icon: "briefcase",   color: ACCENT_GREEN,  faqCount: 11, status: "Inactive", createdAt: "20 Nov, 2025", slug: "seller"   },
+    { id: 8, name: "Technical Issues",     description: "App bugs, errors & fixes",           icon: "tool",        color: ACCENT_VIOLET, faqCount: 6,  status: "Active",   createdAt: "22 Nov, 2025", slug: "tech"     },
 ];
 
-const ICON_CYCLE: MaterialIconName[] = ['groups', 'person', 'shopping-cart', 'local-shipping', 'account-balance-wallet', 'autorenew'];
+// ─── ADD / EDIT MODAL ────────────────────────────────────────────────────────
+const CategoryModal: React.FC<{
+    visible: boolean;
+    onClose: () => void;
+    onSave: (cat: Partial<FaqCategory>) => void;
+    editing: FaqCategory | null;
+    isWeb: boolean;
+}> = ({ visible, onClose, onSave, editing, isWeb }) => {
+    const [name,   setName]   = useState(editing?.name        ?? "");
+    const [desc,   setDesc]   = useState(editing?.description ?? "");
+    const [status, setStatus] = useState<CategoryStatus>(editing?.status ?? "Active");
 
-function mapApiCategory(row: ReturnType<typeof mapFaqCategoryRow>, index: number): FaqCategory {
-  const theme = THEME_CYCLE[index % THEME_CYCLE.length];
-  const iconName = (row.icon as MaterialIconName) || ICON_CYCLE[index % ICON_CYCLE.length];
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.name,
-    sortOrder: row.sortOrder,
-    status: row.status ? 'Active' : 'Inactive',
-    createdDate: '—',
-    createdTime: '—',
-    articleCount: row.faqCount,
-    theme,
-    icon: iconName,
-  };
-}
+    React.useEffect(() => {
+        setName(editing?.name        ?? "");
+        setDesc(editing?.description ?? "");
+        setStatus(editing?.status    ?? "Active");
+    }, [editing, visible]);
 
-function Icon({
-  name,
-  size = 16,
-  color = FaqColors.text,
-}: {
-  name: { ios: string; android: MaterialIconName; web: MaterialIconName };
-  size?: number;
-  color?: string;
-}) {
-  if (Platform.OS === 'ios') {
-    return <SymbolView name={name.ios as never} size={size} tintColor={color} />;
-  }
-  const materialName = Platform.OS === 'web' ? name.web : name.android;
-  return <MaterialIcons name={materialName} size={size} color={color} />;
-}
+    if (!visible) return null;
 
-function StatusBadge({ status }: { status: RowStatus }) {
-  const active = status === 'Active';
-  return (
-    <View
-      style={[
-        styles.statusBadge,
-        {
-          backgroundColor: active ? FaqColors.activeBg : FaqColors.inactiveBg,
-          borderColor: active ? FaqColors.activeBorder : FaqColors.inactiveBorder,
-        },
-      ]}>
-      <ThemedText
-        type="smallBold"
-        style={{ fontSize: 12, color: active ? FaqColors.activeText : FaqColors.inactiveText }}>
-        {status}
-      </ThemedText>
-    </View>
-  );
-}
-
-function FaqRowActions() {
-  return (
-    <View style={styles.rowActions}>
-      <Pressable style={[styles.faqActionBtn, { backgroundColor: FaqColors.viewBtn }]}>
-        <Icon name={{ ios: 'eye', android: 'visibility', web: 'visibility' }} size={14} color="#fff" />
-      </Pressable>
-      <Pressable style={[styles.faqActionBtn, { backgroundColor: FaqColors.editBtn }]}>
-        <Icon name={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' }} size={14} color="#fff" />
-      </Pressable>
-      <Pressable style={[styles.faqActionBtn, styles.faqDeleteBtn]}>
-        <Icon
-          name={{ ios: 'trash', android: 'delete', web: 'delete' }}
-          size={14}
-          color={FaqColors.deleteBtnIcon}
-        />
-      </Pressable>
-    </View>
-  );
-}
-
-function CategoryNameCell({ category }: { category: FaqCategory }) {
-  return (
-    <View style={styles.nameCell}>
-      <View style={[styles.nameIcon, { backgroundColor: category.theme.iconBg }]}>
-        <MaterialIcons name={category.icon} size={18} color={category.theme.iconColor} />
-      </View>
-      <View style={styles.nameTextWrap}>
-        <ThemedText type="smallBold" style={styles.categoryName} numberOfLines={1}>
-          {category.name}
-        </ThemedText>
-        <ThemedText type="small" style={styles.categoryDesc} numberOfLines={2}>
-          {category.description}
-        </ThemedText>
-      </View>
-    </View>
-  );
-}
-
-function FaqGridCard({ category }: { category: FaqCategory }) {
-  return (
-    <View style={[styles.gridCard, { borderTopColor: category.theme.border }]}>
-      <View style={styles.gridCardHeader}>
-        <View style={styles.gridCardTitleRow}>
-          <View style={[styles.gridIcon, { backgroundColor: category.theme.iconBg }]}>
-            <MaterialIcons name={category.icon} size={20} color={category.theme.iconColor} />
-          </View>
-          <ThemedText type="smallBold" style={styles.gridCardTitle} numberOfLines={2}>
-            {category.name}
-          </ThemedText>
-        </View>
-        <Pressable hitSlop={8}>
-          <MaterialIcons name="more-vert" size={18} color={FaqColors.textMuted} />
-        </Pressable>
-      </View>
-
-      <ThemedText type="small" style={styles.gridCardDesc} numberOfLines={3}>
-        {category.description}
-      </ThemedText>
-
-      <View style={styles.gridMetaRow}>
-        <View style={styles.gridDateRow}>
-          <MaterialIcons name="calendar-today" size={13} color={FaqColors.textMuted} />
-          <ThemedText type="small" style={{ color: FaqColors.textMuted }}>
-            {category.createdDate}
-          </ThemedText>
-        </View>
-        <StatusBadge status={category.status} />
-      </View>
-
-      <View style={styles.gridCardFooter}>
-        <ThemedText type="smallBold" style={{ color: category.theme.accent }}>
-          {category.articleCount} Articles
-        </ThemedText>
-        <Pressable style={[styles.gridArrowBtn, { borderColor: category.theme.accent }]}>
-          <MaterialIcons name="chevron-right" size={18} color={category.theme.accent} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function FaqListTable({ rows }: { rows: FaqCategory[] }) {
-  if (rows.length === 0) {
     return (
-      <View style={styles.empty}>
-        <ThemedText type="small" style={{ color: FaqColors.textMuted }}>
-          No categories found.
-        </ThemedText>
-      </View>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+            <View style={mSt.overlay}>
+                <View style={[mSt.sheet, isWeb && mSt.sheetWeb]}>
+                    {/* Header */}
+                    <View style={mSt.header}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                            <View style={[mSt.headerDot, { backgroundColor: PRIMARY }]} />
+                            <Text style={mSt.title}>{editing ? "Edit Category" : "New FAQ Category"}</Text>
+                        </View>
+                        <TouchableOpacity onPress={onClose} style={mSt.closeBtn}>
+                            <Feather name="x" size={16} color={TEXT_BODY} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={{ padding: 24 }}>
+                        <Text style={mSt.label}>Category Name</Text>
+                        <TextInput style={mSt.input} value={name} onChangeText={setName}
+                            placeholder="e.g. Orders & Tracking" placeholderTextColor={TEXT_MUTED} />
+
+                        <Text style={mSt.label}>Short Description</Text>
+                        <TextInput style={[mSt.input, { height: 80, textAlignVertical: "top", paddingTop: 12 }]}
+                            value={desc} onChangeText={setDesc}
+                            placeholder="Briefly describe this category..." placeholderTextColor={TEXT_MUTED} multiline />
+
+                        <Text style={mSt.label}>Status</Text>
+                        <View style={mSt.statusToggle}>
+                            {(["Active", "Inactive"] as const).map(s => (
+                                <TouchableOpacity key={s}
+                                    style={[mSt.statusOption,
+                                        status === s && { backgroundColor: s === "Active" ? ACCENT_TEAL : ACCENT_RED,
+                                                          borderColor:     s === "Active" ? ACCENT_TEAL : ACCENT_RED }]}
+                                    onPress={() => setStatus(s)}>
+                                    <Text style={[mSt.statusOptionText, status === s && { color: "#fff" }]}>{s}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </ScrollView>
+
+                    <View style={mSt.footer}>
+                        <TouchableOpacity style={mSt.cancelBtn} onPress={onClose}>
+                            <Text style={mSt.cancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={mSt.saveBtn}
+                            onPress={() => { onSave({ name, description: desc, status }); onClose(); }}>
+                            <Feather name={editing ? "check" : "plus"} size={14} color="#fff" />
+                            <Text style={mSt.saveText}>{editing ? "Save Changes" : "Add Category"}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
     );
-  }
+};
 
-  return (
-    <View style={styles.tableCard}>
-      <View style={styles.tableHead}>
-        <View style={[styles.thCell, styles.colId]}>
-          <ThemedText type="smallBold" style={styles.th}>ID</ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.colName]}>
-          <ThemedText type="smallBold" style={styles.th}>Category Name</ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.colSort]}>
-          <ThemedText type="smallBold" style={styles.th}>Sort Order</ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.colStatus]}>
-          <ThemedText type="smallBold" style={styles.th}>Status</ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.colDate]}>
-          <ThemedText type="smallBold" style={styles.th}>Created Date</ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.colActions]}>
-          <ThemedText type="smallBold" style={styles.th}>Action</ThemedText>
-        </View>
-      </View>
-
-      {rows.map((row, i) => (
-        <Pressable
-          key={row.id}
-          style={({ hovered }) => [
-            styles.tableRow,
-            i > 0 && styles.tableRowBorder,
-            hovered && styles.tableRowHover,
-          ]}>
-          <View style={[styles.tdCell, styles.colId]}>
-            <ThemedText type="smallBold" style={styles.idText}>
-              {String(row.id).padStart(2, '0')}
-            </ThemedText>
-          </View>
-          <View style={[styles.tdCell, styles.colName, styles.nameTdCell]}>
-            <CategoryNameCell category={row} />
-          </View>
-          <View style={[styles.tdCell, styles.colSort]}>
-            <ThemedText type="smallBold" style={styles.tdCenter}>{row.sortOrder}</ThemedText>
-          </View>
-          <View style={[styles.tdCell, styles.colStatus]}>
-            <StatusBadge status={row.status} />
-          </View>
-          <View style={[styles.tdCell, styles.colDate]}>
-            <ThemedText type="smallBold" style={styles.tdCenter}>{row.createdDate}</ThemedText>
-            <ThemedText type="small" style={styles.timeText}>{row.createdTime}</ThemedText>
-          </View>
-          <View style={[styles.tdCell, styles.colActions]}>
-            <FaqRowActions />
-          </View>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-const MOBILE_TABLE_WIDTH = 720;
-
-function FaqMobileListTable({ rows }: { rows: FaqCategory[] }) {
-  if (rows.length === 0) {
+// ─── GRID CARD  (image-2 style) ───────────────────────────────────────────────
+// Layout:
+//   [ icon-box (top-left) ]          [ edit 🖊  delete 🗑 (top-right) ]
+//   Category Name (bold)
+//   Description (muted)
+//   ─────────────────────────────────────────────
+//   📋 N FAQs   📅 date    • ACTIVE / INACTIVE
+// Top border uses the category accent color.
+const GridCard: React.FC<{
+    cat: FaqCategory;
+    onEdit: () => void;
+    onToggle: () => void;
+    onDelete: () => void;
+    onNavigate: () => void;
+}> = ({ cat, onEdit, onToggle, onDelete, onNavigate }) => {
+    const isActive = cat.status === "Active";
     return (
-      <View style={styles.empty}>
-        <ThemedText type="small" style={{ color: FaqColors.textMuted }}>
-          No categories found.
-        </ThemedText>
-      </View>
+        <TouchableOpacity style={[cSt.card, { borderTopColor: cat.color }]} onPress={onNavigate} activeOpacity={0.8}>
+            {/* Top row: icon + action buttons */}
+            <View style={cSt.topRow}>
+                <View style={[cSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
+                    <Feather name={cat.icon as any} size={20} color={cat.color} />
+                </View>
+                <View style={cSt.actionBtns}>
+                    <TouchableOpacity style={cSt.iconBtn} onPress={onEdit}>
+                        <Feather name="edit-2" size={13} color={TEXT_BODY} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[cSt.iconBtn, cSt.iconBtnRed]} onPress={onToggle}>
+                        <Feather name={isActive ? "eye-off" : "eye"} size={13} color={ACCENT_RED} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[cSt.iconBtn, cSt.iconBtnRed]} onPress={onDelete}>
+                        <Feather name="trash-2" size={13} color={ACCENT_RED} />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Name + description */}
+            <Text style={cSt.name} numberOfLines={1}>{cat.name}</Text>
+            <Text style={cSt.desc} numberOfLines={2}>{cat.description}</Text>
+
+            {/* Divider */}
+            <View style={cSt.divider} />
+
+            {/* Meta row */}
+            <View style={cSt.metaRow}>
+                <View style={cSt.metaItem}>
+                    <Feather name="help-circle" size={11} color={TEXT_MUTED} />
+                    <Text style={cSt.metaText}>{cat.faqCount} FAQs</Text>
+                </View>
+                <View style={cSt.metaItem}>
+                    <Feather name="calendar" size={11} color={TEXT_MUTED} />
+                    <Text style={cSt.metaText}>{cat.createdAt}</Text>
+                </View>
+                <View style={cSt.metaItem}>
+                    <View style={[cSt.statusDot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
+                    <Text style={[cSt.statusLabel, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>
+                        {cat.status.toUpperCase()}
+                    </Text>
+                </View>
+            </View>
+        </TouchableOpacity>
     );
-  }
+};
 
-  return (
-    <View style={styles.tableCard}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
-        <View style={{ minWidth: MOBILE_TABLE_WIDTH }}>
-          <View style={styles.tableHead}>
-            <View style={[styles.thCell, styles.colId]}>
-              <ThemedText type="smallBold" style={styles.th}>ID</ThemedText>
-            </View>
-            <View style={[styles.thCell, styles.colName]}>
-              <ThemedText type="smallBold" style={styles.th}>Category Name</ThemedText>
-            </View>
-            <View style={[styles.thCell, styles.colSort]}>
-              <ThemedText type="smallBold" style={styles.th}>Sort Order</ThemedText>
-            </View>
-            <View style={[styles.thCell, styles.colStatus]}>
-              <ThemedText type="smallBold" style={styles.th}>Status</ThemedText>
-            </View>
-            <View style={[styles.thCell, styles.colDate]}>
-              <ThemedText type="smallBold" style={styles.th}>Created Date</ThemedText>
-            </View>
-            <View style={[styles.thCell, styles.colActions]}>
-              <ThemedText type="smallBold" style={styles.th}>Action</ThemedText>
-            </View>
-          </View>
-
-          {rows.map((row, i) => (
-            <Pressable
-              key={row.id}
-              style={[styles.tableRow, i > 0 && styles.tableRowBorder, styles.tableRowPressed]}>
-              <View style={[styles.tdCell, styles.colId]}>
-                <ThemedText type="smallBold" style={styles.idText}>
-                  {String(row.id).padStart(2, '0')}
-                </ThemedText>
-              </View>
-              <View style={[styles.tdCell, styles.colName, styles.nameTdCell]}>
-                <CategoryNameCell category={row} />
-              </View>
-              <View style={[styles.tdCell, styles.colSort]}>
-                <ThemedText type="smallBold" style={styles.tdCenter}>{row.sortOrder}</ThemedText>
-              </View>
-              <View style={[styles.tdCell, styles.colStatus]}>
-                <StatusBadge status={row.status} />
-              </View>
-              <View style={[styles.tdCell, styles.colDate]}>
-                <ThemedText type="smallBold" style={styles.tdCenter}>{row.createdDate}</ThemedText>
-                <ThemedText type="small" style={styles.timeText}>{row.createdTime}</ThemedText>
-              </View>
-              <View style={[styles.tdCell, styles.colActions]}>
-                <FaqRowActions />
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
-function FaqGridView({ rows, columns }: { rows: FaqCategory[]; columns: number }) {
-  if (rows.length === 0) {
+// ─── LIST ROW ─────────────────────────────────────────────────────────────────
+const ListRow: React.FC<{
+    cat: FaqCategory;
+    onEdit: () => void;
+    onToggle: () => void;
+    onDelete: () => void;
+    onNavigate: () => void;
+}> = ({ cat, onEdit, onToggle, onDelete, onNavigate }) => {
+    const isActive = cat.status === "Active";
     return (
-      <View style={[styles.empty, styles.gridEmpty]}>
-        <ThemedText type="small" style={{ color: FaqColors.textMuted }}>
-          No categories found.
-        </ThemedText>
-      </View>
-    );
-  }
-
-  const itemWidth = columns === 1 ? '100%' : columns === 2 ? '48.5%' : '31.8%';
-
-  return (
-    <View style={styles.gridContainer}>
-      {rows.map((category) => (
-        <View key={category.id} style={[styles.gridCardWrap, { width: itemWidth }]}>
-          <FaqGridCard category={category} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-export default function FaqCategoriesScreen() {
-  const { width } = useWindowDimensions();
-  const isWeb = Platform.OS === 'web';
-  const isMobile = !isWeb;
-
-  const [query, setQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [categories, setCategories] = useState<FaqCategory[]>([]);
-
-  const loadCategories = useCallback(async () => {
-    try {
-      const rows = await fetchFaqCategories();
-      setCategories(rows.map((r, i) => mapApiCategory(mapFaqCategoryRow(r), i)));
-    } catch (e) {
-      console.warn(getApiErrorMessage(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
-
-  const handleAddCategory = async () => {
-    try {
-      await createFaqCategory({
-        categoryName: `New Category ${categories.length + 1}`,
-        sortOrder: categories.length + 1,
-        status: true,
-      });
-      await loadCategories();
-    } catch (e) {
-      console.warn(getApiErrorMessage(e));
-    }
-  };
-
-  const gridColumns = isWeb ? (width < 768 ? 1 : width < 1100 ? 2 : 3) : 1;
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return categories;
-    return categories.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        String(c.id).includes(q),
-    );
-  }, [query, categories]);
-
-  return (
-    <AdminLayout>
-      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <AppHeader />
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}
-        showsVerticalScrollIndicator={false}>
-        <View style={[styles.pageHeader, isMobile && styles.pageHeaderMobile]}>
-          <View style={[styles.pageHeaderLeft, isMobile && styles.pageHeaderLeftMobile]}>
-            <View style={styles.pageIconBox}>
-              <MaterialIcons name="help-outline" size={22} color="#fff" />
+        <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
+            <View style={[lSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
+                <Feather name={cat.icon as any} size={18} color={cat.color} />
             </View>
-            <View style={styles.pageTitleWrap}>
-              <ThemedText type="subtitle" style={[styles.pageTitle, isMobile && styles.pageTitleMobile]}>
-                FAQ Categories Management
-              </ThemedText>
-              <View style={styles.breadcrumbs}>
-                <Icon
-                  name={{ ios: 'house', android: 'home', web: 'home' }}
-                  size={13}
-                  color={FaqColors.accent}
+            <View style={lSt.info}>
+                <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
+                <Text style={lSt.desc} numberOfLines={1}>{cat.description}</Text>
+            </View>
+            <View style={lSt.countBox}>
+                <Text style={lSt.countNum}>{cat.faqCount}</Text>
+                <Text style={lSt.countLabel}>FAQs</Text>
+            </View>
+            <View style={[lSt.badge, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
+                <View style={[lSt.dot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
+                <Text style={[lSt.badgeText, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{cat.status}</Text>
+            </View>
+            <Text style={lSt.date}>{cat.createdAt}</Text>
+            <View style={lSt.actions}>
+                <TouchableOpacity style={lSt.btn} onPress={onEdit}>
+                    <Feather name="edit-2" size={14} color={PRIMARY} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[lSt.btn, lSt.btnRed]} onPress={onToggle}>
+                    <Feather name={isActive ? "eye-off" : "eye"} size={14} color={ACCENT_RED} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[lSt.btn, lSt.btnRed]} onPress={onDelete}>
+                    <Feather name="trash-2" size={14} color={ACCENT_RED} />
+                </TouchableOpacity>
+            </View>
+        </TouchableOpacity>
+    );
+};
+
+// ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
+const FaqCategoriesScreen: React.FC = () => {
+    const isWeb = Platform.OS === "web";
+    const [categories, setCategories] = useState<FaqCategory[]>(initialCategories);
+    const [search,        setSearch]        = useState("");
+    const [viewMode,      setViewMode]      = useState<"grid" | "list">("grid");
+    const [statusFilter,  setStatusFilter]  = useState<"All" | "Active" | "Inactive">("All");
+    const [modalVisible,  setModalVisible]  = useState(false);
+    const [editingCat,    setEditingCat]    = useState<FaqCategory | null>(null);
+
+    const filtered = categories.filter(c => {
+        const ms = c.name.toLowerCase().includes(search.toLowerCase()) ||
+                   c.description.toLowerCase().includes(search.toLowerCase());
+        const mf = statusFilter === "All" || c.status === statusFilter;
+        return ms && mf;
+    });
+
+    const totalActive = categories.filter(c => c.status === "Active").length;
+    const totalFaqs   = categories.reduce((s, c) => s + c.faqCount, 0);
+
+    const handleSave = (data: Partial<FaqCategory>) => {
+        if (editingCat) {
+            setCategories(prev => prev.map(c => c.id === editingCat.id ? { ...c, ...data } : c));
+        } else {
+            const newCat: FaqCategory = {
+                id: Date.now(),
+                name: data.name ?? "New Category",
+                description: data.description ?? "",
+                icon: "help-circle",
+                color: PRIMARY,
+                faqCount: 0,
+                status: data.status ?? "Active",
+                createdAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+                slug: (data.name ?? "new").toLowerCase().replace(/\s+/g, "-"),
+            };
+            setCategories(prev => [newCat, ...prev]);
+        }
+    };
+
+    const handleToggle = (id: number) =>
+        setCategories(prev => prev.map(c => c.id === id
+            ? { ...c, status: c.status === "Active" ? "Inactive" : "Active" } : c));
+
+    const handleDelete = (id: number) => {
+        if (Platform.OS === "web") {
+            if (window.confirm("Are you sure you want to delete this category?")) {
+                setCategories(prev => prev.filter(c => c.id !== id));
+            }
+        } else {
+            Alert.alert(
+                "Confirm Delete",
+                "Are you sure you want to delete this category?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: () => setCategories(prev => prev.filter(c => c.id !== id)) }
+                ]
+            );
+        }
+    };
+
+    // Stat cards data
+    const stats = [
+        { label: "Total Categories", value: String(categories.length), icon: "grid",         color: PRIMARY       },
+        { label: "Active",           value: String(totalActive),        icon: "check-circle", color: ACCENT_TEAL   },
+        { label: "Inactive",         value: String(categories.length - totalActive), icon: "slash", color: ACCENT_RED },
+        { label: "Total FAQs",       value: String(totalFaqs),          icon: "help-circle",  color: ACCENT_SKY    },
+    ];
+
+    return (
+        <AdminLayout>
+            <View style={st.root}>
+                <StatusBar barStyle="light-content" backgroundColor={DARK_NAVY} />
+
+                {/* ── HEADER ── */}
+                <View style={[st.header, isWeb && st.headerWeb]}>
+                    <View style={st.headerLeft}>
+                        <View style={st.headerIcon}>
+                            <Feather name="help-circle" size={22} color="#fff" />
+                        </View>
+                        <View>
+                            <Text style={st.headerTitle}>FAQ Categories</Text>
+                            <Text style={st.headerBreadcrumb}>
+                                <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  ›  FAQ Categories"}
+                            </Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity style={st.addBtn}
+                        onPress={() => { setEditingCat(null); setModalVisible(true); }}>
+                        <Feather name="plus" size={14} color="#fff" />
+                        <Text style={st.addBtnText}>Add Category</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView style={st.scroll}
+                    contentContainerStyle={[st.scrollContent, !isWeb && { paddingBottom: 100 }]}
+                    showsVerticalScrollIndicator={false}>
+
+                    {/* ── STAT CARDS ── */}
+                    {isWeb ? (
+                        <View style={st.statsRow}>
+                            {stats.map((s, i) => (
+                                <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
+                                    <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
+                                        <Feather name={s.icon as any} size={22} color={s.color} />
+                                    </View>
+                                    <View>
+                                        <Text style={[st.statValue, { color: s.color }]}>{s.value}</Text>
+                                        <Text style={st.statLabel}>{s.label.toUpperCase()}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    ) : (
+                        <View style={st.statsCardSingle}>
+                            {stats.map((s, i) => (
+                                <React.Fragment key={i}>
+                                    {i > 0 && <View style={st.statDividerSingle} />}
+                                    <View style={st.statBlockSingle}>
+                                        <View style={[st.statIconWrapperSingle, { backgroundColor: s.color + "18" }]}>
+                                            <Feather name={s.icon as any} size={20} color={s.color} />
+                                        </View>
+                                        <View style={st.statTextWrapperSingle}>
+                                            <Text style={[st.statValueSingle, { color: s.color }]}>{s.value}</Text>
+                                            <Text style={st.statLabelSingle}>{s.label.toUpperCase()}</Text>
+                                        </View>
+                                    </View>
+                                </React.Fragment>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* ── TOOLBAR ── */}
+                    <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
+                        {/* Search */}
+                        <View style={[st.searchWrap, !isWeb && { minWidth: "100%" as any }]}>
+                            <Feather name="search" size={14} color={PRIMARY} />
+                            <TextInput style={st.searchInput}
+                                placeholder="Search categories..."
+                                placeholderTextColor={TEXT_MUTED}
+                                value={search}
+                                onChangeText={setSearch} />
+                            {search.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearch("")}>
+                                    <Feather name="x-circle" size={14} color={TEXT_MUTED} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Filter chips */}
+                        <View style={st.chips}>
+                            {(["All", "Active", "Inactive"] as const).map(f => (
+                                <TouchableOpacity key={f}
+                                    style={[st.chip, statusFilter === f && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                                    onPress={() => setStatusFilter(f)}>
+                                    <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* View toggle */}
+                        <View style={st.viewToggle}>
+                            <TouchableOpacity
+                                style={[st.viewBtn, viewMode === "grid" && { backgroundColor: PRIMARY }]}
+                                onPress={() => setViewMode("grid")}>
+                                <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_MUTED} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[st.viewBtn, viewMode === "list" && { backgroundColor: PRIMARY }]}
+                                onPress={() => setViewMode("list")}>
+                                <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_MUTED} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* ── RESULT COUNT ── */}
+                    <Text style={st.resultCount}>
+                        Showing{" "}
+                        <Text style={{ color: PRIMARY, fontWeight: "700" }}>{filtered.length}</Text>
+                        {" "}of {categories.length} categories
+                    </Text>
+
+                    {/* ── CONTENT ── */}
+                    {filtered.length === 0 ? (
+                        <View style={st.empty}>
+                            <View style={st.emptyIconWrap}>
+                                <Feather name="inbox" size={36} color={TEXT_MUTED} />
+                            </View>
+                            <Text style={st.emptyTitle}>No categories found</Text>
+                            <Text style={st.emptySubtitle}>Try adjusting your search or filters</Text>
+                        </View>
+                    ) : viewMode === "grid" ? (
+                        <View style={[st.grid, isWeb && st.gridWeb]}>
+                            {filtered.map(cat => (
+                                <View key={cat.id} style={[st.gridItem, isWeb && st.gridItemWeb]}>
+                                    <GridCard
+                                        cat={cat}
+                                        onEdit={() => { setEditingCat(cat); setModalVisible(true); }}
+                                        onToggle={() => handleToggle(cat.id)}
+                                        onDelete={() => handleDelete(cat.id)}
+                                        onNavigate={() => router.push("/Faqs")}
+                                    />
+                                </View>
+                            ))}
+                        </View>
+                    ) : (
+                        <View style={st.listWrap}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                <View style={{ minWidth: 800 }}>
+                                    <View style={lSt.headerRow}>
+                                        <Text style={[lSt.headerCell, { flex: 2 }]}>Category</Text>
+                                        <Text style={[lSt.headerCell, { width: 70  }]}>FAQs</Text>
+                                        <Text style={[lSt.headerCell, { width: 90  }]}>Status</Text>
+                                        <Text style={[lSt.headerCell, { width: 110 }]}>Created</Text>
+                                        <Text style={[lSt.headerCell, { width: 120  }]}>Actions</Text>
+                                    </View>
+                                    {filtered.map(cat => (
+                                        <ListRow key={cat.id} cat={cat}
+                                            onEdit={() => { setEditingCat(cat); setModalVisible(true); }}
+                                            onToggle={() => handleToggle(cat.id)}
+                                            onDelete={() => handleDelete(cat.id)}
+                                            onNavigate={() => router.push("/Faqs")} />
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        </View>
+                    )}
+                </ScrollView>
+
+                {/* ── MODAL ── */}
+                <CategoryModal
+                    visible={modalVisible}
+                    onClose={() => { setModalVisible(false); setEditingCat(null); }}
+                    onSave={handleSave}
+                    editing={editingCat}
+                    isWeb={isWeb}
                 />
-                <ThemedText type="small" style={styles.breadcrumbLink}>Dashboard</ThemedText>
-                <ThemedText type="small" style={styles.breadcrumbSep}>&gt;</ThemedText>
-                <ThemedText type="small" style={styles.breadcrumbActive}>FAQ Categories</ThemedText>
-              </View>
             </View>
-          </View>
-          <Pressable style={[styles.addBtn, isMobile && styles.addBtnMobile]} onPress={handleAddCategory}>
-            <Icon name={{ ios: 'plus', android: 'add', web: 'add' }} size={14} color="#fff" />
-            <ThemedText type="smallBold" style={{ color: '#fff' }}>
-              Add New FAQ Category
-            </ThemedText>
-          </Pressable>
-        </View>
+        </AdminLayout>
+    );
+};
 
-        <View style={styles.screenNav}>
-          <Link href="/locations" asChild>
-            <Pressable>
-              <ThemedText type="small" style={styles.navLink}>Locations</ThemedText>
-            </Pressable>
-          </Link>
-          <ThemedText type="small" style={styles.navSep}>|</ThemedText>
-          <ThemedText type="smallBold" style={styles.navActive}>FAQ Categories</ThemedText>
-        </View>
+export default FaqCategoriesScreen;
 
-        <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
-          <View style={[styles.searchBox, isMobile && styles.searchBoxMobile]}>
-            <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={16} color={FaqColors.textLight} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search categories..."
-              placeholderTextColor={FaqColors.textLight}
-              style={styles.searchInput}
-            />
-          </View>
-          <View style={styles.viewToggle}>
-            {!isMobile && (
-              <ThemedText type="small" style={{ color: FaqColors.textMuted }}>View:</ThemedText>
-            )}
-            <Pressable
-              style={[styles.viewBtn, viewMode === 'grid' && styles.viewBtnActive]}
-              onPress={() => setViewMode('grid')}>
-              <Icon
-                name={{ ios: 'square.grid.2x2', android: 'grid-view', web: 'grid-view' }}
-                size={15}
-                color={viewMode === 'grid' ? '#fff' : FaqColors.textMuted}
-              />
-            </Pressable>
-            <Pressable
-              style={[styles.viewBtn, viewMode === 'list' && styles.viewBtnActive]}
-              onPress={() => setViewMode('list')}>
-              <Icon
-                name={{ ios: 'list.bullet', android: 'view-list', web: 'view-list' }}
-                size={15}
-                color={viewMode === 'list' ? '#fff' : FaqColors.textMuted}
-              />
-            </Pressable>
-          </View>
-        </View>
+// ─── MAIN STYLES ─────────────────────────────────────────────────────────────
+const st = StyleSheet.create({
+    root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
-        {viewMode === 'list' ? (
-          isWeb ? (
-            <FaqListTable rows={filtered} />
-          ) : (
-            <FaqMobileListTable rows={filtered} />
-          )
-        ) : (
-          <FaqGridView rows={filtered} columns={gridColumns} />
-        )}
+    // Header
+    header:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DARK_NAVY },
+    headerWeb:       { paddingHorizontal: 28, paddingVertical: 20 },
+    headerLeft:      { flexDirection: "row", alignItems: "center", gap: 14 },
+    headerIcon:      { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
+    headerTitle:     { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },
+    headerBreadcrumb:{ fontSize: 12, color: "#cbd5e1", marginTop: 2 },
+    addBtn:          { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: PRIMARY, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    addBtnText:      { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-        <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-          <ThemedText type="small" style={{ color: FaqColors.textMuted }}>
-            Showing 1 to {filtered.length} of {filtered.length} categories
-          </ThemedText>
-          <View style={styles.pages}>
-            <Pressable style={styles.pageArrow}>
-              <Icon name={{ ios: 'chevron.left', android: 'chevron-left', web: 'chevron-left' }} size={14} color={FaqColors.textMuted} />
-            </Pressable>
-            <Pressable style={[styles.pageNum, styles.pageNumActive]}>
-              <ThemedText type="smallBold" style={{ color: '#fff' }}>1</ThemedText>
-            </Pressable>
-            <Pressable style={styles.pageArrow}>
-              <Icon name={{ ios: 'chevron.right', android: 'chevron-right', web: 'chevron-right' }} size={14} color={FaqColors.textMuted} />
-            </Pressable>
-          </View>
-        </View>
-      </ScrollView>
-      </SafeAreaView>
-    </AdminLayout>
-  );
-}
+    // Scroll
+    scroll:        { flex: 1 },
+    scrollContent: { padding: 16, gap: 14 },
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: FaqColors.pageBg },
-  screen: { flex: 1 },
-  content: {
-    padding: 24,
-    paddingBottom: 40,
-    maxWidth: 1200,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  contentMobile: { padding: 16, paddingBottom: 28 },
-  pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 16,
-  },
-  pageHeaderMobile: { flexDirection: 'column', alignItems: 'stretch' },
-  pageHeaderLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, flex: 1 },
-  pageHeaderLeftMobile: { flexDirection: 'row' },
-  pageIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: FaqColors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  pageTitleWrap: { flex: 1, minWidth: 0 },
-  pageTitle: { fontSize: 26, lineHeight: 32, color: FaqColors.titleDark, marginBottom: 6 },
-  pageTitleMobile: { fontSize: 22, lineHeight: 28 },
-  breadcrumbs: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  breadcrumbLink: { color: FaqColors.accent, fontSize: 13 },
-  breadcrumbSep: { color: FaqColors.textMuted, fontSize: 13 },
-  breadcrumbActive: { color: FaqColors.textMuted, fontSize: 13 },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: FaqColors.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flexShrink: 0,
-  },
-  addBtnMobile: { justifyContent: 'center', paddingVertical: 12 },
-  screenNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 20,
-  },
-  navLink: { color: FaqColors.accent, fontSize: 13 },
-  navSep: { color: FaqColors.textLight, fontSize: 13 },
-  navActive: { color: FaqColors.text, fontSize: 13 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
-  toolbarMobile: { gap: 10 },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: FaqColors.cardBg,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 44,
-  },
-  searchBoxMobile: { minWidth: 0 },
-  searchInput: { flex: 1, fontSize: 14, color: FaqColors.text, paddingVertical: 0 },
-  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
-  viewBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: FaqColors.cardBg,
-  },
-  viewBtnActive: { backgroundColor: FaqColors.viewActive, borderColor: FaqColors.viewActive },
-  tableCard: {
-    backgroundColor: FaqColors.cardBg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  tableHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: FaqColors.tableHeader,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: FaqColors.border,
-  },
-  thCell: { alignItems: 'center', justifyContent: 'center' },
-  th: { color: FaqColors.textMuted, fontSize: 13, textAlign: 'center', width: '100%' },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' as const } : null),
-  },
-  tableRowBorder: { borderTopWidth: 1, borderTopColor: FaqColors.borderLight },
-  tableRowHover: { backgroundColor: '#FFF7ED' },
-  tableRowPressed: { backgroundColor: '#FFF7ED' },
-  colId: { width: 56, flexShrink: 0 },
-  colName: { width: 260, flexShrink: 0 },
-  colSort: { width: 90, flexShrink: 0 },
-  colStatus: { width: 100, flexShrink: 0 },
-  colDate: { width: 120, flexShrink: 0 },
-  colActions: { width: 130, flexShrink: 0 },
-  tdCell: { justifyContent: 'center', overflow: 'hidden' },
-  nameTdCell: { alignItems: 'flex-start' },
-  tdCenter: { textAlign: 'center', width: '100%', color: FaqColors.text },
-  idText: { color: FaqColors.idText, textAlign: 'center', width: '100%' },
-  timeText: { color: FaqColors.textMuted, textAlign: 'center', fontSize: 11, marginTop: 2 },
-  nameCell: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 4, minWidth: 0 },
-  nameIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  nameTextWrap: { flex: 1, minWidth: 0 },
-  categoryName: { color: FaqColors.text, fontSize: 13, marginBottom: 2 },
-  categoryDesc: { color: FaqColors.textMuted, fontSize: 12, lineHeight: 16 },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignSelf: 'center',
-  },
-  rowActions: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
-  faqActionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  faqDeleteBtn: { backgroundColor: FaqColors.deleteBtnBg },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 },
-  gridCardWrap: { minWidth: 200 },
-  gridCard: {
-    backgroundColor: FaqColors.cardBg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    borderTopWidth: 3,
-    padding: 16,
-    flex: 1,
-    ...(Platform.OS === 'web'
-      ? { boxShadow: '0 1px 3px rgba(0,0,0,0.08)' as never }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.08,
-          shadowRadius: 3,
-          elevation: 2,
-        }),
-  },
-  gridCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    gap: 8,
-  },
-  gridCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
-  gridIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  gridCardTitle: { flex: 1, color: FaqColors.text, fontSize: 15 },
-  gridCardDesc: { color: FaqColors.textMuted, fontSize: 13, lineHeight: 18, marginBottom: 14 },
-  gridMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    gap: 8,
-  },
-  gridDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  gridCardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: FaqColors.borderLight,
-    paddingTop: 12,
-  },
-  gridArrowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  empty: { padding: 32, alignItems: 'center' },
-  gridEmpty: {
-    backgroundColor: FaqColors.cardBg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    marginBottom: 16,
-  },
-  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  paginationMobile: { flexDirection: 'column', gap: 12, alignItems: 'flex-start' },
-  pages: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pageArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: FaqColors.cardBg,
-  },
-  pageNum: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: FaqColors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: FaqColors.cardBg,
-  },
-  pageNumActive: { backgroundColor: FaqColors.accent, borderColor: FaqColors.accent },
+    // Stats
+    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4 },
+    statCard:    { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "column", alignItems: "center", gap: 10, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
+    statIconWrap:{ width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    statValue:   { fontSize: 26, fontWeight: "800", textAlign: "center" },
+    statLabel:   { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", textAlign: "center", letterSpacing: 0.5 },
+
+    // Stats Single Card (Mobile)
+    statsCardSingle: { backgroundColor: BG_CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2, marginBottom: 4 },
+    statBlockSingle: { flexDirection: "row", alignItems: "center", gap: 14 },
+    statIconWrapperSingle: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    statTextWrapperSingle: { flex: 1 },
+    statValueSingle: { fontSize: 20, fontWeight: "800", marginBottom: 2 },
+    statLabelSingle: { fontSize: 11, fontWeight: "700", color: TEXT_MUTED, letterSpacing: 0.5 },
+    statDividerSingle: { height: 1, backgroundColor: BORDER, marginVertical: 12 },
+
+    // Toolbar
+    toolbar:     { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: BG_CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+    searchWrap:  { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: PRIMARY + "55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
+    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, outlineStyle: "none" } as any,
+    chips:       { flexDirection: "row", gap: 6 },
+    chip:        { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, backgroundColor: BG_PAGE },
+    chipText:    { fontSize: 12, fontWeight: "600", color: TEXT_BODY },
+    viewToggle:  { flexDirection: "row", backgroundColor: BG_PAGE, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
+    viewBtn:     { padding: 8 },
+
+    // Result count
+    resultCount: { fontSize: 12, color: TEXT_MUTED, fontWeight: "500" },
+
+    // Grid
+    grid:        { gap: 14 },
+    gridWeb:     { flexDirection: "row", flexWrap: "wrap" as any, gap: 16 },
+    gridItem:    { width: "100%" },
+    gridItemWeb: { width: "23%", minWidth: 240 },
+
+    // List
+    listWrap: { backgroundColor: BG_CARD, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+
+    // Empty
+    empty:        { alignItems: "center", paddingVertical: 60, gap: 10 },
+    emptyIconWrap:{ width: 72, height: 72, borderRadius: 24, backgroundColor: BG_CARD, alignItems: "center", justifyContent: "center", marginBottom: 4, borderWidth: 1, borderColor: BORDER },
+    emptyTitle:   { fontSize: 16, fontWeight: "700", color: TEXT_HEAD },
+    emptySubtitle:{ fontSize: 13, color: TEXT_MUTED },
+});
+
+// ─── CARD STYLES (image-2) ────────────────────────────────────────────────────
+const cSt = StyleSheet.create({
+    card: {
+        backgroundColor: BG_CARD,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: BORDER,
+        borderTopWidth: 4,
+        padding: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.07,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    topRow:     { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
+    iconWrap:   { width: 52, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    actionBtns: { flexDirection: "row", gap: 8 },
+    iconBtn:    { width: 32, height: 32, borderRadius: 8, backgroundColor: BG_PAGE, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: BORDER },
+    iconBtnRed: { backgroundColor: ACCENT_RED + "10", borderColor: ACCENT_RED + "40" },
+
+    name: { fontSize: 15, fontWeight: "800", color: TEXT_HEAD, marginBottom: 4 },
+    desc: { fontSize: 12, color: TEXT_BODY, lineHeight: 18, marginBottom: 14 },
+
+    divider: { height: 1, backgroundColor: BORDER, marginBottom: 12 },
+
+    metaRow:    { flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" as any },
+    metaItem:   { flexDirection: "row", alignItems: "center", gap: 4 },
+    metaText:   { fontSize: 11, color: TEXT_MUTED, fontWeight: "500" },
+    statusDot:  { width: 7, height: 7, borderRadius: 4 },
+    statusLabel:{ fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+});
+
+// ─── LIST ROW STYLES ─────────────────────────────────────────────────────────
+const lSt = StyleSheet.create({
+    headerRow:  { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: BG_PAGE },
+    headerCell: { fontSize: 10, fontWeight: "800", color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 0.5 },
+
+    row:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER, gap: 14 },
+    iconWrap:   { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    info:       { flex: 1 },
+    name:       { fontSize: 14, fontWeight: "700", color: TEXT_HEAD, marginBottom: 2 },
+    desc:       { fontSize: 12, color: TEXT_BODY },
+    countBox:   { alignItems: "center", width: 44 },
+    countNum:   { fontSize: 16, fontWeight: "800", color: TEXT_HEAD },
+    countLabel: { fontSize: 9,  color: TEXT_MUTED, fontWeight: "700", textTransform: "uppercase" },
+    badge:      { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, width: 82 },
+    dot:        { width: 6,  height: 6,  borderRadius: 3 },
+    badgeText:  { fontSize: 11, fontWeight: "700" },
+    date:       { fontSize: 11, color: TEXT_MUTED, width: 100 },
+    actions:    { flexDirection: "row", gap: 8 },
+    btn:        { width: 32, height: 32, borderRadius: 8, backgroundColor: PRIMARY_LIGHT, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: PRIMARY + "30" },
+    btnRed:     { backgroundColor: ACCENT_RED + "10", borderColor: ACCENT_RED + "30" },
+});
+
+// ─── MODAL STYLES ────────────────────────────────────────────────────────────
+const mSt = StyleSheet.create({
+    overlay:          { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center" },
+    sheet:            { backgroundColor: BG_CARD, borderRadius: 20, overflow: "hidden", width: "90%", maxWidth: 480, maxHeight: "85%" as any, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },
+    sheetWeb:         { width: 460 },
+    header:           { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 22, paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: DARK_NAVY, backgroundColor: DARK_NAVY },
+    headerDot:        { width: 10, height: 10, borderRadius: 5 },
+    title:            { fontSize: 16, fontWeight: "800", color: "#ffffff" },
+    closeBtn:         { width: 32, height: 32, borderRadius: 10, backgroundColor: BG_PAGE, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: BORDER },
+    label:            { fontSize: 11, fontWeight: "700", color: TEXT_BODY, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 },
+    input:            { borderWidth: 1.5, borderColor: BORDER, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 13, color: TEXT_HEAD, backgroundColor: BG_PAGE, marginBottom: 18 },
+    statusToggle:     { flexDirection: "row", gap: 10, marginBottom: 18 },
+    statusOption:     { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, alignItems: "center" },
+    statusOptionText: { fontSize: 13, fontWeight: "700", color: TEXT_BODY },
+    footer:           { flexDirection: "row", justifyContent: "flex-end", gap: 12, padding: 18, borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG_PAGE },
+    cancelBtn:        { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, backgroundColor: BG_CARD },
+    cancelText:       { color: TEXT_BODY, fontWeight: "700", fontSize: 13 },
+    saveBtn:          { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: PRIMARY, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    saveText:         { color: "#fff", fontWeight: "700", fontSize: 13 },
 });

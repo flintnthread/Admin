@@ -29,7 +29,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 const Icon = Ionicons;
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
