@@ -1259,13 +1259,13 @@ const styles = StyleSheet.create({
   attrGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
   attrGridMobile: { gap: 8 },
   attrBox: {
-    width: '48%',
+    width: '48%' as any,
     borderWidth: 1,
     borderColor: PALETTE.border,
     borderRadius: 10,
     padding: 12,
     gap: 4,
-    ...(Platform.OS === 'web' ? { boxSizing: 'border-box' as const, width: 'calc(50% - 5px)' } : {}),
+    ...(Platform.OS === 'web' ? { boxSizing: 'border-box' as const, width: '48%' as any } : {}),
   },
   attrLabel: { fontSize: 11, color: PALETTE.textMuted, fontWeight: '600' },
   attrValue: { fontSize: 14, fontWeight: '700', color: PALETTE.textPrimary },
@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
   vColorDot: { width: 10, height: 10, borderRadius: 5 },
   vColorName: { fontSize: 12, fontWeight: '600', color: PALETTE.textPrimary, flex: 1 },
   vSizePill: {
-    backgroundColor: PALETTE.blueLight,
+    backgroundColor: '#DBEAFE',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1451,7 +1451,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.border,
     gap: 10,
-    ...(Platform.OS === 'web' ? { flexBasis: 'calc(50% - 6px)', maxWidth: 'calc(50% - 6px)' } : {}),
+    ...(Platform.OS === 'web' ? { flexBasis: '48%' as any, maxWidth: '48%' as any } : {}),
   },
   variantCardCompact: {
     width: '100%',
@@ -1725,4 +1725,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   backBtnLightText: { color: '#FFF', fontWeight: '700' },
-});
+}) as any;

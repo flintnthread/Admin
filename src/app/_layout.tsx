@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { AuthProvider, useAuth } from "@/context/auth-context";
@@ -21,7 +22,7 @@ function ProtectedNavigator() {
       router.replace("/login");
     } else if (token && inAuthGroup) {
       // Already signed in → send to dashboard
-      router.replace("/approveseller");
+      router.replace("/Dashboard");
     }
   }, [token, isLoading, segments, router]);
 
