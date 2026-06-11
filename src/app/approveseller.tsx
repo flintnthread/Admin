@@ -9,9 +9,15 @@ import {
   Image,
   useWindowDimensions,
   Alert,
+  Modal,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { router, useLocalSearchParams } from "expo-router";
+import { useAsyncLoad } from "@/hooks/useAsyncLoad";
+import { fetchSellers, blockSeller, unblockSeller } from "@/services/sellerApi";
+import { mapSellerToApprovedRow } from "@/lib/mappers";
+import { getApiErrorMessage } from "@/lib/api/client";
 
 // --- MOCK DATA TYPE ---
 type Seller = {
@@ -29,6 +35,24 @@ type Seller = {
   city: string;
   status: "Active" | "Blocked";
 };
+
+type PendingSeller = {
+  id: number;
+  name: string;
+  email: string;
+  mobile?: string;
+  businessName?: string;
+  businessType?: string;
+  submittedOn?: string;
+  state?: string;
+  city?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  holderName?: string;
+};
+
+const INITIAL_PENDING_SELLERS: PendingSeller[] = [];
 
 // --- THE 10 EXACT SELLERS FROM SCREENSHOTS ---
 const EXACT_SELLERS: Seller[] = [
@@ -290,10 +314,10 @@ export default function ApprovedSellersScreen() {
     if (!query) return pendingSellers;
     return pendingSellers.filter(
       (s) =>
-        s.name.toLowerCase().includes(query) ||
-        s.businessName.toLowerCase().includes(query) ||
-        s.email.toLowerCase().includes(query) ||
-        s.mobile.toLowerCase().includes(query)
+        (s.name ?? "").toLowerCase().includes(query) ||
+        (s.businessName ?? "").toLowerCase().includes(query) ||
+        (s.email ?? "").toLowerCase().includes(query) ||
+        (s.mobile ?? "").toLowerCase().includes(query)
     );
   }, [pendingSellers, pendingSearchQuery]);
 
@@ -312,17 +336,17 @@ export default function ApprovedSellersScreen() {
               name: pending.name,
               email: pending.email,
               avatar: `https://randomuser.me/api/portraits/men/${pending.id % 100}.jpg`,
-              businessName: pending.businessName,
-              businessType: pending.businessType,
+              businessName: pending.businessName ?? "—",
+              businessType: pending.businessType ?? "—",
               products: 0,
               walletBalance: 0,
-              joinDate: pending.submittedOn,
+              joinDate: pending.submittedOn ?? "",
               revenue: 0,
-              state: pending.state,
-              city: pending.city,
+              state: pending.state ?? "—",
+              city: pending.city ?? "—",
               status: "Active",
             };
-            setSellers(prev => [ApprovedSellerDetails, ...prev]);
+            setData((prev) => [ApprovedSellerDetails, ...(prev ?? [])]);
             setShowPendingModal(false);
             Alert.alert("Success", "Seller approved successfully!");
           }
@@ -922,8 +946,6 @@ export default function ApprovedSellersScreen() {
                 </View>
               </View>
             )}
-          </>
-        )}
 
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>

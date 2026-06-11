@@ -22,7 +22,7 @@ type Props = {
 // Navigation items definition
 const NAV_ITEMS = {
   GENERAL: [
-    { label: "Dashboard", icon: "home", path: "/approveseller" },
+    { label: "Dashboard", icon: "home", path: "/Dashboard" },
     { label: "SEO Engine", icon: "globe", path: null },
   ],
   "EMPLOYEE MANAGEMENT": [
