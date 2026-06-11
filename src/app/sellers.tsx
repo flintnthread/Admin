@@ -19,6 +19,7 @@ import {
     View
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { router } from 'expo-router';
 
 // ─────────────────────────── TYPES ───────────────────────────────────────────
 type KycStatus    = 'Not Submitted' | 'Submitted' | 'Approved' | 'Pending';
@@ -605,7 +606,7 @@ export default function SellersScreen() {
   const handleSearch = useCallback((v: string) => { setSearch(v); setPage(1); }, []);
 
   // Actions
-  const doView = (s: Seller) => setViewSeller(s);
+  const doView = (s: Seller) => router.push('/Viewseller');
 
   const doToggle = (s: Seller) => {
     setConfirmModal({
@@ -663,7 +664,7 @@ export default function SellersScreen() {
             <Text style={[SS.pageTitle, isMobile && { fontSize:18 }]}>Active Sellers</Text>
             <View style={SS.pill}><Text style={SS.pillTxt}>Active Only</Text></View>
           </View>
-          <TouchableOpacity style={SS.exportBtn}>
+          <TouchableOpacity style={SS.exportBtn} onPress={() => router.push('/sellershiprocket')}>
             <IconUpload size={13} color="#FFF" />
             <Text style={SS.exportTxt}>  Export to Shiprocket</Text>
           </TouchableOpacity>
