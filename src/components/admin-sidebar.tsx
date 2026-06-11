@@ -1,14 +1,14 @@
-import React from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
+import React from "react";
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 type Props = {
   /** Whether the sidebar is in collapsed (icon-only) mode – desktop only */
@@ -36,7 +36,7 @@ const NAV_ITEMS = {
     children: [
       { label: "Products", icon: "package", path: null },
       { label: "Customers", icon: "users", path: "/customerManagement" },
-      { label: "Sellers", icon: "user-check", path: null },
+      { label: "Sellers", icon: "user-check", path: "/sellers" },
       { label: "Sellers Graph", icon: "trending-up", path: "/sellergraphs" },
       { label: "Seller Bank Approval", icon: "credit-card", path: "/sellerbankapproval" },
       { label: "Orphaned Products", icon: "alert-circle", path: null },
@@ -45,6 +45,8 @@ const NAV_ITEMS = {
       { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges" },
     ],
     standalone: [
+      { label: "Pending Sellers", icon: "user-plus", path: "/pendingsellers" },
+
       { label: "Pending Sellers", icon: "user-plus", path: "/pendingSellers" },
       { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
       { label: "Customer Support", icon: "headphones", path: null },
