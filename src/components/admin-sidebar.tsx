@@ -45,11 +45,19 @@ const NAV_ITEMS = {
       { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges", color: "#00b359" },
     ],
     standalone: [
+
       { label: "Pending Sellers", icon: "user-plus", path: null, color: "#14B8A6" },
       { label: "Approved Sellers", icon: "user-check", path: "/approveseller", color: "#06B6D4" },
       { label: "Customer Support", icon: "headphones", path: "/Customersupport", color: "#0EA5E9" },
       { label: "Category Requests", icon: "grid", path: "/categoryRequests", color: "#8B5CF6" },
       { label: "Seller Support", icon: "message-square", path: "/Sellerticket", color: "#D946EF" },
+
+      { label: "Pending Sellers", icon: "user-plus", path: "/pendingSellers" },
+      { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
+      { label: "Customer Support", icon: "headphones", path: null },
+      { label: "Category Requests", icon: "grid", path: "/categoryRequests" },
+      { label: "Seller Support", icon: "message-square", path: "/supportticket" },
+ 
     ],
   },
   "EMAIL MANAGEMENT": [

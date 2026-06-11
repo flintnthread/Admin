@@ -13,7 +13,15 @@
  * mapped 1-to-1 to a visually identical alternative below.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapSupportTicket } from "@/lib/mappers";
+import {
+  fetchSupportTicket,
+  fetchSupportTickets,
+  replySupportTicket,
+  updateSupportTicketStatus,
+} from "@/services/supportApi";
 import {
   Dimensions,
   Modal,
@@ -71,80 +79,13 @@ interface Ticket {
   messages: Message[];
 }
 
-/* ══════════════════════════════════════════════
-   SAMPLE DATA
-══════════════════════════════════════════════ */
-const TICKETS: Ticket[] = [
-  {
-    id: "1",
-    subject:  "When will we receive the credit of our payment",
-    user:     "Ravi Chauhan",
-    priority: "General",
-    status:   "Open",
-    ticketNo: "#TKT-250601-000001",
-    date:     "06 Jun, 25 20:22",
-    messages: [
-      { from: "Ravi Chauhan", content: "Hello, I made a payment 3 days ago but I have not received the credit yet. Please look into this matter urgently.", time: "06 Jun, 25 20:22", isAdmin: false },
-      { from: "Support Team", content: "Hello Ravi, we have received your query. Our team is looking into it. You should receive the credit within 24 hours.", time: "06 Jun, 25 21:05", isAdmin: true  },
-      { from: "Ravi Chauhan", content: "Thank you for the quick response. Please keep me updated.", time: "06 Jun, 25 21:30", isAdmin: false },
-    ],
-  },
-  {
-    id: "2",
-    subject:  "Please arrange pickup of our core product",
-    user:     "Suresh Patel",
-    priority: "General",
-    status:   "Open",
-    ticketNo: "#TKT-250531-000002",
-    date:     "31 May, 25 13:01",
-    messages: [
-      { from: "Suresh Patel", content: "We have 20 units of our core product ready for pickup. Please arrange logistics at the earliest.", time: "31 May, 25 13:01", isAdmin: false },
-      { from: "Support Team", content: "Dear Suresh, our logistics team will contact you within 2 business days to schedule the pickup.", time: "31 May, 25 14:20", isAdmin: true },
-    ],
-  },
-  {
-    id: "3",
-    subject:  "HOW TO COUNT KYC",
-    user:     "Jasmeet Bansal",
-    priority: "General",
-    status:   "Open",
-    ticketNo: "#TKT-250507-000003",
-    date:     "07 May, 25 11:14",
-    messages: [
-      { from: "Jasmeet Bansal", content: "Can you please explain how KYC count is calculated in the admin panel? I am unable to understand the metrics.", time: "07 May, 25 11:14", isAdmin: false },
-      { from: "Support Team",   content: "Hi Jasmeet, KYC count is calculated based on successfully verified documents. Each seller who has uploaded and passed verification counts as 1.", time: "07 May, 25 12:00", isAdmin: true  },
-      { from: "Jasmeet Bansal", content: "Got it! Thank you for clarifying.", time: "07 May, 25 12:45", isAdmin: false },
-    ],
-  },
-  {
-    id: "4",
-    subject:  "products upload is issue",
-    user:     "Sandeep Narula",
-    priority: "General",
-    status:   "Resolved",
-    ticketNo: "#TKT-250425-000004",
-    date:     "25 Apr, 25 17:08",
-    messages: [
-      { from: "Sandeep Narula", content: "I am facing issues uploading products to the platform. The upload button is not working.", time: "25 Apr, 25 17:08", isAdmin: false },
-      { from: "Support Team",   content: "Hi Sandeep, we have identified the issue. It was a temporary server glitch. Please try again now.", time: "25 Apr, 25 17:45", isAdmin: true  },
-      { from: "Sandeep Narula", content: "It is working now. Thank you!", time: "25 Apr, 25 18:00", isAdmin: false },
-      { from: "Support Team",   content: "Great! We are marking this ticket as resolved. Please reach out if you face any issues.", time: "25 Apr, 25 18:10", isAdmin: true  },
-    ],
-  },
-  {
-    id: "5",
-    subject:  "Unable to access seller dashboard",
-    user:     "Meena Sharma",
-    priority: "High",
-    status:   "In Progress",
-    ticketNo: "#TKT-250420-000005",
-    date:     "20 Apr, 25 09:30",
-    messages: [
-      { from: "Meena Sharma",  content: "I am unable to login to my seller dashboard since yesterday. Please help urgently.", time: "20 Apr, 25 09:30", isAdmin: false },
-      { from: "Support Team",  content: "Hi Meena, we are investigating the issue. Our technical team is working on it.", time: "20 Apr, 25 10:15", isAdmin: true  },
-    ],
-  },
-];
+const STATUS_TO_API: Record<string, string> = {
+  Open: "open",
+  "In Progress": "in_progress",
+  Waiting: "waiting",
+  Resolved: "closed",
+  Urgent: "open",
+};
 
 /* ══════════════════════════════════════════════
    BADGE CONFIGS
@@ -368,9 +309,12 @@ function TicketRow({
    CONVERSATION PANEL
 ══════════════════════════════════════════════ */
 function ConversationPanel({
-  ticket, onBack, onSendMessage,
+  ticket, onBack, onSendMessage, onStatusChange,
 }: {
-  ticket: Ticket | null; onBack: () => void; onSendMessage: (message: string) => void;
+  ticket: Ticket | null;
+  onBack: () => void;
+  onSendMessage: (message: string) => void;
+  onStatusChange: (status: TicketStatus) => void;
 }) {
   const [replyText, setReplyText] = useState("");
   const scrollRef = useRef<ScrollView>(null);
@@ -409,6 +353,26 @@ function ConversationPanel({
             <StatusBadge status={ticket.status} />
           </View>
           <Text style={styles.ticketMeta}>{ticket.ticketNo}</Text>
+          {ticket.status !== "Resolved" && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {(["Open", "In Progress", "Waiting", "Resolved"] as TicketStatus[]).map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => onStatusChange(s)}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    backgroundColor: ticket.status === s ? ORANGE : "#F3F4F6",
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: "600", color: ticket.status === s ? "#fff" : "#374151" }}>
+                    {s}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 
@@ -497,26 +461,64 @@ export default function SupportTicketManagement() {
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority | "All Priorities">("All Priorities");
   const [selectedId,     setSelectedId]     = useState<string | null>(null);
   const [view,           setView]           = useState<"list" | "chat">("list");
-  const [tickets,        setTickets]        = useState(TICKETS);
+  const [tickets,        setTickets]        = useState<Ticket[]>([]);
 
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const isDesktop = width >= 1024;
 
-  const handleSendMessage = (message: string) => {
-    if (selectedId) {
-      setTickets(prev => prev.map(t => {
-        if (t.id === selectedId) {
-          return {
-            ...t,
-            messages: [
-              ...t.messages,
-              { from: "Support Team", content: message, time: new Date().toLocaleString(), isAdmin: true }
-            ]
-          };
-        }
-        return t;
-      }));
+  const loadTickets = useCallback(async () => {
+    try {
+      const statusParam = statusFilter === "All Status" ? undefined : STATUS_TO_API[statusFilter];
+      const res = await fetchSupportTickets({ status: statusParam, size: 100 });
+      let rows = (res.items ?? []).map(mapSupportTicket) as Ticket[];
+      if (priorityFilter !== "All Priorities") {
+        rows = rows.filter((t) => t.priority === priorityFilter);
+      }
+      setTickets(rows);
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+      setTickets([]);
+    }
+  }, [statusFilter, priorityFilter]);
+
+  useEffect(() => {
+    loadTickets();
+  }, [loadTickets]);
+
+  const refreshSelectedTicket = async (id: string) => {
+    try {
+      const detail = mapSupportTicket(await fetchSupportTicket(Number(id))) as Ticket;
+      setTickets((prev) => prev.map((t) => (t.id === id ? detail : t)));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (!selectedId) return;
+    try {
+      await replySupportTicket(Number(selectedId), message);
+      if (statusFilter === "All Status" || statusFilter === "Open") {
+        await updateSupportTicketStatus(Number(selectedId), "in_progress");
+      }
+      await refreshSelectedTicket(selectedId);
+      await loadTickets();
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  };
+
+  const handleStatusChange = async (status: TicketStatus) => {
+    if (!selectedId) return;
+    const apiStatus = STATUS_TO_API[status];
+    if (!apiStatus) return;
+    try {
+      await updateSupportTicketStatus(Number(selectedId), apiStatus);
+      await refreshSelectedTicket(selectedId);
+      await loadTickets();
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
     }
   };
 
@@ -548,6 +550,7 @@ export default function SupportTicketManagement() {
           ticket={selectedTicket}
           onBack={() => { setView("list"); setSelectedId(null); }}
           onSendMessage={handleSendMessage}
+          onStatusChange={handleStatusChange}
         />
       </View>
     );
@@ -662,6 +665,7 @@ export default function SupportTicketManagement() {
                     ticket={selectedTicket}
                     onBack={() => setSelectedId(null)}
                     onSendMessage={handleSendMessage}
+                    onStatusChange={handleStatusChange}
                   />
                 ) : (
                   <View style={styles.desktopEmptyState}>

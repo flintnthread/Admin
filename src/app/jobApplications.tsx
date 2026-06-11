@@ -7,7 +7,10 @@
  *   All other imports are from react-native core.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { formatDate, initialsFromName } from '@/lib/format';
+import { fetchJobApplications } from '@/services/hrApi';
 import {
   View,
   Text,
@@ -42,105 +45,28 @@ const C = {
   white: '#FFFFFF',
 };
 
-// ─── Dummy Data ──────────────────────────────────────────────────────────────
-const DUMMY_APPLICATIONS = [
-  {
-    id: '1',
-    name: 'Arjun Mehta',
-    role: 'Senior React Native Developer',
-    department: 'Engineering',
-    applied: '02 Jun 2025',
-    status: 'Shortlisted',
-    avatar: 'AM',
-    avatarColor: '#5B4EFF',
-    experience: '5 yrs',
-    location: 'Hyderabad',
-  },
-  {
-    id: '2',
-    name: 'Priya Sharma',
-    role: 'UI/UX Designer',
-    department: 'Design',
-    applied: '01 Jun 2025',
-    status: 'Interviewed',
-    avatar: 'PS',
-    avatarColor: '#8B5CF6',
-    experience: '3 yrs',
-    location: 'Bengaluru',
-  },
-  {
-    id: '3',
-    name: 'Rohan Verma',
-    role: 'Backend Engineer',
-    department: 'Engineering',
-    applied: '31 May 2025',
-    status: 'Reviewed',
-    avatar: 'RV',
-    avatarColor: '#06B6D4',
-    experience: '4 yrs',
-    location: 'Pune',
-  },
-  {
-    id: '4',
-    name: 'Sneha Kapoor',
-    role: 'Product Manager',
-    department: 'Product',
-    applied: '30 May 2025',
-    status: 'Pending',
-    avatar: 'SK',
-    avatarColor: '#F97316',
-    experience: '6 yrs',
-    location: 'Mumbai',
-  },
-  {
-    id: '5',
-    name: 'Karan Joshi',
-    role: 'Data Scientist',
-    department: 'Data',
-    applied: '29 May 2025',
-    status: 'Rejected',
-    avatar: 'KJ',
-    avatarColor: '#EF4444',
-    experience: '2 yrs',
-    location: 'Chennai',
-  },
-  {
-    id: '6',
-    name: 'Meena Iyer',
-    role: 'DevOps Engineer',
-    department: 'Infrastructure',
-    applied: '28 May 2025',
-    status: 'Shortlisted',
-    avatar: 'MI',
-    avatarColor: '#10B981',
-    experience: '7 yrs',
-    location: 'Hyderabad',
-  },
-  {
-    id: '7',
-    name: 'Aditya Rao',
-    role: 'iOS Developer',
-    department: 'Engineering',
-    applied: '27 May 2025',
-    status: 'Pending',
-    avatar: 'AR',
-    avatarColor: '#F59E0B',
-    experience: '3 yrs',
-    location: 'Bengaluru',
-  },
-  {
-    id: '8',
-    name: 'Divya Nair',
-    role: 'QA Engineer',
-    department: 'Quality',
-    applied: '26 May 2025',
-    status: 'Reviewed',
-    avatar: 'DN',
-    avatarColor: '#EC4899',
-    experience: '4 yrs',
-    location: 'Kochi',
-  },
-];
+const AVATAR_COLORS = ['#5B4EFF', '#8B5CF6', '#06B6D4', '#F97316', '#EF4444', '#10B981', '#F59E0B', '#EC4899'];
+
+function mapApplication(a: import('@/lib/api/types').JobApplication, index: number) {
+  const statusRaw = (a.status ?? 'pending').toLowerCase();
+  const status =
+    statusRaw === 'reviewed' ? 'Reviewed' :
+    statusRaw === 'shortlisted' ? 'Shortlisted' :
+    statusRaw === 'interviewed' ? 'Interviewed' :
+    statusRaw === 'rejected' ? 'Rejected' : 'Pending';
+  return {
+    id: String(a.id),
+    name: a.name ?? 'Applicant',
+    role: a.coverLetter ? a.coverLetter.slice(0, 40) : `Job #${a.jobId ?? ''}`,
+    department: `Job #${a.jobId ?? '—'}`,
+    applied: formatDate(a.appliedAt),
+    status,
+    avatar: initialsFromName(a.name),
+    avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
+    experience: '—',
+    location: a.phone ?? '—',
+  };
+}
 
 const STATUS_CONFIG = {
   Pending:     { color: C.pending,     bg: '#FFF7ED', icon: '⏳' },
@@ -255,9 +181,23 @@ export default function JobApplicationsScreen() {
   const [search, setSearch] = useState('');
   const [selectedJob, setSelectedJob] = useState('All Jobs');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
+  const [applications, setApplications] = useState<ReturnType<typeof mapApplication>[]>([]);
+
+  const loadApplications = useCallback(async () => {
+    try {
+      const res = await fetchJobApplications(undefined, 0, 100);
+      setApplications((res.items ?? []).map((a, i) => mapApplication(a, i)));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadApplications();
+  }, [loadApplications]);
 
   const filtered = useMemo(() => {
-    return DUMMY_APPLICATIONS.filter(a => {
+    return applications.filter(a => {
       const matchSearch =
         a.name.toLowerCase().includes(search.toLowerCase()) ||
         a.role.toLowerCase().includes(search.toLowerCase());
@@ -265,13 +205,13 @@ export default function JobApplicationsScreen() {
       const matchStatus = selectedStatus === 'All Status' || a.status === selectedStatus;
       return matchSearch && matchJob && matchStatus;
     });
-  }, [search, selectedJob, selectedStatus]);
+  }, [search, selectedJob, selectedStatus, applications]);
 
   const counts = useMemo(() => {
-    const c: { [key: string]: number } = { total: DUMMY_APPLICATIONS.length };
-    DUMMY_APPLICATIONS.forEach(a => { c[a.status] = (c[a.status] || 0) + 1; });
+    const c: { [key: string]: number } = { total: applications.length };
+    applications.forEach(a => { c[a.status] = (c[a.status] || 0) + 1; });
     return c;
-  }, []);
+  }, [applications]);
 
   const numColumns = isWeb ? 2 : 1;
 
@@ -350,7 +290,7 @@ export default function JobApplicationsScreen() {
         <View style={styles.resultsRow}>
           <Text style={styles.resultsText}>
             Showing <Text style={{ color: C.primary, fontWeight: '700' }}>{filtered.length}</Text> of{' '}
-            <Text style={{ fontWeight: '700' }}>{DUMMY_APPLICATIONS.length}</Text> applications
+            <Text style={{ fontWeight: '700' }}>{applications.length}</Text> applications
           </Text>
         </View>
 

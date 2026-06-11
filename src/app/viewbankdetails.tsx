@@ -1,6 +1,7 @@
-import { useNavigation } from "@react-navigation/native";
-import React from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   ScrollView,
   StatusBar,
@@ -11,11 +12,11 @@ import {
   View,
 } from "react-native";
 
-// Bootstrap Icons via @expo/vector-icons
-// For Expo: npx expo install @expo/vector-icons
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDate, maskAccount } from "@/lib/format";
+import { approveSellerBank, fetchSellerBankDetails, rejectSellerBank } from "@/services/sellerApi";
 
-// ─── Breakpoints ───────────────────────────────────────────────────────────────
 const BP = { mobile: 480, tablet: 768, laptop: 1024, desktop: 1280 };
 
 type Breakpoint = "mobile" | "tablet" | "laptop" | "desktop";
@@ -28,21 +29,19 @@ function useBreakpoint(): Breakpoint {
   return "desktop";
 }
 
-// ─── Data ──────────────────────────────────────────────────────────────────────
-const BANK_DATA = {
-  name: "Sanju Sandhya",
-  email: "flintandthread.hr@gmail.com",
-  status: "Not requested",
-  bank: "Canara Bank",
-  branch: "DARSI",
-  accountHolder: "MANAM RAMYA",
-  account: "XXXX1022",
-  ifsc: "CNRB0013641",
-  adminNote: "-",
-  sellerNote: "-",
+type BankDetail = {
+  fullName?: string;
+  email?: string;
+  bankName?: string;
+  branchName?: string;
+  accountHolder?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  bankVerified?: boolean;
+  adminRemarks?: string;
+  updatedAt?: string;
 };
 
-// ─── Header Banner ─────────────────────────────────────────────────────────────
 function Header({ bp }: { bp: Breakpoint }) {
   const isMobile = bp === "mobile";
   return (
@@ -50,7 +49,6 @@ function Header({ bp }: { bp: Breakpoint }) {
       <View style={styles.headerCircle1} />
       <View style={styles.headerCircle2} />
       <View style={styles.headerCircle3} />
-      {/* Bootstrap icon: bi-clock-history → history */}
       <View style={styles.headerIconBox}>
         <Icon name="history" size={isMobile ? 22 : 26} color={ORANGE} />
       </View>
@@ -58,60 +56,71 @@ function Header({ bp }: { bp: Breakpoint }) {
   );
 }
 
-// ─── Title + Action Buttons ────────────────────────────────────────────────────
-function TitleSection({ bp }: { bp: Breakpoint }) {
+function TitleSection({
+  bp,
+  data,
+  loading,
+  acting,
+  onBack,
+  onProof,
+  onApprove,
+  onReject,
+}: {
+  bp: Breakpoint;
+  data: BankDetail | null;
+  loading: boolean;
+  acting: boolean;
+  onBack: () => void;
+  onProof: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
   const isMobile = bp === "mobile" || bp === "tablet";
-  const navigation = useNavigation<any>();
+  const statusLabel = data?.bankVerified ? "Approved" : data ? "Pending" : "—";
 
   return (
     <View style={[styles.titleSection, isMobile && styles.titleSectionMobile]}>
       <View style={styles.titleLeft}>
         <Text style={styles.pageTitle}>Bank Approval History</Text>
-        <Text style={styles.userName}>{BANK_DATA.name}</Text>
-        <Text style={styles.userEmail}>{BANK_DATA.email}</Text>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{BANK_DATA.status}</Text>
-        </View>
+        {loading ? (
+          <ActivityIndicator color={ORANGE} style={{ marginTop: 12 }} />
+        ) : (
+          <>
+            <Text style={styles.userName}>{data?.fullName ?? "—"}</Text>
+            <Text style={styles.userEmail}>{data?.email ?? "—"}</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>{statusLabel}</Text>
+            </View>
+          </>
+        )}
       </View>
 
-      <View
-        style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}
-      >
-        {/* Bootstrap icon: bi-arrow-left-circle → arrow-left-circle */}
-        <TouchableOpacity
-          style={styles.backBtn}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate("sellerbankapproval")}
-        >
-          <Icon
-            name="arrow-left-circle"
-            size={16}
-            color={ORANGE}
-            style={styles.btnIcon}
-          />
+      <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
+        <TouchableOpacity style={styles.backBtn} activeOpacity={0.8} onPress={onBack}>
+          <Icon name="arrow-left-circle" size={16} color={ORANGE} style={styles.btnIcon} />
           <Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
 
-        {/* Bootstrap icon: bi-file-earmark-text → file-document-outline */}
-        <TouchableOpacity
-          style={styles.proofBtn}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate("bankproof", { sellerId: BANK_DATA.name })}
-        >
-          <Icon
-            name="file-document-outline"
-            size={16}
-            color="#fff"
-            style={styles.btnIcon}
-          />
+        <TouchableOpacity style={styles.proofBtn} activeOpacity={0.8} onPress={onProof} disabled={!data}>
+          <Icon name="file-document-outline" size={16} color="#fff" style={styles.btnIcon} />
           <Text style={styles.proofBtnText}>Bank Proof</Text>
         </TouchableOpacity>
+
+        {!data?.bankVerified && data && (
+          <>
+            <TouchableOpacity style={styles.approveBtn} activeOpacity={0.8} onPress={onApprove} disabled={acting}>
+              <Text style={styles.approveBtnText}>{acting ? "..." : "Approve"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.rejectBtn} activeOpacity={0.8} onPress={onReject} disabled={acting}>
+              <Text style={styles.rejectBtnText}>{acting ? "..." : "Reject"}</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
 }
 
-// ─── Bank Detail Row ───────────────────────────────────────────────────────────
 function BankDetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailRow}>
@@ -122,128 +131,173 @@ function BankDetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ─── Current Bank Details Card ─────────────────────────────────────────────────
-function CurrentBankDetails() {
+function CurrentBankDetails({ data }: { data: BankDetail | null }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardTitleRow}>
-        {/* Bootstrap icon: bi-bank → bank-outline */}
-        <Icon
-          name="bank-outline"
-          size={18}
-          color={ORANGE}
-          style={{ marginRight: 8 }}
-        />
+        <Icon name="bank-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
         <Text style={styles.cardTitle}>Current Bank Details</Text>
       </View>
 
       <View style={styles.detailRows}>
-        <BankDetailRow label="Bank" value={BANK_DATA.bank} />
-        <BankDetailRow label="Branch" value={BANK_DATA.branch} />
-        <BankDetailRow label="Account holder" value={BANK_DATA.accountHolder} />
-        <BankDetailRow label="Account" value={BANK_DATA.account} />
-        <BankDetailRow label="IFSC" value={BANK_DATA.ifsc} />
+        <BankDetailRow label="Bank" value={data?.bankName ?? "—"} />
+        <BankDetailRow label="Branch" value={data?.branchName ?? "—"} />
+        <BankDetailRow label="Account holder" value={data?.accountHolder ?? "—"} />
+        <BankDetailRow label="Account" value={maskAccount(data?.accountNumber)} />
+        <BankDetailRow label="IFSC" value={data?.ifscCode ?? "—"} />
       </View>
 
       <View style={styles.divider} />
 
-      <BankDetailRow label="Admin Note" value={BANK_DATA.adminNote} />
+      <BankDetailRow label="Admin Note" value={data?.adminRemarks ?? "—"} />
       <View style={{ height: 8 }} />
-      <BankDetailRow label="Seller Note" value={BANK_DATA.sellerNote} />
+      <BankDetailRow label="Last Updated" value={formatDate(data?.updatedAt)} />
     </View>
   );
 }
 
-// ─── History / Timeline Card ───────────────────────────────────────────────────
-function HistoryTimeline({ compact }: { compact?: boolean }) {
+function HistoryTimeline({ compact, verified, updatedAt }: { compact?: boolean; verified?: boolean; updatedAt?: string }) {
+  const hasHistory = Boolean(verified && updatedAt);
   return (
     <View style={[styles.card, compact && styles.historyCardCompact]}>
       <View style={styles.cardTitleRow}>
-        {/* Bootstrap icon: bi-clock-history → history */}
-        <Icon
-          name="history"
-          size={18}
-          color={ORANGE}
-          style={{ marginRight: 8 }}
-        />
+        <Icon name="history" size={18} color={ORANGE} style={{ marginRight: 8 }} />
         <Text style={styles.cardTitle}>History / Timeline</Text>
       </View>
 
-      <View style={styles.emptyHistory}>
-        <View style={styles.emptyIconCircle}>
-          {/* Bootstrap icon: bi-calendar-x → calendar-remove-outline */}
-          <Icon
-            name="calendar-remove-outline"
-            size={compact ? 24 : 30}
-            color={GRAY}
-          />
+      {hasHistory ? (
+        <View style={styles.detailRows}>
+          <BankDetailRow label="Approved" value={formatDate(updatedAt)} />
         </View>
-        <Text style={styles.emptyTitle}>No history found.</Text>
-        {!compact && (
-          <Text style={styles.emptySubtitle}>
-            There is no history or timeline available.
-          </Text>
-        )}
-      </View>
+      ) : (
+        <View style={styles.emptyHistory}>
+          <View style={styles.emptyIconCircle}>
+            <Icon name="calendar-remove-outline" size={compact ? 24 : 30} color={GRAY} />
+          </View>
+          <Text style={styles.emptyTitle}>No history found.</Text>
+          {!compact && (
+            <Text style={styles.emptySubtitle}>There is no history or timeline available.</Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
-// ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function BankApprovalHistory() {
-  const { width } = useWindowDimensions();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ sellerId?: string }>();
+  const sellerId = Number(params.sellerId);
   const bp = useBreakpoint();
   const isMobile = bp === "mobile";
   const isDesktopWide = bp === "laptop" || bp === "desktop";
 
+  const [data, setData] = useState<BankDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDetails = useCallback(async () => {
+    if (!sellerId || Number.isNaN(sellerId)) {
+      setError("Invalid seller.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const detail = await fetchSellerBankDetails(sellerId);
+      setData(detail as BankDetail);
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [sellerId]);
+
+  useEffect(() => {
+    loadDetails();
+  }, [loadDetails]);
+
+  const handleApprove = async () => {
+    if (!sellerId) return;
+    setActing(true);
+    try {
+      await approveSellerBank(sellerId);
+      await loadDetails();
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!sellerId) return;
+    setActing(true);
+    try {
+      await rejectSellerBank(sellerId, "Rejected by admin");
+      await loadDetails();
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setActing(false);
+    }
+  };
+
   const contentMaxWidth =
-    bp === "desktop"
-      ? 1200
-      : bp === "laptop"
-        ? 960
-        : bp === "tablet"
-          ? 700
-          : "100%";
+    bp === "desktop" ? 1200 : bp === "laptop" ? 960 : bp === "tablet" ? 700 : "100%";
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#C05E1A" />
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          !isMobile && { alignItems: "center" },
-        ]}
+        contentContainerStyle={[styles.scrollContent, !isMobile && { alignItems: "center" }]}
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[
-            styles.outerContainer,
-            { maxWidth: contentMaxWidth, width: "100%" },
-          ]}
-        >
-          {/* Top card: header banner + title section */}
+        <View style={[styles.outerContainer, { maxWidth: contentMaxWidth, width: "100%" }]}>
           <View style={styles.topCard}>
             <Header bp={bp} />
-            <TitleSection bp={bp} />
+            <TitleSection
+              bp={bp}
+              data={data}
+              loading={loading}
+              acting={acting}
+              onBack={() => router.push("/sellerbankapproval")}
+              onProof={() => router.push({ pathname: "/bankproof", params: { sellerId: String(sellerId) } })}
+              onApprove={handleApprove}
+              onReject={handleReject}
+            />
           </View>
 
-          {/* Body: side-by-side on desktop, stacked on mobile/tablet */}
-          <View
-            style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}
-          >
+          {error ? (
+            <View style={styles.card}>
+              <Text style={{ color: "#DC2626" }}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}>
             {isDesktopWide ? (
               <>
                 <View style={styles.leftCol}>
-                  <CurrentBankDetails />
+                  <CurrentBankDetails data={data} />
                 </View>
                 <View style={styles.rightCol}>
-                  <HistoryTimeline compact={false} />
+                  <HistoryTimeline
+                    compact={false}
+                    verified={data?.bankVerified}
+                    updatedAt={data?.updatedAt}
+                  />
                 </View>
               </>
             ) : (
               <>
-                <CurrentBankDetails />
-                <HistoryTimeline compact={isMobile} />
+                <CurrentBankDetails data={data} />
+                <HistoryTimeline
+                  compact={isMobile}
+                  verified={data?.bankVerified}
+                  updatedAt={data?.updatedAt}
+                />
               </>
             )}
           </View>
@@ -253,7 +307,6 @@ export default function BankApprovalHistory() {
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
 const ORANGE = "#C05E1A";
 const ORANGE_LIGHT = "#E8892F";
 const DARK = "#2C3E50";
@@ -261,52 +314,22 @@ const GRAY = "#8492A6";
 const BG = "#F4F6F9";
 
 const shadow: any = Platform.select({
-  ios: {
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-  },
+  ios: { shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   android: { elevation: 4 },
   default: { boxShadow: "0 4px 16px rgba(0,0,0,0.08)" },
 });
 
 const shadowSm: any = Platform.select({
-  ios: {
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-  },
+  ios: { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 } },
   android: { elevation: 3 },
   default: { boxShadow: "0 3px 12px rgba(0,0,0,0.07)" },
 });
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 32,
-  },
-  outerContainer: {
-    alignSelf: "center",
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    gap: 16,
-  },
-
-  // ── Top card ────────────────────────────────────
-  topCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    ...shadow,
-  },
-
-  // ── Header banner ───────────────────────────────
+  root: { flex: 1, backgroundColor: BG },
+  scrollContent: { flexGrow: 1, paddingBottom: 32 },
+  outerContainer: { alignSelf: "center", paddingHorizontal: 12, paddingTop: 12, gap: 16 },
+  topCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", ...shadow },
   headerBanner: {
     backgroundColor: ORANGE,
     height: 100,
@@ -350,19 +373,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-      },
-      android: { elevation: 4 },
-      default: { boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
-    }),
   },
-
-  // ── Title section ────────────────────────────────
   titleSection: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -373,31 +384,11 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 16,
   },
-  titleSectionMobile: {
-    flexDirection: "column",
-  },
-  titleLeft: {
-    flex: 1,
-    minWidth: 200,
-    gap: 4,
-  },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: DARK,
-    letterSpacing: -0.3,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: DARK,
-    marginTop: 6,
-  },
-  userEmail: {
-    fontSize: 13,
-    color: GRAY,
-    marginTop: 2,
-  },
+  titleSectionMobile: { flexDirection: "column" },
+  titleLeft: { flex: 1, minWidth: 200, gap: 4 },
+  pageTitle: { fontSize: 22, fontWeight: "700", color: DARK, letterSpacing: -0.3 },
+  userName: { fontSize: 15, fontWeight: "600", color: DARK, marginTop: 6 },
+  userEmail: { fontSize: 13, color: GRAY, marginTop: 2 },
   statusBadge: {
     marginTop: 10,
     alignSelf: "flex-start",
@@ -406,27 +397,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  statusText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "500",
-  },
-
-  // ── Action buttons ───────────────────────────────
-  actionButtons: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  actionButtonsMobile: {
-    width: "100%",
-  },
-  btnIcon: {
-    marginRight: 6,
-  },
+  statusText: { color: "#fff", fontSize: 12, fontWeight: "500" },
+  actionButtons: { flexDirection: "row", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" },
+  actionButtonsMobile: { width: "100%" },
+  btnIcon: { marginRight: 6 },
   backBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -438,13 +413,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     minWidth: 90,
   },
-  backBtnText: {
-    color: ORANGE,
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  backBtnText: { color: ORANGE, fontSize: 14, fontWeight: "600" },
   proofBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -454,88 +424,36 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     minWidth: 110,
   },
-  proofBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
+  proofBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  approveBtn: {
+    backgroundColor: "#16A34A",
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-
-  // ── Body section ─────────────────────────────────
-  bodySection: {
-    gap: 16,
+  approveBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  rejectBtn: {
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  bodySectionRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
+  rejectBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  bodySection: { gap: 16 },
+  bodySectionRow: { flexDirection: "row", alignItems: "flex-start" },
   leftCol: { flex: 1 },
   rightCol: { flex: 1 },
-
-  // ── Card ─────────────────────────────────────────
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    ...shadowSm,
-  },
-  historyCardCompact: {
-    minHeight: 140,
-  },
-  cardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: DARK,
-    letterSpacing: -0.2,
-  },
-
-  // ── Detail rows ──────────────────────────────────
-  detailRows: {
-    gap: 2,
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 8,
-  },
-  detailLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: GRAY,
-    fontWeight: "400",
-    minWidth: 110,
-  },
-  detailColon: {
-    fontSize: 14,
-    color: GRAY,
-    marginHorizontal: 8,
-    width: 10,
-  },
-  detailValue: {
-    flex: 1.5,
-    fontSize: 14,
-    color: DARK,
-    fontWeight: "500",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#EDF2F7",
-    marginVertical: 12,
-  },
-
-  // ── Empty history ─────────────────────────────────
-  emptyHistory: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 24,
-    gap: 10,
-  },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 20, ...shadowSm },
+  historyCardCompact: { minHeight: 140 },
+  cardTitleRow: { flexDirection: "row", alignItems: "center", marginBottom: 18 },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: DARK, letterSpacing: -0.2 },
+  detailRows: { gap: 2, marginBottom: 16 },
+  detailRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 8 },
+  detailLabel: { flex: 1, fontSize: 14, color: GRAY, fontWeight: "400", minWidth: 110 },
+  detailColon: { fontSize: 14, color: GRAY, marginHorizontal: 8, width: 10 },
+  detailValue: { flex: 1.5, fontSize: 14, color: DARK, fontWeight: "500" },
+  divider: { height: 1, backgroundColor: "#EDF2F7", marginVertical: 12 },
+  emptyHistory: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 24, gap: 10 },
   emptyIconCircle: {
     width: 64,
     height: 64,
@@ -545,15 +463,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 4,
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: DARK,
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    color: GRAY,
-    textAlign: "center",
-    paddingHorizontal: 16,
-  },
+  emptyTitle: { fontSize: 15, fontWeight: "700", color: DARK },
+  emptySubtitle: { fontSize: 13, color: GRAY, textAlign: "center", paddingHorizontal: 16 },
 } as any);
