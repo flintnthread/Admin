@@ -1,14 +1,14 @@
-import React from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
+import React from "react";
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 type Props = {
   /** Whether the sidebar is in collapsed (icon-only) mode – desktop only */
@@ -35,6 +35,7 @@ const NAV_ITEMS = {
     icon: "shopping-bag",
     color: "#6366F1",
     children: [
+
       { label: "Products", icon: "package", path: "/Products", color: "#0984e3" },
       { label: "Customers", icon: "users", path: "/customerManagement", color: "#00b894" },
       { label: "Sellers", icon: "user-check", path: null, color: "#6c5ce7" },
@@ -45,19 +46,11 @@ const NAV_ITEMS = {
       { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges", color: "#00b359" },
     ],
     standalone: [
-
-      { label: "Pending Sellers", icon: "user-plus", path: null, color: "#14B8A6" },
+      { label: "Pending Sellers", icon: "user-plus", path: "/pendingsellers", color: "#14B8A6" },
       { label: "Approved Sellers", icon: "user-check", path: "/approveseller", color: "#06B6D4" },
       { label: "Customer Support", icon: "headphones", path: "/Customersupport", color: "#0EA5E9" },
       { label: "Category Requests", icon: "grid", path: "/categoryRequests", color: "#8B5CF6" },
       { label: "Seller Support", icon: "message-square", path: "/Sellerticket", color: "#D946EF" },
-
-      { label: "Pending Sellers", icon: "user-plus", path: "/pendingSellers" },
-      { label: "Approved Sellers", icon: "user-check", path: "/approveseller" },
-      { label: "Customer Support", icon: "headphones", path: null },
-      { label: "Category Requests", icon: "grid", path: "/categoryRequests" },
-      { label: "Seller Support", icon: "message-square", path: "/supportticket" },
- 
     ],
   },
   "EMAIL MANAGEMENT": [
