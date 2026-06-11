@@ -4,6 +4,7 @@ import {
     Animated,
     Image,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,6 +12,7 @@ import {
     useWindowDimensions,
     View
 } from 'react-native';
+import { router } from 'expo-router';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
 // Install: expo install @expo/vector-icons  OR  npm install react-native-vector-icons
@@ -388,25 +390,21 @@ const SparklineChart: React.FC<{
         </View>
       )}
 
-      {/* X-axis labels – show every nth */}
-      {data.map((d, i) => {
-        const step = Math.ceil(data.length / 8);
-        if (i % step !== 0 && i !== data.length - 1) return null;
-        return (
-          <View
-            key={i}
-            style={{
-              position: 'absolute',
-              left: getX(i) - 16,
-              top: padding.top + chartH + 4,
-              width: 32,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 9, color: COLORS.textMuted }}>{d.label}</Text>
-          </View>
-        );
-      })}
+      {/* X-axis labels – show all labels */}
+      {data.map((d, i) => (
+        <View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: getX(i) - 16,
+            top: padding.top + chartH + 4,
+            width: 32,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 8, color: COLORS.textMuted }}>{d.label}</Text>
+        </View>
+      ))}
     </View>
   );
 };
@@ -651,6 +649,104 @@ const StatusBadge: React.FC<{ label: string; color: string }> = ({ label, color 
   </View>
 );
 
+// ─── CSV Export Modal ───────────────────────────────────────────────────────────
+const CsvExportModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  content: string;
+}> = ({ visible, onClose, title, content }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 600;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={csvModalStyles.overlay}>
+        <View style={[csvModalStyles.modal, isMobile && csvModalStyles.modalMobile]}>
+          <View style={csvModalStyles.header}>
+            <Text style={csvModalStyles.title}>{title}</Text>
+            <TouchableOpacity onPress={onClose} style={csvModalStyles.closeBtn}>
+              <BootstrapIcon name="x-lg" size={18} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={csvModalStyles.content}>
+            <Text style={csvModalStyles.csvText}>{content}</Text>
+          </ScrollView>
+          <TouchableOpacity style={csvModalStyles.closeBtnBottom} onPress={onClose}>
+            <Text style={csvModalStyles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const csvModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modal: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 600,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalMobile: {
+    maxWidth: '100%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.primary,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  content: {
+    padding: 16,
+    maxHeight: 400,
+  },
+  csvText: {
+    fontSize: 12,
+    color: COLORS.text,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+    lineHeight: 18,
+  },
+  closeBtnBottom: {
+    padding: 14,
+    backgroundColor: COLORS.primary,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+});
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ViewSeller() {
   const { width } = useWindowDimensions();
@@ -661,6 +757,8 @@ export default function ViewSeller() {
   const [loading] = useState(false);
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string>('');
+  const [productsExportModal, setProductsExportModal] = useState(false);
+  const [ordersExportModal, setOrdersExportModal] = useState(false);
 
   const openDoc = (name: string) => {
     setSelectedDoc(name);
@@ -718,7 +816,7 @@ export default function ViewSeller() {
             </View>
           </View>
         </View>
-        <TouchableOpacity style={styles.backBtn}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
             <Text style={styles.backBtnText}>Back to Sellers</Text>
@@ -794,18 +892,24 @@ export default function ViewSeller() {
 
         {/* Export buttons */}
         <View style={styles.exportRow}>
-          <TouchableOpacity style={styles.exportBtn}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <BootstrapIcon name="download" size={13} color={COLORS.white} />
-                <Text style={styles.exportBtnText}>Export Products CSV</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.exportBtn}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <BootstrapIcon name="download" size={13} color={COLORS.white} />
-                <Text style={styles.exportBtnText}>Export Orders CSV</Text>
-              </View>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={() => router.push('/sellers')}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <BootstrapIcon name="list" size={13} color={COLORS.white} />
+              <Text style={styles.exportBtnText}>View List</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={() => setProductsExportModal(true)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <BootstrapIcon name="download" size={13} color={COLORS.white} />
+              <Text style={styles.exportBtnText}>Export Products CSV</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={() => setOrdersExportModal(true)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <BootstrapIcon name="download" size={13} color={COLORS.white} />
+              <Text style={styles.exportBtnText}>Export Orders CSV</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.statsRow, isMobile && { flexDirection: 'column' }]}>
@@ -954,7 +1058,7 @@ export default function ViewSeller() {
             width={width}
           />
         </View>
-        <TouchableOpacity style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+        <TouchableOpacity style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => router.push('/productApproval')}>
           <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
           <Text style={styles.actionBtnText}>View All Products</Text>
         </TouchableOpacity>
@@ -989,6 +1093,22 @@ export default function ViewSeller() {
         visible={docModalVisible}
         docName={selectedDoc}
         onClose={() => setDocModalVisible(false)}
+      />
+
+      {/* Products Export Modal */}
+      <CsvExportModal
+        visible={productsExportModal}
+        onClose={() => setProductsExportModal(false)}
+        title="Export Products CSV"
+        content='263,"Red Banarasi Style Cotton Silk Saree with Silver Zari Border",Active,"2026-05-25 13:41:05"'
+      />
+
+      {/* Orders Export Modal */}
+      <CsvExportModal
+        visible={ordersExportModal}
+        onClose={() => setOrdersExportModal(false)}
+        title="Export Orders CSV"
+        content='"Order Status","Total Amount","Created At"'
       />
 
       {/* Bottom spacer */}
