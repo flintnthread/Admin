@@ -1,4 +1,12 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapFaqCategoryRow } from "@/lib/mappers";
+import {
+  createFaqCategory,
+  deleteFaqCategory,
+  fetchFaqCategories,
+  updateFaqCategory,
+} from "@/services/faqApi";
 import {
     View,
     Text,
@@ -52,18 +60,6 @@ interface FaqCategory {
     createdAt: string;
     slug: string;
 }
-
-// ─── DATA ─────────────────────────────────────────────────────────────────────
-const initialCategories: FaqCategory[] = [
-    { id: 1, name: "About Flint & Thread", description: "Brand story, mission & values",     icon: "info",        color: ACCENT_TEAL,   faqCount: 8,  status: "Active",   createdAt: "18 Nov, 2025", slug: "about"    },
-    { id: 2, name: "Account & Profile",    description: "Login, settings, preferences",       icon: "user",        color: ACCENT_PURPLE, faqCount: 12, status: "Active",   createdAt: "18 Nov, 2025", slug: "account"  },
-    { id: 3, name: "Orders & Tracking",    description: "Order status, updates & history",    icon: "package",     color: ACCENT_SKY,    faqCount: 15, status: "Active",   createdAt: "18 Nov, 2025", slug: "orders"   },
-    { id: 4, name: "Shipping & Delivery",  description: "Timelines, zones & charges",         icon: "truck",       color: ACCENT_AMBER,  faqCount: 10, status: "Active",   createdAt: "18 Nov, 2025", slug: "shipping" },
-    { id: 5, name: "Payments & Wallet",    description: "Methods, wallet & transactions",     icon: "credit-card", color: ACCENT_PINK,   faqCount: 9,  status: "Active",   createdAt: "18 Nov, 2025", slug: "payments" },
-    { id: 6, name: "Returns & Refunds",    description: "Policy, process & timelines",        icon: "refresh-cw",  color: ACCENT_RED,    faqCount: 7,  status: "Active",   createdAt: "18 Nov, 2025", slug: "returns"  },
-    { id: 7, name: "Seller Support",       description: "Onboarding, listings & payouts",     icon: "briefcase",   color: ACCENT_GREEN,  faqCount: 11, status: "Inactive", createdAt: "20 Nov, 2025", slug: "seller"   },
-    { id: 8, name: "Technical Issues",     description: "App bugs, errors & fixes",           icon: "tool",        color: ACCENT_VIOLET, faqCount: 6,  status: "Active",   createdAt: "22 Nov, 2025", slug: "tech"     },
-];
 
 // ─── ADD / EDIT MODAL ────────────────────────────────────────────────────────
 const CategoryModal: React.FC<{
@@ -249,12 +245,28 @@ const ListRow: React.FC<{
 // ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
 const FaqCategoriesScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
-    const [categories, setCategories] = useState<FaqCategory[]>(initialCategories);
+    const [categories, setCategories] = useState<FaqCategory[]>([]);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [search,        setSearch]        = useState("");
     const [viewMode,      setViewMode]      = useState<"grid" | "list">("grid");
     const [statusFilter,  setStatusFilter]  = useState<"All" | "Active" | "Inactive">("All");
     const [modalVisible,  setModalVisible]  = useState(false);
     const [editingCat,    setEditingCat]    = useState<FaqCategory | null>(null);
+
+    const loadCategories = useCallback(async () => {
+        try {
+            setLoadError(null);
+            const rows = await fetchFaqCategories();
+            setCategories(rows.map((r, i) => mapFaqCategoryRow(r, i)));
+        } catch (e) {
+            setLoadError(getApiErrorMessage(e));
+            setCategories([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadCategories();
+    }, [loadCategories]);
 
     const filtered = categories.filter(c => {
         const ms = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -267,32 +279,59 @@ const FaqCategoriesScreen: React.FC = () => {
     const totalFaqs   = categories.reduce((s, c) => s + c.faqCount, 0);
 
     const handleSave = (data: Partial<FaqCategory>) => {
-        if (editingCat) {
-            setCategories(prev => prev.map(c => c.id === editingCat.id ? { ...c, ...data } : c));
-        } else {
-            const newCat: FaqCategory = {
-                id: Date.now(),
-                name: data.name ?? "New Category",
-                description: data.description ?? "",
-                icon: "help-circle",
-                color: PRIMARY,
-                faqCount: 0,
-                status: data.status ?? "Active",
-                createdAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-                slug: (data.name ?? "new").toLowerCase().replace(/\s+/g, "-"),
-            };
-            setCategories(prev => [newCat, ...prev]);
-        }
+        void (async () => {
+            try {
+                const payload = {
+                    categoryName: data.name,
+                    categoryIcon: editingCat?.icon ?? "help-circle",
+                    sortOrder: editingCat?.id ?? categories.length + 1,
+                    status: data.status !== "Inactive",
+                };
+                if (editingCat) {
+                    await updateFaqCategory(editingCat.id, payload);
+                } else {
+                    await createFaqCategory(payload);
+                }
+                await loadCategories();
+            } catch (e) {
+                setLoadError(getApiErrorMessage(e));
+            }
+        })();
     };
 
-    const handleToggle = (id: number) =>
-        setCategories(prev => prev.map(c => c.id === id
-            ? { ...c, status: c.status === "Active" ? "Inactive" : "Active" } : c));
+    const handleToggle = (id: number) => {
+        const cat = categories.find((c) => c.id === id);
+        if (!cat) return;
+        void (async () => {
+            try {
+                await updateFaqCategory(id, {
+                    categoryName: cat.name,
+                    categoryIcon: cat.icon,
+                    sortOrder: id,
+                    status: cat.status !== "Active",
+                });
+                await loadCategories();
+            } catch (e) {
+                setLoadError(getApiErrorMessage(e));
+            }
+        })();
+    };
+
+    const doDelete = (id: number) => {
+        void (async () => {
+            try {
+                await deleteFaqCategory(id);
+                await loadCategories();
+            } catch (e) {
+                setLoadError(getApiErrorMessage(e));
+            }
+        })();
+    };
 
     const handleDelete = (id: number) => {
         if (Platform.OS === "web") {
             if (window.confirm("Are you sure you want to delete this category?")) {
-                setCategories(prev => prev.filter(c => c.id !== id));
+                doDelete(id);
             }
         } else {
             Alert.alert(
@@ -300,7 +339,7 @@ const FaqCategoriesScreen: React.FC = () => {
                 "Are you sure you want to delete this category?",
                 [
                     { text: "Cancel", style: "cancel" },
-                    { text: "Delete", style: "destructive", onPress: () => setCategories(prev => prev.filter(c => c.id !== id)) }
+                    { text: "Delete", style: "destructive", onPress: () => doDelete(id) },
                 ]
             );
         }
@@ -342,6 +381,10 @@ const FaqCategoriesScreen: React.FC = () => {
                 <ScrollView style={st.scroll}
                     contentContainerStyle={[st.scrollContent, !isWeb && { paddingBottom: 100 }]}
                     showsVerticalScrollIndicator={false}>
+
+                    {loadError ? (
+                        <Text style={{ color: ACCENT_RED, marginBottom: 12, paddingHorizontal: 16 }}>{loadError}</Text>
+                    ) : null}
 
                     {/* ── STAT CARDS ── */}
                     {isWeb ? (

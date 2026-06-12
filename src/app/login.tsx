@@ -154,6 +154,9 @@ function MobileLoginScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
                   />
                 </View>
                 {emailError ? (
@@ -196,6 +199,10 @@ function MobileLoginScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    autoComplete="password"
+                    textContentType="password"
+                    returnKeyType="go"
+                    onSubmitEditing={() => void handleLogin()}
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
@@ -545,12 +552,11 @@ function WebLoginScreen() {
   );
 }
 
-// --- PLATFORM SELECTOR ROUTER ---
+// --- RESPONSIVE ROUTER (web tablet/desktop vs mobile + native apps) ---
 export default function LoginScreen() {
-  if (Platform.OS === "web") {
-    return <WebLoginScreen />;
-  }
-  return <MobileLoginScreen />;
+  const { width } = useWindowDimensions();
+  const useWebLayout = Platform.OS === "web" && width >= 768;
+  return useWebLayout ? <WebLoginScreen /> : <MobileLoginScreen />;
 }
 
 // --- MOBILE STYLES ---
@@ -632,6 +638,10 @@ const stylesMobile = StyleSheet.create({
     paddingRight: 20,
     fontSize: 16,
     color: "#1d324e",
+    ...Platform.select({
+      web: { outlineStyle: "none" as const },
+      default: {},
+    }),
   },
   inputFocused: {
     borderColor: "#1d324e",
@@ -661,6 +671,10 @@ const stylesMobile = StyleSheet.create({
     paddingLeft: 12,
     fontSize: 16,
     color: "#1d324e",
+    ...Platform.select({
+      web: { outlineStyle: "none" as const },
+      default: {},
+    }),
   },
   eyeButton: {
     paddingHorizontal: 15,

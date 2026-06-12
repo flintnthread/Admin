@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,11 +15,18 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAsyncLoad } from "@/hooks/useAsyncLoad";
-import { fetchSellers, blockSeller, unblockSeller } from "@/services/sellerApi";
-import { mapSellerToApprovedRow } from "@/lib/mappers";
+import {
+  fetchSellers,
+  blockSeller,
+  unblockSeller,
+  fetchPendingProfileSellers,
+  fetchPendingProfileDetail,
+  approveSellerProfile,
+  rejectSellerProfile,
+} from "@/services/sellerApi";
+import { mapPendingProfileRow, mapSellerToApprovedRow } from "@/lib/mappers";
 import { getApiErrorMessage } from "@/lib/api/client";
 
-// --- MOCK DATA TYPE ---
 type Seller = {
   id: number;
   name: string;
@@ -52,252 +59,15 @@ type PendingSeller = {
   holderName?: string;
 };
 
-const INITIAL_PENDING_SELLERS: PendingSeller[] = [];
-
-// --- THE 10 EXACT SELLERS FROM SCREENSHOTS ---
-const EXACT_SELLERS: Seller[] = [
-  {
-    id: 1,
-    name: "Khaiser Mohammed",
-    email: "mkhaiser0786@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    businessName: "ZOYA ALL BAGS CENTER",
-    businessType: "Sole Proprietorship",
-    products: 2,
-    walletBalance: 0,
-    joinDate: "May 29, 2026",
-    revenue: 0,
-    state: "Telangana",
-    city: "Sangareddy",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Gone Mahender",
-    email: "saineeshopingmall@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-    businessName: "SAINEE SHOPPING MALL",
-    businessType: "Sole Proprietorship",
-    products: 1,
-    walletBalance: 0,
-    joinDate: "May 14, 2026",
-    revenue: 0,
-    state: "Telangana",
-    city: "Hyderabad",
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Malathi Devulapalli",
-    email: "9032893883malathi@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    businessName: "PRAHARSHI CREATIONS",
-    businessType: "Sole Proprietorship",
-    products: 0,
-    walletBalance: 0,
-    joinDate: "May 11, 2026",
-    revenue: 0,
-    state: "Andhra Pradesh",
-    city: "Vijayawada",
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Panwar Chair Compay",
-    email: "myidea702@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/4.jpg",
-    businessName: "ANIL RETAILS",
-    businessType: "Sole Proprietorship",
-    products: 1,
-    walletBalance: 0,
-    joinDate: "Apr 28, 2026",
-    revenue: 0,
-    state: "Karnataka",
-    city: "Bangalore",
-    status: "Active",
-  },
-  {
-    id: 5,
-    name: "Smart Fashions",
-    email: "syedlucky129@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/women/5.jpg",
-    businessName: "SMART FASHIONS",
-    businessType: "Sole Proprietorship",
-    products: 8,
-    walletBalance: 0,
-    joinDate: "Apr 22, 2026",
-    revenue: 689,
-    state: "Maharashtra",
-    city: "Mumbai",
-    status: "Active",
-  },
-  {
-    id: 6,
-    name: "Arhaan Collection",
-    email: "arhaancollection1355@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/6.jpg",
-    businessName: "ARHAAN COLLECTIONS",
-    businessType: "Sole Proprietorship",
-    products: 0,
-    walletBalance: 0,
-    joinDate: "Apr 22, 2026",
-    revenue: 0,
-    state: "Gujarat",
-    city: "Surat",
-    status: "Active",
-  },
-  {
-    id: 7,
-    name: "Ahmad Expoters",
-    email: "ahmadexpoters900@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/7.jpg",
-    businessName: "AHMAD EXPORTERS",
-    businessType: "Sole Proprietorship",
-    products: 0,
-    walletBalance: 0,
-    joinDate: "Apr 21, 2026",
-    revenue: 0,
-    state: "West Bengal",
-    city: "Kolkata",
-    status: "Active",
-  },
-  {
-    id: 8,
-    name: "Lakshmi Sumana",
-    email: "ubstore2025@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/women/8.jpg",
-    businessName: "UNIVERSAL BAGS",
-    businessType: "Partnership",
-    products: 12,
-    walletBalance: 0,
-    joinDate: "Apr 19, 2026",
-    revenue: 0,
-    state: "Tamil Nadu",
-    city: "Chennai",
-    status: "Active",
-  },
-  {
-    id: 9,
-    name: "Finn Brooks",
-    email: "brandshoppe789@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/9.jpg",
-    businessName: "BRAND SHOPPE",
-    businessType: "Sole Proprietorship",
-    products: 5,
-    walletBalance: 0,
-    joinDate: "Apr 17, 2026",
-    revenue: 3068,
-    state: "Telangana",
-    city: "Rangareddy",
-    status: "Active",
-  },
-  {
-    id: 10,
-    name: "Satya Retailer",
-    email: "satyaretailer@gmail.com",
-    avatar: "https://randomuser.me/api/portraits/men/10.jpg",
-    businessName: "Satya Retail Corporation",
-    businessType: "Sole Proprietorship",
-    products: 9,
-    walletBalance: 0,
-    joinDate: "Apr 13, 2026",
-    revenue: 3927,
-    state: "Andhra Pradesh",
-    city: "Sri Sathya Sai",
-    status: "Active",
-  },
-];
-
-// --- PROGRAMMATIC MOCK SELLER LIST GENERATOR (TOTAL 71) ---
-const generateAllSellers = (): Seller[] => {
-  const sellers = [...EXACT_SELLERS];
-
-  const statePool = [
-    ...Array(14).fill({ state: "Telangana", city: "Sangareddy" }),
-    ...Array(12).fill({ state: "Telangana", city: "Hyderabad" }),
-    ...Array(1).fill({ state: "Telangana", city: "Rangareddy" }),
-    ...Array(6).fill({ state: "Telangana", city: "Warangal" }),
-    ...Array(3).fill({ state: "Maharashtra", city: "Mumbai" }),
-    ...Array(3).fill({ state: "Maharashtra", city: "Pune" }),
-    ...Array(1).fill({ state: "Andhra Pradesh", city: "Sri Sathya Sai" }),
-    ...Array(4).fill({ state: "Andhra Pradesh", city: "Vijayawada" }),
-    ...Array(2).fill({ state: "Karnataka", city: "Bangalore" }),
-    ...Array(1).fill({ state: "Karnataka", city: "Mysore" }),
-    ...Array(2).fill({ state: "Gujarat", city: "Surat" }),
-    ...Array(1).fill({ state: "Gujarat", city: "Ahmedabad" }),
-    ...Array(2).fill({ state: "West Bengal", city: "Kolkata" }),
-    ...Array(2).fill({ state: "Uttar Pradesh", city: "Agra" }),
-    ...Array(1).fill({ state: "Uttar Pradesh", city: "Lucknow" }),
-    ...Array(2).fill({ state: "Tamil Nadu", city: "Chennai" }),
-    ...Array(2).fill({ state: "Rajasthan", city: "Jaipur" }),
-    ...Array(1).fill({ state: "Unknown", city: "Unknown" }),
-    ...Array(1).fill({ state: "Kerala", city: "Kochi" }),
-  ];
-
-  const firstNames = [
-    "Rahul", "Amit", "Priya", "Sneha", "Karan", "Anjali", "Vikram", "Deepa",
-    "Sanjay", "Neha", "Arjun", "Ritu", "Manish", "Kiran", "Vijay", "Aisha",
-    "Rohan", "Pooja", "Rajesh", "Divya", "Suresh", "Swati", "Anil", "Meera",
-  ];
-  const lastNames = [
-    "Sharma", "Verma", "Gupta", "Patel", "Reddy", "Rao", "Nair", "Joshi",
-    "Singh", "Kumar", "Mehta", "Sen", "Das", "Roy", "Chawla", "Bose",
-    "Pillai", "Naidu", "Deshmukh", "Kulkarni", "Shenoy", "Shetty", "Gowda",
-  ];
-  const businessWords = [
-    "Retails", "Enterprises", "Stores", "Bazaar", "Fashions", "Creations",
-    "Bags", "Footwear", "Apparels", "Textiles", "Electronics", "Mart",
-  ];
-  const businessTypes = ["Sole Proprietorship", "Partnership", "Private Limited"];
-
-  for (let i = 0; i < 61; i++) {
-    const id = 11 + i;
-    const fName = firstNames[(i + 3) % firstNames.length];
-    const lName = lastNames[(i + 7) % lastNames.length];
-    const name = `${fName} ${lName}`;
-    const email = `${fName.toLowerCase()}.${lName.toLowerCase()}${id}@gmail.com`;
-    const busWord = businessWords[i % businessWords.length];
-    const businessName = `${fName.toUpperCase()} ${busWord.toUpperCase()}`;
-    const businessType = businessTypes[i % businessTypes.length];
-    const products = (i * 3 + 1) % 15;
-    const walletBalance = i % 5 === 0 ? parseFloat((i * 120.5).toFixed(2)) : 0;
-    const revenue = i % 3 === 0 ? parseFloat((i * 850.75).toFixed(2)) : 0;
-
-    const month = ["Jan", "Feb", "Mar", "Apr", "May"][i % 5];
-    const day = ((i * 7 + 1) % 28) + 1;
-    const joinDate = `${month} ${day}, 2026`;
-
-    const { state, city } = statePool[i];
-
-    sellers.push({
-      id,
-      name,
-      email,
-      avatar: `https://randomuser.me/api/portraits/${i % 2 === 0 ? "men" : "women"}/${id}.jpg`,
-      businessName,
-      businessType,
-      products,
-      walletBalance,
-      joinDate,
-      revenue,
-      state,
-      city,
-      status: "Active",
-    });
-  }
-
-  return sellers;
-};
-
-const ALL_MOCK_SELLERS = generateAllSellers();
-
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const showPending = tab === "pending";
 
-  const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>(INITIAL_PENDING_SELLERS);
+  const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState<string | null>(null);
   const [pendingSearchQuery, setPendingSearchQuery] = useState("");
   const [selectedPendingSeller, setSelectedPendingSeller] = useState<PendingSeller | null>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
@@ -321,6 +91,75 @@ export default function ApprovedSellersScreen() {
     );
   }, [pendingSellers, pendingSearchQuery]);
 
+  const { data, loading, error, reload, setData } = useAsyncLoad(
+    async () => {
+      const page = await fetchSellers({ size: 500 });
+      return (page.items ?? [])
+        .filter((s) => s.status === "active" || s.status === "suspended")
+        .map(mapSellerToApprovedRow);
+    },
+    []
+  );
+  const sellers: Seller[] = data ?? [];
+
+  const loadPendingSellers = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError(null);
+    try {
+      const rows = await fetchPendingProfileSellers();
+      const mapped = await Promise.all(
+        rows.map(async (row) => {
+          const base = mapPendingProfileRow(row);
+          try {
+            const detail = await fetchPendingProfileDetail(row.sellerId);
+            return {
+              ...base,
+              businessType: String(detail.businessType ?? "—"),
+              state: String(detail.state ?? "—"),
+              city: String(detail.city ?? "—"),
+              bankName: String(detail.bankName ?? "—"),
+              accountNumber: String(detail.accountNumber ?? "—"),
+              ifscCode: String(detail.ifscCode ?? "—"),
+              holderName: String(detail.accountHolder ?? "—"),
+            };
+          } catch {
+            return base;
+          }
+        })
+      );
+      setPendingSellers(mapped);
+    } catch (e) {
+      setPendingError(getApiErrorMessage(e));
+    } finally {
+      setPendingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPending) {
+      void loadPendingSellers();
+    }
+  }, [showPending, loadPendingSellers]);
+
+  const openPendingDetail = async (pending: PendingSeller) => {
+    try {
+      const detail = await fetchPendingProfileDetail(pending.id);
+      setSelectedPendingSeller({
+        ...pending,
+        businessType: String(detail.businessType ?? pending.businessType ?? "—"),
+        state: String(detail.state ?? pending.state ?? "—"),
+        city: String(detail.city ?? pending.city ?? "—"),
+        bankName: String(detail.bankName ?? pending.bankName ?? "—"),
+        accountNumber: String(detail.accountNumber ?? pending.accountNumber ?? "—"),
+        ifscCode: String(detail.ifscCode ?? pending.ifscCode ?? "—"),
+        holderName: String(detail.accountHolder ?? pending.holderName ?? "—"),
+      });
+      setShowPendingModal(true);
+    } catch (e) {
+      Alert.alert("Error", getApiErrorMessage(e));
+    }
+  };
+
   const handleApprovePending = (pending: PendingSeller) => {
     Alert.alert(
       "Approve Seller",
@@ -329,28 +168,18 @@ export default function ApprovedSellersScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Approve",
-          onPress: () => {
-            setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
-            const ApprovedSellerDetails: Seller = {
-              id: pending.id,
-              name: pending.name,
-              email: pending.email,
-              avatar: `https://randomuser.me/api/portraits/men/${pending.id % 100}.jpg`,
-              businessName: pending.businessName ?? "—",
-              businessType: pending.businessType ?? "—",
-              products: 0,
-              walletBalance: 0,
-              joinDate: pending.submittedOn ?? "",
-              revenue: 0,
-              state: pending.state ?? "—",
-              city: pending.city ?? "—",
-              status: "Active",
-            };
-            setData((prev) => [ApprovedSellerDetails, ...(prev ?? [])]);
-            setShowPendingModal(false);
-            Alert.alert("Success", "Seller approved successfully!");
-          }
-        }
+          onPress: async () => {
+            try {
+              await approveSellerProfile(pending.id);
+              setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
+              setShowPendingModal(false);
+              await reload();
+              Alert.alert("Success", "Seller approved successfully!");
+            } catch (e) {
+              Alert.alert("Error", getApiErrorMessage(e));
+            }
+          },
+        },
       ]
     );
   };
@@ -364,25 +193,21 @@ export default function ApprovedSellersScreen() {
         {
           text: "Reject",
           style: "destructive",
-          onPress: () => {
-            setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
-            setShowPendingModal(false);
-            Alert.alert("Rejected", "Seller request has been rejected.");
-          }
-        }
+          onPress: async () => {
+            try {
+              await rejectSellerProfile(pending.id, "Rejected by admin");
+              setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
+              setShowPendingModal(false);
+              Alert.alert("Rejected", "Seller request has been rejected.");
+            } catch (e) {
+              Alert.alert("Error", getApiErrorMessage(e));
+            }
+          },
+        },
       ]
     );
   };
 
-
-  const { data, loading, error, reload, setData } = useAsyncLoad(
-    async () => {
-      const page = await fetchSellers({ status: "active", size: 100 });
-      return (page.items ?? []).map(mapSellerToApprovedRow);
-    },
-    []
-  );
-  const sellers: Seller[] = data ?? [];
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [sortBy, setSortBy] = useState("Name");
@@ -540,26 +365,96 @@ export default function ApprovedSellersScreen() {
                   
                   {/* Title & Breadcrumbs */}
                   <View style={styles.bannerTitleContainer}>
-                    <Text style={styles.bannerTitle}>Approved Sellers</Text>
+                    <Text style={styles.bannerTitle}>
+                      {showPending ? "Pending Sellers" : "Approved Sellers"}
+                    </Text>
                     <View style={styles.breadcrumbs}>
                       <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
                       <Text style={styles.breadcrumbActive}>Dashboard</Text>
                       <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                      <Text style={styles.breadcrumbText}>Approved Sellers</Text>
+                      <Text style={styles.breadcrumbText}>
+                        {showPending ? "Pending Sellers" : "Approved Sellers"}
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* Right: Action button */}
                 <TouchableOpacity
                   style={styles.bannerActionBtn}
-                  onPress={() => router.push("/approveseller?tab=pending")}
+                  onPress={() => router.push(showPending ? "/approveseller" : "/approveseller?tab=pending")}
                 >
-                  <Feather name="clock" size={14} color="#FFFFFF" style={styles.bannerActionIcon} />
-                  <Text style={styles.bannerActionBtnText}>Pending Sellers</Text>
+                  <Feather
+                    name={showPending ? "check" : "clock"}
+                    size={14}
+                    color="#FFFFFF"
+                    style={styles.bannerActionIcon}
+                  />
+                  <Text style={styles.bannerActionBtnText}>
+                    {showPending ? "Approved Sellers" : "Pending Sellers"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
+
+            {showPending ? (
+              <>
+                <View style={styles.toolbar}>
+                  <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search pending sellers..."
+                      placeholderTextColor="#9CA3AF"
+                      value={pendingSearchQuery}
+                      onChangeText={setPendingSearchQuery}
+                    />
+                  </View>
+                </View>
+
+                {pendingError ? (
+                  <Text style={styles.loadErrorText}>{pendingError}</Text>
+                ) : null}
+
+                {pendingLoading ? (
+                  <Text style={styles.emptyText}>Loading pending sellers...</Text>
+                ) : (
+                  <View style={styles.tableCard}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableTh, { flex: 1.2 }]}>Seller</Text>
+                      <Text style={[styles.tableTh, { flex: 1.4 }]}>Business</Text>
+                      <Text style={[styles.tableTh, { flex: 1.4 }]}>Email</Text>
+                      <Text style={[styles.tableTh, { flex: 1 }]}>Submitted</Text>
+                      <Text style={[styles.tableTh, { flex: 0.6, textAlign: "center" }]}>Action</Text>
+                    </View>
+                    {filteredPendingSellers.map((pending, idx) => (
+                      <View key={pending.id} style={[styles.tableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                        <Text style={[styles.tableCellText, { flex: 1.2 }]} numberOfLines={1}>{pending.name}</Text>
+                        <Text style={[styles.tableCellText, { flex: 1.4 }]} numberOfLines={1}>{pending.businessName}</Text>
+                        <Text style={[styles.tableCellText, { flex: 1.4 }]} numberOfLines={1}>{pending.email}</Text>
+                        <Text style={[styles.tableCellText, { flex: 1 }]} numberOfLines={1}>{pending.submittedOn}</Text>
+                        <TouchableOpacity
+                          style={[styles.pendingViewBtn, { flex: 0.6 }]}
+                          onPress={() => void openPendingDetail(pending)}
+                        >
+                          <Text style={styles.pendingViewBtnText}>Review</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    {filteredPendingSellers.length === 0 && !pendingLoading ? (
+                      <View style={styles.emptyTable}>
+                        <Text style={styles.emptyText}>No pending seller requests found.</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+
+            {error ? <Text style={styles.loadErrorText}>{error}</Text> : null}
+            {loading ? (
+              <Text style={styles.emptyText}>Loading approved sellers...</Text>
+            ) : null}
 
             {/* --- DATA VIEW CONTROLS TOOLBAR --- */}
             <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
@@ -726,11 +621,11 @@ export default function ApprovedSellersScreen() {
                     <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
                     <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      ₹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </Text>
                     <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>{seller.joinDate}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      ₹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </Text>
                     <View style={[styles.tableCellActions, { flex: 1.6 }]}>
                       <TouchableOpacity
@@ -819,13 +714,13 @@ export default function ApprovedSellersScreen() {
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Wallet Balance:</Text>
                         <Text style={styles.cardCurrency}>
-                          ₹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Revenue:</Text>
                         <Text style={styles.cardCurrency}>
-                          ₹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                     </View>
@@ -945,6 +840,9 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+            )}
+
+              </>
             )}
 
         {/* --- COPYRIGHT FOOTER --- */}

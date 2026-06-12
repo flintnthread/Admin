@@ -560,13 +560,19 @@ const DeliveryChargesScreen: React.FC = () => {
   const [slabs, setSlabs] = useState<WeightSlab[]>([]);
   const [editingSlabId, setEditingSlabId] = useState<number | null>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadSlabs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const rows = await fetchDeliverySlabs();
       setSlabs(rows.map((r, i) => mapSlabToUi(mapDeliverySlabRow(r), i)));
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      setError(getApiErrorMessage(e, "Failed to load delivery charges."));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -725,7 +731,18 @@ const DeliveryChargesScreen: React.FC = () => {
           </View>
         </View>
 
-        {viewMode === "grid" ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>Loading delivery charges…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={loadSlabs}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : viewMode === "grid" ? (
           <View style={isWeb
             ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
             : { gap: 12 }
@@ -1702,5 +1719,27 @@ const styles = StyleSheet.create({
   tableBtnIcon: {
     fontSize: 12,
     color: "#FFFFFF",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 12,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: T.textM,
+    textAlign: "center",
+  },
+  retryBtn: {
+    backgroundColor: T.orange,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });

@@ -8,7 +8,7 @@
 import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapCustomerRow } from "@/lib/mappers";
-import { fetchCustomers } from "@/services/customerApi";
+import { fetchCustomers, fetchCustomerStats } from "@/services/customerApi";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -167,7 +167,7 @@ function StatChip({ label, value, valueColor = C.text }: { label: string; value:
 // ─────────────────────────────────────────────────────────────────────────────
 // GRID CARD  (web / tablet only — unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
-function GridCard({ c, onToggle, onView }: { c: Customer; onToggle: () => void; onView: () => void }) {
+function GridCard({ c, onView }: { c: Customer; onView: () => void }) {
   return (
     <View style={s.gCard}>
       <View style={s.gCardTop}>
@@ -206,9 +206,6 @@ function GridCard({ c, onToggle, onView }: { c: Customer; onToggle: () => void; 
         <TouchableOpacity style={s.btnView} onPress={onView} activeOpacity={0.8}>
           <EyeIcon /><Text style={s.btnTxt}>View</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.btnBan} onPress={onToggle} activeOpacity={0.8}>
-          <BanIcon /><Text style={s.btnTxt}>{c.status === "Active" ? "Deactivate" : "Activate"}</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -217,7 +214,7 @@ function GridCard({ c, onToggle, onView }: { c: Customer; onToggle: () => void; 
 // ─────────────────────────────────────────────────────────────────────────────
 // WEB LIST ROW + HEADER  (tablet / desktop — unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
-function ListRow({ c, onToggle, onView, isDesktop }: { c: Customer; onToggle: () => void; onView: () => void; isDesktop: boolean }) {
+function ListRow({ c, onView, isDesktop }: { c: Customer; onView: () => void; isDesktop: boolean }) {
   return (
     <View style={s.lRow}>
       <View style={[s.lCol, { flex: isDesktop ? 2.2 : 2 }]}>
@@ -249,7 +246,6 @@ function ListRow({ c, onToggle, onView, isDesktop }: { c: Customer; onToggle: ()
       </View>
       <View style={[s.lCol, { flex: 0.8, flexDirection: "row", gap: 7, justifyContent: "center" }]}>
         <TouchableOpacity style={s.lBtnView} onPress={onView} activeOpacity={0.8}><EyeIcon size={14} /></TouchableOpacity>
-        <TouchableOpacity style={s.lBtnBan} onPress={onToggle} activeOpacity={0.8}><BanIcon size={14} /></TouchableOpacity>
       </View>
     </View>
   );
@@ -276,7 +272,7 @@ function ListHeader({ isDesktop }: { isDesktop: boolean }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MOBILE GRID CARD  (used when isMobile + grid view)
 // ─────────────────────────────────────────────────────────────────────────────
-function MobileListCard({ c, onToggle, onView }: { c: Customer; onToggle: () => void; onView: () => void }) {
+function MobileListCard({ c, onView }: { c: Customer; onView: () => void }) {
   return (
     <View style={s.mCard}>
       <View style={s.mTop}>
@@ -312,9 +308,6 @@ function MobileListCard({ c, onToggle, onView }: { c: Customer; onToggle: () => 
       <View style={s.mActions}>
         <TouchableOpacity style={[s.mBtn, { backgroundColor: C.navy }]} onPress={onView} activeOpacity={0.8}>
           <EyeIcon /><Text style={s.btnTxt}>View</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.mBtn, { backgroundColor: C.primary }]} onPress={onToggle} activeOpacity={0.8}>
-          <BanIcon /><Text style={s.btnTxt}>{c.status === "Active" ? "Deactivate" : "Activate"}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -360,7 +353,7 @@ function MobileTableHeader() {
   );
 }
 
-function MobileTableRow({ c, onToggle, onView, isEven }: { c: Customer; onToggle: () => void; onView: () => void; isEven: boolean }) {
+function MobileTableRow({ c, onView, isEven }: { c: Customer; onView: () => void; isEven: boolean }) {
   return (
     <View style={[mt.row, { width: TABLE_WIDTH, backgroundColor: isEven ? "#FAFAFA" : C.surface }]}>
 
@@ -412,9 +405,6 @@ function MobileTableRow({ c, onToggle, onView, isEven }: { c: Customer; onToggle
         <TouchableOpacity style={mt.iconBtnView} onPress={onView} activeOpacity={0.8}>
           <EyeIcon size={13} />
         </TouchableOpacity>
-        <TouchableOpacity style={mt.iconBtnBan} onPress={onToggle} activeOpacity={0.8}>
-          <BanIcon size={13} />
-        </TouchableOpacity>
       </View>
 
     </View>
@@ -456,6 +446,10 @@ export default function CustomerManagementScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
+  const [customerStats, setCustomerStats] = useState<{ total: number; revenue: number }>({
+    total: 0,
+    revenue: 0,
+  });
 
   const PAGE_SIZE = 12;
 
@@ -464,9 +458,16 @@ export default function CustomerManagementScreen() {
     setError(null);
     try {
       const safePage = Math.max(1, page);
-      const response = await fetchCustomers(search.trim() || undefined, safePage - 1, PAGE_SIZE);
+      const [response, statsRes] = await Promise.all([
+        fetchCustomers(search.trim() || undefined, safePage - 1, PAGE_SIZE),
+        fetchCustomerStats(),
+      ]);
       setCustomers(response.items.map((c) => mapCustomerRow(c) as Customer));
       setTotalPages(Math.max(1, response.totalPages));
+      setCustomerStats({
+        total: Number(statsRes.total ?? statsRes.totalCustomers ?? 0),
+        revenue: Number(statsRes.totalRevenue ?? 0),
+      });
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load customers."));
       setCustomers([]);
@@ -482,19 +483,14 @@ export default function CustomerManagementScreen() {
   const safePage = Math.min(page, totalPages);
   const paginated = customers;
 
-  const toggle = (id: number) =>
-    setCustomers((prev) =>
-      prev.map((c) => c.id === id ? { ...c, status: c.status === "Active" ? "Inactive" : "Active" } : c)
-    );
-
   const viewCustomer = (id: number) =>
     router.push({ pathname: "/customerDetails", params: { id: String(id) } });
 
   const px      = isMobile ? 14 : isTablet ? 20 : 28;
-  const total   = customers.length;
-  const active  = customers.filter((c) => c.status === "Active").length;
-  const inactive = total - active;
-  const revenue  = customers.reduce((n, c) => n + c.totalSpent, 0);
+  const total   = customerStats.total;
+  const active  = total;
+  const inactive = 0;
+  const revenue  = customerStats.revenue;
 
   // ── Card column width — auto-fit with gap ─────────────────────────────────
   // Gap between cards is 14px. We derive the exact % so cards fill the row.
@@ -623,7 +619,7 @@ export default function CustomerManagementScreen() {
               // Mobile grid → stacked cards
               <View>
                 {paginated.map((c) => (
-                  <MobileListCard key={c.id} c={c} onToggle={() => toggle(c.id)} onView={() => viewCustomer(c.id)} />
+                  <MobileListCard key={c.id} c={c} onView={() => viewCustomer(c.id)} />
                 ))}
               </View>
             ) : (
@@ -631,7 +627,7 @@ export default function CustomerManagementScreen() {
               <View style={[s.gridWrap, { gap: GAP }]}>
                 {paginated.map((c) => (
                   <View key={c.id} style={{ width: colPct }}>
-                    <GridCard c={c} onToggle={() => toggle(c.id)} onView={() => viewCustomer(c.id)} />
+                    <GridCard c={c} onView={() => viewCustomer(c.id)} />
                   </View>
                 ))}
               </View>
@@ -651,7 +647,6 @@ export default function CustomerManagementScreen() {
                         key={c.id}
                         c={c}
                         isEven={idx % 2 === 0}
-                        onToggle={() => toggle(c.id)}
                         onView={() => viewCustomer(c.id)}
                       />
                     ))}
@@ -663,7 +658,7 @@ export default function CustomerManagementScreen() {
               <View style={s.listWrap}>
                 <ListHeader isDesktop={isDesktop} />
                 {paginated.map((c) => (
-                  <ListRow key={c.id} c={c} onToggle={() => toggle(c.id)} onView={() => viewCustomer(c.id)} isDesktop={isDesktop} />
+                  <ListRow key={c.id} c={c} onView={() => viewCustomer(c.id)} isDesktop={isDesktop} />
                 ))}
               </View>
             )

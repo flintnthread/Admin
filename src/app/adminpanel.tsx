@@ -13,6 +13,7 @@ import {
   createAdminUser,
   deleteAdminUser,
   fetchAdminUsers,
+  fromApiRole,
   updateAdminUser,
 } from "@/services/adminUserApi";
 import {
@@ -74,7 +75,8 @@ type Role = typeof ROLES[number];
 type Status = typeof STATUSES[number];
 
 function mapAdminRow(u: AdminUserRow): User {
-  const role = (ROLES.includes((u.role ?? "Admin") as Role) ? u.role : "Admin") as Role;
+  const displayRole = fromApiRole(u.role);
+  const role = (ROLES.includes(displayRole as Role) ? displayRole : "Admin") as Role;
   return {
     id: u.id,
     name: u.fullName ?? u.email ?? "Admin",

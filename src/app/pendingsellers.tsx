@@ -9,21 +9,24 @@
  * ─────────────────────────────────────────────────────────────────
  */
 
-import React, { useEffect, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapPendingProfileRow } from '@/lib/mappers';
+import { fetchPendingProfileSellers } from '@/services/sellerApi';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Dimensions,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-import ViewPendingSeller, { SellerProp } from './viewpendingseller';
+import ViewPendingSeller, { SellerProp } from '@/components/ViewPendingSeller';
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 const C = {
@@ -80,13 +83,6 @@ type Seller = {
   submittedOn: string;
 };
 
-const SELLERS: Seller[] = [
-  { id: 266, name: 'Sanju Sandhya',  businessName: 'SG Creations',      email: 'flintandthread.hr@gmail.com', mobile: '+91 93919 39868', submittedOn: 'Jun 05, 2026' },
-  { id: 267, name: 'Ravi Kumar',     businessName: 'RK Textiles',        email: 'ravi.kumar@rktextiles.in',    mobile: '+91 98765 43210', submittedOn: 'Jun 06, 2026' },
-  { id: 268, name: 'Priya Mehta',    businessName: 'Mehta Handicrafts',  email: 'priya.mehta@craftshop.com',   mobile: '+91 87654 32109', submittedOn: 'Jun 07, 2026' },
-  { id: 269, name: 'Arjun Sharma',   businessName: 'Sharma Enterprises', email: 'arjun.sharma@sharmaent.co',   mobile: '+91 76543 21098', submittedOn: 'Jun 08, 2026' },
-];
-
 // ─── Breakpoints ──────────────────────────────────────────────────────────────
 const BP = { mobile: 480, tablet: 768, laptop: 1024 };
 type Device = 'mobile' | 'tablet' | 'laptop' | 'desktop';
@@ -96,15 +92,29 @@ const getDevice = (w: number): Device =>
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
-export default function PendingSellers() {
+export default function Pendingsellers() {
   const [dim, setDim]                       = useState(Dimensions.get('window'));
   const [search, setSearch]                 = useState('');
+  const [sellers, setSellers]               = useState<Seller[]>([]);
+  const [loadError, setLoadError]           = useState<string | null>(null);
   const [detailSeller, setDetailSeller]     = useState<SellerProp | null>(null);
+
+  const loadPending = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const rows = await fetchPendingProfileSellers();
+      setSellers(rows.map(mapPendingProfileRow));
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
+  }, []);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window: w }) => setDim(w));
     return () => sub?.remove();
   }, []);
+
+  useEffect(() => { void loadPending(); }, [loadPending]);
 
   const { width } = dim;
   const device   = getDevice(width);
@@ -112,7 +122,7 @@ export default function PendingSellers() {
   const isTablet = device === 'tablet';
   const isBig    = device === 'laptop' || device === 'desktop';
 
-  const filtered = SELLERS.filter(s =>
+  const filtered = sellers.filter(s =>
     [s.name, s.businessName, s.email].some(v =>
       v.toLowerCase().includes(search.toLowerCase())
     )
@@ -163,6 +173,8 @@ export default function PendingSellers() {
                 <Text style={st.badgeTxt}>  {filtered.length} Pending</Text>
               </View>
             </View>
+
+            {loadError ? <Text style={{ color: C.orange, marginBottom: 10 }}>{loadError}</Text> : null}
 
             {/* Search */}
             <View style={st.searchBox}>
