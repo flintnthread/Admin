@@ -1,22 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { formatDate, formatRupee, maskAccount } from '@/lib/format';
+import { formatDate, maskAccount } from '@/lib/format';
 import { fetchSellerDetail } from '@/services/sellerApi';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View
+  ActivityIndicator,
+  Animated,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import { router } from 'expo-router';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
 // Install: expo install @expo/vector-icons  OR  npm install react-native-vector-icons
@@ -604,8 +603,22 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
             <TouchableOpacity
               style={[modalStyles.actionOutlineBtn, modalStyles.downloadBtn]}
               onPress={() => {
-                // In production: FileSystem.downloadAsync or Linking.openURL
-                console.log('Download:', docName, imageUri);
+                if (Platform.OS === 'web') {
+                  // Web download using blob
+                  const link = document.createElement('a');
+                  link.href = imageUri;
+                  link.download = `${docName.replace(/\s+/g, '_')}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                } else {
+                  // React Native: use expo-file-system or similar
+                  console.log('Download:', docName, imageUri);
+                  // In production, implement with expo-file-system:
+                  // import * as FileSystem from 'expo-file-system';
+                  // const fileUri = FileSystem.documentDirectory + `${docName}.png`;
+                  // await FileSystem.downloadAsync(imageUri, fileUri);
+                }
               }}
             >
               <BootstrapIcon name="download" size={15} color={COLORS.white} />
@@ -1051,7 +1064,7 @@ export default function ViewSeller() {
                   <Text style={styles.actionBtnText}>Download</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.textSecondary }]}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.textSecondary }]} onPress={() => router.push('/sellers')}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
                   <Text style={styles.actionBtnText}>Back to List</Text>
