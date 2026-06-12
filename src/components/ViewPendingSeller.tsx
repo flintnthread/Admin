@@ -7,7 +7,7 @@
  * ─────────────────────────────────────────────────────────────────
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { fetchPendingProfileDetail } from '@/services/sellerApi';
 import {

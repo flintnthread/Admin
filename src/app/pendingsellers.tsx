@@ -9,24 +9,24 @@
  * ─────────────────────────────────────────────────────────────────
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapPendingProfileRow } from '@/lib/mappers';
 import { fetchPendingProfileSellers } from '@/services/sellerApi';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Dimensions,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-import ViewPendingSeller, { SellerProp } from './viewpendingseller';
+import ViewPendingSeller, { SellerProp } from '@/components/ViewPendingSeller';
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 const C = {
@@ -92,7 +92,7 @@ const getDevice = (w: number): Device =>
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
-export default function PendingSellers() {
+export default function Pendingsellers() {
   const [dim, setDim]                       = useState(Dimensions.get('window'));
   const [search, setSearch]                 = useState('');
   const [sellers, setSellers]               = useState<Seller[]>([]);
