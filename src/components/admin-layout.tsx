@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   pageBody: {
     flex: 1,
-    overflow: "hidden",
+    overflow: "visible",
   },
   drawerOverlay: {
     position: "absolute",

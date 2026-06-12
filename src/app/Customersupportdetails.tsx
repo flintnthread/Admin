@@ -741,7 +741,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#EF7B1A',
     borderRadius: 10,
     paddingVertical: 14,
     marginTop: 16,

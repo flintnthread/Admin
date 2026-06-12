@@ -9,8 +9,6 @@ import {
   StyleSheet,
   useWindowDimensions,
   Platform,
-  FlatList,
-  StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AdminLayout from '@/components/admin-layout';
@@ -109,12 +107,28 @@ const TicketIcon = () => (
   </Svg>
 );
 
+// ─── Column widths — all fixed so content never squeezes ─────────────────────
+const COL = {
+  id:       70,
+  subject:  320,
+  customer: 210,
+  type:     130,
+  order:    170,
+  status:   120,
+  created:  150,
+  actions:  100,
+};
+
+const TABLE_MIN_WIDTH =
+  COL.id + COL.subject + COL.customer + COL.type +
+  COL.order + COL.status + COL.created + COL.actions; // ≈ 1270
+
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const TICKETS = [
   {
     id: '#11',
-    subject: 'Order #FNT202604028262 - My order is not delivered on time and it\'s cancelled',
+    subject: "Order #FNT202604028262 - My order is not delivered on time and it's cancelled",
     customer: 'Sravani Surampalli',
     email: 'sravanisurampalli612@gmail.com',
     type: 'Delivery Issue',
@@ -157,19 +171,19 @@ const TICKETS = [
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Closed'];
 const TYPE_OPTIONS = ['Delivery Issue', 'Product Issue', 'Payment Issue', 'Other'];
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// ─── Badges ───────────────────────────────────────────────────────────────────
 
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-  'Open': { bg: '#DCFCE7', text: '#16A34A', dot: '#16A34A' },
+  'Open':        { bg: '#DCFCE7', text: '#16A34A', dot: '#16A34A' },
   'In Progress': { bg: '#FEF9C3', text: '#CA8A04', dot: '#CA8A04' },
-  'Closed': { bg: '#F3F4F6', text: '#6B7280', dot: '#9CA3AF' },
+  'Closed':      { bg: '#F3F4F6', text: '#6B7280', dot: '#9CA3AF' },
 };
 
 const typeColors: Record<string, { bg: string; text: string }> = {
   'Delivery Issue': { bg: '#EFF6FF', text: '#3B82F6' },
-  'Product Issue': { bg: '#FFF7ED', text: '#EA580C' },
-  'Payment Issue': { bg: '#FDF4FF', text: '#A21CAF' },
-  'Other': { bg: '#F0FDF4', text: '#16A34A' },
+  'Product Issue':  { bg: '#FFF7ED', text: '#EA580C' },
+  'Payment Issue':  { bg: '#FDF4FF', text: '#A21CAF' },
+  'Other':          { bg: '#F0FDF4', text: '#16A34A' },
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -203,79 +217,68 @@ interface FilterModalProps {
   isWeb: boolean;
 }
 
-const FilterModal = ({ visible, title, options, selected, onSelect, onClose, isWeb }: FilterModalProps) => {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType={isWeb ? 'fade' : 'slide'}
-      onRequestClose={onClose}
-    >
+const FilterModal = ({
+  visible, title, options, selected, onSelect, onClose, isWeb,
+}: FilterModalProps) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType={isWeb ? 'fade' : 'slide'}
+    onRequestClose={onClose}
+  >
+    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
       <TouchableOpacity
-        style={styles.modalOverlay}
         activeOpacity={1}
-        onPress={onClose}
+        style={[styles.modalContainer, isWeb ? styles.modalWeb : styles.modalMobile]}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          style={[
-            styles.modalContainer,
-            isWeb ? styles.modalWeb : styles.modalMobile,
-          ]}
-        >
-          {/* Mobile handle */}
-          {!isWeb && <View style={styles.mobileHandle} />}
-
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            {isWeb && (
-              <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-                <XIcon />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Options */}
-          <View style={styles.modalOptions}>
-            {options.map((opt) => {
-              const isSelected = selected === opt;
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.modalOption, isSelected && styles.modalOptionSelected]}
-                  onPress={() => { onSelect(opt); onClose(); }}
-                >
-                  <Text style={[styles.modalOptionText, isSelected && styles.modalOptionTextSelected]}>
-                    {opt}
-                  </Text>
-                  {isSelected && <CheckIcon />}
-                </TouchableOpacity>
-              );
-            })}
-            {/* Clear option */}
-            <TouchableOpacity
-              style={styles.modalOption}
-              onPress={() => { onSelect(''); onClose(); }}
-            >
-              <Text style={[styles.modalOptionText, { color: '#9CA3AF' }]}>Clear filter</Text>
+        {!isWeb && <View style={styles.mobileHandle} />}
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          {isWeb && (
+            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+              <XIcon />
             </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.modalOptions}>
+          {options.map((opt) => {
+            const isSelected = selected === opt;
+            return (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.modalOption, isSelected && styles.modalOptionSelected]}
+                onPress={() => { onSelect(opt); onClose(); }}
+              >
+                <Text style={[styles.modalOptionText, isSelected && styles.modalOptionTextSelected]}>
+                  {opt}
+                </Text>
+                {isSelected && <CheckIcon />}
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            style={styles.modalOption}
+            onPress={() => { onSelect(''); onClose(); }}
+          >
+            <Text style={[styles.modalOptionText, { color: '#9CA3AF' }]}>Clear filter</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
-    </Modal>
-  );
-};
+    </TouchableOpacity>
+  </Modal>
+);
 
 // ─── Mobile Card ──────────────────────────────────────────────────────────────
 
-interface MobileCardProps {
+const MobileCard = ({
+  ticket,
+  onView,
+  onRefresh,
+}: {
   ticket: typeof TICKETS[0];
   onView: () => void;
   onRefresh: () => void;
-}
-
-const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
+}) => (
   <View style={styles.card}>
     <View style={styles.cardHeader}>
       <View style={styles.cardIdRow}>
@@ -291,27 +294,22 @@ const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
         </TouchableOpacity>
       </View>
     </View>
-
     <Text style={styles.cardSubject} numberOfLines={2}>{ticket.subject}</Text>
-
     <View style={styles.cardDivider} />
-
     <View style={styles.cardMeta}>
-      <View style={styles.cardMetaRow}>
-        <Text style={styles.cardMetaLabel}>Customer</Text>
-        <Text style={styles.cardMetaValue}>{ticket.customer}</Text>
-      </View>
+      {[
+        { label: 'Customer', value: ticket.customer },
+        { label: 'Order',    value: ticket.order,    isLink: true },
+        { label: 'Created',  value: ticket.created },
+      ].map(({ label, value, isLink }) => (
+        <View key={label} style={styles.cardMetaRow}>
+          <Text style={styles.cardMetaLabel}>{label}</Text>
+          <Text style={[styles.cardMetaValue, isLink && styles.orderLink]}>{value}</Text>
+        </View>
+      ))}
       <View style={styles.cardMetaRow}>
         <Text style={styles.cardMetaLabel}>Type</Text>
         <TypeBadge type={ticket.type} />
-      </View>
-      <View style={styles.cardMetaRow}>
-        <Text style={styles.cardMetaLabel}>Order</Text>
-        <Text style={[styles.cardMetaValue, styles.orderLink]}>{ticket.order}</Text>
-      </View>
-      <View style={styles.cardMetaRow}>
-        <Text style={styles.cardMetaLabel}>Created</Text>
-        <Text style={styles.cardMetaValue}>{ticket.created}</Text>
       </View>
     </View>
   </View>
@@ -319,57 +317,92 @@ const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
 
 // ─── Web Table ────────────────────────────────────────────────────────────────
 
-interface WebTableProps {
+const WebTable = ({
+  tickets,
+  onView,
+  onRefresh,
+}: {
   tickets: typeof TICKETS;
-  onView: (ticket: typeof TICKETS[0]) => void;
-  onRefresh: (ticket: typeof TICKETS[0]) => void;
-}
+  onView: (t: typeof TICKETS[0]) => void;
+  onRefresh: (t: typeof TICKETS[0]) => void;
+}) => (
+  /* Horizontal scroll wrapper — table never gets squished */
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tableScrollOuter}>
+    <View style={[styles.tableWrapper, { minWidth: TABLE_MIN_WIDTH }]}>
 
-const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
-  <View style={styles.tableWrapper}>
-    {/* Table Header */}
-    <View style={styles.tableHeader}>
-      <Text style={[styles.th, { width: 60 }]}>ID</Text>
-      <Text style={[styles.th, { flex: 2.5 }]}>Subject</Text>
-      <Text style={[styles.th, { flex: 1.4 }]}>Customer</Text>
-      <Text style={[styles.th, { width: 120 }]}>Type</Text>
-      <Text style={[styles.th, { width: 130 }]}>Order</Text>
-      <Text style={[styles.th, { width: 100 }]}>Status</Text>
-      <Text style={[styles.th, { width: 130 }]}>Created</Text>
-      <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>Actions</Text>
-    </View>
-
-    {/* Table Rows */}
-    {tickets.map((ticket, idx) => (
-      <View
-        key={ticket.id}
-        style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
-      >
-        <Text style={[styles.td, { width: 60 }, styles.tdId]}>{ticket.id}</Text>
-        <Text style={[styles.td, { flex: 2.5 }]} numberOfLines={2}>{ticket.subject}</Text>
-        <View style={[{ flex: 1.4, paddingVertical: 13, paddingHorizontal: 12 }]}>
-          <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
-          <Text style={styles.tdCustomerEmail} numberOfLines={1}>{ticket.email}</Text>
-        </View>
-        <View style={[{ width: 120, paddingVertical: 13, paddingHorizontal: 12, justifyContent: 'center' }]}>
-          <TypeBadge type={ticket.type} />
-        </View>
-        <Text style={[styles.td, { width: 130 }, styles.orderLink]}>{ticket.order}</Text>
-        <View style={[{ width: 100, paddingVertical: 13, paddingHorizontal: 12, justifyContent: 'center' }]}>
-          <StatusBadge status={ticket.status} />
-        </View>
-        <Text style={[styles.td, { width: 130 }, styles.tdMuted]}>{ticket.created}</Text>
-        <View style={[styles.tdActions, { width: 90 }]}>
-          <TouchableOpacity style={styles.actionBtnView} onPress={() => onView(ticket)}>
-            <EyeIcon />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtnRefresh} onPress={() => onRefresh(ticket)}>
-            <RefreshIcon />
-          </TouchableOpacity>
-        </View>
+      {/* Header */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.th, { width: COL.id }]}>ID</Text>
+        <Text style={[styles.th, { width: COL.subject }]}>Subject</Text>
+        <Text style={[styles.th, { width: COL.customer }]}>Customer</Text>
+        <Text style={[styles.th, { width: COL.type }]}>Type</Text>
+        <Text style={[styles.th, { width: COL.order }]}>Order</Text>
+        <Text style={[styles.th, { width: COL.status }]}>Status</Text>
+        <Text style={[styles.th, { width: COL.created }]}>Created</Text>
+        <Text style={[styles.th, { width: COL.actions, textAlign: 'center' }]}>Actions</Text>
       </View>
-    ))}
-  </View>
+
+      {/* Rows */}
+      {tickets.map((ticket, idx) => (
+        <View
+          key={ticket.id}
+          style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
+        >
+          {/* ID */}
+          <View style={[styles.cell, { width: COL.id }]}>
+            <Text style={styles.tdId}>{ticket.id}</Text>
+          </View>
+
+          {/* Subject */}
+          <View style={[styles.cell, { width: COL.subject }]}>
+            <Text style={styles.tdSubject} numberOfLines={2}>{ticket.subject}</Text>
+          </View>
+
+          {/* Customer */}
+          <View style={[styles.cell, { width: COL.customer }]}>
+            <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
+            <Text style={styles.tdCustomerEmail} numberOfLines={1}>{ticket.email}</Text>
+          </View>
+
+          {/* Type */}
+          <View style={[styles.cell, { width: COL.type }]}>
+            <TypeBadge type={ticket.type} />
+          </View>
+
+          {/* Order */}
+          <View style={[styles.cell, { width: COL.order }]}>
+            <Text style={[styles.tdOrder]} numberOfLines={1}>{ticket.order}</Text>
+          </View>
+
+          {/* Status */}
+          <View style={[styles.cell, { width: COL.status }]}>
+            <StatusBadge status={ticket.status} />
+          </View>
+
+          {/* Created */}
+          <View style={[styles.cell, { width: COL.created }]}>
+            <Text style={styles.tdMuted}>{ticket.created}</Text>
+          </View>
+
+          {/* Actions */}
+          <View style={[styles.cell, { width: COL.actions, flexDirection: 'row', gap: 6, justifyContent: 'center' }]}>
+            <TouchableOpacity style={styles.actionBtnView} onPress={() => onView(ticket)}>
+              <EyeIcon />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtnRefresh} onPress={() => onRefresh(ticket)}>
+              <RefreshIcon />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+      {tickets.length === 0 && (
+        <View style={styles.emptyRow}>
+          <Text style={styles.emptyRowText}>No tickets match your filters</Text>
+        </View>
+      )}
+    </View>
+  </ScrollView>
 );
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -386,13 +419,13 @@ export default function CustomerSupportTickets() {
   const [typeModalOpen, setTypeModalOpen] = useState(false);
 
   const filtered = TICKETS.filter((t) => {
-    const matchSearch =
-      !search ||
-      t.subject.toLowerCase().includes(search.toLowerCase()) ||
-      t.customer.toLowerCase().includes(search.toLowerCase()) ||
-      t.id.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = !search ||
+      t.subject.toLowerCase().includes(q) ||
+      t.customer.toLowerCase().includes(q) ||
+      t.id.toLowerCase().includes(q);
     const matchStatus = !selectedStatus || t.status === selectedStatus;
-    const matchType = !selectedType || t.type === selectedType;
+    const matchType   = !selectedType   || t.type   === selectedType;
     return matchSearch && matchStatus && matchType;
   });
 
@@ -404,13 +437,16 @@ export default function CustomerSupportTickets() {
   };
 
   const handleRefresh = (ticket: typeof TICKETS[0]) => {
-    // Refresh ticket logic
     console.log('Refresh ticket', ticket.id);
   };
 
   return (
     <AdminLayout>
-      <ScrollView style={styles.root} contentContainerStyle={styles.rootContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.rootContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* ── Page Header ── */}
         <View style={styles.pageHeader}>
           <View style={styles.pageHeaderLeft}>
@@ -422,9 +458,8 @@ export default function CustomerSupportTickets() {
           </View>
         </View>
 
-        {/* ── Search + Filters Row ── */}
+        {/* ── Search + Filters ── */}
         <View style={styles.toolbarRow}>
-          {/* Search */}
           <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
             <SearchIcon />
             <TextInput
@@ -435,38 +470,36 @@ export default function CustomerSupportTickets() {
               onChangeText={setSearch}
             />
           </View>
-
-          {/* Filter Buttons */}
           <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.filterBtn, selectedStatus ? styles.filterBtnActive : null]}
-              onPress={() => setStatusModalOpen(true)}
-            >
-              <Text style={[styles.filterBtnText, selectedStatus ? styles.filterBtnTextActive : null]}>
-                {selectedStatus || 'All Statuses'}
-              </Text>
-              <ChevronDownIcon color={selectedStatus ? '#1E3A5F' : '#374151'} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.filterBtn, selectedType ? styles.filterBtnActive : null]}
-              onPress={() => setTypeModalOpen(true)}
-            >
-              <Text style={[styles.filterBtnText, selectedType ? styles.filterBtnTextActive : null]}>
-                {selectedType || 'All Types'}
-              </Text>
-              <ChevronDownIcon color={selectedType ? '#1E3A5F' : '#374151'} />
-            </TouchableOpacity>
+            {[
+              {
+                label: selectedStatus || 'All Statuses',
+                active: !!selectedStatus,
+                onPress: () => setStatusModalOpen(true),
+              },
+              {
+                label: selectedType || 'All Types',
+                active: !!selectedType,
+                onPress: () => setTypeModalOpen(true),
+              },
+            ].map(({ label, active, onPress }) => (
+              <TouchableOpacity
+                key={label}
+                style={[styles.filterBtn, active && styles.filterBtnActive]}
+                onPress={onPress}
+              >
+                <Text style={[styles.filterBtnText, active && styles.filterBtnTextActive]}>
+                  {label}
+                </Text>
+                <ChevronDownIcon color={active ? '#1E3A5F' : '#374151'} />
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
         {/* ── Content ── */}
         {isWeb ? (
-          <WebTable
-            tickets={filtered}
-            onView={handleView}
-            onRefresh={handleRefresh}
-          />
+          <WebTable tickets={filtered} onView={handleView} onRefresh={handleRefresh} />
         ) : (
           <View style={styles.cardList}>
             {filtered.map((ticket) => (
@@ -482,14 +515,12 @@ export default function CustomerSupportTickets() {
 
         {filtered.length === 0 && (
           <View style={styles.emptyState}>
-            <TicketIcon />
             <Text style={styles.emptyTitle}>No tickets found</Text>
             <Text style={styles.emptySubtitle}>Try adjusting your search or filters</Text>
           </View>
         )}
       </ScrollView>
 
-      {/* ── Status Filter Modal ── */}
       <FilterModal
         visible={statusModalOpen}
         title="Filter by Status"
@@ -499,8 +530,6 @@ export default function CustomerSupportTickets() {
         onClose={() => setStatusModalOpen(false)}
         isWeb={isWeb}
       />
-
-      {/* ── Type Filter Modal ── */}
       <FilterModal
         visible={typeModalOpen}
         title="Filter by Type"
@@ -517,16 +546,10 @@ export default function CustomerSupportTickets() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  rootContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  root: { flex: 1, backgroundColor: '#F8F9FB' },
+  rootContent: { padding: 20, paddingBottom: 40 },
 
-  // Page Header
+  // Header
   pageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -536,28 +559,15 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
   },
-  pageHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-  },
+  pageHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pageTitle: { fontSize: 22, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.3 },
   ticketCount: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
-  ticketCountText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  ticketCountText: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
 
   // Toolbar
   toolbarRow: {
@@ -580,19 +590,14 @@ const styles = StyleSheet.create({
     height: 42,
     gap: 8,
   },
-  searchBoxWeb: {
-    maxWidth: 400,
-  },
+  searchBoxWeb: { maxWidth: 400 },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: '#111827',
     outlineStyle: 'none',
   } as any,
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  filterRow: { flexDirection: 'row', gap: 8 },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,19 +610,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     height: 42,
   },
-  filterBtnActive: {
-    backgroundColor: '#EBF0F8',
-    borderColor: '#1E3A5F',
-  },
-  filterBtnText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  filterBtnTextActive: {
-    color: '#1E3A5F',
-    fontWeight: '600',
-  },
+  filterBtnActive: { backgroundColor: '#EBF0F8', borderColor: '#1E3A5F' },
+  filterBtnText: { fontSize: 13, fontWeight: '500', color: '#374151' },
+  filterBtnTextActive: { color: '#1E3A5F', fontWeight: '600' },
 
   // Badges
   badge: {
@@ -626,28 +621,16 @@ const styles = StyleSheet.create({
     gap: 5,
     borderRadius: 20,
     paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
   },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  typeBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  badgeDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeText: { fontSize: 12, fontWeight: '600' },
+  typeBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
+  typeBadgeText: { fontSize: 12, fontWeight: '500' },
 
   // Table
+  tableScrollOuter: { borderRadius: 14 },
   tableWrapper: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -657,17 +640,16 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#F1F4F9',
-    paddingHorizontal: 4,
+    backgroundColor: 'rgba(246, 199, 149, 0.2);',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   th: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    fontSize: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#111827',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -676,69 +658,43 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     alignItems: 'center',
+    minHeight: 60,
   },
-  tableRowAlt: {
-    backgroundColor: '#FAFAFA',
-  },
-  td: {
-    paddingVertical: 13,
-    paddingHorizontal: 12,
-    fontSize: 13,
-    color: '#374151',
-  },
-  tdId: {
-    fontWeight: '700',
-    color: '#1E3A5F',
-  },
-  tdCustomerName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  tdCustomerEmail: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  tdMuted: {
-    color: '#9CA3AF',
-    fontSize: 12,
-  },
-  orderLink: {
-    color: '#3B82F6',
-    fontWeight: '500',
-  },
-  tdActions: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
+  tableRowAlt: { backgroundColor: '#FAFAFA' },
+
+  // Every data cell — consistent padding, no overlap
+  cell: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     justifyContent: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 8,
   },
+
+  // Cell text styles
+  tdId: { fontSize: 13, fontWeight: '700', color: '#1E3A5F' },
+  tdSubject: { fontSize: 13, color: '#374151', lineHeight: 18 },
+  tdCustomerName: { fontSize: 13, fontWeight: '600', color: '#111827', marginBottom: 2 },
+  tdCustomerEmail: { fontSize: 11, color: '#9CA3AF' },
+  tdOrder: { fontSize: 13, color: '#3B82F6', fontWeight: '500' },
+  tdMuted: { fontSize: 12, color: '#9CA3AF' },
+  orderLink: { color: '#3B82F6', fontWeight: '500' },
+
+  emptyRow: { padding: 40, alignItems: 'center' },
+  emptyRowText: { fontSize: 14, color: '#9CA3AF' },
 
   // Action Buttons
   actionBtnView: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 36, height: 36, borderRadius: 8,
     backgroundColor: '#1E3A5F',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   actionBtnRefresh: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 36, height: 36, borderRadius: 8,
     backgroundColor: '#F97316',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
 
   // Mobile Cards
-  cardList: {
-    gap: 12,
-  },
+  cardList: { gap: 12 },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -757,51 +713,21 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 10,
   },
-  cardIdRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cardId: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1E3A5F',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  cardSubject: {
-    fontSize: 13,
-    color: '#374151',
-    lineHeight: 19,
-    marginBottom: 12,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 12,
-  },
-  cardMeta: {
-    gap: 8,
-  },
+  cardIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardId: { fontSize: 15, fontWeight: '700', color: '#1E3A5F' },
+  cardActions: { flexDirection: 'row', gap: 8 },
+  cardSubject: { fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 12 },
+  cardDivider: { height: 1, backgroundColor: '#F3F4F6', marginBottom: 12 },
+  cardMeta: { gap: 8 },
   cardMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardMetaLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontWeight: '500',
-    width: 70,
-  },
+  cardMetaLabel: { fontSize: 12, color: '#9CA3AF', fontWeight: '500', width: 70 },
   cardMetaValue: {
-    fontSize: 13,
-    color: '#374151',
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
+    fontSize: 13, color: '#374151', fontWeight: '500',
+    flex: 1, textAlign: 'right',
   },
 
   // Modal
@@ -811,14 +737,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    width: '100%',
-  },
+  modalContainer: { backgroundColor: '#FFFFFF', width: '100%' },
   modalWeb: {
     width: 360,
     borderRadius: 16,
-    marginBottom: 0,
     alignSelf: 'center',
     position: 'absolute',
     top: '50%',
@@ -830,13 +752,8 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   mobileHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#D1D5DB',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    width: 40, height: 4, backgroundColor: '#D1D5DB',
+    borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -847,23 +764,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 32, height: 32, borderRadius: 8,
     backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  modalOptions: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
+  modalOptions: { paddingHorizontal: 16, paddingVertical: 8 },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -873,33 +780,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginVertical: 2,
   },
-  modalOptionSelected: {
-    backgroundColor: '#EBF0F8',
-  },
-  modalOptionText: {
-    fontSize: 15,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  modalOptionTextSelected: {
-    color: '#1E3A5F',
-    fontWeight: '700',
-  },
+  modalOptionSelected: { backgroundColor: '#EBF0F8' },
+  modalOptionText: { fontSize: 15, color: '#374151', fontWeight: '500' },
+  modalOptionTextSelected: { color: '#1E3A5F', fontWeight: '700' },
 
-  // Empty State
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    gap: 10,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
+  // Empty state
+  emptyState: { alignItems: 'center', paddingVertical: 60, gap: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginTop: 8 },
+  emptySubtitle: { fontSize: 14, color: '#9CA3AF' },
 });

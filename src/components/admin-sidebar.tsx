@@ -22,40 +22,112 @@ type Props = {
 // Navigation items definition
 const NAV_ITEMS = {
   GENERAL: [
-
     { label: "Dashboard", icon: "home", path: "/Dashboard" },
     { label: "SEO Engine", icon: "globe", path: null },
 
-    { label: "Dashboard", icon: "home", path: "/approveseller", color: "#3B82F6" },
+    {
+      label: "Dashboard",
+      icon: "home",
+      path: "/approveseller",
+      color: "#3B82F6",
+    },
     { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
-
   ],
   "EMPLOYEE MANAGEMENT": [
-    { label: "Employee Management", icon: "user-plus", path: null, color: "#8B5CF6" },
+    {
+      label: "Employee Management",
+      icon: "user-plus",
+      path: null,
+      color: "#8B5CF6",
+    },
     { label: "Role Management", icon: "shield", path: null, color: "#F59E0B" },
-    { label: "Activity Dashboard", icon: "clock", path: null, color: "#EC4899" },
+    {
+      label: "Activity Dashboard",
+      icon: "clock",
+      path: null,
+      color: "#EC4899",
+    },
   ],
   APPS: {
     label: "Ecommerce",
     icon: "shopping-bag",
     color: "#6366F1",
     children: [
-
-      { label: "Products", icon: "package", path: "/Products", color: "#0984e3" },
-      { label: "Customers", icon: "users", path: "/customerManagement", color: "#00b894" },
+      {
+        label: "Products",
+        icon: "package",
+        path: "/Products",
+        color: "#0984e3",
+      },
+      {
+        label: "Customers",
+        icon: "users",
+        path: "/customerManagement",
+        color: "#00b894",
+      },
       { label: "Sellers", icon: "user-check", path: null, color: "#6c5ce7" },
-      { label: "Sellers Graph", icon: "trending-up", path: "/sellergraphs", color: "#e17055" },
-      { label: "Seller Bank Approval", icon: "credit-card", path: "/sellerbankapproval", color: "#e84393" },
-      { label: "Orders", icon: "shopping-cart", path: "/orders", color: "#d63031" },
-      { label: "Refund Management", icon: "rotate-ccw", path: null, color: "#e67e22" },
-      { label: "Delivery Charges", icon: "truck", path: "/Deliverycharges", color: "#00b359" },
+      {
+        label: "Sellers Graph",
+        icon: "trending-up",
+        path: "/sellergraphs",
+        color: "#e17055",
+      },
+      {
+        label: "Seller Bank Approval",
+        icon: "credit-card",
+        path: "/sellerbankapproval",
+        color: "#e84393",
+      },
+      {
+        label: "Orders",
+        icon: "shopping-cart",
+        path: "/orders",
+        color: "#d63031",
+      },
+      {
+        label: "Refund Management",
+        icon: "rotate-ccw",
+        path: null,
+        color: "#e67e22",
+      },
+      {
+        label: "Delivery Charges",
+        icon: "truck",
+        path: "/Deliverycharges",
+        color: "#00b359",
+      },
     ],
     standalone: [
-      { label: "Pending Sellers", icon: "user-plus", path: "/pendingsellers", color: "#14B8A6" },
-      { label: "Approved Sellers", icon: "user-check", path: "/approveseller", color: "#06B6D4" },
-      { label: "Customer Support", icon: "headphones", path: "/Customersupport", color: "#0EA5E9" },
-      { label: "Category Requests", icon: "grid", path: "/categoryRequests", color: "#8B5CF6" },
-      { label: "Seller Support", icon: "message-square", path: "/Sellerticket", color: "#D946EF" },
+      {
+        label: "Pending Sellers",
+        icon: "user-plus",
+        path: "/pendingsellers",
+        color: "#14B8A6",
+      },
+      {
+        label: "Approved Sellers",
+        icon: "user-check",
+        path: "/approveseller",
+        color: "#06B6D4",
+      },
+      {
+        label: "Customer Support",
+        icon: "headphones",
+        path: "/Customersupport",
+        color: "#0EA5E9",
+      },
+      {
+        label: "Category Requests",
+        icon: "grid",
+        path: "/categoryRequests",
+        color: "#8B5CF6",
+      },
+      {
+        label: "Seller Support",
+        icon: "message-square",
+        path: "/Sellerticket",
+        color: "#D946EF",
+      },
     ],
   },
   "EMAIL MANAGEMENT": [
@@ -63,12 +135,32 @@ const NAV_ITEMS = {
     { label: "Seller Emails", icon: "mail", path: null, color: "#F97316" },
   ],
   "PAYMENTS & PRODUCTS": [
-    { label: "Commission rates (B2B/B2C)", icon: "percent", path: "/commissionrates", color: "#EAB308" },
-    { label: "Seller Payments", icon: "dollar-sign", path: "/Sellerpayments", color: "#84CC16" },
-    { label: "Product Approvals", icon: "check-square", path: "/productApproval", color: "#22C55E" },
+    {
+      label: "Commission rates (B2B/B2C)",
+      icon: "percent",
+      path: "/commissionrates",
+      color: "#EAB308",
+    },
+    {
+      label: "Seller Payments",
+      icon: "dollar-sign",
+      path: "/Sellerpayments",
+      color: "#84CC16",
+    },
+    {
+      label: "Product Approvals",
+      icon: "check-square",
+      path: "/productApproval",
+      color: "#22C55E",
+    },
     { label: "Add Sellers", icon: "user-plus", path: null, color: "#10B981" },
     { label: "Ads Admin Users", icon: "user", path: null, color: "#14B8A6" },
-    { label: "Admin Panel Users", icon: "shield", path: "/adminpanel", color: "#06B6D4" },
+    {
+      label: "Admin Panel Users",
+      icon: "shield",
+      path: "/adminpanel",
+      color: "#06B6D4",
+    },
   ],
   ADVERTISING: [
     {
@@ -86,8 +178,8 @@ const NAV_ITEMS = {
         { label: "Payments Management", icon: "none", path: null },
         { label: "Customers Management", icon: "none", path: null },
         { label: "Notifications", icon: "none", path: null },
-      ]
-    }
+      ],
+    },
   ],
   CUSTOM: [
     {
@@ -96,11 +188,21 @@ const NAV_ITEMS = {
       color: "#8B5CF6",
       path: null,
       children: [
-        { label: "Main Categories", icon: "layers", path: null, color: "#A855F7" },
-        { label: "Subcategories", icon: "git-branch", path: null, color: "#D946EF" },
+        {
+          label: "Main Categories",
+          icon: "layers",
+          path: "/mainCategories",
+          color: "#A855F7",
+        },
+        {
+          label: "Subcategories",
+          icon: "git-branch",
+          path: "/subCategories",
+          color: "#D946EF",
+        },
         { label: "Colors", icon: "droplet", path: null, color: "#EC4899" },
         { label: "Sizes", icon: "maximize", path: null, color: "#F43F5E" },
-      ]
+      ],
     },
     {
       label: "FAQs",
@@ -108,11 +210,26 @@ const NAV_ITEMS = {
       color: "#F59E0B",
       path: null,
       children: [
-        { label: "FAQ Categories", icon: "layers", path: "/faq-categories", color: "#F97316" },
-        { label: "FAQ Questions", icon: "help-circle", path: "/Faqs", color: "#EF4444" }
-      ]
+        {
+          label: "FAQ Categories",
+          icon: "layers",
+          path: "/faq-categories",
+          color: "#F97316",
+        },
+        {
+          label: "FAQ Questions",
+          icon: "help-circle",
+          path: "/Faqs",
+          color: "#EF4444",
+        },
+      ],
     },
-    { label: "Contact Messages", icon: "mail", path: "/Contactmessages", color: "#3B82F6" },
+    {
+      label: "Contact Messages",
+      icon: "mail",
+      path: "/Contactmessages",
+      color: "#3B82F6",
+    },
     { label: "Logos", icon: "image", path: null, color: "#0EA5E9" },
     {
       label: "Banners",
@@ -120,8 +237,8 @@ const NAV_ITEMS = {
       color: "#06B6D4",
       path: null,
       children: [
-        { label: "Banner List", icon: "list", path: null, color: "#14B8A6" }
-      ]
+        { label: "Banner List", icon: "list", path: null, color: "#14B8A6" },
+      ],
     },
     {
       label: "Locations",
@@ -129,12 +246,17 @@ const NAV_ITEMS = {
       color: "#10B981",
       path: null,
       children: [
-        { label: "Countries", icon: "globe", path: "/locations", color: "#22C55E" },
+        {
+          label: "Countries",
+          icon: "globe",
+          path: "/locations",
+          color: "#22C55E",
+        },
         { label: "States", icon: "map", path: null, color: "#84CC16" },
         { label: "Cities", icon: "navigation", path: null, color: "#EAB308" },
         { label: "Areas", icon: "compass", path: null, color: "#F59E0B" },
-        { label: "Pincodes", icon: "hash", path: null, color: "#F97316" }
-      ]
+        { label: "Pincodes", icon: "hash", path: null, color: "#F97316" },
+      ],
     },
     {
       label: "Careers Management",
@@ -142,12 +264,27 @@ const NAV_ITEMS = {
       color: "#8B5CF6",
       path: null,
       children: [
-        { label: "Departments", icon: "layers", path: "/Departments", color: "#6366F1" },
-        { label: "Job Openings", icon: "briefcase", path: "/jobopenings", color: "#3B82F6" },
-        { label: "Applications", icon: "file-text", path: "/jobApplications", color: "#0EA5E9" }
-      ]
-    }
-  ]
+        {
+          label: "Departments",
+          icon: "layers",
+          path: "/Departments",
+          color: "#6366F1",
+        },
+        {
+          label: "Job Openings",
+          icon: "briefcase",
+          path: "/jobopenings",
+          color: "#3B82F6",
+        },
+        {
+          label: "Applications",
+          icon: "file-text",
+          path: "/jobApplications",
+          color: "#0EA5E9",
+        },
+      ],
+    },
+  ],
 } as const;
 
 export default function AdminSidebar({
@@ -157,7 +294,9 @@ export default function AdminSidebar({
 }: Props) {
   const pathname = usePathname();
   const [ecommerceExpanded, setEcommerceExpanded] = React.useState(true);
-  const [expandedItems, setExpandedItems] = React.useState<Record<string, boolean>>({});
+  const [expandedItems, setExpandedItems] = React.useState<
+    Record<string, boolean>
+  >({});
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -182,7 +321,10 @@ export default function AdminSidebar({
           />
         )}
         {isLargeScreen && (
-          <TouchableOpacity onPress={onToggleCollapse} style={styles.collapseBtn}>
+          <TouchableOpacity
+            onPress={onToggleCollapse}
+            style={styles.collapseBtn}
+          >
             <Feather
               name={collapsed ? "chevron-right" : "chevron-left"}
               size={16}
@@ -193,25 +335,31 @@ export default function AdminSidebar({
       </View>
 
       {/* Scrollable nav items */}
-      <ScrollView 
-        style={styles.navScroll} 
-        contentContainerStyle={{ paddingBottom: 80 }} 
+      <ScrollView
+        style={styles.navScroll}
+        contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
       >
-
         {/* GENERAL */}
         <View style={styles.section}>
           {!collapsed && <Text style={styles.sectionTitle}>GENERAL</Text>}
           {NAV_ITEMS.GENERAL.map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
+              style={[
+                styles.menuItem,
+                isActive(item.path) && styles.menuItemActive,
+              ]}
               onPress={() => navigate(item.path)}
             >
               <Feather
                 name={item.icon as any}
                 size={18}
-                color={isActive(item.path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                color={
+                  isActive(item.path)
+                    ? "#EA580C"
+                    : (item as any).color || "#6B7280"
+                }
               />
               {!collapsed && (
                 <Text
@@ -235,13 +383,20 @@ export default function AdminSidebar({
           {NAV_ITEMS["EMPLOYEE MANAGEMENT"].map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
+              style={[
+                styles.menuItem,
+                isActive(item.path) && styles.menuItemActive,
+              ]}
               onPress={() => navigate(item.path)}
             >
               <Feather
                 name={item.icon as any}
                 size={18}
-                color={isActive(item.path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                color={
+                  isActive(item.path)
+                    ? "#EA580C"
+                    : (item as any).color || "#6B7280"
+                }
               />
               {!collapsed && (
                 <Text
@@ -264,7 +419,11 @@ export default function AdminSidebar({
             style={styles.menuItem}
             onPress={() => setEcommerceExpanded(!ecommerceExpanded)}
           >
-            <Feather name="shopping-bag" size={18} color={NAV_ITEMS.APPS.color || "#6B7280"} />
+            <Feather
+              name="shopping-bag"
+              size={18}
+              color={NAV_ITEMS.APPS.color || "#6B7280"}
+            />
             {!collapsed && (
               <>
                 <Text style={styles.menuItemText}>Ecommerce</Text>
@@ -279,7 +438,9 @@ export default function AdminSidebar({
           </TouchableOpacity>
 
           {ecommerceExpanded && (
-            <View style={[styles.subMenu, collapsed && styles.subMenuCollapsed]}>
+            <View
+              style={[styles.subMenu, collapsed && styles.subMenuCollapsed]}
+            >
               {NAV_ITEMS.APPS.children.map((child) => (
                 <TouchableOpacity
                   key={child.label}
@@ -292,7 +453,11 @@ export default function AdminSidebar({
                   <Feather
                     name={child.icon as any}
                     size={14}
-                    color={isActive(child.path) ? "#EA580C" : ((child as any).color || "#6B7280")}
+                    color={
+                      isActive(child.path)
+                        ? "#EA580C"
+                        : (child as any).color || "#6B7280"
+                    }
                   />
                   {!collapsed && (
                     <Text
@@ -313,13 +478,20 @@ export default function AdminSidebar({
           {NAV_ITEMS.APPS.standalone.map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
+              style={[
+                styles.menuItem,
+                isActive(item.path) && styles.menuItemActive,
+              ]}
               onPress={() => navigate(item.path)}
             >
               <Feather
                 name={item.icon as any}
                 size={18}
-                color={isActive(item.path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                color={
+                  isActive(item.path)
+                    ? "#EA580C"
+                    : (item as any).color || "#6B7280"
+                }
               />
               {!collapsed && (
                 <Text
@@ -343,13 +515,20 @@ export default function AdminSidebar({
           {NAV_ITEMS["EMAIL MANAGEMENT"].map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
+              style={[
+                styles.menuItem,
+                isActive(item.path) && styles.menuItemActive,
+              ]}
               onPress={() => navigate(item.path)}
             >
               <Feather
                 name={item.icon as any}
                 size={18}
-                color={isActive(item.path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                color={
+                  isActive(item.path)
+                    ? "#EA580C"
+                    : (item as any).color || "#6B7280"
+                }
               />
               {!collapsed && (
                 <Text
@@ -373,13 +552,20 @@ export default function AdminSidebar({
           {NAV_ITEMS["PAYMENTS & PRODUCTS"].map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.menuItem, isActive(item.path) && styles.menuItemActive]}
+              style={[
+                styles.menuItem,
+                isActive(item.path) && styles.menuItemActive,
+              ]}
               onPress={() => navigate(item.path)}
             >
               <Feather
                 name={item.icon as any}
                 size={18}
-                color={isActive(item.path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                color={
+                  isActive(item.path)
+                    ? "#EA580C"
+                    : (item as any).color || "#6B7280"
+                }
               />
               {!collapsed && (
                 <Text
@@ -399,16 +585,20 @@ export default function AdminSidebar({
         <View style={styles.section}>
           {!collapsed && <Text style={styles.sectionTitle}>ADVERTISING</Text>}
           {NAV_ITEMS.ADVERTISING.map((item) => {
-            const hasChildren = 'children' in item;
-            const isExpanded = hasChildren ? !!expandedItems[item.label] : false;
+            const hasChildren = "children" in item;
+            const isExpanded = hasChildren
+              ? !!expandedItems[item.label]
+              : false;
 
             return (
               <View key={item.label}>
                 <TouchableOpacity
                   style={[
                     styles.menuItem,
-                    !hasChildren && isActive((item as any).path) && styles.menuItemActive,
-                    isExpanded && { backgroundColor: "#F5F3FF" }
+                    !hasChildren &&
+                      isActive((item as any).path) &&
+                      styles.menuItemActive,
+                    isExpanded && { backgroundColor: "#F5F3FF" },
                   ]}
                   onPress={() => {
                     if (hasChildren) {
@@ -421,14 +611,20 @@ export default function AdminSidebar({
                   <Feather
                     name={item.icon as any}
                     size={18}
-                    color={!hasChildren && isActive((item as any).path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                    color={
+                      !hasChildren && isActive((item as any).path)
+                        ? "#EA580C"
+                        : (item as any).color || "#6B7280"
+                    }
                   />
                   {!collapsed && (
                     <>
                       <Text
                         style={[
                           styles.menuItemText,
-                          !hasChildren && isActive((item as any).path) && styles.menuItemTextActive,
+                          !hasChildren &&
+                            isActive((item as any).path) &&
+                            styles.menuItemTextActive,
                         ]}
                       >
                         {item.label}
@@ -446,7 +642,12 @@ export default function AdminSidebar({
                 </TouchableOpacity>
 
                 {hasChildren && isExpanded && (
-                  <View style={[styles.subMenu, collapsed && styles.subMenuCollapsed]}>
+                  <View
+                    style={[
+                      styles.subMenu,
+                      collapsed && styles.subMenuCollapsed,
+                    ]}
+                  >
                     {item.children.map((child) => (
                       <TouchableOpacity
                         key={child.label}
@@ -460,15 +661,23 @@ export default function AdminSidebar({
                           <Feather
                             name={child.icon as any}
                             size={14}
-                            color={isActive(child.path) ? "#EA580C" : ((child as any).color || "#6B7280")}
+                            color={
+                              isActive(child.path)
+                                ? "#EA580C"
+                                : (child as any).color || "#6B7280"
+                            }
                           />
                         )}
                         {!collapsed && (
                           <Text
                             style={[
                               styles.subMenuItemText,
-                              child.icon === "none" && { marginLeft: 30, color: "#9CA3AF" },
-                              isActive(child.path) && styles.subMenuItemTextActive,
+                              child.icon === "none" && {
+                                marginLeft: 30,
+                                color: "#9CA3AF",
+                              },
+                              isActive(child.path) &&
+                                styles.subMenuItemTextActive,
                             ]}
                           >
                             {child.label}
@@ -487,13 +696,20 @@ export default function AdminSidebar({
         <View style={[styles.section, { marginBottom: 30 }]}>
           {!collapsed && <Text style={styles.sectionTitle}>CUSTOM</Text>}
           {NAV_ITEMS.CUSTOM.map((item) => {
-            const hasChildren = 'children' in item;
-            const isExpanded = hasChildren ? !!expandedItems[item.label] : false;
+            const hasChildren = "children" in item;
+            const isExpanded = hasChildren
+              ? !!expandedItems[item.label]
+              : false;
 
             return (
               <View key={item.label}>
                 <TouchableOpacity
-                  style={[styles.menuItem, !hasChildren && isActive((item as any).path) && styles.menuItemActive]}
+                  style={[
+                    styles.menuItem,
+                    !hasChildren &&
+                      isActive((item as any).path) &&
+                      styles.menuItemActive,
+                  ]}
                   onPress={() => {
                     if (hasChildren) {
                       toggleExpanded(item.label);
@@ -505,14 +721,20 @@ export default function AdminSidebar({
                   <Feather
                     name={item.icon as any}
                     size={18}
-                    color={!hasChildren && isActive((item as any).path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                    color={
+                      !hasChildren && isActive((item as any).path)
+                        ? "#EA580C"
+                        : (item as any).color || "#6B7280"
+                    }
                   />
                   {!collapsed && (
                     <>
                       <Text
                         style={[
                           styles.menuItemText,
-                          !hasChildren && isActive((item as any).path) && styles.menuItemTextActive,
+                          !hasChildren &&
+                            isActive((item as any).path) &&
+                            styles.menuItemTextActive,
                         ]}
                       >
                         {item.label}
@@ -530,7 +752,12 @@ export default function AdminSidebar({
                 </TouchableOpacity>
 
                 {hasChildren && isExpanded && (
-                  <View style={[styles.subMenu, collapsed && styles.subMenuCollapsed]}>
+                  <View
+                    style={[
+                      styles.subMenu,
+                      collapsed && styles.subMenuCollapsed,
+                    ]}
+                  >
                     {item.children.map((child) => (
                       <TouchableOpacity
                         key={child.label}
@@ -543,13 +770,18 @@ export default function AdminSidebar({
                         <Feather
                           name={child.icon as any}
                           size={14}
-                          color={isActive(child.path) ? "#EA580C" : ((child as any).color || "#6B7280")}
+                          color={
+                            isActive(child.path)
+                              ? "#EA580C"
+                              : (child as any).color || "#6B7280"
+                          }
                         />
                         {!collapsed && (
                           <Text
                             style={[
                               styles.subMenuItemText,
-                              isActive(child.path) && styles.subMenuItemTextActive,
+                              isActive(child.path) &&
+                                styles.subMenuItemTextActive,
                             ]}
                           >
                             {child.label}
