@@ -9,15 +9,11 @@ import {
   Image,
   useWindowDimensions,
   Alert,
-  Modal,
+  Modal
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
-import { router, useLocalSearchParams } from "expo-router";
-import { useAsyncLoad } from "@/hooks/useAsyncLoad";
-import { fetchSellers, blockSeller, unblockSeller } from "@/services/sellerApi";
-import { mapSellerToApprovedRow } from "@/lib/mappers";
-import { getApiErrorMessage } from "@/lib/api/client";
+import { useLocalSearchParams, router } from "expo-router";
 
 // --- MOCK DATA TYPE ---
 type Seller = {
@@ -35,24 +31,6 @@ type Seller = {
   city: string;
   status: "Active" | "Blocked";
 };
-
-type PendingSeller = {
-  id: number;
-  name: string;
-  email: string;
-  mobile?: string;
-  businessName?: string;
-  businessType?: string;
-  submittedOn?: string;
-  state?: string;
-  city?: string;
-  bankName?: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  holderName?: string;
-};
-
-const INITIAL_PENDING_SELLERS: PendingSeller[] = [];
 
 // --- THE 10 EXACT SELLERS FROM SCREENSHOTS ---
 const EXACT_SELLERS: Seller[] = [
@@ -291,6 +269,42 @@ const generateAllSellers = (): Seller[] => {
 
 const ALL_MOCK_SELLERS = generateAllSellers();
 
+
+// --- PENDING SELLER TYPES ---
+type PendingSeller = {
+  id: number;
+  name: string;
+  businessName: string;
+  email: string;
+  mobile: string;
+  submittedOn: string;
+  businessType: string;
+  city: string;
+  state: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  holderName: string;
+};
+
+const INITIAL_PENDING_SELLERS: PendingSeller[] = [
+  {
+    id: 286,
+    name: "Sanju Sandhya",
+    businessName: "sg creations",
+    email: "flintandthread.hr@gmail.com",
+    mobile: "+919391939868",
+    submittedOn: "Jun 05, 2026",
+    businessType: "Sole Proprietorship",
+    city: "Hyderabad",
+    state: "Telangana",
+    bankName: "State Bank of India",
+    accountNumber: "38472948293",
+    ifscCode: "SBIN0020123",
+    holderName: "Sanju Sandhya",
+  }
+];
+
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
@@ -309,15 +323,41 @@ export default function ApprovedSellersScreen() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showKycDropdown, setShowKycDropdown] = useState(false);
 
+  // --- SEND MESSAGE MODAL STATES ---
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
+  const [messageSeller, setMessageSeller] = useState<Seller | null>(null);
+  const [messageSubject, setMessageSubject] = useState("");
+  const [messageBody, setMessageBody] = useState("");
+
+  // --- DEACTIVATE SELLER MODAL STATES ---
+  const [deactivateModalVisible, setDeactivateModalVisible] = useState(false);
+  const [deactivateSeller, setDeactivateSeller] = useState<Seller | null>(null);
+  const [deactivateReason, setDeactivateReason] = useState("");
+
+  // --- DELETE SELLER MODAL STATES ---
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteSeller, setDeleteSeller] = useState<Seller | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+
+  // --- TOAST SYSTEM STATE & HELPERS ---
+  const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts(p => [...p, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(p => p.filter(t => t.id !== id));
+    }, 3000);
+  };
+
   const filteredPendingSellers = useMemo(() => {
     const query = pendingSearchQuery.trim().toLowerCase();
     if (!query) return pendingSellers;
     return pendingSellers.filter(
       (s) =>
-        (s.name ?? "").toLowerCase().includes(query) ||
-        (s.businessName ?? "").toLowerCase().includes(query) ||
-        (s.email ?? "").toLowerCase().includes(query) ||
-        (s.mobile ?? "").toLowerCase().includes(query)
+        s.name.toLowerCase().includes(query) ||
+        s.businessName.toLowerCase().includes(query) ||
+        s.email.toLowerCase().includes(query) ||
+        s.mobile.toLowerCase().includes(query)
     );
   }, [pendingSellers, pendingSearchQuery]);
 
@@ -336,19 +376,19 @@ export default function ApprovedSellersScreen() {
               name: pending.name,
               email: pending.email,
               avatar: `https://randomuser.me/api/portraits/men/${pending.id % 100}.jpg`,
-              businessName: pending.businessName ?? "—",
-              businessType: pending.businessType ?? "—",
+              businessName: pending.businessName,
+              businessType: pending.businessType,
               products: 0,
               walletBalance: 0,
-              joinDate: pending.submittedOn ?? "",
+              joinDate: pending.submittedOn,
               revenue: 0,
-              state: pending.state ?? "—",
-              city: pending.city ?? "—",
+              state: pending.state,
+              city: pending.city,
               status: "Active",
             };
-            setData((prev) => [ApprovedSellerDetails, ...(prev ?? [])]);
+            setSellers(prev => [ApprovedSellerDetails, ...prev]);
             setShowPendingModal(false);
-            Alert.alert("Success", "Seller approved successfully!");
+            showToast("Seller approved successfully!", "success");
           }
         }
       ]
@@ -367,7 +407,7 @@ export default function ApprovedSellersScreen() {
           onPress: () => {
             setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
             setShowPendingModal(false);
-            Alert.alert("Rejected", "Seller request has been rejected.");
+            showToast("Seller request has been rejected.", "error");
           }
         }
       ]
@@ -375,14 +415,7 @@ export default function ApprovedSellersScreen() {
   };
 
 
-  const { data, loading, error, reload, setData } = useAsyncLoad(
-    async () => {
-      const page = await fetchSellers({ status: "active", size: 100 });
-      return (page.items ?? []).map(mapSellerToApprovedRow);
-    },
-    []
-  );
-  const sellers: Seller[] = data ?? [];
+  const [sellers, setSellers] = useState<Seller[]>(ALL_MOCK_SELLERS);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [sortBy, setSortBy] = useState("Name");
@@ -460,54 +493,26 @@ export default function ApprovedSellersScreen() {
     setCurrentPage(1);
   };
 
-  const handleBlockSeller = (id: number) => {
-    const seller = sellers.find((s) => s.id === id);
-    if (!seller) return;
-    const actionText = seller.status === "Active" ? "Block" : "Unblock";
-
-    Alert.alert(
-      `${actionText} Seller`,
-      `Are you sure you want to ${actionText.toLowerCase()} ${seller.name}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: actionText,
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (seller.status === "Active") {
-                await blockSeller(id);
-              } else {
-                await unblockSeller(id);
-              }
-              await reload();
-            } catch (e) {
-              Alert.alert("Error", getApiErrorMessage(e));
-            }
-          },
-        },
-      ]
+  const handleConfirmDeactivate = () => {
+    if (!deactivateSeller) return;
+    setSellers((prev) =>
+      prev.map((s) =>
+        s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s
+      )
     );
+    setDeactivateModalVisible(false);
+    setDeactivateSeller(null);
+    setDeactivateReason("");
+    showToast("Seller successfully blocked!", "success");
   };
 
-  const handleDeleteSeller = (id: number) => {
-    const seller = sellers.find((s) => s.id === id);
-    if (!seller) return;
-
-    Alert.alert(
-      "Delete Seller",
-      `Are you sure you want to delete ${seller.name}? This action cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setData((prev) => (prev ?? []).filter((s) => s.id !== id));
-          },
-        },
-      ]
-    );
+  const handleConfirmDelete = () => {
+    if (!deleteSeller) return;
+    setSellers((prev) => prev.filter((s) => s.id !== deleteSeller.id));
+    setDeleteModalVisible(false);
+    setDeleteSeller(null);
+    setDeleteReason("");
+    showToast("Seller successfully deleted!", "success");
   };
 
   const handleExportCSV = () => {
@@ -522,7 +527,630 @@ export default function ApprovedSellersScreen() {
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
-      >
+      >       {selectedSellerId !== null ? (
+          (() => {
+            const seller = sellers.find(s => s.id === selectedSellerId);
+            if (!seller) return null;
+
+            const handleUpdateSellerStatus = () => {
+              setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, status: adminStatus } : s));
+              showToast(`Seller status updated to ${adminStatus}!`, "success");
+            };
+
+            return (
+              <View style={styles.detailsContainer}>
+                {/* --- HEADER BANNER --- */}
+                <View style={styles.detailsHeaderBanner}>
+                  <View style={styles.detailsHeaderLeft}>
+                    <TouchableOpacity
+                      style={styles.headerBackBtn}
+                      onPress={() => setSelectedSellerId(null)}
+                    >
+                      <Feather name="arrow-left" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.headerBackBtnText}>Back</Text>
+                    </TouchableOpacity>
+                    <View style={styles.avatarWrapper}>
+                      <Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />
+                      <View style={styles.statusDotActive} />
+                    </View>
+                    <View style={styles.detailsMeta}>
+                      <Text style={styles.detailsTitle}>{seller.name}</Text>
+                      <View style={styles.detailsMetaRow}>
+                        <Feather name="mail" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
+                        <Text style={styles.detailsSubtext}>{seller.email}</Text>
+                      </View>
+                      <View style={styles.detailsMetaRow}>
+                        <Feather name="calendar" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
+                        <Text style={styles.detailsSubtext}>Joined {seller.joinDate}</Text>
+                        <Feather name="briefcase" size={14} color="#F3F4F6" style={{ marginLeft: 12, marginRight: 6 }} />
+                        <Text style={styles.detailsSubtext}>{seller.businessName}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailsHeaderRight}>
+                    <View style={styles.currentStatusCard}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Feather name="check-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                        <Text style={styles.currentStatusVal}>{seller.status}</Text>
+                      </View>
+                      <Text style={styles.currentStatusLabel}>Current Status</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* --- KYC VERIFICATION STATUS BAR --- */}
+                <View style={styles.kycBar}>
+                  <Text style={styles.kycBarTitle}>KYC Verification Status</Text>
+                  <View style={styles.kycNotCompletedBadge}>
+                    <Text style={styles.kycNotCompletedText}>Not Completed</Text>
+                  </View>
+                </View>
+
+                {/* --- 3x2 GRID OF KYC DETAILS --- */}
+                <View style={styles.kycGrid}>
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="check" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>KYC STATUS</Text>
+                      <View style={[styles.kycBadge, { backgroundColor: "#EF4444" }]}>
+                        <Text style={styles.kycBadgeText}>Not Completed</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="calendar" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>SUBMITTED ON</Text>
+                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="image" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>IMAGES CAPTURED</Text>
+                      <View style={styles.kycGridCircleCount}>
+                        <Text style={styles.kycGridCircleCountText}>0</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="check" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>VERIFICATION STATUS</Text>
+                      <View style={[styles.kycBadge, { backgroundColor: "#FBBF24" }]}>
+                        <Text style={[styles.kycBadgeText, { color: "#1F2937" }]}>Pending</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="user" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>VERIFIED BY</Text>
+                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.kycGridCard}>
+                    <View style={styles.kycIconCircle}>
+                      <Feather name="clock" size={16} color="#EA580C" />
+                    </View>
+                    <View style={styles.kycGridCardContent}>
+                      <Text style={styles.kycGridCardLabel}>VERIFIED ON</Text>
+                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* --- 2 COLUMN DETAILS INFO & DOCUMENT SECTION --- */}
+                <View style={[styles.detailsColumns, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                  {/* Left Column (2/3 width) - Info Tables */}
+                  <View style={[styles.detailsColumnLeft, { flex: isLargeScreen ? 2.3 : 1 }]}>
+                    <View style={styles.infoCard}>
+                      <View style={styles.infoCardHeader}>
+                        <Feather name="user" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Text style={styles.infoCardTitle}>Seller Information</Text>
+                      </View>
+
+                      <View style={styles.infoCardBody}>
+                        {/* Personal Details */}
+                        <Text style={styles.infoSectionTitle}>Personal Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>First Name</Text>
+                          <Text style={styles.infoValue}>{seller.name.split(" ")[0]}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Last Name</Text>
+                          <Text style={styles.infoValue}>{seller.name.split(" ").slice(1).join(" ") || "Collection"}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Email</Text>
+                          <Text style={styles.infoValue}>{seller.email}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Mobile</Text>
+                          <Text style={styles.infoValue}>+918466066939</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Registered On</Text>
+                          <Text style={styles.infoValue}>{seller.joinDate}</Text>
+                        </View>
+
+                        {/* Business Details */}
+                        <Text style={styles.infoSectionTitle}>Business Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Business Name</Text>
+                          <Text style={styles.infoValue}>{seller.businessName}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Seller Category</Text>
+                          <View style={styles.b2cBadge}>
+                            <Text style={styles.b2cBadgeText}>B2C</Text>
+                          </View>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Business Type</Text>
+                          <Text style={styles.infoValue}>{seller.businessType}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Address</Text>
+                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Sri Sathya Sai Dist, Andhra Pradesh, 515133.</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>GST</Text>
+                          <Text style={styles.infoValue}>No</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>PAN Number</Text>
+                          <Text style={styles.infoValue}>AJEP12353R</Text>
+                        </View>
+
+                        {/* Bank Details */}
+                        <Text style={styles.infoSectionTitle}>Bank Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Bank Name</Text>
+                          <Text style={styles.infoValue}>Canara Bank</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Branch Name</Text>
+                          <Text style={styles.infoValue}>HINDUPUR TEACHERS COLONY</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Account Number</Text>
+                          <Text style={styles.infoValue}>******4165</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>IFSC Code</Text>
+                          <Text style={styles.infoValue}>CNRB0013234</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Account Holder</Text>
+                          <Text style={styles.infoValue}>IRTANUM</Text>
+                        </View>
+
+                        {/* Location Details */}
+                        <Text style={styles.infoSectionTitle}>Location Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Country</Text>
+                          <Text style={styles.infoValue}>India</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>State</Text>
+                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>City</Text>
+                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Area</Text>
+                          <Text style={styles.infoValue}>Kothacheruvu</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Pincode</Text>
+                          <Text style={styles.infoValue}>515133</Text>
+                        </View>
+
+                        {/* Warehouse Details */}
+                        <Text style={styles.infoSectionTitle}>Warehouse Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Warehouse Address</Text>
+                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Near Indian oil petrol pump, Sri Sathya Sai Dist, Andhra Pradesh, 515133</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Country</Text>
+                          <Text style={styles.infoValue}>India</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>State</Text>
+                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>City</Text>
+                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Area</Text>
+                          <Text style={styles.infoValue}>Kothacheruvu</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Right Column (1/3 width) - Images & Documents */}
+                  <View style={[styles.detailsColumnRight, { flex: isLargeScreen ? 1.2 : 1, marginLeft: isLargeScreen ? 20 : 0, marginTop: isLargeScreen ? 0 : 20 }]}>
+                    {/* Profile Picture */}
+                    <View style={styles.sidebarCard}>
+                      <View style={styles.sidebarCardHeader}>
+                        <Text style={styles.sidebarCardTitle}>Profile Picture</Text>
+                      </View>
+                      <View style={styles.sidebarCardBody}>
+                        <Image source={{ uri: seller.avatar }} style={styles.sidebarProfileImg} />
+                      </View>
+                    </View>
+
+                    {/* Verification Documents */}
+                    <View style={[styles.sidebarCard, { marginTop: 20 }]}>
+                      <View style={styles.sidebarCardHeader}>
+                        <Text style={styles.sidebarCardTitle}>Verification Documents</Text>
+                      </View>
+                      <View style={styles.sidebarCardBodyDocs}>
+                        {[
+                          "Aadhaar Front",
+                          "Aadhaar Back",
+                          "PAN Card",
+                          "Cancelled Cheque",
+                          "Business Proof",
+                          "Bank Proof",
+                        ].map((docName) => (
+                          <View key={docName} style={styles.docRow}>
+                            <Text style={styles.docLabel}>{docName}</Text>
+                            <TouchableOpacity
+                              style={styles.docViewBtn}
+                              onPress={() => Alert.alert("Document View", `Opening preview for ${docName}...`)}
+                            >
+                              <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                              <Text style={styles.docViewBtnText}>View</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+
+                        <Text style={styles.docSectionSubTitle}>Business Proof Documents (Multiple)</Text>
+                        <View style={styles.docThumbnailRow}>
+                          <Image source={{ uri: seller.avatar }} style={styles.docThumbnail} />
+                        </View>
+
+                        <Text style={styles.docSectionSubTitle}>Live Selfie Documents</Text>
+                        <View style={styles.selfieThumbnailRow}>
+                          {[1, 2, 3, 4, 5].map((idx) => (
+                            <Image key={idx} source={{ uri: seller.avatar }} style={styles.selfieThumbnail} />
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* --- ADMIN ACTIONS SECTION --- */}
+                <View style={styles.adminActionsCard}>
+                  <View style={styles.adminActionsHeader}>
+                    <Feather name="settings" size={16} color="#1F2937" style={{ marginRight: 8 }} />
+                    <Text style={styles.adminActionsTitle}>Admin Actions</Text>
+                  </View>
+
+                  <View style={[styles.adminActionsBody, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                    {/* Left Form (2/3 width) */}
+                    <View style={{ flex: isLargeScreen ? 2 : 1 }}>
+                      <View style={[styles.rowLayout, { gap: 16, flexWrap: "wrap", marginBottom: 16 }]}>
+                        {/* Update Status Dropdown */}
+                        <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
+                          <Text style={styles.formLabel}>Update Status</Text>
+                          <TouchableOpacity
+                            style={styles.selectDropdown}
+                            onPress={() => {
+                              setShowStatusDropdown(!showStatusDropdown);
+                              setShowKycDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.selectDropdownText}>{adminStatus}</Text>
+                            <Feather name="chevron-down" size={14} color="#6B7280" />
+                          </TouchableOpacity>
+                          {showStatusDropdown && (
+                            <View style={styles.selectMenu}>
+                              {["Active", "Blocked"].map((opt) => (
+                                <TouchableOpacity
+                                  key={opt}
+                                  style={styles.selectMenuItem}
+                                  onPress={() => {
+                                    setAdminStatus(opt as any);
+                                    setShowStatusDropdown(false);
+                                  }}
+                                >
+                                  <Text style={styles.selectMenuText}>{opt}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+
+                        {/* KYC Status Dropdown */}
+                        <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
+                          <Text style={styles.formLabel}>KYC Verification Status</Text>
+                          <TouchableOpacity
+                            style={styles.selectDropdown}
+                            onPress={() => {
+                              setShowKycDropdown(!showKycDropdown);
+                              setShowStatusDropdown(false);
+                            }}
+                          >
+                            <Text style={styles.selectDropdownText}>{adminKycStatus}</Text>
+                            <Feather name="chevron-down" size={14} color="#6B7280" />
+                          </TouchableOpacity>
+                          {showKycDropdown && (
+                            <View style={styles.selectMenu}>
+                              {["Pending Verification", "Active", "Rejected", "Inactive"].map((opt) => (
+                                <TouchableOpacity
+                                  key={opt}
+                                  style={styles.selectMenuItem}
+                                  onPress={() => {
+                                    setAdminKycStatus(opt);
+                                    setShowKycDropdown(false);
+                                  }}
+                                >
+                                  <Text style={styles.selectMenuText}>{opt}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Unique Seller ID */}
+                      <View style={{ marginBottom: 16 }}>
+                        <Text style={styles.formLabel}>Unique Seller ID (Auto-generated)</Text>
+                        <TextInput
+                          style={styles.formTextInputDisabled}
+                          value={`FNT-SELLER-0000${seller.id}`}
+                          editable={false}
+                        />
+                        <Text style={styles.formCaption}>Unique ID: FNT-SELLER-0000{seller.id}</Text>
+                      </View>
+
+                      {/* KYC Remarks */}
+                      <View style={{ marginBottom: 20 }}>
+                        <Text style={styles.formLabel}>KYC Verification Remarks</Text>
+                        <TextInput
+                          style={styles.formTextArea}
+                          placeholder="Provide any remarks or notes about the KYC verification process..."
+                          placeholderTextColor="#9CA3AF"
+                          value={kycRemarks}
+                          onChangeText={setKycRemarks}
+                          multiline={true}
+                          numberOfLines={4}
+                        />
+                        <Text style={styles.formCaption}>Optional notes about the verification process.</Text>
+                      </View>
+
+                      {/* Footer actions */}
+                      <View style={[styles.rowLayout, { gap: 12 }]}>
+                        <TouchableOpacity
+                          style={styles.updateStatusBtn}
+                          onPress={handleUpdateSellerStatus}
+                        >
+                          <Feather name="check" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.updateStatusBtnText}>Update Status</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.backBtnGrey}
+                          onPress={() => setSelectedSellerId(null)}
+                        >
+                          <Feather name="arrow-left" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.backBtnGreyText}>Back to Sellers</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Right Info (1/3 width) */}
+                    <View style={[styles.adminInfoPanel, { marginLeft: isLargeScreen ? 24 : 0, marginTop: isLargeScreen ? 0 : 24 }]}>
+                      <View style={styles.adminInfoPanelHeader}>
+                        <Feather name="info" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Text style={styles.adminInfoPanelTitle}>Status Information</Text>
+                      </View>
+
+                      <View style={styles.adminInfoPanelBody}>
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#FFFBEB" }]}>
+                            <Feather name="clock" size={14} color="#D97706" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Pending</Text>
+                            <Text style={styles.statusInfoDesc}>Seller has submitted profile but not yet reviewed</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#ECFDF5" }]}>
+                            <Feather name="check-circle" size={14} color="#10B981" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Active</Text>
+                            <Text style={styles.statusInfoDesc}>Seller is approved and can sell products</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#FEF2F2" }]}>
+                            <Feather name="x-circle" size={14} color="#EF4444" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Rejected</Text>
+                            <Text style={styles.statusInfoDesc}>Seller application has been rejected</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.statusInfoRow}>
+                          <View style={[styles.statusIconCircle, { backgroundColor: "#F3F4F6" }]}>
+                            <Feather name="pause-circle" size={14} color="#6B7280" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.statusInfoTitle}>Inactive</Text>
+                            <Text style={styles.statusInfoDesc}>Seller account has been temporarily suspended</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            );
+          })()
+        ) : showPending ? (
+          <>
+            {/* --- PENDING HEADER BANNER CARD --- */}
+            <View style={styles.pageHeaderCard}>
+              <View style={styles.bannerTop}>
+                <TouchableOpacity
+                  style={styles.bannerBackBtn}
+                  onPress={() => router.back()}
+                >
+                  <Feather name="arrow-left" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.bannerBackBtnText}>Back</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={[styles.bannerBottom, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                <View style={styles.bannerBottomLeft}>
+                  <View style={styles.overlapBadgeContainer}>
+                    <View style={styles.overlapBadgeCircle}>
+                      <Feather name="map-pin" size={20} color="#FFFFFF" />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.bannerTitleContainer}>
+                    <Text style={styles.bannerTitle}>Pending Sellers</Text>
+                    <View style={styles.breadcrumbs}>
+                      <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
+                      <TouchableOpacity onPress={() => router.push("/approveseller")}>
+                        <Text style={styles.breadcrumbActive}>Dashboard</Text>
+                      </TouchableOpacity>
+                      <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
+                      <Text style={styles.breadcrumbText}>Pending Sellers</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.bannerPendingBadge}
+                  onPress={() => router.push("/approveseller")}
+                >
+                  <Feather name="clock" size={14} color="#1F2937" />
+                  <Text style={styles.bannerPendingBadgeText}>{pendingSellers.length} Pending</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* --- SEARCH TOOLBAR --- */}
+            <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <View style={[styles.searchContainer, { flex: 1, marginRight: 0 }]}>
+                <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search pending sellers..."
+                  placeholderTextColor="#9CA3AF"
+                  value={pendingSearchQuery}
+                  onChangeText={setPendingSearchQuery}
+                />
+                {pendingSearchQuery ? (
+                  <TouchableOpacity onPress={() => setPendingSearchQuery("")} style={styles.clearSearchBtn}>
+                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            {/* --- PENDING TABLE --- */}
+            <View style={styles.tableCard}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableTh, { flex: 0.8 }]}>ID</Text>
+                <Text style={[styles.tableTh, { flex: 1.8 }]}>Name</Text>
+                <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
+                <Text style={[styles.tableTh, { flex: 2.2 }]}>Email</Text>
+                <Text style={[styles.tableTh, { flex: 1.6 }]}>Mobile</Text>
+                <Text style={[styles.tableTh, { flex: 1.4 }]}>Submitted On</Text>
+                <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Actions</Text>
+              </View>
+
+              {filteredPendingSellers.map((seller) => (
+                <View key={seller.id} style={styles.tableRow}>
+                  <View style={[styles.tableCell, { flex: 0.8 }]}>
+                    <View style={styles.idBadge}>
+                      <Text style={styles.idBadgeText}>{seller.id}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.tableCellTextBold, { flex: 1.8 }]}>{seller.name}</Text>
+                  <Text style={[styles.tableCellText, { flex: 2 }]}>{seller.businessName}</Text>
+                  <Text style={[styles.tableCellText, { flex: 2.2 }]} numberOfLines={1}>{seller.email}</Text>
+                  <Text style={[styles.tableCellText, { flex: 1.6 }]}>{seller.mobile}</Text>
+                  <Text style={[styles.tableCellText, { flex: 1.4 }]}>{seller.submittedOn}</Text>
+                  <View style={[styles.tableCellActions, { flex: 1.2, justifyContent: "center" }]}>
+                    <TouchableOpacity
+                      style={styles.pendingViewBtn}
+                      onPress={() => {
+                        setSelectedPendingSeller(seller);
+                        setShowPendingModal(true);
+                      }}
+                    >
+                      <Text style={styles.pendingViewBtnText}>View</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {filteredPendingSellers.length === 0 && (
+                <View style={styles.emptyTable}>
+                  <Text style={styles.emptyText}>No pending sellers found.</Text>
+                </View>
+              )}
+            </View>
+
+            {/* --- FOOTER PAGINATION --- */}
+            <View style={[styles.pagination, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+              <Text style={styles.paginationText}>
+                Showing 1 - {filteredPendingSellers.length} of {filteredPendingSellers.length} pending sellers
+              </Text>
+
+              <View style={styles.pageSelectors}>
+                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
+                  <Ionicons name="chevron-back" size={16} color="#D1D5DB" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.pageNumber, styles.pageNumberActive]}>
+                  <Text style={[styles.pageNumberText, styles.pageNumberTextActive]}>1</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
+                  <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+
             {/* --- PAGE HEADER BANNER CARD --- */}
             <View style={styles.pageHeaderCard}>
               {/* Banner Top Portion (Orange Gradient) */}
@@ -744,13 +1372,30 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.actionMessageBtn}
-                        onPress={() => Alert.alert("Message Seller", `Send a message to ${seller.name}`)}
+                        onPress={() => {
+                          setMessageSeller(seller);
+                          setMessageModalVisible(true);
+                        }}
                       >
                         <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.actionBlockBtn, seller.status === "Blocked" && styles.actionBlockBtnActive]}
-                        onPress={() => handleBlockSeller(seller.id)}
+                        onPress={() => {
+                          if (seller.status === "Active") {
+                            setDeactivateSeller(seller);
+                            setDeactivateReason("");
+                            setDeactivateModalVisible(true);
+                          } else {
+                            // Directly unblock
+                            setSellers((prev) =>
+                              prev.map((s) =>
+                                s.id === seller.id ? { ...s, status: "Active" } : s
+                              )
+                            );
+                            showToast("Seller successfully unblocked!", "success");
+                          }
+                        }}
                       >
                         <Ionicons
                           name="ban"
@@ -760,7 +1405,11 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.actionDeleteBtn}
-                        onPress={() => handleDeleteSeller(seller.id)}
+                        onPress={() => {
+                          setDeleteSeller(seller);
+                          setDeleteReason("");
+                          setDeleteModalVisible(true);
+                        }}
                       >
                         <Ionicons name="trash-outline" size={15} color="#EF4444" />
                       </TouchableOpacity>
@@ -842,7 +1491,10 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.cardActionBtn, styles.actionMessageBtn]}
-                        onPress={() => Alert.alert("Message Seller", `Send a message to ${seller.name}`)}
+                        onPress={() => {
+                          setMessageSeller(seller);
+                          setMessageModalVisible(true);
+                        }}
                       >
                         <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -852,7 +1504,21 @@ export default function ApprovedSellersScreen() {
                           styles.actionBlockBtn,
                           seller.status === "Blocked" && styles.actionBlockBtnActive,
                         ]}
-                        onPress={() => handleBlockSeller(seller.id)}
+                        onPress={() => {
+                          if (seller.status === "Active") {
+                            setDeactivateSeller(seller);
+                            setDeactivateReason("");
+                            setDeactivateModalVisible(true);
+                          } else {
+                            // Directly unblock
+                            setSellers((prev) =>
+                              prev.map((s) =>
+                                s.id === seller.id ? { ...s, status: "Active" } : s
+                              )
+                            );
+                            showToast("Seller successfully unblocked!", "success");
+                          }
+                        }}
                       >
                         <Ionicons
                           name="ban"
@@ -862,7 +1528,11 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.cardActionBtn, styles.actionDeleteBtn]}
-                        onPress={() => handleDeleteSeller(seller.id)}
+                        onPress={() => {
+                          setDeleteSeller(seller);
+                          setDeleteReason("");
+                          setDeleteModalVisible(true);
+                        }}
                       >
                         <Ionicons name="trash-outline" size={15} color="#EF4444" />
                       </TouchableOpacity>
@@ -946,6 +1616,8 @@ export default function ApprovedSellersScreen() {
                 </View>
               </View>
             )}
+          </>
+        )}
 
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>
@@ -1054,6 +1726,255 @@ export default function ApprovedSellersScreen() {
           </View>
         </Modal>
       )}
+
+      {/* --- SEND MESSAGE MODAL --- */}
+      {messageModalVisible && messageSeller && (
+        <Modal
+          visible={messageModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMessageModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.messageModalContent}>
+              {/* Header */}
+              <View style={styles.messageModalHeader}>
+                <View style={styles.messageHeaderLeft}>
+                  <View style={styles.messageIconContainer}>
+                    <Feather name="mail" size={20} color="#EA580C" />
+                  </View>
+                  <View style={{ marginLeft: 12 }}>
+                    <Text style={styles.messageTitle}>Send Message</Text>
+                    <Text style={styles.messageSubtitle}>to {messageSeller.name}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setMessageModalVisible(false)}>
+                  <Feather name="x" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Body */}
+              <View style={styles.messageModalBody}>
+                <Text style={styles.messageFormLabel}>Subject</Text>
+                <TextInput
+                  style={styles.messageFormInput}
+                  placeholder="Enter message subject..."
+                  placeholderTextColor="#9CA3AF"
+                  value={messageSubject}
+                  onChangeText={setMessageSubject}
+                />
+
+                <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Message</Text>
+                <TextInput
+                  style={styles.messageFormTextArea}
+                  placeholder="Type your message here..."
+                  placeholderTextColor="#9CA3AF"
+                  value={messageBody}
+                  onChangeText={setMessageBody}
+                  multiline
+                  numberOfLines={5}
+                />
+              </View>
+
+              {/* Footer */}
+              <View style={styles.messageModalFooter}>
+                <TouchableOpacity
+                  style={styles.messageCancelBtn}
+                  onPress={() => setMessageModalVisible(false)}
+                >
+                  <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.messageCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.messageSendBtn}
+                  onPress={() => {
+                    if (!messageSubject.trim() || !messageBody.trim()) {
+                      showToast("Subject and message are required", "error");
+                      return;
+                    }
+                    setMessageModalVisible(false);
+                    setMessageSubject("");
+                    setMessageBody("");
+                    showToast("Message sent successfully!", "success");
+                  }}
+                >
+                  <Feather name="send" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.messageSendBtnText}>Send Message</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* --- DEACTIVATE SELLER MODAL --- */}
+      {deactivateModalVisible && deactivateSeller && (
+        <Modal
+          visible={deactivateModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDeactivateModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.messageModalContent}>
+              {/* Header */}
+              <View style={[styles.messageModalHeader, { backgroundColor: "#DC2626" }]}>
+                <View style={styles.messageHeaderLeft}>
+                  <View style={styles.messageIconContainer}>
+                    <Feather name="user-x" size={20} color="#DC2626" />
+                  </View>
+                  <View style={{ marginLeft: 12 }}>
+                    <Text style={styles.messageTitle}>Deactivate Seller</Text>
+                    <Text style={styles.messageSubtitle}>This action will deactivate the seller account</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setDeactivateModalVisible(false)}>
+                  <Feather name="x" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Body */}
+              <View style={styles.messageModalBody}>
+                {/* Warning Banner */}
+                <View style={styles.warningBanner}>
+                  <Feather name="alert-triangle" size={24} color="#D97706" style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.warningBannerTitle}>Warning</Text>
+                    <Text style={styles.warningBannerText}>
+                      Are you sure you want to deactivate <Text style={{ fontWeight: '700' }}>{deactivateSeller.name}</Text>?
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deactivation</Text>
+                <TextInput
+                  style={styles.messageFormTextArea}
+                  placeholder="Please provide a reason for deactivating this seller..."
+                  placeholderTextColor="#9CA3AF"
+                  value={deactivateReason}
+                  onChangeText={setDeactivateReason}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              {/* Footer */}
+              <View style={styles.messageModalFooter}>
+                <TouchableOpacity
+                  style={styles.messageCancelBtn}
+                  onPress={() => setDeactivateModalVisible(false)}
+                >
+                  <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.messageCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
+                  onPress={handleConfirmDeactivate}
+                >
+                  <Ionicons name="ban" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.messageSendBtnText}>Deactivate</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* --- DELETE SELLER MODAL --- */}
+      {deleteModalVisible && deleteSeller && (
+        <Modal
+          visible={deleteModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDeleteModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.messageModalContent}>
+              {/* Header */}
+              <View style={[styles.messageModalHeader, { backgroundColor: "#991B1B" }]}>
+                <View style={styles.messageHeaderLeft}>
+                  <View style={styles.messageIconContainer}>
+                    <Feather name="trash-2" size={20} color="#991B1B" />
+                  </View>
+                  <View style={{ marginLeft: 12 }}>
+                    <Text style={styles.messageTitle}>Delete Seller</Text>
+                    <Text style={styles.messageSubtitle}>This action cannot be undone</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setDeleteModalVisible(false)}>
+                  <Feather name="x" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Body */}
+              <View style={styles.messageModalBody}>
+                {/* Danger Zone Banner */}
+                <View style={styles.dangerBanner}>
+                  <Feather name="alert-circle" size={24} color="#DC2626" style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.dangerBannerTitle}>Danger Zone</Text>
+                    <Text style={styles.dangerBannerText}>
+                      Are you sure you want to permanently delete <Text style={{ fontWeight: '700' }}>{deleteSeller.name}</Text>? This action cannot be undone and will remove all seller data.
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deletion</Text>
+                <TextInput
+                  style={styles.messageFormTextArea}
+                  placeholder="Please provide a reason for deleting this seller..."
+                  placeholderTextColor="#9CA3AF"
+                  value={deleteReason}
+                  onChangeText={setDeleteReason}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              {/* Footer */}
+              <View style={styles.messageModalFooter}>
+                <TouchableOpacity
+                  style={styles.messageCancelBtn}
+                  onPress={() => setDeleteModalVisible(false)}
+                >
+                  <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.messageCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
+                  onPress={handleConfirmDelete}
+                >
+                  <Feather name="trash-2" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.messageSendBtnText}>Delete Permanently</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* --- TOAST CONTAINER --- */}
+      <View style={styles.toastContainer} pointerEvents="box-none">
+        {toasts.map((toast) => (
+          <View
+            key={toast.id}
+            style={[
+              styles.toast,
+              toast.type === "success" ? styles.toastSuccess : styles.toastError,
+            ]}
+          >
+            <Feather
+              name={toast.type === "success" ? "check-circle" : "alert-circle"}
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </View>
+        ))}
+      </View>
     </AdminLayout>
   );
 }
@@ -1067,12 +1988,6 @@ const styles = StyleSheet.create({
   scrollBodyContent: {
     padding: 24,
     paddingBottom: 60,
-  },
-  loadErrorText: {
-    fontSize: 14,
-    color: "#DC2626",
-    marginBottom: 16,
-    textAlign: "center",
   },
   rowLayout: {
     flexDirection: "row",
@@ -1097,8 +2012,23 @@ const styles = StyleSheet.create({
   },
   bannerTop: {
     height: 100,
-    backgroundColor: "#C2410C", // Bold orange/gold background matching screenshot banner
-    // Alternatively, we can use background color / pattern styles here
+    backgroundColor: "#1d324e",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    paddingHorizontal: 20,
+  },
+  bannerBackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+  },
+  bannerBackBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
   bannerBottom: {
     padding: 20,
@@ -1193,6 +2123,8 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     marginBottom: 24,
     gap: 16,
+    position: "relative",
+    zIndex: 10,
   },
   searchContainer: {
     flex: 1,
@@ -1301,6 +2233,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
+    zIndex: 100,
   },
   sortMenuItem: {
     paddingVertical: 8,
@@ -1884,7 +2817,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   detailsHeaderBanner: {
-    backgroundColor: "#EA580C",
+    backgroundColor: "#1d324e",
     borderRadius: 12,
     padding: 24,
     flexDirection: "row",
@@ -1893,6 +2826,20 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 16,
     marginBottom: 20,
+  },
+  headerBackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  headerBackBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
   detailsHeaderLeft: {
     flexDirection: "row",
@@ -1973,7 +2920,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   kycBar: {
-    backgroundColor: "#EA580C",
+    backgroundColor: "#1d324e",
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -2397,6 +3344,198 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#6B7280",
     lineHeight: 15,
+  },
+  messageModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    width: "90%",
+    maxWidth: 500,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    overflow: "hidden",
+  },
+  messageModalHeader: {
+    backgroundColor: "#EA580C",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  messageHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  messageIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  messageTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  messageSubtitle: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  messageModalBody: {
+    padding: 20,
+  },
+  messageFormLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 8,
+  },
+  messageFormInput: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#1F2937",
+    height: 44,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 16,
+  },
+  messageFormTextArea: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#1F2937",
+    height: 120,
+    backgroundColor: "#FFFFFF",
+    textAlignVertical: "top",
+  },
+  messageModalFooter: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  messageCancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4B5563",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flex: 1,
+    height: 44,
+  },
+  messageCancelBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  messageSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EA580C",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flex: 1.2,
+    height: 44,
+  },
+  messageSendBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  toastContainer: {
+    position: "absolute",
+    top: 90,
+    right: 24,
+    zIndex: 9999,
+    gap: 10,
+    alignItems: "flex-end",
+  },
+  toast: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 260,
+    maxWidth: 360,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  toastSuccess: {
+    backgroundColor: "#10B981",
+  },
+  toastError: {
+    backgroundColor: "#EF4444",
+  },
+  toastText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 8,
+    flex: 1,
+  },
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    borderColor: "#F59E0B",
+    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  warningBannerTitle: {
+    color: "#92400E",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  warningBannerText: {
+    color: "#B45309",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  dangerBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEE2E2",
+    borderColor: "#EF4444",
+    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  dangerBannerTitle: {
+    color: "#991B1B",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  dangerBannerText: {
+    color: "#B91C1C",
+    fontSize: 13,
+    lineHeight: 18,
   },
 
 });
