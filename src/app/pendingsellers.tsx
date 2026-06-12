@@ -1,12 +1,3 @@
-import AdminLayout from "@/components/admin-layout";
-import { Feather } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  ScrollView,
 /**
  * PendingSellers.tsx
  * ─────────────────────────────────────────────────────────────────
@@ -32,66 +23,46 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { formatDateTime, initialsFromName } from "@/lib/format";
-import {
-  approveSellerProfile,
-  fetchPendingProfileSellers,
-  rejectSellerProfile,
-  type PendingProfileSeller,
-} from "@/services/sellerApi";
-
-const ORANGE = "#ef7b1a";
-const NAVY = "#1d324e";
-const MUTED = "#69798c";
-const BORDER = "#e5e7eb";
-
   View,
 } from 'react-native';
 
 import ViewPendingSeller, { SellerProp } from '@/components/ViewPendingSeller';
 
-export default function PendingSellersScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 1024;
+// ─── Palette ─────────────────────────────────────────────────────────────────
+const C = {
+  orange:      '#E07B20',
+  orangeLight: '#FFF3E0',
+  blue:        '#3B82F6',
+  dark:        '#1A1A1A',
+  mid:         '#555',
+  light:       '#999',
+  border:      '#E8D9C8',
+  cream:       '#FFF8F2',
+  tableHead:   '#FDF0E4',
+  rowAlt:      '#FFFAF5',
+  bg:          '#F2F3F5',
+  white:       '#FFFFFF',
+};
 
-  const [sellers, setSellers] = useState<PendingProfileSeller[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actionId, setActionId] = useState<number | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<PendingProfileSeller | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [search, setSearch] = useState("");
+// ─── Bootstrap Icons ──────────────────────────────────────────────────────────
+const BI_MAP: Record<string, string> = {
+  'geo-alt-fill':       '\uF390',
+  'house-fill':         '\uF425',
+  'search':             '\uF52A',
+  'clock-history':      '\uF292',
+  'eye':                '\uF332',
+  'arrow-left':         '\uF12A',
+  'chevron-left':       '\uF284',
+  'chevron-right':      '\uF285',
+  'person-badge':       '\uF4DB',
+  'shop':               '\uF541',
+  'envelope-fill':      '\uF32F',
+  'telephone-fill':     '\uF5F4',
+  'calendar3':          '\uF214',
+  'hash':               '\uF3A7',
+  'funnel':             '\uF38B',
+};
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const rows = await fetchPendingProfileSellers();
-      setSellers(rows);
-    } catch (e) {
-      setError(getApiErrorMessage(e, "Failed to load pending sellers."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return sellers;
-    return sellers.filter(
-      (s) =>
-        s.fullName?.toLowerCase().includes(q) ||
-        s.email?.toLowerCase().includes(q) ||
-        s.mobile?.includes(q)
-=======
 type BIProps = { name: string; size?: number; color?: string; style?: object };
 const BI = ({ name, size = 16, color = C.mid, style }: BIProps) => (
   <Text
@@ -165,118 +136,43 @@ export default function Pendingsellers() {
         onBack={() => setDetailSeller(null)}
       />
     );
-  }, [sellers, search]);
+  }
 
-  const handleApprove = (seller: PendingProfileSeller) => {
-    const run = async () => {
-      setActionId(seller.sellerId);
-      try {
-        await approveSellerProfile(seller.sellerId);
-        await load();
-        if (Platform.OS === "web") window.alert("Seller profile approved.");
-        else Alert.alert("Success", "Seller profile approved.");
-      } catch (e) {
-        const msg = getApiErrorMessage(e);
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Error", msg);
-      } finally {
-        setActionId(null);
-      }
-    };
-
-    if (Platform.OS === "web") {
-      if (window.confirm(`Approve profile for ${seller.fullName}?`)) void run();
-    } else {
-      Alert.alert("Approve seller", `Approve profile for ${seller.fullName}?`, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Approve", onPress: () => void run() },
-      ]);
-    }
-  };
-
-  const submitReject = async () => {
-    if (!rejectTarget) return;
-    const reason = rejectReason.trim() || "Profile rejected by admin.";
-    setActionId(rejectTarget.sellerId);
-    try {
-      await rejectSellerProfile(rejectTarget.sellerId, reason);
-      setRejectTarget(null);
-      setRejectReason("");
-      await load();
-    } catch (e) {
-      const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Error", msg);
-    } finally {
-      setActionId(null);
-    }
-  };
-
+  // ── List page ─────────────────────────────────────────────────────────────
   return (
-    <AdminLayout>
-      <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Pending seller profiles</Text>
-            <Text style={styles.subtitle}>
-              Sellers who completed KYC and are waiting for admin approval
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
-            <Feather name="refresh-cw" size={16} color={ORANGE} />
-            <Text style={styles.refreshText}>Refresh</Text>
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={st.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={C.orange} />
+      <ScrollView
+        style={st.flex}
+        contentContainerStyle={[
+          st.scrollContent,
+          isMobile && { padding: 12 },
+          isTablet && { padding: 16 },
+          isBig    && { padding: 24, maxWidth: 1200, alignSelf: 'center', width: '100%' },
+        ]}
+      >
+        {/* ── Page card ── */}
+        <View style={st.card}>
+          {/* Banner */}
+          <Banner />
 
-        <View style={styles.searchRow}>
-          <Feather name="search" size={18} color={MUTED} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search name, email, phone…"
-            placeholderTextColor={MUTED}
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={ORANGE} />
-            <Text style={styles.muted}>Loading pending sellers…</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.center}>
-            <Text style={styles.error}>{error}</Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => void load()}>
-              <Text style={styles.primaryBtnText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Feather name="check-circle" size={40} color="#22c55e" />
-            <Text style={styles.emptyTitle}>No pending profiles</Text>
-            <Text style={styles.muted}>All submitted seller profiles have been reviewed.</Text>
-          </View>
-        ) : isWide ? (
-          <View style={styles.table}>
-            <View style={styles.tableHead}>
-              <Text style={[styles.th, { flex: 2 }]}>Seller</Text>
-              <Text style={[styles.th, { flex: 1.2 }]}>Mobile</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Status</Text>
-              <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Actions</Text>
+          <View style={[st.cardBody, isMobile && { paddingHorizontal: 14, paddingTop: 28 }]}>
+            {/* Header */}
+            <View style={st.headerRow}>
+              <View>
+                <Text style={[st.pageTitle, isMobile && { fontSize: 19 }]}>Pending Sellers</Text>
+                <View style={st.breadcrumb}>
+                  <BI name="house-fill" size={11} color={C.orange} />
+                  <Text style={st.bcLink}> Dashboard</Text>
+                  <Text style={st.bcSep}> › </Text>
+                  <Text style={st.bcCur}>Pending Sellers</Text>
+                </View>
+              </View>
+              <View style={st.badge}>
+                <BI name="clock-history" size={12} color={C.orange} />
+                <Text style={st.badgeTxt}>  {filtered.length} Pending</Text>
+              </View>
             </View>
-<<<<<<< HEAD
-            {filtered.map((s) => (
-              <View key={s.sellerId} style={styles.tableRow}>
-                <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initialsFromName(s.fullName)}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.name}>{s.fullName}</Text>
-                    <Text style={styles.email}>{s.email}</Text>
-=======
 
             {loadError ? <Text style={{ color: C.orange, marginBottom: 10 }}>{loadError}</Text> : null}
 
@@ -307,226 +203,221 @@ export default function Pendingsellers() {
                     <Text style={[st.hT, { width: 140 }]}>Mobile</Text>
                     {isBig && <Text style={[st.hT, { width: 118 }]}>Submitted On</Text>}
                     <Text style={[st.hT, { width: 90, textAlign: 'center' }]}>Actions</Text>
-
                   </View>
-                </View>
-                <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>
-                <Text style={[styles.td, { flex: 1 }]}>{s.status}</Text>
-                <Text style={[styles.td, { flex: 1.2 }]}>{formatDateTime(s.profileUpdatedAt)}</Text>
-                <View style={[styles.actions, { flex: 1 }]}>
-                  <TouchableOpacity
-                    style={styles.approveBtn}
-                    disabled={actionId === s.sellerId}
-                    onPress={() => handleApprove(s)}
-                  >
-                    <Text style={styles.approveText}>Approve</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.rejectBtn}
-                    disabled={actionId === s.sellerId}
-                    onPress={() => {
-                      setRejectTarget(s);
-                      setRejectReason("");
-                    }}
-                  >
-                    <Text style={styles.rejectText}>Reject</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          filtered.map((s) => (
-            <View key={s.sellerId} style={styles.card}>
-              <View style={styles.cardTop}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initialsFromName(s.fullName)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{s.fullName}</Text>
-                  <Text style={styles.email}>{s.email}</Text>
-                  <Text style={styles.muted}>{s.mobile ?? "—"}</Text>
-                </View>
-              </View>
-              <Text style={styles.muted}>Submitted: {formatDateTime(s.profileUpdatedAt)}</Text>
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.approveBtn, { flex: 1 }]}
-                  disabled={actionId === s.sellerId}
-                  onPress={() => handleApprove(s)}
-                >
-                  <Text style={styles.approveText}>Approve</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rejectBtn, { flex: 1 }]}
-                  disabled={actionId === s.sellerId}
-                  onPress={() => {
-                    setRejectTarget(s);
-                    setRejectReason("");
-                  }}
-                >
-                  <Text style={styles.rejectText}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
 
-      <Modal visible={rejectTarget != null} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Reject profile</Text>
-            <Text style={styles.muted}>{rejectTarget?.fullName}</Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Reason for rejection"
-              placeholderTextColor={MUTED}
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              multiline
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.rejectBtn} onPress={() => setRejectTarget(null)}>
-                <Text style={styles.rejectText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => void submitReject()}>
-                <Text style={styles.primaryBtnText}>Reject</Text>
-              </TouchableOpacity>
+                  {/* Table rows */}
+                  {filtered.map((s, i) => (
+                    <View key={s.id} style={[st.tRow, i % 2 !== 0 && { backgroundColor: C.rowAlt }]}>
+                      {/* ID */}
+                      <View style={{ width: 70, justifyContent: 'center' }}>
+                        <View style={st.idPill}><Text style={st.idPillT}>{s.id}</Text></View>
+                      </View>
+                      {/* Name */}
+                      <Text style={[st.cT, { flex: 1 }]}>{s.name}</Text>
+                      {/* Business */}
+                      <Text style={[st.cT, { flex: 1 }]}>{s.businessName}</Text>
+                      {/* Email – desktop only */}
+                      {isBig && (
+                        <Text style={[st.cT, { flex: 1.4 }]} numberOfLines={1}>{s.email}</Text>
+                      )}
+                      {/* Mobile */}
+                      <Text style={[st.cT, { width: 140 }]}>{s.mobile}</Text>
+                      {/* Date – desktop only */}
+                      {isBig && (
+                        <Text style={[st.cT, { width: 118 }]}>{s.submittedOn}</Text>
+                      )}
+                      {/* Action */}
+                      <View style={{ width: 90, alignItems: 'center' }}>
+                        <TouchableOpacity style={st.viewBtn} onPress={() => setDetailSeller(s)}>
+                          <BI name="eye" size={12} color={C.white} style={{ marginRight: 4 }} />
+                          <Text style={st.viewBtnT}>View</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+            {/* Pagination */}
+            <View style={st.pgRow}>
+              <Text style={st.pgInfo}>Showing 1 – {filtered.length} of {filtered.length} pending sellers</Text>
+              <View style={st.pgBtns}>
+                <TouchableOpacity style={st.pgBtn}>
+                  <BI name="chevron-left" size={13} color={C.mid} />
+                </TouchableOpacity>
+                <View style={st.pgActive}><Text style={st.pgActiveT}>1</Text></View>
+                <TouchableOpacity style={st.pgBtn}>
+                  <BI name="chevron-right" size={13} color={C.mid} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
-      </Modal>
-    </AdminLayout>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#f8fafc" },
-  pageContent: { padding: 16, paddingBottom: 32, gap: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  title: { fontSize: 22, fontWeight: "800", color: NAVY },
-  subtitle: { fontSize: 13, color: MUTED, marginTop: 4, maxWidth: 520 },
-  refreshBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "#fff",
+// ═════════════════════════════════════════════════════════════════════════════
+// MOBILE CARD
+// ═════════════════════════════════════════════════════════════════════════════
+function MobileCard({
+  seller,
+  index,
+  onView,
+}: {
+  seller: Seller;
+  index: number;
+  onView: () => void;
+}) {
+  return (
+    <View style={[mc.card, index % 2 !== 0 && { backgroundColor: C.cream }]}>
+      <View style={mc.top}>
+        <View style={mc.left}>
+          <View style={mc.idPill}><Text style={mc.idPillT}>#{seller.id}</Text></View>
+          <Text style={mc.name}>{seller.name}</Text>
+        </View>
+        <TouchableOpacity style={mc.btn} onPress={onView}>
+          <BI name="eye" size={13} color={C.white} style={{ marginRight: 4 }} />
+          <Text style={mc.btnT}>View</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={mc.row}>
+        <BI name="shop" size={12} color={C.orange} style={{ marginRight: 6 }} />
+        <Text style={mc.sub}>{seller.businessName}</Text>
+      </View>
+      <View style={mc.row}>
+        <BI name="envelope-fill" size={12} color={C.light} style={{ marginRight: 6 }} />
+        <Text style={mc.meta} numberOfLines={1}>{seller.email}</Text>
+      </View>
+      <View style={mc.row}>
+        <BI name="telephone-fill" size={12} color={C.light} style={{ marginRight: 6 }} />
+        <Text style={mc.meta}>{seller.mobile}</Text>
+        <BI name="calendar3" size={12} color={C.light} style={{ marginLeft: 14, marginRight: 4 }} />
+        <Text style={mc.meta}>{seller.submittedOn}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BANNER
+// ═════════════════════════════════════════════════════════════════════════════
+function Banner() {
+  return (
+    <View style={st.banner}>
+      <View style={st.logoBox}>
+        <BI name="geo-alt-fill" size={22} color={C.orange} />
+      </View>
+      <View style={[st.circle, { width: 140, height: 140, right: 90,  top: -30, opacity: 0.14 }]} />
+      <View style={[st.circle, { width: 85,  height: 85,  right: 20,  top: 10,  opacity: 0.10 }]} />
+      <View style={[st.circle, { width: 55,  height: 55,  right: 200, top: 18,  opacity: 0.08 }]} />
+    </View>
+  );
+}
+
+// ─── Shadows helper ───────────────────────────────────────────────────────────
+const shadow = Platform.select({
+  ios:     { shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } },
+  android: { elevation: 3 },
+  default: {},
+}) as object;
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STYLES – LIST PAGE
+// ═════════════════════════════════════════════════════════════════════════════
+const st = StyleSheet.create({
+  safe:         { flex: 1, backgroundColor: C.bg },
+  flex:         { flex: 1 },
+  scrollContent:{ flexGrow: 1, padding: 20 },
+
+  // Card shell
+  card: { backgroundColor: C.white, borderRadius: 16, overflow: 'hidden', ...shadow },
+  cardBody: { paddingHorizontal: 22, paddingTop: 32, paddingBottom: 22 },
+
+  // Banner
+  banner: {
+    height: 108, backgroundColor: C.orange,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden',
   },
-  refreshText: { color: ORANGE, fontWeight: "600", fontSize: 13 },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  logoBox: {
+    width: 52, height: 52, backgroundColor: C.white, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+    position: 'absolute', bottom: -22, left: 22, zIndex: 10, ...shadow,
   },
-  searchInput: { flex: 1, fontSize: 14, color: NAVY },
-  center: { alignItems: "center", paddingVertical: 48, gap: 12 },
-  muted: { color: MUTED, fontSize: 13 },
-  error: { color: "#dc2626", fontSize: 14, textAlign: "center" },
-  emptyCard: {
-    alignItems: "center",
-    gap: 8,
-    padding: 40,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER,
+  circle: { position: 'absolute', backgroundColor: C.white, borderRadius: 999 },
+
+  // Header
+  headerRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 8,
   },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: NAVY },
-  table: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
-  tableHead: { flexDirection: "row", backgroundColor: "#f1f5f9", padding: 12, gap: 8 },
-  th: { fontSize: 11, fontWeight: "700", color: MUTED, textTransform: "uppercase" },
-  tableRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
+  pageTitle:  { fontSize: 22, fontWeight: '800', color: C.dark, letterSpacing: -0.3, marginBottom: 4 },
+  breadcrumb: { flexDirection: 'row', alignItems: 'center' },
+  bcLink:     { fontSize: 12, color: C.orange, fontWeight: '600' },
+  bcSep:      { fontSize: 12, color: C.light },
+  bcCur:      { fontSize: 12, color: C.mid },
+  badge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.orangeLight, borderColor: C.orange, borderWidth: 1.5,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
-  td: { fontSize: 13, color: NAVY },
+  badgeTxt: { color: C.orange, fontWeight: '700', fontSize: 13 },
+
+  // Search
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.orange, borderRadius: 10,
+    paddingHorizontal: 14, height: 46, marginBottom: 18, backgroundColor: C.white,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: C.dark },
+
+  // Table
+  tableWrap: { borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: C.border, width: '100%' },
+  tHead: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.tableHead, paddingVertical: 13, paddingHorizontal: 10,
+  },
+  hT: { fontWeight: '700', fontSize: 13, color: C.dark, paddingHorizontal: 4 },
+  tRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: 10,
+    borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.white,
+  },
+  cT:      { fontSize: 13, color: C.mid, paddingHorizontal: 4 },
+  idPill:  { backgroundColor: C.blue, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+  idPillT: { color: C.white, fontSize: 12, fontWeight: '700' },
+  viewBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.dark, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  viewBtnT: { color: C.white, fontSize: 12, fontWeight: '600' },
+
+  // Pagination
+  pgRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, flexWrap: 'wrap', gap: 8 },
+  pgInfo:   { fontSize: 12, color: C.light },
+  pgBtns:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pgBtn:    { width: 32, height: 32, borderRadius: 7, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center' },
+  pgActive: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.orange, justifyContent: 'center', alignItems: 'center' },
+  pgActiveT:{ color: C.white, fontWeight: '700', fontSize: 14 },
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STYLES – MOBILE CARD
+// ═════════════════════════════════════════════════════════════════════════════
+const mc = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 14,
-    gap: 10,
+    backgroundColor: C.white, borderRadius: 12, padding: 14,
+    marginBottom: 10, borderWidth: 1, borderColor: C.border,
   },
-  cardTop: { flexDirection: "row", gap: 12, alignItems: "center" },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#fff7ed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { color: ORANGE, fontWeight: "800", fontSize: 14 },
-  name: { fontSize: 15, fontWeight: "700", color: NAVY },
-  email: { fontSize: 12, color: MUTED },
-  actions: { flexDirection: "row", gap: 8 },
-  approveBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#dcfce7",
-    borderWidth: 1,
-    borderColor: "#86efac",
-  },
-  approveText: { color: "#15803d", fontWeight: "700", fontSize: 12 },
-  rejectBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#fee2e2",
-    borderWidth: 1,
-    borderColor: "#fca5a5",
-  },
-  rejectText: { color: "#b91c1c", fontWeight: "700", fontSize: 12 },
-  primaryBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: ORANGE,
-  },
-  primaryBtnText: { color: "#fff", fontWeight: "700" },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
-    gap: 12,
-    maxWidth: 420,
-    alignSelf: "center",
-    width: "100%",
-  },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: NAVY },
-  reasonInput: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 8,
-    padding: 12,
-    minHeight: 88,
-    textAlignVertical: "top",
-    fontSize: 14,
-    color: NAVY,
-  },
-  modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
+  top:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
+  left:   { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  name:   { fontSize: 15, fontWeight: '700', color: C.dark, flexShrink: 1 },
+  row:    { flexDirection: 'row', alignItems: 'center', marginTop: 5, flexWrap: 'wrap' },
+  sub:    { fontSize: 13, color: C.orange, fontWeight: '500' },
+  meta:   { fontSize: 12, color: C.light, flexShrink: 1 },
+  btn:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.dark, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6 },
+  btnT:   { color: C.white, fontSize: 12, fontWeight: '600' },
+  idPill: { backgroundColor: C.blue, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  idPillT:{ color: C.white, fontSize: 12, fontWeight: '700' },
 });
