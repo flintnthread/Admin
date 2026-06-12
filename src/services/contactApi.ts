@@ -1,8 +1,16 @@
 import { adminApiRequest } from "@/lib/api/client";
 import type { ContactMessage, PageResponse } from "@/lib/api/types";
 
-export async function fetchContacts(page = 0, size = 20): Promise<PageResponse<ContactMessage>> {
+export async function fetchContacts(page = 0, size = 200): Promise<PageResponse<ContactMessage>> {
   return adminApiRequest(`/api/admin/contacts?page=${page}&size=${size}`);
+}
+
+export async function fetchContactStats(): Promise<Record<string, number>> {
+  return adminApiRequest("/api/admin/contacts/stats");
+}
+
+export async function fetchContact(id: number): Promise<ContactMessage> {
+  return adminApiRequest(`/api/admin/contacts/${id}`);
 }
 
 export async function updateContactStatus(id: number, active: boolean): Promise<ContactMessage> {
@@ -17,4 +25,8 @@ export async function replyContact(id: number, reply: string): Promise<ContactMe
     method: "POST",
     body: JSON.stringify({ reply }),
   });
+}
+
+export async function deleteContact(id: number): Promise<void> {
+  await adminApiRequest(`/api/admin/contacts/${id}`, { method: "DELETE" });
 }

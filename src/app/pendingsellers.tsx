@@ -7,6 +7,27 @@ import {
   Modal,
   Platform,
   ScrollView,
+/**
+ * PendingSellers.tsx
+ * ─────────────────────────────────────────────────────────────────
+ * • No sidebar, no top navbar, no right-side panel on desktop
+ * • Table is 100% full-width on all breakpoints
+ * • "View" on any device → navigates to ViewPendingSeller component
+ * • Back button returns to list
+ * • Bootstrap Icons via bi font (load 'bootstrap-icons' TTF in your app)
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapPendingProfileRow } from '@/lib/mappers';
+import { fetchPendingProfileSellers } from '@/services/sellerApi';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Dimensions,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +48,11 @@ const ORANGE = "#ef7b1a";
 const NAVY = "#1d324e";
 const MUTED = "#69798c";
 const BORDER = "#e5e7eb";
+
+  View,
+} from 'react-native';
+
+import ViewPendingSeller, { SellerProp } from '@/components/ViewPendingSeller';
 
 export default function PendingSellersScreen() {
   const { width } = useWindowDimensions();
@@ -65,6 +91,79 @@ export default function PendingSellersScreen() {
         s.fullName?.toLowerCase().includes(q) ||
         s.email?.toLowerCase().includes(q) ||
         s.mobile?.includes(q)
+=======
+type BIProps = { name: string; size?: number; color?: string; style?: object };
+const BI = ({ name, size = 16, color = C.mid, style }: BIProps) => (
+  <Text
+    style={[{ fontFamily: 'bootstrap-icons', fontSize: size, color, lineHeight: size + 4 }, style]}
+    accessible={false}
+  >
+    {BI_MAP[name] ?? '•'}
+  </Text>
+);
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+type Seller = {
+  id: number;
+  name: string;
+  businessName: string;
+  email: string;
+  mobile: string;
+  submittedOn: string;
+};
+
+// ─── Breakpoints ──────────────────────────────────────────────────────────────
+const BP = { mobile: 480, tablet: 768, laptop: 1024 };
+type Device = 'mobile' | 'tablet' | 'laptop' | 'desktop';
+const getDevice = (w: number): Device =>
+  w < BP.mobile ? 'mobile' : w < BP.tablet ? 'tablet' : w < BP.laptop ? 'laptop' : 'desktop';
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═════════════════════════════════════════════════════════════════════════════
+export default function Pendingsellers() {
+  const [dim, setDim]                       = useState(Dimensions.get('window'));
+  const [search, setSearch]                 = useState('');
+  const [sellers, setSellers]               = useState<Seller[]>([]);
+  const [loadError, setLoadError]           = useState<string | null>(null);
+  const [detailSeller, setDetailSeller]     = useState<SellerProp | null>(null);
+
+  const loadPending = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const rows = await fetchPendingProfileSellers();
+      setSellers(rows.map(mapPendingProfileRow));
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window: w }) => setDim(w));
+    return () => sub?.remove();
+  }, []);
+
+  useEffect(() => { void loadPending(); }, [loadPending]);
+
+  const { width } = dim;
+  const device   = getDevice(width);
+  const isMobile = device === 'mobile';
+  const isTablet = device === 'tablet';
+  const isBig    = device === 'laptop' || device === 'desktop';
+
+  const filtered = sellers.filter(s =>
+    [s.name, s.businessName, s.email].some(v =>
+      v.toLowerCase().includes(search.toLowerCase())
+    )
+  );
+
+  // ── Navigate to ViewPendingSeller (all devices) ───────────────────────────
+  if (detailSeller) {
+    return (
+      <ViewPendingSeller
+        seller={detailSeller}
+        onBack={() => setDetailSeller(null)}
+      />
     );
   }, [sellers, search]);
 
@@ -167,6 +266,7 @@ export default function PendingSellersScreen() {
               <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
               <Text style={[styles.th, { flex: 1 }]}>Actions</Text>
             </View>
+<<<<<<< HEAD
             {filtered.map((s) => (
               <View key={s.sellerId} style={styles.tableRow}>
                 <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -176,6 +276,38 @@ export default function PendingSellersScreen() {
                   <View>
                     <Text style={styles.name}>{s.fullName}</Text>
                     <Text style={styles.email}>{s.email}</Text>
+=======
+
+            {loadError ? <Text style={{ color: C.orange, marginBottom: 10 }}>{loadError}</Text> : null}
+
+            {/* Search */}
+            <View style={st.searchBox}>
+              <TextInput
+                style={st.searchInput}
+                placeholder="Search pending sellers..."
+                placeholderTextColor={C.light}
+                value={search}
+                onChangeText={setSearch}
+              />
+            </View>
+
+            {/* Table / Cards */}
+            {isMobile
+              ? filtered.map((s, i) => (
+                  <MobileCard key={s.id} seller={s} index={i} onView={() => setDetailSeller(s)} />
+                ))
+              : (
+                <View style={st.tableWrap}>
+                  {/* Table header */}
+                  <View style={st.tHead}>
+                    <Text style={[st.hT, { width: 70 }]}>ID</Text>
+                    <Text style={[st.hT, { flex: 1 }]}>Name</Text>
+                    <Text style={[st.hT, { flex: 1 }]}>Business Name</Text>
+                    {isBig && <Text style={[st.hT, { flex: 1.4 }]}>Email</Text>}
+                    <Text style={[st.hT, { width: 140 }]}>Mobile</Text>
+                    {isBig && <Text style={[st.hT, { width: 118 }]}>Submitted On</Text>}
+                    <Text style={[st.hT, { width: 90, textAlign: 'center' }]}>Actions</Text>
+
                   </View>
                 </View>
                 <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>

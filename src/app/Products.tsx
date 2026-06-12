@@ -1,4 +1,7 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapProductListRow } from "@/lib/mappers";
+import { fetchProducts } from "@/services/productApi";
 import AdminLayout from "@/components/admin-layout";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -754,11 +757,23 @@ const wp = StyleSheet.create({
 // WEB DESKTOP SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 const WebProductsScreen: React.FC = () => {
-    // ── TODO: replace with: const { products, loading, error, reload } = useSellerProducts();
-    const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
-    const loading = false;
-    const error: string | null = null;
-    const reload = () => {};
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const reload = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const res = await fetchProducts({ size: 500 });
+            setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
+        } catch (e) {
+            setError(getApiErrorMessage(e));
+            setProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    useEffect(() => { void reload(); }, [reload]);
 
     const [viewType, setViewType]               = useState<ViewType>("list");
     const [selectedTab, setSelectedTab]         = useState<TabType>("All Products");
@@ -1485,11 +1500,23 @@ const wst = StyleSheet.create({
 // MOBILE SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 const MobileProductsScreen: React.FC = () => {
-    // ── TODO: replace with: const { products, loading, error, reload } = useSellerProducts();
-    const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
-    const loading = false;
-    const error: string | null = null;
-    const reload = () => {};
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const reload = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const res = await fetchProducts({ size: 500 });
+            setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
+        } catch (e) {
+            setError(getApiErrorMessage(e));
+            setProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    useEffect(() => { void reload(); }, [reload]);
 
     const [viewType, setViewType]               = useState<ViewType>("list");
     const [selectedTab, setSelectedTab]         = useState<TabType>("All Products");

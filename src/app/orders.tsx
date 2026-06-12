@@ -1,8 +1,9 @@
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -15,7 +16,7 @@ import AdminLayout from "../components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
-import { fetchOrders } from "@/services/orderApi";
+import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 
@@ -755,126 +756,141 @@ const ss = StyleSheet.create({
     fontWeight: "700",
     fontSize: 13,
   },
+
+  pagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 12,
+    marginHorizontal: 14,
+    marginTop: 4,
+    marginBottom: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: C.border,
+  },
+  paginationInfo: {
+    fontSize: 13,
+    color: C.textSecondary,
+  },
+  paginationControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  pageBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.white,
+  },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageNum: {
+    minWidth: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.white,
+    paddingHorizontal: 6,
+  },
+  pageNumActive: {
+    backgroundColor: C.brand,
+    borderColor: C.brand,
+  },
+  pageNumText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.navy,
+  },
+  pageNumTextActive: { color: C.white },
+  pageEllipsis: {
+    fontSize: 13,
+    color: C.textMuted,
+    paddingHorizontal: 4,
+  },
 });
 
-// ─── Mock Data + Screen (for testing) ────────────────────────────────────────
+const ORDERS_PAGE_SIZE = 20;
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: "1",
-    orderNumber: "#FNT250600270043",
-    date: "29 May 2024",
-    time: "10:34 AM",
-    customer: { name: "Sri Raj Dodda", email: "sriraj.dodda@gmail.com" },
-    sellers: [{ name: "MATHA THREAD ENTERPRISES", email: "matha@thread.com" }],
-    products: [
-      {
-        id: "p1",
-        name: "Brass Antique Vase",
-        image: "https://via.placeholder.com/48/d4a853/ffffff?text=V",
-        seller: "MATHA THREAD ENTERPRISES",
-        sellerEmail: "matha@thread.com",
-      },
-    ],
-    amount: 412,
-    paymentType: "Cash on Delivery",
-    status: "Processing",
-    gstStatus: "Not Filed",
-    hasInvoice: true,
-  },
-  {
-    id: "2",
-    orderNumber: "#FNT250600270314",
-    date: "27 May 2024",
-    time: "04:22 PM",
-    customer: {
-      name: "Rayapati Trinaventha Nadh",
-      email: "rayapati.t@sms.com",
-    },
-    sellers: [{ name: "SMS DMG HOUSE", email: "sms@dmghouse.com" }],
-    products: [
-      {
-        id: "p2",
-        name: "Smart Speaker",
-        image: "https://via.placeholder.com/48/2d2d2d/ffffff?text=S",
-        seller: "SMS DMG HOUSE",
-        sellerEmail: "sms@dmghouse.com",
-      },
-      {
-        id: "p3",
-        name: "Wireless Charger",
-        image: "https://via.placeholder.com/48/444/ffffff?text=W",
-        seller: "SMS DMG HOUSE",
-        sellerEmail: "sms@dmghouse.com",
-      },
-    ],
-    amount: 634,
-    paymentType: "Cash on Delivery",
-    status: "Pending",
-    gstStatus: "Filed",
-    hasInvoice: true,
-  },
-  {
-    id: "3",
-    orderNumber: "#FNT250600270872",
-    date: "26 May 2024",
-    time: "12:32 PM",
-    customer: { name: "Aruna Bharati Bommi", email: "aruna.bommi@sahithi.com" },
-    sellers: [{ name: "SAHITHI GIFT ARTICLES", email: "info@sahithi.com" }],
-    products: [
-      {
-        id: "p4",
-        name: "Gift Hamper Set",
-        image: "https://via.placeholder.com/48/e74c3c/ffffff?text=G",
-        seller: "SAHITHI GIFT ARTICLES",
-        sellerEmail: "info@sahithi.com",
-      },
-    ],
-    amount: 364,
-    paymentType: "Cash on Delivery",
-    status: "Completed",
-    gstStatus: "Not Filed",
-    hasInvoice: true,
-  },
-];
+function buildOrderPageNumbers(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "ellipsis")[] = [1];
+  if (current > 3) pages.push("ellipsis");
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p += 1) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push("ellipsis");
+  if (total > 1) pages.push(total);
+  return pages;
+}
 
 export default function OrdersScreen({ navigation }: { navigation?: any }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const page = await fetchOrders({ page: 0, size: 50 });
+      const page = await fetchOrders({ page: currentPage - 1, size: ORDERS_PAGE_SIZE });
       setOrders(page.items.map((item) => toUiOrder(mapOrderRow(item), item)));
+      setTotalElements(page.totalElements);
+      setTotalPages(page.totalPages);
+      if (currentPage > page.totalPages && page.totalPages > 0) {
+        setCurrentPage(page.totalPages);
+      }
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load orders."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
 
+  const pageNumbers = useMemo(
+    () => buildOrderPageNumbers(currentPage, totalPages),
+    [currentPage, totalPages],
+  );
+  const rangeStart =
+    totalElements === 0 ? 0 : (currentPage - 1) * ORDERS_PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * ORDERS_PAGE_SIZE, totalElements);
+
   const handleView = useCallback(
     (o: Order) => {
-      router.push({
-        pathname: "/orderDetails",
-        params: { id: o.id },
-      });
+      if (navigation) navigation.navigate("OrderDetails", { order: o });
     },
-    [router],
+    [navigation],
   );
 
-  const handleGST = useCallback((id: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, gstStatus: "Filed" } : o)),
-    );
+  const handleGST = useCallback(async (id: string) => {
+    try {
+      await updateOrderGstStatus(Number(id), "Filed");
+      setOrders((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, gstStatus: "Filed" } : o)),
+      );
+    } catch (err) {
+      const msg = getApiErrorMessage(err, "Failed to update GST status.");
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Error", msg);
+    }
   }, []);
 
   return (
@@ -902,14 +918,68 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
             <Text style={ss.stateText}>No orders found</Text>
           </View>
         ) : (
-          orders.map((o) => (
-            <OrderCard
-              key={o.id}
-              order={o}
-              onView={handleView}
-              onGST={handleGST}
-            />
-          ))
+          <>
+            {orders.map((o) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                onView={handleView}
+                onGST={handleGST}
+              />
+            ))}
+            {totalPages > 0 && (
+              <View style={ss.pagination}>
+                <Text style={ss.paginationInfo}>
+                  Showing {rangeStart} to {rangeEnd} of {totalElements} orders
+                </Text>
+                {totalPages > 1 && (
+                  <View style={ss.paginationControls}>
+                    <TouchableOpacity
+                      style={[ss.pageBtn, currentPage <= 1 && ss.pageBtnDisabled]}
+                      disabled={currentPage <= 1}
+                      onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    >
+                      <Text style={ss.pageNumText}>‹</Text>
+                    </TouchableOpacity>
+                    {pageNumbers.map((num, index) =>
+                      num === "ellipsis" ? (
+                        <Text key={`e-${index}`} style={ss.pageEllipsis}>
+                          ...
+                        </Text>
+                      ) : (
+                        <TouchableOpacity
+                          key={num}
+                          style={[ss.pageNum, num === currentPage && ss.pageNumActive]}
+                          onPress={() => setCurrentPage(num)}
+                        >
+                          <Text
+                            style={[
+                              ss.pageNumText,
+                              num === currentPage && ss.pageNumTextActive,
+                            ]}
+                          >
+                            {num}
+                          </Text>
+                        </TouchableOpacity>
+                      ),
+                    )}
+                    <TouchableOpacity
+                      style={[
+                        ss.pageBtn,
+                        currentPage >= totalPages && ss.pageBtnDisabled,
+                      ]}
+                      disabled={currentPage >= totalPages}
+                      onPress={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                    >
+                      <Text style={ss.pageNumText}>›</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
       </View>

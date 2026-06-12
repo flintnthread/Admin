@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { fetchSellerBankDetails } from "@/services/sellerApi";
 import {
+  ActivityIndicator,
   Image,
   Platform,
   ScrollView,
@@ -87,10 +88,16 @@ export default function BankProof() {
   const [bankProofUrl, setBankProofUrl] = useState<string | undefined>();
   const [cancelledChequeUrl, setCancelledChequeUrl] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!sellerId || Number.isNaN(sellerId)) return;
+    if (!sellerId || Number.isNaN(sellerId)) {
+      setLoading(false);
+      return;
+    }
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
         const detail = await fetchSellerBankDetails(sellerId);
         setSellerName(String(detail.fullName ?? "Seller"));
@@ -98,6 +105,8 @@ export default function BankProof() {
         setCancelledChequeUrl(detail.cancelledChequeUrl as string | undefined);
       } catch (e) {
         setError(getApiErrorMessage(e));
+      } finally {
+        setLoading(false);
       }
     })();
   }, [sellerId]);
@@ -152,12 +161,21 @@ export default function BankProof() {
             </View>
           </View>
 
-          {error ? (
+          {loading ? (
+            <View style={styles.card}>
+              <ActivityIndicator size="large" color={ORANGE} />
+              <Text style={{ textAlign: "center", marginTop: 12, color: GRAY }}>Loading bank documents…</Text>
+            </View>
+          ) : null}
+
+          {!loading && error ? (
             <View style={styles.card}>
               <Text style={{ color: "#DC2626" }}>{error}</Text>
             </View>
           ) : null}
 
+          {!loading && !error ? (
+            <>
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
               <Icon name="image-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
@@ -177,6 +195,8 @@ export default function BankProof() {
             </View>
             <ProofImage uri={cancelledChequeUrl} label="cancelled cheque" />
           </View>
+            </>
+          ) : null}
         </View>
       </ScrollView>
     </View>

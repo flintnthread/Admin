@@ -18,11 +18,13 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import { mapSupportTicket } from "@/lib/mappers";
 import {
   fetchSupportTicket,
+  fetchSupportTicketStats,
   fetchSupportTickets,
   replySupportTicket,
   updateSupportTicketStatus,
 } from "@/services/supportApi";
 import {
+  ActivityIndicator,
   Dimensions,
   Modal,
   Platform,
@@ -33,7 +35,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View, 
+  View,
   useWindowDimensions,
 } from "react-native";
 
@@ -86,6 +88,15 @@ const STATUS_TO_API: Record<string, string> = {
   Resolved: "closed",
   Urgent: "open",
 };
+
+const PRIORITY_TO_API: Record<string, string> = {
+  General: "general",
+  High: "high",
+  Low: "low",
+  Critical: "critical",
+};
+
+const TICKETS_PAGE_SIZE = 20;
 
 /* ══════════════════════════════════════════════
    BADGE CONFIGS
@@ -462,29 +473,60 @@ export default function SupportTicketManagement() {
   const [selectedId,     setSelectedId]     = useState<string | null>(null);
   const [view,           setView]           = useState<"list" | "chat">("list");
   const [tickets,        setTickets]        = useState<Ticket[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState<string | null>(null);
+  const [ticketStats,    setTicketStats]    = useState<Record<string, number>>({});
+  const [currentPage,    setCurrentPage]    = useState(1);
+  const [totalPages,     setTotalPages]     = useState(0);
+  const [totalElements,  setTotalElements]  = useState(0);
 
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const isDesktop = width >= 1024;
 
   const loadTickets = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const statusParam = statusFilter === "All Status" ? undefined : STATUS_TO_API[statusFilter];
-      const res = await fetchSupportTickets({ status: statusParam, size: 100 });
-      let rows = (res.items ?? []).map(mapSupportTicket) as Ticket[];
-      if (priorityFilter !== "All Priorities") {
-        rows = rows.filter((t) => t.priority === priorityFilter);
+      let statusParam = statusFilter === "All Status" ? undefined : STATUS_TO_API[statusFilter];
+      let priorityParam =
+        priorityFilter === "All Priorities" ? undefined : PRIORITY_TO_API[priorityFilter];
+      if (statusFilter === "Urgent") {
+        statusParam = undefined;
+        priorityParam = "critical";
       }
+      const [res, stats] = await Promise.all([
+        fetchSupportTickets({
+          status: statusParam,
+          priority: priorityParam,
+          page: currentPage - 1,
+          size: TICKETS_PAGE_SIZE,
+        }),
+        fetchSupportTicketStats(),
+      ]);
+      const rows = (res.items ?? []).map(mapSupportTicket) as Ticket[];
       setTickets(rows);
+      setTotalElements(res.totalElements);
+      setTotalPages(res.totalPages);
+      if (currentPage > res.totalPages && res.totalPages > 0) {
+        setCurrentPage(res.totalPages);
+      }
+      setTicketStats(stats);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      setError(getApiErrorMessage(e, "Failed to load support tickets."));
       setTickets([]);
+    } finally {
+      setLoading(false);
     }
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, currentPage]);
 
   useEffect(() => {
     loadTickets();
   }, [loadTickets]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, priorityFilter]);
 
   const refreshSelectedTicket = async (id: string) => {
     try {
@@ -522,22 +564,16 @@ export default function SupportTicketManagement() {
     }
   };
 
-  const countOf = (s: TicketStatus) => tickets.filter(t => t.status === s).length;
-
   const STATS = [
-    { label: "Total Tickets", count: tickets.length,        bg: ORANGE,    icon: "bi-ticket-perforated-fill"   },
-    { label: "Open",          count: countOf("Open"),        bg: "#10B981", icon: "bi-envelope-open-fill"       },
-    { label: "In Progress",   count: countOf("In Progress"), bg: "#F59E0B", icon: "bi-arrow-clockwise"          },
-    { label: "Waiting",       count: countOf("Waiting"),     bg: "#0D9488", icon: "bi-clock-fill"               },
-    { label: "Resolved",      count: countOf("Resolved"),    bg: "#6B7280", icon: "bi-check-circle-fill"        },
-    { label: "Urgent",        count: countOf("Urgent"),      bg: "#EF4444", icon: "bi-exclamation-circle-fill"  },
+    { label: "Total Tickets", count: Number(ticketStats.total ?? 0),        bg: ORANGE,    icon: "bi-ticket-perforated-fill"   },
+    { label: "Open",          count: Number(ticketStats.open ?? 0),         bg: "#10B981", icon: "bi-envelope-open-fill"       },
+    { label: "In Progress",   count: Number(ticketStats.inProgress ?? 0),   bg: "#F59E0B", icon: "bi-arrow-clockwise"          },
+    { label: "Waiting",       count: Number(ticketStats.waiting ?? 0),      bg: "#0D9488", icon: "bi-clock-fill"               },
+    { label: "Resolved",      count: Number(ticketStats.resolved ?? 0),     bg: "#6B7280", icon: "bi-check-circle-fill"        },
+    { label: "Urgent",        count: Number(ticketStats.urgent ?? 0),       bg: "#EF4444", icon: "bi-exclamation-circle-fill"  },
   ];
 
-  const filtered = tickets.filter(t => {
-    const okStatus   = statusFilter   === "All Status"     || t.status   === statusFilter;
-    const okPriority = priorityFilter === "All Priorities" || t.priority === priorityFilter;
-    return okStatus && okPriority;
-  });
+  const filtered = tickets;
 
   const selectedTicket = tickets.find(t => t.id === selectedId) ?? null;
 
@@ -590,6 +626,21 @@ export default function SupportTicketManagement() {
         </View>
 
         <View style={[styles.content, { padding: isDesktop ? 32 : isMobile ? 14 : 20 }]}>
+          {loading && (
+            <View style={styles.stateBox}>
+              <ActivityIndicator size="large" color={ORANGE} />
+              <Text style={styles.stateText}>Loading tickets…</Text>
+            </View>
+          )}
+          {error && !loading && (
+            <View style={styles.stateBox}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={loadTickets}>
+                <Text style={styles.retryBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* ── Stat Cards (responsive grid) ── */}
           <View style={styles.statGrid}>
             {STATS.map((s, i) => (
@@ -714,6 +765,32 @@ export default function SupportTicketManagement() {
             </View>
           )}
 
+          {!loading && !error && totalPages > 1 && (
+            <View style={styles.paginationBar}>
+              <Text style={styles.paginationInfo}>
+                Showing {(currentPage - 1) * TICKETS_PAGE_SIZE + 1} to{" "}
+                {Math.min(currentPage * TICKETS_PAGE_SIZE, totalElements)} of {totalElements}
+              </Text>
+              <View style={styles.paginationControls}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}
+                  disabled={currentPage <= 1}
+                  onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  <Text style={styles.pageNumText}>‹</Text>
+                </TouchableOpacity>
+                <Text style={styles.pageNumText}>{currentPage} / {totalPages}</Text>
+                <TouchableOpacity
+                  style={[styles.pageBtn, currentPage >= totalPages && styles.pageBtnDisabled]}
+                  disabled={currentPage >= totalPages}
+                  onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  <Text style={styles.pageNumText}>›</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Footer */}
           <Text style={styles.footer}>
             2026 © Flintnthread India Pvt. Ltd. — Support System
@@ -732,6 +809,49 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F3F4F6",
   },
+  stateBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+    gap: 10,
+  },
+  stateText: { fontSize: 14, color: "#6B7280" },
+  errorText: { fontSize: 14, color: "#DC2626", textAlign: "center" },
+  retryBtn: {
+    backgroundColor: ORANGE,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  paginationBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 14,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  paginationInfo: { fontSize: 13, color: "#6B7280" },
+  paginationControls: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pageBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageNumText: { fontSize: 13, fontWeight: "700", color: "#1F2937" },
 
   /* ── Header ── */
   header: {

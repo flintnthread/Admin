@@ -39,8 +39,16 @@ type BankDetail = {
   ifscCode?: string;
   bankVerified?: boolean;
   adminRemarks?: string;
+  createdAt?: string;
   updatedAt?: string;
 };
+
+function bankStatusLabel(data: BankDetail | null): string {
+  if (!data) return "—";
+  if (data.bankVerified) return "Approved";
+  if (data.bankName || data.accountNumber) return "Pending verification";
+  return "Not requested";
+}
 
 function Header({ bp }: { bp: Breakpoint }) {
   const isMobile = bp === "mobile";
@@ -76,7 +84,7 @@ function TitleSection({
   onReject: () => void;
 }) {
   const isMobile = bp === "mobile" || bp === "tablet";
-  const statusLabel = data?.bankVerified ? "Approved" : data ? "Pending" : "—";
+  const statusLabel = bankStatusLabel(data);
 
   return (
     <View style={[styles.titleSection, isMobile && styles.titleSectionMobile]}>
@@ -156,8 +164,21 @@ function CurrentBankDetails({ data }: { data: BankDetail | null }) {
   );
 }
 
-function HistoryTimeline({ compact, verified, updatedAt }: { compact?: boolean; verified?: boolean; updatedAt?: string }) {
-  const hasHistory = Boolean(verified && updatedAt);
+function HistoryTimeline({
+  compact,
+  data,
+}: {
+  compact?: boolean;
+  data: BankDetail | null;
+}) {
+  const events: { label: string; value: string }[] = [];
+  if (data?.createdAt) events.push({ label: "Seller registered", value: formatDate(data.createdAt) });
+  if (data?.bankName) events.push({ label: "Bank details submitted", value: formatDate(data.updatedAt ?? data.createdAt) });
+  if (data?.bankVerified && data.updatedAt) events.push({ label: "Bank approved", value: formatDate(data.updatedAt) });
+  else if (data?.adminRemarks && data.adminRemarks !== "—") {
+    events.push({ label: "Admin note", value: data.adminRemarks });
+  }
+
   return (
     <View style={[styles.card, compact && styles.historyCardCompact]}>
       <View style={styles.cardTitleRow}>
@@ -165,9 +186,11 @@ function HistoryTimeline({ compact, verified, updatedAt }: { compact?: boolean; 
         <Text style={styles.cardTitle}>History / Timeline</Text>
       </View>
 
-      {hasHistory ? (
+      {events.length > 0 ? (
         <View style={styles.detailRows}>
-          <BankDetailRow label="Approved" value={formatDate(updatedAt)} />
+          {events.map((event) => (
+            <BankDetailRow key={event.label} label={event.label} value={event.value} />
+          ))}
         </View>
       ) : (
         <View style={styles.emptyHistory}>
@@ -273,6 +296,9 @@ export default function BankApprovalHistory() {
           {error ? (
             <View style={styles.card}>
               <Text style={{ color: "#DC2626" }}>{error}</Text>
+              <TouchableOpacity style={styles.proofBtn} onPress={loadDetails}>
+                <Text style={styles.proofBtnText}>Retry</Text>
+              </TouchableOpacity>
             </View>
           ) : null}
 
@@ -283,21 +309,13 @@ export default function BankApprovalHistory() {
                   <CurrentBankDetails data={data} />
                 </View>
                 <View style={styles.rightCol}>
-                  <HistoryTimeline
-                    compact={false}
-                    verified={data?.bankVerified}
-                    updatedAt={data?.updatedAt}
-                  />
+                  <HistoryTimeline compact={false} data={data} />
                 </View>
               </>
             ) : (
               <>
                 <CurrentBankDetails data={data} />
-                <HistoryTimeline
-                  compact={isMobile}
-                  verified={data?.bankVerified}
-                  updatedAt={data?.updatedAt}
-                />
+                <HistoryTimeline compact={isMobile} data={data} />
               </>
             )}
           </View>

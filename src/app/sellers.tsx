@@ -7,7 +7,10 @@
  * Working pagination
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapSellerListRow } from '@/lib/mappers';
+import { blockSeller, fetchSellers, unblockSeller } from '@/services/sellerApi';
 import {
     Image,
     Modal,
@@ -25,7 +28,7 @@ import { router } from 'expo-router';
 type KycStatus    = 'Not Submitted' | 'Submitted' | 'Approved' | 'Pending';
 type ProductStatus = 'Done' | 'Not Started' | 'Pending';
 interface Seller {
-  id: string; serialNo: number;
+  id: string; numericId: number; serialNo: number;
   name: string; email: string; mobile: string;
   business: string; sain: string;
   status: 'Active' | 'Inactive';
@@ -33,35 +36,6 @@ interface Seller {
   products: { status: ProductStatus; count: number };
   wallet: string; registered: string; banner?: string;
 }
-
-// ─────────────────────────── MOCK DATA ───────────────────────────────────────
-const BASE_SELLERS = [
-  { name:'Khaiser Mohammed',   email:'khaiser123@gmail.com',        mobile:'9876543210', business:'ZOVA ALL BAGS CENTER',       kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:2 }, registered:'29 May, 2026', banner:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&h=260&fit=crop' },
-  { name:'Gone Mahender',      email:'gone.mahender@gmail.com',     mobile:'9123456780', business:'SAINEE SHOPPING MALL',       kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:1 }, registered:'16 May, 2026', banner:'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=600&h=260&fit=crop' },
-  { name:'Malathi Devulapalli',email:'malathi.devulapalli@gmail.com',mobile:'9012345678', business:'PRAHARSHI CREATIONS',        kyc:'Not Submitted' as KycStatus, products:{ status:'Not Started' as ProductStatus, count:0 }, registered:'11 May, 2026', banner:'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=260&fit=crop' },
-  { name:'Panwar Chair Company',email:'panwarchair@gmail.com',      mobile:'9958305856', business:'ANIL RETAILS',                kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:1 }, registered:'26 Apr, 2026', banner:'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&h=260&fit=crop' },
-  { name:'Smart Fashions',     email:'ysfashions77@gmail.com',      mobile:'9812345670', business:'SMART FASHIONS',              kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:2 }, registered:'22 Apr, 2026', banner:'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&h=260&fit=crop' },
-  { name:'Arhaan Collection',  email:'arhaancollections786@gmail.com',mobile:'9745612380',business:'ARHAAN COLLECTIONS',         kyc:'Not Submitted' as KycStatus, products:{ status:'Not Started' as ProductStatus, count:0 }, registered:'22 Apr, 2026', banner:'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=260&fit=crop' },
-  { name:'Ahmad Exporters',    email:'ahmad.exporters00@gmail.com', mobile:'9634521780', business:'AHMAD EXPORTERS',             kyc:'Not Submitted' as KycStatus, products:{ status:'Not Started' as ProductStatus, count:0 }, registered:'21 Apr, 2026', banner:'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600&h=260&fit=crop' },
-  { name:'Lakshmi Sumana',     email:'l.sumana@gmail.com',          mobile:'9523416780', business:'UNIVERSAL BAGS',              kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:1 }, registered:'19 Apr, 2026', banner:'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&h=260&fit=crop' },
-  { name:'Finn Brooks',        email:'finnbrookshop@gmail.com',     mobile:'9412356780', business:'BRAND SHOPPE',                kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:1 }, registered:'17 Apr, 2026', banner:'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=600&h=260&fit=crop' },
-  { name:'Satya Retailer',     email:'satyaretail@gmail.com',       mobile:'9301234567', business:'Satya Retailr Corporation',   kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:2 }, registered:'13 Apr, 2026', banner:'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=600&h=260&fit=crop' },
-  { name:'Praveen Simha',      email:'praveen@gmail.com',           mobile:'9290123456', business:'Praveen',                    kyc:'Not Submitted' as KycStatus, products:{ status:'Not Started' as ProductStatus, count:0 }, registered:'01 Apr, 2026', banner:'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=600&h=260&fit=crop' },
-  { name:'Kancharia Raghu',    email:'kancharia.textiles@gmail.com',mobile:'9178234560', business:'KANCHARIA TEXTILES',          kyc:'Not Submitted' as KycStatus, products:{ status:'Done'        as ProductStatus, count:2 }, registered:'31 Mar, 2026', banner:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=260&fit=crop' },
-];
-
-const ALL_SELLERS: Seller[] = Array.from({ length: 71 }, (_, i) => {
-  const b = BASE_SELLERS[i % BASE_SELLERS.length];
-  return {
-    id: `FNT-SELLER-${String(i + 1).padStart(6, '0')}`,
-    serialNo: i + 1,
-    name: b.name, email: b.email, mobile: b.mobile,
-    business: b.business, sain: 'Sain Piyush@zova.in',
-    status: 'Active', kyc: b.kyc,
-    products: b.products,
-    wallet: '₹0.00', registered: b.registered, banner: b.banner,
-  };
-});
 
 // ─────────────────────────── COLORS ──────────────────────────────────────────
 const C = {
@@ -575,38 +549,42 @@ export default function SellersScreen() {
   const GUTTER = isMobile ? 10 : isTablet ? 14 : 18;
   const HPAD   = isMobile ? 12 : isTablet ? 16 : 24;
 
-  const [sellers, setSellers]       = useState<Seller[]>(ALL_SELLERS);
+  const [sellers, setSellers]       = useState<Seller[]>([]);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loadError, setLoadError]   = useState<string | null>(null);
   const [viewMode, setViewMode]     = useState<'grid'|'list'>('grid');
   const [search, setSearch]         = useState('');
+  const [searchQ, setSearchQ]       = useState('');
   const [page, setPage]             = useState(1);
   const [viewSeller, setViewSeller] = useState<Seller|null>(null);
+
+  const loadSellers = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const res = await fetchSellers({ status: 'active', search: searchQ || undefined, page: page - 1, size: ipp });
+      const items = (res.items ?? []).map((s, i) => ({
+        ...mapSellerListRow(s, (page - 1) * ipp + i),
+      }));
+      setSellers(items);
+      setTotalElements(res.totalElements ?? items.length);
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
+  }, [ipp, page, searchQ]);
+
+  useEffect(() => { void loadSellers(); }, [loadSellers]);
   const [confirmModal, setConfirmModal] = useState<{
     visible:boolean; title:string; message:string;
     confirmLabel:string; confirmColor:string; onConfirm:()=>void;
   }>({ visible:false, title:'', message:'', confirmLabel:'', confirmColor:'', onConfirm:()=>{} });
 
-  const q = search.toLowerCase().trim();
-  const filtered = useMemo(() =>
-    q === ''
-      ? sellers
-      : sellers.filter(s =>
-          s.name.toLowerCase().includes(q) ||
-          s.business.toLowerCase().includes(q) ||
-          s.email.toLowerCase().includes(q) ||
-          s.mobile.includes(q) ||
-          s.id.toLowerCase().includes(q)
-        ),
-    [sellers, q],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ipp));
+  const totalPages = Math.max(1, Math.ceil(totalElements / ipp));
   const safePage   = Math.min(page, totalPages);
-  const paginated  = filtered.slice((safePage-1)*ipp, safePage*ipp);
+  const paginated  = sellers;
 
-  const handleSearch = useCallback((v: string) => { setSearch(v); setPage(1); }, []);
+  const handleSearch = useCallback((v: string) => { setSearch(v); setSearchQ(v); setPage(1); }, []);
 
-  // Actions
-  const doView = (s: Seller) => router.push('/Viewseller');
+  const doView = (s: Seller) => router.push({ pathname: '/Viewseller', params: { sellerId: String(s.numericId) } });
 
   const doToggle = (s: Seller) => {
     setConfirmModal({
@@ -616,8 +594,17 @@ export default function SellersScreen() {
       confirmLabel: s.status==='Active' ? 'Deactivate' : 'Activate',
       confirmColor: s.status==='Active' ? C.amber : C.green,
       onConfirm: () => {
-        setSellers(prev => prev.map(x => x.id===s.id ? { ...x, status: x.status==='Active'?'Inactive':'Active' } : x));
-        setConfirmModal(m => ({ ...m, visible:false }));
+        void (async () => {
+          try {
+            if (s.status === 'Active') await blockSeller(s.numericId);
+            else await unblockSeller(s.numericId);
+            setConfirmModal(m => ({ ...m, visible:false }));
+            void loadSellers();
+          } catch (e) {
+            setLoadError(getApiErrorMessage(e));
+            setConfirmModal(m => ({ ...m, visible:false }));
+          }
+        })();
       },
     });
   };
@@ -625,14 +612,21 @@ export default function SellersScreen() {
   const doDelete = (s: Seller) => {
     setConfirmModal({
       visible: true,
-      title: 'Delete Seller',
-      message: `This will permanently delete "${s.name}". This action cannot be undone.`,
-      confirmLabel: 'Delete',
+      title: 'Suspend Seller',
+      message: `This will suspend "${s.name}" from the platform.`,
+      confirmLabel: 'Suspend',
       confirmColor: C.red,
       onConfirm: () => {
-        setSellers(prev => prev.filter(x => x.id !== s.id));
-        setConfirmModal(m => ({ ...m, visible:false }));
-        if (safePage > 1 && paginated.length === 1) setPage(p => p-1);
+        void (async () => {
+          try {
+            await blockSeller(s.numericId);
+            setConfirmModal(m => ({ ...m, visible:false }));
+            void loadSellers();
+          } catch (e) {
+            setLoadError(getApiErrorMessage(e));
+            setConfirmModal(m => ({ ...m, visible:false }));
+          }
+        })();
       },
     });
   };
@@ -659,6 +653,9 @@ export default function SellersScreen() {
           <Text style={SS.bcSep}> › </Text>
           <Text style={SS.bcCur}>Active Sellers</Text>
         </View>
+        {loadError ? (
+          <Text style={{ color: C.red, marginBottom: 8 }}>{loadError}</Text>
+        ) : null}
         <View style={[SS.titleRow, isMobile && { flexWrap:'wrap', gap:8 }]}>
           <View style={{ flexDirection:'row', alignItems:'center', gap:10, flex:1 }}>
             <Text style={[SS.pageTitle, isMobile && { fontSize:18 }]}>Active Sellers</Text>
@@ -712,7 +709,7 @@ export default function SellersScreen() {
 
         {viewMode === 'grid' ? (
           <View style={{ paddingHorizontal: HPAD }}>
-            {filtered.length === 0
+            {paginated.length === 0
               ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
               : gridRows.map((row, ri) => (
                   <View key={ri} style={{ flexDirection:'row', gap:GUTTER }}>
@@ -734,7 +731,7 @@ export default function SellersScreen() {
         ) : (
           <View style={[SS.listBox, isMobile && { marginHorizontal:0, borderRadius:0 }]}>
             {!isMobile && <ListHeader isTablet={isTablet} />}
-            {filtered.length === 0
+            {paginated.length === 0
               ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
               : paginated.map((s, idx) => (
                   <ListRow
@@ -750,10 +747,10 @@ export default function SellersScreen() {
         )}
 
         {/* Footer */}
-        {filtered.length > 0 && (
+        {totalElements > 0 && (
           <View style={[SS.footer, isMobile && { flexDirection:'column', alignItems:'flex-start' }]}>
             <Text style={SS.footTxt}>
-              Showing {(safePage-1)*ipp + 1}–{Math.min(safePage*ipp, filtered.length)} of {filtered.length} sellers
+              Showing {(safePage-1)*ipp + 1}–{Math.min(safePage*ipp, totalElements)} of {totalElements} sellers
             </Text>
             <Pagination current={safePage} total={totalPages} onChange={setPage} />
           </View>

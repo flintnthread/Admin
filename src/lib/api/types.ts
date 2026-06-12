@@ -17,13 +17,24 @@ export type SellerSummary = {
   status?: string;
   sellerCategory?: string;
   kycVerified?: boolean;
+  kycCompleted?: boolean;
+  profileCompleted?: boolean;
   bankVerified?: boolean;
   walletBalance?: number;
   createdAt?: string;
+  updatedAt?: string;
   profilePicUrl?: string;
   bankName?: string;
   accountHolder?: string;
-  updatedAt?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  branchName?: string;
+  sellerUniqueId?: string;
+  referralCode?: string;
+  productCount?: number;
+  city?: string;
+  state?: string;
+  businessType?: string;
 };
 
 export type ProductSummary = {
@@ -122,6 +133,9 @@ export type FaqCategory = {
   categoryIcon?: string;
   sortOrder?: number;
   status?: boolean;
+  faqCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type FaqItem = {
@@ -129,6 +143,8 @@ export type FaqItem = {
   categoryId?: number;
   question?: string;
   answer?: string;
+  createdAt?: string;
+  updatedAt?: string;
   sortOrder?: number;
   status?: boolean;
   isSeller?: boolean;
@@ -162,6 +178,7 @@ export type Department = {
   icon?: string;
   color?: string;
   active?: boolean;
+  jobCount?: number;
 };
 
 export type JobOpening = {
@@ -173,11 +190,14 @@ export type JobOpening = {
   employmentType?: string;
   status?: string;
   createdAt?: string;
+  applicationCount?: number;
 };
 
 export type JobApplication = {
   id: number;
   jobId?: number;
+  jobTitle?: string;
+  departmentName?: string;
   name?: string;
   email?: string;
   phone?: string;
