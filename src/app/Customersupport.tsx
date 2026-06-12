@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapContactToCustomerTicket } from '@/lib/mappers';
+import { fetchContactStats, fetchContacts } from '@/services/contactApi';
 import {
   View,
   Text,
@@ -16,7 +19,7 @@ import { useRouter } from 'expo-router';
 import AdminLayout from '@/components/admin-layout';
 import Svg, { Path, Circle, G, Rect } from 'react-native-svg';
 
-// ─── SVG Icons ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ SVG Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SearchIcon = () => (
   <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
@@ -109,55 +112,13 @@ const TicketIcon = () => (
   </Svg>
 );
 
-// ─── Data ────────────────────────────────────────────────────────────────────
-
-const TICKETS = [
-  {
-    id: '#11',
-    subject: 'Order #FNT202604028262 - My order is not delivered on time and it\'s cancelled',
-    customer: 'Sravani Surampalli',
-    email: 'sravanisurampalli612@gmail.com',
-    type: 'Delivery Issue',
-    order: '#FNT202604028262',
-    status: 'Open',
-    created: '08 Jun, 2026 16:58',
-  },
-  {
-    id: '#12',
-    subject: 'Order #FNT202604019831 - Product received was damaged',
-    customer: 'Rahul Mehta',
-    email: 'rahulmehta@example.com',
-    type: 'Product Issue',
-    order: '#FNT202604019831',
-    status: 'In Progress',
-    created: '07 Jun, 2026 11:22',
-  },
-  {
-    id: '#13',
-    subject: 'Order #FNT202604009412 - Payment deducted but order not confirmed',
-    customer: 'Priya Sharma',
-    email: 'priyasharma@example.com',
-    type: 'Payment Issue',
-    order: '#FNT202604009412',
-    status: 'Closed',
-    created: '05 Jun, 2026 09:14',
-  },
-  {
-    id: '#14',
-    subject: 'Order #FNT202604031100 - Need to change delivery address',
-    customer: 'Ankit Verma',
-    email: 'ankitverma@example.com',
-    type: 'Other',
-    order: '#FNT202604031100',
-    status: 'Open',
-    created: '09 Jun, 2026 14:05',
-  },
-];
+// â”€â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Tickets loaded from /api/admin/contacts
 
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Closed'];
 const TYPE_OPTIONS = ['Delivery Issue', 'Product Issue', 'Payment Issue', 'Other'];
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Status Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
   'Open': { bg: '#DCFCE7', text: '#16A34A', dot: '#16A34A' },
@@ -191,7 +152,7 @@ const TypeBadge = ({ type }: { type: string }) => {
   );
 };
 
-// ─── Filter Modal ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Filter Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface FilterModalProps {
   visible: boolean;
@@ -267,7 +228,7 @@ const FilterModal = ({ visible, title, options, selected, onSelect, onClose, isW
   );
 };
 
-// ─── Mobile Card ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Mobile Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface MobileCardProps {
   ticket: typeof TICKETS[0];
@@ -317,7 +278,7 @@ const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
   </View>
 );
 
-// ─── Web Table ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Web Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface WebTableProps {
   tickets: typeof TICKETS;
@@ -372,20 +333,38 @@ const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
   </View>
 );
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function CustomerSupportTickets() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
+  const [tickets, setTickets] = useState<ReturnType<typeof mapContactToCustomerTicket>[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
 
-  const filtered = TICKETS.filter((t) => {
+  const loadTickets = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const res = await fetchContacts(0, 300);
+      setTickets((res.items ?? []).map(mapContactToCustomerTicket));
+      await fetchContactStats();
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+      setTickets([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
+
+  const filtered = tickets.filter((t) => {
     const matchSearch =
       !search ||
       t.subject.toLowerCase().includes(search.toLowerCase()) ||
@@ -396,22 +375,24 @@ export default function CustomerSupportTickets() {
     return matchSearch && matchStatus && matchType;
   });
 
-  const handleView = (ticket: typeof TICKETS[0]) => {
+  const handleView = (ticket: (typeof tickets)[0]) => {
     router.push({
       pathname: '/Customersupportdetails',
-      params: { ticketId: ticket.id },
+      params: { ticketId: String(ticket.numericId) },
     });
   };
 
-  const handleRefresh = (ticket: typeof TICKETS[0]) => {
+  const handleRefresh = (ticket: (typeof tickets)[0]) => {
     // Refresh ticket logic
-    console.log('Refresh ticket', ticket.id);
+    void loadTickets();
   };
 
   return (
     <AdminLayout>
       <ScrollView style={styles.root} contentContainerStyle={styles.rootContent} showsVerticalScrollIndicator={false}>
-        {/* ── Page Header ── */}
+        {loadError ? (
+          <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
+        ) : null}
         <View style={styles.pageHeader}>
           <View style={styles.pageHeaderLeft}>
             <TicketIcon />
@@ -422,7 +403,7 @@ export default function CustomerSupportTickets() {
           </View>
         </View>
 
-        {/* ── Search + Filters Row ── */}
+        {/* â”€â”€ Search + Filters Row â”€â”€ */}
         <View style={styles.toolbarRow}>
           {/* Search */}
           <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
@@ -460,7 +441,7 @@ export default function CustomerSupportTickets() {
           </View>
         </View>
 
-        {/* ── Content ── */}
+        {/* â”€â”€ Content â”€â”€ */}
         {isWeb ? (
           <WebTable
             tickets={filtered}
@@ -489,7 +470,7 @@ export default function CustomerSupportTickets() {
         )}
       </ScrollView>
 
-      {/* ── Status Filter Modal ── */}
+      {/* â”€â”€ Status Filter Modal â”€â”€ */}
       <FilterModal
         visible={statusModalOpen}
         title="Filter by Status"
@@ -500,7 +481,7 @@ export default function CustomerSupportTickets() {
         isWeb={isWeb}
       />
 
-      {/* ── Type Filter Modal ── */}
+      {/* â”€â”€ Type Filter Modal â”€â”€ */}
       <FilterModal
         visible={typeModalOpen}
         title="Filter by Type"
@@ -514,7 +495,7 @@ export default function CustomerSupportTickets() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const styles = StyleSheet.create({
   root: {

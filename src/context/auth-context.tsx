@@ -8,8 +8,7 @@ import React, {
 import { getApiErrorMessage } from "@/lib/api/client";
 import {
   clearAdminSession,
-  getAdminToken,
-  getAdminUser,
+  hydrateAdminSession,
   saveAdminSession,
   type AdminSessionUser,
 } from "@/lib/api/session";
@@ -40,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function restore() {
-      const storedToken = getAdminToken();
+      const { token: storedToken } = await hydrateAdminSession();
       if (!storedToken) {
         if (!cancelled) {
           setToken(false);

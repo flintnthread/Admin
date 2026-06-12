@@ -1,10 +1,9 @@
 import AdminLayout from "@/components/admin-layout";
-import { useAsyncLoad } from "@/hooks/useAsyncLoad";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapPayoutToPaymentRow } from "@/lib/mappers";
-import { fetchPayouts, markPayoutPaid } from "@/services/payoutApi";
+import { fetchPayoutStats, fetchPayouts, markPayoutPaid } from "@/services/payoutApi";
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -142,13 +141,25 @@ const OrderCard: React.FC<{
 };
 
 // ─── PAY MODAL ────────────────────────────────────────────────────────────────
+const PAYMENTS_PAGE_SIZE = 20;
+
 const PayModal: React.FC<{
     visible: boolean;
     order: SellerOrder | null;
     onClose: () => void;
-    onConfirm: (id: number) => void;
+    onConfirm: (id: number, transactionRef: string, adminNote: string) => void;
     isWeb: boolean;
 }> = ({ visible, order, onClose, onConfirm, isWeb }) => {
+    const [transactionRef, setTransactionRef] = useState("");
+    const [adminNote, setAdminNote] = useState("");
+
+    useEffect(() => {
+        if (visible) {
+            setTransactionRef("");
+            setAdminNote("");
+        }
+    }, [visible, order?.id]);
+
     if (!visible || !order) return null;
     return (
         <Modal visible={visible} transparent animationType={isWeb ? "fade" : "slide"} onRequestClose={onClose}>
@@ -166,15 +177,28 @@ const PayModal: React.FC<{
                             <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Wallet</Text><Text style={styles.summaryValue}>{order.walletBalance}</Text></View>
                         </View>
                         <Text style={styles.inputLabel}>Transaction Reference</Text>
-                        <TextInput style={styles.input} placeholder="Enter UTR / Ref number" placeholderTextColor={TEXT_MUTED} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter UTR / Ref number"
+                            placeholderTextColor={TEXT_MUTED}
+                            value={transactionRef}
+                            onChangeText={setTransactionRef}
+                        />
                         <Text style={styles.inputLabel}>Remarks</Text>
-                        <TextInput style={[styles.input, { height: 80, textAlignVertical: "top", paddingTop: 12 }]} placeholder="Optional remarks..." placeholderTextColor={TEXT_MUTED} multiline />
+                        <TextInput
+                            style={[styles.input, { height: 80, textAlignVertical: "top", paddingTop: 12 }]}
+                            placeholder="Optional remarks..."
+                            placeholderTextColor={TEXT_MUTED}
+                            multiline
+                            value={adminNote}
+                            onChangeText={setAdminNote}
+                        />
                     </ScrollView>
                     <View style={styles.modalFooter}>
                         <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
                             <Text style={styles.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.confirmBtn} onPress={() => onConfirm(order.id)}>
+                        <TouchableOpacity style={styles.confirmBtn} onPress={() => onConfirm(order.id, transactionRef.trim(), adminNote.trim())}>
                             <Feather name="check" size={14} color="#fff" />
                             <Text style={styles.confirmBtnText}>Confirm Payment</Text>
                         </TouchableOpacity>
@@ -188,14 +212,13 @@ const PayModal: React.FC<{
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 const SellerPaymentsScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
-    const { data, loading, error, reload } = useAsyncLoad(
-        async () => {
-            const page = await fetchPayouts(undefined, 0, 100);
-            return (page.items ?? []).map(mapPayoutToPaymentRow);
-        },
-        []
-    );
-    const orders: SellerOrder[] = data ?? [];
+    const [orders, setOrders] = useState<SellerOrder[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0 });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalElements, setTotalElements] = useState(0);
     const [search, setSearch] = useState("");
     const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Cancelled">("All");
     const [paymentDropdownOpen, setPaymentDropdownOpen] = useState(false);
@@ -204,6 +227,47 @@ const SellerPaymentsScreen: React.FC = () => {
     const [sortPriority, setSortPriority] = useState<"Priority (Red first)" | "Date: Newest First" | "Date: Oldest First">("Priority (Red first)");
     const [priorityDropdownOpen, setPriorityDropdownOpen] = useState(false);
     const [payModalOrder, setPayModalOrder] = useState<SellerOrder | null>(null);
+
+    const apiStatus =
+        filterPayment === "Pending" ? "pending" :
+        filterPayment === "Paid" ? "paid" :
+        filterPayment === "Cancelled" ? "cancelled" :
+        undefined;
+
+    const loadPayments = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [page, apiStats] = await Promise.all([
+                fetchPayouts(apiStatus, currentPage - 1, PAYMENTS_PAGE_SIZE),
+                fetchPayoutStats(),
+            ]);
+            setOrders((page.items ?? []).map(mapPayoutToPaymentRow));
+            setTotalElements(page.totalElements);
+            setTotalPages(page.totalPages);
+            if (currentPage > page.totalPages && page.totalPages > 0) {
+                setCurrentPage(page.totalPages);
+            }
+            setStats({
+                total: Number(apiStats.total ?? 0),
+                pending: Number(apiStats.pending ?? 0),
+                paid: Number(apiStats.paid ?? 0),
+                totalPaidAmount: Number(apiStats.totalPaidAmount ?? 0),
+            });
+        } catch (e) {
+            setError(getApiErrorMessage(e, "Failed to load seller payments."));
+        } finally {
+            setLoading(false);
+        }
+    }, [apiStatus, currentPage]);
+
+    useEffect(() => {
+        loadPayments();
+    }, [loadPayments]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterPayment]);
 
     const filtered = orders.filter((o) => {
         const ms = o.orderId.toLowerCase().includes(search.toLowerCase()) || o.sellerName.toLowerCase().includes(search.toLowerCase());
@@ -227,19 +291,14 @@ const SellerPaymentsScreen: React.FC = () => {
         return scoreB - scoreA;
     });
 
-    const total = orders.length;
-    const paid = orders.filter(o => o.paymentStatus === "Paid").length;
-    const pending = orders.filter(o => o.paymentStatus === "Pending").length;
-    const totalAmt = orders.filter(o => o.paymentStatus === "Paid").reduce((s, o) => s + parseFloat(o.customerPaid.replace(/[₹,]/g, "")), 0);
-
-    const handleConfirmPay = async (id: number) => {
+    const handleConfirmPay = async (id: number, transactionRef: string, adminNote: string) => {
         try {
-            await markPayoutPaid(id);
+            await markPayoutPaid(id, transactionRef || undefined, adminNote || undefined);
             setPayModalOrder(null);
             const msg = "Payment marked as paid!";
             if (Platform.OS === "web") window.alert(msg);
             else Alert.alert("Success", msg);
-            await reload();
+            await loadPayments();
         } catch (e) {
             const msg = getApiErrorMessage(e);
             if (Platform.OS === "web") window.alert(msg);
@@ -284,17 +343,22 @@ const SellerPaymentsScreen: React.FC = () => {
                     <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 24 }} />
                 )}
                 {error ? (
-                    <Text style={{ color: "#DC2626", fontSize: 13, marginBottom: 12 }}>{error}</Text>
+                    <View style={{ marginBottom: 12, gap: 8 }}>
+                        <Text style={{ color: "#DC2626", fontSize: 13 }}>{error}</Text>
+                        <TouchableOpacity style={styles.exportBtn} onPress={loadPayments}>
+                            <Text style={styles.exportBtnText}>Retry</Text>
+                        </TouchableOpacity>
+                    </View>
                 ) : null}
 
                 {/* Stats */}
                 <View style={[styles.statsCardSingle, !isWeb && { flexDirection: "column", gap: 16 }, isWeb && { justifyContent: "space-between" }]}>
                     <View style={{ flexDirection: isWeb ? "row" : "column", gap: isWeb ? 24 : 16, alignItems: isWeb ? "center" : "stretch", flex: isWeb ? 1 : undefined }}>
                         {[
-                            { icon: "list", label: "All Orders", value: String(total), color: "#a78bfa" }, // Pleasant Soft Purple
-                            { icon: "check-circle", label: "Delivery Done Orders", value: String(paid), color: "#f472b6" }, // Pleasant Soft Pink
-                            { icon: "credit-card", label: "Paid Orders", value: String(pending), color: "#7dd3fc" }, // Pleasant Soft Sky Blue
-                            { icon: "dollar-sign", label: "Total Paid", value: `₹${totalAmt.toLocaleString("en-IN")}`, color: "#6ee7b7" }, // Pleasant Soft Mint
+                            { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
+                            { icon: "clock", label: "Pending", value: String(stats.pending), color: "#f472b6" },
+                            { icon: "check-circle", label: "Paid", value: String(stats.paid), color: "#7dd3fc" },
+                            { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
                         ].map((s, i) => (
                             <React.Fragment key={i}>
                                 <View style={[styles.statBlockSingle]}>
@@ -580,6 +644,32 @@ const SellerPaymentsScreen: React.FC = () => {
                         ))}
                     </View>
                 )}
+
+                {!loading && !error && totalPages > 1 && (
+                    <View style={styles.paginationBar}>
+                        <Text style={styles.paginationInfo}>
+                            Showing {(currentPage - 1) * PAYMENTS_PAGE_SIZE + 1} to{" "}
+                            {Math.min(currentPage * PAYMENTS_PAGE_SIZE, totalElements)} of {totalElements}
+                        </Text>
+                        <View style={styles.paginationControls}>
+                            <TouchableOpacity
+                                style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}
+                                disabled={currentPage <= 1}
+                                onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            >
+                                <Feather name="chevron-left" size={14} color={TEXT_BODY} />
+                            </TouchableOpacity>
+                            <Text style={styles.pageNumText}>{currentPage} / {totalPages}</Text>
+                            <TouchableOpacity
+                                style={[styles.pageBtn, currentPage >= totalPages && styles.pageBtnDisabled]}
+                                disabled={currentPage >= totalPages}
+                                onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            >
+                                <Feather name="chevron-right" size={14} color={TEXT_BODY} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
@@ -728,5 +818,34 @@ const styles = StyleSheet.create({
     tableAvatarText: { color: PRIMARY, fontSize: 13, fontWeight: "800" },
     tableActionBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center" },
     actionBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 4 },
-    actionBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" }
+    actionBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+
+    paginationBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: 12,
+        marginTop: 8,
+        marginBottom: 16,
+        padding: 14,
+        backgroundColor: BG_CARD,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: BORDER,
+    },
+    paginationInfo: { fontSize: 13, color: TEXT_MUTED },
+    paginationControls: { flexDirection: "row", alignItems: "center", gap: 10 },
+    pageBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: BORDER,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: BG_CARD,
+    },
+    pageBtnDisabled: { opacity: 0.4 },
+    pageNumText: { fontSize: 13, fontWeight: "700", color: TEXT_HEAD },
 });

@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { initialsFromName, maskAccount } from "@/lib/format";
-import { fetchPendingBankSellers } from "@/services/sellerApi";
+import { fetchBankStats, fetchBankVerifications } from "@/services/sellerApi";
 import type { SellerSummary } from "@/lib/api/types";
 import {
   Animated,
@@ -68,8 +68,8 @@ function mapSellerToVerification(s: SellerSummary, index: number): Verification 
     email: s.email ?? "",
     phone: s.mobile ?? "",
     business: s.businessName ?? "—",
-    account: maskAccount(undefined),
-    ifsc: "—",
+    account: maskAccount(s.accountNumber),
+    ifsc: s.ifscCode ?? "—",
     bank: s.bankName ?? "—",
     status,
     attempts: 1,
@@ -413,6 +413,7 @@ export default function BankVerifications() {
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [verifications, setVerifications] = useState<Verification[]>([]);
+  const [bankStats, setBankStats] = useState<Record<string, number>>({});
 
   const { width } = Dimensions.get("window");
   const isMobile = width < 768;
@@ -421,11 +422,18 @@ export default function BankVerifications() {
 
   const loadVerifications = useCallback(async () => {
     try {
-      const res = await fetchPendingBankSellers(0, 200);
-      setVerifications((res.items ?? []).map(mapSellerToVerification));
+      const [pendingRes, verifiedRes, statsRes] = await Promise.all([
+        fetchBankVerifications("pending", 0, 500),
+        fetchBankVerifications("verified", 0, 500),
+        fetchBankStats(),
+      ]);
+      const merged = [...(pendingRes.items ?? []), ...(verifiedRes.items ?? [])];
+      setVerifications(merged.map(mapSellerToVerification));
+      setBankStats(statsRes);
     } catch (e) {
       console.warn(getApiErrorMessage(e));
       setVerifications([]);
+      setBankStats({});
     }
   }, []);
 
@@ -437,14 +445,14 @@ export default function BankVerifications() {
     router.push({ pathname: "/viewbankdetails", params: { sellerId: String(sellerId) } });
   };
 
-  /* Counts */
+  /* Counts from backend stats API */
   const counts = {
-    total:      verifications.length,
-    pending:    verifications.filter(v => v.status === "Pending").length,
-    processing: verifications.filter(v => v.status === "Processing").length,
-    verified:   verifications.filter(v => v.status === "Verified").length,
-    failed:     verifications.filter(v => v.status === "Failed").length,
-    expired:    verifications.filter(v => v.status === "Expired").length,
+    total:      bankStats.total ?? verifications.length,
+    pending:    bankStats.pending ?? verifications.filter(v => v.status === "Pending").length,
+    processing: bankStats.processing ?? verifications.filter(v => v.status === "Processing").length,
+    verified:   bankStats.verified ?? verifications.filter(v => v.status === "Verified").length,
+    failed:     bankStats.failed ?? verifications.filter(v => v.status === "Failed").length,
+    expired:    bankStats.expired ?? verifications.filter(v => v.status === "Expired").length,
   };
 
   /* Filter */

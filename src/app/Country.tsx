@@ -1,5 +1,5 @@
-import { Redirect } from 'expo-router';
+import { Redirect } from "expo-router";
 
-export default function Index() {
-  return <Redirect href="/sellerbankapproval" />;
+export default function CountryScreen() {
+  return <Redirect href="/locations" />;
 }

@@ -14,12 +14,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
-import type { SellerSummary } from "@/lib/api/types";
 import { formatDate, initialsFromName } from "@/lib/format";
+import { useAuth } from "@/context/auth-context";
 import {
   fetchSellerAnalyticsChart,
+  fetchSellerAnalyticsInsights,
   fetchSellerAnalyticsSummary,
+  fetchSellerAnalyticsYears,
   fetchSellers,
+  fetchSellersForGraph,
+  normalizeSellerGraphChart,
+  normalizeSellerGraphSummary,
+  type SellerGraphChartData,
+  type SellerGraphInsight,
+  type SellerGraphRow,
 } from "@/services/sellerApi";
 import {
   Animated,
@@ -69,7 +77,7 @@ type Seller = {
 
 const SELLER_COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4", "#F59E0B", "#EF4444", "#7C3AED", "#059669"];
 
-function mapSellerGraphRow(s: SellerSummary, index: number): Seller {
+function mapSellerGraphRow(s: SellerGraphRow, index: number): Seller {
   const statusRaw = (s.status ?? "").toLowerCase();
   const status =
     statusRaw === "active" ? "Active" :
@@ -82,24 +90,25 @@ function mapSellerGraphRow(s: SellerSummary, index: number): Seller {
     business: s.businessName ?? "—",
     onboard: formatDate(s.createdAt),
     status,
-    profile: "Complete",
-    kyc: s.kycVerified ? "Complete" : "Pending",
-    supplement: "Not Provided",
-    shiprocket: "Not Uploaded",
-    shipDate: null,
-    products: 0,
+    profile: s.profile ?? "Incomplete",
+    kyc: s.kyc ?? "Not done",
+    supplement: s.supplement ?? "Not Provided",
+    shiprocket: s.shiprocket ?? "Not Uploaded",
+    shipDate: s.shipDate ?? null,
+    products: s.products ?? 0,
     initials: initialsFromName(s.fullName),
     color: SELLER_COLORS[index % SELLER_COLORS.length],
   };
 }
 
-const DEFAULT_CHART_DATA: Record<string, string[] | number[]> = {
-  labels:             ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-  registered:         [10, 20, 28, 50, 90, 160, 300, 450, 580, 680, 760, 880],
-  profileCompleted:   [ 0,  2,  5, 10, 20,  50, 120, 220, 320, 430, 500, 590],
-  approved:           [ 0,  1,  3,  8, 18,  55, 140, 250, 310, 380, 430, 440],
-  productsAdded:      [ 0,  0,  2,  5, 10,  28,  90, 195, 285, 345, 255, 280],
-  shiprocketUploaded: [ 0,  0,  0,  2,  5,  10,  25,  50,  70, 100, 115, 140],
+const EMPTY_CHART_DATA: SellerGraphChartData = {
+  labels: [],
+  registered: [],
+  profileCompleted: [],
+  approved: [],
+  productsAdded: [],
+  shiprocketUploaded: [],
+  maxY: 100,
 };
 
 const SERIES = [
@@ -110,7 +119,6 @@ const SERIES = [
   { key: "shiprocketUploaded", label: "Shiprocket Uploaded", color: "#0891B2", dashArray: [],          marker: "star"     },
 ];
 
-const YEAR_OPTIONS   = ["2027","2026","2025","2024","2023","2022","2021","2020","2019","2018","2017","2016"];
 const FILTER_OPTIONS = ["Overall","Monthly","Weekly","Quarterly"];
 const PERPAGE_OPTIONS = ["10","25","50","100"];
 const METRIC_OPTIONS = ["All Metrics","Registered","Profile Completed","Approved","Products Added","Shiprocket Uploaded"];
@@ -128,13 +136,6 @@ const STATUS_MAP: Record<string, { bg: string; color: string; border: string }> 
   "Not Provided":      { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" },
   "Not done":          { bg: "#1F2937", color: "#F9FAFB", border: "#374151" },
 };
-
-const INSIGHTS = [
-  { iconName: "trending-up",       text: "Registered sellers increased by 85% vs previous period.", color: "#2563EB", bg: "#EFF6FF" },
-  { iconName: "checkmark-circle",  text: "71 sellers are fully approved and active.",               color: "#16A34A", bg: "#F0FDF4" },
-  { iconName: "cube",              text: "707 products added in 2025.",                             color: "#7C3AED", bg: "#F5F3FF" },
-  { iconName: "sync",              text: "Shiprocket sync is currently running smoothly.",          color: ORANGE,    bg: "#FFF7ED" },
-];
 
 /* ═══════════════════════════════════════════════════════════════════════
    HELPER COMPONENTS
@@ -380,28 +381,39 @@ function LineChart({
   width,
   activeSeries,
   chartData,
+  chartYear,
 }: {
   width: number;
   activeSeries: string;
-  chartData: Record<string, string[] | number[]>;
+  chartData: SellerGraphChartData;
+  chartYear: string;
 }) {
   const height   = 240;
   const padL = 44, padR = 16, padT = 20, padB = 38;
   const W = width - padL - padR;
   const H = height - padT - padB;
-  const maxY = 900;
-  const yTicks = [0, 150, 300, 450, 600, 750, 900];
-  const labels  = chartData.labels as string[];
+  const maxY = chartData.maxY > 0 ? chartData.maxY : 100;
+  const step = Math.max(1, Math.round(maxY / 6));
+  const yTicks = Array.from({ length: 7 }, (_, i) => i * step);
+  const labels  = chartData.labels;
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  const xScale = (i: number) => (i / (labels.length - 1)) * W;
+  const xScale = (i: number) => {
+    if (labels.length <= 1) return W / 2;
+    return (i / (labels.length - 1)) * W;
+  };
   const yScale = (v: number) => H - (v / maxY) * H;
 
   const visibleSeries = activeSeries === "All Metrics"
     ? SERIES : SERIES.filter(s => s.label === activeSeries);
 
-  const getPath = (key: string) =>
-    (chartData[key] as number[]).map((v, i) =>
+  const seriesValues = (key: keyof SellerGraphChartData) => {
+    const values = chartData[key];
+    return Array.isArray(values) ? values as number[] : [];
+  };
+
+  const getPath = (key: keyof SellerGraphChartData) =>
+    seriesValues(key).map((v, i) =>
       `${i === 0 ? "M" : "L"}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`
     ).join(" ");
 
@@ -447,7 +459,7 @@ function LineChart({
             strokeLinejoin="round" strokeLinecap="round" />
         ))}
         {visibleSeries.map(s =>
-          (chartData[s.key] as number[]).map((v, i) => (
+          seriesValues(s.key as keyof SellerGraphChartData).map((v, i) => (
             <ChartMarker key={`${s.key}-${i}`}
               type={s.marker} cx={xScale(i)} cy={yScale(v)} color={s.color} size={4} />
           ))
@@ -459,7 +471,7 @@ function LineChart({
             {visibleSeries.map(s => (
               <ChartMarker key={`h-${s.key}`} type={s.marker}
                 cx={xScale(hoveredIdx)}
-                cy={yScale((chartData[s.key] as number[])[hoveredIdx])}
+                cy={yScale(seriesValues(s.key as keyof SellerGraphChartData)[hoveredIdx] ?? 0)}
                 color={s.color} size={7} />
             ))}
             <Rect
@@ -469,13 +481,13 @@ function LineChart({
             <SvgText
               x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
               y={17} fontSize={11} fontWeight="bold" fill="#1B2332">
-              {labels[hoveredIdx]} 2025
+              {labels[hoveredIdx]} {chartYear}
             </SvgText>
             {visibleSeries.map((s, i) => (
               <SvgText key={s.key}
                 x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
                 y={31 + i * ttLineH} fontSize={10} fill={s.color}>
-                {s.label}: {(chartData[s.key] as number[])[hoveredIdx]}
+                {s.label}: {seriesValues(s.key as keyof SellerGraphChartData)[hoveredIdx] ?? 0}
               </SvgText>
             ))}
           </>
@@ -708,13 +720,15 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
 ═══════════════════════════════════════════════════════════════════════ */
 export default function SellersDashboard() {
   const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
   const { width: screenW } = Dimensions.get("window");
   const isTablet  = screenW >= 768;
   const isDesktop = screenW >= 1024;
 
   const [sellerFilter, setSellerFilter] = useState("All Sellers");
-  const [filterType,   setFilterType]   = useState("Overall");
-  const [filterYear,   setFilterYear]   = useState("2025");
+  const [filterType,   setFilterType]   = useState("Monthly");
+  const [filterYear,   setFilterYear]   = useState(String(new Date().getFullYear()));
+  const [yearOptions,  setYearOptions]  = useState<string[]>([String(new Date().getFullYear())]);
   const [activeSeries, setActiveSeries] = useState("All Metrics");
   const [fromDate,     setFromDate]     = useState("");
   const [toDate,       setToDate]       = useState("");
@@ -729,71 +743,157 @@ export default function SellersDashboard() {
   const [perPage,  setPerPage]  = useState(10);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [sellerNameOptions, setSellerNameOptions] = useState<{ id: number; name: string }[]>([]);
   const [summary, setSummary] = useState<Record<string, number>>({});
-  const [chartData, setChartData] = useState(DEFAULT_CHART_DATA);
+  const [chartData, setChartData] = useState<SellerGraphChartData>(EMPTY_CHART_DATA);
+  const [insights, setInsights] = useState<SellerGraphInsight[]>([]);
+  const [totalSellers, setTotalSellers] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  const selectedSellerId = useMemo(() => {
+    if (sellerFilter === "All Sellers") return undefined;
+    return sellerNameOptions.find((s) => s.name === sellerFilter)?.id;
+  }, [sellerFilter, sellerNameOptions]);
+
+  const graphFilters = useMemo(() => ({
+    filterType,
+    year: Number(filterYear) || undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    sellerId: selectedSellerId,
+  }), [filterType, filterYear, fromDate, toDate, selectedSellerId]);
+
+  const loadSellerList = useCallback(async () => {
+    if (!token || authLoading) return;
+    try {
+      let sellerRes;
+      try {
+        sellerRes = await fetchSellersForGraph({
+          search: searchQ || undefined,
+          sellerId: selectedSellerId,
+          page: page - 1,
+          size: perPage,
+        });
+      } catch {
+        sellerRes = await fetchSellers({
+          search: searchQ || undefined,
+          page: page - 1,
+          size: perPage,
+        });
+      }
+      setSellers((sellerRes.items ?? []).map(mapSellerGraphRow));
+      setTotalSellers(sellerRes.totalElements ?? 0);
+      setTotalPages(Math.max(1, sellerRes.totalPages ?? 1));
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
+  }, [authLoading, searchQ, selectedSellerId, page, perPage, token]);
 
   const loadAnalytics = useCallback(async () => {
-    try {
-      const [sellerRes, summaryRes, chartRes] = await Promise.all([
-        fetchSellers({ page: 0, size: 100 }),
-        fetchSellerAnalyticsSummary(),
-        fetchSellerAnalyticsChart(),
-      ]);
-      setSellers((sellerRes.items ?? []).map(mapSellerGraphRow));
-      setSummary(summaryRes as Record<string, number>);
-      if (chartRes.length > 0) {
-        setChartData((prev) => ({
-          ...prev,
-          labels: chartRes.map((p) => String(p.month)),
-          registered: chartRes.map((p) => p.count),
-        }));
-      }
-    } catch (e) {
-      console.warn(getApiErrorMessage(e));
+    if (!token || authLoading) return;
+    setDataLoading(true);
+    setLoadError(null);
+    const errors: string[] = [];
+
+    const [summaryRes, chartRes, insightsRes, yearsRes, namesRes] = await Promise.allSettled([
+      fetchSellerAnalyticsSummary(graphFilters),
+      fetchSellerAnalyticsChart(graphFilters),
+      fetchSellerAnalyticsInsights(graphFilters),
+      fetchSellerAnalyticsYears(),
+      fetchSellersForGraph({ page: 0, size: 500 }).catch(() => fetchSellers({ page: 0, size: 500 })),
+    ]);
+
+    if (summaryRes.status === "fulfilled") {
+      setSummary(normalizeSellerGraphSummary(summaryRes.value as Record<string, unknown>));
+    } else {
+      errors.push(getApiErrorMessage(summaryRes.reason));
     }
-  }, []);
+
+    if (chartRes.status === "fulfilled") {
+      setChartData(normalizeSellerGraphChart(chartRes.value));
+    } else {
+      errors.push(getApiErrorMessage(chartRes.reason));
+    }
+
+    if (insightsRes.status === "fulfilled") {
+      setInsights(insightsRes.value);
+    } else {
+      setInsights([]);
+    }
+
+    if (yearsRes.status === "fulfilled" && yearsRes.value.length > 0) {
+      setYearOptions(yearsRes.value);
+      if (!yearsRes.value.includes(filterYear)) {
+        setFilterYear(yearsRes.value[0]);
+      }
+    }
+
+    if (namesRes.status === "fulfilled") {
+      setSellerNameOptions(
+        (namesRes.value.items ?? []).map((s) => ({
+          id: s.id,
+          name: s.fullName ?? `Seller #${s.id}`,
+        }))
+      );
+    }
+
+    if (errors.length > 0) {
+      setLoadError(errors[0]);
+    }
+    setDataLoading(false);
+  }, [authLoading, graphFilters, filterYear, token]);
 
   useEffect(() => {
-    loadAnalytics();
-  }, [loadAnalytics]);
+    if (!authLoading && token) {
+      loadAnalytics();
+    }
+  }, [authLoading, loadAnalytics, token]);
+
+  useEffect(() => {
+    if (!authLoading && token) {
+      loadSellerList();
+    }
+  }, [authLoading, loadSellerList, token]);
 
   const sellerOptions = useMemo(
-    () => ["All Sellers", ...sellers.map((s) => s.name)],
-    [sellers]
+    () => ["All Sellers", ...sellerNameOptions.map((s) => s.name)],
+    [sellerNameOptions]
   );
 
   const statCards = useMemo(
     () => [
-      { iconName: "person-add", label: "Registered", value: String(summary.total ?? 0), sub: "All sellers", iconBg: "#FFF7ED", iconColor: ORANGE },
-      { iconName: "person-done", label: "Profile Completed", value: String(summary.active ?? 0), sub: "Active sellers", iconBg: "#F0FDF4", iconColor: "#10B981" },
-      { iconName: "shield-checkmark", label: "Approved", value: String(summary.active ?? 0), sub: "Active accounts", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
-      { iconName: "cube", label: "Pending", value: String(summary.pending ?? 0), sub: "Awaiting approval", iconBg: "#F5F3FF", iconColor: "#8B5CF6" },
-      { iconName: "cloud-upload", label: "Bank Verified", value: String(summary.bankVerified ?? 0), sub: "Verified banks", iconBg: "#ECFDF5", iconColor: "#06B6D4" },
+      { iconName: "person-add", label: "Registered", value: String(summary.registered ?? summary.total ?? 0), sub: "All sellers", iconBg: "#FFF7ED", iconColor: ORANGE },
+      { iconName: "person-done", label: "Profile Completed", value: String(summary.profileCompleted ?? 0), sub: "Completed profiles", iconBg: "#F0FDF4", iconColor: "#10B981" },
+      { iconName: "shield-checkmark", label: "Approved", value: String(summary.approved ?? summary.active ?? 0), sub: "Active accounts", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
+      { iconName: "cube", label: "Products Added", value: String(summary.productsAdded ?? 0), sub: "Listed products", iconBg: "#F5F3FF", iconColor: "#8B5CF6" },
+      { iconName: "cloud-upload", label: "Shiprocket Uploaded", value: String(summary.shiprocketUploaded ?? 0), sub: "Warehouse ready", iconBg: "#ECFDF5", iconColor: "#06B6D4" },
       { iconName: "sync", label: "Pending Bank", value: String(summary.pendingBank ?? 0), sub: "Bank review", iconBg: "#FFF7ED", iconColor: ORANGE },
     ],
     [summary]
   );
 
-  const filteredSellers = sellers.filter(s => {
-    const q = searchQ.toLowerCase();
-    const matchQ = !q
-      || s.name.toLowerCase().includes(q)
-      || s.email.toLowerCase().includes(q)
-      || s.business.toLowerCase().includes(q)
-      || s.phone.includes(q);
-    const matchSeller = sellerFilter === "All Sellers" || s.name === sellerFilter;
-    return matchQ && matchSeller;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredSellers.length / perPage));
   const safePage   = Math.min(page, totalPages);
-  const paginated  = filteredSellers.slice((safePage - 1) * perPage, safePage * perPage);
+  const paginated  = sellers;
 
   const doSearch = () => { setSearchQ(search); setPage(1); };
   const doReset  = () => { setSearch(""); setSearchQ(""); setPage(1); setPerPage(10); };
   const applyFilters = () => {
-    console.log("Applying filters:", { filterType, sellerFilter, filterYear, fromDate, toDate });
+    setPage(1);
+    void loadAnalytics();
+    void loadSellerList();
   };
+
+  const errorBanner = loadError ? (
+    <View style={styles.errorBanner}>
+      <Ionicons name="warning-outline" size={16} color="#B45309" />
+      <Text style={styles.errorBannerText}>{loadError}</Text>
+      <TouchableOpacity onPress={() => { void loadAnalytics(); void loadSellerList(); }}>
+        <Text style={styles.errorRetryText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  ) : null;
 
   const pageNums: (number | string)[] = (() => {
     if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
@@ -837,6 +937,8 @@ export default function SellersDashboard() {
             </View>
           </View>
 
+          {errorBanner}
+
           {/* ── DESKTOP: All Filters in ONE Row ── */}
           <View style={[styles.card, { marginBottom: 14 }]}>
             <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "nowrap" }}>
@@ -862,7 +964,7 @@ export default function SellersDashboard() {
                   <Ionicons name="calendar-outline" size={13} color="#64748B" />
                   <Text style={styles.filterLabelText}>Year</Text>
                 </View>
-                <Dropdown value={filterYear} onChange={setFilterYear} options={YEAR_OPTIONS} />
+                <Dropdown value={filterYear} onChange={setFilterYear} options={yearOptions} />
               </View>
               {/* From */}
               <View style={{ flex: 1, minWidth: 130 }}>
@@ -925,7 +1027,16 @@ export default function SellersDashboard() {
                   options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
               </View>
               <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)} style={{ width: "100%" }}>
-                {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} chartData={chartData} />}
+                {chartWidth > 0 && chartData.labels.length > 0 ? (
+                  <LineChart width={chartWidth} activeSeries={activeSeries} chartData={chartData} chartYear={filterYear} />
+                ) : (
+                  <View style={styles.chartEmpty}>
+                    <Ionicons name="bar-chart-outline" size={32} color="#CBD5E1" />
+                    <Text style={styles.chartEmptyText}>
+                      {dataLoading ? "Loading chart..." : "No chart data for the selected filters."}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.legendRow}>
                 {SERIES.map(s => {
@@ -950,7 +1061,7 @@ export default function SellersDashboard() {
                 <Ionicons name="bulb" size={18} color="#F59E0B" />
                 <Text style={styles.chartTitle}>Key Insights</Text>
               </View>
-              {INSIGHTS.map((ins, i) => (
+              {insights.map((ins, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
                   <View style={[styles.insightIcon, { backgroundColor: ins.bg }]}>
                     <Ionicons name={ins.iconName as any} size={18} color={ins.color} />
@@ -974,7 +1085,7 @@ export default function SellersDashboard() {
               </View>
               <View style={styles.totalBadge}>
                 <Ionicons name="person" size={11} color="#64748B" />
-                <Text style={styles.totalBadgeText}>Total {filteredSellers.length}</Text>
+                <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
               </View>
             </View>
 
@@ -1009,9 +1120,9 @@ export default function SellersDashboard() {
             </View>
 
             <Text style={styles.showingText}>
-              {filteredSellers.length === 0
+              {totalSellers === 0
                 ? "No results found"
-                : `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage, filteredSellers.length)} of ${filteredSellers.length} entries`}
+                : `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage, totalSellers)} of ${totalSellers} entries`}
             </Text>
 
             {/* Table */}
@@ -1047,7 +1158,7 @@ export default function SellersDashboard() {
             </View>
 
             {/* Pagination */}
-            {filteredSellers.length > 0 && (
+            {totalSellers > 0 && (
               <View style={styles.paginationRow}>
                 <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
                 <View style={{ flexDirection: "row", gap: 4 }}>
@@ -1121,6 +1232,8 @@ export default function SellersDashboard() {
           </View>
         </View>
 
+        {errorBanner}
+
         {/* ── Filters Card ── */}
         <View style={styles.card}>
           <View style={styles.filterLabel}>
@@ -1143,7 +1256,7 @@ export default function SellersDashboard() {
                 <Ionicons name="calendar-outline" size={13} color="#64748B" />
                 <Text style={styles.filterLabelText}>Year</Text>
               </View>
-              <Dropdown value={filterYear} onChange={setFilterYear} options={YEAR_OPTIONS} />
+              <Dropdown value={filterYear} onChange={setFilterYear} options={yearOptions} />
             </View>
           </View>
 
@@ -1203,7 +1316,16 @@ export default function SellersDashboard() {
               options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
           </View>
           <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)} style={{ width: "100%" }}>
-            {chartWidth > 0 && <LineChart width={chartWidth} activeSeries={activeSeries} chartData={chartData} />}
+            {chartWidth > 0 && chartData.labels.length > 0 ? (
+              <LineChart width={chartWidth} activeSeries={activeSeries} chartData={chartData} chartYear={filterYear} />
+            ) : (
+              <View style={styles.chartEmpty}>
+                <Ionicons name="bar-chart-outline" size={32} color="#CBD5E1" />
+                <Text style={styles.chartEmptyText}>
+                  {dataLoading ? "Loading chart..." : "No chart data for the selected filters."}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={styles.legendRow}>
             {SERIES.map(s => {
@@ -1228,7 +1350,7 @@ export default function SellersDashboard() {
             <Ionicons name="bulb" size={18} color="#F59E0B" />
             <Text style={styles.chartTitle}>Key Insights</Text>
           </View>
-          {INSIGHTS.map((ins, i) => (
+          {insights.map((ins, i) => (
             <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
               <View style={[styles.insightIcon, { backgroundColor: ins.bg }]}>
                 <Ionicons name={ins.iconName as any} size={18} color={ins.color} />
@@ -1250,7 +1372,7 @@ export default function SellersDashboard() {
             </View>
             <View style={styles.totalBadge}>
               <Ionicons name="person" size={11} color="#64748B" />
-              <Text style={styles.totalBadgeText}>Total {filteredSellers.length}</Text>
+              <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
             </View>
           </View>
 
@@ -1287,9 +1409,9 @@ export default function SellersDashboard() {
           </View>
 
           <Text style={styles.showingText}>
-            {filteredSellers.length === 0
+            {totalSellers === 0
               ? "No results found"
-              : `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage, filteredSellers.length)} of ${filteredSellers.length} entries`}
+              : `Showing ${(safePage-1)*perPage+1}–${Math.min(safePage*perPage, totalSellers)} of ${totalSellers} entries`}
           </Text>
 
           {paginated.length === 0 ? (
@@ -1308,7 +1430,7 @@ export default function SellersDashboard() {
             </View>
           )}
 
-          {filteredSellers.length > 0 && (
+          {totalSellers > 0 && (
             <View style={styles.paginationRow}>
               <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
               <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
@@ -1615,4 +1737,25 @@ const styles = StyleSheet.create({
   shiprocketText: { fontSize: 13, color: "#065F46" },
 
   footer: { textAlign: "center", paddingVertical: 20, fontSize: 12, color: "#94A3B8", lineHeight: 20 },
+
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+  },
+  errorBannerText: { flex: 1, fontSize: 12, color: "#92400E", lineHeight: 18 },
+  errorRetryText: { fontSize: 12, fontWeight: "700", color: ORANGE },
+  chartEmpty: {
+    height: 240,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  chartEmptyText: { fontSize: 13, color: "#94A3B8", textAlign: "center", paddingHorizontal: 20 },
 });

@@ -38,7 +38,15 @@ import Svg, {
 import AdminLayout from "@/components/admin-layout";
 
 // API Services
-import { fetchDashboardStats } from "@/services/dashboardApi";
+import {
+  fetchDashboardStats,
+  fetchDashboardRevenueChart,
+  fetchDashboardTopProducts,
+  fetchDashboardTopSellers,
+  fetchDashboardInventoryAlerts,
+  fetchDashboardActivity,
+} from "@/services/dashboardApi";
+import { formatDate } from "@/lib/format";
 import { fetchOrders } from "@/services/orderApi";
 import { fetchSellers, fetchSellerAnalyticsSummary } from "@/services/sellerApi";
 import { fetchProductStats } from "@/services/productApi";
@@ -72,6 +80,28 @@ const C = {
   greyBg:        "#f1f5f9",
 };
 
+function formatOrderStatus(status?: string) {
+  if (!status) return "Processing";
+  const normalized = status.toLowerCase();
+  if (normalized.includes("complete") || normalized.includes("deliver")) return "Completed";
+  if (normalized.includes("cancel")) return "Cancelled";
+  if (normalized.includes("return") || normalized.includes("refund")) return "Returned";
+  if (normalized.includes("ship")) return "Shipped";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatPaymentMethod(method?: string) {
+  if (!method) return "Online";
+  const normalized = method.toLowerCase();
+  if (normalized.includes("cod") || normalized.includes("cash")) return "COD";
+  return "Online";
+}
+
+function chartYLabels(maxVal: number) {
+  const step = maxVal / 5;
+  return Array.from({ length: 6 }, (_, i) => `₹${Math.round(maxVal - step * i)}`);
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { width: screenW } = useWindowDimensions();
@@ -95,7 +125,12 @@ export default function DashboardScreen() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [customerStats, setCustomerStats] = useState<any>(null);
   const [sellers, setSellers] = useState<any[]>([]);
-  
+  const [revenueChart, setRevenueChart] = useState<any>(null);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [topSellers, setTopSellers] = useState<any[]>([]);
+  const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+
   // UX Controls
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,13 +156,7 @@ export default function DashboardScreen() {
   const [sellerSortAsc, setSellerSortAsc] = useState(false);
 
   // Section 14: Notifications State
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: "order", message: "New Order FNT2026053001 received (₹1,084.00)", read: false, time: "5 mins ago" },
-    { id: 2, type: "seller", message: "Seller 'Suvadip Ghosh' updated business profile", read: false, time: "25 mins ago" },
-    { id: 3, type: "stock", message: "Critical Alert: Loafers for Men is Out of Stock!", read: true, time: "1 hr ago" },
-    { id: 4, type: "payment", message: "Stripe payment failed for Customer #204", read: false, time: "2 hrs ago" },
-    { id: 5, type: "customer", message: "New Customer 'Aruna bharati' registered", read: false, time: "4 hrs ago" },
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   // Section 15: Coupon Creator Modal
   const [couponModalVisible, setCouponModalVisible] = useState(false);
@@ -139,7 +168,20 @@ export default function DashboardScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [statsRes, ordersRes, sellerRes, productRes, custRes, custStatsRes, sellersListRes] = await Promise.allSettled([
+      const [
+        statsRes,
+        ordersRes,
+        sellerRes,
+        productRes,
+        custRes,
+        custStatsRes,
+        sellersListRes,
+        chartRes,
+        topProductsRes,
+        topSellersRes,
+        alertsRes,
+        activityRes,
+      ] = await Promise.allSettled([
         fetchDashboardStats(),
         fetchOrders({ page: 0, size: 20 }),
         fetchSellerAnalyticsSummary(),
@@ -147,22 +189,45 @@ export default function DashboardScreen() {
         fetchCustomers("", 0, 20),
         fetchCustomerStats(),
         fetchSellers({ page: 0, size: 20 }),
+        fetchDashboardRevenueChart(revenueTimeframe),
+        fetchDashboardTopProducts(10),
+        fetchDashboardTopSellers(10),
+        fetchDashboardInventoryAlerts(10),
+        fetchDashboardActivity(10),
       ]);
 
       if (statsRes.status === "fulfilled") setStats(statsRes.value);
-      if (ordersRes.status === "fulfilled") setOrders(ordersRes.value.items || []);
+      if (ordersRes.status === "fulfilled") {
+        const items = ordersRes.value.items || [];
+        setOrders(items);
+        setRecentOrders(
+          items.slice(0, 10).map((o) => ({
+            id: o.orderNumber || `ORD-${o.id}`,
+            customer: o.shippingName || "Customer",
+            amount: Number(o.totalAmount ?? 0),
+            status: formatOrderStatus(o.orderStatus),
+            payment: formatPaymentMethod(o.paymentMethod),
+            date: formatDate(o.createdAt),
+          }))
+        );
+      }
       if (sellerRes.status === "fulfilled") setSellerStats(sellerRes.value);
       if (productRes.status === "fulfilled") setProductStats(productRes.value);
       if (custRes.status === "fulfilled") setCustomers(custRes.value.items || []);
       if (custStatsRes.status === "fulfilled") setCustomerStats(custStatsRes.value);
       if (sellersListRes.status === "fulfilled") setSellers(sellersListRes.value.items || []);
+      if (chartRes.status === "fulfilled") setRevenueChart(chartRes.value);
+      if (topProductsRes.status === "fulfilled") setTopProducts(topProductsRes.value || []);
+      if (topSellersRes.status === "fulfilled") setTopSellers(topSellersRes.value || []);
+      if (alertsRes.status === "fulfilled") setInventoryAlerts(alertsRes.value || []);
+      if (activityRes.status === "fulfilled") setNotifications(activityRes.value || []);
     } catch (err) {
       console.error("Dashboard enhancement fetch error:", err);
-      setError(getApiErrorMessage(err, "Failed to load dashboard data. Running in simulated fallback mode."));
+      setError(getApiErrorMessage(err, "Failed to load dashboard data."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [revenueTimeframe]);
 
   useEffect(() => {
     loadData();
@@ -175,97 +240,67 @@ export default function DashboardScreen() {
   // SECTION 1: Top Statistics KPI dataset with growth metrics
   const kpiStats = useMemo(() => {
     return {
-      totalRevenue: { value: rupee(stats?.totalRevenue ?? stats?.allTimeRevenue ?? 16696.00), growth: "+12.5%", trend: "up", label: "Total Revenue", icon: "cash-outline", color: C.active },
-      todayRevenue: { value: rupee(stats?.todayRevenue ?? 417.00), growth: "+4.2%", trend: "up", label: "Today's Revenue", icon: "wallet-outline", color: C.primary },
-      totalOrders: { value: count(stats?.totalOrders ?? stats?.allTimeOrders ?? 57), growth: "+8.3%", trend: "up", label: "Total Orders", icon: "cart-outline", color: C.processing },
-      pendingOrders: { value: count(stats?.pendingOrders ?? 0), growth: "0.0%", trend: "flat", label: "Pending Orders", icon: "hourglass-outline", color: C.warning },
-      completedOrders: { value: count(stats?.completedOrders ?? 18), growth: "+14.1%", trend: "up", label: "Completed Orders", icon: "checkmark-done-circle-outline", color: C.active },
-      cancelledOrders: { value: count(stats?.cancelledOrders ?? 35), growth: "-2.1%", trend: "down", label: "Cancelled Orders", icon: "close-circle-outline", color: C.inactive },
-      totalCustomers: { value: count(customerStats?.total ?? 204), growth: "+5.7%", trend: "up", label: "Total Customers", icon: "people-outline", color: "#0ea5e9" },
-      totalSellers: { value: count(sellerStats?.total ?? 141), growth: "+3.2%", trend: "up", label: "Total Sellers", icon: "storefront-outline", color: C.purple },
-      totalProducts: { value: count(productStats?.total ?? 708), growth: "+1.8%", trend: "up", label: "Total Products", icon: "cube-outline", color: C.violet },
-      outOfStock: { value: count(productStats?.outOfStock ?? 0), growth: "0.0%", trend: "flat", label: "Out Of Stock", icon: "alert-circle-outline", color: C.inactive },
-      lowStock: { value: count(productStats?.lowStock ?? 3), growth: "-5.0%", trend: "down", label: "Low Stock Products", icon: "warning-outline", color: C.warning },
-      totalCategories: { value: count(stats?.totalCategories ?? 48), growth: "+2.0%", trend: "up", label: "Total Categories", icon: "grid-outline", color: "#ec4899" }
+      totalRevenue: { value: rupee(Number(stats?.totalRevenue ?? stats?.allTimeRevenue ?? 0)), growth: "—", trend: "flat", label: "Total Revenue", icon: "cash-outline", color: C.active },
+      todayRevenue: { value: rupee(Number(stats?.todayRevenue ?? 0)), growth: "—", trend: "flat", label: "Today's Revenue", icon: "wallet-outline", color: C.primary },
+      totalOrders: { value: count(Number(stats?.totalOrders ?? stats?.allTimeOrders ?? 0)), growth: "—", trend: "flat", label: "Total Orders", icon: "cart-outline", color: C.processing },
+      pendingOrders: { value: count(Number(stats?.pendingOrders ?? 0)), growth: "—", trend: "flat", label: "Pending Orders", icon: "hourglass-outline", color: C.warning },
+      completedOrders: { value: count(Number(stats?.completedOrders ?? 0)), growth: "—", trend: "flat", label: "Completed Orders", icon: "checkmark-done-circle-outline", color: C.active },
+      cancelledOrders: { value: count(Number(stats?.cancelledOrders ?? 0)), growth: "—", trend: "flat", label: "Cancelled Orders", icon: "close-circle-outline", color: C.inactive },
+      totalCustomers: { value: count(Number(customerStats?.total ?? 0)), growth: "—", trend: "flat", label: "Total Customers", icon: "people-outline", color: "#0ea5e9" },
+      totalSellers: { value: count(Number(sellerStats?.total ?? sellerStats?.registered ?? 0)), growth: "—", trend: "flat", label: "Total Sellers", icon: "storefront-outline", color: C.purple },
+      totalProducts: { value: count(Number(productStats?.total ?? 0)), growth: "—", trend: "flat", label: "Total Products", icon: "cube-outline", color: C.violet },
+      outOfStock: { value: count(Number(productStats?.outOfStock ?? 0)), growth: "—", trend: "flat", label: "Out Of Stock", icon: "alert-circle-outline", color: C.inactive },
+      lowStock: { value: count(Number(productStats?.lowStock ?? 0)), growth: "—", trend: "flat", label: "Low Stock Products", icon: "warning-outline", color: C.warning },
+      totalCategories: { value: count(Number(stats?.totalCategories ?? 0)), growth: "—", trend: "flat", label: "Total Categories", icon: "grid-outline", color: "#ec4899" }
     };
   }, [stats, customerStats, sellerStats, productStats]);
 
   // Unified Dashboard metrics data object
   const d = useMemo(() => {
     return {
-      todayRevenue: stats?.todayRevenue ?? 417.00,
-      todayOrders: stats?.todayOrders ?? 2,
-      weekRevenue: stats?.weekRevenue ?? 4200.00,
-      weekOrders: stats?.weekOrders ?? 15,
-      monthRevenue: stats?.monthRevenue ?? 16696.00,
-      monthOrders: stats?.monthOrders ?? 57,
-      allTimeRevenue: stats?.totalRevenue ?? stats?.allTimeRevenue ?? 16696.00,
-      allTimeOrders: stats?.totalOrders ?? stats?.allTimeOrders ?? 57,
-      pendingOrders: stats?.pendingOrders ?? 0,
-      processingCount: stats?.processingCount ?? stats?.processingOrders ?? 2,
-      returnedCount: stats?.returnedCount ?? stats?.returnedOrders ?? 1,
-      returnedBg: "#fef3c7", // Amber/Yellow
+      todayRevenue: Number(stats?.todayRevenue ?? 0),
+      todayOrders: Number(stats?.todayOrders ?? 0),
+      weekRevenue: Number(stats?.weekRevenue ?? 0),
+      weekOrders: Number(stats?.weekOrders ?? 0),
+      monthRevenue: Number(stats?.monthRevenue ?? 0),
+      monthOrders: Number(stats?.monthOrders ?? 0),
+      allTimeRevenue: Number(stats?.totalRevenue ?? stats?.allTimeRevenue ?? 0),
+      allTimeOrders: Number(stats?.totalOrders ?? stats?.allTimeOrders ?? 0),
+      pendingOrders: Number(stats?.pendingOrders ?? 0),
+      processingCount: Number(stats?.processingCount ?? stats?.processingOrders ?? 0),
+      returnedCount: Number(stats?.returnedCount ?? stats?.returnedOrders ?? 0),
+      returnedBg: "#fef3c7",
       returned: "#d97706",
-      productsCount: productStats?.total ?? 708,
-      outOfStock: productStats?.outOfStock ?? 0,
-      lowStock: productStats?.lowStock ?? 3,
+      productsCount: Number(productStats?.total ?? 0),
+      outOfStock: Number(productStats?.outOfStock ?? 0),
+      lowStock: Number(productStats?.lowStock ?? 0),
     };
   }, [stats, productStats]);
 
   // SECTION 2: Chart Timeframe calculations
   const revenueChartData = useMemo(() => {
-    switch (revenueTimeframe) {
-      case "daily":
-        return {
-          labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-          revenue: [400, 1200, 900, 1800, 2400, 3100, 2900],
-          orders: [2, 5, 3, 6, 8, 11, 9],
-          yLabels: ["₹4000", "₹3200", "₹2400", "₹1600", "₹800", "₹0"],
-          maxVal: 4000,
-        };
-      case "weekly":
-        return {
-          labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
-          revenue: [2400, 4800, 9200, 16696],
-          orders: [8, 15, 30, 57],
-          yLabels: ["₹20000", "₹16000", "₹12000", "₹8000", "₹4000", "₹0"],
-          maxVal: 20000,
-        };
-      case "yearly":
-        return {
-          labels: ["2023", "2024", "2025", "2026"],
-          revenue: [8200, 11500, 14200, 16696],
-          orders: [28, 41, 49, 57],
-          yLabels: ["₹20000", "₹16000", "₹12000", "₹8000", "₹4000", "₹0"],
-          maxVal: 20000,
-        };
-      case "monthly":
-      default:
-        return {
-          labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-          revenue: [800, 1400, 2600, 4200, 5800, 7100, 8900, 10400, 11500, 12900, 14800, 16696],
-          orders: [3, 6, 8, 12, 18, 22, 29, 34, 38, 45, 50, 57],
-          yLabels: ["₹20000", "₹16000", "₹12000", "₹8000", "₹4000", "₹0"],
-          maxVal: 20000,
-        };
-    }
-  }, [revenueTimeframe]);
+    const maxVal = Number(revenueChart?.maxVal ?? 1000);
+    return {
+      labels: revenueChart?.labels ?? [],
+      revenue: (revenueChart?.revenue ?? []).map((v) => Number(v)),
+      orders: (revenueChart?.orders ?? []).map((v) => Number(v)),
+      yLabels: chartYLabels(maxVal),
+      maxVal,
+    };
+  }, [revenueChart]);
 
   // SECTION 7: Top Selling Products dataset
   const topProductsRaw = useMemo(() => {
-    return [
-      { id: "P001", name: "Latest Modern Design Casual Loafers for Men & Boys | Slip-On Daily Wear Shoes | Flexible & Comfortable", sales: 84, revenue: 91056.00, stock: "In Stock", stockCount: 120, image: "👟" },
-      { id: "P002", name: "Men's Mustard Yellow Quick-Dry Performance T-Shirt | Men's Quick Dry Sports T-Shirt", sales: 59, revenue: 49206.00, stock: "Low Stock", stockCount: 8, image: "👕" },
-      { id: "P003", name: "Hand-Painted Saree with Lord Buddha Motif – Yellow, Black & White Color Block Design with Gold Border", sales: 51, revenue: 100980.00, stock: "In Stock", stockCount: 45, image: "👗" },
-      { id: "P004", name: "Elegant Maroon Bandhani Printed Saree with Blouse Piece", sales: 49, revenue: 36652.00, stock: "In Stock", stockCount: 62, image: "👘" },
-      { id: "P005", name: "Women's Pink Floral Printed Kurta with Palazzo Set", sales: 44, revenue: 40700.00, stock: "Out Of Stock", stockCount: 0, image: "👚" },
-      { id: "P006", name: "Leather Formal Oxford Shoes for Office & Formal Events", sales: 38, revenue: 75240.00, stock: "In Stock", stockCount: 85, image: "👞" },
-      { id: "P007", name: "Premium Soft Cotton Bedsheet with Pillow Covers (King Size)", sales: 30, revenue: 29970.00, stock: "Low Stock", stockCount: 5, image: "🛏" },
-      { id: "P008", name: "Modern Nordic Design Table Lamp for Living Room & Bedroom", sales: 25, revenue: 49750.00, stock: "In Stock", stockCount: 38, image: "💡" },
-      { id: "P009", name: "Waterproof Bluetooth Sports Wireless Earbuds with Mic", sales: 20, revenue: 39800.00, stock: "In Stock", stockCount: 150, image: "🎧" },
-      { id: "P010", name: "Genuine Leather Slim Wallet with RFID Blocking Layer", sales: 15, revenue: 14925.00, stock: "In Stock", stockCount: 220, image: "👛" }
-    ];
-  }, []);
+    return topProducts.map((p) => ({
+      id: p.id,
+      name: p.name,
+      sales: Number(p.sales ?? 0),
+      revenue: Number(p.revenue ?? 0),
+      stock: p.stock ?? "In Stock",
+      stockCount: Number(p.stockCount ?? 0),
+      image: p.image || "📦",
+    }));
+  }, [topProducts]);
 
   // Filtered & Sorted Top Products
   const filteredProducts = useMemo(() => {
@@ -288,30 +323,16 @@ export default function DashboardScreen() {
 
   // SECTION 8: Top Sellers Dataset
   const topSellersRaw = useMemo(() => {
-    if (sellers.length > 0) {
-      return sellers.map((s, idx) => ({
-        id: s.id,
-        name: s.fullName || "Seller Name",
-        business: s.businessName || "Business Name",
-        orders: 57 - idx * 4,
-        revenue: 16696.00 - idx * 1200,
-        rating: (5.0 - idx * 0.1).toFixed(1),
-        status: s.status || "Active",
-      }));
-    }
-    return [
-      { id: 1, name: "Pickcell Pickcell", business: "PICKCELL", orders: 84, revenue: 91056.00, rating: "4.9", status: "Active" },
-      { id: 2, name: "Suvadip Ghosh", business: "Suvayushna Enterprise", orders: 59, revenue: 49206.00, rating: "4.8", status: "Active" },
-      { id: 3, name: "Hitesh Jethani", business: "HITESH BANGALES", orders: 51, revenue: 100980.00, rating: "4.7", status: "Active" },
-      { id: 4, name: "The Legacy Closet India", business: "MATHA THERESA ENTERPRISES", orders: 49, revenue: 36652.00, rating: "4.6", status: "Active" },
-      { id: 5, name: "THE WUGO", business: "SATYA SALES CORPORATION", orders: 44, revenue: 40700.00, rating: "4.5", status: "Active" },
-      { id: 6, name: "Manish Bagad", business: "Tajoo", orders: 38, revenue: 75240.00, rating: "4.4", status: "Active" },
-      { id: 7, name: "Domnic Rathnam", business: "Dstudio", orders: 30, revenue: 29970.00, rating: "4.3", status: "Active" },
-      { id: 8, name: "Krishnappa Mohan", business: "Padmashree Creations", orders: 25, revenue: 49750.00, rating: "4.2", status: "Active" },
-      { id: 9, name: "Priyadarsini Mathiazhagan", business: "For She - Avalukaaga", orders: 20, revenue: 39800.00, rating: "4.1", status: "Active" },
-      { id: 10, name: "Isha Fashion Nandhini Ram", business: "Isha Fashions", orders: 15, revenue: 14925.00, rating: "4.0", status: "Active" }
-    ];
-  }, [sellers]);
+    return topSellers.map((s) => ({
+      id: s.id,
+      name: s.name || "Seller",
+      business: s.business || "—",
+      orders: Number(s.orders ?? 0),
+      revenue: Number(s.revenue ?? 0),
+      rating: s.rating || "4.5",
+      status: s.status || "Active",
+    }));
+  }, [topSellers]);
 
   const filteredSellers = useMemo(() => {
     let result = topSellersRaw.filter(s => s.name.toLowerCase().includes(sellerSearch.toLowerCase()));
@@ -327,59 +348,40 @@ export default function DashboardScreen() {
     return result.slice(0, 10);
   }, [topSellersRaw, sellerSearch, sellerSortField, sellerSortAsc]);
 
-  // SECTION 9: Recent 10 Orders with status modification capabilities
-  const [recentOrders, setRecentOrders] = useState([
-    { id: "FNT20260529463", customer: "Sri Raj Dodda", amount: 417.00, status: "Processing", payment: "Online", date: "29 May 2026" },
-    { id: "FNT20260527814", customer: "Rayapati Raveendra Nadh", amount: 634.00, status: "Completed", payment: "Online", date: "27 May 2026" },
-    { id: "FNT20260526387", customer: "Aruna bharati kumari", amount: 364.00, status: "Completed", payment: "COD", date: "26 May 2026" },
-    { id: "FNT20260518604", customer: "Sri Raj Dodda", amount: 1342.00, status: "Completed", payment: "Online", date: "18 May 2026" },
-    { id: "FNT202605154408", customer: "Yaparu Sriman Srivathsa", amount: 689.00, status: "Cancelled", payment: "COD", date: "15 May 2026" },
-    { id: "FNT20260512999", customer: "Rohan Sharma", amount: 980.00, status: "Shipped", payment: "Online", date: "12 May 2026" },
-    { id: "FNT20260510888", customer: "Megha Gupta", amount: 1450.00, status: "Delivered", payment: "Online", date: "10 May 2026" },
-    { id: "FNT20260508777", customer: "Anil Kapoor", amount: 2200.00, status: "Returned", payment: "COD", date: "08 May 2026" },
-    { id: "FNT20260505666", customer: "Vikram Malhotra", amount: 310.00, status: "Completed", payment: "Online", date: "05 May 2026" },
-    { id: "FNT20260503555", customer: "Sneha Nair", amount: 1180.00, status: "Processing", payment: "Online", date: "03 May 2026" }
-  ]);
-
   const updateOrderStatus = (orderId: string, newStatus: string) => {
     setRecentOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
   };
 
   // SECTION 10: Recent 10 Customers
   const recentCustomersList = useMemo(() => {
-    if (customers.length > 0) {
-      return customers.slice(0, 10).map((c, idx) => ({
-        id: c.id,
-        name: c.name || "Customer Name",
-        email: c.email || "customer@email.com",
-        date: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "29 May 2026",
-        status: "Active"
-      }));
-    }
-    return [
-      { id: 1, name: "Sri Raj Dodda", email: "sri.raj@gmail.com", date: "29 May 2026", status: "Active" },
-      { id: 2, name: "Rayapati Raveendra Nadh", email: "raveendra.nadh@gmail.com", date: "27 May 2026", status: "Active" },
-      { id: 3, name: "Aruna bharati kumari", email: "aruna.bharati@gmail.com", date: "26 May 2026", status: "Active" },
-      { id: 4, name: "Yaparu Sriman Srivathsa", email: "y.sriman@gmail.com", date: "15 May 2026", status: "Active" },
-      { id: 5, name: "Rohan Sharma", email: "rohan.sharma@gmail.com", date: "12 May 2026", status: "Active" },
-      { id: 6, name: "Megha Gupta", email: "megha.gupta@gmail.com", date: "10 May 2026", status: "Active" },
-      { id: 7, name: "Anil Kapoor", email: "anil.kapoor@gmail.com", date: "08 May 2026", status: "Active" },
-      { id: 8, name: "Vikram Malhotra", email: "vikram.m@gmail.com", date: "05 May 2026", status: "Active" },
-      { id: 9, name: "Sneha Nair", email: "sneha.nair@gmail.com", date: "03 May 2026", status: "Active" },
-      { id: 10, name: "Kabir Dev", email: "kabir.dev@gmail.com", date: "01 May 2026", status: "Active" }
-    ];
+    return customers.slice(0, 10).map((c) => ({
+      id: c.id,
+      name: c.name || "Customer",
+      email: c.email || "—",
+      date: formatDate(c.lastOrderAt || c.createdAt),
+      status: "Active",
+    }));
   }, [customers]);
 
-  // SECTION 11: Inventory Alerts (Alert severity, local restock action triggers)
-  const [inventoryAlerts, setInventoryAlerts] = useState([
-    { id: 1, name: "Women's Pink Floral Printed Kurta", type: "Out Of Stock", qty: 0, severity: "High", badgeColor: C.inactive, bg: C.inactiveBg },
-    { id: 2, name: "Men's Mustard Yellow Quick-Dry Performance T-Shirt", type: "Low Stock", qty: 8, severity: "Medium", badgeColor: C.warning, bg: C.warningBg },
-    { id: 3, name: "Premium Soft Cotton Bedsheet (King Size)", type: "Low Stock", qty: 5, severity: "Medium", badgeColor: C.warning, bg: C.warningBg },
-    { id: 4, name: "Hand-Painted Saree with Lord Buddha Motif", type: "Restock Required", qty: 45, severity: "Low", badgeColor: C.primary, bg: C.primaryLight }
-  ]);
+  const inventoryAlertsView = useMemo(() => {
+    return inventoryAlerts.map((item) => {
+      const isOut = item.type === "Out Of Stock" || Number(item.qty) <= 0;
+      return {
+        ...item,
+        badgeColor: isOut ? C.inactive : C.warning,
+        bg: isOut ? C.inactiveBg : C.warningBg,
+      };
+    });
+  }, [inventoryAlerts]);
 
   const restockProduct = (id: number) => {
-    setInventoryAlerts(prev => prev.map(item => item.id === id ? { ...item, qty: item.qty + 50, type: "Restock Scheduled", severity: "Low", badgeColor: C.active, bg: C.activeBg } : item));
+    setInventoryAlerts((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, qty: Number(item.qty ?? 0) + 50, type: "Restock Scheduled", severity: "Low" }
+          : item
+      )
+    );
   };
 
   // Coupon Creation trigger
@@ -1047,7 +1049,7 @@ export default function DashboardScreen() {
                       <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Action</Text>
                     </View>
 
-                    {inventoryAlerts.map(item => (
+                    {inventoryAlertsView.map(item => (
                       <View key={item.id} style={styles.tableRowData}>
                         <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
                           {item.name}
@@ -1271,7 +1273,7 @@ export default function DashboardScreen() {
                   <Text style={styles.cardColTitle}>👥 Customer Base Analytics</Text>
                   <View style={styles.paymentOverviewList}>
                     {[
-                      { label: "Total Registered Customers", count: customerStats?.total ?? 204 },
+                      { label: "Total Registered Customers", count: customerStats?.total ?? 0 },
                       { label: "New Customers Registered Today", count: 4 },
                       { label: "New Customers This Week", count: 18 },
                       { label: "New Customers This Month", count: 42 },
@@ -1291,10 +1293,10 @@ export default function DashboardScreen() {
                   <Text style={styles.cardColTitle}>🏪 Seller Network Summary</Text>
                   <View style={styles.paymentOverviewList}>
                     {[
-                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? 141 },
-                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? 71 },
+                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? sellerStats?.registered ?? 0 },
+                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? sellerStats?.approved ?? 0 },
                       { label: "Inactive Sellers (No Products)", count: 70 },
-                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 4 },
+                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 0 },
                       { label: "Top Performing Sellers (Verified)", count: 10 }
                     ].map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
@@ -1802,7 +1804,7 @@ export default function DashboardScreen() {
                       <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Action</Text>
                     </View>
 
-                    {inventoryAlerts.map(item => (
+                    {inventoryAlertsView.map(item => (
                       <View key={item.id} style={styles.tableRowData}>
                         <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
                           {item.name}
@@ -2015,7 +2017,7 @@ export default function DashboardScreen() {
                   <Text style={styles.cardColTitle}>👥 Customer Base Analytics</Text>
                   <View style={styles.paymentOverviewList}>
                     {[
-                      { label: "Total Registered Customers", count: customerStats?.total ?? 204 },
+                      { label: "Total Registered Customers", count: customerStats?.total ?? 0 },
                       { label: "New Customers Registered Today", count: 4 },
                       { label: "New Customers This Week", count: 18 },
                       { label: "New Customers This Month", count: 42 },
@@ -2035,10 +2037,10 @@ export default function DashboardScreen() {
                   <Text style={styles.cardColTitle}>🏪 Seller Network Summary</Text>
                   <View style={styles.paymentOverviewList}>
                     {[
-                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? 141 },
-                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? 71 },
+                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? sellerStats?.registered ?? 0 },
+                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? sellerStats?.approved ?? 0 },
                       { label: "Inactive Sellers (No Products)", count: 70 },
-                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 4 },
+                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 0 },
                       { label: "Top Performing Sellers (Verified)", count: 10 }
                     ].map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>

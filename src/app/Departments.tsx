@@ -97,7 +97,7 @@ function mapApiDepartment(d: ApiDepartment): Department {
         id: d.id,
         name: d.name ?? "",
         description: d.description ?? "",
-        jobs: 0,
+        jobs: Number(d.jobCount ?? 0),
         createdAt: "—",
         status: d.active !== false ? "Active" : "Inactive",
     };
@@ -728,13 +728,19 @@ const dc = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 const DepartmentsScreen: React.FC = () => {
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const loadDepartments = useCallback(async () => {
+        setLoading(true);
+        setError(null);
         try {
             const rows = await fetchDepartments();
             setDepartments(rows.map(mapApiDepartment));
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
+            setError(getApiErrorMessage(e, "Failed to load departments."));
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -921,7 +927,18 @@ const DepartmentsScreen: React.FC = () => {
                 </Text>
 
                 {/* ── DEPARTMENT CARDS / LIST ── */}
-                {filtered.length === 0 ? (
+                {loading ? (
+                    <View style={s.empty}>
+                        <Text style={s.emptyTitle}>Loading departments…</Text>
+                    </View>
+                ) : error ? (
+                    <View style={s.empty}>
+                        <Text style={s.emptyTitle}>{error}</Text>
+                        <TouchableOpacity style={s.addBtn} onPress={loadDepartments}>
+                            <Text style={s.addBtnTxt}>Retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : filtered.length === 0 ? (
                     <View style={s.empty}>
                         <View style={s.emptyIcon}>
                             <Feather name="inbox" size={30} color={T.textHint} />

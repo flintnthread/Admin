@@ -1,4 +1,12 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapSellerSupportTicket } from "@/lib/mappers";
+import {
+  fetchSupportTicket,
+  fetchSupportTickets,
+  replySupportTicket,
+  updateSupportTicketStatus,
+} from "@/services/supportApi";
 import {
   View,
   Text,
@@ -51,157 +59,14 @@ interface Ticket {
   messages: Message[];
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_TICKETS: Ticket[] = [
-  {
-    id: "1",
-    ticketCode: "TKT-69ECDB58E8BBC",
-    description: "When will we receive the credit of our payment",
-    sellerName: "Ishna Collections",
-    email: "ishnacollections@gmail.com",
-    phone: "+918334956789",
-    department: "Billing",
-    status: "Closed",
-    priority: "High",
-    createdAt: "Apr 25, 20:48",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        senderName: "Ishna Collections",
-        text: "Kindly let us know by when can we expect a credit of our payment of the last order ????",
-        timestamp: "Apr 25, 20:48",
-      },
-      {
-        id: "m2",
-        sender: "admin",
-        senderName: "You (Admin)",
-        text: "Dear Ishna Collections,\n\nThank you for reaching out.\n\nWe would like to inform you that due to the bank holiday today, the payment will be processed tomorrow. The amount is expected to be credited to your account on the next working day.\n\nBest regards,\nFlint & Thread Team",
-        timestamp: "Apr 26, 12:40",
-      },
-    ],
-  },
-  {
-    id: "2",
-    ticketCode: "TKT-69E51421854D2",
-    description: "Please arrange pickup of our order product",
-    sellerName: "Ishna Collections",
-    email: "ishnacollections@gmail.com",
-    phone: "+918334956789",
-    department: "Logistics",
-    status: "In Progress",
-    priority: "High",
-    createdAt: "Apr 19, 23:12",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        senderName: "Ishna Collections",
-        text: "We have 3 orders that need to be picked up. Please send the courier at the earliest.",
-        timestamp: "Apr 19, 23:12",
-      },
-    ],
-  },
-  {
-    id: "3",
-    ticketCode: "TKT-695FB4CCD7FCB",
-    description: "HOW TO COMLIT KYC",
-    sellerName: "Mumtaz Begum",
-    email: "mumtaz@example.com",
-    phone: "+917654321098",
-    department: "Compliance",
-    status: "Closed",
-    priority: "High",
-    createdAt: "Jan 08, 19:14",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        senderName: "Mumtaz Begum",
-        text: "I don't know how to complete KYC on the platform. Please guide me step by step.",
-        timestamp: "Jan 08, 19:14",
-      },
-      {
-        id: "m2",
-        sender: "admin",
-        senderName: "You (Admin)",
-        text: "Hello Mumtaz,\n\nPlease go to Settings > KYC Verification and upload your Aadhaar and PAN card. The process takes 24-48 hours.\n\nBest,\nSupport Team",
-        timestamp: "Jan 09, 10:05",
-      },
-    ],
-  },
-  {
-    id: "4",
-    ticketCode: "TKT-69265EB7C56F3E",
-    description: "products uploading issue",
-    sellerName: "Saranya Inukollu",
-    email: "saranya@example.com",
-    phone: "+919876543210",
-    department: "Technical",
-    status: "Open",
-    priority: "Medium",
-    createdAt: "Nov 26, 17:28",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        senderName: "Saranya Inukollu",
-        text: "I am unable to upload my product images. The page shows an error after I select photos.",
-        timestamp: "Nov 26, 17:28",
-      },
-    ],
-  },
-  {
-    id: "5",
-    ticketCode: "TKT-88ABCD1234EFG",
-    description: "Payment not received for last 3 orders",
-    sellerName: "Fashion Hub",
-    email: "fashionhub@gmail.com",
-    phone: "+919999888877",
-    department: "Billing",
-    status: "Waiting Admin",
-    priority: "Urgent",
-    createdAt: "Jun 10, 09:15",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        senderName: "Fashion Hub",
-        text: "We have not received payment for orders #1023, #1024 and #1025. It has been 7 days.",
-        timestamp: "Jun 10, 09:15",
-      },
-    ],
-  },
-  {
-    id: "6",
-    ticketCode: "TKT-77XYZW9988LMN",
-    description: "GST invoice not generating",
-    sellerName: "Trendy Weaves",
-    email: "trendy@example.com",
-    phone: "+918811223344",
-    department: "Billing",
-    status: "Resolved",
-    priority: "Low",
-    createdAt: "Jun 08, 14:30",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        senderName: "Trendy Weaves",
-        text: "GST invoices are not being generated for my last week's orders.",
-        timestamp: "Jun 08, 14:30",
-      },
-      {
-        id: "m2",
-        sender: "admin",
-        senderName: "You (Admin)",
-        text: "Hi,\n\nThis has been resolved on our end. Invoices should now appear in the Reports section.\n\nRegards,\nSupport",
-        timestamp: "Jun 08, 16:00",
-      },
-    ],
-  },
-];
+const STATUS_TO_API: Record<string, string> = {
+  Open: "open",
+  "In Progress": "in_progress",
+  "Waiting Admin": "waiting",
+  "Waiting Seller": "waiting",
+  Resolved: "closed",
+  Closed: "closed",
+};
 
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
 
@@ -520,11 +385,33 @@ export default function SupportTicketManagement() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [priorityFilter, setPriorityFilter] = useState("All Priorities");
   const [searchText, setSearchText] = useState("");
+
+  const loadTickets = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const statusParam =
+        statusFilter === "All Status" ? undefined : STATUS_TO_API[statusFilter];
+      const res = await fetchSupportTickets({ status: statusParam, size: 200 });
+      let rows = (res.items ?? []).map(mapSellerSupportTicket) as Ticket[];
+      if (priorityFilter !== "All Priorities") {
+        rows = rows.filter((t) => t.priority === priorityFilter);
+      }
+      setTickets(rows);
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+      setTickets([]);
+    }
+  }, [statusFilter, priorityFilter]);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
 
   const statusOptions = [
     "All Status",
@@ -571,40 +458,40 @@ export default function SupportTicketManagement() {
     []
   );
 
-  const handleReopen = useCallback((id: string) => {
-    setTickets((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: "Open" } : t))
-    );
-    setSelectedTicket((prev) =>
-      prev?.id === id ? { ...prev, status: "Open" } : prev
-    );
+  const refreshTicket = useCallback(async (id: string) => {
+    try {
+      const detail = mapSellerSupportTicket(await fetchSupportTicket(Number(id))) as Ticket;
+      setTickets((prev) => prev.map((t) => (t.id === id ? detail : t)));
+      setSelectedTicket((prev) => (prev?.id === id ? detail : prev));
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
   }, []);
 
+  const handleReopen = useCallback((id: string) => {
+    void (async () => {
+      try {
+        await updateSupportTicketStatus(Number(id), "open");
+        await refreshTicket(id);
+        await loadTickets();
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
+  }, [loadTickets, refreshTicket]);
+
   const handleSend = useCallback((id: string, text: string) => {
-    const newMsg: Message = {
-      id: `m${Date.now()}`,
-      sender: "admin",
-      senderName: "You (Admin)",
-      text,
-      timestamp: new Date().toLocaleString("en-IN", {
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }),
-    };
-    setTickets((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, messages: [...t.messages, newMsg] } : t
-      )
-    );
-    setSelectedTicket((prev) =>
-      prev?.id === id
-        ? { ...prev, messages: [...prev.messages, newMsg] }
-        : prev
-    );
-  }, []);
+    void (async () => {
+      try {
+        await replySupportTicket(Number(id), text);
+        await updateSupportTicketStatus(Number(id), "in_progress");
+        await refreshTicket(id);
+        await loadTickets();
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
+  }, [loadTickets, refreshTicket]);
 
   const statCards = [
     { label: "Total Tickets", count: stats.total, color: C.brand, bgColor: C.brandFaint },
@@ -641,6 +528,10 @@ export default function SupportTicketManagement() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.bodyContent}
         >
+          {loadError ? (
+            <Text style={{ color: C.brand, marginBottom: 12, paddingHorizontal: 4 }}>{loadError}</Text>
+          ) : null}
+
           {/* ── Stats ── */}
           <Text style={styles.sectionLabel}>Overview</Text>
           <View style={styles.statsGrid}>
