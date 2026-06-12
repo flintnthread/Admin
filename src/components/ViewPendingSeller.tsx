@@ -8,6 +8,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { fetchPendingProfileDetail } from '@/services/sellerApi';
 import {
     Dimensions,
     Image,
@@ -101,32 +103,32 @@ export type SellerProp = {
   submittedOn: string;
 };
 
-// ─── Mock / fallback seller data (used when no prop is passed) ────────────────
-const MOCK_SELLER = {
-  id: 286,
-  firstName: 'Sanju',
-  lastName: 'Sandhya',
-  email: 'flintandthread.hr@gmail.com',
-  mobile: '+919391939868',
-  registeredOn: 'Jan 05, 2026',
-  businessName: 'sg creations',
-  sellerCategory: 'B2C',
-  businessType: 'Sole Proprietorship',
-  address: 'albon a road, Hyderabad, telangana',
+const EMPTY_SELLER = {
+  id: 0,
+  firstName: '',
+  lastName: '',
+  email: '',
+  mobile: '',
+  registeredOn: '',
+  businessName: '',
+  sellerCategory: '',
+  businessType: '',
+  address: '',
   gst: 'No',
-  panNumber: 'ABC12 C040',
-  bankName: 'Canara Bank',
-  branchName: 'GARIB',
-  accountNumber: '****12',
-  ifscCode: 'CNRB0724248',
-  accountHolder: 'MAUKAR SANIYA',
-  warehouseAddress: 'albon a road, Hyderabad, telangana',
-  country: 'India',
-  state: 'Telangana',
-  city: 'Hyderabad',
-  area: 'Malpur',
-  pincode: '500041',
+  panNumber: '',
+  bankName: '',
+  branchName: '',
+  accountNumber: '',
+  ifscCode: '',
+  accountHolder: '',
+  warehouseAddress: '',
+  country: '',
+  state: '',
+  city: '',
+  area: '',
+  pincode: '',
   profileImage: null as string | null,
+  documents: [] as { name: string; url?: string }[],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -143,26 +145,56 @@ type Props = { onBack?: () => void; seller?: SellerProp };
 
 export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props) {
   const [dim, setDim] = useState(Dimensions.get('window'));
-  const [docModal, setDocModal] = useState<{ visible: boolean; label: string }>({ visible: false, label: '' });
-
-  // Merge prop data on top of mock defaults
-  const SELLER = {
-    ...MOCK_SELLER,
-    ...(sellerProp ? {
-      id:           sellerProp.id,
-      firstName:    sellerProp.name.split(' ')[0] ?? MOCK_SELLER.firstName,
-      lastName:     sellerProp.name.split(' ').slice(1).join(' ') || MOCK_SELLER.lastName,
-      email:        sellerProp.email,
-      mobile:       sellerProp.mobile,
-      registeredOn: sellerProp.submittedOn,
-      businessName: sellerProp.businessName,
-    } : {}),
-  };
+  const [docModal, setDocModal] = useState<{ visible: boolean; label: string; url?: string }>({ visible: false, label: '' });
+  const [sellerState, setSellerState] = useState(EMPTY_SELLER);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window: w }) => setDim(w));
     return () => sub?.remove();
   }, []);
+
+  useEffect(() => {
+    const sellerId = sellerProp?.id;
+    if (!sellerId) return;
+    void (async () => {
+      try {
+        setLoadError(null);
+        const d = await fetchPendingProfileDetail(sellerId);
+        setSellerState({
+          id: Number(d.sellerId ?? sellerId),
+          firstName: String(d.firstName ?? sellerProp?.name.split(' ')[0] ?? ''),
+          lastName: String(d.lastName ?? sellerProp?.name.split(' ').slice(1).join(' ') ?? ''),
+          email: String(d.email ?? sellerProp?.email ?? ''),
+          mobile: String(d.mobile ?? sellerProp?.mobile ?? ''),
+          registeredOn: String(d.registeredOn ?? sellerProp?.submittedOn ?? ''),
+          businessName: String(d.businessName ?? sellerProp?.businessName ?? ''),
+          sellerCategory: String(d.sellerCategory ?? '').toUpperCase(),
+          businessType: String(d.businessType ?? '—'),
+          address: String(d.address ?? '—'),
+          gst: d.hasGst ? String(d.gstNumber ?? 'Yes') : 'No',
+          panNumber: String(d.panNumber ?? '—'),
+          bankName: String(d.bankName ?? '—'),
+          branchName: String(d.branchName ?? '—'),
+          accountNumber: String(d.accountNumber ?? '—'),
+          ifscCode: String(d.ifscCode ?? '—'),
+          accountHolder: String(d.accountHolder ?? '—'),
+          warehouseAddress: String(d.warehouseAddress ?? '—'),
+          country: String(d.warehouseCountry ?? d.country ?? '—'),
+          state: String(d.warehouseState ?? d.state ?? '—'),
+          city: String(d.warehouseCity ?? d.city ?? '—'),
+          area: String(d.warehouseArea ?? '—'),
+          pincode: String(d.pincode ?? '—'),
+          profileImage: (d.profilePicUrl as string) || null,
+          documents: Array.isArray(d.documents) ? d.documents as { name: string; url?: string }[] : [],
+        });
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
+  }, [sellerProp]);
+
+  const SELLER = sellerState;
 
   const { width } = dim;
   const device   = getDevice(width);
@@ -212,19 +244,18 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
   );
 
   // ── Verification doc row ──────────────────────────────────────────────────
-  const DocRow = ({ label }: { label: string }) => (
+  const DocRow = ({ label, onView }: { label: string; onView?: () => void }) => (
     <View style={sc.docRow}>
       <View style={sc.docLeft}>
         <BI name="file-earmark" size={14} color={C.orange} style={{ marginRight: 8 }} />
         <Text style={sc.docLabel}>{label}</Text>
       </View>
-      <TouchableOpacity
-        style={sc.docViewBtn}
-        onPress={() => setDocModal({ visible: true, label })}
-      >
-        <BI name="eye" size={12} color={C.white} style={{ marginRight: 4 }} />
-        <Text style={sc.docViewBtnT}>View</Text>
-      </TouchableOpacity>
+      {onView ? (
+        <TouchableOpacity style={sc.docViewBtn} onPress={onView}>
+          <BI name="eye" size={12} color={C.white} style={{ marginRight: 4 }} />
+          <Text style={sc.docViewBtnT}>View</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 
@@ -246,6 +277,12 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
         contentContainerStyle={[g.scroll, { padding: pad }]}
       >
         <View style={[g.page, isBig && g.pageWide]}>
+
+          {loadError ? (
+            <View style={{ marginBottom: 12, padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
+              <Text style={{ color: '#B91C1C' }}>{loadError}</Text>
+            </View>
+          ) : null}
 
           {/* ════════════════════════════════════════════════
               HERO BANNER
@@ -433,19 +470,13 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
                   <Text style={vd.headerTxt}>Verification Documents</Text>
                 </View>
                 <View style={vd.body}>
-                  {['Aadhaar Front', 'Aadhaar Back', 'PAN Card', 'Cancelled Cheque', 'Business Proof', 'Bank Proof'].map(label => (
-                    <DocRow key={label} label={label} />
+                  {(SELLER.documents.length > 0 ? SELLER.documents : [{ name: 'No documents uploaded' }]).map((doc) => (
+                    <DocRow
+                      key={doc.name}
+                      label={doc.name}
+                      onView={doc.url ? () => setDocModal({ visible: true, label: doc.name, url: doc.url }) : undefined}
+                    />
                   ))}
-
-                  <Text style={vd.subHeading}>Business Proof Documents Multiple</Text>
-                  <View style={vd.thumbRow}>
-                    <ImgThumb /><ImgThumb />
-                  </View>
-
-                  <Text style={vd.subHeading}>Live Selfie Document</Text>
-                  <View style={vd.thumbRow}>
-                    <ImgThumb /><ImgThumb />
-                  </View>
                 </View>
               </Section>
             </View>
@@ -484,11 +515,15 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
 
                 {/* Modal body — placeholder document preview */}
                 <View style={mod.body}>
-                  <View style={mod.previewBox}>
-                    <BI name="file-earmark" size={48} color={C.border} style={{ marginBottom: 12 }} />
-                    <Text style={mod.previewTitle}>{docModal.label}</Text>
-                    <Text style={mod.previewSub}>Document preview not available</Text>
-                  </View>
+                  {docModal.url ? (
+                    <Image source={{ uri: docModal.url }} style={{ width: '100%', height: 320, resizeMode: 'contain' }} />
+                  ) : (
+                    <View style={mod.previewBox}>
+                      <BI name="file-earmark" size={48} color={C.border} style={{ marginBottom: 12 }} />
+                      <Text style={mod.previewTitle}>{docModal.label}</Text>
+                      <Text style={mod.previewSub}>Document preview not available</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </TouchableWithoutFeedback>

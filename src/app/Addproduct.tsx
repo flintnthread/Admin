@@ -8,6 +8,7 @@ import {
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
+import { fetchProductCatalog } from "@/services/productApi";
 
 const AppText = Text;
 
@@ -67,13 +68,20 @@ const getHsnForMaterial = (_material: string) => "000000";
 const MATERIAL_TYPES: string[] = ["Cotton", "Polyester", "Silk", "Linen", "Wool", "Blend"];
 const uniquePickerOptions = (options: string[]) => Array.from(new Set(options));
 
-const fetchProductFormCatalog = async (): Promise<ProductFormCatalog> => ({
-    categories: [
-        { id: "c1", name: "Men's Apparel", subcategories: [{ id: "s1", name: "T-Shirts" }, { id: "s2", name: "Shirts" }] },
-        { id: "c2", name: "Women's Apparel", subcategories: [{ id: "s3", name: "Dresses" }, { id: "s4", name: "Tops" }] }
-    ],
-    materials: MATERIAL_TYPES.map((m, i) => ({ id: `m${i}`, name: m })),
-});
+const fetchProductFormCatalog = async (): Promise<ProductFormCatalog> => {
+    const data = await fetchProductCatalog();
+    return {
+        categories: (data.categories ?? []).map((c) => ({
+            id: String(c.id),
+            name: c.name,
+            subcategories: (c.subcategories ?? []).map((s) => ({
+                id: String(s.id),
+                name: s.name,
+            })),
+        })),
+        materials: MATERIAL_TYPES.map((m, i) => ({ id: `m${i}`, name: m })),
+    };
+};
 
 const createProduct = async (_payload: any): Promise<{ productId: string }> => ({
     productId: "new-product-id",

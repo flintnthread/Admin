@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapContactRow } from "@/lib/mappers";
-import { fetchContacts, replyContact, updateContactStatus } from "@/services/contactApi";
+import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact } from "@/services/contactApi";
 import {
   View,
   Text,
@@ -177,12 +177,10 @@ const MessageCard: React.FC<{
 );
 
 // ─── STATS HEADER ─────────────────────────────────────────────────────────────
-const StatsHeader: React.FC<{ messages: ContactMessage[] }> = ({
-  messages,
+const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: number } }> = ({
+  stats,
 }) => {
-  const total = messages.length;
-  const replied = messages.filter((m) => m.status === "Replied").length;
-  const pending = messages.filter((m) => m.status === "Not Replied").length;
+  const { total, replied, pending } = stats;
 
   const statsData = [
     {
@@ -611,13 +609,28 @@ const ContactMessagesScreen: React.FC = () => {
   const isWeb = Platform.OS === "web";
 
   const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [contactStats, setContactStats] = useState({ total: 0, replied: 0, pending: 0 });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadMessages = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetchContacts(0, 100);
+      const [res, statsRes] = await Promise.all([
+        fetchContacts(0, 100),
+        fetchContactStats(),
+      ]);
       setMessages((res.items ?? []).map((item, i) => toUiContact(mapContactRow(item), i)));
+      setContactStats({
+        total: Number(statsRes.total ?? 0),
+        replied: Number(statsRes.closed ?? 0),
+        pending: Number(statsRes.open ?? 0),
+      });
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      setLoadError(getApiErrorMessage(e));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -629,7 +642,6 @@ const ContactMessagesScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [viewMsg, setViewMsg] = useState<ContactMessage | null>(null);
   const [replyMsg, setReplyMsg] = useState<ContactMessage | null>(null);
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
   const AVATAR_COLORS = [
     { color: "#7C3AED", bg: "#EDE9FE" },
@@ -685,19 +697,23 @@ const ContactMessagesScreen: React.FC = () => {
   };
 
   const deleteMessage = (id: number) => {
-    const confirmDelete = () => {
-      setMessages((prev) => prev.filter((m) => m.id !== id));
-      const msg = "Message deleted successfully!";
-      if (Platform.OS === "web") {
-        window.alert(msg);
-      } else {
-        Alert.alert("Deleted", msg);
+    const confirmDelete = async () => {
+      try {
+        await deleteContact(id);
+        await loadMessages();
+        const msg = "Message deleted successfully!";
+        if (Platform.OS === "web") window.alert(msg);
+        else Alert.alert("Deleted", msg);
+      } catch (e) {
+        const err = getApiErrorMessage(e);
+        if (Platform.OS === "web") window.alert(err);
+        else Alert.alert("Error", err);
       }
     };
 
     if (Platform.OS === "web") {
       if (window.confirm("Are you sure you want to delete this message?")) {
-        confirmDelete();
+        void confirmDelete();
       }
     } else {
       Alert.alert(
@@ -705,21 +721,10 @@ const ContactMessagesScreen: React.FC = () => {
         "Are you sure you want to delete this message?",
         [
           { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: confirmDelete },
+          { text: "Delete", style: "destructive", onPress: () => void confirmDelete() },
         ]
       );
     }
-  };
-
-  const addMessage = (
-    msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">
-  ) => {
-    const nextId = Math.max(...messages.map((m) => m.id)) + 1;
-    const av = AVATAR_COLORS[nextId % AVATAR_COLORS.length];
-    setMessages((prev) => [
-      { ...msg, id: nextId, avatarColor: av.color, avatarBg: av.bg },
-      ...prev,
-    ]);
   };
 
   const MainContent = (
@@ -771,21 +776,14 @@ const ContactMessagesScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
-          <TouchableOpacity
-            style={styles.addButton}
-            activeOpacity={0.85}
-            onPress={() => setIsAddModalVisible(true)}
-          >
-            <Feather
-              name="plus"
-              size={16}
-              color="#FFFFFF"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.addButtonText}>Add New Message</Text>
-          </TouchableOpacity>
         </View>
       </View>
+
+      {loadError ? (
+        <Text style={{ color: "#DC2626", paddingHorizontal: isWeb ? 24 : 14, marginBottom: 8 }}>
+          {loadError}
+        </Text>
+      ) : null}
 
       {/* ── Mobile Controls ── */}
       {!isWeb && (
@@ -902,8 +900,12 @@ const ContactMessagesScreen: React.FC = () => {
         )}
 
         {/* Stats */}
-        <StatsHeader messages={messages} />
+        <StatsHeader stats={contactStats} />
 
+        {loading ? (
+          <Text style={styles.resultCount}>Loading contact messages…</Text>
+        ) : (
+        <>
         {/* Result count */}
         <Text style={styles.resultCount}>
           {filtered.length} message{filtered.length !== 1 ? "s" : ""} found
@@ -1015,6 +1017,8 @@ const ContactMessagesScreen: React.FC = () => {
             </View>
           </ScrollView>
         )}
+        </>
+        )}
       </ScrollView>
     </View>
   );
@@ -1039,12 +1043,6 @@ const ContactMessagesScreen: React.FC = () => {
           onClose={() => setReplyMsg(null)}
           onSend={handleSendReply}
           msg={replyMsg}
-          isWeb={isWeb}
-        />
-        <AddMessageModal
-          visible={isAddModalVisible}
-          onClose={() => setIsAddModalVisible(false)}
-          onSave={addMessage}
           isWeb={isWeb}
         />
       </View>

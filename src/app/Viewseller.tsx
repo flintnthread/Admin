@@ -1,18 +1,21 @@
-import React, { useRef, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { formatDate, maskAccount } from '@/lib/format';
+import { fetchSellerDetail } from '@/services/sellerApi';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View
+  ActivityIndicator,
+  Animated,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import { router } from 'expo-router';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
 // Install: expo install @expo/vector-icons  OR  npm install react-native-vector-icons
@@ -600,8 +603,22 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
             <TouchableOpacity
               style={[modalStyles.actionOutlineBtn, modalStyles.downloadBtn]}
               onPress={() => {
-                // In production: FileSystem.downloadAsync or Linking.openURL
-                console.log('Download:', docName, imageUri);
+                if (Platform.OS === 'web') {
+                  // Web download using blob
+                  const link = document.createElement('a');
+                  link.href = imageUri;
+                  link.download = `${docName.replace(/\s+/g, '_')}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                } else {
+                  // React Native: use expo-file-system or similar
+                  console.log('Download:', docName, imageUri);
+                  // In production, implement with expo-file-system:
+                  // import * as FileSystem from 'expo-file-system';
+                  // const fileUri = FileSystem.documentDirectory + `${docName}.png`;
+                  // await FileSystem.downloadAsync(imageUri, fileUri);
+                }
               }}
             >
               <BootstrapIcon name="download" size={15} color={COLORS.white} />
@@ -748,13 +765,76 @@ const csvModalStyles = StyleSheet.create({
 });
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+function mapDetailToSellerData(d: Record<string, unknown>): SellerData {
+  const emptySeries = { daily: [] as ChartDataPoint[], weekly: [] as ChartDataPoint[], monthly: [] as ChartDataPoint[], yearly: [] as ChartDataPoint[] };
+  const docs = Array.isArray(d.documents) ? d.documents as { name: string }[] : [];
+  const productCount = Number(d.productCount ?? 0);
+  const statusRaw = String(d.status ?? 'active').toLowerCase();
+  return {
+    id: String(d.id ?? ''),
+    firstName: String(d.firstName ?? ''),
+    lastName: String(d.lastName ?? ''),
+    email: String(d.email ?? ''),
+    mobile: String(d.mobile ?? ''),
+    sellerId: String(d.sellerUniqueId ?? `FNT-SELLER-${String(d.id ?? '').padStart(6, '0')}`),
+    emailVerified: Boolean(d.emailVerified),
+    registrationDate: formatDate(d.createdAt as string),
+    lastLogin: formatDate(d.lastLoginAt as string),
+    status: statusRaw === 'suspended' ? 'Inactive' : statusRaw === 'pending' ? 'Pending' : 'Active',
+    avatar: d.profilePicUrl as string | undefined,
+    businessName: String(d.businessName ?? '—'),
+    businessType: String(d.businessType ?? '—'),
+    gstNumber: String(d.gstNumber ?? '—'),
+    panNumber: String(d.panNumber ?? '—'),
+    address: String(d.address ?? '—'),
+    city: String(d.city ?? '—'),
+    state: String(d.state ?? '—'),
+    pincode: String(d.pincode ?? '—'),
+    walletBalance: Number(d.walletBalance ?? 0),
+    ifscCode: String(d.ifscCode ?? '—'),
+    bankName: String(d.bankName ?? '—'),
+    accountHolder: String(d.accountHolder ?? '—'),
+    accountNumber: maskAccount(d.accountNumber as string | undefined) || '—',
+    productsListingStatus: productCount > 0 ? 'Live' : 'Inactive',
+    totalProducts: productCount,
+    productStatusDistribution: { active: productCount, inactive: 0, pending: 0 },
+    orderStatusDistribution: { pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0 },
+    totalOrders: 0,
+    verificationDocuments: docs.map((doc) => ({ name: doc.name, available: true })),
+    analyticsData: emptySeries,
+    ordersAnalyticsData: emptySeries,
+  };
+}
+
 export default function ViewSeller() {
+  const params = useLocalSearchParams<{ sellerId?: string }>();
   const { width } = useWindowDimensions();
-  const [seller] = useState<SellerData>(MOCK_SELLER);
+  const [seller, setSeller] = useState<SellerData>(() => mapDetailToSellerData({}));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const sellerId = Number(params.sellerId);
+    if (!sellerId || Number.isNaN(sellerId)) {
+      setLoading(false);
+      return;
+    }
+    void (async () => {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        const detail = await fetchSellerDetail(sellerId);
+        setSeller(mapDetailToSellerData(detail as Record<string, unknown>));
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [params.sellerId]);
   const [analyticsTab, setAnalyticsTab] = useState<'products' | 'orders'>('products');
   const [periodTab, setPeriodTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
-  const [loading] = useState(false);
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string>('');
   const [productsExportModal, setProductsExportModal] = useState(false);
@@ -823,6 +903,12 @@ export default function ViewSeller() {
           </View>
         </TouchableOpacity>
       </View>
+
+      {loadError ? (
+        <View style={{ marginHorizontal: isMobile ? 16 : 24, marginBottom: 12, padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
+          <Text style={{ color: '#B91C1C' }}>{loadError}</Text>
+        </View>
+      ) : null}
 
       {/* ── Analytics Dashboard ─────────────────────────────────────────── */}
       <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
@@ -978,7 +1064,7 @@ export default function ViewSeller() {
                   <Text style={styles.actionBtnText}>Download</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.textSecondary }]}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.textSecondary }]} onPress={() => router.push('/sellers')}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
                   <Text style={styles.actionBtnText}>Back to List</Text>

@@ -13,6 +13,10 @@ export type CategoryRequestRow = {
   createdAt?: string;
 };
 
+export async function fetchCategoryRequestStats(): Promise<Record<string, number>> {
+  return adminApiRequest("/api/admin/category-requests/stats");
+}
+
 export async function fetchCategoryRequests(
   status?: string,
   page = 0,

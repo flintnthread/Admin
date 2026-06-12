@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -20,8 +20,8 @@ import {
   type ProductStatus,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { mapProductToApprovalRow } from '@/lib/mappers';
-import { fetchPendingProducts, fetchProductStats } from '@/services/productApi';
+import { mapProductListToApprovalRow } from '@/lib/mappers';
+import { fetchProductStats, fetchProducts, type ProductListRow } from '@/services/productApi';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ const DEFAULT_STATS: ProductStats = {
 
 const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/96?text=Product';
 
-function toApprovalProduct(row: ReturnType<typeof mapProductToApprovalRow>): ApprovalProduct {
+function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): ApprovalProduct {
   return {
     id: row.id,
     name: row.name,
@@ -676,38 +676,79 @@ function ProductTable({
   );
 }
 
+const PAGE_SIZE = 20;
+
+function buildPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | 'ellipsis')[] = [1];
+  if (current > 3) pages.push('ellipsis');
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p += 1) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push('ellipsis');
+  if (total > 1) pages.push(total);
+  return pages;
+}
+
 function Pagination({
   isMobile,
-  total,
-  showing,
+  page,
+  totalPages,
+  totalElements,
+  onPageChange,
 }: {
   isMobile: boolean;
-  total: number;
-  showing: number;
+  page: number;
+  totalPages: number;
+  totalElements: number;
+  onPageChange: (page: number) => void;
 }) {
-  const pages = [1, 2, 3];
+  const start = totalElements === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const end = Math.min(page * PAGE_SIZE, totalElements);
+  const pageNumbers = buildPageNumbers(page, totalPages);
+
+  if (totalPages <= 1) {
+    return (
+      <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
+        <Text style={styles.paginationInfo}>
+          Showing {start} to {end} of {totalElements} products
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
       <Text style={styles.paginationInfo}>
-        Showing {showing > 0 ? 1 : 0} to {showing} of {total} products
+        Showing {start} to {end} of {totalElements} products
       </Text>
       <View style={styles.paginationControls}>
-        <Pressable style={styles.pageBtn}>
+        <Pressable
+          style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+          disabled={page <= 1}
+          onPress={() => onPageChange(page - 1)}>
           <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
         </Pressable>
-        {pages.map((page) => (
-          <Pressable
-            key={page}
-            style={[styles.pageNum, page === 1 && styles.pageNumActive]}>
-            <Text style={[styles.pageNumText, page === 1 && styles.pageNumTextActive]}>{page}</Text>
-          </Pressable>
-        ))}
-        <Text style={styles.pageEllipsis}>...</Text>
-        <Pressable style={styles.pageNum}>
-          <Text style={styles.pageNumText}>71</Text>
-        </Pressable>
-        <Pressable style={styles.pageBtn}>
+        {pageNumbers.map((num, index) =>
+          num === 'ellipsis' ? (
+            <Text key={`e-${index}`} style={styles.pageEllipsis}>
+              ...
+            </Text>
+          ) : (
+            <Pressable
+              key={num}
+              style={[styles.pageNum, num === page && styles.pageNumActive]}
+              onPress={() => onPageChange(num)}>
+              <Text style={[styles.pageNumText, num === page && styles.pageNumTextActive]}>
+                {num}
+              </Text>
+            </Pressable>
+          ),
+        )}
+        <Pressable
+          style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+          disabled={page >= totalPages}
+          onPress={() => onPageChange(page + 1)}>
           <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
         </Pressable>
       </View>
@@ -715,30 +756,62 @@ function Pagination({
   );
 }
 
+function filterStatusForApi(filter: FilterKey): string | undefined {
+  if (filter === 'all') return undefined;
+  if (filter === 'approved') return 'active';
+  if (filter === 'review') return 'under_review';
+  return filter;
+}
+
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function ProductApprovalScreen() {
   const { isMobile, isTablet, isWide, width } = useBreakpoint();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [products, setProducts] = useState<ApprovalProduct[]>([]);
   const [stats, setStats] = useState<ProductStats>(DEFAULT_STATS);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [page, apiStats] = await Promise.all([fetchPendingProducts(0, 50), fetchProductStats()]);
-      setProducts(page.items.map((p) => toApprovalProduct(mapProductToApprovalRow(p))));
+      const apiStatus = filterStatusForApi(activeFilter);
+      const [page, apiStats] = await Promise.all([
+        fetchProducts({
+          status: apiStatus,
+          search: debouncedSearch.trim() || undefined,
+          page: currentPage - 1,
+          size: PAGE_SIZE,
+        }),
+        fetchProductStats(),
+      ]);
+      setProducts(
+        page.items.map((p: ProductListRow) =>
+          toApprovalProduct(mapProductListToApprovalRow(p)),
+        ),
+      );
       setTotalProducts(page.totalElements);
+      setTotalPages(page.totalPages);
+      if (currentPage > page.totalPages && page.totalPages > 0) {
+        setCurrentPage(page.totalPages);
+      }
       setStats({
         pending: Number(apiStats.pending ?? 0),
-        review: 0,
-        approved: Number(apiStats.approved ?? 0),
+        review: Number(apiStats.underReview ?? 0),
+        approved: Number(apiStats.approved ?? apiStats.active ?? 0),
         rejected: Number(apiStats.rejected ?? 0),
         all: Number(apiStats.total ?? 0),
       });
@@ -747,28 +820,23 @@ export default function ProductApprovalScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeFilter, currentPage, debouncedSearch]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filteredProducts = useMemo(() => {
-    let list = products;
-    if (activeFilter !== 'all') {
-      list = list.filter((p) => p.status === activeFilter);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.seller.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q),
-      );
-    }
-    return list;
-  }, [activeFilter, products, search]);
+  const handleFilterChange = useCallback((filter: FilterKey) => {
+    setActiveFilter(filter);
+    setCurrentPage(1);
+    setSelected(new Set());
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+    setSelected(new Set());
+  }, []);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -780,10 +848,10 @@ export default function ProductApprovalScreen() {
   };
 
   const toggleSelectAll = () => {
-    if (filteredProducts.every((p) => selected.has(p.id))) {
+    if (products.every((p) => selected.has(p.id))) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filteredProducts.map((p) => p.id)));
+      setSelected(new Set(products.map((p) => p.id)));
     }
   };
 
@@ -803,14 +871,14 @@ export default function ProductApprovalScreen() {
           showsVerticalScrollIndicator={false}>
           <PageHeader isWide={isWide} />
 
-          <StatsRow stats={stats} onFilter={setActiveFilter} isWide={isWide} />
+          <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
 
           <FilterSection
             stats={stats}
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
+            onFilterChange={handleFilterChange}
             isMobile={isMobile}
             isTablet={isTablet}
             isWide={isWide}
@@ -830,21 +898,27 @@ export default function ProductApprovalScreen() {
             </View>
           ) : isWide ? (
             <ProductTable
-              products={filteredProducts}
+              products={products}
               selected={selected}
               onToggle={toggleSelect}
               onToggleAll={toggleSelectAll}
             />
           ) : (
             <View style={styles.productList}>
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </View>
           )}
 
           {!loading && !error && (
-            <Pagination isMobile={isMobile} total={totalProducts} showing={filteredProducts.length} />
+            <Pagination
+              isMobile={isMobile}
+              page={currentPage}
+              totalPages={totalPages}
+              totalElements={totalProducts}
+              onPageChange={setCurrentPage}
+            />
           )}
         </ScrollView>
       </View>
@@ -1608,6 +1682,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: PALETTE.cardBg,
+  },
+  pageBtnDisabled: {
+    opacity: 0.4,
   },
   pageNum: {
     minWidth: 34,

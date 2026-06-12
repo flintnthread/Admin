@@ -101,6 +101,24 @@ function mapApiCustomerDetail(data: Record<string, unknown>): Customer {
       }
     : undefined;
 
+  const orderHistory: Order[] = Array.isArray(data.orders)
+    ? (data.orders as Record<string, unknown>[]).map((o) => ({
+        id: String(o.orderNumber ?? o.id ?? "—"),
+        date: formatDate(String(o.createdAt ?? "")),
+        items: Number(o.itemCount ?? 0),
+        amount: Number(o.totalAmount ?? 0),
+        payment: formatPaymentLabel(String(o.paymentMethod ?? "")),
+        status: mapOrderStatus(String(o.orderStatus ?? "")),
+      }))
+    : [];
+
+  const monthlySpending: MonthlyData[] = Array.isArray(data.monthlySpending)
+    ? (data.monthlySpending as Record<string, unknown>[]).map((m) => ({
+        month: String(m.month ?? ""),
+        amount: Number(m.amount ?? 0),
+      }))
+    : [];
+
   return {
     id: Number(data.id ?? 0),
     name: String(data.name ?? "Customer"),
@@ -114,9 +132,26 @@ function mapApiCustomerDetail(data: Record<string, unknown>): Customer {
     lastLogin: "Never",
     billingAddress: address,
     shippingAddress: address,
-    orderHistory: [],
-    monthlySpending: [],
+    orderHistory,
+    monthlySpending,
   };
+}
+
+function formatPaymentLabel(method: string) {
+  const normalized = method.toLowerCase();
+  if (normalized.includes("cod") || normalized.includes("cash")) return "COD";
+  if (!method) return "Online";
+  return method.charAt(0).toUpperCase() + method.slice(1);
+}
+
+function mapOrderStatus(status: string): Order["status"] {
+  const normalized = status.toLowerCase();
+  if (normalized.includes("complete") || normalized.includes("deliver")) return "Completed";
+  if (normalized.includes("cancel")) return "Cancelled";
+  if (normalized.includes("process") || normalized.includes("pending") || normalized.includes("ship")) {
+    return "Processing";
+  }
+  return "Pending";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -568,8 +603,10 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
   const c = customer;
 
-  const weekly   = 0;
-  const monthly  = c.totalSpent;
+  const weekly   = monthlyData.length
+    ? monthlyData[monthlyData.length - 1]?.amount ?? 0
+    : 0;
+  const monthly  = monthlyData.reduce((sum, m) => sum + m.amount, 0);
   const yearly   = c.totalSpent;
   const maxSpend = Math.max(weekly, monthly, yearly, 1);
   const avgOrder = c.orders > 0 ? c.totalSpent / c.orders : 0;

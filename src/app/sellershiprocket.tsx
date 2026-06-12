@@ -1,4 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { formatDate } from '@/lib/format';
+import { fetchShiprocketSellers, type ShiprocketSellerRow } from '@/services/sellerApi';
 import {
     ActivityIndicator,
     Alert,
@@ -28,111 +31,18 @@ interface Props {
   navigation: any; // replace with your navigation type
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const PENDING_SELLERS: Seller[] = [
-  {
-    id: '1',
-    businessName: 'Praveen',
-    contactPerson: 'Praveen Simha',
-    phone: '+918121407772',
-    city: 'Sangareddy',
-    state: 'Telangana',
-    status: 'Not Uploaded',
-  },
-  {
-    id: '2',
-    businessName: 'Gopi Store',
-    contactPerson: 'Gopi Tayi',
-    phone: '+919705699481',
-    city: 'Hyderabad',
-    state: 'Telangana',
-    status: 'Not Uploaded',
-  },
-];
-
-const UPLOADED_SELLERS: Seller[] = [
-  {
-    id: 'u1',
-    businessName: 'ANIL RETAILS',
-    contactPerson: 'Panwar Chair Compey',
-    phone: '+919000000001',
-    city: 'Sikar',
-    state: 'Rajasthan',
-    status: 'Uploaded',
-    uploadedAt: '04 Jun, 2026 03:05 PM',
-  },
-  {
-    id: 'u2',
-    businessName: 'ZOYA ALL BAGS CENTER',
-    contactPerson: 'Khaiser Mohammed',
-    phone: '+919000000002',
-    city: 'Sangareddy',
-    state: 'Telangana',
-    status: 'Uploaded',
-    uploadedAt: '30 May, 2026 11:23 AM',
-  },
-  {
-    id: 'u3',
-    businessName: 'PRAHARSHI CREATIONS',
-    contactPerson: 'Malathi Devulapalli',
-    phone: '+919000000003',
-    city: 'Hyderabad',
-    state: 'Telangana',
-    status: 'Uploaded',
-    uploadedAt: '17 May, 2026 10:48 AM',
-  },
-  {
-    id: 'u4',
-    businessName: 'SAINEE SHOPPING MALL',
-    contactPerson: 'Gone Mahender',
-    phone: '+919000000004',
-    city: 'Jayashankar Bhupalpally',
-    state: 'Telangana',
-    status: 'Uploaded',
-    uploadedAt: '17 May, 2026 10:48 AM',
-  },
-  {
-    id: 'u5',
-    businessName: 'BRAND SHOPPE',
-    contactPerson: 'Finn Brooks',
-    phone: '+919000000005',
-    city: 'Bengaluru Urban',
-    state: 'Karnataka',
-    status: 'Uploaded',
-    uploadedAt: '02 May, 2026 02:14 PM',
-  },
-  {
-    id: 'u6',
-    businessName: 'Naaz Collections',
-    contactPerson: 'Mohammed Sharvas Begum',
-    phone: '+919000000006',
-    city: 'Medchal-Malkajgiri',
-    state: 'Telangana',
-    status: 'Uploaded',
-    uploadedAt: '02 May, 2026 02:14 PM',
-  },
-  {
-    id: 'u7',
-    businessName: 'SMART FASHIONS',
-    contactPerson: 'Sri Sathya Sai',
-    phone: '+919000000007',
-    city: 'Sri Sathya Sai',
-    state: 'Andhra Pradesh',
-    status: 'Uploaded',
-    uploadedAt: '24 Apr, 2026 10:59 AM',
-  },
-  {
-    id: 'u8',
-    businessName: 'ARHAAN COLLECTIONS',
-    contactPerson: 'Arhaan Collection',
-    phone: '+919000000008',
-    city: 'Sri Sathya Sai',
-    state: 'Andhra Pradesh',
-    status: 'Uploaded',
-    uploadedAt: '24 Apr, 2026 10:59 AM',
-  },
-];
+function mapShiprocketRow(row: ShiprocketSellerRow, status: Seller['status']): Seller {
+  return {
+    id: String(row.id),
+    businessName: row.businessName ?? '—',
+    contactPerson: row.contactPerson ?? '—',
+    phone: row.phone ?? '—',
+    city: row.city ?? '—',
+    state: row.state ?? '—',
+    status,
+    uploadedAt: row.uploadedAt ? formatDate(row.uploadedAt) : undefined,
+  };
+}
 
 // ─── Bootstrap Icon Component (SVG-free text fallback) ───────────────────────
 // Uses Unicode characters that closely match Bootstrap Icons
@@ -173,9 +83,36 @@ const BsIcon: React.FC<{ name: string; size?: number; color?: string }> = ({
 
 const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
   const { width } = useWindowDimensions();
+  const [pendingSellers, setPendingSellers] = useState<Seller[]>([]);
+  const [uploadedSellers, setUploadedSellers] = useState<Seller[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [markingUploaded, setMarkingUploaded] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const loadSellers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+      const [pendingRes, uploadedRes] = await Promise.all([
+        fetchShiprocketSellers('pending', 0, 500),
+        fetchShiprocketSellers('uploaded', 0, 500),
+      ]);
+      setPendingSellers((pendingRes.items ?? []).map((r) => mapShiprocketRow(r, 'Not Uploaded')));
+      setUploadedSellers((uploadedRes.items ?? []).map((r) => mapShiprocketRow(r, 'Uploaded')));
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+      setPendingSellers([]);
+      setUploadedSellers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSellers();
+  }, [loadSellers]);
 
   // ── Breakpoints ──────────────────────────────────────────────────────────
   const isMobile = width < 480;
@@ -204,11 +141,11 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) =>
-      prev.size === PENDING_SELLERS.length
+      prev.size === pendingSellers.length
         ? new Set()
-        : new Set(PENDING_SELLERS.map((s) => s.id))
+        : new Set(pendingSellers.map((s) => s.id))
     );
-  }, []);
+  }, [pendingSellers]);
 
   const handleMarkUploaded = useCallback(async () => {
     if (selectedIds.size === 0) {
@@ -216,19 +153,20 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
       return;
     }
     setMarkingUploaded(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    Alert.alert(
+      'Tracked in database',
+      'Upload status is set when the seller completes their warehouse address in profile. Refresh this page after Shiprocket upload and seller warehouse update.'
+    );
     setMarkingUploaded(false);
-    Alert.alert('Success', `${selectedIds.size} seller(s) marked as uploaded.`);
     setSelectedIds(new Set());
-  }, [selectedIds]);
+    void loadSellers();
+  }, [selectedIds, loadSellers]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setExporting(false);
 
     const headers = ['Business Name', 'Contact Person', 'Phone', 'City', 'State', 'Status'];
-    const rows = PENDING_SELLERS.map((s) =>
+    const rows = pendingSellers.map((s) =>
       [s.businessName, s.contactPerson, s.phone, s.city, s.state, s.status].join(',')
     );
     const csv = [headers.join(','), ...rows].join('\n');
@@ -245,7 +183,8 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
       // React Native: use expo-file-system / react-native-fs in real project
       Alert.alert('Export Ready', 'CSV download triggered.\n\nIn production, use expo-file-system to save:\n\n' + csv.slice(0, 120) + '…');
     }
-  }, []);
+    setExporting(false);
+  }, [pendingSellers]);
 
   const handleBackToSellers = useCallback(() => {
     if (navigation?.navigate) {
@@ -333,7 +272,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
               Profile Completed - Pending Upload
             </Text>
             <Text style={[styles.statValue, { fontSize: isMobile ? 32 : 40 }]}>
-              {PENDING_SELLERS.length}
+              {pendingSellers.length}
             </Text>
             <Text style={[styles.statSubLabel, { fontSize: fontSize.xs }]}>
               Profile Completed Sellers
@@ -357,7 +296,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
               Profile Completed - Already Uploaded
             </Text>
             <Text style={[styles.statValue, styles.statValueGreen, { fontSize: isMobile ? 32 : 40 }]}>
-              {UPLOADED_SELLERS.length}
+              {uploadedSellers.length}
             </Text>
             <Text style={[styles.statSubLabel, { fontSize: fontSize.xs }]}>
               Profile Completed Sellers
@@ -428,7 +367,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
       <View style={styles.sectionHeaderPending}>
         <BsIcon name="hourglass-split" size={15} color="#D97706" />
         <Text style={[styles.sectionTitle, { fontSize: fontSize.base, marginLeft: 6 }]}>
-          Profile Completed Sellers Pending Upload ({PENDING_SELLERS.length})
+          Profile Completed Sellers Pending Upload ({pendingSellers.length})
         </Text>
       </View>
       <Text style={[styles.sectionSubtitle, { fontSize: fontSize.xs, paddingHorizontal: 16, paddingTop: 4 }]}>
@@ -442,16 +381,16 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
           {/* Select All */}
           <TouchableOpacity style={styles.selectAllRow} onPress={toggleSelectAll}>
             <BsIcon
-              name={selectedIds.size === PENDING_SELLERS.length ? 'check-square' : 'square'}
+              name={selectedIds.size === pendingSellers.length ? 'check-square' : 'square'}
               size={16}
               color="#4F46E5"
             />
             <Text style={[styles.selectAllText, { fontSize: fontSize.sm, marginLeft: 8 }]}>
-              {selectedIds.size === PENDING_SELLERS.length ? 'Deselect All' : 'Select All'}
+              {selectedIds.size === pendingSellers.length ? 'Deselect All' : 'Select All'}
             </Text>
           </TouchableOpacity>
 
-          {PENDING_SELLERS.map((seller) => (
+          {pendingSellers.map((seller) => (
             <View
               key={seller.id}
               style={[
@@ -502,7 +441,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
             <View style={[styles.tableHead, { paddingHorizontal: 16 }]}>
               <TouchableOpacity style={{ width: 36 }} onPress={toggleSelectAll}>
                 <BsIcon
-                  name={selectedIds.size === PENDING_SELLERS.length ? 'check-square' : 'square'}
+                  name={selectedIds.size === pendingSellers.length ? 'check-square' : 'square'}
                   size={16}
                   color="#4F46E5"
                 />
@@ -514,7 +453,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
               ))}
             </View>
 
-            {PENDING_SELLERS.map((seller, idx) => (
+            {pendingSellers.map((seller, idx) => (
               <TouchableOpacity
                 key={seller.id}
                 onPress={() => toggleSelect(seller.id)}
@@ -597,7 +536,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
       {isMobile || isTablet ? (
         // Card view
         <View style={{ padding: 12 }}>
-          {UPLOADED_SELLERS.map((seller) => (
+          {uploadedSellers.map((seller) => (
             <View key={seller.id} style={[styles.sellerCard, { borderRadius: cardRadius - 2, marginBottom: 10 }]}>
               <View style={styles.sellerCardHeader}>
                 <Text style={[styles.sellerCardName, { fontSize: fontSize.base }]}>
@@ -635,7 +574,7 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
                 </Text>
               ))}
             </View>
-            {UPLOADED_SELLERS.map((seller, idx) => (
+            {uploadedSellers.map((seller, idx) => (
               <View
                 key={seller.id}
                 style={[styles.tableRow, { paddingHorizontal: 16 }, idx % 2 === 1 && styles.tableRowAlt]}
@@ -676,17 +615,25 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
           {renderHeader()}
         </View>
 
+        {loadError ? (
+          <Text style={{ color: '#DC2626', marginHorizontal: contentPadding, marginTop: 8 }}>{loadError}</Text>
+        ) : null}
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 24 }} />
+        ) : null}
+
         {/* Stats */}
-        {renderStatCards()}
+        {!loading ? renderStatCards() : null}
 
         {/* Steps guide */}
-        {renderStepsGuide()}
+        {!loading ? renderStepsGuide() : null}
 
         {/* Pending sellers */}
-        {renderPendingSellers()}
+        {!loading ? renderPendingSellers() : null}
 
         {/* Uploaded sellers */}
-        {renderUploadedSellers()}
+        {!loading ? renderUploadedSellers() : null}
       </ScrollView>
     </View>
   );
@@ -1098,4 +1045,4 @@ const styles = StyleSheet.create({
   },
 });
 
-//export default SellerShiprocket;
+export default SellerShiprocket;

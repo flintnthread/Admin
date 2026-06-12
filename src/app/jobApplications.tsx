@@ -10,7 +10,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate, initialsFromName } from '@/lib/format';
-import { fetchJobApplications } from '@/services/hrApi';
+import { fetchJobApplications, fetchJobs, updateJobApplicationStatus } from '@/services/hrApi';
 import {
   View,
   Text,
@@ -54,16 +54,18 @@ function mapApplication(a: import('@/lib/api/types').JobApplication, index: numb
     statusRaw === 'shortlisted' ? 'Shortlisted' :
     statusRaw === 'interviewed' ? 'Interviewed' :
     statusRaw === 'rejected' ? 'Rejected' : 'Pending';
+  const jobTitle = a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : '—');
   return {
     id: String(a.id),
+    jobId: a.jobId,
     name: a.name ?? 'Applicant',
-    role: a.coverLetter ? a.coverLetter.slice(0, 40) : `Job #${a.jobId ?? ''}`,
-    department: `Job #${a.jobId ?? '—'}`,
+    role: jobTitle,
+    department: a.departmentName ?? '—',
     applied: formatDate(a.appliedAt),
     status,
     avatar: initialsFromName(a.name),
     avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
-    experience: '—',
+    experience: a.email ?? '—',
     location: a.phone ?? '—',
   };
 }
@@ -85,8 +87,8 @@ const STAT_CARDS = [
   { key: 'Rejected',    label: 'Rejected',    color: C.rejected,    icon: '✕' },
 ];
 
-const JOBS = ['All Jobs', 'Engineering', 'Design', 'Product', 'Data', 'Infrastructure', 'Quality'];
 const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'];
+const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'] as const;
 
 // ─── Helper components ───────────────────────────────────────────────────────
 
@@ -121,26 +123,66 @@ function StatCard({ label, count, color, icon, isWeb }: { label: string, count: 
   );
 }
 
-function ApplicationCard({ item, isWeb }: { item: any, isWeb: boolean }) {
+function ApplicationCard({
+  item,
+  isWeb,
+  onStatusChange,
+  updating,
+}: {
+  item: ReturnType<typeof mapApplication>;
+  isWeb: boolean;
+  onStatusChange: (id: string, status: string) => void;
+  updating: boolean;
+}) {
+  const [statusOpen, setStatusOpen] = useState(false);
+
   return (
     <View style={[styles.appCard, isWeb && styles.appCardWeb]}>
-      {/* Left: Avatar */}
       <Avatar initials={item.avatar} color={item.avatarColor} size={isWeb ? 52 : 46} />
 
-      {/* Middle: Info */}
       <View style={styles.appInfo}>
         <Text style={styles.appName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.appRole} numberOfLines={1}>{item.role}</Text>
         <View style={styles.appMeta}>
           <Text style={styles.metaChip}>🏢 {item.department}</Text>
           <Text style={styles.metaChip}>📍 {item.location}</Text>
-          <Text style={styles.metaChip}>💼 {item.experience}</Text>
+          <Text style={styles.metaChip}>✉️ {item.experience}</Text>
         </View>
       </View>
 
-      {/* Right: Status + Date */}
-      <View style={styles.appRight}>
-        <StatusBadge status={item.status} />
+      <View style={[styles.appRight, { zIndex: statusOpen ? 4000 : 1 }]}>
+        <View style={styles.statusPickerWrap}>
+          <TouchableOpacity
+            onPress={() => setStatusOpen((o) => !o)}
+            activeOpacity={0.8}
+            disabled={updating}
+          >
+            <StatusBadge status={updating ? 'Updating…' : item.status} />
+          </TouchableOpacity>
+          {statusOpen && (
+            <View style={styles.statusMenu}>
+              {STATUS_UPDATE_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.statusMenuItem, item.status === opt && styles.statusMenuItemActive]}
+                  onPress={() => {
+                    setStatusOpen(false);
+                    if (opt !== item.status) onStatusChange(item.id, opt);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.statusMenuText,
+                      item.status === opt && { color: C.primary, fontWeight: '700' },
+                    ]}
+                  >
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
         <Text style={styles.appDate}>{item.applied}</Text>
       </View>
     </View>
@@ -181,16 +223,53 @@ export default function JobApplicationsScreen() {
   const [search, setSearch] = useState('');
   const [selectedJob, setSelectedJob] = useState('All Jobs');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
+  const [jobOptions, setJobOptions] = useState<string[]>(['All Jobs']);
+  const [jobIdByTitle, setJobIdByTitle] = useState<Record<string, number>>({});
   const [applications, setApplications] = useState<ReturnType<typeof mapApplication>[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const loadApplications = useCallback(async () => {
+  const handleStatusChange = useCallback(async (id: string, status: string) => {
+    setUpdatingId(id);
     try {
-      const res = await fetchJobApplications(undefined, 0, 100);
-      setApplications((res.items ?? []).map((a, i) => mapApplication(a, i)));
+      await updateJobApplicationStatus(Number(id), status.toLowerCase());
+      setApplications((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status } : a)),
+      );
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      const msg = getApiErrorMessage(e, 'Failed to update status.');
+      if (Platform.OS === 'web') window.alert(msg);
+    } finally {
+      setUpdatingId(null);
     }
   }, []);
+
+  const loadApplications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const jobRows = await fetchJobs();
+      const titles: Record<string, number> = {};
+      const options = ['All Jobs'];
+      jobRows.forEach((j) => {
+        if (j.id && j.title) {
+          titles[j.title] = j.id;
+          options.push(j.title);
+        }
+      });
+      setJobOptions(options);
+      setJobIdByTitle(titles);
+
+      const jobId = selectedJob !== 'All Jobs' ? titles[selectedJob] : undefined;
+      const res = await fetchJobApplications(jobId, 0, 100);
+      setApplications((res.items ?? []).map((a, i) => mapApplication(a, i)));
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'Failed to load applications.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedJob]);
 
   useEffect(() => {
     loadApplications();
@@ -201,7 +280,7 @@ export default function JobApplicationsScreen() {
       const matchSearch =
         a.name.toLowerCase().includes(search.toLowerCase()) ||
         a.role.toLowerCase().includes(search.toLowerCase());
-      const matchJob = selectedJob === 'All Jobs' || a.department === selectedJob;
+      const matchJob = selectedJob === 'All Jobs' || a.role === selectedJob;
       const matchStatus = selectedStatus === 'All Status' || a.status === selectedStatus;
       return matchSearch && matchJob && matchStatus;
     });
@@ -274,7 +353,7 @@ export default function JobApplicationsScreen() {
             )}
           </View>
           <View style={[styles.filterDropdowns, isWeb && styles.filterDropdownsWeb]}>
-            <Dropdown value={selectedJob} options={JOBS} onSelect={setSelectedJob} placeholder="All Jobs" />
+            <Dropdown value={selectedJob} options={jobOptions} onSelect={setSelectedJob} placeholder="All Jobs" />
             <Dropdown value={selectedStatus} options={STATUSES} onSelect={setSelectedStatus} placeholder="All Status" />
             <TouchableOpacity
               style={styles.resetBtn}
@@ -295,7 +374,18 @@ export default function JobApplicationsScreen() {
         </View>
 
         {/* ── Application List ── */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>Loading applications…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>{error}</Text>
+            <TouchableOpacity style={styles.resetBtn} onPress={loadApplications}>
+              <Text style={styles.resetBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filtered.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyIcon}>📭</Text>
             <Text style={styles.emptyTitle}>No Applications Found</Text>
@@ -306,14 +396,25 @@ export default function JobApplicationsScreen() {
           <View style={styles.webGrid}>
             {filtered.map(item => (
               <View key={item.id} style={styles.webGridItem}>
-                <ApplicationCard item={item} isWeb={isWeb} />
+                <ApplicationCard
+                  item={item}
+                  isWeb={isWeb}
+                  onStatusChange={handleStatusChange}
+                  updating={updatingId === item.id}
+                />
               </View>
             ))}
           </View>
         ) : (
           // Mobile: single column list
           filtered.map(item => (
-            <ApplicationCard key={item.id} item={item} isWeb={false} />
+            <ApplicationCard
+              key={item.id}
+              item={item}
+              isWeb={false}
+              onStatusChange={handleStatusChange}
+              updating={updatingId === item.id}
+            />
           ))
         )}
       </ScrollView>
@@ -551,6 +652,32 @@ const styles = StyleSheet.create({
   metaChip: { fontSize: 11, color: C.sub, backgroundColor: C.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   appRight: { alignItems: 'flex-end', gap: 6 },
   appDate: { fontSize: 11, color: C.sub },
+  statusPickerWrap: { position: 'relative' },
+  statusMenu: {
+    position: 'absolute',
+    top: 36,
+    right: 0,
+    minWidth: 140,
+    backgroundColor: C.white,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 12,
+    zIndex: 5000,
+    overflow: 'hidden',
+  },
+  statusMenuItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  statusMenuItemActive: { backgroundColor: C.tag },
+  statusMenuText: { fontSize: 12, color: C.text },
 
   // Badge
   badge: {
