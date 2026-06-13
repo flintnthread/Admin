@@ -26,9 +26,6 @@ const NAV_ITEMS = {
     { label: "Dashboard", icon: "home", path: "/Dashboard" },
     { label: "SEO Engine", icon: "globe", path: null },
 
-    { label: "Dashboard", icon: "home", path: "/approveseller", color: "#3B82F6" },
-    { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
-
   ],
   "EMPLOYEE MANAGEMENT": [
     { label: "Employee Management", icon: "user-plus", path: null, color: "#8B5CF6" },

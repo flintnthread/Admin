@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
+﻿import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,20 +13,9 @@ import {
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
-import { router, useLocalSearchParams } from "expo-router";
-import { useAsyncLoad } from "@/hooks/useAsyncLoad";
-import {
-  fetchSellers,
-  blockSeller,
-  unblockSeller,
-  fetchPendingProfileSellers,
-  fetchPendingProfileDetail,
-  approveSellerProfile,
-  rejectSellerProfile,
-} from "@/services/sellerApi";
-import { mapPendingProfileRow, mapSellerToApprovedRow } from "@/lib/mappers";
-import { getApiErrorMessage } from "@/lib/api/client";
+import { useLocalSearchParams, router } from "expo-router";
 
+// --- MOCK DATA TYPE ---
 type Seller = {
   id: number;
   name: string;
@@ -43,32 +32,286 @@ type Seller = {
   status: "Active" | "Blocked";
 };
 
+// --- THE 10 EXACT SELLERS FROM SCREENSHOTS ---
+const EXACT_SELLERS: Seller[] = [
+  {
+    id: 1,
+    name: "Khaiser Mohammed",
+    email: "mkhaiser0786@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+    businessName: "ZOYA ALL BAGS CENTER",
+    businessType: "Sole Proprietorship",
+    products: 2,
+    walletBalance: 0,
+    joinDate: "May 29, 2026",
+    revenue: 0,
+    state: "Telangana",
+    city: "Sangareddy",
+    status: "Active",
+  },
+  {
+    id: 2,
+    name: "Gone Mahender",
+    email: "saineeshopingmall@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/2.jpg",
+    businessName: "SAINEE SHOPPING MALL",
+    businessType: "Sole Proprietorship",
+    products: 1,
+    walletBalance: 0,
+    joinDate: "May 14, 2026",
+    revenue: 0,
+    state: "Telangana",
+    city: "Hyderabad",
+    status: "Active",
+  },
+  {
+    id: 3,
+    name: "Malathi Devulapalli",
+    email: "9032893883malathi@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
+    businessName: "PRAHARSHI CREATIONS",
+    businessType: "Sole Proprietorship",
+    products: 0,
+    walletBalance: 0,
+    joinDate: "May 11, 2026",
+    revenue: 0,
+    state: "Andhra Pradesh",
+    city: "Vijayawada",
+    status: "Active",
+  },
+  {
+    id: 4,
+    name: "Panwar Chair Compay",
+    email: "myidea702@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/4.jpg",
+    businessName: "ANIL RETAILS",
+    businessType: "Sole Proprietorship",
+    products: 1,
+    walletBalance: 0,
+    joinDate: "Apr 28, 2026",
+    revenue: 0,
+    state: "Karnataka",
+    city: "Bangalore",
+    status: "Active",
+  },
+  {
+    id: 5,
+    name: "Smart Fashions",
+    email: "syedlucky129@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/women/5.jpg",
+    businessName: "SMART FASHIONS",
+    businessType: "Sole Proprietorship",
+    products: 8,
+    walletBalance: 0,
+    joinDate: "Apr 22, 2026",
+    revenue: 689,
+    state: "Maharashtra",
+    city: "Mumbai",
+    status: "Active",
+  },
+  {
+    id: 6,
+    name: "Arhaan Collection",
+    email: "arhaancollection1355@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/6.jpg",
+    businessName: "ARHAAN COLLECTIONS",
+    businessType: "Sole Proprietorship",
+    products: 0,
+    walletBalance: 0,
+    joinDate: "Apr 22, 2026",
+    revenue: 0,
+    state: "Gujarat",
+    city: "Surat",
+    status: "Active",
+  },
+  {
+    id: 7,
+    name: "Ahmad Expoters",
+    email: "ahmadexpoters900@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/7.jpg",
+    businessName: "AHMAD EXPORTERS",
+    businessType: "Sole Proprietorship",
+    products: 0,
+    walletBalance: 0,
+    joinDate: "Apr 21, 2026",
+    revenue: 0,
+    state: "West Bengal",
+    city: "Kolkata",
+    status: "Active",
+  },
+  {
+    id: 8,
+    name: "Lakshmi Sumana",
+    email: "ubstore2025@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/women/8.jpg",
+    businessName: "UNIVERSAL BAGS",
+    businessType: "Partnership",
+    products: 12,
+    walletBalance: 0,
+    joinDate: "Apr 19, 2026",
+    revenue: 0,
+    state: "Tamil Nadu",
+    city: "Chennai",
+    status: "Active",
+  },
+  {
+    id: 9,
+    name: "Finn Brooks",
+    email: "brandshoppe789@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/9.jpg",
+    businessName: "BRAND SHOPPE",
+    businessType: "Sole Proprietorship",
+    products: 5,
+    walletBalance: 0,
+    joinDate: "Apr 17, 2026",
+    revenue: 3068,
+    state: "Telangana",
+    city: "Rangareddy",
+    status: "Active",
+  },
+  {
+    id: 10,
+    name: "Satya Retailer",
+    email: "satyaretailer@gmail.com",
+    avatar: "https://randomuser.me/api/portraits/men/10.jpg",
+    businessName: "Satya Retail Corporation",
+    businessType: "Sole Proprietorship",
+    products: 9,
+    walletBalance: 0,
+    joinDate: "Apr 13, 2026",
+    revenue: 3927,
+    state: "Andhra Pradesh",
+    city: "Sri Sathya Sai",
+    status: "Active",
+  },
+];
+
+// --- PROGRAMMATIC MOCK SELLER LIST GENERATOR (TOTAL 71) ---
+const generateAllSellers = (): Seller[] => {
+  const sellers = [...EXACT_SELLERS];
+
+  const statePool = [
+    ...Array(14).fill({ state: "Telangana", city: "Sangareddy" }),
+    ...Array(12).fill({ state: "Telangana", city: "Hyderabad" }),
+    ...Array(1).fill({ state: "Telangana", city: "Rangareddy" }),
+    ...Array(6).fill({ state: "Telangana", city: "Warangal" }),
+    ...Array(3).fill({ state: "Maharashtra", city: "Mumbai" }),
+    ...Array(3).fill({ state: "Maharashtra", city: "Pune" }),
+    ...Array(1).fill({ state: "Andhra Pradesh", city: "Sri Sathya Sai" }),
+    ...Array(4).fill({ state: "Andhra Pradesh", city: "Vijayawada" }),
+    ...Array(2).fill({ state: "Karnataka", city: "Bangalore" }),
+    ...Array(1).fill({ state: "Karnataka", city: "Mysore" }),
+    ...Array(2).fill({ state: "Gujarat", city: "Surat" }),
+    ...Array(1).fill({ state: "Gujarat", city: "Ahmedabad" }),
+    ...Array(2).fill({ state: "West Bengal", city: "Kolkata" }),
+    ...Array(2).fill({ state: "Uttar Pradesh", city: "Agra" }),
+    ...Array(1).fill({ state: "Uttar Pradesh", city: "Lucknow" }),
+    ...Array(2).fill({ state: "Tamil Nadu", city: "Chennai" }),
+    ...Array(2).fill({ state: "Rajasthan", city: "Jaipur" }),
+    ...Array(1).fill({ state: "Unknown", city: "Unknown" }),
+    ...Array(1).fill({ state: "Kerala", city: "Kochi" }),
+  ];
+
+  const firstNames = [
+    "Rahul", "Amit", "Priya", "Sneha", "Karan", "Anjali", "Vikram", "Deepa",
+    "Sanjay", "Neha", "Arjun", "Ritu", "Manish", "Kiran", "Vijay", "Aisha",
+    "Rohan", "Pooja", "Rajesh", "Divya", "Suresh", "Swati", "Anil", "Meera",
+  ];
+  const lastNames = [
+    "Sharma", "Verma", "Gupta", "Patel", "Reddy", "Rao", "Nair", "Joshi",
+    "Singh", "Kumar", "Mehta", "Sen", "Das", "Roy", "Chawla", "Bose",
+    "Pillai", "Naidu", "Deshmukh", "Kulkarni", "Shenoy", "Shetty", "Gowda",
+  ];
+  const businessWords = [
+    "Retails", "Enterprises", "Stores", "Bazaar", "Fashions", "Creations",
+    "Bags", "Footwear", "Apparels", "Textiles", "Electronics", "Mart",
+  ];
+  const businessTypes = ["Sole Proprietorship", "Partnership", "Private Limited"];
+
+  for (let i = 0; i < 61; i++) {
+    const id = 11 + i;
+    const fName = firstNames[(i + 3) % firstNames.length];
+    const lName = lastNames[(i + 7) % lastNames.length];
+    const name = `${fName} ${lName}`;
+    const email = `${fName.toLowerCase()}.${lName.toLowerCase()}${id}@gmail.com`;
+    const busWord = businessWords[i % businessWords.length];
+    const businessName = `${fName.toUpperCase()} ${busWord.toUpperCase()}`;
+    const businessType = businessTypes[i % businessTypes.length];
+    const products = (i * 3 + 1) % 15;
+    const walletBalance = i % 5 === 0 ? parseFloat((i * 120.5).toFixed(2)) : 0;
+    const revenue = i % 3 === 0 ? parseFloat((i * 850.75).toFixed(2)) : 0;
+
+    const month = ["Jan", "Feb", "Mar", "Apr", "May"][i % 5];
+    const day = ((i * 7 + 1) % 28) + 1;
+    const joinDate = `${month} ${day}, 2026`;
+
+    const { state, city } = statePool[i];
+
+    sellers.push({
+      id,
+      name,
+      email,
+      avatar: `https://randomuser.me/api/portraits/${i % 2 === 0 ? "men" : "women"}/${id}.jpg`,
+      businessName,
+      businessType,
+      products,
+      walletBalance,
+      joinDate,
+      revenue,
+      state,
+      city,
+      status: "Active",
+    });
+  }
+
+  return sellers;
+};
+
+const ALL_MOCK_SELLERS = generateAllSellers();
+
 
 // --- PENDING SELLER TYPES ---
 type PendingSeller = {
   id: number;
   name: string;
+  businessName: string;
   email: string;
-  mobile?: string;
-  businessName?: string;
-  businessType?: string;
-  submittedOn?: string;
-  state?: string;
-  city?: string;
-  bankName?: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  holderName?: string;
+  mobile: string;
+  submittedOn: string;
+  businessType: string;
+  city: string;
+  state: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  holderName: string;
 };
+
+const INITIAL_PENDING_SELLERS: PendingSeller[] = [
+  {
+    id: 286,
+    name: "Sanju Sandhya",
+    businessName: "sg creations",
+    email: "flintandthread.hr@gmail.com",
+    mobile: "+919391939868",
+    submittedOn: "Jun 05, 2026",
+    businessType: "Sole Proprietorship",
+    city: "Hyderabad",
+    state: "Telangana",
+    bankName: "State Bank of India",
+    accountNumber: "38472948293",
+    ifscCode: "SBIN0020123",
+    holderName: "Sanju Sandhya",
+  }
+];
+
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const showPending = tab === "pending";
 
-  const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>([]);
-  const [pendingLoading, setPendingLoading] = useState(false);
-  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>(INITIAL_PENDING_SELLERS);
   const [pendingSearchQuery, setPendingSearchQuery] = useState("");
   const [selectedPendingSeller, setSelectedPendingSeller] = useState<PendingSeller | null>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
@@ -79,32 +322,6 @@ export default function ApprovedSellersScreen() {
   const [kycRemarks, setKycRemarks] = useState("");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showKycDropdown, setShowKycDropdown] = useState(false);
-
-  // --- SEND MESSAGE MODAL STATES ---
-  const [messageModalVisible, setMessageModalVisible] = useState(false);
-  const [messageSeller, setMessageSeller] = useState<Seller | null>(null);
-  const [messageSubject, setMessageSubject] = useState("");
-  const [messageBody, setMessageBody] = useState("");
-
-  // --- DEACTIVATE SELLER MODAL STATES ---
-  const [deactivateModalVisible, setDeactivateModalVisible] = useState(false);
-  const [deactivateSeller, setDeactivateSeller] = useState<Seller | null>(null);
-  const [deactivateReason, setDeactivateReason] = useState("");
-
-  // --- DELETE SELLER MODAL STATES ---
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deleteSeller, setDeleteSeller] = useState<Seller | null>(null);
-  const [deleteReason, setDeleteReason] = useState("");
-
-  // --- TOAST SYSTEM STATE & HELPERS ---
-  const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    const id = Date.now() + Math.random();
-    setToasts(p => [...p, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(p => p.filter(t => t.id !== id));
-    }, 3000);
-  };
 
   const filteredPendingSellers = useMemo(() => {
     const query = pendingSearchQuery.trim().toLowerCase();
@@ -118,75 +335,6 @@ export default function ApprovedSellersScreen() {
     );
   }, [pendingSellers, pendingSearchQuery]);
 
-  const { data, loading, error, reload, setData } = useAsyncLoad(
-    async () => {
-      const page = await fetchSellers({ size: 500 });
-      return (page.items ?? [])
-        .filter((s) => s.status === "active" || s.status === "suspended")
-        .map(mapSellerToApprovedRow);
-    },
-    []
-  );
-  const sellers: Seller[] = data ?? [];
-
-  const loadPendingSellers = useCallback(async () => {
-    setPendingLoading(true);
-    setPendingError(null);
-    try {
-      const rows = await fetchPendingProfileSellers();
-      const mapped = await Promise.all(
-        rows.map(async (row) => {
-          const base = mapPendingProfileRow(row);
-          try {
-            const detail = await fetchPendingProfileDetail(row.sellerId);
-            return {
-              ...base,
-              businessType: String(detail.businessType ?? "—"),
-              state: String(detail.state ?? "—"),
-              city: String(detail.city ?? "—"),
-              bankName: String(detail.bankName ?? "—"),
-              accountNumber: String(detail.accountNumber ?? "—"),
-              ifscCode: String(detail.ifscCode ?? "—"),
-              holderName: String(detail.accountHolder ?? "—"),
-            };
-          } catch {
-            return base;
-          }
-        })
-      );
-      setPendingSellers(mapped);
-    } catch (e) {
-      setPendingError(getApiErrorMessage(e));
-    } finally {
-      setPendingLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (showPending) {
-      void loadPendingSellers();
-    }
-  }, [showPending, loadPendingSellers]);
-
-  const openPendingDetail = async (pending: PendingSeller) => {
-    try {
-      const detail = await fetchPendingProfileDetail(pending.id);
-      setSelectedPendingSeller({
-        ...pending,
-        businessType: String(detail.businessType ?? pending.businessType ?? "—"),
-        state: String(detail.state ?? pending.state ?? "—"),
-        city: String(detail.city ?? pending.city ?? "—"),
-        bankName: String(detail.bankName ?? pending.bankName ?? "—"),
-        accountNumber: String(detail.accountNumber ?? pending.accountNumber ?? "—"),
-        ifscCode: String(detail.ifscCode ?? pending.ifscCode ?? "—"),
-        holderName: String(detail.accountHolder ?? pending.holderName ?? "—"),
-      });
-      setShowPendingModal(true);
-    } catch (e) {
-      Alert.alert("Error", getApiErrorMessage(e));
-    }
-  };
-
   const handleApprovePending = (pending: PendingSeller) => {
     Alert.alert(
       "Approve Seller",
@@ -195,18 +343,28 @@ export default function ApprovedSellersScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Approve",
-          onPress: async () => {
-            try {
-              await approveSellerProfile(pending.id);
-              setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
-              setShowPendingModal(false);
-              await reload();
-              Alert.alert("Success", "Seller approved successfully!");
-            } catch (e) {
-              Alert.alert("Error", getApiErrorMessage(e));
-            }
-          },
-        },
+          onPress: () => {
+            setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
+            const ApprovedSellerDetails: Seller = {
+              id: pending.id,
+              name: pending.name,
+              email: pending.email,
+              avatar: `https://randomuser.me/api/portraits/men/${pending.id % 100}.jpg`,
+              businessName: pending.businessName,
+              businessType: pending.businessType,
+              products: 0,
+              walletBalance: 0,
+              joinDate: pending.submittedOn,
+              revenue: 0,
+              state: pending.state,
+              city: pending.city,
+              status: "Active",
+            };
+            setSellers(prev => [ApprovedSellerDetails, ...prev]);
+            setShowPendingModal(false);
+            Alert.alert("Success", "Seller approved successfully!");
+          }
+        }
       ]
     );
   };
@@ -220,22 +378,18 @@ export default function ApprovedSellersScreen() {
         {
           text: "Reject",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await rejectSellerProfile(pending.id, "Rejected by admin");
-              setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
-              setShowPendingModal(false);
-              Alert.alert("Rejected", "Seller request has been rejected.");
-            } catch (e) {
-              Alert.alert("Error", getApiErrorMessage(e));
-            }
-          },
-        },
+          onPress: () => {
+            setPendingSellers(prev => prev.filter(s => s.id !== pending.id));
+            setShowPendingModal(false);
+            Alert.alert("Rejected", "Seller request has been rejected.");
+          }
+        }
       ]
     );
   };
 
-  
+
+  const [sellers, setSellers] = useState<Seller[]>(ALL_MOCK_SELLERS);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [sortBy, setSortBy] = useState("Name");
@@ -313,26 +467,51 @@ export default function ApprovedSellersScreen() {
     setCurrentPage(1);
   };
 
-  const handleConfirmDeactivate = () => {
-    if (!deactivateSeller) return;
-    setSellers((prev) =>
-      prev.map((s) =>
-        s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s
-      )
+  const handleBlockSeller = (id: number) => {
+    const seller = sellers.find((s) => s.id === id);
+    if (!seller) return;
+    const actionText = seller.status === "Active" ? "Block" : "Unblock";
+
+    Alert.alert(
+      `${actionText} Seller`,
+      `Are you sure you want to ${actionText.toLowerCase()} ${seller.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: actionText,
+          style: "destructive",
+          onPress: () => {
+            setSellers((prev) =>
+              prev.map((s) =>
+                s.id === id
+                  ? { ...s, status: s.status === "Active" ? "Blocked" : "Active" }
+                  : s
+              )
+            );
+          },
+        },
+      ]
     );
-    setDeactivateModalVisible(false);
-    setDeactivateSeller(null);
-    setDeactivateReason("");
-    showToast("Seller successfully blocked!", "success");
   };
 
-  const handleConfirmDelete = () => {
-    if (!deleteSeller) return;
-    setSellers((prev) => prev.filter((s) => s.id !== deleteSeller.id));
-    setDeleteModalVisible(false);
-    setDeleteSeller(null);
-    setDeleteReason("");
-    showToast("Seller successfully deleted!", "success");
+  const handleDeleteSeller = (id: number) => {
+    const seller = sellers.find((s) => s.id === id);
+    if (!seller) return;
+
+    Alert.alert(
+      "Delete Seller",
+      `Are you sure you want to delete ${seller.name}? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            setSellers((prev) => prev.filter((s) => s.id !== id));
+          },
+        },
+      ]
+    );
   };
 
   const handleExportCSV = () => {
@@ -354,7 +533,7 @@ export default function ApprovedSellersScreen() {
 
             const handleUpdateSellerStatus = () => {
               setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, status: adminStatus } : s));
-              showToast(`Seller status updated to ${adminStatus}!`, "success");
+              Alert.alert("Success", `Seller status updated to ${adminStatus}!`);
             };
 
             return (
@@ -362,13 +541,6 @@ export default function ApprovedSellersScreen() {
                 {/* --- HEADER BANNER --- */}
                 <View style={styles.detailsHeaderBanner}>
                   <View style={styles.detailsHeaderLeft}>
-                    <TouchableOpacity
-                      style={styles.headerBackBtn}
-                      onPress={() => setSelectedSellerId(null)}
-                    >
-                      <Feather name="arrow-left" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={styles.headerBackBtnText}>Back</Text>
-                    </TouchableOpacity>
                     <View style={styles.avatarWrapper}>
                       <Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />
                       <View style={styles.statusDotActive} />
@@ -396,6 +568,14 @@ export default function ApprovedSellersScreen() {
                       </View>
                       <Text style={styles.currentStatusLabel}>Current Status</Text>
                     </View>
+                    
+                    <TouchableOpacity
+                      style={styles.backBtn}
+                      onPress={() => setSelectedSellerId(null)}
+                    >
+                      <Feather name="arrow-left" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.backBtnText}>Back to Sellers</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -843,15 +1023,7 @@ export default function ApprovedSellersScreen() {
           <>
             {/* --- PENDING HEADER BANNER CARD --- */}
             <View style={styles.pageHeaderCard}>
-              <View style={styles.bannerTop}>
-                <TouchableOpacity
-                  style={styles.bannerBackBtn}
-                  onPress={() => router.back()}
-                >
-                  <Feather name="arrow-left" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.bannerBackBtnText}>Back</Text>
-                </TouchableOpacity>
-              </View>
+              <View style={styles.bannerTop} />
               <View style={[styles.bannerBottom, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
                 <View style={styles.bannerBottomLeft}>
                   <View style={styles.overlapBadgeContainer}>
@@ -988,96 +1160,26 @@ export default function ApprovedSellersScreen() {
                   
                   {/* Title & Breadcrumbs */}
                   <View style={styles.bannerTitleContainer}>
-                    <Text style={styles.bannerTitle}>
-                      {showPending ? "Pending Sellers" : "Approved Sellers"}
-                    </Text>
+                    <Text style={styles.bannerTitle}>Approved Sellers</Text>
                     <View style={styles.breadcrumbs}>
                       <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
                       <Text style={styles.breadcrumbActive}>Dashboard</Text>
                       <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                      <Text style={styles.breadcrumbText}>
-                        {showPending ? "Pending Sellers" : "Approved Sellers"}
-                      </Text>
+                      <Text style={styles.breadcrumbText}>Approved Sellers</Text>
                     </View>
                   </View>
                 </View>
 
+                {/* Right: Action button */}
                 <TouchableOpacity
                   style={styles.bannerActionBtn}
-                  onPress={() => router.push(showPending ? "/approveseller" : "/approveseller?tab=pending")}
+                  onPress={() => router.push("/approveseller?tab=pending")}
                 >
-                  <Feather
-                    name={showPending ? "check" : "clock"}
-                    size={14}
-                    color="#FFFFFF"
-                    style={styles.bannerActionIcon}
-                  />
-                  <Text style={styles.bannerActionBtnText}>
-                    {showPending ? "Approved Sellers" : "Pending Sellers"}
-                  </Text>
+                  <Feather name="clock" size={14} color="#FFFFFF" style={styles.bannerActionIcon} />
+                  <Text style={styles.bannerActionBtnText}>Pending Sellers</Text>
                 </TouchableOpacity>
               </View>
             </View>
-
-            {showPending ? (
-              <>
-                <View style={styles.toolbar}>
-                  <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search pending sellers..."
-                      placeholderTextColor="#9CA3AF"
-                      value={pendingSearchQuery}
-                      onChangeText={setPendingSearchQuery}
-                    />
-                  </View>
-                </View>
-
-                {pendingError ? (
-                  <Text style={styles.loadErrorText}>{pendingError}</Text>
-                ) : null}
-
-                {pendingLoading ? (
-                  <Text style={styles.emptyText}>Loading pending sellers...</Text>
-                ) : (
-                  <View style={styles.tableCard}>
-                    <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableTh, { flex: 1.2 }]}>Seller</Text>
-                      <Text style={[styles.tableTh, { flex: 1.4 }]}>Business</Text>
-                      <Text style={[styles.tableTh, { flex: 1.4 }]}>Email</Text>
-                      <Text style={[styles.tableTh, { flex: 1 }]}>Submitted</Text>
-                      <Text style={[styles.tableTh, { flex: 0.6, textAlign: "center" }]}>Action</Text>
-                    </View>
-                    {filteredPendingSellers.map((pending, idx) => (
-                      <View key={pending.id} style={[styles.tableRow, idx % 2 === 1 && styles.rowAltBg]}>
-                        <Text style={[styles.tableCellText, { flex: 1.2 }]} numberOfLines={1}>{pending.name}</Text>
-                        <Text style={[styles.tableCellText, { flex: 1.4 }]} numberOfLines={1}>{pending.businessName}</Text>
-                        <Text style={[styles.tableCellText, { flex: 1.4 }]} numberOfLines={1}>{pending.email}</Text>
-                        <Text style={[styles.tableCellText, { flex: 1 }]} numberOfLines={1}>{pending.submittedOn}</Text>
-                        <TouchableOpacity
-                          style={[styles.pendingViewBtn, { flex: 0.6 }]}
-                          onPress={() => void openPendingDetail(pending)}
-                        >
-                          <Text style={styles.pendingViewBtnText}>Review</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                    {filteredPendingSellers.length === 0 && !pendingLoading ? (
-                      <View style={styles.emptyTable}>
-                        <Text style={styles.emptyText}>No pending seller requests found.</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                )}
-              </>
-            ) : (
-              <>
-
-            {error ? <Text style={styles.loadErrorText}>{error}</Text> : null}
-            {loading ? (
-              <Text style={styles.emptyText}>Loading approved sellers...</Text>
-            ) : null}
 
             {/* --- DATA VIEW CONTROLS TOOLBAR --- */}
             <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
@@ -1171,7 +1273,7 @@ export default function ApprovedSellersScreen() {
             <View style={styles.insightsCard}>
               <View style={styles.insightsHeader}>
                 <Text style={styles.insightsTitle}>Insights</Text>
-                <Text style={styles.insightsSubtitle}>Top 10 by count • Filter-aware</Text>
+                <Text style={styles.insightsSubtitle}>Top 10 by count ΓÇó Filter-aware</Text>
               </View>
 
               <View style={[styles.insightsContainer, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
@@ -1244,11 +1346,11 @@ export default function ApprovedSellersScreen() {
                     <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
                     <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      Γé╣{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </Text>
                     <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>{seller.joinDate}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      Γé╣{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </Text>
                     <View style={[styles.tableCellActions, { flex: 1.6 }]}>
                       <TouchableOpacity
@@ -1262,30 +1364,13 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.actionMessageBtn}
-                        onPress={() => {
-                          setMessageSeller(seller);
-                          setMessageModalVisible(true);
-                        }}
+                        onPress={() => Alert.alert("Message Seller", `Send a message to ${seller.name}`)}
                       >
                         <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.actionBlockBtn, seller.status === "Blocked" && styles.actionBlockBtnActive]}
-                        onPress={() => {
-                          if (seller.status === "Active") {
-                            setDeactivateSeller(seller);
-                            setDeactivateReason("");
-                            setDeactivateModalVisible(true);
-                          } else {
-                            // Directly unblock
-                            setSellers((prev) =>
-                              prev.map((s) =>
-                                s.id === seller.id ? { ...s, status: "Active" } : s
-                              )
-                            );
-                            showToast("Seller successfully unblocked!", "success");
-                          }
-                        }}
+                        onPress={() => handleBlockSeller(seller.id)}
                       >
                         <Ionicons
                           name="ban"
@@ -1295,11 +1380,7 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.actionDeleteBtn}
-                        onPress={() => {
-                          setDeleteSeller(seller);
-                          setDeleteReason("");
-                          setDeleteModalVisible(true);
-                        }}
+                        onPress={() => handleDeleteSeller(seller.id)}
                       >
                         <Ionicons name="trash-outline" size={15} color="#EF4444" />
                       </TouchableOpacity>
@@ -1358,13 +1439,13 @@ export default function ApprovedSellersScreen() {
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Wallet Balance:</Text>
                         <Text style={styles.cardCurrency}>
-                          â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          Γé╣{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Revenue:</Text>
                         <Text style={styles.cardCurrency}>
-                          â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          Γé╣{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                     </View>
@@ -1381,10 +1462,7 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.cardActionBtn, styles.actionMessageBtn]}
-                        onPress={() => {
-                          setMessageSeller(seller);
-                          setMessageModalVisible(true);
-                        }}
+                        onPress={() => Alert.alert("Message Seller", `Send a message to ${seller.name}`)}
                       >
                         <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -1394,21 +1472,7 @@ export default function ApprovedSellersScreen() {
                           styles.actionBlockBtn,
                           seller.status === "Blocked" && styles.actionBlockBtnActive,
                         ]}
-                        onPress={() => {
-                          if (seller.status === "Active") {
-                            setDeactivateSeller(seller);
-                            setDeactivateReason("");
-                            setDeactivateModalVisible(true);
-                          } else {
-                            // Directly unblock
-                            setSellers((prev) =>
-                              prev.map((s) =>
-                                s.id === seller.id ? { ...s, status: "Active" } : s
-                              )
-                            );
-                            showToast("Seller successfully unblocked!", "success");
-                          }
-                        }}
+                        onPress={() => handleBlockSeller(seller.id)}
                       >
                         <Ionicons
                           name="ban"
@@ -1418,11 +1482,7 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.cardActionBtn, styles.actionDeleteBtn]}
-                        onPress={() => {
-                          setDeleteSeller(seller);
-                          setDeleteReason("");
-                          setDeleteModalVisible(true);
-                        }}
+                        onPress={() => handleDeleteSeller(seller.id)}
                       >
                         <Ionicons name="trash-outline" size={15} color="#EF4444" />
                       </TouchableOpacity>
@@ -1509,13 +1569,10 @@ export default function ApprovedSellersScreen() {
           </>
         )}
 
-              </>
-            )}
-
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>
           <Text style={styles.footerCopyrightText}>
-            2026 © Flintnthread India Pvt. Ltd. Crafted by{" "}
+            2026 ┬⌐ Flintnthread India Pvt. Ltd. Crafted by{" "}
             <Feather name="heart" size={12} color="#EF4444" /> Flintnthread India Pvt. Ltd.
           </Text>
         </View>
@@ -1619,255 +1676,6 @@ export default function ApprovedSellersScreen() {
           </View>
         </Modal>
       )}
-
-      {/* --- SEND MESSAGE MODAL --- */}
-      {messageModalVisible && messageSeller && (
-        <Modal
-          visible={messageModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setMessageModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.messageModalContent}>
-              {/* Header */}
-              <View style={styles.messageModalHeader}>
-                <View style={styles.messageHeaderLeft}>
-                  <View style={styles.messageIconContainer}>
-                    <Feather name="mail" size={20} color="#EA580C" />
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.messageTitle}>Send Message</Text>
-                    <Text style={styles.messageSubtitle}>to {messageSeller.name}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => setMessageModalVisible(false)}>
-                  <Feather name="x" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Body */}
-              <View style={styles.messageModalBody}>
-                <Text style={styles.messageFormLabel}>Subject</Text>
-                <TextInput
-                  style={styles.messageFormInput}
-                  placeholder="Enter message subject..."
-                  placeholderTextColor="#9CA3AF"
-                  value={messageSubject}
-                  onChangeText={setMessageSubject}
-                />
-
-                <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Message</Text>
-                <TextInput
-                  style={styles.messageFormTextArea}
-                  placeholder="Type your message here..."
-                  placeholderTextColor="#9CA3AF"
-                  value={messageBody}
-                  onChangeText={setMessageBody}
-                  multiline
-                  numberOfLines={5}
-                />
-              </View>
-
-              {/* Footer */}
-              <View style={styles.messageModalFooter}>
-                <TouchableOpacity
-                  style={styles.messageCancelBtn}
-                  onPress={() => setMessageModalVisible(false)}
-                >
-                  <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.messageCancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.messageSendBtn}
-                  onPress={() => {
-                    if (!messageSubject.trim() || !messageBody.trim()) {
-                      showToast("Subject and message are required", "error");
-                      return;
-                    }
-                    setMessageModalVisible(false);
-                    setMessageSubject("");
-                    setMessageBody("");
-                    showToast("Message sent successfully!", "success");
-                  }}
-                >
-                  <Feather name="send" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.messageSendBtnText}>Send Message</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* --- DEACTIVATE SELLER MODAL --- */}
-      {deactivateModalVisible && deactivateSeller && (
-        <Modal
-          visible={deactivateModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setDeactivateModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.messageModalContent}>
-              {/* Header */}
-              <View style={[styles.messageModalHeader, { backgroundColor: "#DC2626" }]}>
-                <View style={styles.messageHeaderLeft}>
-                  <View style={styles.messageIconContainer}>
-                    <Feather name="user-x" size={20} color="#DC2626" />
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.messageTitle}>Deactivate Seller</Text>
-                    <Text style={styles.messageSubtitle}>This action will deactivate the seller account</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => setDeactivateModalVisible(false)}>
-                  <Feather name="x" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Body */}
-              <View style={styles.messageModalBody}>
-                {/* Warning Banner */}
-                <View style={styles.warningBanner}>
-                  <Feather name="alert-triangle" size={24} color="#D97706" style={{ marginRight: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.warningBannerTitle}>Warning</Text>
-                    <Text style={styles.warningBannerText}>
-                      Are you sure you want to deactivate <Text style={{ fontWeight: '700' }}>{deactivateSeller.name}</Text>?
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deactivation</Text>
-                <TextInput
-                  style={styles.messageFormTextArea}
-                  placeholder="Please provide a reason for deactivating this seller..."
-                  placeholderTextColor="#9CA3AF"
-                  value={deactivateReason}
-                  onChangeText={setDeactivateReason}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              {/* Footer */}
-              <View style={styles.messageModalFooter}>
-                <TouchableOpacity
-                  style={styles.messageCancelBtn}
-                  onPress={() => setDeactivateModalVisible(false)}
-                >
-                  <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.messageCancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
-                  onPress={handleConfirmDeactivate}
-                >
-                  <Ionicons name="ban" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.messageSendBtnText}>Deactivate</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* --- DELETE SELLER MODAL --- */}
-      {deleteModalVisible && deleteSeller && (
-        <Modal
-          visible={deleteModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setDeleteModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.messageModalContent}>
-              {/* Header */}
-              <View style={[styles.messageModalHeader, { backgroundColor: "#991B1B" }]}>
-                <View style={styles.messageHeaderLeft}>
-                  <View style={styles.messageIconContainer}>
-                    <Feather name="trash-2" size={20} color="#991B1B" />
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.messageTitle}>Delete Seller</Text>
-                    <Text style={styles.messageSubtitle}>This action cannot be undone</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => setDeleteModalVisible(false)}>
-                  <Feather name="x" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Body */}
-              <View style={styles.messageModalBody}>
-                {/* Danger Zone Banner */}
-                <View style={styles.dangerBanner}>
-                  <Feather name="alert-circle" size={24} color="#DC2626" style={{ marginRight: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.dangerBannerTitle}>Danger Zone</Text>
-                    <Text style={styles.dangerBannerText}>
-                      Are you sure you want to permanently delete <Text style={{ fontWeight: '700' }}>{deleteSeller.name}</Text>? This action cannot be undone and will remove all seller data.
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deletion</Text>
-                <TextInput
-                  style={styles.messageFormTextArea}
-                  placeholder="Please provide a reason for deleting this seller..."
-                  placeholderTextColor="#9CA3AF"
-                  value={deleteReason}
-                  onChangeText={setDeleteReason}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              {/* Footer */}
-              <View style={styles.messageModalFooter}>
-                <TouchableOpacity
-                  style={styles.messageCancelBtn}
-                  onPress={() => setDeleteModalVisible(false)}
-                >
-                  <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.messageCancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
-                  onPress={handleConfirmDelete}
-                >
-                  <Feather name="trash-2" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.messageSendBtnText}>Delete Permanently</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* --- TOAST CONTAINER --- */}
-      <View style={styles.toastContainer} pointerEvents="box-none">
-        {toasts.map((toast) => (
-          <View
-            key={toast.id}
-            style={[
-              styles.toast,
-              toast.type === "success" ? styles.toastSuccess : styles.toastError,
-            ]}
-          >
-            <Feather
-              name={toast.type === "success" ? "check-circle" : "alert-circle"}
-              size={18}
-              color="#FFFFFF"
-            />
-            <Text style={styles.toastText}>{toast.message}</Text>
-          </View>
-        ))}
-      </View>
     </AdminLayout>
   );
 }
@@ -1905,23 +1713,8 @@ const styles = StyleSheet.create({
   },
   bannerTop: {
     height: 100,
-    backgroundColor: "#1d324e",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    paddingHorizontal: 20,
-  },
-  bannerBackBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-  },
-  bannerBackBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
+    backgroundColor: "#C2410C", // Bold orange/gold background matching screenshot banner
+    // Alternatively, we can use background color / pattern styles here
   },
   bannerBottom: {
     padding: 20,
@@ -2016,8 +1809,6 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     marginBottom: 24,
     gap: 16,
-    position: "relative",
-    zIndex: 10,
   },
   searchContainer: {
     flex: 1,
@@ -2126,7 +1917,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
-    zIndex: 100,
   },
   sortMenuItem: {
     paddingVertical: 8,
@@ -2710,7 +2500,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   detailsHeaderBanner: {
-    backgroundColor: "#1d324e",
+    backgroundColor: "#EA580C",
     borderRadius: 12,
     padding: 24,
     flexDirection: "row",
@@ -2719,20 +2509,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 16,
     marginBottom: 20,
-  },
-  headerBackBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  headerBackBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
   },
   detailsHeaderLeft: {
     flexDirection: "row",
@@ -2813,7 +2589,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   kycBar: {
-    backgroundColor: "#1d324e",
+    backgroundColor: "#EA580C",
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -3237,198 +3013,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#6B7280",
     lineHeight: 15,
-  },
-  messageModalContent: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    width: "90%",
-    maxWidth: 500,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    overflow: "hidden",
-  },
-  messageModalHeader: {
-    backgroundColor: "#EA580C",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  messageHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  messageIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  messageTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  messageSubtitle: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 13,
-    marginTop: 2,
-  },
-  messageModalBody: {
-    padding: 20,
-  },
-  messageFormLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-  messageFormInput: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#1F2937",
-    height: 44,
-    backgroundColor: "#FFFFFF",
-    marginBottom: 16,
-  },
-  messageFormTextArea: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#1F2937",
-    height: 120,
-    backgroundColor: "#FFFFFF",
-    textAlignVertical: "top",
-  },
-  messageModalFooter: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 12,
-  },
-  messageCancelBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#4B5563",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    flex: 1,
-    height: 44,
-  },
-  messageCancelBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  messageSendBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#EA580C",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    flex: 1.2,
-    height: 44,
-  },
-  messageSendBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  toastContainer: {
-    position: "absolute",
-    top: 90,
-    right: 24,
-    zIndex: 9999,
-    gap: 10,
-    alignItems: "flex-end",
-  },
-  toast: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 260,
-    maxWidth: 360,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  toastSuccess: {
-    backgroundColor: "#10B981",
-  },
-  toastError: {
-    backgroundColor: "#EF4444",
-  },
-  toastText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
-    marginLeft: 8,
-    flex: 1,
-  },
-  warningBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FEF3C7",
-    borderColor: "#F59E0B",
-    borderWidth: 1.5,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  warningBannerTitle: {
-    color: "#92400E",
-    fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  warningBannerText: {
-    color: "#B45309",
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  dangerBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FEE2E2",
-    borderColor: "#EF4444",
-    borderWidth: 1.5,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  dangerBannerTitle: {
-    color: "#991B1B",
-    fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  dangerBannerText: {
-    color: "#B91C1C",
-    fontSize: 13,
-    lineHeight: 18,
   },
 
 });

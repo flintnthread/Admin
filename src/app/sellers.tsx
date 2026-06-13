@@ -637,11 +637,15 @@ export default function SellersScreen() {
 
   return (
     <View style={SS.root}>
-      <StatusBar barStyle="light-content" backgroundColor={C.primary} />
+      <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
-      {/* Orange top bar */}
+      {/* Dark blue top bar */}
       <View style={SS.topBar}>
-        <View style={SS.logoBox}><IconPerson size={22} color="#FFF" /></View>
+        <TouchableOpacity style={SS.backButton} onPress={() => router.back()}>
+          <IconChevLeft size={16} color="#FFF" />
+          <Text style={SS.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        <View style={[SS.logoBox, { marginLeft: 10 }]}><IconPerson size={22} color="#FFF" /></View>
       </View>
 
       {/* Title bar */}
@@ -707,8 +711,6 @@ export default function SellersScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
 
-        {viewMode === 'grid' ? (
-          <View style={{ paddingHorizontal: HPAD }}>
             {paginated.length === 0
               ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
               : gridRows.map((row, ri) => (
@@ -730,7 +732,6 @@ export default function SellersScreen() {
           </View>
         ) : (
           <View style={[SS.listBox, isMobile && { marginHorizontal:0, borderRadius:0 }]}>
-            {!isMobile && <ListHeader isTablet={isTablet} />}
             {paginated.length === 0
               ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
               : paginated.map((s, idx) => (
@@ -775,8 +776,10 @@ export default function SellersScreen() {
 // ─────────────────────────── ROOT STYLES ─────────────────────────────────────
 const SS = StyleSheet.create({
   root:       { flex:1, backgroundColor:C.bg },
-  topBar:     { height:56, backgroundColor:C.primary, flexDirection:'row', alignItems:'center', paddingHorizontal:16 },
+  topBar:     { height:56, backgroundColor:'#1d324e', flexDirection:'row', alignItems:'center', paddingHorizontal:16 },
   logoBox:    { width:40, height:40, borderRadius:8, backgroundColor:'rgba(255,255,255,0.2)', justifyContent:'center', alignItems:'center' },
+  backButton: { flexDirection:'row', alignItems:'center', marginRight:10 },
+  backButtonText: { color:'#FFF', fontSize:14, fontWeight:'600', marginLeft:4 },
   titleBar:   { backgroundColor:C.card, paddingHorizontal:20, paddingTop:14, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border },
   breadcrumb: { flexDirection:'row', alignItems:'center', marginBottom:10 },
   bcLink:     { fontSize:12, color:C.primary, fontWeight:'500' },
