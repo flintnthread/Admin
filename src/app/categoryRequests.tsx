@@ -1,4 +1,12 @@
-import React, { useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapCategoryRequestRow } from '@/lib/mappers';
+import {
+  approveCategoryRequest,
+  fetchCategoryRequests,
+  fetchCategoryRequestStats,
+  rejectCategoryRequest,
+} from '@/services/categoryRequestApi';
 import {
   View,
   Text,
@@ -13,12 +21,13 @@ import {
 import AdminLayout from '@/components/admin-layout';
 import Svg, { Path, Circle, Rect, G, Polyline } from 'react-native-svg';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type Status = 'Pending' | 'Approved' | 'Rejected';
 
 interface CategoryRequest {
   id: string;
+  numericId: number;
   categoryName: string;
   sellerName: string;
   sellerEmail: string;
@@ -29,7 +38,7 @@ interface CategoryRequest {
   adminReason?: string;
 }
 
-// ─── SVG Icons ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ SVG Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const LayersIcon = ({ color = '#1E3A5F', size = 20 }: { color?: string; size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -87,65 +96,10 @@ const TotalIcon = () => (
   </Svg>
 );
 
-// ─── Sample Data ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sample Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Loaded from /api/admin/category-requests
 
-const INITIAL_REQUESTS: CategoryRequest[] = [
-  {
-    id: 'CR-001',
-    categoryName: 'Accessories',
-    sellerName: 'Arumulla Mahima',
-    sellerEmail: 'localiqdigitalmedia@gmail.com',
-    description: 'I want to add "lights" under Accessories category so plz add this sub-category to help customers find lighting products easily.',
-    reason: 'This category is not present in the current system and there is strong demand from buyers.',
-    status: 'Approved',
-    submitted: 'Dec 18, 2025 11:58',
-    adminReason: 'Valid request - lights subcategory will improve product discoverability.',
-  },
-  {
-    id: 'CR-002',
-    categoryName: 'Home Decor',
-    sellerName: 'Ravi Shankar',
-    sellerEmail: 'ravishankar.seller@gmail.com',
-    description: 'Requesting a new "Wall Art" category under Home Decor to list handmade paintings and prints.',
-    reason: 'Many sellers have handmade art products but no proper category exists.',
-    status: 'Pending',
-    submitted: 'Jan 05, 2026 09:22',
-  },
-  {
-    id: 'CR-003',
-    categoryName: 'Electronics',
-    sellerName: 'Preethi Nair',
-    sellerEmail: 'preethinair.biz@gmail.com',
-    description: 'Want to add "Smart Home Devices" as a top-level category for IoT and automation products.',
-    reason: 'Growing market segment with no dedicated space on the platform.',
-    status: 'Pending',
-    submitted: 'Jan 10, 2026 14:45',
-  },
-  {
-    id: 'CR-004',
-    categoryName: 'Sports',
-    sellerName: 'Kiran Reddy',
-    sellerEmail: 'kiranreddy.sports@gmail.com',
-    description: 'Requesting "Yoga & Fitness" sub-category under Sports for mats, blocks, and resistance bands.',
-    reason: 'Post-pandemic wellness trend has spiked demand for yoga equipment.',
-    status: 'Rejected',
-    submitted: 'Dec 28, 2025 16:10',
-    adminReason: 'Already covered under existing Fitness Equipment category.',
-  },
-  {
-    id: 'CR-005',
-    categoryName: 'Fashion',
-    sellerName: 'Sneha Kulkarni',
-    sellerEmail: 'snehakulkarni.fashion@gmail.com',
-    description: 'Add "Ethnic Wear" as a dedicated category separate from general clothing.',
-    reason: 'High volume of ethnic wear products are hard to discover in general clothing.',
-    status: 'Approved',
-    submitted: 'Jan 02, 2026 10:30',
-    adminReason: 'Approved — ethnic wear is a significant segment needing its own navigation.',
-  },
-];
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Status Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const statusConfig: Record<Status, { bg: string; text: string; dot: string }> = {
   Pending: { bg: '#FEF9C3', text: '#CA8A04', dot: '#CA8A04' },
@@ -163,7 +117,7 @@ const StatusBadge = ({ status }: { status: Status }) => {
   );
 };
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface StatCardProps {
   label: string;
@@ -183,7 +137,7 @@ const StatCard = ({ label, value, icon, accent, bg }: StatCardProps) => (
   </View>
 );
 
-// ─── View Modal ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ View Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ViewModalProps {
   request: CategoryRequest | null;
@@ -298,7 +252,7 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
                   textAlignVertical="top"
                 />
                 {!adminReason.trim() && (
-                  <Text style={styles.validationNote}>⚠ Please enter a reason before taking action.</Text>
+                  <Text style={styles.validationNote}>âš  Please enter a reason before taking action.</Text>
                 )}
 
                 {/* Action Buttons */}
@@ -331,7 +285,7 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
                   { borderLeftColor: request.status === 'Approved' ? '#16A34A' : '#DC2626' }
                 ]}>
                   <Text style={styles.adminDecisionText}>
-                    {request.adminReason || '—'}
+                    {request.adminReason || 'â€”'}
                   </Text>
                 </View>
               </View>
@@ -343,29 +297,60 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
   );
 };
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function CategoryRequests() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
-  const [requests, setRequests] = useState<CategoryRequest[]>(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState<CategoryRequest[]>([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | Status>('All');
   const [selectedRequest, setSelectedRequest] = useState<CategoryRequest | null>(null);
 
-  const stats = {
-    total: requests.length,
-    pending: requests.filter((r) => r.status === 'Pending').length,
-    approved: requests.filter((r) => r.status === 'Approved').length,
-    rejected: requests.filter((r) => r.status === 'Rejected').length,
-  };
+  const loadData = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const statusParam = filter === 'All' ? undefined : filter.toLowerCase();
+      const [listRes, statsRes] = await Promise.all([
+        fetchCategoryRequests(statusParam, 0, 200),
+        fetchCategoryRequestStats(),
+      ]);
+      setRequests((listRes.items ?? []).map(mapCategoryRequestRow));
+      setStats({
+        total: Number(statsRes.total ?? 0),
+        pending: Number(statsRes.pending ?? 0),
+        approved: Number(statsRes.approved ?? 0),
+        rejected: Number(statsRes.rejected ?? 0),
+      });
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+      setRequests([]);
+    }
+  }, [filter]);
 
-  const filtered = filter === 'All' ? requests : requests.filter((r) => r.status === filter);
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const filtered = requests;
 
   const handleUpdate = (id: string, status: 'Approved' | 'Rejected', reason: string) => {
-    setRequests((prev) =>
-      prev.map((r) => r.id === id ? { ...r, status, adminReason: reason } : r)
-    );
+    const row = requests.find((r) => r.id === id);
+    if (!row) return;
+    void (async () => {
+      try {
+        if (status === 'Approved') {
+          await approveCategoryRequest(row.numericId, reason);
+        } else {
+          await rejectCategoryRequest(row.numericId, reason);
+        }
+        await loadData();
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
   };
 
   const FILTERS: Array<'All' | Status> = ['All', 'Pending', 'Approved', 'Rejected'];
@@ -377,7 +362,11 @@ export default function CategoryRequests() {
         contentContainerStyle={styles.rootContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Page Header ── */}
+        {loadError ? (
+          <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
+        ) : null}
+
+        {/* Page Header */}
         <View style={styles.pageHeader}>
           <View style={styles.pageHeaderLeft}>
             <View style={styles.pageIconWrap}>
@@ -390,7 +379,7 @@ export default function CategoryRequests() {
           </View>
         </View>
 
-        {/* ── Stats Cards ── */}
+        {/* â”€â”€ Stats Cards â”€â”€ */}
         <View style={[styles.statsRow, isWeb && styles.statsRowWeb]}>
           <StatCard
             label="Total Requests"
@@ -422,7 +411,7 @@ export default function CategoryRequests() {
           />
         </View>
 
-        {/* ── Filter Tabs ── */}
+        {/* â”€â”€ Filter Tabs â”€â”€ */}
         <View style={styles.filterRow}>
           {FILTERS.map((f) => {
             const count = f === 'All'
@@ -447,7 +436,7 @@ export default function CategoryRequests() {
           })}
         </View>
 
-        {/* ── Web Table / Mobile Cards ── */}
+        {/* â”€â”€ Web Table / Mobile Cards â”€â”€ */}
         {isWeb ? (
           <View style={styles.tableWrapper}>
             {/* Table Header */}
@@ -549,7 +538,7 @@ export default function CategoryRequests() {
         )}
       </ScrollView>
 
-      {/* ── View Modal ── */}
+      {/* â”€â”€ View Modal â”€â”€ */}
       <ViewModal
         request={selectedRequest}
         onClose={() => setSelectedRequest(null)}
@@ -560,7 +549,7 @@ export default function CategoryRequests() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const styles = StyleSheet.create({
   root: {

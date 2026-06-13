@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { mapContactToCustomerTicket } from '@/lib/mappers';
+import { fetchContact, replyContact, updateContactStatus } from '@/services/contactApi';
 import {
   View,
   Text,
@@ -257,22 +260,50 @@ export default function CustomerSupportTicketDetails() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
+  const [ticket, setTicket] = useState<ReturnType<typeof mapContactToCustomerTicket> | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [response, setResponse] = useState('');
   const [updateStatus, setUpdateStatus] = useState('In Progress');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const id = Number(ticketId);
+    if (!id || Number.isNaN(id)) return;
+    void (async () => {
+      try {
+        setLoadError(null);
+        const detail = await fetchContact(id);
+        const mapped = mapContactToCustomerTicket(detail);
+        setTicket(mapped);
+        setUpdateStatus(mapped.status === 'Closed' ? 'Closed' : 'In Progress');
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
+  }, [ticketId]);
 
   const handleSubmit = async () => {
     if (!response.trim()) {
       Alert.alert('Required', 'Please enter a response before submitting.');
       return;
     }
+    const id = Number(ticketId);
+    if (!id || Number.isNaN(id)) return;
     setSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await replyContact(id, response.trim());
+      if (updateStatus === 'Closed') {
+        await updateContactStatus(id, true);
+      }
+      const detail = await fetchContact(id);
+      setTicket(mapContactToCustomerTicket(detail));
       setResponse('');
       Alert.alert('Success', 'Response submitted and status updated.');
-    }, 1000);
+    } catch (e) {
+      Alert.alert('Error', getApiErrorMessage(e));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleViewCustomer = () => {
@@ -295,51 +326,47 @@ export default function CustomerSupportTicketDetails() {
             <BackArrowIcon />
           </TouchableOpacity>
           <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>Ticket {ticketId || '#11'}</Text>
+            <Text style={styles.headerTitle}>Ticket #{ticketId || '—'}</Text>
             <Text style={styles.headerSubtitle}>Support ticket details</Text>
           </View>
         </View>
 
-        {/* ── Grid Layout for web ── */}
+        {loadError ? (
+          <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
+        ) : null}
+
         <View style={[styles.grid, isWeb && styles.gridWeb]}>
 
-          {/* Left Column */}
           <View style={[styles.col, isWeb && styles.colLeft]}>
 
-            {/* CARD 1 — Ticket Information */}
             <Card icon={<TicketInfoIcon />} title="Ticket Information">
               <InfoRow label="Status">
-                <StatusBadge status="Open" />
+                <StatusBadge status={ticket?.status ?? 'Open'} />
               </InfoRow>
               <View style={styles.divider} />
               <InfoRow label="Type">
-                <TypeBadge type="Delivery Issue" />
+                <TypeBadge type={ticket?.type ?? 'Other'} />
               </InfoRow>
               <View style={styles.divider} />
               <InfoRow label="Created">
-                <Text style={styles.infoText}>Jun 08, 2026 16:58</Text>
-              </InfoRow>
-              <View style={styles.divider} />
-              <InfoRow label="Last Updated">
-                <Text style={styles.infoText}>Jun 08, 2026 16:58</Text>
+                <Text style={styles.infoText}>{ticket?.created ?? '—'}</Text>
               </InfoRow>
               <View style={styles.divider} />
               <InfoRow label="Related Order">
                 <Text style={[styles.infoText, styles.orderLink]}>
-                  Order #FNT202604028262
+                  {ticket?.order ?? '—'}
                 </Text>
               </InfoRow>
             </Card>
 
-            {/* CARD 2 — Customer Information */}
             <Card icon={<CustomerIcon />} title="Customer Information">
               <InfoRow label="Name">
-                <Text style={styles.infoText}>Sravani Surampalli</Text>
+                <Text style={styles.infoText}>{ticket?.customer ?? '—'}</Text>
               </InfoRow>
               <View style={styles.divider} />
               <InfoRow label="Email">
                 <Text style={[styles.infoText, styles.emailText]} numberOfLines={1}>
-                  sravanisurampalli612@gmail.com
+                  {ticket?.email ?? '—'}
                 </Text>
               </InfoRow>
               <View style={styles.divider} />
@@ -362,21 +389,28 @@ export default function CustomerSupportTicketDetails() {
             <Card icon={<SubjectIcon />} title="Customer Message">
               <View style={styles.messageSubjectBox}>
                 <Text style={styles.messageSubject}>
-                  Order #FNT202604028262 - My order is not delivered on time and it's cancelled
+                  {ticket?.subject ?? '—'}
                 </Text>
               </View>
               <View style={styles.messageMeta}>
                 <View style={styles.messageAvatar}>
-                  <Text style={styles.messageAvatarText}>SS</Text>
+                  <Text style={styles.messageAvatarText}>
+                    {(ticket?.customer ?? 'C').slice(0, 2).toUpperCase()}
+                  </Text>
                 </View>
                 <View>
-                  <Text style={styles.messageAuthor}>Sravani Surampalli</Text>
-                  <Text style={styles.messageDate}>Jun 08, 2026 · 16:58</Text>
+                  <Text style={styles.messageAuthor}>{ticket?.customer ?? '—'}</Text>
+                  <Text style={styles.messageDate}>{ticket?.created ?? '—'}</Text>
                 </View>
               </View>
               <Text style={styles.messageBody}>
-                My order was not delivered within the promised delivery time. Due to the delay and lack of timely delivery, the order was automatically cancelled. I am disappointed with the service and request an explanation and appropriate resolution.
+                {ticket?.message ?? '—'}
               </Text>
+              {ticket?.adminNotes ? (
+                <Text style={[styles.messageBody, { marginTop: 12, color: '#6B7280' }]}>
+                  Admin notes: {ticket.adminNotes}
+                </Text>
+              ) : null}
             </Card>
 
             {/* CARD 4 — Add Response */}

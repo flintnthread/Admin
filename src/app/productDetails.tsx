@@ -19,10 +19,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   getVariantStats,
-  PRODUCT_DELIVERY,
-  PRODUCT_RETURNS,
-  PRODUCT_SIZE_CHART,
-  PRODUCT_SPECS,
   type ProductDetail,
   type ProductStatus,
   type ProductVariant,
@@ -44,9 +40,163 @@ type ApiVariant = {
   finalPrice?: number;
 };
 
+type SpecItem = { label: string; value: string };
+
+export type ProductDetailExtras = {
+  specItems: SpecItem[];
+  keyFeatures: string;
+  package: {
+    boxDimensions: string;
+    grossWeight: string;
+    packagingType: string;
+    fragileItem: string;
+    productWeight: string;
+    productDimensions: string;
+  };
+  delivery: {
+    estimatedDays: string;
+    coverageNote: string;
+    standardDelivery: string;
+    expressDelivery: string;
+    cashOnDelivery: string;
+    coverage: string;
+    charges: { zone: string; standard: string; express: string }[];
+  };
+  returns: {
+    policyHighlight: string;
+    policySubtext: string;
+    returnWindow: string;
+    refundMode: string;
+    warranty: string;
+    conditions: string[];
+    processSteps: string[];
+  };
+  sizeChart: {
+    unit: string;
+    footerNote: string;
+    rows: { size: string; chest: string; waist: string; hip: string; length: string }[];
+  };
+};
+
+function dash(value: unknown): string {
+  if (value == null || value === '') return '—';
+  return String(value);
+}
+
+function formatRupee(value: unknown): string {
+  const n = Number(value);
+  if (Number.isNaN(n)) return '—';
+  return `₹${n.toLocaleString('en-IN')}`;
+}
+
+function formatDims(l?: unknown, w?: unknown, h?: unknown): string {
+  if (l == null && w == null && h == null) return '—';
+  return `${dash(l)} × ${dash(w)} × ${dash(h)} cm`;
+}
+
+function parseSpecItems(raw: unknown): SpecItem[] {
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => {
+          if (item && typeof item === 'object') {
+            const row = item as Record<string, unknown>;
+            const label = dash(row.label ?? row.name ?? row.key);
+            const value = dash(row.value ?? row.val);
+            if (label === '—') return null;
+            return { label, value };
+          }
+          return null;
+        })
+        .filter((item): item is SpecItem => item != null);
+    }
+  } catch {
+    // plain text fallback
+  }
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => ({ label: `Item ${index + 1}`, value: line }));
+}
+
+function buildExtras(data: Record<string, unknown>, variants: ProductVariant[]): ProductDetailExtras {
+  const minDays = data.deliveryTimeMin;
+  const maxDays = data.deliveryTimeMax;
+  const estimatedDays =
+    minDays != null && maxDays != null
+      ? `${minDays}-${maxDays} days`
+      : minDays != null
+        ? `${minDays} days`
+        : maxDays != null
+          ? `${maxDays} days`
+          : '—';
+
+  const returnPolicy = dash(data.returnPolicy);
+  const warrantyInfo = dash(data.warrantyInfo);
+  const careInstructions = dash(data.careInstructions);
+  const deliveryInfo = dash(data.deliveryInfo);
+  const acceptCod = data.acceptCod === true;
+  const deliverAll = data.deliverAllLocations !== false;
+  const uniqueSizes = [...new Set(variants.map((v) => v.size).filter((s) => s && s !== '—'))];
+
+  return {
+    specItems: parseSpecItems(data.specifications),
+    keyFeatures: dash(data.features),
+    package: {
+      boxDimensions: formatDims(data.lengthCm, data.widthCm, data.heightCm),
+      grossWeight: dash(data.productWeight) !== '—' ? `${dash(data.productWeight)} kg` : '—',
+      packagingType: dash(data.productMaterialType),
+      fragileItem: data.fragile === true ? 'Yes' : data.fragile === false ? 'No' : '—',
+      productWeight: dash(data.productWeight) !== '—' ? `${dash(data.productWeight)} kg` : '—',
+      productDimensions: formatDims(data.lengthCm, data.widthCm, data.heightCm),
+    },
+    delivery: {
+      estimatedDays,
+      coverageNote: deliveryInfo !== '—' ? deliveryInfo : deliverAll ? 'Deliverable across India' : 'Limited locations',
+      standardDelivery: estimatedDays !== '—' ? `Available (${estimatedDays})` : '—',
+      expressDelivery: '—',
+      cashOnDelivery: acceptCod ? 'Available' : 'Not Available',
+      coverage: deliverAll ? 'Pan India' : 'Selected locations',
+      charges: [
+        { zone: 'Intra City', standard: formatRupee(data.intraCityCharge), express: '—' },
+        { zone: 'Metro to Metro', standard: formatRupee(data.metroMetroCharge), express: '—' },
+      ],
+    },
+    returns: {
+      policyHighlight: returnPolicy !== '—' ? returnPolicy : 'Return policy not specified',
+      policySubtext: careInstructions !== '—' ? careInstructions : 'See seller return terms',
+      returnWindow: returnPolicy !== '—' ? returnPolicy : '—',
+      refundMode: 'As per marketplace policy',
+      warranty: warrantyInfo,
+      conditions: careInstructions !== '—' ? [careInstructions] : ['Product must be unused and in original packaging'],
+      processSteps: ['Request Return', 'Pickup Scheduled', 'Quality Check', 'Refund Processed'],
+    },
+    sizeChart: {
+      unit: 'Measurements in inches (variant sizes from listing)',
+      footerNote:
+        data.sizeChartId != null
+          ? `Linked size chart #${data.sizeChartId}`
+          : uniqueSizes.length > 0
+            ? 'Sizes available in variants tab'
+            : 'No size chart linked for this product',
+      rows: uniqueSizes.map((size) => ({
+        size,
+        chest: '—',
+        waist: '—',
+        hip: '—',
+        length: '—',
+      })),
+    },
+  };
+}
+
 function mapApiProductDetail(data: Record<string, unknown>): {
   product: ProductDetail;
   variants: ProductVariant[];
+  extras: ProductDetailExtras;
 } {
   const images = (data.images as ApiImage[] | undefined) ?? [];
   const gallery = images.map((img) => String(img.url ?? '')).filter(Boolean);
@@ -55,11 +205,11 @@ function mapApiProductDetail(data: Record<string, unknown>): {
   const gst = Number(data.gstPercentage ?? 18);
   const statusRaw = String(data.status ?? 'pending').toLowerCase();
   const status: ProductStatus =
-    statusRaw === 'approved'
+    statusRaw === 'approved' || statusRaw === 'active'
       ? 'approved'
       : statusRaw === 'rejected'
         ? 'rejected'
-        : statusRaw === 'review'
+        : statusRaw === 'review' || statusRaw === 'under_review'
           ? 'review'
           : 'pending';
 
@@ -98,37 +248,40 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     image: primaryImage,
     seller: String(data.sellerName ?? `Seller #${data.sellerId ?? '—'}`),
     email: '',
-    category: `Category #${data.categoryId ?? '—'}`,
+    category: String(data.categoryName ?? `Category #${data.categoryId ?? '—'}`),
     status,
     submittedOn: formatDateTime(String(data.createdAt ?? '')),
     sku: String(data.sku ?? '—'),
-    lastUpdated: formatDate(String(data.createdAt ?? '')),
-    categoryLabel: `Category #${data.categoryId ?? '—'}`,
-    subcategory: `Subcategory #${data.subcategoryId ?? '—'}`,
+    lastUpdated: formatDate(String(data.updatedAt ?? data.createdAt ?? '')),
+    categoryLabel: String(data.categoryName ?? `Category #${data.categoryId ?? '—'}`),
+    subcategory: String(data.subcategoryName ?? `Subcategory #${data.subcategoryId ?? '—'}`),
     fullTitle: String(data.name ?? 'Product'),
     price: firstVariant?.sellingPriceWithGst ?? 0,
     mrp: firstVariant?.mrp ?? 0,
     gst,
-    material: '—',
-    weight: '—',
-    hsnCode: '—',
-    warranty: '—',
-    returnPolicy: '—',
+    material: dash(data.productMaterialType),
+    weight: dash(data.productWeight) !== '—' ? `${dash(data.productWeight)} kg` : '—',
+    hsnCode: dash(data.hsnCode),
+    warranty: dash(data.warrantyInfo),
+    returnPolicy: dash(data.returnPolicy),
     size: firstVariant?.size ?? '—',
-    delivery: '—',
+    delivery:
+      data.deliveryTimeMin != null && data.deliveryTimeMax != null
+        ? `${data.deliveryTimeMin}-${data.deliveryTimeMax} days`
+        : '—',
     stock: totalStock,
     stockStatus: totalStock > 0 ? 'In Stock' : 'Out of Stock',
     discount: 0,
     color: firstVariant?.colorName ?? '—',
     dbStatus: statusRaw,
     createdAt: formatDate(String(data.createdAt ?? '')),
-    approvedAt: '—',
+    approvedAt: data.reviewedAt ? formatDateTime(String(data.reviewedAt)) : '—',
     adminNote: String(data.adminNotes ?? '—'),
     fullDescription: String(data.description ?? data.shortDescription ?? ''),
     gallery: gallery.length > 0 ? gallery : [primaryImage],
   };
 
-  return { product, variants };
+  return { product, variants, extras: buildExtras(data, variants) };
 }
 
 const PALETTE = {
@@ -410,16 +563,20 @@ function SpecSectionCard({
   );
 }
 
-function SpecificationsTab({ isWide }: { isWide: boolean }) {
-  const { items, keyFeatures, package: pkg } = PRODUCT_SPECS;
+function SpecificationsTab({ isWide, extras }: { isWide: boolean; extras: ProductDetailExtras }) {
+  const { specItems, keyFeatures, package: pkg } = extras;
 
   return (
     <View style={styles.tabContent}>
       <View style={[styles.specTopRow, !isWide && styles.specTopRowMobile]}>
         <SpecSectionCard title="Specifications" icon="clipboard-list-outline" flex={isWide ? 2 : undefined}>
-          {items.map((item) => (
-            <SpecRow key={item.label} label={item.label} value={item.value} stacked={!isWide} />
-          ))}
+          {specItems.length > 0 ? (
+            specItems.map((item) => (
+              <SpecRow key={item.label} label={item.label} value={item.value} stacked={!isWide} />
+            ))
+          ) : (
+            <Text style={styles.emptyTabText}>No specifications provided.</Text>
+          )}
         </SpecSectionCard>
 
         <SpecSectionCard title="Key Features" icon="lightning-bolt" flex={isWide ? 1 : undefined}>
@@ -450,8 +607,8 @@ function SpecificationsTab({ isWide }: { isWide: boolean }) {
   );
 }
 
-function DeliveryTab({ isWide }: { isWide: boolean }) {
-  const d = PRODUCT_DELIVERY;
+function DeliveryTab({ isWide, extras }: { isWide: boolean; extras: ProductDetailExtras }) {
+  const d = extras.delivery;
 
   return (
     <View style={styles.tabContent}>
@@ -508,8 +665,8 @@ function DeliveryTab({ isWide }: { isWide: boolean }) {
   );
 }
 
-function ReturnsTab({ isWide }: { isWide: boolean }) {
-  const r = PRODUCT_RETURNS;
+function ReturnsTab({ isWide, extras }: { isWide: boolean; extras: ProductDetailExtras }) {
+  const r = extras.returns;
 
   return (
     <View style={styles.tabContent}>
@@ -567,8 +724,8 @@ function ReturnsTab({ isWide }: { isWide: boolean }) {
   );
 }
 
-function SizeChartTab({ isWide }: { isWide: boolean }) {
-  const chart = PRODUCT_SIZE_CHART;
+function SizeChartTab({ isWide, extras }: { isWide: boolean; extras: ProductDetailExtras }) {
+  const chart = extras.sizeChart;
   const colStyle = isWide ? styles.sizeColWide : styles.sizeCol;
 
   const table = (
@@ -580,7 +737,9 @@ function SizeChartTab({ isWide }: { isWide: boolean }) {
         <Text style={[styles.sizeTh, colStyle]}>Hip</Text>
         <Text style={[styles.sizeTh, colStyle]}>Length</Text>
       </View>
-      {chart.rows.map((row, index) => (
+      {chart.rows.length === 0 ? (
+        <Text style={styles.emptyTabText}>No size chart data available.</Text>
+      ) : chart.rows.map((row, index) => (
         <View
           key={row.size}
           style={[
@@ -653,6 +812,7 @@ export default function ProductDetailsScreen() {
   const [activeImage, setActiveImage] = useState(0);
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [extras, setExtras] = useState<ProductDetailExtras | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -674,6 +834,7 @@ export default function ProductDetailsScreen() {
       const mapped = mapApiProductDetail(data);
       setProduct(mapped.product);
       setVariants(mapped.variants);
+      setExtras(mapped.extras);
       setActiveImage(0);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to load product.'));
@@ -1067,13 +1228,15 @@ export default function ProductDetailsScreen() {
           <VariantsTab isWide={isWide} variants={variants} />
         )}
 
-        {activeTab === 'specifications' && <SpecificationsTab isWide={isWide} />}
+        {activeTab === 'specifications' && extras && (
+          <SpecificationsTab isWide={isWide} extras={extras} />
+        )}
 
-        {activeTab === 'delivery' && <DeliveryTab isWide={isWide} />}
+        {activeTab === 'delivery' && extras && <DeliveryTab isWide={isWide} extras={extras} />}
 
-        {activeTab === 'returns' && <ReturnsTab isWide={isWide} />}
+        {activeTab === 'returns' && extras && <ReturnsTab isWide={isWide} extras={extras} />}
 
-        {activeTab === 'sizechart' && <SizeChartTab isWide={isWide} />}
+        {activeTab === 'sizechart' && extras && <SizeChartTab isWide={isWide} extras={extras} />}
       </ScrollView>
 
     </SafeAreaView>
@@ -1310,6 +1473,11 @@ const styles = StyleSheet.create({
   tabBadgeTextActive: { color: '#FFF' },
 
   tabContent: { gap: 16, width: '100%', alignSelf: 'stretch' },
+  emptyTabText: {
+    fontSize: 14,
+    color: PALETTE.textSecondary,
+    paddingVertical: 8,
+  },
 
   // Variants tab
   variantStatsRow: {

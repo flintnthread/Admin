@@ -12,9 +12,11 @@
  * react-native-vector-icons as you prefer.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AdminLayout from "@/components/admin-layout";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { fetchProductDetail } from "@/services/productApi";
 import {
   Alert,
   Animated,
@@ -1132,10 +1134,57 @@ const StepDetails = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function EditProduct() {
+  const params = useLocalSearchParams<{ productId?: string }>();
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDiscard, setShowDiscard] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
+
+  useEffect(() => {
+    const productId = Number(params.productId);
+    if (!productId || Number.isNaN(productId)) return;
+    void (async () => {
+      try {
+        const d = await fetchProductDetail(productId);
+        const variants = Array.isArray(d.variants) ? d.variants as Record<string, unknown>[] : [];
+        const images = Array.isArray(d.images) ? d.images as { url?: string }[] : [];
+        setState((s) => ({
+          ...s,
+          basic: {
+            ...s.basic,
+            id: String(d.id ?? productId),
+            name: String(d.name ?? ''),
+            category: String(d.categoryName ?? s.basic.category),
+            subcategory: String(d.subcategoryName ?? s.basic.subcategory),
+            hsnCode: String(d.hsnCode ?? s.basic.hsnCode),
+            shortDesc: String(d.shortDescription ?? ''),
+            fullDesc: String(d.description ?? ''),
+          },
+          variants: variants.map((v, i) => ({
+            id: String(v.id ?? `v${i}`),
+            color: String(v.color ?? ''),
+            size: String(v.size ?? ''),
+            sku: String(v.sku ?? ''),
+            stock: String(v.stock ?? '0'),
+            mrp: String(v.sellingPrice ?? ''),
+            sellingPrice: String(v.finalPrice ?? v.sellingPrice ?? ''),
+            discount: '0',
+          })),
+          images: {
+            ...s.images,
+            primaryImage: images[0]?.url ?? s.images.primaryImage,
+            additionalImages: images.slice(1).map((img) => img.url ?? '').filter(Boolean),
+          },
+          details: {
+            ...s.details,
+            returnPolicyText: String(d.returnPolicy ?? s.details.returnPolicyText),
+          },
+        }));
+      } catch (e) {
+        setToasts((t) => [...t, { id: Date.now(), message: getApiErrorMessage(e), type: 'error' }]);
+      }
+    })();
+  }, [params.productId]);
 
   // Picker state
   const [pickerVisible, setPickerVisible] = useState(false);

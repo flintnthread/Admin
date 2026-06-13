@@ -285,6 +285,10 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
         {/* Page Content */}
         <View style={[styles.pageContent, { padding: isDesktop ? 32 : isMobile ? 16 : 24 }]}>
 
+            {loadError ? (
+              <Text style={{ color: "#DC2626", marginBottom: 12 }}>{loadError}</Text>
+            ) : null}
+
             {/* Desktop Page Title Bar */}
             {!isMobile && (
               <View style={styles.desktopHeader}>

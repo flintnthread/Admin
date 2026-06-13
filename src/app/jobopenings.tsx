@@ -85,7 +85,7 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
         location: j.location ?? "—",
         type,
         positions: 1,
-        applications: 0,
+        applications: Number(j.applicationCount ?? 0),
         postedAt: formatDate(j.createdAt),
         status,
     };
@@ -770,21 +770,30 @@ const jr = StyleSheet.create({
 const EditJobModal: React.FC<{
     visible: boolean;
     job: Job | null;
+    departments: string[];
     onClose: () => void;
     onSave: (job: Job) => void;
-}> = ({ visible, job, onClose, onSave }) => {
+}> = ({ visible, job, departments, onClose, onSave }) => {
     const isWeb = Platform.OS === 'web';
     const [statusOpen, setStatusOpen] = useState(false);
+    const [deptOpen, setDeptOpen] = useState(false);
     const [status, setStatus] = useState<string>(job?.status || "Active");
     const [title, setTitle] = useState(job?.title || "");
+    const [department, setDepartment] = useState(job?.department || departments[0] || "");
+    const [location, setLocation] = useState(job?.location || "");
+    const [empType, setEmpType] = useState<JobType>(job?.type || "Full Time");
 
     useEffect(() => {
         if (visible) {
             setStatus(job?.status || "Active");
             setTitle(job?.title || "");
+            setDepartment(job?.department || departments[0] || "");
+            setLocation(job?.location || "");
+            setEmpType(job?.type || "Full Time");
             setStatusOpen(false);
+            setDeptOpen(false);
         }
-    }, [visible, job]);
+    }, [visible, job, departments]);
     
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -800,12 +809,29 @@ const EditJobModal: React.FC<{
                     
                     <ScrollView style={em.body} contentContainerStyle={em.bodyContent} showsVerticalScrollIndicator={false}>
                         <View style={em.row}>
-                            <View style={em.field}>
+                            <View style={[em.field, { zIndex: 1100, elevation: 1100 }]}>
                                 <Text style={em.label}>Department <Text style={{ color: T.red }}>*</Text></Text>
-                                <View style={em.inputWrap}>
-                                    <Text style={em.inputText}>{job?.department || "Select Department"}</Text>
+                                <TouchableOpacity
+                                    style={[em.inputWrap, deptOpen && { borderColor: T.orange, borderWidth: 1.5 }]}
+                                    onPress={() => setDeptOpen(!deptOpen)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={em.inputText}>{department || "Select Department"}</Text>
                                     <Feather name="chevron-down" size={14} color={T.textHint} />
-                                </View>
+                                </TouchableOpacity>
+                                {deptOpen && (
+                                    <View style={em.dropdown}>
+                                        {departments.map((opt) => (
+                                            <TouchableOpacity
+                                                key={opt}
+                                                style={em.dropItem}
+                                                onPress={() => { setDepartment(opt); setDeptOpen(false); }}
+                                            >
+                                                <Text style={em.dropItemText}>{opt}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                             <View style={em.field}>
                                 <Text style={em.label}>Job Title <Text style={{ color: T.red }}>*</Text></Text>
@@ -835,7 +861,7 @@ const EditJobModal: React.FC<{
                             <View style={em.field}>
                                 <Text style={em.label}>Location <Text style={{ color: T.red }}>*</Text></Text>
                                 <View style={em.inputWrap}>
-                                    <TextInput style={em.input} value={job?.location || ""} placeholder="Location" placeholderTextColor={T.textHint} />
+                                    <TextInput style={em.input} value={location} onChangeText={setLocation} placeholder="Location" placeholderTextColor={T.textHint} />
                                 </View>
                             </View>
                             <View style={em.field}>
@@ -876,7 +902,7 @@ const EditJobModal: React.FC<{
                             </TouchableOpacity>
                             {statusOpen && (
                                 <View style={em.dropdown}>
-                                    {["Active", "Inactive", "Closed"].map(opt => (
+                                    {["Active", "Paused", "Closed"].map(opt => (
                                         <TouchableOpacity key={opt} style={em.dropItem} onPress={() => { setStatus(opt); setStatusOpen(false); }}>
                                             <Text style={em.dropItemText}>{opt}</Text>
                                         </TouchableOpacity>
@@ -891,20 +917,27 @@ const EditJobModal: React.FC<{
                             </TouchableOpacity>
                             <TouchableOpacity style={em.saveBtn} onPress={() => {
                                 const trimTitle = title.trim() || "New Job Opening";
+                                const dept = department || departments[0] || "—";
                                 if (job) {
-                                    onSave({ ...job, title: trimTitle, status: status as JobStatus });
+                                    onSave({
+                                        ...job,
+                                        title: trimTitle,
+                                        department: dept,
+                                        location: location.trim() || job.location,
+                                        type: empType,
+                                        status: status as JobStatus,
+                                    });
                                 } else {
                                     onSave({
-                                        id: Date.now(),
+                                        id: 0,
                                         title: trimTitle,
-                                        department: "Engineering", // mock for new job
-                                        location: "Remote",
-                                        type: "Full Time",
+                                        department: dept,
+                                        location: location.trim() || "—",
+                                        type: empType,
                                         positions: 1,
                                         applications: 0,
                                         status: status as JobStatus,
-                                        urgent: false,
-                                        postedAt: "Just now"
+                                        postedAt: "Just now",
                                     });
                                 }
                             }}>
@@ -1205,8 +1238,11 @@ const JobOpeningsScreen: React.FC = () => {
     const [editingJob, setEditingJob]               = useState<Job | null>(null);
     const [deleteTarget, setDeleteTarget]           = useState<Job | null>(null);
     const [alertConfig, setAlertConfig]             = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: "", message: "" });
+    const [loading, setLoading]                     = useState(true);
+    const [error, setError]                         = useState<string | null>(null);
 
     const isWeb = Platform.OS === "web";
+    const departmentNames = deptOptions.filter((d) => d !== "All Departments");
 
     const filtered = jobs.filter(j => {
         const matchSearch =
@@ -1219,6 +1255,8 @@ const JobOpeningsScreen: React.FC = () => {
     });
 
     const loadJobs = useCallback(async () => {
+        setLoading(true);
+        setError(null);
         try {
             const [jobRows, deptRows] = await Promise.all([fetchJobs(), fetchDepartments()]);
             const names: Record<number, string> = {};
@@ -1235,7 +1273,9 @@ const JobOpeningsScreen: React.FC = () => {
             setDeptIdByName(idByName);
             setJobs(jobRows.map((j) => mapApiJob(j, names)));
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
+            setError(getApiErrorMessage(e, "Failed to load job openings."));
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -1264,7 +1304,7 @@ const JobOpeningsScreen: React.FC = () => {
                 status: updated.status.toLowerCase(),
                 departmentId: deptIdByName[updated.department],
             };
-            if (jobs.find((j) => j.id === updated.id)) {
+            if (updated.id > 0 && jobs.find((j) => j.id === updated.id)) {
                 await updateJob(updated.id, payload);
                 setAlertConfig({ visible: true, title: "Updated!", message: "Job opening updated successfully." });
             } else {
@@ -1469,7 +1509,18 @@ const JobOpeningsScreen: React.FC = () => {
                 </Text>
 
                 {/* ── JOB CARDS ── */}
-                {filtered.length === 0 ? (
+                {loading ? (
+                    <View style={s.empty}>
+                        <Text style={s.emptyTitle}>Loading job openings…</Text>
+                    </View>
+                ) : error ? (
+                    <View style={s.empty}>
+                        <Text style={s.emptyTitle}>{error}</Text>
+                        <TouchableOpacity style={s.addBtn} onPress={loadJobs}>
+                            <Text style={s.addBtnTxt}>Retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : filtered.length === 0 ? (
                     <View style={s.empty}>
                         <View style={s.emptyIcon}>
                             <Feather name="inbox" size={30} color={T.textHint} />
@@ -1561,6 +1612,7 @@ const JobOpeningsScreen: React.FC = () => {
             <EditJobModal
                 visible={editModalVisible}
                 job={editingJob}
+                departments={departmentNames}
                 onClose={() => setEditModalVisible(false)}
                 onSave={handleSave}
             />

@@ -40,7 +40,7 @@ const NAV_ITEMS = {
 
       { label: "Products", icon: "package", path: "/Products", color: "#0984e3" },
       { label: "Customers", icon: "users", path: "/customerManagement", color: "#00b894" },
-      { label: "Sellers", icon: "user-check", path: null, color: "#6c5ce7" },
+      { label: "Sellers", icon: "user-check", path: "/sellers", color: "#6c5ce7" },
       { label: "Sellers Graph", icon: "trending-up", path: "/sellergraphs", color: "#e17055" },
       { label: "Seller Bank Approval", icon: "credit-card", path: "/sellerbankapproval", color: "#e84393" },
       { label: "Orders", icon: "shopping-cart", path: "/orders", color: "#d63031" },
@@ -95,8 +95,8 @@ const NAV_ITEMS = {
       children: [
         { label: "Main Categories", icon: "layers", path: null, color: "#A855F7" },
         { label: "Subcategories", icon: "git-branch", path: null, color: "#D946EF" },
-        { label: "Colors", icon: "droplet", path: null, color: "#EC4899" },
-        { label: "Sizes", icon: "maximize", path: null, color: "#F43F5E" },
+        { label: "Colors", icon: "droplet", path: "/colors", color: "#EC4899" },
+        { label: "Sizes", icon: "maximize", path: "/sizes", color: "#F43F5E" },
       ]
     },
     {

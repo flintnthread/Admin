@@ -1,4 +1,12 @@
 import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDateTime, initialsFromName } from "@/lib/format";
+import {
+  approveSellerProfile,
+  fetchPendingProfileSellers,
+  rejectSellerProfile,
+  type PendingProfileSeller,
+} from "@/services/sellerApi";
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -14,14 +22,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { formatDateTime, initialsFromName } from "@/lib/format";
-import {
-  approveSellerProfile,
-  fetchPendingProfileSellers,
-  rejectSellerProfile,
-  type PendingProfileSeller,
-} from "@/services/sellerApi";
+
 
 const ORANGE = "#ef7b1a";
 const NAVY = "#1d324e";

@@ -1,4 +1,13 @@
-import React, { useState } from "react";
+﻿import React, { useCallback, useEffect, useState } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapFaqCategoryRow, mapFaqQuestionRow } from "@/lib/mappers";
+import {
+  createFaq,
+  deleteFaq,
+  fetchFaqCategories,
+  fetchFaqs,
+  updateFaq,
+} from "@/services/faqApi";
 import {
     View,
     Text,
@@ -14,7 +23,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 
-// ─── THEME ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ THEME â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PRIMARY = "#ef7b1a";
 const PRIMARY_LIGHT = "#fff4eb";
 const NAVY = "#1e3a5f";
@@ -34,7 +43,7 @@ const TEXT_HEAD = "#1a2b4a";
 const TEXT_BODY = "#4a5568";
 const TEXT_MUTED = "#a0aec0";
 
-// ─── TYPES ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface FaqCategory {
     id: number;
     name: string;
@@ -54,88 +63,9 @@ interface FaqQuestion {
     isForSeller?: boolean;
 }
 
-// ─── CATEGORIES ──────────────────────────────────────────────────────────────
-const CATEGORIES: FaqCategory[] = [
-    { id: 1, name: "About Flint & Thread", icon: "info", color: NAVY, slug: "about" },
-    { id: 2, name: "Account & Profile", icon: "user", color: PRIMARY, slug: "account" },
-    { id: 3, name: "Orders & Tracking", icon: "package", color: NAVY, slug: "orders" },
-    { id: 4, name: "Shipping & Delivery", icon: "truck", color: PRIMARY, slug: "shipping" },
-    { id: 5, name: "Payments & Wallet", icon: "credit-card", color: NAVY, slug: "payments" },
-    { id: 6, name: "Returns & Refunds", icon: "refresh-cw", color: PRIMARY, slug: "returns" },
-    { id: 7, name: "Seller Support", icon: "briefcase", color: NAVY, slug: "seller" },
-    { id: 8, name: "Technical Issues", icon: "tool", color: PRIMARY, slug: "tech" },
-];
+// FAQ categories and questions load from /api/admin/faq
 
-// ─── QUESTIONS DATA ───────────────────────────────────────────────────────────
-const initialQuestions: FaqQuestion[] = [
-    // About Flint & Thread (cat 1)
-    { id: 101, categoryId: 1, question: "What is Flint & Thread?", answer: "Flint & Thread is a premium online fashion marketplace connecting buyers with verified sellers across India. We curate quality clothing, accessories and lifestyle products from trusted brands and independent designers.", status: "Active", createdAt: "18 Nov, 2025", order: 1 },
-    { id: 102, categoryId: 1, question: "When was Flint & Thread founded?", answer: "Flint & Thread was founded in 2023 with a mission to make authentic fashion accessible to every corner of India while empowering local sellers and artisans.", status: "Active", createdAt: "18 Nov, 2025", order: 2 },
-    { id: 103, categoryId: 1, question: "Is Flint & Thread available across India?", answer: "Yes! We currently deliver to 500+ cities across India. We are continuously expanding our reach to serve more pin codes every month.", status: "Active", createdAt: "18 Nov, 2025", order: 3 },
-    { id: 104, categoryId: 1, question: "How do I contact customer support?", answer: "You can reach our support team via the in-app chat, email at support@flintandthread.com, or call our helpline at 1800-XXX-XXXX (Mon–Sat, 9 AM – 7 PM).", status: "Active", createdAt: "18 Nov, 2025", order: 4 },
-    { id: 105, categoryId: 1, question: "Does Flint & Thread have a mobile app?", answer: "Yes, the Flint & Thread app is available on both the Google Play Store (Android) and Apple App Store (iOS). Download it for a faster, personalized shopping experience.", status: "Active", createdAt: "18 Nov, 2025", order: 5 },
-    { id: 106, categoryId: 1, question: "What makes Flint & Thread different from other platforms?", answer: "We focus on quality over quantity — every seller is verified, every product is reviewed, and our curation team ensures only authentic, high-quality items are listed.", status: "Active", createdAt: "18 Nov, 2025", order: 6 },
-    { id: 107, categoryId: 1, question: "Are the products on Flint & Thread authentic?", answer: "Absolutely. We have a strict seller verification process and a quality check team that reviews products before they go live on the platform.", status: "Active", createdAt: "18 Nov, 2025", order: 7 },
-    { id: 108, categoryId: 1, question: "Does Flint & Thread support sustainable fashion?", answer: "Yes, we actively promote eco-friendly and sustainable brands. Look for the 'Eco Badge' on product listings to identify sustainable choices.", status: "Inactive", createdAt: "18 Nov, 2025", order: 8 },
-
-    // Account & Profile (cat 2)
-    { id: 201, categoryId: 2, question: "How do I create an account?", answer: "Tap 'Sign Up' on the home screen, enter your mobile number or email, verify via OTP, and complete your profile. It takes less than 2 minutes!", status: "Active", createdAt: "18 Nov, 2025", order: 1 },
-    { id: 202, categoryId: 2, question: "I forgot my password. How do I reset it?", answer: "Go to the login screen, tap 'Forgot Password', enter your registered email or mobile number, and follow the OTP verification steps to set a new password.", status: "Active", createdAt: "18 Nov, 2025", order: 2 },
-    { id: 203, categoryId: 2, question: "Can I change my registered mobile number?", answer: "Yes. Go to Profile → Settings → Account Details → Edit Mobile Number. You will need to verify the new number via OTP.", status: "Active", createdAt: "18 Nov, 2025", order: 3 },
-    { id: 204, categoryId: 2, question: "How do I update my delivery address?", answer: "Go to Profile → Saved Addresses → Add / Edit address. You can save multiple addresses and set a default for faster checkout.", status: "Active", createdAt: "18 Nov, 2025", order: 4 },
-    { id: 205, categoryId: 2, question: "Can I have multiple accounts?", answer: "Each mobile number and email can be linked to only one Flint & Thread account. Multiple accounts violate our Terms of Service.", status: "Active", createdAt: "18 Nov, 2025", order: 5 },
-    { id: 206, categoryId: 2, question: "How do I delete my account?", answer: "Go to Profile → Settings → Account → Delete Account. Please note this action is irreversible and all your data, orders and wallet balance will be permanently removed.", status: "Active", createdAt: "18 Nov, 2025", order: 6 },
-    { id: 207, categoryId: 2, question: "Is my personal data safe?", answer: "Yes. We use industry-standard encryption and never share your personal data with third parties without your consent. Read our Privacy Policy for full details.", status: "Active", createdAt: "18 Nov, 2025", order: 7 },
-    { id: 208, categoryId: 2, question: "How do I enable two-factor authentication?", answer: "Go to Profile → Settings → Security → Two-Factor Authentication and toggle it on. You will receive an OTP on your registered number at every login.", status: "Active", createdAt: "18 Nov, 2025", order: 8 },
-    { id: 209, categoryId: 2, question: "Can I log in on multiple devices?", answer: "Yes, you can be logged in on up to 3 devices simultaneously. You can manage active sessions from Profile → Settings → Active Sessions.", status: "Active", createdAt: "18 Nov, 2025", order: 9 },
-    { id: 210, categoryId: 2, question: "How do I change my profile photo?", answer: "Go to Profile, tap the camera icon on your avatar, and choose to take a photo or upload from your gallery.", status: "Inactive", createdAt: "18 Nov, 2025", order: 10 },
-
-    // Orders & Tracking (cat 3)
-    { id: 301, categoryId: 3, question: "How do I place an order?", answer: "Browse or search for a product, tap 'Add to Cart' or 'Buy Now', select your size/variant, choose a delivery address, pick a payment method, and confirm your order.", status: "Active", createdAt: "18 Nov, 2025", order: 1 },
-    { id: 302, categoryId: 3, question: "How do I track my order?", answer: "Go to Orders → Select your order → Track Shipment. You will see real-time tracking updates. You also receive SMS/email notifications at every status change.", status: "Active", createdAt: "18 Nov, 2025", order: 2 },
-    { id: 303, categoryId: 3, question: "Can I cancel an order?", answer: "Yes, you can cancel before the order is shipped. Go to Orders → Select order → Cancel Order. Once shipped, cancellation is not possible; you may initiate a return after delivery.", status: "Active", createdAt: "18 Nov, 2025", order: 3 },
-    { id: 304, categoryId: 3, question: "What if I receive a wrong item?", answer: "We apologise for the inconvenience. Go to Orders → Select order → Report an Issue → Wrong Item Received. We will arrange a replacement or full refund within 48 hours.", status: "Active", createdAt: "18 Nov, 2025", order: 4 },
-    { id: 305, categoryId: 3, question: "Can I modify my order after placing it?", answer: "Orders can be modified (address change or item removal) within 30 minutes of placement. Go to Orders → Select order → Modify Order.", status: "Active", createdAt: "18 Nov, 2025", order: 5 },
-    { id: 306, categoryId: 3, question: "What is the estimated delivery time?", answer: "Standard delivery takes 3–7 business days. Express delivery (where available) delivers within 1–2 business days. Timelines may vary based on your location.", status: "Active", createdAt: "18 Nov, 2025", order: 6 },
-
-    // Shipping & Delivery (cat 4)
-    { id: 401, categoryId: 4, question: "Is delivery free?", answer: "Orders above ₹499 get free standard delivery. Orders below ₹499 attract a flat ₹49 delivery fee. Express delivery is charged separately based on weight and location.", status: "Active", createdAt: "18 Nov, 2025", order: 1 },
-    { id: 402, categoryId: 4, question: "Do you deliver internationally?", answer: "Currently we deliver only within India. International shipping is on our roadmap and will be announced soon.", status: "Active", createdAt: "18 Nov, 2025", order: 2 },
-    { id: 403, categoryId: 4, question: "What shipping partners do you use?", answer: "We work with Bluedart, Delhivery, Ekart, DTDC and India Post to ensure reliable and timely delivery across all serviceable pin codes.", status: "Active", createdAt: "18 Nov, 2025", order: 3 },
-    { id: 404, categoryId: 4, question: "My order is delayed. What should I do?", answer: "First check the tracking page for latest updates. If the status hasn't changed in 48 hours, contact our support team with your Order ID and we will investigate immediately.", status: "Active", createdAt: "18 Nov, 2025", order: 4 },
-    { id: 405, categoryId: 4, question: "Can I schedule a delivery time slot?", answer: "Yes! For select pin codes we offer preferred time slot delivery. You can choose your slot at checkout or from the order tracking page before dispatch.", status: "Active", createdAt: "18 Nov, 2025", order: 5 },
-
-    // Payments & Wallet (cat 5)
-    { id: 501, categoryId: 5, question: "What payment methods are accepted?", answer: "We accept UPI (GPay, PhonePe, Paytm, BHIM), debit/credit cards (Visa, Mastercard, Rupay, Amex), Net Banking, EMI, and Flint & Thread Wallet.", status: "Active", createdAt: "18 Nov, 2025", order: 1 },
-    { id: 502, categoryId: 5, question: "Is Cash on Delivery available?", answer: "Yes, COD is available for orders up to ₹5,000 in eligible pin codes. A ₹25 handling fee applies for COD orders.", status: "Active", createdAt: "18 Nov, 2025", order: 2 },
-    { id: 503, categoryId: 5, question: "How does the Flint & Thread Wallet work?", answer: "The Wallet stores your refunds, cashbacks and gift credits. Your wallet balance is automatically applied at checkout — you can also choose to pay the remainder via any other method.", status: "Active", createdAt: "18 Nov, 2025", order: 3 },
-    { id: 504, categoryId: 5, question: "My payment failed but amount was deducted. What now?", answer: "Don't worry — failed payment deductions are automatically reversed within 5–7 business days. If not, raise a dispute from Orders → Payment Issue with your transaction reference.", status: "Active", createdAt: "18 Nov, 2025", order: 4 },
-    { id: 505, categoryId: 5, question: "Is it safe to save my card details?", answer: "Yes. We are PCI-DSS compliant. Card details are stored as secure tokens with our payment gateway partners and are never accessible to Flint & Thread directly.", status: "Active", createdAt: "18 Nov, 2025", order: 5 },
-
-    // Returns & Refunds (cat 6)
-    { id: 601, categoryId: 6, question: "What is the return policy?", answer: "Most items can be returned within 7 days of delivery. The item must be unused, unwashed, with original tags and packaging intact. Some categories like innerwear and customised products are non-returnable.", status: "Active", createdAt: "18 Nov, 2025", order: 1 },
-    { id: 602, categoryId: 6, question: "How do I initiate a return?", answer: "Go to Orders → Select order → Return Item → Choose reason → Schedule pickup. Our logistics partner will collect the item from your doorstep within 2–3 business days.", status: "Active", createdAt: "18 Nov, 2025", order: 2 },
-    { id: 603, categoryId: 6, question: "How long does a refund take?", answer: "Once the returned item is quality-checked (1–2 days after pickup), the refund is processed within 5–7 business days to the original payment method or instantly to your Flint & Thread Wallet.", status: "Active", createdAt: "18 Nov, 2025", order: 3 },
-    { id: 604, categoryId: 6, question: "Can I exchange instead of returning?", answer: "Yes! Select 'Exchange' during the return flow and choose a different size or colour of the same item. Exchanges are processed faster than returns.", status: "Active", createdAt: "18 Nov, 2025", order: 4 },
-    { id: 605, categoryId: 6, question: "What if the return pickup fails?", answer: "If the pickup fails twice, you can drop the item at any of our nearest partner drop-off locations (listed in the app under Returns → Drop-off Points).", status: "Active", createdAt: "18 Nov, 2025", order: 5 },
-
-    // Seller Support (cat 7)
-    { id: 701, categoryId: 7, question: "How do I register as a seller?", answer: "Visit the Seller Hub at seller.flintandthread.com, click 'Register', fill in your business details, upload GST certificate and bank details, and submit for verification. Approval takes 2–3 business days.", status: "Active", createdAt: "20 Nov, 2025", order: 1 },
-    { id: 702, categoryId: 7, question: "What documents are required for seller onboarding?", answer: "You need: PAN card, GST registration certificate, business bank account details, and a cancelled cheque. For individual sellers, Aadhar card is additionally required.", status: "Active", createdAt: "20 Nov, 2025", order: 2 },
-    { id: 703, categoryId: 7, question: "When and how do sellers get paid?", answer: "Seller payouts are processed every 7 days after order delivery confirmation. Payments are transferred directly to your registered bank account via NEFT/IMPS.", status: "Active", createdAt: "20 Nov, 2025", order: 3 },
-    { id: 704, categoryId: 7, question: "What commission does Flint & Thread charge?", answer: "Commission ranges from 8%–18% depending on the product category. Full commission details are available in the Seller Hub under Pricing & Commission.", status: "Active", createdAt: "20 Nov, 2025", order: 4 },
-    { id: 705, categoryId: 7, question: "How do I list a new product?", answer: "In the Seller Hub, go to Products → Add New Product, fill in product details, upload images (minimum 3, white background recommended), set pricing, and publish.", status: "Inactive", createdAt: "20 Nov, 2025", order: 5 },
-
-    // Technical Issues (cat 8)
-    { id: 801, categoryId: 8, question: "The app is crashing. What should I do?", answer: "Try these steps: 1) Force close and reopen the app, 2) Clear app cache (Settings → Apps → Flint & Thread → Clear Cache), 3) Update to the latest version, 4) Uninstall and reinstall. If the issue persists, contact support with your device model.", status: "Active", createdAt: "22 Nov, 2025", order: 1 },
-    { id: 802, categoryId: 8, question: "I am not receiving OTPs. What do I do?", answer: "Check if your mobile number is correct. Ensure you have network coverage. Check if SMS is blocked by your carrier. Try 'Resend OTP' after 60 seconds. If the problem continues, use email OTP or contact support.", status: "Active", createdAt: "22 Nov, 2025", order: 2 },
-    { id: 803, categoryId: 8, question: "Images are not loading in the app.", answer: "This is usually a network issue. Check your internet connection, toggle Wi-Fi off and on, or switch to mobile data. Clearing the image cache from app settings can also help.", status: "Active", createdAt: "22 Nov, 2025", order: 3 },
-    { id: 804, categoryId: 8, question: "The website is not loading. Is there an outage?", answer: "Check our status page at status.flintandthread.com for real-time system status. You can also check our social media handles for announcements during outages.", status: "Active", createdAt: "22 Nov, 2025", order: 4 },
-    { id: 805, categoryId: 8, question: "How do I report a bug or technical issue?", answer: "Go to Profile → Help → Report a Bug. Fill in the issue description, attach screenshots if possible, and submit. Our tech team reviews all reports within 24 hours.", status: "Active", createdAt: "22 Nov, 2025", order: 5 },
-    { id: 806, categoryId: 8, question: "The payment page is showing an error.", answer: "Try refreshing the page, clearing browser cookies (on web), or switching to a different payment method. If the issue persists, use a different browser or the mobile app.", status: "Inactive", createdAt: "22 Nov, 2025", order: 6 },
-];
-
-// ─── VIEW QUESTION MODAL ─────────────────────────────────────────────────────
+// â”€â”€â”€ VIEW QUESTION MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ViewModal: React.FC<{
     visible: boolean;
     question: FaqQuestion | null;
@@ -204,7 +134,7 @@ const ViewModal: React.FC<{
     );
 };
 
-// ─── ADD / EDIT QUESTION MODAL ────────────────────────────────────────────────
+// â”€â”€â”€ ADD / EDIT QUESTION MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QuestionModal: React.FC<{
     visible: boolean;
     editing: FaqQuestion | null;
@@ -318,7 +248,7 @@ const QuestionModal: React.FC<{
     );
 };
 
-// ─── DELETE CONFIRM MODAL ─────────────────────────────────────────────────────
+// â”€â”€â”€ DELETE CONFIRM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DeleteModal: React.FC<{
     visible: boolean;
     question: FaqQuestion | null;
@@ -362,7 +292,7 @@ const DeleteModal: React.FC<{
     );
 };
 
-// ─── QUESTION TABLE ROW ──────────────────────────────────────────────────────
+// â”€â”€â”€ QUESTION TABLE ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QuestionRow: React.FC<{
     q: FaqQuestion;
     cat: FaqCategory | undefined;
@@ -382,7 +312,7 @@ const QuestionRow: React.FC<{
             </View>
             {/* Category */}
             <View style={qSt.cellCat}>
-                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "—"}</Text>
+                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "â€”"}</Text>
             </View>
             {/* Question */}
             <View style={qSt.cellQuestion}>
@@ -427,7 +357,7 @@ const QuestionRow: React.FC<{
     );
 };
 
-// ─── QUESTION GRID CARD ──────────────────────────────────────────────────────
+// â”€â”€â”€ QUESTION GRID CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QuestionGridCard: React.FC<{
     q: FaqQuestion;
     cat: FaqCategory | undefined;
@@ -476,12 +406,14 @@ const QuestionGridCard: React.FC<{
     );
 };
 
-// ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FaqQuestionsScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
 
-    const [questions, setQuestions] = useState<FaqQuestion[]>(initialQuestions);
-    const [selectedCatId, setSelectedCatId] = useState<number>(1);
+    const [categories, setCategories] = useState<FaqCategory[]>([]);
+    const [questions, setQuestions] = useState<FaqQuestion[]>([]);
+    const [selectedCatId, setSelectedCatId] = useState<number>(0);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
     const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Inactive">("All");
@@ -492,7 +424,44 @@ const FaqQuestionsScreen: React.FC = () => {
     const [deleteModal, setDeleteModal] = useState<FaqQuestion | null>(null);
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
-    const selectedCat = CATEGORIES.find(c => c.id === selectedCatId);
+    const loadCategories = useCallback(async () => {
+        try {
+            setLoadError(null);
+            const rows = await fetchFaqCategories();
+            const mapped = rows.map((r, i) => {
+                const cat = mapFaqCategoryRow(r, i);
+                return { id: cat.id, name: cat.name, icon: cat.icon, color: cat.color, slug: cat.slug };
+            });
+            setCategories(mapped);
+            if (mapped.length > 0) {
+                setSelectedCatId((prev) => (prev && mapped.some((c) => c.id === prev) ? prev : mapped[0].id));
+            }
+        } catch (e) {
+            setLoadError(getApiErrorMessage(e));
+        }
+    }, []);
+
+    const loadQuestions = useCallback(async (categoryId: number) => {
+        if (!categoryId) return;
+        try {
+            setLoadError(null);
+            const rows = await fetchFaqs(categoryId);
+            setQuestions(rows.map(mapFaqQuestionRow));
+        } catch (e) {
+            setLoadError(getApiErrorMessage(e));
+            setQuestions([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadCategories();
+    }, [loadCategories]);
+
+    useEffect(() => {
+        if (selectedCatId) void loadQuestions(selectedCatId);
+    }, [selectedCatId, loadQuestions]);
+
+    const selectedCat = categories.find(c => c.id === selectedCatId);
 
     const filtered = questions.filter(q => {
         const inCat = q.categoryId === selectedCatId;
@@ -511,29 +480,44 @@ const FaqQuestionsScreen: React.FC = () => {
     };
 
     const handleSave = (data: Partial<FaqQuestion> & { categoryId: number }) => {
-        if (editModal) {
-            setQuestions(prev => prev.map(q => q.id === editModal.id ? { ...q, ...data } : q));
-        } else {
-            const newQ: FaqQuestion = {
-                id: Date.now(),
-                categoryId: data.categoryId,
-                question: data.question ?? "",
-                answer: data.answer ?? "",
-                status: data.status ?? "Active",
-                createdAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-                order: questions.filter(q => q.categoryId === data.categoryId).length + 1,
-                isForSeller: data.isForSeller ?? false,
-            };
-            setQuestions(prev => [newQ, ...prev]);
-        }
-        setEditModal(null);
+        void (async () => {
+            try {
+                const payload = {
+                    question: data.question,
+                    answer: data.answer,
+                    sortOrder: data.order ?? questions.length + 1,
+                    status: data.status !== "Inactive",
+                    isSeller: data.isForSeller ?? false,
+                };
+                if (editModal) {
+                    await updateFaq(data.categoryId, editModal.id, payload);
+                } else {
+                    await createFaq(data.categoryId, payload);
+                }
+                await loadQuestions(data.categoryId);
+                await loadCategories();
+            } catch (e) {
+                setLoadError(getApiErrorMessage(e));
+            } finally {
+                setEditModal(null);
+                setAddModal(false);
+            }
+        })();
     };
 
     const handleDelete = () => {
-        if (deleteModal) {
-            setQuestions(prev => prev.filter(q => q.id !== deleteModal.id));
-            setDeleteModal(null);
-        }
+        if (!deleteModal) return;
+        void (async () => {
+            try {
+                await deleteFaq(deleteModal.categoryId, deleteModal.id);
+                await loadQuestions(deleteModal.categoryId);
+                await loadCategories();
+            } catch (e) {
+                setLoadError(getApiErrorMessage(e));
+            } finally {
+                setDeleteModal(null);
+            }
+        })();
     };
 
     // Stats for selected category
@@ -545,7 +529,7 @@ const FaqQuestionsScreen: React.FC = () => {
             <View style={st.root}>
                 <StatusBar barStyle="dark-content" backgroundColor={BG_PAGE} />
 
-                {/* ── PAGE HEADER ── */}
+                {/* â”€â”€ PAGE HEADER â”€â”€ */}
                 <View style={[st.header, isWeb && st.headerWeb]}>
                     <View style={st.headerLeft}>
                         <View style={[st.headerIcon, { backgroundColor: selectedCat?.color ?? PRIMARY }]}>
@@ -554,7 +538,7 @@ const FaqQuestionsScreen: React.FC = () => {
                         <View>
                             <Text style={st.headerTitle}>FAQ Questions</Text>
                             <Text style={st.headerBreadcrumb}>
-                                <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  ›  FAQ Questions"}
+                                <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  â€º  FAQ Questions"}
                             </Text>
                         </View>
                     </View>
@@ -569,12 +553,16 @@ const FaqQuestionsScreen: React.FC = () => {
                     contentContainerStyle={[st.scrollContent, !isWeb && { paddingBottom: 120 }]}
                     showsVerticalScrollIndicator={false}>
 
-                    {/* ── CATEGORY TABS (pill buttons) ── */}
+                    {loadError ? (
+                        <Text style={{ color: ACCENT_RED, marginBottom: 12 }}>{loadError}</Text>
+                    ) : null}
+
+                    {/* CATEGORY TABS */}
                     <View style={st.catSection}>
                         <Text style={st.sectionLabel}>SELECT CATEGORY</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}
                             contentContainerStyle={st.catScrollContent}>
-                            {CATEGORIES.map(cat => {
+                            {categories.map(cat => {
                                 const catQCount = questions.filter(q => q.categoryId === cat.id).length;
                                 const isSelected = cat.id === selectedCatId;
                                 return (
@@ -596,7 +584,7 @@ const FaqQuestionsScreen: React.FC = () => {
                         </ScrollView>
                     </View>
 
-                    {/* ── SELECTED CATEGORY HERO ── */}
+                    {/* â”€â”€ SELECTED CATEGORY HERO â”€â”€ */}
                     <View style={[st.heroCard, { borderLeftColor: selectedCat?.color ?? PRIMARY }]}>
                         <View style={st.heroLeft}>
                             <View style={[st.heroIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
@@ -604,7 +592,7 @@ const FaqQuestionsScreen: React.FC = () => {
                             </View>
                             <View>
                                 <Text style={st.heroTitle}>{selectedCat?.name}</Text>
-                                <Text style={st.heroSub}>{catQuestions.length} questions  ·  {activeCount} active</Text>
+                                <Text style={st.heroSub}>{catQuestions.length} questions  Â·  {activeCount} active</Text>
                             </View>
                         </View>
                         <View style={[st.heroBadge, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
@@ -612,7 +600,7 @@ const FaqQuestionsScreen: React.FC = () => {
                         </View>
                     </View>
 
-                    {/* ── SEARCH + FILTER TOOLBAR ── */}
+                    {/* â”€â”€ SEARCH + FILTER TOOLBAR â”€â”€ */}
                     <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
                         <View style={[st.searchWrap, !isWeb && { minWidth: "100%" as any }]}>
                             <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
@@ -661,12 +649,12 @@ const FaqQuestionsScreen: React.FC = () => {
                         </View>
                     </View>
 
-                    {/* ── RESULT COUNT ── */}
+                    {/* â”€â”€ RESULT COUNT â”€â”€ */}
                     <Text style={st.resultCount}>
                         Showing <Text style={{ color: selectedCat?.color ?? PRIMARY, fontWeight: "700" }}>{filtered.length}</Text> questions
                     </Text>
 
-                    {/* ── QUESTIONS LIST / GRID ── */}
+                    {/* â”€â”€ QUESTIONS LIST / GRID â”€â”€ */}
                     {filtered.length === 0 ? (
                         <View style={st.empty}>
                             <View style={[st.emptyIconWrap, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "15" }]}>
@@ -756,11 +744,11 @@ const FaqQuestionsScreen: React.FC = () => {
                     )}
                 </ScrollView>
 
-                {/* ── MODALS ── */}
+                {/* â”€â”€ MODALS â”€â”€ */}
                 <ViewModal
                     visible={!!viewModal}
                     question={viewModal}
-                    category={CATEGORIES.find(c => c.id === viewModal?.categoryId)}
+                    category={categories.find(c => c.id === viewModal?.categoryId)}
                     onClose={() => setViewModal(null)}
                     isWeb={isWeb}
                 />
@@ -768,7 +756,7 @@ const FaqQuestionsScreen: React.FC = () => {
                     visible={addModal}
                     editing={editModal}
                     categoryId={selectedCatId}
-                    categories={CATEGORIES}
+                    categories={categories}
                     onClose={() => { setAddModal(false); setEditModal(null); }}
                     onSave={handleSave}
                     isWeb={isWeb}
@@ -787,7 +775,7 @@ const FaqQuestionsScreen: React.FC = () => {
 
 export default FaqQuestionsScreen;
 
-// ─── MAIN STYLES ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
@@ -856,7 +844,7 @@ const st = StyleSheet.create({
     emptyAddTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
 });
 
-// ─── QUESTION GRID CARD STYLES ───────────────────────────────────────────────
+// â”€â”€â”€ QUESTION GRID CARD STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const gSt = StyleSheet.create({
     card: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, borderTopWidth: 3, padding: 14, flex: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, gap: 8 },
     cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -876,7 +864,7 @@ const gSt = StyleSheet.create({
     actionBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });
 
-// ─── QUESTION ROW STYLES ──────────────────────────────────────────────────────
+// â”€â”€â”€ QUESTION ROW STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const qSt = StyleSheet.create({
     // Table header
     headerRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fef3e7", paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -916,7 +904,7 @@ const qSt = StyleSheet.create({
     actionBtn: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
 });
 
-// ─── MODAL STYLES ────────────────────────────────────────────────────────────
+// â”€â”€â”€ MODAL STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const mSt = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center" },
     sheet: { backgroundColor: BG_CARD, borderRadius: 20, overflow: "hidden", width: "92%", maxWidth: 520, maxHeight: "90%" as any, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },
