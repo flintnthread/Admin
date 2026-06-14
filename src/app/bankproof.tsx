@@ -1,7 +1,7 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { fetchSellerBankDetails } from "@/services/sellerApi";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
+import AdminLayout from "@/components/admin-layout";
 
 // ─── Breakpoints ───────────────────────────────────────────────────────────────
 const BP = { mobile: 480, tablet: 768, laptop: 1024, desktop: 1280 };
@@ -121,7 +122,8 @@ export default function BankProof() {
           : "100%";
 
   return (
-    <View style={styles.root}>
+    <AdminLayout>
+      <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#C05E1A" />
       <ScrollView
         contentContainerStyle={[
@@ -176,30 +178,31 @@ export default function BankProof() {
 
           {!loading && !error ? (
             <>
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Icon name="image-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
-              <Text style={styles.cardTitle}>Bank Proof Document</Text>
-            </View>
-            <ProofImage uri={bankProofUrl} label="bank proof" />
-            <View style={styles.imageInfo}>
-              <Text style={styles.infoLabel}>Seller:</Text>
-              <Text style={styles.infoValue}>{sellerName}</Text>
-            </View>
-          </View>
+              <View style={styles.card}>
+                <View style={styles.cardTitleRow}>
+                  <Icon name="image-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Bank Proof Document</Text>
+                </View>
+                <ProofImage uri={bankProofUrl} label="bank proof" />
+                <View style={styles.imageInfo}>
+                  <Text style={styles.infoLabel}>Seller:</Text>
+                  <Text style={styles.infoValue}>{sellerName}</Text>
+                </View>
+              </View>
 
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Icon name="file-document-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
-              <Text style={styles.cardTitle}>Cancelled Cheque</Text>
-            </View>
-            <ProofImage uri={cancelledChequeUrl} label="cancelled cheque" />
-          </View>
+              <View style={styles.card}>
+                <View style={styles.cardTitleRow}>
+                  <Icon name="file-document-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Cancelled Cheque</Text>
+                </View>
+                <ProofImage uri={cancelledChequeUrl} label="cancelled cheque" />
+              </View>
             </>
           ) : null}
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </AdminLayout>
   );
 }
 

@@ -116,17 +116,21 @@ export default function PendingSellersScreen() {
   return (
     <AdminLayout>
       <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Pending seller profiles</Text>
-            <Text style={styles.subtitle}>
-              Sellers who completed KYC and are waiting for admin approval
-            </Text>
+
+        {/* ── Dark-blue header container ── */}
+        <View style={styles.headerContainer}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>Pending seller profiles</Text>
+              <Text style={styles.subtitle}>
+                Sellers who completed KYC and are waiting for admin approval
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
+              <Feather name="refresh-cw" size={16} color={ORANGE} />
+              <Text style={styles.refreshText}>Refresh</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
-            <Feather name="refresh-cw" size={16} color={ORANGE} />
-            <Text style={styles.refreshText}>Refresh</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.searchRow}>
@@ -272,9 +276,22 @@ export default function PendingSellersScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: "#f8fafc" },
   pageContent: { padding: 16, paddingBottom: 32, gap: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  title: { fontSize: 22, fontWeight: "800", color: NAVY },
-  subtitle: { fontSize: 13, color: MUTED, marginTop: 4, maxWidth: 520 },
+
+  // ── Header container: dark blue background ──
+  headerContainer: {
+    backgroundColor: NAVY,
+    borderRadius: 12,
+    padding: 16,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  title: { fontSize: 22, fontWeight: "800", color: "#ffffff" },
+  subtitle: { fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 4, maxWidth: 520 },
+
   refreshBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -283,8 +300,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "#fff",
+    borderColor: "rgba(255,255,255,0.25)",
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
   refreshText: { color: ORANGE, fontWeight: "600", fontSize: 13 },
   searchRow: {

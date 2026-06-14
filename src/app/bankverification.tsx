@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
+import AdminLayout from "@/components/admin-layout";
 import { initialsFromName, maskAccount } from "@/lib/format";
 import { fetchBankStats, fetchBankVerifications } from "@/services/sellerApi";
 import type { SellerSummary } from "@/lib/api/types";
@@ -495,7 +496,8 @@ export default function BankVerifications() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: LIGHT }}>
+    <AdminLayout>
+      <View style={{ flex: 1, backgroundColor: LIGHT }}>
       {isMobile ? (
         <FlatList
           data={paginated}
@@ -966,7 +968,8 @@ export default function BankVerifications() {
           </View>
         </ScrollView>
       )}
-    </View>
+      </View>
+    </AdminLayout>
   );
 }
 

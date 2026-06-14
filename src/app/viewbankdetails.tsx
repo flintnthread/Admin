@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
+import AdminLayout from "@/components/admin-layout";
 import {
   ActivityIndicator,
   Platform,
@@ -272,7 +273,8 @@ export default function BankApprovalHistory() {
     bp === "desktop" ? 1200 : bp === "laptop" ? 960 : bp === "tablet" ? 700 : "100%";
 
   return (
-    <View style={styles.root}>
+    <AdminLayout>
+      <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#C05E1A" />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, !isMobile && { alignItems: "center" }]}
@@ -321,7 +323,8 @@ export default function BankApprovalHistory() {
           </View>
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </AdminLayout>
   );
 }
 

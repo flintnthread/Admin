@@ -1,17 +1,19 @@
-import React, { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
+import AdminLayout from "@/components/admin-layout";
 import { formatDate } from '@/lib/format';
 import { fetchShiprocketSellers, type ShiprocketSellerRow } from '@/services/sellerApi';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -28,7 +30,7 @@ interface Seller {
 }
 
 interface Props {
-  navigation: any; // replace with your navigation type
+  // navigation prop removed - using expo-router
 }
 
 function mapShiprocketRow(row: ShiprocketSellerRow, status: Seller['status']): Seller {
@@ -81,7 +83,8 @@ const BsIcon: React.FC<{ name: string; size?: number; color?: string }> = ({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
+const SellerShiprocket: React.FC<Props> = () => {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const [pendingSellers, setPendingSellers] = useState<Seller[]>([]);
   const [uploadedSellers, setUploadedSellers] = useState<Seller[]>([]);
@@ -187,12 +190,8 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
   }, [pendingSellers]);
 
   const handleBackToSellers = useCallback(() => {
-    if (navigation?.navigate) {
-      navigation.navigate('sellers');
-    } else {
-      Alert.alert('Navigate', 'Would navigate to sellers.tsx');
-    }
-  }, [navigation]);
+    router.push('/sellers');
+  }, [router]);
 
   // ── Sub-components ────────────────────────────────────────────────────────
 
@@ -601,7 +600,8 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.root}>
+    <AdminLayout>
+      <View style={styles.root}>
       {/* Orange gradient top bar */}
       <View style={styles.topAccentBar} />
 
@@ -635,7 +635,8 @@ const SellerShiprocket: React.FC<Props> = ({ navigation }) => {
         {/* Uploaded sellers */}
         {!loading ? renderUploadedSellers() : null}
       </ScrollView>
-    </View>
+      </View>
+    </AdminLayout>
   );
 };
 
