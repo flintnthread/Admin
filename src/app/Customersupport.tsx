@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapContactToCustomerTicket } from '@/lib/mappers';
 import { fetchContactStats, fetchContacts } from '@/services/contactApi';
@@ -230,8 +230,10 @@ const FilterModal = ({ visible, title, options, selected, onSelect, onClose, isW
 
 // â”€â”€â”€ Mobile Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+type TicketType = ReturnType<typeof mapContactToCustomerTicket>;
+
 interface MobileCardProps {
-  ticket: typeof TICKETS[0];
+  ticket: TicketType;
   onView: () => void;
   onRefresh: () => void;
 }
@@ -281,9 +283,9 @@ const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
 // â”€â”€â”€ Web Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface WebTableProps {
-  tickets: typeof TICKETS;
-  onView: (ticket: typeof TICKETS[0]) => void;
-  onRefresh: (ticket: typeof TICKETS[0]) => void;
+  tickets: TicketType[];
+  onView: (ticket: TicketType) => void;
+  onRefresh: (ticket: TicketType) => void;
 }
 
 const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (

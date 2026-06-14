@@ -312,9 +312,6 @@ export default function JobApplicationsScreen() {
             </Text>
             <Text style={styles.pageTitle}>Job Applications</Text>
           </View>
-          <TouchableOpacity style={styles.addBtn} activeOpacity={0.85}>
-            <Text style={styles.addBtnText}>＋  Post Job</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Stat Cards ── */}

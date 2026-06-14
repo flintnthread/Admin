@@ -10,6 +10,8 @@ import {
 import { Feather } from "@expo/vector-icons";
 import AdminHeader from "./admin-header";
 import AdminSidebar from "./admin-sidebar";
+import { useTheme } from "@/hooks/use-theme";
+import { useThemeContext } from "@/context/theme-context";
 
 type Props = {
   children: React.ReactNode;
@@ -18,13 +20,15 @@ type Props = {
 export default function AdminLayout({ children }: Props) {
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 1024;
+  const colors = useTheme();
+  const { theme } = useThemeContext();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
+      <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
       <View style={styles.container}>
 
         {/* ── Desktop fixed sidebar ── */}
@@ -44,13 +48,13 @@ export default function AdminLayout({ children }: Props) {
             onPress={() => setMobileMenuOpen(false)}
           >
             <TouchableOpacity
-              style={styles.drawerPanel}
+              style={[styles.drawerPanel, { backgroundColor: colors.surface }]}
               activeOpacity={1}
             >
               {/* Close button at top of drawer */}
-              <View style={styles.drawerCloseBar}>
+              <View style={[styles.drawerCloseBar, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => setMobileMenuOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Feather name="x" size={24} color="#1F2937" />
+                  <Feather name="x" size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -64,7 +68,7 @@ export default function AdminLayout({ children }: Props) {
         )}
 
         {/* ── Main content area (header + page body) ── */}
-        <View style={styles.main}>
+        <View style={[styles.main, { backgroundColor: colors.bg }]}>
           <AdminHeader
             showMenuButton={!isLargeScreen}
             onMenuPress={() => setMobileMenuOpen(true)}
