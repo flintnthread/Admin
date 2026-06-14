@@ -34,14 +34,15 @@
  */
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import AdminLayout from "@/components/admin-layout";
 import React from "react";
 import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from "react-native";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ interface Props {
 
 export default function RecentlyUploadedSellersTable({ sellers }: Props) {
   const { width: screenWidth } = useWindowDimensions();
+  const safeSellers = sellers ?? [];
 
   // Only columns whose hideBelow threshold is met
   const visibleCols = COLUMNS.filter(
@@ -226,7 +228,8 @@ export default function RecentlyUploadedSellersTable({ sellers }: Props) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.wrapper}>
+    <AdminLayout>
+      <View style={styles.wrapper}>
       <SectionHeader />
 
       {/* Horizontal scroll only kicks in when content is wider than screen */}
@@ -239,10 +242,10 @@ export default function RecentlyUploadedSellersTable({ sellers }: Props) {
         <View style={styles.tableContainer}>
           <TableHeader />
 
-          {sellers.length === 0 ? (
+          {safeSellers.length === 0 ? (
             <EmptyState />
           ) : (
-            sellers.map((seller, index) => (
+            safeSellers.map((seller, index) => (
               <DataRow
                 key={seller.id ?? index}
                 seller={seller}
@@ -252,7 +255,8 @@ export default function RecentlyUploadedSellersTable({ sellers }: Props) {
           )}
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </AdminLayout>
   );
 }
 

@@ -10,6 +10,7 @@
 //   npx react-native link react-native-vector-icons
 //   Then replace the two import lines below accordingly.
 
+import AdminLayout from "@/components/admin-layout";
 import React, { useMemo, useState } from "react";
 import {
   Dimensions,
@@ -17,14 +18,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 // ── Linear Gradient ──────────────────────────────────────────
@@ -226,7 +226,8 @@ const GridCard: React.FC<{
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={S.gridCardTop}
-      >
+      > 
+     
         {showActions ? (
           <View style={S.gridCardActions}>
             <TouchableOpacity
@@ -599,13 +600,15 @@ export default function SizesManagement() {
   const numCols = isDesktop ? 4 : isTablet ? 3 : 2;
   const PADDING = 16;
   const GAP = 12;
-  const cardWidth = (width - PADDING * 2 - GAP * (numCols - 1)) / numCols;
 
   const [sizes, setSizes] = useState<SizeItem[]>(INITIAL_SIZES);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState<ModalState>(null);
+  const [containerWidth, setContainerWidth] = useState(width);
+
+  const cardWidth = Math.max(0, (containerWidth - PADDING * 2 - GAP * (numCols - 1)) / numCols);
 
   const filtered = useMemo(
     () => sizes.filter(s =>
@@ -649,154 +652,158 @@ export default function SizesManagement() {
   );
 
   return (
-    <SafeAreaView style={S.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
+    <AdminLayout>
+      <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+        <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
-      {/* ── BANNER ── */}
-      <LinearGradient
-        colors={["#c0601a", "#8b3e0f"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={S.banner}
-      >
-        <View style={S.bannerIconBox}>
-          {/* Bootstrap: grid-3x3 */}
-          <BI name="grid-3x3" size={22} color="#fff" />
+
+        {/* ── BANNER ── */}
+         <LinearGradient
+          colors={["#0f2d6b", "#08275c"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={S.banner}
+        > 
+         
+          <View style={S.bannerIconBox}>
+            {/* Bootstrap: grid-3x3 */}
+            <BI name="grid-3x3" size={22} color="#fff" />
+          </View>
+        </LinearGradient>
+
+        {/* ── TITLE CARD ── */}
+        <View style={[S.titleCard, { marginHorizontal: PADDING }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={S.pageTitle}>Sizes Management</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
+              <Text style={S.breadcrumbLink}>Dashboard</Text>
+              {/* Bootstrap: chevron-right */}
+              <BI name="chevron-right" size={10} color="#bbb" />
+              <Text style={S.breadcrumbLink}>Categories</Text>
+              <BI name="chevron-right" size={10} color="#bbb" />
+              <Text style={S.breadcrumbCurrent}>Sizes</Text>
+            </View>
+          </View>
+          {/* Bootstrap: plus-lg on Add button */}
+          <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
+            <BI name="plus-lg" size={15} color="#fff" />
+            <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
+          </TouchableOpacity>
         </View>
-      </LinearGradient>
 
-      {/* ── TITLE CARD ── */}
-      <View style={[S.titleCard, { marginHorizontal: PADDING }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={S.pageTitle}>Sizes Management</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
-            <Text style={S.breadcrumbLink}>Dashboard</Text>
-            {/* Bootstrap: chevron-right */}
-            <BI name="chevron-right" size={10} color="#bbb" />
-            <Text style={S.breadcrumbLink}>Categories</Text>
-            <BI name="chevron-right" size={10} color="#bbb" />
-            <Text style={S.breadcrumbCurrent}>Sizes</Text>
+        {/* ── CONTROL BAR ── */}
+        <View style={[S.controlBar, { marginHorizontal: PADDING }]}>
+          <View style={S.searchBox}>
+            {/* Bootstrap: search */}
+            <BI name="search" size={15} color="#aaa" />
+            <TextInput
+              style={S.searchInput}
+              value={search}
+              onChangeText={handleSearch}
+              placeholder="Search sizes..."
+              placeholderTextColor="#bbb"
+            />
+            {!!search && (
+              <TouchableOpacity onPress={() => handleSearch("")}>
+                {/* Bootstrap: x-lg */}
+                <BI name="x-lg" size={13} color="#aaa" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={S.viewToggle}>
+            {/* Bootstrap: grid (grid view) */}
+            <TouchableOpacity
+              style={[S.viewBtn, view === "grid" && S.viewBtnActive]}
+              onPress={() => setView("grid")}
+            >
+              <BI name="grid" size={17} color={view === "grid" ? "#fff" : "#666"} />
+            </TouchableOpacity>
+            {/* Bootstrap: list-ul (list view) */}
+            <TouchableOpacity
+              style={[S.viewBtn, view === "list" && S.viewBtnActive]}
+              onPress={() => setView("list")}
+            >
+              <BI name="list-ul" size={17} color={view === "list" ? "#fff" : "#666"} />
+            </TouchableOpacity>
           </View>
         </View>
-        {/* Bootstrap: plus-lg on Add button */}
-        <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
-          <BI name="plus-lg" size={15} color="#fff" />
-          <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* ── CONTROL BAR ── */}
-      <View style={[S.controlBar, { marginHorizontal: PADDING }]}>
-        <View style={S.searchBox}>
-          {/* Bootstrap: search */}
-          <BI name="search" size={15} color="#aaa" />
-          <TextInput
-            style={S.searchInput}
-            value={search}
-            onChangeText={handleSearch}
-            placeholder="Search sizes..."
-            placeholderTextColor="#bbb"
+        {/* ── GRID VIEW ── */}
+        {view === "grid" ? (
+          <FlatList
+            key={`grid-${numCols}`}
+            data={paginated}
+            keyExtractor={item => String(item.id)}
+            numColumns={numCols}
+            renderItem={({ item, index }) => (
+              <GridCard
+                item={item}
+                idx={(safePage - 1) * PAGE_SIZE + index}
+                onEdit={s => setModal({ type: "edit", size: s })}
+                onDelete={s => setModal({ type: "delete", size: s })}
+                cardWidth={cardWidth}
+              />
+            )}
+            contentContainerStyle={{
+              paddingHorizontal: PADDING,
+              paddingTop: 12,
+              paddingBottom: 24,
+              gap: GAP,
+            }}
+            columnWrapperStyle={{ gap: GAP }}
+            ListEmptyComponent={
+              <View style={S.emptyBox}>
+                {/* Bootstrap: search (empty state) */}
+                <BI name="search" size={40} color="#ccc" />
+                <Text style={S.emptyText}>No sizes found</Text>
+              </View>
+            }
+            ListFooterComponent={Footer}
           />
-          {!!search && (
-            <TouchableOpacity onPress={() => handleSearch("")}>
-              {/* Bootstrap: x-lg */}
-              <BI name="x-lg" size={13} color="#aaa" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={S.viewToggle}>
-          {/* Bootstrap: grid (grid view) */}
-          <TouchableOpacity
-            style={[S.viewBtn, view === "grid" && S.viewBtnActive]}
-            onPress={() => setView("grid")}
-          >
-            <BI name="grid" size={17} color={view === "grid" ? "#fff" : "#666"} />
-          </TouchableOpacity>
-          {/* Bootstrap: list-ul (list view) */}
-          <TouchableOpacity
-            style={[S.viewBtn, view === "list" && S.viewBtnActive]}
-            onPress={() => setView("list")}
-          >
-            <BI name="list-ul" size={17} color={view === "list" ? "#fff" : "#666"} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── GRID VIEW ── */}
-      {view === "grid" ? (
-        <FlatList
-          key={`grid-${numCols}`}
-          data={paginated}
-          keyExtractor={item => String(item.id)}
-          numColumns={numCols}
-          renderItem={({ item, index }) => (
-            <GridCard
-              item={item}
-              idx={(safePage - 1) * PAGE_SIZE + index}
-              onEdit={s => setModal({ type: "edit", size: s })}
-              onDelete={s => setModal({ type: "delete", size: s })}
-              cardWidth={cardWidth}
-            />
-          )}
-          contentContainerStyle={{
-            paddingHorizontal: PADDING,
-            paddingTop: 12,
-            paddingBottom: 24,
-            gap: GAP,
-          }}
-          columnWrapperStyle={{ gap: GAP }}
-          ListEmptyComponent={
-            <View style={S.emptyBox}>
-              {/* Bootstrap: search (empty state) */}
-              <BI name="search" size={40} color="#ccc" />
-              <Text style={S.emptyText}>No sizes found</Text>
-            </View>
-          }
-          ListFooterComponent={Footer}
-        />
-      ) : (
-        /* ── LIST VIEW ── */
-        <FlatList
-          key="list"
-          data={paginated}
-          keyExtractor={item => String(item.id)}
-          ListHeaderComponent={
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: Math.max(width - PADDING * 2, 660), paddingHorizontal: PADDING }}>
-                <View style={S.listHeader}>
-                  <Text style={[S.listHeaderCell, { width: 42 }]}>ID</Text>
-                  <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
-                  <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                  <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                  <Text style={[S.listHeaderCell, { width: 72 }]}>Status</Text>
-                  <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+        ) : (
+          /* ── LIST VIEW ── */
+          <FlatList
+            key="list"
+            data={paginated}
+            keyExtractor={item => String(item.id)}
+            ListHeaderComponent={
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ minWidth: Math.max(width - PADDING * 2, 660), paddingHorizontal: PADDING }}>
+                  <View style={S.listHeader}>
+                    <Text style={[S.listHeaderCell, { width: 42 }]}>ID</Text>
+                    <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
+                    <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                    <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
+                    <Text style={[S.listHeaderCell, { width: 72 }]}>Status</Text>
+                    <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+                  </View>
                 </View>
+              </ScrollView>
+            }
+            renderItem={({ item, index }) => (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ minWidth: Math.max(width - PADDING * 2, 660), paddingHorizontal: PADDING }}>
+                  <ListRow
+                    item={item}
+                    idx={index}
+                    onEdit={s => setModal({ type: "edit", size: s })}
+                    onDelete={s => setModal({ type: "delete", size: s })}
+                  />
+                </View>
+              </ScrollView>
+            )}
+            ListEmptyComponent={
+              <View style={S.emptyBox}>
+                <BI name="search" size={40} color="#ccc" />
+                <Text style={S.emptyText}>No sizes found</Text>
               </View>
-            </ScrollView>
-          }
-          renderItem={({ item, index }) => (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: Math.max(width - PADDING * 2, 660), paddingHorizontal: PADDING }}>
-                <ListRow
-                  item={item}
-                  idx={index}
-                  onEdit={s => setModal({ type: "edit", size: s })}
-                  onDelete={s => setModal({ type: "delete", size: s })}
-                />
-              </View>
-            </ScrollView>
-          )}
-          ListEmptyComponent={
-            <View style={S.emptyBox}>
-              <BI name="search" size={40} color="#ccc" />
-              <Text style={S.emptyText}>No sizes found</Text>
-            </View>
-          }
-          ListFooterComponent={Footer}
-          contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
-        />
-      )}
+            }
+            ListFooterComponent={Footer}
+            contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
+          />
+        )}
+      </View>
 
       {/* ── MODALS ── */}
       <AddSizeModal
@@ -815,7 +822,7 @@ export default function SizesManagement() {
         onClose={() => setModal(null)}
         onDelete={() => modal?.type === "delete" && handleDelete(modal.size.id)}
       />
-    </SafeAreaView>
+    </AdminLayout>
   );
 }
 
