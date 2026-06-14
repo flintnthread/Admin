@@ -729,18 +729,28 @@ export default function SellersScreen() {
   return (
     <AdminLayout>
       <View style={SS.root}>
-        <StatusBar barStyle="light-content" backgroundColor='#1E2A45' />
+        <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
-        {/* Orange top bar */}
+        {/* Top bar */}
         <View style={SS.topBar}>
-          <View style={SS.logoBox}><IconPerson size={22} color="#FFF" /></View>
+          <TouchableOpacity style={SS.backButton} onPress={() => router.back()}>
+            <IconChevLeft size={16} color="#FFF" />
+            <Text style={SS.backButtonText}>Back</Text>
+          </TouchableOpacity>
+          <View style={[SS.logoBox, { marginLeft: 10 }]}><IconPerson size={22} color="#FFF" /></View>
         </View>
 
-        {/* Title bar */}
+        {/* Title */}
         <View style={SS.titleBar}>
-          {loadError ? (
-            <Text style={{ color: C.red, marginBottom: 8 }}>{loadError}</Text>
-          ) : null}
+          <View style={SS.breadcrumb}>
+            <Text style={SS.bcLink}>🏠 Dashboard</Text>
+            <Text style={SS.bcSep}> › </Text>
+            <Text style={SS.bcLink}>Ecommerce</Text>
+            <Text style={SS.bcSep}> › </Text>
+            <Text style={SS.bcCur}>Active Sellers</Text>
+          </View>
+
+          {loadError ? <Text style={{ color: C.red, marginBottom: 8 }}>{loadError}</Text> : null}
           <View style={[SS.titleRow, isMobile && { flexWrap: 'wrap', gap: 8 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <Text style={[SS.pageTitle, isMobile && { fontSize: 18 }]}>Active Sellers</Text>
@@ -770,16 +780,13 @@ export default function SellersScreen() {
               </TouchableOpacity>
             )}
           </View>
+
           <View style={SS.viewToggle}>
             <Text style={SS.viewLabel}>View:</Text>
-            <TouchableOpacity
-              style={[SS.vBtn, viewMode === 'grid' && SS.vBtnOn]}
-              onPress={() => setViewMode('grid')}>
-              <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
+              <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
+                <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[SS.vBtn, viewMode === 'list' && SS.vBtnOn]}
-              onPress={() => setViewMode('list')}>
+            <TouchableOpacity style={[SS.vBtn, viewMode === 'list' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('list')}>
               <IconList size={17} color={viewMode === 'list' ? '#FFF' : C.sub} />
             </TouchableOpacity>
           </View>
@@ -788,12 +795,11 @@ export default function SellersScreen() {
         {/* Content */}
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[SS.content, viewMode === 'list' && { paddingHorizontal: 0 }]}
+          contentContainerStyle={[SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {viewMode === 'grid' ? (
-            // ── WEB: flexWrap grid ────────────────────────────────────────────
             IS_WEB ? (
               <WebGridView
                 sellers={paginated}
@@ -805,15 +811,17 @@ export default function SellersScreen() {
                 gutter={GUTTER}
               />
             ) : (
-              // ── NATIVE: manual row-splitting (unchanged) ──────────────────
               <View style={{ paddingHorizontal: HPAD }}>
-                {paginated.length === 0
-                  ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-                  : gridRows.map((row, ri) => (
+                {paginated.length === 0 ? (
+                  <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+                ) : (
+                  gridRows.map((row, ri) => (
                     <View key={ri} style={{ flexDirection: 'row', gap: GUTTER, marginBottom: GUTTER }}>
                       {row.map(s => (
                         <GridCard
-                          key={s.id} seller={s} cardWidth={cardW}
+                          key={s.id}
+                          seller={s}
+                          cardWidth={cardW}
                           onView={() => doView(s)}
                           onToggleStatus={() => doToggle(s)}
                           onDelete={() => doDelete(s)}
@@ -824,25 +832,28 @@ export default function SellersScreen() {
                       ))}
                     </View>
                   ))
-                }
+                )}
               </View>
             )
           ) : (
-            // ── LIST VIEW (unchanged, same on all platforms) ──────────────────
             <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
               {!isMobile && <ListHeader isTablet={isTablet} />}
-              {paginated.length === 0
-                ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-                : paginated.map((s, idx) => (
+              {paginated.length === 0 ? (
+                <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+              ) : (
+                paginated.map((s, idx) => (
                   <ListRow
-                    key={s.id} seller={s} even={idx % 2 === 0}
-                    isTablet={isTablet} isMobile={isMobile}
+                    key={s.id}
+                    seller={s}
+                    even={idx % 2 === 0}
+                    isTablet={isTablet}
+                    isMobile={isMobile}
                     onView={() => doView(s)}
                     onToggleStatus={() => doToggle(s)}
                     onDelete={() => doDelete(s)}
                   />
                 ))
-              }
+              )}
             </View>
           )}
 
@@ -875,28 +886,35 @@ export default function SellersScreen() {
 
 // ─────────────────────────── ROOT STYLES ─────────────────────────────────────
 const SS = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  topBar: { height: 56, backgroundColor: '#1E2A45', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  logoBox: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  titleBar: { backgroundColor: C.card, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: C.text },
-  pill: { backgroundColor: C.primaryLight, borderWidth: 1.5, borderColor: C.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  pillTxt: { fontSize: 11, color: C.primary, fontWeight: '700' },
-  exportBtn: { backgroundColor: C.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
-  exportTxt: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
-  searchBox: { flex: 1, maxWidth: 700, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
-  searchInput: { flex: 1, fontSize: 14, color: C.text, height: 42, marginLeft: 8 },
-  clearBtn: { padding: 4 },
-  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 14 },
-  viewLabel: { fontSize: 13, color: C.sub, fontWeight: '500', marginRight: 2 },
-  vBtn: { width: 36, height: 36, borderRadius: 7, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center' },
-  vBtnOn: { backgroundColor: C.primary, borderColor: C.primary },
-  content: { paddingVertical: 20, paddingBottom: 50 },
-  listBox: { backgroundColor: C.card, marginHorizontal: 20, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, gap: 12, flexWrap: 'wrap' },
-  footTxt: { fontSize: 13, color: C.sub },
-  empty: { padding: 40, alignItems: 'center' },
-  emptyTxt: { fontSize: 14, color: C.muted, textAlign: 'center' },
+
+  root:       { flex:1, backgroundColor:C.bg },
+  topBar:     { height:56, backgroundColor:'#1d324e', flexDirection:'row', alignItems:'center', paddingHorizontal:16 },
+  logoBox:    { width:40, height:40, borderRadius:8, backgroundColor:'rgba(255,255,255,0.2)', justifyContent:'center', alignItems:'center' },
+  backButton: { flexDirection:'row', alignItems:'center', marginRight:10 },
+  backButtonText: { color:'#FFF', fontSize:14, fontWeight:'600', marginLeft:4 },
+  titleBar:   { backgroundColor:C.card, paddingHorizontal:20, paddingTop:14, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border },
+  breadcrumb: { flexDirection:'row', alignItems:'center', marginBottom:10 },
+  bcLink:     { fontSize:12, color:C.primary, fontWeight:'500' },
+  bcSep:      { fontSize:12, color:C.muted, marginHorizontal:2 },
+  bcCur:      { fontSize:12, color:C.sub },
+  titleRow:   { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
+  pageTitle:  { fontSize:22, fontWeight:'800', color:C.text },
+  pill:       { backgroundColor:C.primaryLight, borderWidth:1.5, borderColor:C.primary, borderRadius:20, paddingHorizontal:10, paddingVertical:3 },
+  pillTxt:    { fontSize:11, color:C.primary, fontWeight:'700' },
+  exportBtn:  { backgroundColor:C.primary, paddingHorizontal:14, paddingVertical:9, borderRadius:8, flexDirection:'row', alignItems:'center' },
+  exportTxt:  { color:'#FFF', fontSize:13, fontWeight:'700' },
+  toolbar:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:20, paddingVertical:14, backgroundColor:C.card, borderBottomWidth:1, borderBottomColor:C.border },
+  searchBox:  { flex:1, maxWidth:700, flexDirection:'row', alignItems:'center', backgroundColor:C.bg, borderWidth:1, borderColor:C.border, borderRadius:8, paddingHorizontal:12, height:42 },
+  searchInput:{ flex:1, fontSize:14, color:C.text, height:42, marginLeft:8 },
+  clearBtn:   { padding:4 },
+  viewToggle: { flexDirection:'row', alignItems:'center', gap:6, marginLeft:14 },
+  viewLabel:  { fontSize:13, color:C.sub, fontWeight:'500', marginRight:2 },
+  vBtn:       { width:36, height:36, borderRadius:7, backgroundColor:C.bg, borderWidth:1, borderColor:C.border, justifyContent:'center', alignItems:'center' },
+  vBtnOn:     { backgroundColor:C.primary, borderColor:C.primary },
+  content:    { paddingVertical:20, paddingBottom:50 },
+  listBox:    { backgroundColor:C.card, marginHorizontal:20, borderRadius:12, overflow:'hidden', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:10, elevation:3 },
+  footer:     { flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:20, paddingTop:20, gap:12, flexWrap:'wrap' },
+  footTxt:    { fontSize:13, color:C.sub },
+  empty:      { padding:40, alignItems:'center' },
+  emptyTxt:   { fontSize:14, color:C.muted, textAlign:'center' },
 });
