@@ -711,29 +711,30 @@ export default function SellersScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
 
-            {paginated.length === 0
-              ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-              : gridRows.map((row, ri) => (
-                  <View key={ri} style={{ flexDirection:'row', gap:GUTTER }}>
-                    {row.map(s => (
-                      <GridCard
-                        key={s.id} seller={s} cardWidth={cardW}
-                        onView={() => doView(s)}
-                        onToggleStatus={() => doToggle(s)}
-                        onDelete={() => doDelete(s)}
-                      />
-                    ))}
-                    {row.length < numCols && Array.from({ length: numCols-row.length }).map((_,ei) => (
-                      <View key={`ph${ei}`} style={{ width:cardW }} />
-                    ))}
-                  </View>
-                ))
-            }
-          </View>
+        {viewMode === 'grid' ? (
+          paginated.length === 0 ? (
+            <View style={SS.empty}><Text style={SS.emptyTxt}>{`No sellers found for "${search}"`}</Text></View>
+          ) : (
+            gridRows.map((row, ri) => (
+              <View key={ri} style={{ flexDirection:'row', gap:GUTTER }}>
+                {row.map(s => (
+                  <GridCard
+                    key={s.id} seller={s} cardWidth={cardW}
+                    onView={() => doView(s)}
+                    onToggleStatus={() => doToggle(s)}
+                    onDelete={() => doDelete(s)}
+                  />
+                ))}
+                {row.length < numCols && Array.from({ length: numCols-row.length }).map((_,ei) => (
+                  <View key={`ph${ei}`} style={{ width:cardW }} />
+                ))}
+              </View>
+            ))
+          )
         ) : (
           <View style={[SS.listBox, isMobile && { marginHorizontal:0, borderRadius:0 }]}>
             {paginated.length === 0
-              ? <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+              ? <View style={SS.empty}><Text style={SS.emptyTxt}>{`No sellers found for "${search}"`}</Text></View>
               : paginated.map((s, idx) => (
                   <ListRow
                     key={s.id} seller={s} even={idx%2===0}

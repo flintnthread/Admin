@@ -112,9 +112,9 @@ export default function ApprovedSellersScreen() {
     return pendingSellers.filter(
       (s) =>
         s.name.toLowerCase().includes(query) ||
-        s.businessName.toLowerCase().includes(query) ||
+        (s.businessName ?? "").toLowerCase().includes(query) ||
         s.email.toLowerCase().includes(query) ||
-        s.mobile.toLowerCase().includes(query)
+        (s.mobile ?? "").toLowerCase().includes(query)
     );
   }, [pendingSellers, pendingSearchQuery]);
 
@@ -315,10 +315,8 @@ export default function ApprovedSellersScreen() {
 
   const handleConfirmDeactivate = () => {
     if (!deactivateSeller) return;
-    setSellers((prev) =>
-      prev.map((s) =>
-        s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s
-      )
+    setData((prev: Seller[] | null) =>
+      prev ? prev.map((s: Seller) => (s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s)) : prev
     );
     setDeactivateModalVisible(false);
     setDeactivateSeller(null);
@@ -328,7 +326,7 @@ export default function ApprovedSellersScreen() {
 
   const handleConfirmDelete = () => {
     if (!deleteSeller) return;
-    setSellers((prev) => prev.filter((s) => s.id !== deleteSeller.id));
+    setData((prev: Seller[] | null) => (prev ? prev.filter((s: Seller) => s.id !== deleteSeller.id) : prev));
     setDeleteModalVisible(false);
     setDeleteSeller(null);
     setDeleteReason("");
@@ -353,7 +351,7 @@ export default function ApprovedSellersScreen() {
             if (!seller) return null;
 
             const handleUpdateSellerStatus = () => {
-              setSellers(prev => prev.map(s => s.id === seller.id ? { ...s, status: adminStatus } : s));
+              setData((prev: Seller[] | null) => (prev ? prev.map((s: Seller) => s.id === seller.id ? { ...s, status: adminStatus } : s) : prev));
               showToast(`Seller status updated to ${adminStatus}!`, "success");
             };
 
@@ -1278,10 +1276,8 @@ export default function ApprovedSellersScreen() {
                             setDeactivateModalVisible(true);
                           } else {
                             // Directly unblock
-                            setSellers((prev) =>
-                              prev.map((s) =>
-                                s.id === seller.id ? { ...s, status: "Active" } : s
-                              )
+                            setData((prev: Seller[] | null) =>
+                              prev ? prev.map((s: Seller) => (s.id === seller.id ? { ...s, status: "Active" } : s)) : prev
                             );
                             showToast("Seller successfully unblocked!", "success");
                           }
@@ -1401,10 +1397,8 @@ export default function ApprovedSellersScreen() {
                             setDeactivateModalVisible(true);
                           } else {
                             // Directly unblock
-                            setSellers((prev) =>
-                              prev.map((s) =>
-                                s.id === seller.id ? { ...s, status: "Active" } : s
-                              )
+                            setData((prev: Seller[] | null) =>
+                              prev ? prev.map((s: Seller) => (s.id === seller.id ? { ...s, status: "Active" } : s)) : prev
                             );
                             showToast("Seller successfully unblocked!", "success");
                           }
@@ -2386,6 +2380,11 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: "#6B7280",
+  },
+  loadErrorText: {
+    color: "#DC2626",
+    fontSize: 14,
+    marginVertical: 8,
   },
 
   // --- GRID / CARDS MODE ---

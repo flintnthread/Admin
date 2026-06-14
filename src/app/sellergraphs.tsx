@@ -454,7 +454,7 @@ function LineChart({
             fontSize={9} fill="#6B7280">{l}</SvgText>
         ))}
         {visibleSeries.map(s => (
-          <Path key={s.key} d={getPath(s.key)} fill="none" stroke={s.color}
+          <Path key={s.key} d={getPath(s.key as keyof SellerGraphChartData)} fill="none" stroke={s.color}
             strokeWidth={2} strokeDasharray={s.dashArray.join(" ") || undefined}
             strokeLinejoin="round" strokeLinecap="round" />
         ))}

@@ -9,18 +9,24 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#1F2937',
+    background: '#FFFFFF',
+    backgroundElement: '#F3F4F6',
+    backgroundSelected: '#E5E7EB',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    surface: '#FFFFFF',
+    bg: '#F3F4F6',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#F9FAFB',
+    background: '#111827',
+    backgroundElement: '#1F2937',
+    backgroundSelected: '#374151',
+    textSecondary: '#9CA3AF',
+    border: '#374151',
+    surface: '#1F2937',
+    bg: '#0F172A',
   },
 } as const;
 
