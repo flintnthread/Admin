@@ -4,8 +4,12 @@
  *
  * Icons: @expo/vector-icons  (Ionicons)
  * Install: npx expo install @expo/vector-icons
+ *
+ * Fix: Grid view is now fully responsive on web using a ScrollView + flexWrap
+ * approach instead of FlatList numColumns, which is unreliable on web.
  */
 
+import AdminLayout from "@/components/admin-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -14,7 +18,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -22,37 +25,38 @@ import {
   TextInput,
   TouchableOpacity,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap-like icon name map → Ionicons
 // ─────────────────────────────────────────────────────────────────────────────
 const BI = {
-  palette:             "color-palette-outline",
-  plus:                "add-outline",
-  search:              "search-outline",
-  xCircle:             "close-circle-outline",
-  grid:                "grid-outline",
-  list:                "list-outline",
-  calendar:            "calendar-outline",
-  pencil:              "create-outline",
-  trash:               "trash-outline",
-  houseDoor:           "home-outline",
-  x:                   "close-outline",
-  floppyDisk:          "save-outline",
-  chevronLeft:         "chevron-back-outline",
-  chevronRight:        "chevron-forward-outline",
+  palette: "color-palette-outline",
+  plus: "add-outline",
+  search: "search-outline",
+  xCircle: "close-circle-outline",
+  grid: "grid-outline",
+  list: "list-outline",
+  calendar: "calendar-outline",
+  pencil: "create-outline",
+  trash: "trash-outline",
+  houseDoor: "home-outline",
+  x: "close-outline",
+  floppyDisk: "save-outline",
+  chevronLeft: "chevron-back-outline",
+  chevronRight: "chevron-forward-outline",
   exclamationTriangle: "warning-outline",
-  trashFill:           "trash",
-  chevronDown:         "chevron-down-outline",
+  trashFill: "trash",
+  chevronDown: "chevron-down-outline",
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-const BRAND     = "#e8651a";
-const DARK_BTN  = "#1E2A45";
+const BRAND = "#e8651a";
+const DARK_BTN = "#1E2A45";
+const HEADER_BG = "#1d324e";
 const PAGE_SIZE = 12;
 
 // Responsive breakpoints
@@ -77,40 +81,40 @@ type ViewMode = "grid" | "list";
 // ─────────────────────────────────────────────────────────────────────────────
 const generateSeedColors = (): ColorItem[] => {
   const base: ColorItem[] = [
-    { id: 11, name: "Black",     code: "#000000", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 12, name: "White",     code: "#ffffff", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 13, name: "Red",       code: "#ff0000", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 14, name: "Blue",      code: "#0000ff", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 15, name: "Green",     code: "#008000", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 16, name: "Yellow",    code: "#ffff00", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 17, name: "Orange",    code: "#ffa500", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 18, name: "Pink",      code: "#ffc0cb", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 19, name: "Purple",    code: "#800080", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 20, name: "Brown",     code: "#a52a2a", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 21, name: "Grey",      code: "#808080", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 22, name: "Navy Blue", code: "#152238", status: "Active",   createdDate: "12 Oct, 2025" },
-    { id: 23, name: "Teal",      code: "#008080", status: "Active",   createdDate: "15 Oct, 2025" },
-    { id: 24, name: "Maroon",    code: "#800000", status: "Active",   createdDate: "15 Oct, 2025" },
-    { id: 25, name: "Olive",     code: "#808000", status: "Active",   createdDate: "15 Oct, 2025" },
-    { id: 26, name: "Cyan",      code: "#00ffff", status: "Active",   createdDate: "16 Oct, 2025" },
-    { id: 27, name: "Magenta",   code: "#ff00ff", status: "Active",   createdDate: "16 Oct, 2025" },
-    { id: 28, name: "Coral",     code: "#ff7f50", status: "Active",   createdDate: "17 Oct, 2025" },
-    { id: 29, name: "Salmon",    code: "#fa8072", status: "Active",   createdDate: "17 Oct, 2025" },
-    { id: 30, name: "Indigo",    code: "#4b0082", status: "Active",   createdDate: "18 Oct, 2025" },
-    { id: 31, name: "Violet",    code: "#ee82ee", status: "Inactive", createdDate: "18 Oct, 2025" },
-    { id: 32, name: "Gold",      code: "#ffd700", status: "Active",   createdDate: "19 Oct, 2025" },
-    { id: 33, name: "Silver",    code: "#c0c0c0", status: "Active",   createdDate: "19 Oct, 2025" },
-    { id: 34, name: "Khaki",     code: "#f0e68c", status: "Active",   createdDate: "20 Oct, 2025" },
-    { id: 35, name: "Lavender",  code: "#e6e6fa", status: "Active",   createdDate: "20 Oct, 2025" },
-    { id: 36, name: "Beige",     code: "#f5f5dc", status: "Active",   createdDate: "21 Oct, 2025" },
-    { id: 37, name: "Mint",      code: "#98ff98", status: "Active",   createdDate: "21 Oct, 2025" },
-    { id: 38, name: "Peach",     code: "#ffcba4", status: "Active",   createdDate: "22 Oct, 2025" },
-    { id: 39, name: "Lilac",     code: "#c8a2c8", status: "Active",   createdDate: "22 Oct, 2025" },
-    { id: 40, name: "Cream",     code: "#fffdd0", status: "Active",   createdDate: "23 Oct, 2025" },
+    { id: 11, name: "Black", code: "#000000", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 12, name: "White", code: "#ffffff", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 13, name: "Red", code: "#ff0000", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 14, name: "Blue", code: "#0000ff", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 15, name: "Green", code: "#008000", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 16, name: "Yellow", code: "#ffff00", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 17, name: "Orange", code: "#ffa500", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 18, name: "Pink", code: "#ffc0cb", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 19, name: "Purple", code: "#800080", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 20, name: "Brown", code: "#a52a2a", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 21, name: "Grey", code: "#808080", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 22, name: "Navy Blue", code: "#152238", status: "Active", createdDate: "12 Oct, 2025" },
+    { id: 23, name: "Teal", code: "#008080", status: "Active", createdDate: "15 Oct, 2025" },
+    { id: 24, name: "Maroon", code: "#800000", status: "Active", createdDate: "15 Oct, 2025" },
+    { id: 25, name: "Olive", code: "#808000", status: "Active", createdDate: "15 Oct, 2025" },
+    { id: 26, name: "Cyan", code: "#00ffff", status: "Active", createdDate: "16 Oct, 2025" },
+    { id: 27, name: "Magenta", code: "#ff00ff", status: "Active", createdDate: "16 Oct, 2025" },
+    { id: 28, name: "Coral", code: "#ff7f50", status: "Active", createdDate: "17 Oct, 2025" },
+    { id: 29, name: "Salmon", code: "#fa8072", status: "Active", createdDate: "17 Oct, 2025" },
+    { id: 30, name: "Indigo", code: "#4b0082", status: "Active", createdDate: "18 Oct, 2025" },
+    { id: 31, name: "Violet", code: "#ee82ee", status: "Inactive", createdDate: "18 Oct, 2025" },
+    { id: 32, name: "Gold", code: "#ffd700", status: "Active", createdDate: "19 Oct, 2025" },
+    { id: 33, name: "Silver", code: "#c0c0c0", status: "Active", createdDate: "19 Oct, 2025" },
+    { id: 34, name: "Khaki", code: "#f0e68c", status: "Active", createdDate: "20 Oct, 2025" },
+    { id: 35, name: "Lavender", code: "#e6e6fa", status: "Active", createdDate: "20 Oct, 2025" },
+    { id: 36, name: "Beige", code: "#f5f5dc", status: "Active", createdDate: "21 Oct, 2025" },
+    { id: 37, name: "Mint", code: "#98ff98", status: "Active", createdDate: "21 Oct, 2025" },
+    { id: 38, name: "Peach", code: "#ffcba4", status: "Active", createdDate: "22 Oct, 2025" },
+    { id: 39, name: "Lilac", code: "#c8a2c8", status: "Active", createdDate: "22 Oct, 2025" },
+    { id: 40, name: "Cream", code: "#fffdd0", status: "Active", createdDate: "23 Oct, 2025" },
   ];
   const palette = [
-    "#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#1abc9c",
-    "#e67e22","#34495e","#e91e63","#00bcd4","#8bc34a","#ff5722",
+    "#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c",
+    "#e67e22", "#34495e", "#e91e63", "#00bcd4", "#8bc34a", "#ff5722",
   ];
   for (let i = 41; i <= 91; i++) {
     base.push({
@@ -157,9 +161,7 @@ const StatusBadge = ({ status }: { status: "Active" | "Inactive" }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StatusDropdown — inline dropdown matching screenshot (no Modal overlay)
-// Opens a list directly below the trigger button inside the form layout.
-// Selected option highlighted in blue (#2563eb), chevron rotates when open.
+// StatusDropdown
 // ─────────────────────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = ["Active", "Inactive"] as const;
 
@@ -174,7 +176,6 @@ const StatusDropdown = ({
 
   return (
     <View style={styles.dropdownWrapper}>
-      {/* Trigger */}
       <TouchableOpacity
         style={[styles.dropdownBtn, open && styles.dropdownBtnOpen]}
         onPress={() => setOpen((o) => !o)}
@@ -189,14 +190,11 @@ const StatusDropdown = ({
         />
       </TouchableOpacity>
 
-      {/* Inline options list — rendered below trigger, z-index floats over siblings */}
       {open && (
         <>
-          {/* Invisible full-screen press-away area */}
           <Pressable
             style={StyleSheet.absoluteFillObject}
             onPress={() => setOpen(false)}
-            // Extend hit area well beyond the modal card
             hitSlop={{ top: 600, bottom: 600, left: 600, right: 600 }}
           />
           <View style={styles.dropdownList}>
@@ -232,15 +230,15 @@ interface ColorModalProps {
   onClose: () => void;
 }
 const ColorFormModal = ({ mode, initial, onSave, onClose }: ColorModalProps) => {
-  const [name,    setName]    = useState(initial?.name   ?? "");
-  const [code,    setCode]    = useState(initial?.code   ?? BRAND);
-  const [status,  setStatus]  = useState<"Active" | "Inactive">(initial?.status ?? "Active");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [code, setCode] = useState(initial?.code ?? BRAND);
+  const [status, setStatus] = useState<"Active" | "Inactive">(initial?.status ?? "Active");
   const [nameErr, setNameErr] = useState("");
   const [codeErr, setCodeErr] = useState("");
 
   function validate() {
     let ok = true;
-    if (!name.trim())      { setNameErr("Color name is required");               ok = false; } else setNameErr("");
+    if (!name.trim()) { setNameErr("Color name is required"); ok = false; } else setNameErr("");
     if (!isValidHex(code)) { setCodeErr("Enter a valid hex code e.g. #ff0000"); ok = false; } else setCodeErr("");
     return ok;
   }
@@ -259,7 +257,7 @@ const ColorFormModal = ({ mode, initial, onSave, onClose }: ColorModalProps) => 
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{mode === "add" ? "Add New Color" : "Edit Color"}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top:10, bottom:10, left:10, right:10 }}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name={BI.x as any} size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -328,7 +326,7 @@ const DeleteModal = ({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
       <View style={[styles.modalCard, { maxWidth: 380 }]}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Confirm Delete</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top:10, bottom:10, left:10, right:10 }}>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name={BI.x as any} size={22} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -360,7 +358,7 @@ const DeleteModal = ({ onConfirm, onClose }: { onConfirm: () => void; onClose: (
 const ColorCard = ({
   item, onEdit, onDelete, cardWidth,
 }: {
-  item: ColorItem; onEdit: () => void; onDelete: () => void; cardWidth: number;
+  item: ColorItem; onEdit: () => void; onDelete: () => void; cardWidth: number | string;
 }) => {
   const [overlayVisible, setOverlayVisible] = useState(false);
   const hoverProps = IS_WEB
@@ -371,7 +369,7 @@ const ColorCard = ({
     <Pressable
       onLongPress={() => !IS_WEB && setOverlayVisible(true)}
       onPressOut={() => !IS_WEB && setOverlayVisible(false)}
-      style={[styles.gridCard, { width: cardWidth }]}
+      style={[styles.gridCard, { width: cardWidth as any }]}
       {...(hoverProps as any)}
     >
       <View style={[styles.gridSwatch, { backgroundColor: item.code }]}>
@@ -399,11 +397,69 @@ const ColorCard = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ListRow — Responsive table row matching the screenshot design
-//
-//  ≥ 640px (md):  ID │ Color Name │ Color Preview │ Color Code │ Created Date │ Status │ Action
-//  480–639px:     Color Name │ Color Preview │ Color Code │ Status │ Action
-//  < 480px:       Color Name │ Preview │ Code │ Status │ Action  (compact)
+// WebGridView — uses flexWrap for reliable web responsiveness
+// On web, FlatList numColumns is broken; this renders a flex-wrap row instead.
+// ─────────────────────────────────────────────────────────────────────────────
+const WebGridView = ({
+  items,
+  onEdit,
+  onDelete,
+  screenWidth,
+  padding,
+  gap,
+}: {
+  items: ColorItem[];
+  onEdit: (item: ColorItem) => void;
+  onDelete: (item: ColorItem) => void;
+  screenWidth: number;
+  padding: number;
+  gap: number;
+}) => {
+  // Calculate columns based on available content width
+  const contentWidth = screenWidth - padding * 2;
+  const numCols =
+    contentWidth >= BP.xl - padding * 2 ? 6 :
+      contentWidth >= BP.lg - padding * 2 ? 5 :
+        contentWidth >= 700 - padding * 2 ? 4 :
+          contentWidth >= BP.sm - padding * 2 ? 3 : 2;
+
+  // Use percentage widths with gap compensation via padding trick
+  // Each card gets: (100% / numCols) minus the gap distributed
+  const cardWidthPct = `${(100 / numCols).toFixed(4)}%` as any;
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        flexWrap: "wrap",
+        paddingHorizontal: padding,
+        // Negative margin trick to handle gap on all sides uniformly
+        marginHorizontal: -gap / 2,
+      }}
+    >
+      {items.map((item) => (
+        <View
+          key={item.id}
+          style={{
+            width: cardWidthPct,
+            paddingHorizontal: gap / 2,
+            paddingBottom: gap,
+          }}
+        >
+          <ColorCard
+            item={item}
+            cardWidth="100%"
+            onEdit={() => onEdit(item)}
+            onDelete={() => onDelete(item)}
+          />
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ListRow — Responsive table row
 // ─────────────────────────────────────────────────────────────────────────────
 const ListRow = ({
   item, onEdit, onDelete, isLast, screenWidth, isEven,
@@ -411,9 +467,8 @@ const ListRow = ({
   item: ColorItem; onEdit: () => void; onDelete: () => void;
   isLast: boolean; screenWidth: number; isEven: boolean;
 }) => {
-  const showId   = screenWidth >= BP.md;
+  const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
-  const isMobile = screenWidth < BP.sm;
 
   return (
     <View style={[
@@ -422,31 +477,26 @@ const ListRow = ({
       !isLast && styles.listRowBorder,
       IS_WEB ? ({ ":hover": { backgroundColor: "#fdf7f3" } } as any) : {},
     ]}>
-      {/* ID */}
       {showId && (
         <View style={styles.colId}>
           <Text style={styles.cellId}>{item.id}</Text>
         </View>
       )}
 
-      {/* Color Name */}
       <View style={styles.colName}>
         <Text style={styles.cellName} numberOfLines={1}>{item.name}</Text>
       </View>
 
-      {/* Color Preview swatch */}
       <View style={styles.colPreview}>
         <View style={[styles.swatchCell, { backgroundColor: item.code }]} />
       </View>
 
-      {/* Color Code badge */}
       <View style={styles.colCode}>
         <View style={styles.codePill}>
           <Text style={styles.cellCode} numberOfLines={1}>{item.code}</Text>
         </View>
       </View>
 
-      {/* Created Date */}
       {showDate && (
         <View style={styles.colDate}>
           <Ionicons name={BI.calendar as any} size={13} color="#888" style={{ marginRight: 5 }} />
@@ -454,12 +504,10 @@ const ListRow = ({
         </View>
       )}
 
-      {/* Status */}
       <View style={styles.colStatus}>
         <StatusBadge status={item.status} />
       </View>
 
-      {/* Actions */}
       <View style={styles.colAction}>
         <TouchableOpacity
           style={styles.editBtn}
@@ -483,15 +531,15 @@ const ListRow = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ListHeader — sticky column headers matching screenshot
+// ListHeader
 // ─────────────────────────────────────────────────────────────────────────────
 const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
-  const showId   = screenWidth >= BP.md;
+  const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
 
   return (
     <View style={styles.tableHeader}>
-      {showId   && <Text style={[styles.headerCell, styles.colId]}>ID</Text>}
+      {showId && <Text style={[styles.headerCell, styles.colId]}>ID</Text>}
       <Text style={[styles.headerCell, styles.colName]}>COLOR NAME</Text>
       <Text style={[styles.headerCell, styles.colPreview, { textAlign: "center" }]}>COLOR PREVIEW</Text>
       <Text style={[styles.headerCell, styles.colCode]}>COLOR CODE</Text>
@@ -566,24 +614,25 @@ const Pagination = ({
 export default function ColorsScreen() {
   const { width } = useWindowDimensions();
 
+  // Native grid: still uses numColumns via FlatList (works fine on native)
   const numCols = useMemo(() => {
-    if (width >= BP.xl)  return 6;
-    if (width >= BP.lg)  return 5;
-    if (width >= 700)    return 4;
-    if (width >= BP.sm)  return 3;
+    if (width >= BP.xl) return 6;
+    if (width >= BP.lg) return 5;
+    if (width >= 700) return 4;
+    if (width >= BP.sm) return 3;
     return 2;
   }, [width]);
 
-  const GAP     = 12;
+  const GAP = 12;
   const PADDING = 16;
   const cardWidth = (width - PADDING * 2 - GAP * (numCols - 1)) / numCols;
 
-  const [colors,       setColors]       = useState<ColorItem[]>(SEED_COLORS);
-  const [viewMode,     setViewMode]     = useState<ViewMode>("list");
-  const [search,       setSearch]       = useState("");
-  const [page,         setPage]         = useState(1);
-  const [addOpen,      setAddOpen]      = useState(false);
-  const [editTarget,   setEditTarget]   = useState<ColorItem | null>(null);
+  const [colors, setColors] = useState<ColorItem[]>(SEED_COLORS);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<ColorItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ColorItem | null>(null);
 
   const filtered = useMemo(
@@ -618,6 +667,7 @@ export default function ColorsScreen() {
     setDeleteTarget(null);
   }, [deleteTarget, filtered.length, page]);
 
+  // ── Native-only FlatList grid render ──────────────────────────────────────
   const renderGridItem = useCallback(({ item }: { item: ColorItem }) => (
     <ColorCard
       item={item}
@@ -638,8 +688,140 @@ export default function ColorsScreen() {
     />
   ), [pageItems.length, width]);
 
+  // ── Shared header + toolbar + footer sections ──────────────────────────────
+  const HeaderSection = (
+    <View style={{ paddingHorizontal: PADDING }}>
+      {/* Page Header Card */}
+      <View style={styles.headerCard}>
+        <View style={styles.headerIcon}>
+          <Ionicons name={BI.palette as any} size={26} color={BRAND} />
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.pageTitle}>Colors Management</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
+            <Ionicons name={BI.houseDoor as any} size={12} color={BRAND} />
+            <Text style={{ fontSize: 12, color: BRAND }}>Dashboard</Text>
+            <Text style={{ fontSize: 12, color: "#aaa" }}>›  Colors</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
+          <Ionicons name={BI.plus as any} size={18} color="#fff" />
+          {width >= BP.sm && <Text style={styles.addBtnText}>Add New Color</Text>}
+        </TouchableOpacity>
+      </View>
+
+      {/* Toolbar */}
+      <View style={styles.toolbar}>
+        <View style={styles.searchBox}>
+          <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
+          <TextInput
+            value={search}
+            onChangeText={handleSearch}
+            placeholder="Search colors..."
+            placeholderTextColor="#bbb"
+            style={styles.searchInput}
+          />
+          {!!search && (
+            <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
+            onPress={() => setViewMode("grid")}
+          >
+            <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
+            onPress={() => setViewMode("list")}
+          >
+            <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  const FooterSection = (
+    <View style={{ paddingHorizontal: PADDING }}>
+      {viewMode === "list" && <View style={styles.tableCardBottom} />}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Showing{" "}
+          {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
+          {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} colors
+        </Text>
+        <Pagination
+          total={filtered.length}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onChange={(p) => setPage(p)}
+        />
+      </View>
+      <Text style={styles.copyright}>2026 © Flintnthread India Pvt. Ltd.</Text>
+    </View>
+  );
+
+  const EmptyComponent = (
+    <View style={{ padding: 60, alignItems: "center" }}>
+      <Ionicons name={BI.palette as any} size={48} color="#ddd" style={{ marginBottom: 12 }} />
+      <Text style={{ color: "#aaa", fontSize: 15 }}>No colors found</Text>
+    </View>
+  );
+
+  // ── WEB: Grid view rendered in a ScrollView with flexWrap ─────────────────
+  if (IS_WEB && viewMode === "grid") {
+    return (
+      <AdminLayout>
+        {/* <StatusBar barStyle="light-content" backgroundColor={BRAND} /> */}
+        <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        >
+          {/* Hero */}
+          <View style={styles.hero}>
+            <View style={styles.heroBubble1} />
+            <View style={styles.heroBubble2} />
+            <View style={styles.heroBubble3} />
+          </View>
+
+          {HeaderSection}
+
+          {pageItems.length === 0 ? EmptyComponent : (
+            <WebGridView
+              items={pageItems}
+              onEdit={(item) => setEditTarget(item)}
+              onDelete={(item) => setDeleteTarget(item)}
+              screenWidth={width}
+              padding={PADDING}
+              gap={GAP}
+            />
+          )}
+
+          {FooterSection}
+        </ScrollView>
+
+        {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
+        {editTarget && (
+          <ColorFormModal
+            mode="edit"
+            initial={editTarget}
+            onSave={handleEdit}
+            onClose={() => setEditTarget(null)}
+          />
+        )}
+        {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+      </AdminLayout>
+    );
+  }
+
+  // ── DEFAULT: FlatList for list view (all platforms) and native grid ────────
   return (
-    <SafeAreaView style={styles.safe}>
+    <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={BRAND} />
 
       {/* Hero Banner */}
@@ -659,116 +841,43 @@ export default function ColorsScreen() {
         showsVerticalScrollIndicator={false}
 
         ListHeaderComponent={
-          <View style={{ paddingHorizontal: PADDING }}>
-
-            {/* Page Header Card */}
-            <View style={styles.headerCard}>
-              <View style={styles.headerIcon}>
-                <Ionicons name={BI.palette as any} size={26} color={BRAND} />
-              </View>
-              <View style={styles.headerContent}>
-                <Text style={styles.pageTitle}>Colors Management</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
-                  <Ionicons name={BI.houseDoor as any} size={12} color={BRAND} />
-                  <Text style={{ fontSize: 12, color: BRAND }}>Dashboard</Text>
-                  <Text style={{ fontSize: 12, color: "#aaa" }}>›  Colors</Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
-                <Ionicons name={BI.plus as any} size={18} color="#fff" />
-                {width >= BP.sm && <Text style={styles.addBtnText}>Add New Color</Text>}
-              </TouchableOpacity>
-            </View>
-
-            {/* Toolbar */}
-            <View style={styles.toolbar}>
-              <View style={styles.searchBox}>
-                <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
-                <TextInput
-                  value={search}
-                  onChangeText={handleSearch}
-                  placeholder="Search colors..."
-                  placeholderTextColor="#bbb"
-                  style={styles.searchInput}
-                />
-                {!!search && (
-                  <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top:8, bottom:8, left:8, right:8 }}>
-                    <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
-                  </TouchableOpacity>
-                )}
-              </View>
-              <View style={styles.viewToggle}>
-                <TouchableOpacity
-                  style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
-                  onPress={() => setViewMode("grid")}
-                >
-                  <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
-                  onPress={() => setViewMode("list")}
-                >
-                  <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
+          <View>
+            {HeaderSection}
             {/* List table header row */}
             {viewMode === "list" && (
-              <View style={styles.tableCard}>
-                <ListHeader screenWidth={width} />
+              <View style={{ paddingHorizontal: PADDING }}>
+                <View style={styles.tableCard}>
+                  <ListHeader screenWidth={width} />
+                </View>
               </View>
             )}
           </View>
         }
 
-        // Wrap grid items; list items rendered inside the tableCard via footer wrapper
-        columnWrapperStyle={viewMode === "grid" ? { gap: GAP, paddingHorizontal: PADDING } : undefined}
-        ItemSeparatorComponent={viewMode === "grid" ? () => <View style={{ height: GAP }} /> : undefined}
-
-        // For list view, wrap items in the same table card started in ListHeaderComponent
-        CellRendererComponent={viewMode === "list"
-          ? ({ children, style, ...rest }: any) => (
-              <View style={[{ paddingHorizontal: PADDING }, style]} {...rest}>
-                <View style={styles.tableCardRows}>
-                  {children}
-                </View>
-              </View>
-            )
+        columnWrapperStyle={viewMode === "grid"
+          ? { gap: GAP, paddingHorizontal: PADDING }
+          : undefined}
+        ItemSeparatorComponent={viewMode === "grid"
+          ? () => <View style={{ height: GAP }} />
           : undefined}
 
-        ListEmptyComponent={
-          <View style={{ padding: 60, alignItems: "center" }}>
-            <Ionicons name={BI.palette as any} size={48} color="#ddd" style={{ marginBottom: 12 }} />
-            <Text style={{ color: "#aaa", fontSize: 15 }}>No colors found</Text>
-          </View>
-        }
-
-        ListFooterComponent={
-          <View style={{ paddingHorizontal: PADDING }}>
-            {/* Close the table card bottom rounded corners */}
-            {viewMode === "list" && <View style={styles.tableCardBottom} />}
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>
-                Showing{" "}
-                {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
-                {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} colors
-              </Text>
-              <Pagination
-                total={filtered.length}
-                page={page}
-                pageSize={PAGE_SIZE}
-                onChange={(p) => setPage(p)}
-              />
+        CellRendererComponent={viewMode === "list"
+          ? ({ children, style, ...rest }: any) => (
+            <View style={[{ paddingHorizontal: PADDING }, style]} {...rest}>
+              <View style={styles.tableCardRows}>
+                {children}
+              </View>
             </View>
-            <Text style={styles.copyright}>2026 © Flintnthread India Pvt. Ltd.</Text>
-          </View>
-        }
+          )
+          : undefined}
+
+        ListEmptyComponent={EmptyComponent}
+
+        ListFooterComponent={FooterSection}
       />
 
       {/* Modals */}
-      {addOpen    && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
+      {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
       {editTarget && (
         <ColorFormModal
           mode="edit"
@@ -778,7 +887,7 @@ export default function ColorsScreen() {
         />
       )}
       {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
-    </SafeAreaView>
+    </AdminLayout>
   );
 }
 
@@ -786,10 +895,13 @@ export default function ColorsScreen() {
 // Styles
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  
   safe: { flex: 1, backgroundColor: "#f5f6fa" },
 
   // Hero
-  hero: { height: 110, backgroundColor: BRAND, overflow: "hidden" },
+  // hero: { height: 110, backgroundColor: BRAND, overflow: "hidden" },
+  hero: { height: 110, backgroundColor: HEADER_BG, overflow: "hidden" },
+
   heroBubble1: {
     position: "absolute", width: 80, height: 80, borderRadius: 40,
     backgroundColor: "rgba(255,255,255,0.07)", top: -10, left: "15%",
@@ -838,7 +950,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   searchInput: { flex: 1, paddingVertical: 8, fontSize: 14, color: "#222" },
-  viewToggle:  { flexDirection: "row", gap: 4, flexShrink: 0 },
+  viewToggle: { flexDirection: "row", gap: 4, flexShrink: 0 },
   viewBtn: {
     width: 36, height: 36, borderRadius: 8,
     backgroundColor: "#f0f0f0", alignItems: "center", justifyContent: "center",
@@ -846,11 +958,6 @@ const styles = StyleSheet.create({
   viewBtnActive: { backgroundColor: DARK_BTN },
 
   // ── TABLE CARD ──────────────────────────────────────────────────────────────
-  // The header row and all rows live inside a single white rounded card with shadow.
-  // Because FlatList renders header + items separately, we use three pieces:
-  //   tableCard       → wraps the <ListHeader> inside ListHeaderComponent
-  //   tableCardRows   → wraps each rendered row cell (via CellRendererComponent)
-  //   tableCardBottom → rendered in ListFooterComponent to close the card visually
   tableCard: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 12,
@@ -879,7 +986,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
 
-  // Table header row — warm cream matching screenshot
+  // Table header row
   tableHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -905,31 +1012,22 @@ const styles = StyleSheet.create({
     minHeight: 64,
     ...(IS_WEB ? ({ cursor: "default" } as any) : {}),
   },
-  listRowEven:   { backgroundColor: "#fafbfc" },
+  listRowEven: { backgroundColor: "#fafbfc" },
   listRowBorder: { borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
 
-  // ── Column widths (shared between header and data rows) ──────────────────
-  //  colId      : fixed  54px
-  //  colName    : flex 1  (fills remaining space)
-  //  colPreview : fixed  80px
-  //  colCode    : fixed 110px
-  //  colDate    : fixed 145px
-  //  colStatus  : fixed  90px
-  //  colAction  : fixed  80px
-  colId:      { width: 54, flexShrink: 0 },
-  colName:    { flex: 1, minWidth: 80, paddingRight: 8 },
+  // Column widths
+  colId: { width: 54, flexShrink: 0 },
+  colName: { flex: 1, minWidth: 80, paddingRight: 8 },
   colPreview: { width: 80, flexShrink: 0, alignItems: "center" },
-  colCode:    { width: 110, flexShrink: 0, paddingHorizontal: 4 },
-  colDate:    { width: 145, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
-  colStatus:  { width: 90, flexShrink: 0, paddingHorizontal: 4 },
-  colAction:  { width: 80, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
+  colCode: { width: 110, flexShrink: 0, paddingHorizontal: 4 },
+  colDate: { width: 145, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
+  colStatus: { width: 90, flexShrink: 0, paddingHorizontal: 4 },
+  colAction: { width: 80, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
 
-  // ── Cell content ───────────────────────────────────────────────────────────
+  // Cell content
   cellId: { fontSize: 13, fontWeight: "600", color: "#64748b" },
-
   cellName: { fontSize: 14, fontWeight: "600", color: "#1a1a2e" },
 
-  // Rounded square swatch matching screenshot
   swatchCell: {
     width: 44,
     height: 44,
@@ -943,7 +1041,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  // Hex code pill badge — light grey background, monospace
   codePill: {
     backgroundColor: "#f5f5f5",
     paddingHorizontal: 10,
@@ -961,7 +1058,6 @@ const styles = StyleSheet.create({
 
   cellDate: { fontSize: 12, color: "#888" },
 
-  // Status badge — green or red pill
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -969,13 +1065,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignSelf: "flex-start",
   },
-  statusActive:       { backgroundColor: "#dcfce7", borderColor: "#22c55e" },
-  statusInactive:     { backgroundColor: "#fee2e2", borderColor: "#ef4444" },
-  statusText:         { fontSize: 11, fontWeight: "700" },
-  statusTextActive:   { color: "#15803d" },
+  statusActive: { backgroundColor: "#dcfce7", borderColor: "#22c55e" },
+  statusInactive: { backgroundColor: "#fee2e2", borderColor: "#ef4444" },
+  statusText: { fontSize: 11, fontWeight: "700" },
+  statusTextActive: { color: "#15803d" },
   statusTextInactive: { color: "#dc2626" },
 
-  // Action buttons — dark edit, light-red delete
   editBtn: {
     width: 32, height: 32, borderRadius: 6,
     backgroundColor: DARK_BTN, alignItems: "center", justifyContent: "center",
@@ -1019,17 +1114,17 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  footerText:     { fontSize: 13, color: "#888", textAlign: "center" },
-  pagination:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  footerText: { fontSize: 13, color: "#888", textAlign: "center" },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   pageBtn: {
     width: 34, height: 34, borderRadius: 8,
     backgroundColor: "#fff", borderWidth: 1, borderColor: "#e0e0e0",
     alignItems: "center", justifyContent: "center",
   },
-  pageBtnActive:      { backgroundColor: BRAND, borderColor: BRAND },
-  pageBtnDisabled:    { opacity: 0.35 },
-  pageBtnText:        { fontSize: 13, color: "#555" },
-  pageBtnTextActive:  { color: "#fff", fontWeight: "700" },
+  pageBtnActive: { backgroundColor: BRAND, borderColor: BRAND },
+  pageBtnDisabled: { opacity: 0.35 },
+  pageBtnText: { fontSize: 13, color: "#555" },
+  pageBtnTextActive: { color: "#fff", fontWeight: "700" },
   copyright: { textAlign: "center", color: "#ccc", fontSize: 12, marginTop: 16 },
 
   // Modal
@@ -1056,8 +1151,8 @@ const styles = StyleSheet.create({
     padding: 10, fontSize: 14, color: "#222", backgroundColor: "#fff",
   },
   inputError: { borderColor: "#e53e3e" },
-  errorRow:   { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
-  errorText:  { color: "#e53e3e", fontSize: 12 },
+  errorRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  errorText: { color: "#e53e3e", fontSize: 12 },
   colorSwatchInput: {
     width: 52, height: 44, borderRadius: 8, borderWidth: 1.5, borderColor: "#e0e0e0",
   },
@@ -1112,6 +1207,6 @@ const styles = StyleSheet.create({
     width: 72, height: 72, borderRadius: 36, backgroundColor: "#fff5ee",
     alignItems: "center", justifyContent: "center", marginBottom: 16,
   },
-  deleteTitle:    { fontSize: 17, fontWeight: "700", color: "#222", marginBottom: 6 },
+  deleteTitle: { fontSize: 17, fontWeight: "700", color: "#222", marginBottom: 6 },
   deleteSubtitle: { fontSize: 14, color: "#888", textAlign: "center" },
 });

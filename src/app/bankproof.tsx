@@ -1,7 +1,7 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { fetchSellerBankDetails } from "@/services/sellerApi";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 
+import AdminLayout from "@/components/admin-layout";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 
 // ─── Breakpoints ───────────────────────────────────────────────────────────────
@@ -121,8 +122,10 @@ export default function BankProof() {
           : "100%";
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#C05E1A" />
+    <AdminLayout>
+      <View style={styles.root}>
+      {/* <StatusBar barStyle="light-content" backgroundColor="#C05E1A" /> */}
+      <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -133,7 +136,7 @@ export default function BankProof() {
         <View
           style={[
             styles.outerContainer,
-            { maxWidth: contentMaxWidth, width: "100%" },
+            { width: "100%" },
           ]}
         >
           {/* Top card: header banner + title section */}
@@ -176,36 +179,38 @@ export default function BankProof() {
 
           {!loading && !error ? (
             <>
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Icon name="image-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
-              <Text style={styles.cardTitle}>Bank Proof Document</Text>
-            </View>
-            <ProofImage uri={bankProofUrl} label="bank proof" />
-            <View style={styles.imageInfo}>
-              <Text style={styles.infoLabel}>Seller:</Text>
-              <Text style={styles.infoValue}>{sellerName}</Text>
-            </View>
-          </View>
+              <View style={styles.card}>
+                <View style={styles.cardTitleRow}>
+                  <Icon name="image-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Bank Proof Document</Text>
+                </View>
+                <ProofImage uri={bankProofUrl} label="bank proof" />
+                <View style={styles.imageInfo}>
+                  <Text style={styles.infoLabel}>Seller:</Text>
+                  <Text style={styles.infoValue}>{sellerName}</Text>
+                </View>
+              </View>
 
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Icon name="file-document-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
-              <Text style={styles.cardTitle}>Cancelled Cheque</Text>
-            </View>
-            <ProofImage uri={cancelledChequeUrl} label="cancelled cheque" />
-          </View>
+              <View style={styles.card}>
+                <View style={styles.cardTitleRow}>
+                  <Icon name="file-document-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
+                  <Text style={styles.cardTitle}>Cancelled Cheque</Text>
+                </View>
+                <ProofImage uri={cancelledChequeUrl} label="cancelled cheque" />
+              </View>
             </>
           ) : null}
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </AdminLayout>
   );
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const ORANGE = "#C05E1A";
 const ORANGE_LIGHT = "#E8892F";
+const HEADER_BG = "#1d324e";
 const DARK = "#2C3E50";
 const GRAY = "#8492A6";
 const BG = "#F4F6F9";
@@ -258,7 +263,7 @@ const styles = StyleSheet.create({
 
   // ── Header banner ───────────────────────────────
   headerBanner: {
-    backgroundColor: ORANGE,
+    backgroundColor: HEADER_BG,
     height: 100,
     justifyContent: "flex-end",
     paddingBottom: 12,

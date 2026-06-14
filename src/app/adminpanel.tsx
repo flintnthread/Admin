@@ -4,11 +4,9 @@
 // Mobile view: card list with bottom nav
 // Uses @expo/vector-icons (Ionicons) – swap with react-native-vector-icons if not using Expo
 
-import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { formatDateTime } from "@/lib/format";
 import type { AdminUserRow } from "@/lib/api/types";
+import { formatDateTime } from "@/lib/format";
 import {
   createAdminUser,
   deleteAdminUser,
@@ -16,6 +14,9 @@ import {
   fromApiRole,
   updateAdminUser,
 } from "@/services/adminUserApi";
+import { Ionicons } from "@expo/vector-icons";
+import AdminLayout from "@/components/admin-layout";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -703,12 +704,12 @@ export default function AdminUsersScreen() {
       <View style={styles.webPageHeader}>
         <View>
           <Text style={styles.webPageTitle}>Admin Panel Users</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+          {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
             <Icon name="home-outline" size={13} color={C.subtext} />
             <Text style={styles.breadcrumb}>Dashboard</Text>
             <Text style={styles.breadcrumb}> › </Text>
             <Text style={[styles.breadcrumb, { color: C.text }]}>Admin Users</Text>
-          </View>
+          </View> */}
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
             <Icon name="add" size={18} color={C.white} />
@@ -796,8 +797,9 @@ export default function AdminUsersScreen() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      {isWide ? <WebLayout /> : <MobileLayout />}
+    <AdminLayout>
+      <View style={{ flex: 1 }}>
+        {isWide ? <WebLayout /> : <MobileLayout />}
 
       <UserModal
         visible={addVisible}
@@ -821,7 +823,8 @@ export default function AdminUsersScreen() {
         onClose={() => setDeleteUser(null)}
         onConfirm={handleDelete}
       />
-    </View>
+      </View>
+    </AdminLayout>
   );
 }
 
@@ -844,7 +847,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     backgroundColor: C.navy,
   },
-  topBarTitle:  { color: C.orange, fontSize: 20, fontWeight: "700" },
+  topBarTitle:  { color: C.white, fontSize: 20, fontWeight: "700" },
   topBarIcons:  { flexDirection: "row", alignItems: "center", gap: 14 },
   topBarAdd:    { backgroundColor: C.orange, borderRadius: 10, padding: 8, justifyContent: "center", alignItems: "center" },
   avatarSmall:  { width: 36, height: 36, borderRadius: 18, backgroundColor: C.orange, justifyContent: "center", alignItems: "center" },
@@ -952,10 +955,12 @@ const styles = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 28, paddingVertical: 20,
-    backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border,
+    backgroundColor: C.navy, borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  webPageTitle: { fontSize: 22, fontWeight: "800", color: C.text },
-  breadcrumb:   { fontSize: 12, color: C.subtext },
+  webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },  // ← C.white
+breadcrumb:   { fontSize: 12, color: "rgba(255,255,255,0.6)" },     // ← soft white
+  // webPageTitle: { fontSize: 22, fontWeight: "800", color: C.text },
+  // breadcrumb:   { fontSize: 12, color: C.subtext },
 
   // ── Web Stats Row ──
   webStatsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },

@@ -1,9 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapBankPendingRow } from "@/lib/mappers";
 import { fetchBankStats, fetchPendingBankSellers } from "@/services/sellerApi";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Modal,
@@ -101,12 +102,20 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
     approved: { bg: "#E8F5E9", color: "#2E7D32", dot: "#4CAF50" },
   };
   const s = styles[status] || styles.not_requested;
+  // return (
+  //   <View style={{
+  //     backgroundColor: s.bg,
+  //     borderRadius: 2,
+  //     paddingHorizontal: 3,
+  //     paddingVertical: 1,
+  //   }}>
   return (
     <View style={{
       backgroundColor: s.bg,
       borderRadius: 2,
-      paddingHorizontal: 3,
-      paddingVertical: 1,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      alignSelf: 'flex-start',
     }}>
       <Text style={{
         color: s.color,
@@ -137,49 +146,49 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
     //   <Text style={{ color, fontWeight: "700", fontSize: 14 }}>{initials}</Text>
     // </View>
     <View
-  style={{
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: color + "22",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: color + "44",
-  }}
->
-  <Text
-    style={{
-      color,
-      fontWeight: "700",
-      fontSize: 14,
-    }}
-  >
-    {initials}
-  </Text>
-</View>
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: color + "22",
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1.5,
+        borderColor: color + "44",
+      }}
+    >
+      <Text
+        style={{
+          color,
+          fontWeight: "700",
+          fontSize: 14,
+        }}
+      >
+        {initials}
+      </Text>
+    </View>
   );
 }
 
 // export default function BankApproval(){
- 
 
-  // const router = useRouter();
-  // const [activeNav, setActiveNav] = useState("Pending Sellers");
-  // const [activeTab, setActiveTab] = useState("Dashboard");
 
-  // Detect mobile via window width using state
-  // const [isMobile, setIsMobile] = useState(
-  //   typeof window !== "undefined" ? window.innerWidth < 768 : false
-  // );
-  // const [searchQuery, setSearchQuery] = useState("");
+// const router = useRouter();
+// const [activeNav, setActiveNav] = useState("Pending Sellers");
+// const [activeTab, setActiveTab] = useState("Dashboard");
 
-  // React.useEffect(() => {
-  //   const handle = () => setIsMobile(window.innerWidth < 768);
-  //   window.addEventListener("resize", handle);
-  //   return () => window.removeEventListener("resize", handle);
-  // }, []);
-  export default function BankApproval() {
+// Detect mobile via window width using state
+// const [isMobile, setIsMobile] = useState(
+//   typeof window !== "undefined" ? window.innerWidth < 768 : false
+// );
+// const [searchQuery, setSearchQuery] = useState("");
+
+// React.useEffect(() => {
+//   const handle = () => setIsMobile(window.innerWidth < 768);
+//   window.addEventListener("resize", handle);
+//   return () => window.removeEventListener("resize", handle);
+// }, []);
+export default function BankApproval() {
   const router = useRouter();
   const [activeNav, setActiveNav] = useState("Pending Sellers");
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -202,10 +211,12 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
         fetchPendingBankSellers(0, 200),
         fetchBankStats(),
       ]);
-      setSellers((pendingRes.items ?? []).map(mapBankPendingRow));
-      setBankStats(statsRes);
+      setSellers((pendingRes?.items ?? []).map(mapBankPendingRow));
+      setBankStats(statsRes ?? {});
     } catch (e) {
       setLoadError(getApiErrorMessage(e));
+      setSellers([]);
+      setBankStats({});
     }
   }, []);
 
@@ -279,11 +290,12 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Main */}
-      <View style={styles.mainContent}>
-        {/* Page Content */}
-        <View style={[styles.pageContent, { padding: isDesktop ? 32 : isMobile ? 16 : 24 }]}>
+    <AdminLayout>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        {/* Main */}
+        <View style={styles.mainContent}>
+          {/* Page Content */}
+          <View style={[styles.pageContent, { padding: isDesktop ? 32 : isMobile ? 16 : 24 }]}>
 
             {loadError ? (
               <Text style={{ color: "#DC2626", marginBottom: 12 }}>{loadError}</Text>
@@ -294,19 +306,21 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
               <View style={styles.desktopHeader}>
                 <View style={styles.desktopHeaderLeft}>
                   <Text style={styles.desktopTitle}>Seller Bank Approval</Text>
-                  <View style={styles.desktopBreadcrumb}>
+                  {/* <View style={styles.desktopBreadcrumb}>
                     <Text style={styles.desktopBreadcrumbItem}>Dashboard</Text>
                     <Text style={styles.desktopBreadcrumbSeparator}>•</Text>
                     <Text style={styles.desktopBreadcrumbItem}>Sellers</Text>
                     <Text style={styles.desktopBreadcrumbSeparator}>•</Text>
                     <Text style={styles.desktopBreadcrumbItemActive}>Bank Approval</Text>
-                  </View>
+                  </View> */}
                 </View>
                 <View style={styles.desktopHeaderTabs}>
                   <TouchableOpacity style={styles.desktopTabActive} onPress={() => router.push('/bankverification')}>
                     <Text style={styles.desktopTabTextActive}>Bank Verifications</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.desktopTab} onPress={() => router.push('/supportticket')}>
+                  {/* <TouchableOpacity style={styles.desktopTab} onPress={() => router.push('/supportticket')}> */}
+                  <TouchableOpacity style={[styles.desktopTab, { backgroundColor: '#16A34A' }]} onPress={() => router.push('/supportticket')}>
+
                     <Text style={styles.desktopTabText}>Seller Support</Text>
                   </TouchableOpacity>
                 </View>
@@ -333,7 +347,8 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
                 <TouchableOpacity style={[styles.btnOutline, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/bankverification')}>
                   <Text style={styles.btnOutlineText}>Bank Verifications</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/supportticket')}>
+                {/* <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/supportticket')}> */}
+                <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center", backgroundColor: '#16A34A' }]} onPress={() => router.push('/supportticket')}>
                   <Text style={styles.btnDarkText}>Seller Support</Text>
                 </TouchableOpacity>
               </View>
@@ -365,7 +380,8 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
                     <Text style={styles.desktopFilterLabel}>Status</Text>
                     <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
                   </View>
-                  <View style={styles.desktopFilterItem}>
+                  {/* <View style={styles.desktopFilterItem}>   */}
+                  <View style={[styles.desktopFilterItem, { flexBasis: 800 }]}>
                     <Text style={styles.desktopFilterLabel}>Search</Text>
                     <TextInput
                       style={styles.desktopSearchInput}
@@ -436,7 +452,8 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 
             {/* Desktop Table */}
             {!isMobile && (
-              <View style={styles.desktopTable}>
+              // <View style={styles.desktopTable}>
+              <View style={[styles.desktopTable, { marginHorizontal: 0, width: "100%" }]}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>ID</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Seller</Text>
@@ -605,7 +622,8 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
             </View>
           </View>
         </View>
-    </ScrollView>
+      </ScrollView>
+    </AdminLayout>
   );
 }
 
@@ -637,7 +655,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   desktopTable: {
-    marginHorizontal: 28,
+    // marginHorizontal: 28,
+     width: "100%",
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#fff",
