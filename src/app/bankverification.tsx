@@ -8,14 +8,14 @@
  * Usage (Expo Router):  app/bankverifications.tsx  → this file
  */
 
+import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import type { SellerSummary } from "@/lib/api/types";
+import { initialsFromName, maskAccount } from "@/lib/format";
+import { fetchBankStats, fetchBankVerifications } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { getApiErrorMessage } from "@/lib/api/client";
-import AdminLayout from "@/components/admin-layout";
-import { initialsFromName, maskAccount } from "@/lib/format";
-import { fetchBankStats, fetchBankVerifications } from "@/services/sellerApi";
-import type { SellerSummary } from "@/lib/api/types";
 import {
   Animated,
   Dimensions,
@@ -507,7 +507,7 @@ export default function BankVerifications() {
           ListHeaderComponent={
           <View>
             {/* ── Page Title (Orange Container) ── */}
-            <View style={{ backgroundColor: "#FF6B35", borderRadius: 16, padding: 16, marginBottom: 20 }}>
+             <View style={{ backgroundColor: "#FF6B35", borderRadius: 16, padding: 16, marginBottom: 20 }}> 
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <Ionicons name="business-outline" size={24} color="#fff" />
                 <Text style={{ fontSize: isTablet ? 24 : 20, fontWeight: "800", color: "#fff" }}>
@@ -535,7 +535,7 @@ export default function BankVerifications() {
                         iconBg={c.iconBg}
                         iconColor={c.iconColor}
                         spinning={c.spinning}
-                        onPress={() => handleStatusChange(c.filterVal)}
+                        onPress={() => handleStatusChange(c.filterVal)} 
                       />
                     </View>
                   ))}

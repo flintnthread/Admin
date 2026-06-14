@@ -56,6 +56,7 @@ const BI = {
 // ─────────────────────────────────────────────────────────────────────────────
 const BRAND = "#e8651a";
 const DARK_BTN = "#1E2A45";
+const HEADER_BG = "#1d324e";
 const PAGE_SIZE = 12;
 
 // Responsive breakpoints
@@ -775,7 +776,8 @@ export default function ColorsScreen() {
   if (IS_WEB && viewMode === "grid") {
     return (
       <AdminLayout>
-        <StatusBar barStyle="light-content" backgroundColor={BRAND} />
+        {/* <StatusBar barStyle="light-content" backgroundColor={BRAND} /> */}
+        <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 32 }}
@@ -893,10 +895,13 @@ export default function ColorsScreen() {
 // Styles
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  
   safe: { flex: 1, backgroundColor: "#f5f6fa" },
 
   // Hero
-  hero: { height: 110, backgroundColor: BRAND, overflow: "hidden" },
+  // hero: { height: 110, backgroundColor: BRAND, overflow: "hidden" },
+  hero: { height: 110, backgroundColor: HEADER_BG, overflow: "hidden" },
+
   heroBubble1: {
     position: "absolute", width: 80, height: 80, borderRadius: 40,
     backgroundColor: "rgba(255,255,255,0.07)", top: -10, left: "15%",

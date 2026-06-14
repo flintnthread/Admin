@@ -15,8 +15,8 @@ import {
   View,
 } from "react-native";
 
-import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 
 // ─── Breakpoints ───────────────────────────────────────────────────────────────
 const BP = { mobile: 480, tablet: 768, laptop: 1024, desktop: 1280 };
@@ -124,7 +124,8 @@ export default function BankProof() {
   return (
     <AdminLayout>
       <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#C05E1A" />
+      {/* <StatusBar barStyle="light-content" backgroundColor="#C05E1A" /> */}
+      <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -135,7 +136,7 @@ export default function BankProof() {
         <View
           style={[
             styles.outerContainer,
-            { maxWidth: contentMaxWidth, width: "100%" },
+            { width: "100%" },
           ]}
         >
           {/* Top card: header banner + title section */}
@@ -209,6 +210,7 @@ export default function BankProof() {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const ORANGE = "#C05E1A";
 const ORANGE_LIGHT = "#E8892F";
+const HEADER_BG = "#1d324e";
 const DARK = "#2C3E50";
 const GRAY = "#8492A6";
 const BG = "#F4F6F9";
@@ -261,7 +263,7 @@ const styles = StyleSheet.create({
 
   // ── Header banner ───────────────────────────────
   headerBanner: {
-    backgroundColor: ORANGE,
+    backgroundColor: HEADER_BG,
     height: 100,
     justifyContent: "flex-end",
     paddingBottom: 12,

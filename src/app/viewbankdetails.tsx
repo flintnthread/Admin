@@ -1,6 +1,6 @@
+import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import AdminLayout from "@/components/admin-layout";
 import {
   ActivityIndicator,
   Platform,
@@ -13,10 +13,10 @@ import {
   View,
 } from "react-native";
 
-import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate, maskAccount } from "@/lib/format";
 import { approveSellerBank, fetchSellerBankDetails, rejectSellerBank } from "@/services/sellerApi";
+import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 
 const BP = { mobile: 480, tablet: 768, laptop: 1024, desktop: 1280 };
 
@@ -275,7 +275,8 @@ export default function BankApprovalHistory() {
   return (
     <AdminLayout>
       <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#C05E1A" />
+      {/* <StatusBar barStyle="light-content" backgroundColor="#C05E1A" /> */}
+      <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, !isMobile && { alignItems: "center" }]}
         showsVerticalScrollIndicator={false}
@@ -330,6 +331,7 @@ export default function BankApprovalHistory() {
 
 const ORANGE = "#C05E1A";
 const ORANGE_LIGHT = "#E8892F";
+const HEADER_BG = "#1d324e";
 const DARK = "#2C3E50";
 const GRAY = "#8492A6";
 const BG = "#F4F6F9";
@@ -349,10 +351,10 @@ const shadowSm: any = Platform.select({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   scrollContent: { flexGrow: 1, paddingBottom: 32 },
-  outerContainer: { alignSelf: "center", paddingHorizontal: 12, paddingTop: 12, gap: 16 },
+  outerContainer: { alignSelf: "center", paddingHorizontal: 0,  width: "100%",paddingTop: 12, gap: 16 },
   topCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", ...shadow },
   headerBanner: {
-    backgroundColor: ORANGE,
+    backgroundColor: HEADER_BG,
     height: 100,
     justifyContent: "flex-end",
     paddingBottom: 12,

@@ -381,7 +381,7 @@ export default function BankApproval() {
                     <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
                   </View>
                   {/* <View style={styles.desktopFilterItem}>   */}
-                  <View style={[styles.desktopFilterItem, { flexBasis: 1000 }]}>
+                  <View style={[styles.desktopFilterItem, { flexBasis: 800 }]}>
                     <Text style={styles.desktopFilterLabel}>Search</Text>
                     <TextInput
                       style={styles.desktopSearchInput}
@@ -452,7 +452,8 @@ export default function BankApproval() {
 
             {/* Desktop Table */}
             {!isMobile && (
-              <View style={styles.desktopTable}>
+              // <View style={styles.desktopTable}>
+              <View style={[styles.desktopTable, { marginHorizontal: 0, width: "100%" }]}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>ID</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Seller</Text>
@@ -654,7 +655,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   desktopTable: {
-    marginHorizontal: 28,
+    // marginHorizontal: 28,
+     width: "100%",
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#fff",

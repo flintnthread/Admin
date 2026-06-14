@@ -226,7 +226,8 @@ const GridCard: React.FC<{
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={S.gridCardTop}
-      >
+      > 
+     
         {showActions ? (
           <View style={S.gridCardActions}>
             <TouchableOpacity
@@ -657,12 +658,13 @@ export default function SizesManagement() {
 
 
         {/* ── BANNER ── */}
-        <LinearGradient
-          colors={["#c0601a", "#8b3e0f"]}
+         <LinearGradient
+          colors={["#0f2d6b", "#08275c"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={S.banner}
-        >
+        > 
+         
           <View style={S.bannerIconBox}>
             {/* Bootstrap: grid-3x3 */}
             <BI name="grid-3x3" size={22} color="#fff" />
