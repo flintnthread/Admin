@@ -560,7 +560,7 @@ const ProductActionSheet: React.FC<ActionSheetProps> = ({ product, onClose, onDe
             }, 300);
         } else if (label === "View Product") {
             onClose();
-            router.push('/productDetails');
+            router.push({ pathname: '/productDetails', params: { id: product.id } });
         } else if (label === "Edit Product") {
             onClose();
             router.push('/Editproduct');
@@ -648,7 +648,7 @@ const WebProductActionPopup: React.FC<ActionSheetProps> = ({ product, onClose, o
             }
         } else if (label === "View Product") {
             onClose();
-            router.push('/productDetails');
+            router.push({ pathname: '/productDetails', params: { id: product.id } });
         } else if (label === "Edit Product") {
             onClose();
             router.push('/Editproduct');
@@ -1192,7 +1192,7 @@ const WebProductsScreen: React.FC = () => {
                                             <TouchableOpacity
                                                 key={product.id}
                                                 style={[wst.tableRow, idx % 2 === 1 && wst.tableRowAlt]}
-                                                onPress={() => router.push('/productDetails')}
+                                                onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
                                                 activeOpacity={0.7}
                                             >
                                                 {/* Product */}
@@ -1281,7 +1281,7 @@ const WebProductsScreen: React.FC = () => {
                                                 <TouchableOpacity
                                                     key={product.id}
                                                     style={wst.webGridCard}
-                                                    onPress={() => router.push('/productDetails')}
+                                                    onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
                                                     activeOpacity={0.75}
                                                 >
                                                     <View style={wst.webGridImgWrap}>
@@ -1838,7 +1838,7 @@ const MobileProductsScreen: React.FC = () => {
                                     key={product.id}
                                     style={s.productRow}
                                     activeOpacity={0.7}
-                                    onPress={() => router.push('/productDetails')}
+                                    onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
                                 >
                                     {product.image ? (
                                         <Image source={{ uri: product.image }} style={s.productImage} />
@@ -1879,7 +1879,7 @@ const MobileProductsScreen: React.FC = () => {
                                     key={product.id}
                                     style={s.gridCard}
                                     activeOpacity={0.7}
-                                    onPress={() => router.push('/productDetails')}
+                                    onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
                                 >
                                     {product.image ? (
                                         <Image source={{ uri: product.image }} style={s.gridImage} resizeMode="contain" />
