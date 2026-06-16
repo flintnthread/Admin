@@ -11,12 +11,16 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import SellerMediaImage from "@/components/SellerMediaImage";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
+import { buildSellerImageCandidates } from '@/lib/api/media';
 import { mapSellerListRow } from '@/lib/mappers';
 import { blockSeller, fetchSellers, unblockSeller } from '@/services/sellerApi';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Platform,
@@ -41,7 +45,12 @@ interface Seller {
   status: 'Active' | 'Inactive';
   kyc: KycStatus;
   products: { status: ProductStatus; count: number };
-  wallet: string; registered: string; banner?: string;
+  wallet: string; registered: string;
+  banner?: string; avatar?: string;
+  profilePicUrl?: string; profilePicPath?: string; liveSelfiePath?: string;
+  city?: string; state?: string; businessType?: string;
+  revenue?: number; totalOrders?: number; country?: string;
+  bankVerified?: boolean;
 }
 
 // ─────────────────────────── COLORS ──────────────────────────────────────────
@@ -198,6 +207,18 @@ const Bd = StyleSheet.create({
   idTxt: { fontSize: 10, color: C.primary, fontWeight: '700' },
 });
 
+const SellerAvatar = ({
+  seller,
+  size = 34,
+  style,
+}: {
+  seller: Seller;
+  size?: number;
+  style?: object;
+}) => (
+  <SellerMediaImage seller={seller} size={size} style={style} />
+);
+
 // ─────────────────────────── CONFIRM MODAL ───────────────────────────────────
 const ConfirmModal = ({
   visible, title, message, confirmLabel, confirmColor, onConfirm, onCancel,
@@ -243,9 +264,15 @@ const ViewModal = ({ seller, onClose }: { seller: Seller | null; onClose: () => 
     ['Email', seller.email],
     ['Mobile', seller.mobile],
     ['Business', seller.business],
+    ['Business Type', seller.businessType ?? '—'],
+    ['Location', `${seller.city ?? '—'}, ${seller.state ?? '—'}`],
     ['Registered', seller.registered],
     ['Wallet', seller.wallet],
+    ['Revenue', seller.revenue != null ? `₹${seller.revenue.toLocaleString('en-IN')}` : '—'],
+    ['Total Orders', seller.totalOrders != null ? String(seller.totalOrders) : '—'],
+    ['Country', seller.country ?? '—'],
     ['KYC', seller.kyc],
+    ['Bank Verified', seller.bankVerified ? 'Yes' : 'No'],
   ];
   return (
     <Modal visible={!!seller} transparent animationType="slide">
@@ -257,7 +284,9 @@ const ViewModal = ({ seller, onClose }: { seller: Seller | null; onClose: () => 
               <Text style={VM.closeX}>✕</Text>
             </TouchableOpacity>
           </View>
-          {seller.banner && <Image source={{ uri: seller.banner }} style={VM.banner} />}
+          {seller.banner ? (
+            <Image source={{ uri: seller.banner }} style={VM.banner} />
+          ) : null}
           <ScrollView style={{ maxHeight: 320 }}>
             {rows.map(([k, v]) => (
               <View key={k} style={VM.row}>
@@ -301,94 +330,116 @@ const GridCard = ({
   onView: () => void;
   onToggleStatus: () => void;
   onDelete: () => void;
-}) => (
-  <View style={[GC.card, { width: cardWidth as any }]}>
-    {/* Banner */}
-    <View style={GC.bannerWrap}>
-      {seller.banner
-        ? <Image source={{ uri: seller.banner }} style={GC.banner} />
-        : <View style={[GC.banner, { backgroundColor: C.primary }]} />}
-      {/* S.No badge top-right */}
-      <View style={GC.snoBadge}>
-        <Text style={GC.snoTxt}>S.No: {seller.serialNo}</Text>
-      </View>
-    </View>
+}) => {
+  const candidates = buildSellerImageCandidates(seller);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const bannerUri = candidates[bannerIndex] ?? null;
 
-    {/* Card body */}
-    <View style={GC.body}>
-      {/* Name */}
-      <View style={GC.nameRow}>
-        <Text style={GC.name} numberOfLines={1}>{seller.name}</Text>
-      </View>
+  useEffect(() => {
+    setBannerIndex(0);
+  }, [candidates.join('|')]);
 
-      {/* ID badge */}
-      <IdBadge id={seller.id} />
-
-      {/* Business */}
-      <View style={GC.infoRow}>
-        <IconBuilding size={12} color={C.muted} />
-        <Text style={GC.infoTxt} numberOfLines={1}>{seller.business}</Text>
-      </View>
-
-      {/* Status */}
-      <View style={{ marginTop: 2 }}>
-        {seller.status === 'Active' ? <ActiveBadge /> : <InactiveBadge />}
-      </View>
-
-      <View style={GC.divider} />
-
-      {/* KYC + Wallet */}
-      <View style={GC.footRow}>
-        <View>
-          <Text style={GC.footLabel}>KYC Status:</Text>
-          <KycBadge kyc={seller.kyc} />
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={GC.footLabel}>Wallet:</Text>
-          <Text style={GC.wallet}>{seller.wallet}</Text>
+  return (
+    <View style={[GC.card, { width: cardWidth as any }]}>
+      {/* Banner — only real DB image */}
+      <View style={GC.bannerWrap}>
+        {bannerUri ? (
+          <Image
+            source={{ uri: bannerUri }}
+            style={GC.banner}
+            onError={() => {
+              if (bannerIndex < candidates.length - 1) setBannerIndex((i) => i + 1);
+            }}
+          />
+        ) : (
+          <View style={[GC.banner, GC.bannerEmpty]}>
+            <IconPerson size={36} color="rgba(255,255,255,0.9)" />
+          </View>
+        )}
+        {/* S.No badge top-right */}
+        <View style={GC.snoBadge}>
+          <Text style={GC.snoTxt}>S.No: {seller.serialNo}</Text>
         </View>
       </View>
 
-      {/* Products */}
-      <View style={{ marginTop: 6 }}>
-        <Text style={GC.footLabel}>Products Listing</Text>
-        <ProductBadge status={seller.products.status} count={seller.products.count} />
-      </View>
+      {/* Card body */}
+      <View style={GC.body}>
+        {/* Name */}
+        <View style={GC.nameRow}>
+          <SellerAvatar seller={seller} size={28} />
+          <Text style={[GC.name, { marginLeft: 8 }]} numberOfLines={1}>{seller.name}</Text>
+        </View>
 
-      <View style={GC.divider} />
+        {/* ID badge */}
+        <IdBadge id={seller.id} />
 
-      {/* Action Buttons — always visible, always clickable */}
-      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={[GC.actionBtn, { backgroundColor: C.navy }]}
-          onPress={onView}
-        >
-          <IconEye size={15} color="#FFF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={[GC.actionBtn, { backgroundColor: C.amber }]}
-          onPress={onToggleStatus}
-        >
-          <IconEyeSlash size={15} color="#FFF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={[GC.actionBtn, { backgroundColor: C.red }]}
-          onPress={onDelete}
-        >
-          <IconTrash size={15} color="#FFF" />
-        </TouchableOpacity>
+        {/* Business */}
+        <View style={GC.infoRow}>
+          <IconBuilding size={12} color={C.muted} />
+          <Text style={GC.infoTxt} numberOfLines={1}>{seller.business}</Text>
+        </View>
+
+        {/* Status */}
+        <View style={{ marginTop: 2 }}>
+          {seller.status === 'Active' ? <ActiveBadge /> : <InactiveBadge />}
+        </View>
+
+        <View style={GC.divider} />
+
+        {/* KYC + Wallet */}
+        <View style={GC.footRow}>
+          <View>
+            <Text style={GC.footLabel}>KYC Status:</Text>
+            <KycBadge kyc={seller.kyc} />
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={GC.footLabel}>Wallet:</Text>
+            <Text style={GC.wallet}>{seller.wallet}</Text>
+          </View>
+        </View>
+
+        {/* Products */}
+        <View style={{ marginTop: 6 }}>
+          <Text style={GC.footLabel}>Products Listing</Text>
+          <ProductBadge status={seller.products.status} count={seller.products.count} />
+        </View>
+
+        <View style={GC.divider} />
+
+        {/* Action Buttons — always visible, always clickable */}
+        <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[GC.actionBtn, { backgroundColor: C.navy }]}
+            onPress={onView}
+          >
+            <IconEye size={15} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[GC.actionBtn, { backgroundColor: C.amber }]}
+            onPress={onToggleStatus}
+          >
+            <IconEyeSlash size={15} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[GC.actionBtn, { backgroundColor: C.red }]}
+            onPress={onDelete}
+          >
+            <IconTrash size={15} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 const GC = StyleSheet.create({
   card: { backgroundColor: C.card, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.09, shadowRadius: 10, elevation: 4 },
   bannerWrap: { height: 130 },
   banner: { width: '100%', height: 130, resizeMode: 'cover' },
+  bannerEmpty: { backgroundColor: C.primary, justifyContent: 'center', alignItems: 'center' },
   snoBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
   snoTxt: { color: '#FFF', fontSize: 10, fontWeight: '700' },
   actionBtn: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
@@ -490,7 +541,6 @@ const ListRow = ({
   seller: Seller; even: boolean; isTablet: boolean; isMobile: boolean;
   onView: () => void; onToggleStatus: () => void; onDelete: () => void;
 }) => {
-  const init = seller.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const rowBg = even ? '#FFF' : '#FFF8F2';
 
   const Actions = () => (
@@ -510,9 +560,7 @@ const ListRow = ({
   if (isMobile) {
     return (
       <View style={[LV.mrow, { backgroundColor: rowBg }]}>
-        <View style={[LV.avatar, { backgroundColor: C.primary }]}>
-          <Text style={LV.avTxt}>{init}</Text>
-        </View>
+        <SellerAvatar seller={seller} size={34} />
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={LV.selName}>{seller.name}</Text>
           <IdBadge id={seller.id} />
@@ -532,9 +580,7 @@ const ListRow = ({
       <Text style={[LV.cell, LV.cSno]}>{seller.serialNo}</Text>
       <View style={LV.cId}><IdBadge id={seller.id} /></View>
       <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8, minWidth: 0 }}>
-        <View style={[LV.avatar, { backgroundColor: C.primary }]}>
-          <Text style={LV.avTxt}>{init}</Text>
-        </View>
+        <SellerAvatar seller={seller} size={34} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={LV.selName} numberOfLines={1}>{seller.name}</Text>
           <Text style={LV.selEmail} numberOfLines={1}>{seller.email}</Text>
@@ -624,6 +670,7 @@ const PG = StyleSheet.create({
 
 // ─────────────────────────── MAIN SCREEN ─────────────────────────────────────
 export default function SellersScreen() {
+  const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const screen = getScreen(width);
   const isMobile = screen === 'xs';
@@ -638,6 +685,7 @@ export default function SellersScreen() {
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [totalElements, setTotalElements] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
@@ -646,6 +694,8 @@ export default function SellersScreen() {
   const [viewSeller, setViewSeller] = useState<Seller | null>(null);
 
   const loadSellers = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
     try {
       setLoadError(null);
       const res = await fetchSellers({ status: 'active', search: searchQ || undefined, page: page - 1, size: ipp });
@@ -655,11 +705,17 @@ export default function SellersScreen() {
       setSellers(items);
       setTotalElements(res.totalElements ?? items.length);
     } catch (e) {
-      setLoadError(getApiErrorMessage(e));
+      setLoadError(getApiErrorMessage(e, 'Failed to load sellers.'));
+      setSellers([]);
+    } finally {
+      setLoading(false);
     }
-  }, [ipp, page, searchQ]);
+  }, [ipp, page, searchQ, token]);
 
-  useEffect(() => { void loadSellers(); }, [loadSellers]);
+  useEffect(() => {
+    if (authLoading || !token) return;
+    void loadSellers();
+  }, [authLoading, token, loadSellers]);
 
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean; title: string; message: string;
@@ -750,7 +806,11 @@ export default function SellersScreen() {
             <Text style={SS.bcCur}>Active Sellers</Text>
           </View>
 
-          {loadError ? <Text style={{ color: C.red, marginBottom: 8 }}>{loadError}</Text> : null}
+          {loadError ? (
+            <TouchableOpacity onPress={() => void loadSellers()}>
+              <Text style={{ color: C.red, marginBottom: 8 }}>{loadError} — Tap to retry</Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={[SS.titleRow, isMobile && { flexWrap: 'wrap', gap: 8 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <Text style={[SS.pageTitle, isMobile && { fontSize: 18 }]}>Active Sellers</Text>
@@ -799,7 +859,12 @@ export default function SellersScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {viewMode === 'grid' ? (
+          {loading ? (
+            <View style={SS.empty}>
+              <ActivityIndicator size="small" color={C.primary} />
+              <Text style={[SS.emptyTxt, { marginTop: 10 }]}>Loading sellers…</Text>
+            </View>
+          ) : viewMode === 'grid' ? (
             IS_WEB ? (
               <WebGridView
                 sellers={paginated}
@@ -858,7 +923,7 @@ export default function SellersScreen() {
           )}
 
           {/* Footer */}
-          {totalElements > 0 && (
+          {!loading && totalElements > 0 && (
             <View style={[SS.footer, isMobile && { flexDirection: 'column', alignItems: 'flex-start' }]}>
               <Text style={SS.footTxt}>
                 Showing {(safePage - 1) * ipp + 1}–{Math.min(safePage * ipp, totalElements)} of {totalElements} sellers

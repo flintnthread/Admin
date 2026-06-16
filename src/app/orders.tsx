@@ -13,9 +13,10 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import AdminLayout from "../components/admin-layout";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
-import { mapOrderRow } from "@/lib/mappers";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
@@ -174,6 +175,7 @@ interface Order {
 
 const fmtCur = (n: number) => `₹${n.toLocaleString("en-IN")}.00`;
 
+
 function toUiOrder(row: ReturnType<typeof mapOrderRow>, raw: OrderSummary): Order {
   const createdAt = raw.createdAt ? new Date(raw.createdAt) : null;
   const validDate = createdAt && !Number.isNaN(createdAt.getTime());
@@ -198,6 +200,19 @@ function toUiOrder(row: ReturnType<typeof mapOrderRow>, raw: OrderSummary): Orde
   const payKey = (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase();
   const paymentType = paymentMap[payKey] ?? "Cash on Delivery";
 
+  const products: Product[] = (raw.products ?? []).map((p, index) => ({
+    id: String(p.id ?? `${raw.id}-${index}`),
+    name: p.name ?? "Product",
+    image: resolveMediaUrl(p.imageUrl),
+    seller: p.sellerName ?? "—",
+    sellerEmail: "",
+  }));
+
+  const sellers = (raw.sellers ?? []).map((s) => ({
+    name: s.name ?? "Seller",
+    email: s.email ?? "",
+  }));
+
   return {
     id: String(row.id),
     orderNumber: row.orderId.startsWith("#") ? row.orderId : `#${row.orderId}`,
@@ -215,8 +230,8 @@ function toUiOrder(row: ReturnType<typeof mapOrderRow>, raw: OrderSummary): Orde
         })
       : "",
     customer: { name: row.customer, email: row.email },
-    sellers: [],
-    products: [],
+    sellers,
+    products,
     amount:
       typeof raw.totalAmount === "number"
         ? raw.totalAmount
@@ -323,13 +338,19 @@ export const OrderCard = ({
       <View style={ss.section}>
         <Text style={ss.sectionLabel}>PRODUCTS</Text>
         <View style={ss.productRow}>
-          {order.products.map((p) => (
-            <Image
-              key={p.id}
-              source={{ uri: p.image }}
-              style={ss.productThumb}
-            />
-          ))}
+          {order.products.length > 0 ? (
+            order.products.map((p) => (
+              <Image
+                key={p.id}
+                source={{ uri: p.image }}
+                style={ss.productThumb}
+              />
+            ))
+          ) : (
+            <View style={[ss.productThumb, ss.productThumbEmpty]}>
+              <Text style={ss.productThumbEmptyText}>—</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -536,6 +557,14 @@ const ss = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: C.border,
     backgroundColor: C.bg,
+  },
+  productThumbEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  productThumbEmptyText: {
+    fontSize: 12,
+    color: C.textMuted,
   },
 
   // Seller
@@ -836,6 +865,7 @@ function buildOrderPageNumbers(current: number, total: number): (number | "ellip
 }
 
 export default function OrdersScreen({ navigation }: { navigation?: any }) {
+  const { token, isLoading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -844,6 +874,7 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
   const [totalPages, setTotalPages] = useState(0);
 
   const loadOrders = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     try {
@@ -859,11 +890,12 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
     } finally {
       setLoading(false);
     }
-  }, [currentPage]);
+  }, [currentPage, token]);
 
   useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+    if (authLoading || !token) return;
+    void loadOrders();
+  }, [authLoading, token, loadOrders]);
 
   const pageNumbers = useMemo(
     () => buildOrderPageNumbers(currentPage, totalPages),
