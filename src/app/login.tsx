@@ -639,9 +639,9 @@ const stylesMobile = StyleSheet.create({
     fontSize: 16,
     color: "#1d324e",
     ...Platform.select({
-      web: { outlineStyle: "none" as const },
+      web: { outlineStyle: "none" },
       default: {},
-    }),
+    }) as any,
   },
   inputFocused: {
     borderColor: "#1d324e",
@@ -672,9 +672,9 @@ const stylesMobile = StyleSheet.create({
     fontSize: 16,
     color: "#1d324e",
     ...Platform.select({
-      web: { outlineStyle: "none" as const },
+      web: { outlineStyle: "none" },
       default: {},
-    }),
+    }) as any,
   },
   eyeButton: {
     paddingHorizontal: 15,

@@ -1,76 +1,72 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { formatDate, formatRupee, maskAccount } from '@/lib/format';
+import { formatDate, maskAccount } from '@/lib/format';
 import { fetchSellerDetail } from '@/services/sellerApi';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View
+  ActivityIndicator,
+  Animated,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import { router } from 'expo-router';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
-// Install: expo install @expo/vector-icons  OR  npm install react-native-vector-icons
-// Falls back to text symbols if icons not available
 let BootstrapIcon: React.FC<{ name: string; size: number; color: string }>;
 try {
   const { MaterialCommunityIcons } = require('@expo/vector-icons');
-  // Map Bootstrap icon names → MaterialCommunityIcons equivalents
   const ICON_MAP: Record<string, string> = {
-    'eye':                   'eye-outline',
-    'eye-fill':              'eye',
-    'zoom-in':               'magnify-plus-outline',
-    'zoom-out':              'magnify-minus-outline',
-    'arrow-counterclockwise':'restore',
-    'download':              'download-outline',
-    'x-lg':                  'close',
-    'file-earmark-text':     'file-document-outline',
-    'person-circle':         'account-circle-outline',
-    'house':                 'home-outline',
-    'box-seam':              'package-variant',
-    'cart3':                 'cart-outline',
-    'bar-chart-line':        'chart-line',
-    'building':              'office-building-outline',
-    'currency-rupee':        'currency-inr',
-    'card-checklist':        'clipboard-check-outline',
-    'arrow-left':            'arrow-left',
-    'arrow-down-circle':     'download-circle-outline',
-    'shield-check':          'shield-check-outline',
+    'eye': 'eye-outline',
+    'eye-fill': 'eye',
+    'zoom-in': 'magnify-plus-outline',
+    'zoom-out': 'magnify-minus-outline',
+    'arrow-counterclockwise': 'restore',
+    'download': 'download-outline',
+    'x-lg': 'close',
+    'file-earmark-text': 'file-document-outline',
+    'person-circle': 'account-circle-outline',
+    'house': 'home-outline',
+    'box-seam': 'package-variant',
+    'cart3': 'cart-outline',
+    'bar-chart-line': 'chart-line',
+    'building': 'office-building-outline',
+    'currency-rupee': 'currency-inr',
+    'card-checklist': 'clipboard-check-outline',
+    'arrow-left': 'arrow-left',
+    'arrow-down-circle': 'download-circle-outline',
+    'shield-check': 'shield-check-outline',
   };
   BootstrapIcon = ({ name, size, color }) => {
     const mapped = ICON_MAP[name] || 'help-circle-outline';
     return <MaterialCommunityIcons name={mapped} size={size} color={color} />;
   };
 } catch {
-  // Fallback text symbols when icon library not installed
   const TEXT_MAP: Record<string, string> = {
-    'eye':                    '\u{1F441}',
-    'zoom-in':                '+',
-    'zoom-out':               '−',
+    'eye': '\u{1F441}',
+    'zoom-in': '+',
+    'zoom-out': '−',
     'arrow-counterclockwise': '↺',
-    'download':               '⬇',
-    'x-lg':                   '✕',
-    'file-earmark-text':      '📋',
-    'person-circle':          '👤',
-    'house':                  '⌂',
-    'box-seam':               '📦',
-    'cart3':                  '🛒',
-    'bar-chart-line':         '📊',
-    'building':               '🏢',
-    'currency-rupee':         '₹',
-    'card-checklist':         '📄',
-    'arrow-left':             '←',
-    'arrow-down-circle':      '⬇',
-    'shield-check':           '🛡',
+    'download': '⬇',
+    'x-lg': '✕',
+    'file-earmark-text': '📋',
+    'person-circle': '👤',
+    'house': '⌂',
+    'box-seam': '📦',
+    'cart3': '🛒',
+    'bar-chart-line': '📊',
+    'building': '🏢',
+    'currency-rupee': '₹',
+    'card-checklist': '📄',
+    'arrow-left': '←',
+    'arrow-down-circle': '⬇',
+    'shield-check': '🛡',
   };
   BootstrapIcon = ({ name, size, color }) => (
     <Text style={{ fontSize: size * 0.75, color, lineHeight: size }}>{TEXT_MAP[name] || '•'}</Text>
@@ -243,7 +239,8 @@ const COLORS = {
   primary: '#B85C00',
   primaryLight: '#E07B30',
   primaryBg: '#FFF5EE',
-  headerBg: '#8B4000',
+  headerBg: '#1E2A45',          // ← dark blue for page header container
+  headerBgDeep: '#16213A',      // ← slightly deeper for subtle depth
   sectionHeader: '#A0522D',
   white: '#FFFFFF',
   text: '#1A1A1A',
@@ -278,7 +275,6 @@ const SparklineChart: React.FC<{
   const getY = (v: number) =>
     padding.top + chartH - ((v - minVal) / (maxVal - minVal)) * chartH;
 
-  // Build SVG-like path as polygon points for fill area
   const points = data.map((d, i) => ({ x: getX(i), y: getY(d.value) }));
   const fillPoints = [
     { x: getX(0), y: padding.top + chartH },
@@ -286,12 +282,10 @@ const SparklineChart: React.FC<{
     { x: getX(data.length - 1), y: padding.top + chartH },
   ];
 
-  // Y-axis labels (0, 1, 2)
   const yLabels = [0, 1, 2].filter(v => v <= maxVal + 0);
 
   return (
     <View style={{ width, height }}>
-      {/* Y-axis labels */}
       {yLabels.map(v => (
         <View
           key={v}
@@ -306,8 +300,6 @@ const SparklineChart: React.FC<{
           <Text style={{ fontSize: 10, color: COLORS.textMuted }}>{v}</Text>
         </View>
       ))}
-
-      {/* Horizontal grid lines */}
       {yLabels.map(v => (
         <View
           key={v}
@@ -321,8 +313,6 @@ const SparklineChart: React.FC<{
           }}
         />
       ))}
-
-      {/* Fill area */}
       <View style={{ position: 'absolute', top: 0, left: 0 }}>
         <svg width={width} height={height} style={{ overflow: 'visible' }}>
           <polygon
@@ -337,8 +327,6 @@ const SparklineChart: React.FC<{
           />
         </svg>
       </View>
-
-      {/* Touch points */}
       {data.map((d, i) => (
         <TouchableOpacity
           key={i}
@@ -367,8 +355,6 @@ const SparklineChart: React.FC<{
           />
         </TouchableOpacity>
       ))}
-
-      {/* Tooltip */}
       {tooltipIndex !== null && (
         <View
           style={{
@@ -393,8 +379,6 @@ const SparklineChart: React.FC<{
           </View>
         </View>
       )}
-
-      {/* X-axis labels – show all labels */}
       {data.map((d, i) => (
         <View
           key={i}
@@ -486,14 +470,13 @@ interface DocModalProps {
   onClose: () => void;
 }
 
-// Mock document images keyed by name
 const DOC_IMAGES: Record<string, string> = {
-  'Aadhaar Front':    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Aadhaar_Card.svg/640px-Aadhaar_Card.svg.png',
-  'Aadhaar Back':     'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Aadhaar_Card.svg/640px-Aadhaar_Card.svg.png',
-  'PAN Card':         'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/PAN_card_India.svg/640px-PAN_card_India.svg.png',
+  'Aadhaar Front': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Aadhaar_Card.svg/640px-Aadhaar_Card.svg.png',
+  'Aadhaar Back': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Aadhaar_Card.svg/640px-Aadhaar_Card.svg.png',
+  'PAN Card': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/PAN_card_India.svg/640px-PAN_card_India.svg.png',
   'Cancelled Cheque': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Cheque_India.svg/640px-Cheque_India.svg.png',
-  'Business Proof':   'https://via.placeholder.com/600x400/CCCCCC/666666?text=Business+Proof',
-  'Bank Proof':       'https://via.placeholder.com/600x400/CCCCCC/666666?text=Bank+Proof',
+  'Business Proof': 'https://via.placeholder.com/600x400/CCCCCC/666666?text=Business+Proof',
+  'Bank Proof': 'https://via.placeholder.com/600x400/CCCCCC/666666?text=Bank+Proof',
 };
 
 const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClose }) => {
@@ -531,19 +514,16 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      {/* Overlay */}
       <TouchableOpacity
         style={modalStyles.overlay}
         activeOpacity={1}
         onPress={onClose}
       >
-        {/* Modal box — stop propagation */}
         <TouchableOpacity
           activeOpacity={1}
           onPress={e => e.stopPropagation()}
           style={[modalStyles.box, { width: modalW }]}
         >
-          {/* ── Header ─────────────────────────────────────── */}
           <View style={modalStyles.header}>
             <View style={modalStyles.headerLeft}>
               <View style={modalStyles.headerIconWrap}>
@@ -559,7 +539,6 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
             </TouchableOpacity>
           </View>
 
-          {/* ── Image area ─────────────────────────────────── */}
           <View style={[modalStyles.imgContainer, { height: imgH }]}>
             <ScrollView
               contentContainerStyle={modalStyles.imgScrollContent}
@@ -580,32 +559,32 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
             </ScrollView>
           </View>
 
-          {/* ── Action Buttons ─────────────────────────────── */}
           <View style={[modalStyles.btnRow, isMobile && { flexWrap: 'wrap' }]}>
-            {/* Zoom In */}
             <TouchableOpacity style={modalStyles.actionOutlineBtn} onPress={zoomIn}>
               <BootstrapIcon name="zoom-in" size={15} color={COLORS.primary} />
               <Text style={modalStyles.actionOutlineBtnText}>  Zoom In</Text>
             </TouchableOpacity>
-
-            {/* Zoom Out */}
             <TouchableOpacity style={modalStyles.actionOutlineBtn} onPress={zoomOut}>
               <BootstrapIcon name="zoom-out" size={15} color={COLORS.primary} />
               <Text style={modalStyles.actionOutlineBtnText}>  Zoom Out</Text>
             </TouchableOpacity>
-
-            {/* Reset */}
             <TouchableOpacity style={modalStyles.actionOutlineBtn} onPress={reset}>
               <BootstrapIcon name="arrow-counterclockwise" size={15} color={COLORS.primary} />
               <Text style={modalStyles.actionOutlineBtnText}>  Reset</Text>
             </TouchableOpacity>
-
-            {/* Download */}
             <TouchableOpacity
               style={[modalStyles.actionOutlineBtn, modalStyles.downloadBtn]}
               onPress={() => {
-                // In production: FileSystem.downloadAsync or Linking.openURL
-                console.log('Download:', docName, imageUri);
+                if (Platform.OS === 'web') {
+                  const link = document.createElement('a');
+                  link.href = imageUri;
+                  link.download = `${docName.replace(/\s+/g, '_')}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                } else {
+                  console.log('Download:', docName, imageUri);
+                }
               }}
             >
               <BootstrapIcon name="download" size={15} color={COLORS.white} />
@@ -653,7 +632,7 @@ const StatusBadge: React.FC<{ label: string; color: string }> = ({ label, color 
   </View>
 );
 
-// ─── CSV Export Modal ───────────────────────────────────────────────────────────
+// ─── CSV Export Modal ─────────────────────────────────────────────────────────
 const CsvExportModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -819,6 +798,7 @@ export default function ViewSeller() {
       }
     })();
   }, [params.sellerId]);
+
   const [analyticsTab, setAnalyticsTab] = useState<'products' | 'orders'>('products');
   const [periodTab, setPeriodTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
@@ -864,329 +844,328 @@ export default function ViewSeller() {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.container}>
-      {/* Page Header */}
-      <View style={[styles.pageHeader, { paddingHorizontal: isMobile ? 16 : 24 }]}>
-        <View style={styles.pageHeaderLeft}>
-          <BootstrapIcon name="person-circle" size={32} color={COLORS.primary} />
-          <View style={{ marginLeft: 8 }}>
-            <Text style={styles.pageHeaderTitle}>Seller Details</Text>
-            <View style={styles.breadcrumb}>
-              <BootstrapIcon name="house" size={11} color={COLORS.primary} />
-              <Text style={[styles.breadcrumbItem, { marginLeft: 3 }]}>Dashboard</Text>
-              <Text style={styles.breadcrumbSep}> › </Text>
-              <Text style={styles.breadcrumbItem}>Ecommerce</Text>
-              <Text style={styles.breadcrumbSep}> › </Text>
-              <Text style={styles.breadcrumbItem}>Sellers List</Text>
-              <Text style={styles.breadcrumbSep}> › </Text>
-              <Text style={[styles.breadcrumbItem, { color: COLORS.textMuted }]}>Seller Details</Text>
+    <AdminLayout>
+      <ScrollView style={styles.root} contentContainerStyle={styles.container}>
+
+        {/* ── Page Header — dark blue container ──────────────────────────── */}
+        <View style={styles.pageHeaderContainer}>
+          <View style={[styles.pageHeader, { paddingHorizontal: isMobile ? 16 : 24 }]}>
+            <View style={styles.pageHeaderLeft}>
+              <BootstrapIcon name="person-circle" size={32} color={COLORS.white} />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.pageHeaderTitle}>Seller Details</Text>
+                <View style={styles.breadcrumb}>
+                  <BootstrapIcon name="house" size={11} color="rgba(255,255,255,0.7)" />
+                  <Text style={[styles.breadcrumbItem, { marginLeft: 3 }]}>Dashboard</Text>
+                  <Text style={styles.breadcrumbSep}> › </Text>
+                  <Text style={styles.breadcrumbItem}>Ecommerce</Text>
+                  <Text style={styles.breadcrumbSep}> › </Text>
+                  <Text style={styles.breadcrumbItem}>Sellers List</Text>
+                  <Text style={styles.breadcrumbSep}> › </Text>
+                  <Text style={[styles.breadcrumbItem, { color: 'rgba(255,255,255,0.5)' }]}>Seller Details</Text>
+                </View>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
+                <Text style={styles.backBtnText}>Back to Sellers</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {loadError ? (
+          <View style={{ marginHorizontal: isMobile ? 16 : 24, marginBottom: 12, padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
+            <Text style={{ color: '#B91C1C' }}>{loadError}</Text>
+          </View>
+        ) : null}
+
+        {/* ── Analytics Dashboard ─────────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="bar-chart-line" title="Analytics Dashboard" />
+
+          <View style={styles.tabRow}>
+            <TouchableOpacity
+              style={[styles.tab, analyticsTab === 'products' && styles.tabActive]}
+              onPress={() => { setAnalyticsTab('products'); setTooltipIndex(null); }}
+            >
+              <BootstrapIcon name="box-seam" size={14} color={analyticsTab === 'products' ? COLORS.primary : COLORS.textSecondary} />
+              <Text style={[styles.tabText, analyticsTab === 'products' && styles.tabTextActive, { marginLeft: 5 }]}>
+                Products Analytics
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, analyticsTab === 'orders' && styles.tabActive]}
+              onPress={() => { setAnalyticsTab('orders'); setTooltipIndex(null); }}
+            >
+              <BootstrapIcon name="cart3" size={14} color={analyticsTab === 'orders' ? COLORS.primary : COLORS.textSecondary} />
+              <Text style={[styles.tabText, analyticsTab === 'orders' && styles.tabTextActive, { marginLeft: 5 }]}>
+                Orders Analytics
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.periodRow}>
+            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
+              <TouchableOpacity
+                key={p}
+                style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
+                onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
+              >
+                <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.legendRow}>
+            <View style={[styles.legendDot, { backgroundColor: COLORS.primaryLight }]} />
+            <Text style={styles.legendText}>
+              {analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
+            </Text>
+          </View>
+
+          <View style={{ marginTop: 8, overflow: 'hidden' }}>
+            <SparklineChart
+              data={currentData}
+              width={chartWidth}
+              height={isMobile ? 180 : 220}
+              color={COLORS.primaryLight}
+              tooltipIndex={tooltipIndex}
+              onPointPress={setTooltipIndex}
+            />
+          </View>
+        </View>
+
+        {/* ── Products & Orders Statistics ───────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="bar-chart-line" title="Products & Orders Statistics" />
+
+          <View style={styles.exportRow}>
+            <TouchableOpacity style={styles.exportBtn} onPress={() => router.push('/sellers')}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <BootstrapIcon name="list" size={13} color={COLORS.white} />
+                <Text style={styles.exportBtnText}>View List</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.exportBtn} onPress={() => setProductsExportModal(true)}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <BootstrapIcon name="download" size={13} color={COLORS.white} />
+                <Text style={styles.exportBtnText}>Export Products CSV</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.exportBtn} onPress={() => setOrdersExportModal(true)}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <BootstrapIcon name="download" size={13} color={COLORS.white} />
+                <Text style={styles.exportBtnText}>Export Orders CSV</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.statsRow, isMobile && { flexDirection: 'column' }]}>
+            <View style={[styles.statCard, isMobile && { width: '100%', marginBottom: 12 }]}>
+              <Text style={styles.statCardTitle}>Product Status Distribution</Text>
+              <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
+              <Text style={styles.statCardTotalLabel}>Total Products</Text>
+              <View style={styles.donutWrap}>
+                <DonutChart
+                  segments={productSegments}
+                  total={seller.totalProducts}
+                  size={isMobile ? 120 : 140}
+                />
+              </View>
+              {productSegments.map(s => (
+                <View key={s.label} style={styles.statLegendRow}>
+                  <Text style={styles.statLegendLabel}>{s.label}</Text>
+                  <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                </View>
+              ))}
+            </View>
+
+            <View style={[styles.statCard, isMobile && { width: '100%' }]}>
+              <Text style={styles.statCardTitle}>Order Status Distribution</Text>
+              <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
+              <Text style={styles.statCardTotalLabel}>Total Orders</Text>
+              <View style={styles.donutWrap}>
+                <DonutChart
+                  segments={orderSegments}
+                  total={Math.max(seller.totalOrders, 1)}
+                  size={isMobile ? 120 : 140}
+                />
+              </View>
+              {orderSegments.map(s => (
+                <View key={s.label} style={styles.statLegendRow}>
+                  <Text style={styles.statLegendLabel}>{s.label}</Text>
+                  <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                </View>
+              ))}
             </View>
           </View>
         </View>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
-            <Text style={styles.backBtnText}>Back to Sellers</Text>
+
+        {/* ── Seller Profile Card ────────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <View style={[styles.profileRow, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {seller.firstName[0]}{seller.lastName[0]}
+                </Text>
+              </View>
+              <Text style={styles.avatarName}>{seller.firstName} {seller.lastName}</Text>
+              <Text style={styles.avatarEmail}>{seller.email}</Text>
+              <Text style={styles.avatarId}>ID: {seller.sellerId}</Text>
+              <StatusBadge
+                label={seller.status}
+                color={seller.status === 'Active' ? COLORS.success : seller.status === 'Pending' ? COLORS.warning : COLORS.danger}
+              />
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <TouchableOpacity style={styles.actionBtn}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <BootstrapIcon name="arrow-down-circle" size={13} color={COLORS.white} />
+                    <Text style={styles.actionBtnText}>Download</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F97316' }]} onPress={() => router.push('/sellers')}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
+                    <Text style={styles.actionBtnText}>Back to List</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={[styles.personalInfo, isMobile && { width: '100%', marginTop: 16 }]}>
+              <SectionHeader icon="person-circle" title="Personal Information" />
+              <View style={styles.infoGrid}>
+                <InfoRow label="First Name" value={seller.firstName} isHalf width={width} />
+                <InfoRow
+                  label="Email Verified"
+                  value={<StatusBadge label={seller.emailVerified ? 'Verified' : 'Not Verified'} color={seller.emailVerified ? COLORS.success : COLORS.danger} />}
+                  isHalf
+                  width={width}
+                />
+                <InfoRow label="Last Name" value={seller.lastName} isHalf width={width} />
+                <InfoRow label="Registration Date" value={seller.registrationDate} isHalf width={width} />
+                <InfoRow label="Email" value={seller.email} isHalf width={width} />
+                <InfoRow label="Last Login" value={seller.lastLogin} isHalf width={width} />
+                <InfoRow label="Mobile" value={seller.mobile} isHalf width={width} />
+                <InfoRow label="Seller ID" value={seller.sellerId} isHalf width={width} />
+              </View>
+            </View>
           </View>
-        </TouchableOpacity>
-      </View>
-
-      {loadError ? (
-        <View style={{ marginHorizontal: isMobile ? 16 : 24, marginBottom: 12, padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
-          <Text style={{ color: '#B91C1C' }}>{loadError}</Text>
-        </View>
-      ) : null}
-
-      {/* ── Analytics Dashboard ─────────────────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <SectionHeader icon="bar-chart-line" title="Analytics Dashboard" />
-
-        {/* Tabs: Products | Orders */}
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.tab, analyticsTab === 'products' && styles.tabActive]}
-            onPress={() => { setAnalyticsTab('products'); setTooltipIndex(null); }}
-          >
-            <BootstrapIcon name="box-seam" size={14} color={analyticsTab === 'products' ? COLORS.primary : COLORS.textSecondary} />
-            <Text style={[styles.tabText, analyticsTab === 'products' && styles.tabTextActive, { marginLeft: 5 }]}>
-              Products Analytics
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, analyticsTab === 'orders' && styles.tabActive]}
-            onPress={() => { setAnalyticsTab('orders'); setTooltipIndex(null); }}
-          >
-            <BootstrapIcon name="cart3" size={14} color={analyticsTab === 'orders' ? COLORS.primary : COLORS.textSecondary} />
-            <Text style={[styles.tabText, analyticsTab === 'orders' && styles.tabTextActive, { marginLeft: 5 }]}>
-              Orders Analytics
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Period Buttons */}
-        <View style={styles.periodRow}>
-          {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
-            <TouchableOpacity
-              key={p}
-              style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
-              onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
-            >
-              <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </Text>
-            </TouchableOpacity>
+        {/* ── Business Information ───────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="building" title="Business Information" />
+          <View style={styles.infoGrid}>
+            <InfoRow label="Business Name" value={seller.businessName} isHalf width={width} />
+            <InfoRow label="Address" value={seller.address} isHalf width={width} />
+            <InfoRow label="Business Type" value={seller.businessType} isHalf width={width} />
+            <InfoRow label="City" value={seller.city} isHalf width={width} />
+            <InfoRow label="GST Number" value={seller.gstNumber} isHalf width={width} />
+            <InfoRow label="State" value={seller.state} isHalf width={width} />
+            <InfoRow label="PAN Number" value={seller.panNumber} isHalf width={width} />
+            <InfoRow label="Pincode" value={seller.pincode} isHalf width={width} />
+          </View>
+        </View>
+
+        {/* ── Financial Information ──────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="currency-rupee" title="Financial Information" />
+          <View style={styles.infoGrid}>
+            <InfoRow
+              label="Wallet Balance"
+              value={<Text style={[styles.infoValue, { color: COLORS.primary, fontWeight: '700' }]}>₹{seller.walletBalance.toFixed(2)}</Text>}
+              isHalf
+              width={width}
+            />
+            <InfoRow label="IFSC Code" value={seller.ifscCode} isHalf width={width} />
+            <InfoRow label="Bank Name" value={seller.bankName} isHalf width={width} />
+            <InfoRow label="Account Holder" value={seller.accountHolder} isHalf width={width} />
+            <InfoRow label="Account Number" value={seller.accountNumber} isHalf width={width} />
+          </View>
+        </View>
+
+        {/* ── Products Listing ───────────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="box-seam" title="Products Listing" />
+          <View style={styles.infoGrid}>
+            <InfoRow
+              label="Products Listing Status"
+              value={<StatusBadge label={seller.productsListingStatus} color={seller.productsListingStatus === 'Live' ? COLORS.success : COLORS.danger} />}
+              isHalf
+              width={width}
+            />
+            <InfoRow
+              label="Total Products"
+              value={<Text style={[styles.infoValue, { color: COLORS.primary, fontWeight: '700' }]}>{seller.totalProducts} Products</Text>}
+              isHalf
+              width={width}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1E3A5F' }]}
+            onPress={() => router.push('/productApproval')}
+          >
+            <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
+            <Text style={styles.actionBtnText}>View All Products</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Verification Documents ─────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="shield-check" title="Verification Documents" />
+          {seller.verificationDocuments.map((doc, i) => (
+            <View key={i} style={styles.docRow}>
+              <View style={styles.docLeft}>
+                <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
+              </View>
+              {doc.available && (
+                <TouchableOpacity
+                  style={styles.viewDocBtn}
+                  onPress={() => openDoc(doc.name)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <BootstrapIcon name="eye" size={13} color={COLORS.white} />
+                    <Text style={styles.viewDocBtnText}>View</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
           ))}
         </View>
 
-        {/* Legend */}
-        <View style={styles.legendRow}>
-          <View style={[styles.legendDot, { backgroundColor: COLORS.primaryLight }]} />
-          <Text style={styles.legendText}>
-            {analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
-          </Text>
-        </View>
+        {/* Document Viewer Modal */}
+        <DocumentViewerModal
+          visible={docModalVisible}
+          docName={selectedDoc}
+          onClose={() => setDocModalVisible(false)}
+        />
 
-        {/* Chart */}
-        <View style={{ marginTop: 8, overflow: 'hidden' }}>
-          <SparklineChart
-            data={currentData}
-            width={chartWidth}
-            height={isMobile ? 180 : 220}
-            color={COLORS.primaryLight}
-            tooltipIndex={tooltipIndex}
-            onPointPress={setTooltipIndex}
-          />
-        </View>
-      </View>
+        {/* Products Export Modal */}
+        <CsvExportModal
+          visible={productsExportModal}
+          onClose={() => setProductsExportModal(false)}
+          title="Export Products CSV"
+          content='263,"Red Banarasi Style Cotton Silk Saree with Silver Zari Border",Active,"2026-05-25 13:41:05"'
+        />
 
-      {/* ── Products & Orders Statistics ───────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <SectionHeader icon="bar-chart-line" title="Products & Orders Statistics" />
+        {/* Orders Export Modal */}
+        <CsvExportModal
+          visible={ordersExportModal}
+          onClose={() => setOrdersExportModal(false)}
+          title="Export Orders CSV"
+          content='"Order Status","Total Amount","Created At"'
+        />
 
-        {/* Export buttons */}
-        <View style={styles.exportRow}>
-          <TouchableOpacity style={styles.exportBtn} onPress={() => router.push('/sellers')}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <BootstrapIcon name="list" size={13} color={COLORS.white} />
-              <Text style={styles.exportBtnText}>View List</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.exportBtn} onPress={() => setProductsExportModal(true)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <BootstrapIcon name="download" size={13} color={COLORS.white} />
-              <Text style={styles.exportBtnText}>Export Products CSV</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.exportBtn} onPress={() => setOrdersExportModal(true)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <BootstrapIcon name="download" size={13} color={COLORS.white} />
-              <Text style={styles.exportBtnText}>Export Orders CSV</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.statsRow, isMobile && { flexDirection: 'column' }]}>
-          {/* Product Status Distribution */}
-          <View style={[styles.statCard, isMobile && { width: '100%', marginBottom: 12 }]}>
-            <Text style={styles.statCardTitle}>Product Status Distribution</Text>
-            <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
-            <Text style={styles.statCardTotalLabel}>Total Products</Text>
-            <View style={styles.donutWrap}>
-              <DonutChart
-                segments={productSegments}
-                total={seller.totalProducts}
-                size={isMobile ? 120 : 140}
-              />
-            </View>
-            {productSegments.map(s => (
-              <View key={s.label} style={styles.statLegendRow}>
-                <Text style={styles.statLegendLabel}>{s.label}</Text>
-                <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
-              </View>
-            ))}
-          </View>
-
-          {/* Order Status Distribution */}
-          <View style={[styles.statCard, isMobile && { width: '100%' }]}>
-            <Text style={styles.statCardTitle}>Order Status Distribution</Text>
-            <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
-            <Text style={styles.statCardTotalLabel}>Total Orders</Text>
-            <View style={styles.donutWrap}>
-              <DonutChart
-                segments={orderSegments}
-                total={Math.max(seller.totalOrders, 1)}
-                size={isMobile ? 120 : 140}
-              />
-            </View>
-            {orderSegments.map(s => (
-              <View key={s.label} style={styles.statLegendRow}>
-                <Text style={styles.statLegendLabel}>{s.label}</Text>
-                <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-
-      {/* ── Seller Profile Card ────────────────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <View style={[styles.profileRow, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {seller.firstName[0]}{seller.lastName[0]}
-              </Text>
-            </View>
-            <Text style={styles.avatarName}>{seller.firstName} {seller.lastName}</Text>
-            <Text style={styles.avatarEmail}>{seller.email}</Text>
-            <Text style={styles.avatarId}>ID: {seller.sellerId}</Text>
-            <StatusBadge
-              label={seller.status}
-              color={seller.status === 'Active' ? COLORS.success : seller.status === 'Pending' ? COLORS.warning : COLORS.danger}
-            />
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <TouchableOpacity style={styles.actionBtn}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <BootstrapIcon name="arrow-down-circle" size={13} color={COLORS.white} />
-                  <Text style={styles.actionBtnText}>Download</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.textSecondary }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
-                  <Text style={styles.actionBtnText}>Back to List</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Personal Information */}
-          <View style={[styles.personalInfo, isMobile && { width: '100%', marginTop: 16 }]}>
-            <SectionHeader icon="person-circle" title="Personal Information" />
-            <View style={styles.infoGrid}>
-              <InfoRow label="First Name" value={seller.firstName} isHalf width={width} />
-              <InfoRow
-                label="Email Verified"
-                value={<StatusBadge label={seller.emailVerified ? 'Verified' : 'Not Verified'} color={seller.emailVerified ? COLORS.success : COLORS.danger} />}
-                isHalf
-                width={width}
-              />
-              <InfoRow label="Last Name" value={seller.lastName} isHalf width={width} />
-              <InfoRow label="Registration Date" value={seller.registrationDate} isHalf width={width} />
-              <InfoRow label="Email" value={seller.email} isHalf width={width} />
-              <InfoRow label="Last Login" value={seller.lastLogin} isHalf width={width} />
-              <InfoRow label="Mobile" value={seller.mobile} isHalf width={width} />
-              <InfoRow label="Seller ID" value={seller.sellerId} isHalf width={width} />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* ── Business Information ───────────────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <SectionHeader icon="building" title="Business Information" />
-        <View style={styles.infoGrid}>
-          <InfoRow label="Business Name" value={seller.businessName} isHalf width={width} />
-          <InfoRow label="Address" value={seller.address} isHalf width={width} />
-          <InfoRow label="Business Type" value={seller.businessType} isHalf width={width} />
-          <InfoRow label="City" value={seller.city} isHalf width={width} />
-          <InfoRow label="GST Number" value={seller.gstNumber} isHalf width={width} />
-          <InfoRow label="State" value={seller.state} isHalf width={width} />
-          <InfoRow label="PAN Number" value={seller.panNumber} isHalf width={width} />
-          <InfoRow label="Pincode" value={seller.pincode} isHalf width={width} />
-        </View>
-      </View>
-
-      {/* ── Financial Information ──────────────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <SectionHeader icon="currency-rupee" title="Financial Information" />
-        <View style={styles.infoGrid}>
-          <InfoRow
-            label="Wallet Balance"
-            value={<Text style={[styles.infoValue, { color: COLORS.primary, fontWeight: '700' }]}>₹{seller.walletBalance.toFixed(2)}</Text>}
-            isHalf
-            width={width}
-          />
-          <InfoRow label="IFSC Code" value={seller.ifscCode} isHalf width={width} />
-          <InfoRow label="Bank Name" value={seller.bankName} isHalf width={width} />
-          <InfoRow label="Account Holder" value={seller.accountHolder} isHalf width={width} />
-          <InfoRow label="Account Number" value={seller.accountNumber} isHalf width={width} />
-        </View>
-      </View>
-
-      {/* ── Products Listing ───────────────────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <SectionHeader icon="box-seam" title="Products Listing" />
-        <View style={styles.infoGrid}>
-          <InfoRow
-            label="Products Listing Status"
-            value={<StatusBadge label={seller.productsListingStatus} color={seller.productsListingStatus === 'Live' ? COLORS.success : COLORS.danger} />}
-            isHalf
-            width={width}
-          />
-          <InfoRow
-            label="Total Products"
-            value={<Text style={[styles.infoValue, { color: COLORS.primary, fontWeight: '700' }]}>{seller.totalProducts} Products</Text>}
-            isHalf
-            width={width}
-          />
-        </View>
-        <TouchableOpacity style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => router.push('/productApproval')}>
-          <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
-          <Text style={styles.actionBtnText}>View All Products</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Verification Documents ─────────────────────────────────────── */}
-      <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-        <SectionHeader icon="shield-check" title="Verification Documents" />
-        {seller.verificationDocuments.map((doc, i) => (
-          <View key={i} style={styles.docRow}>
-            <View style={styles.docLeft}>
-              <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
-              <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
-            </View>
-            {doc.available && (
-              <TouchableOpacity
-                style={styles.viewDocBtn}
-                onPress={() => openDoc(doc.name)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <BootstrapIcon name="eye" size={13} color={COLORS.white} />
-                  <Text style={styles.viewDocBtnText}>View</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
-      </View>
-
-      {/* Document Viewer Modal */}
-      <DocumentViewerModal
-        visible={docModalVisible}
-        docName={selectedDoc}
-        onClose={() => setDocModalVisible(false)}
-      />
-
-      {/* Products Export Modal */}
-      <CsvExportModal
-        visible={productsExportModal}
-        onClose={() => setProductsExportModal(false)}
-        title="Export Products CSV"
-        content='263,"Red Banarasi Style Cotton Silk Saree with Silver Zari Border",Active,"2026-05-25 13:41:05"'
-      />
-
-      {/* Orders Export Modal */}
-      <CsvExportModal
-        visible={ordersExportModal}
-        onClose={() => setOrdersExportModal(false)}
-        title="Export Orders CSV"
-        content='"Order Status","Total Amount","Created At"'
-      />
-
-      {/* Bottom spacer */}
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </AdminLayout>
   );
 }
 
@@ -1197,7 +1176,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0EB',
   },
   container: {
-    paddingTop: 16,
     paddingBottom: 24,
   },
   loadingContainer: {
@@ -1207,12 +1185,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0EB',
   },
 
-  // Page header
+  // ── Page header container — dark blue background ──────────────────────────
+  pageHeaderContainer: {
+    backgroundColor: COLORS.headerBg,   // #1E2A45 dark navy
+    paddingTop: 20,
+    paddingBottom: 20,
+    marginBottom: 16,
+    // Subtle bottom shadow to lift it above content
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+  },
   pageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
     flexWrap: 'wrap',
     gap: 8,
   },
@@ -1221,14 +1210,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  pageHeaderIcon: {
-    fontSize: 28,
-    marginRight: 4,
-  },
   pageHeaderTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.text,
+    color: COLORS.white,             // white on dark blue
   },
   breadcrumb: {
     flexDirection: 'row',
@@ -1237,17 +1222,19 @@ const styles = StyleSheet.create({
   },
   breadcrumbItem: {
     fontSize: 12,
-    color: COLORS.primary,
+    color: 'rgba(255,255,255,0.75)', // soft white
   },
   breadcrumbSep: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: 'rgba(255,255,255,0.4)',
   },
   backBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   backBtnText: {
     color: COLORS.white,
@@ -1277,9 +1264,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 8,
   },
-  sectionHeaderIcon: {
-    fontSize: 16,
-  },
   sectionHeaderText: {
     color: COLORS.white,
     fontSize: 15,
@@ -1306,9 +1290,6 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     borderBottomColor: COLORS.primary,
-  },
-  tabIcon: {
-    fontSize: 13,
   },
   tabText: {
     fontSize: 13,
@@ -1375,7 +1356,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   exportBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#F97316',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 5,
@@ -1558,9 +1539,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
-  },
-  docIcon: {
-    fontSize: 16,
   },
   docName: {
     fontSize: 13,

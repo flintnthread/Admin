@@ -259,6 +259,8 @@ const FilterModal = ({
 
 // â”€â”€â”€ Mobile Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+type TicketType = ReturnType<typeof mapContactToCustomerTicket>;
+
 interface MobileCardProps {
   ticket: Ticket;
   onView: () => void;

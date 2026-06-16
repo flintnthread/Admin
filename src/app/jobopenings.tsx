@@ -67,12 +67,16 @@ interface Job {
     postedAt: string;
     status: JobStatus;
     urgent?: boolean;
+    description: string;
+    requirements: string;
+    experience: string;
+    salaryRange: string;
 }
 
 function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
     const statusRaw = (j.status ?? "active").toLowerCase();
     const status: JobStatus =
-        statusRaw === "paused" ? "Paused" : statusRaw === "closed" ? "Closed" : "Active";
+        statusRaw === "paused" || statusRaw === "inactive" ? "Paused" : statusRaw === "closed" ? "Closed" : "Active";
     const typeRaw = (j.employmentType ?? "full time").toLowerCase();
     const type: JobType =
         typeRaw.includes("part") ? "Part Time" :
@@ -84,10 +88,14 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
         department: j.departmentId != null ? (deptNames[j.departmentId] ?? `Dept #${j.departmentId}`) : "—",
         location: j.location ?? "—",
         type,
-        positions: 1,
+        positions: Number(j.vacancies ?? 1),
         applications: Number(j.applicationCount ?? 0),
         postedAt: formatDate(j.createdAt),
         status,
+        description: j.description ?? "",
+        requirements: j.requirements ?? "",
+        experience: j.experienceRequired ?? "",
+        salaryRange: j.salaryRange ?? "",
     };
 }
 
@@ -777,11 +785,19 @@ const EditJobModal: React.FC<{
     const isWeb = Platform.OS === 'web';
     const [statusOpen, setStatusOpen] = useState(false);
     const [deptOpen, setDeptOpen] = useState(false);
+    const [empTypeOpen, setEmpTypeOpen] = useState(false);
+
     const [status, setStatus] = useState<string>(job?.status || "Active");
     const [title, setTitle] = useState(job?.title || "");
     const [department, setDepartment] = useState(job?.department || departments[0] || "");
     const [location, setLocation] = useState(job?.location || "");
     const [empType, setEmpType] = useState<JobType>(job?.type || "Full Time");
+
+    const [description, setDescription] = useState(job?.description || "");
+    const [requirements, setRequirements] = useState(job?.requirements || "");
+    const [experience, setExperience] = useState(job?.experience || "");
+    const [salaryRange, setSalaryRange] = useState(job?.salaryRange || "");
+    const [vacancies, setVacancies] = useState(job?.positions?.toString() || "");
 
     useEffect(() => {
         if (visible) {
@@ -790,8 +806,14 @@ const EditJobModal: React.FC<{
             setDepartment(job?.department || departments[0] || "");
             setLocation(job?.location || "");
             setEmpType(job?.type || "Full Time");
+            setDescription(job?.description || "");
+            setRequirements(job?.requirements || "");
+            setExperience(job?.experience || "");
+            setSalaryRange(job?.salaryRange || "");
+            setVacancies(job?.positions?.toString() || "");
             setStatusOpen(false);
             setDeptOpen(false);
+            setEmpTypeOpen(false);
         }
     }, [visible, job, departments]);
     
@@ -808,8 +830,8 @@ const EditJobModal: React.FC<{
                     </View>
                     
                     <ScrollView style={em.body} contentContainerStyle={em.bodyContent} showsVerticalScrollIndicator={false}>
-                        <View style={em.row}>
-                            <View style={[em.field, { zIndex: 1100, elevation: 1100 }]}>
+                        <View style={[em.row, deptOpen && { zIndex: 70, elevation: 70 }]}>
+                            <View style={[em.field, deptOpen && { zIndex: 1100, elevation: 1100 }]}>
                                 <Text style={em.label}>Department <Text style={{ color: T.red }}>*</Text></Text>
                                 <TouchableOpacity
                                     style={[em.inputWrap, deptOpen && { borderColor: T.orange, borderWidth: 1.5 }]}
@@ -840,61 +862,78 @@ const EditJobModal: React.FC<{
                                 </View>
                             </View>
                         </View>
-
+ 
                         <View style={em.field}>
                             <Text style={em.label}>Description <Text style={{ color: T.red }}>*</Text></Text>
                             <View style={[em.inputWrap, { height: 80, alignItems: "flex-start", paddingTop: 10 }]}>
-                                <TextInput style={[em.input, { height: "100%", textAlignVertical: "top" }]} multiline placeholder="Job Description" placeholderTextColor={T.textHint} value="We are looking for dynamic & result-oriented individuals to join our growing team!" />
+                                <TextInput style={[em.input, { height: "100%", textAlignVertical: "top" }]} multiline placeholder="Job Description" placeholderTextColor={T.textHint} value={description} onChangeText={setDescription} />
                                 <Feather name="edit-2" size={12} color={T.textHint} style={{ position: "absolute", bottom: 8, right: 8 }} />
                             </View>
                         </View>
-
+ 
                         <View style={em.field}>
                             <Text style={em.label}>Requirements</Text>
                             <View style={[em.inputWrap, { height: 60, alignItems: "flex-start", paddingTop: 10 }]}>
-                                <TextInput style={[em.input, { height: "100%", textAlignVertical: "top" }]} multiline placeholder="Requirements" placeholderTextColor={T.textHint} value="Excellent communication skills" />
+                                <TextInput style={[em.input, { height: "100%", textAlignVertical: "top" }]} multiline placeholder="Requirements" placeholderTextColor={T.textHint} value={requirements} onChangeText={setRequirements} />
                                 <Feather name="edit-2" size={12} color={T.textHint} style={{ position: "absolute", bottom: 8, right: 8 }} />
                             </View>
                         </View>
-
-                        <View style={em.row}>
+ 
+                        <View style={[em.row, empTypeOpen && { zIndex: 40, elevation: 40 }]}>
                             <View style={em.field}>
                                 <Text style={em.label}>Location <Text style={{ color: T.red }}>*</Text></Text>
                                 <View style={em.inputWrap}>
                                     <TextInput style={em.input} value={location} onChangeText={setLocation} placeholder="Location" placeholderTextColor={T.textHint} />
                                 </View>
                             </View>
-                            <View style={em.field}>
+                            <View style={[em.field, empTypeOpen && { zIndex: 1100, elevation: 1100 }]}>
                                 <Text style={em.label}>Employment Type <Text style={{ color: T.red }}>*</Text></Text>
-                                <View style={em.inputWrap}>
-                                    <Text style={em.inputText}>{job?.type || "Full Time"}</Text>
+                                <TouchableOpacity
+                                    style={[em.inputWrap, empTypeOpen && { borderColor: T.orange, borderWidth: 1.5 }]}
+                                    onPress={() => setEmpTypeOpen(!empTypeOpen)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={em.inputText}>{empType}</Text>
                                     <Feather name="chevron-down" size={14} color={T.textHint} />
-                                </View>
+                                </TouchableOpacity>
+                                {empTypeOpen && (
+                                    <View style={em.dropdown}>
+                                        {["Full Time", "Part Time", "Contract", "Internship"].map((opt) => (
+                                            <TouchableOpacity
+                                                key={opt}
+                                                style={em.dropItem}
+                                                onPress={() => { setEmpType(opt as JobType); setEmpTypeOpen(false); }}
+                                            >
+                                                <Text style={em.dropItemText}>{opt}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                         </View>
-
+ 
                         <View style={em.row3}>
                             <View style={em.field}>
                                 <Text style={em.label}>Experience</Text>
                                 <View style={em.inputWrap}>
-                                    <TextInput style={em.input} value="0-1" placeholder="Yrs" placeholderTextColor={T.textHint} />
+                                    <TextInput style={em.input} value={experience} onChangeText={setExperience} placeholder="Yrs" placeholderTextColor={T.textHint} />
                                 </View>
                             </View>
                             <View style={em.field}>
                                 <Text style={em.label}>Salary Range</Text>
                                 <View style={em.inputWrap}>
-                                    <TextInput style={em.input} value="₹15,000 - ₹25,000" placeholder="Salary" placeholderTextColor={T.textHint} />
+                                    <TextInput style={em.input} value={salaryRange} onChangeText={setSalaryRange} placeholder="Salary" placeholderTextColor={T.textHint} />
                                 </View>
                             </View>
                             <View style={em.field}>
                                 <Text style={em.label}>Vacancies <Text style={{ color: T.red }}>*</Text></Text>
                                 <View style={em.inputWrap}>
-                                    <TextInput style={em.input} value={job?.positions?.toString() || "1"} keyboardType="numeric" placeholderTextColor={T.textHint} />
+                                    <TextInput style={em.input} value={vacancies} onChangeText={setVacancies} keyboardType="numeric" placeholderTextColor={T.textHint} />
                                 </View>
                             </View>
                         </View>
-
-                        <View style={[em.field, { zIndex: 1000, elevation: 1000 }]}>
+ 
+                        <View style={[em.field, statusOpen && { zIndex: 20, elevation: 20 }]}>
                             <Text style={em.label}>Status <Text style={{ color: T.red }}>*</Text></Text>
                             <TouchableOpacity style={[em.inputWrap, statusOpen && { borderColor: T.orange, borderWidth: 1.5 }]} onPress={() => setStatusOpen(!statusOpen)} activeOpacity={0.8}>
                                 <Text style={em.inputText}>{status}</Text>
@@ -910,7 +949,7 @@ const EditJobModal: React.FC<{
                                 </View>
                             )}
                         </View>
-
+ 
                         <View style={em.footer}>
                             <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
                                 <Text style={em.cancelBtnTxt}>Cancel</Text>
@@ -918,26 +957,42 @@ const EditJobModal: React.FC<{
                             <TouchableOpacity style={em.saveBtn} onPress={() => {
                                 const trimTitle = title.trim() || "New Job Opening";
                                 const dept = department || departments[0] || "—";
+                                const trimLoc = location.trim() || "—";
+                                const trimDesc = description.trim();
+                                const trimReq = requirements.trim();
+                                const trimExp = experience.trim();
+                                const trimSal = salaryRange.trim();
+                                const parsedVac = parseInt(vacancies.trim(), 10) || 1;
+
                                 if (job) {
                                     onSave({
                                         ...job,
                                         title: trimTitle,
                                         department: dept,
-                                        location: location.trim() || job.location,
+                                        location: trimLoc,
                                         type: empType,
                                         status: status as JobStatus,
+                                        description: trimDesc,
+                                        requirements: trimReq,
+                                        experience: trimExp,
+                                        salaryRange: trimSal,
+                                        positions: parsedVac,
                                     });
                                 } else {
                                     onSave({
                                         id: 0,
                                         title: trimTitle,
                                         department: dept,
-                                        location: location.trim() || "—",
+                                        location: trimLoc,
                                         type: empType,
-                                        positions: 1,
+                                        positions: parsedVac,
                                         applications: 0,
                                         status: status as JobStatus,
                                         postedAt: "Just now",
+                                        description: trimDesc,
+                                        requirements: trimReq,
+                                        experience: trimExp,
+                                        salaryRange: trimSal,
                                     });
                                 }
                             }}>
@@ -1052,8 +1107,8 @@ const em = StyleSheet.create({
         borderColor: T.border,
         borderRadius: 8,
         marginTop: 4,
-        zIndex: 999,
-        elevation: 5,
+        zIndex: 9999,
+        elevation: 10,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
@@ -1303,6 +1358,11 @@ const JobOpeningsScreen: React.FC = () => {
                 employmentType: updated.type,
                 status: updated.status.toLowerCase(),
                 departmentId: deptIdByName[updated.department],
+                description: updated.description,
+                requirements: updated.requirements,
+                experienceRequired: updated.experience,
+                salaryRange: updated.salaryRange,
+                vacancies: updated.positions,
             };
             if (updated.id > 0 && jobs.find((j) => j.id === updated.id)) {
                 await updateJob(updated.id, payload);

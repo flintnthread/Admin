@@ -239,11 +239,13 @@ const EditModal: React.FC<{
     const [desc, setDesc] = useState(dept?.description ?? "");
     const [status, setStatus] = useState<"Active" | "Inactive">(dept?.status ?? "Active");
     const [statusOpen, setStatusOpen] = useState(false);
+    const [nameError, setNameError] = useState("");
 
     React.useEffect(() => {
         if (dept) { setName(dept.name); setDesc(dept.description); setStatus(dept.status); }
         else { setName(""); setDesc(""); setStatus("Active"); }
         setStatusOpen(false);
+        setNameError("");
     }, [dept, visible]);
 
     const isAdd = !dept;
@@ -268,15 +270,18 @@ const EditModal: React.FC<{
                     <View style={[em.body, { zIndex: 1000 }]}>
                         {/* Name field */}
                         <Text style={[em.label, { marginTop: 0 }]}>Department Name <Text style={em.asterisk}>*</Text></Text>
-                        <View style={em.fieldWrap}>
+                        <View style={[em.fieldWrap, !!nameError && { borderColor: T.red }]}>
                             <TextInput
                                 style={em.input}
                                 value={name}
-                                onChangeText={setName}
+                                onChangeText={(t) => { setName(t); setNameError(""); }}
                                 placeholder={isAdd ? "e.g., Engineering, Marketing" : "Customer Support"}
                                 placeholderTextColor={T.textHint}
                             />
                         </View>
+                        {!!nameError && (
+                            <Text style={{ color: T.red, fontSize: 12, marginTop: 4, fontWeight: "500" }}>{nameError}</Text>
+                        )}
 
                         {/* Description field */}
                         <Text style={em.label}>Description</Text>
@@ -324,7 +329,11 @@ const EditModal: React.FC<{
                             onPress={() => {
                                 const trimName = name.trim();
                                 const trimDesc = desc.trim();
-                                if (!trimName) return;
+                                if (!trimName) {
+                                    setNameError("Department name is required.");
+                                    return;
+                                }
+                                setNameError("");
                                 if (dept) {
                                     onSave({ ...dept, name: trimName, description: trimDesc || dept.description, status });
                                 } else {
@@ -753,7 +762,7 @@ const DepartmentsScreen: React.FC = () => {
     const [addOpen, setAddOpen] = useState(false);
 
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: "", message: "" });
+    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type?: 'success' | 'error' }>({ visible: false, title: "", message: "", type: 'success' });
 
     const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
     const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
@@ -785,16 +794,17 @@ const DepartmentsScreen: React.FC = () => {
             };
             if (departments.find((d) => d.id === updated.id)) {
                 await updateDepartment(updated.id, payload);
-                setAlertConfig({ visible: true, title: "Updated!", message: "Department updated successfully." });
+                setAlertConfig({ visible: true, title: "Updated!", message: "Department updated successfully.", type: 'success' });
             } else {
                 await createDepartment(payload);
-                setAlertConfig({ visible: true, title: "Added!", message: "Department added successfully." });
+                setAlertConfig({ visible: true, title: "Added!", message: "Department added successfully.", type: 'success' });
             }
             await loadDepartments();
             setEditTarget(null);
             setAddOpen(false);
         } catch (e) {
             console.warn(getApiErrorMessage(e));
+            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e), type: 'error' });
         }
     };
 
@@ -806,6 +816,7 @@ const DepartmentsScreen: React.FC = () => {
             setDeleteTarget(null);
         } catch (e) {
             console.warn(getApiErrorMessage(e));
+            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e), type: 'error' });
         }
     };
 
@@ -1055,12 +1066,12 @@ const DepartmentsScreen: React.FC = () => {
             <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
                     <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                            <Feather name="check" size={32} color="#10b981" />
+                        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: alertConfig.type === 'error' ? '#fee2e2' : '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+                            <Feather name={alertConfig.type === 'error' ? "alert-triangle" : "check"} size={32} color={alertConfig.type === 'error' ? "#ef4444" : "#10b981"} />
                         </View>
                         <Text style={{ fontSize: 20, fontWeight: '800', color: '#1f2937', marginBottom: 8, textAlign: 'center' }}>{alertConfig.title}</Text>
                         <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{alertConfig.message}</Text>
-                        <TouchableOpacity style={{ backgroundColor: T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
+                        <TouchableOpacity style={{ backgroundColor: alertConfig.type === 'error' ? '#ef4444' : T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
                             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>OK</Text>
                         </TouchableOpacity>
                     </View>

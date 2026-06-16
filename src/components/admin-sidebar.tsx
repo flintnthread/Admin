@@ -1,13 +1,15 @@
+import { useThemeContext } from "@/context/theme-context";
+import { useTheme } from "@/hooks/use-theme";
 import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import React from "react";
 import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 type Props = {
@@ -24,14 +26,6 @@ const NAV_ITEMS = {
   GENERAL: [
     { label: "Dashboard", icon: "home", path: "/Dashboard" },
     { label: "SEO Engine", icon: "globe", path: null },
-
-    {
-      label: "Dashboard",
-      icon: "home",
-      path: "/approveseller",
-      color: "#3B82F6",
-    },
-    { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
   ],
   "EMPLOYEE MANAGEMENT": [
     {
@@ -65,7 +59,12 @@ const NAV_ITEMS = {
         path: "/customerManagement",
         color: "#00b894",
       },
-      { label: "Sellers", icon: "user-check", path: null, color: "#6c5ce7" },
+      {
+        label: "Sellers",
+        icon: "user-check",
+        path: "/sellers",
+        color: "#6c5ce7",
+      },
       {
         label: "Sellers Graph",
         icon: "trending-up",
@@ -200,8 +199,8 @@ const NAV_ITEMS = {
           path: "/subCategories",
           color: "#D946EF",
         },
-        { label: "Colors", icon: "droplet", path: null, color: "#EC4899" },
-        { label: "Sizes", icon: "maximize", path: null, color: "#F43F5E" },
+        { label: "Colors", icon: "droplet", path: "/colors", color: "#EC4899" },
+        { label: "Sizes", icon: "maximize", path: "/sizes", color: "#F43F5E" },
       ],
     },
     {
@@ -309,10 +308,22 @@ export default function AdminSidebar({
     if (path) router.push(path as never);
   };
 
+  const colors = useTheme();
+  const { theme } = useThemeContext();
+  const isDark = theme === "dark";
+
   return (
-    <View style={[styles.sidebar, collapsed && styles.sidebarCollapsed]}>
+    <View
+      style={[
+        styles.sidebar,
+        collapsed && styles.sidebarCollapsed,
+        { backgroundColor: colors.surface, borderRightColor: colors.border },
+      ]}
+    >
       {/* Header row: logo + collapse toggle */}
-      <View style={styles.sidebarHeader}>
+      <View
+        style={[styles.sidebarHeader, { borderBottomColor: colors.border }]}
+      >
         {!collapsed && (
           <Image
             source={require("../../assets/images/logo.jpg")}
@@ -323,12 +334,18 @@ export default function AdminSidebar({
         {isLargeScreen && (
           <TouchableOpacity
             onPress={onToggleCollapse}
-            style={styles.collapseBtn}
+            style={[
+              styles.collapseBtn,
+              {
+                backgroundColor: isDark ? "#374151" : "#F9FAFB",
+                borderColor: colors.border,
+              },
+            ]}
           >
             <Feather
               name={collapsed ? "chevron-right" : "chevron-left"}
               size={16}
-              color="#6B7280"
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -724,7 +741,7 @@ export default function AdminSidebar({
                     color={
                       !hasChildren && isActive((item as any).path)
                         ? "#EA580C"
-                        : (item as any).color || "#6B7280"
+                        : (item as any).color || colors.textSecondary
                     }
                   />
                   {!collapsed && (
@@ -735,6 +752,9 @@ export default function AdminSidebar({
                           !hasChildren &&
                             isActive((item as any).path) &&
                             styles.menuItemTextActive,
+                          !isActive((item as any).path) && {
+                            color: isDark ? "#D1D5DB" : "#4B5563",
+                          },
                         ]}
                       >
                         {item.label}
@@ -743,7 +763,7 @@ export default function AdminSidebar({
                         <Feather
                           name={isExpanded ? "chevron-down" : "chevron-right"}
                           size={14}
-                          color="#6B7280"
+                          color={colors.textSecondary}
                           style={styles.chevron}
                         />
                       )}
@@ -773,7 +793,7 @@ export default function AdminSidebar({
                           color={
                             isActive(child.path)
                               ? "#EA580C"
-                              : (child as any).color || "#6B7280"
+                              : (child as any).color || colors.textSecondary
                           }
                         />
                         {!collapsed && (
@@ -782,6 +802,9 @@ export default function AdminSidebar({
                               styles.subMenuItemText,
                               isActive(child.path) &&
                                 styles.subMenuItemTextActive,
+                              !isActive(child.path) && {
+                                color: isDark ? "#9CA3AF" : "#4B5563",
+                              },
                             ]}
                           >
                             {child.label}
