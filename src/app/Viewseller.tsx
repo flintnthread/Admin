@@ -1,7 +1,13 @@
 import AdminLayout from "@/components/admin-layout";
+import SellerMediaImage from "@/components/SellerMediaImage";
 import { getApiErrorMessage } from '@/lib/api/client';
+import { resolveMediaUrl, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
-import { fetchSellerDetail } from '@/services/sellerApi';
+import {
+  fetchSellerAnalyticsChart,
+  fetchSellerDetail,
+  normalizeSellerGraphChart,
+} from '@/services/sellerApi';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -91,6 +97,10 @@ interface SellerData {
   lastLogin: string;
   status: 'Active' | 'Inactive' | 'Pending';
   avatar?: string;
+  profilePicUrl?: string;
+  profilePicPath?: string;
+  liveSelfiePath?: string;
+  fullName: string;
   businessName: string;
   businessType: string;
   gstNumber: string;
@@ -99,6 +109,24 @@ interface SellerData {
   city: string;
   state: string;
   pincode: string;
+  country: string;
+  mobileVerified: boolean;
+  bankVerified: boolean;
+  kycVerified: boolean;
+  profileCompleted: boolean;
+  branchName: string;
+  totalRevenue: number;
+  totalOrders: number;
+  referralCode: string;
+  sellerCategory: string;
+  hasGst: boolean;
+  warehouseAddress: string;
+  warehouseCity: string;
+  warehouseState: string;
+  warehouseCountry: string;
+  warehouseArea: string;
+  adminRemarks: string;
+  kycRemarks: string;
   walletBalance: number;
   ifscCode: string;
   bankName: string;
@@ -122,6 +150,7 @@ interface SellerData {
   verificationDocuments: {
     name: string;
     available: boolean;
+    url?: string;
   }[];
   analyticsData: {
     daily: ChartDataPoint[];
@@ -149,6 +178,7 @@ const MOCK_SELLER: SellerData = {
   registrationDate: '25 May, 2026 17:12',
   lastLogin: '04 Jun, 2026 11:26',
   status: 'Active',
+  fullName: 'Khaiser Mohammed',
   businessName: 'JOYA ALL BAGS CENTRE',
   businessType: 'Sole Proprietorship',
   gstNumber: '36JCBPA4456R1ZS',
@@ -157,6 +187,23 @@ const MOCK_SELLER: SellerData = {
   city: 'Sangareddy',
   state: 'Telangana',
   pincode: '502110',
+  country: 'India',
+  mobileVerified: true,
+  bankVerified: true,
+  kycVerified: true,
+  profileCompleted: true,
+  branchName: '—',
+  totalRevenue: 0,
+  referralCode: '—',
+  sellerCategory: '—',
+  hasGst: true,
+  warehouseAddress: '—',
+  warehouseCity: '—',
+  warehouseState: '—',
+  warehouseCountry: '—',
+  warehouseArea: '—',
+  adminRemarks: '—',
+  kycRemarks: '—',
   walletBalance: 0.0,
   ifscCode: 'FDRL0002111',
   bankName: 'FEDERAL BANK LTD',
@@ -467,19 +514,11 @@ const DonutChart: React.FC<{
 interface DocModalProps {
   visible: boolean;
   docName: string;
+  docUrl?: string;
   onClose: () => void;
 }
 
-const DOC_IMAGES: Record<string, string> = {
-  'Aadhaar Front': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Aadhaar_Card.svg/640px-Aadhaar_Card.svg.png',
-  'Aadhaar Back': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Aadhaar_Card.svg/640px-Aadhaar_Card.svg.png',
-  'PAN Card': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/PAN_card_India.svg/640px-PAN_card_India.svg.png',
-  'Cancelled Cheque': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Cheque_India.svg/640px-Cheque_India.svg.png',
-  'Business Proof': 'https://via.placeholder.com/600x400/CCCCCC/666666?text=Business+Proof',
-  'Bank Proof': 'https://via.placeholder.com/600x400/CCCCCC/666666?text=Bank+Proof',
-};
-
-const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClose }) => {
+const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl, onClose }) => {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isMobile = screenW < 600;
 
@@ -504,7 +543,7 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
   const modalW = isMobile ? screenW - 24 : Math.min(screenW - 64, 800);
   const imgH = isMobile ? 220 : 340;
 
-  const imageUri = DOC_IMAGES[docName] || `https://via.placeholder.com/600x400/CCCCCC/666666?text=${encodeURIComponent(docName)}`;
+  const imageUri = resolveMediaUrl(docUrl);
 
   return (
     <Modal
@@ -540,6 +579,11 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
           </View>
 
           <View style={[modalStyles.imgContainer, { height: imgH }]}>
+            {!imageUri ? (
+              <View style={modalStyles.imgScrollContent}>
+                <Text style={{ color: COLORS.textMuted, fontSize: 14 }}>No document image available</Text>
+              </View>
+            ) : (
             <ScrollView
               contentContainerStyle={modalStyles.imgScrollContent}
               maximumZoomScale={3}
@@ -553,10 +597,10 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, onClos
                 <Image
                   source={{ uri: imageUri }}
                   style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
-                  defaultSource={{ uri: `https://via.placeholder.com/${modalW - 32}x${imgH - 16}/F5F0EB/A0522D?text=Loading...` }}
                 />
               </Animated.View>
             </ScrollView>
+            )}
           </View>
 
           <View style={[modalStyles.btnRow, isMobile && { flexWrap: 'wrap' }]}>
@@ -731,44 +775,120 @@ const csvModalStyles = StyleSheet.create({
 });
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-function mapDetailToSellerData(d: Record<string, unknown>): SellerData {
+function splitSellerName(d: Record<string, unknown>) {
+  let firstName = String(d.firstName ?? '').trim();
+  let lastName = String(d.lastName ?? '').trim();
+  const fullName = String(d.fullName ?? '').trim();
+  if (!firstName && fullName) {
+    const parts = fullName.split(/\s+/);
+    firstName = parts[0] ?? '';
+    lastName = parts.slice(1).join(' ') || '';
+  }
+  return {
+    firstName,
+    lastName,
+    fullName: fullName || `${firstName} ${lastName}`.trim() || 'Seller',
+  };
+}
+
+function chartToSeries(raw: unknown, valueKey: 'productsAdded' | 'registered'): ChartDataPoint[] {
+  const chart = normalizeSellerGraphChart(raw);
+  return chart.labels.map((label, i) => ({
+    label,
+    value: Number(chart[valueKey]?.[i] ?? 0),
+  }));
+}
+
+function mapDetailToSellerData(
+  d: Record<string, unknown>,
+  charts?: { monthly?: unknown; yearly?: unknown },
+): SellerData {
   const emptySeries = { daily: [] as ChartDataPoint[], weekly: [] as ChartDataPoint[], monthly: [] as ChartDataPoint[], yearly: [] as ChartDataPoint[] };
-  const docs = Array.isArray(d.documents) ? d.documents as { name: string }[] : [];
+  const docs = Array.isArray(d.documents)
+    ? (d.documents as { name?: string; url?: string; available?: boolean }[])
+    : [];
   const productCount = Number(d.productCount ?? 0);
+  const totalOrders = Number(d.totalOrders ?? 0);
   const statusRaw = String(d.status ?? 'active').toLowerCase();
+  const names = splitSellerName(d);
+  const profile = {
+    profilePicUrl: d.profilePicUrl as string | undefined,
+    profilePicPath: d.profilePicPath as string | undefined,
+    liveSelfiePath: d.liveSelfiePath as string | undefined,
+  };
+  const monthlyProducts = chartToSeries(charts?.monthly, 'productsAdded');
+  const yearlyProducts = chartToSeries(charts?.yearly, 'productsAdded');
+  const monthlyOrders = chartToSeries(charts?.monthly, 'registered');
+  const yearlyOrders = chartToSeries(charts?.yearly, 'registered');
+
   return {
     id: String(d.id ?? ''),
-    firstName: String(d.firstName ?? ''),
-    lastName: String(d.lastName ?? ''),
+    firstName: names.firstName,
+    lastName: names.lastName,
+    fullName: names.fullName,
     email: String(d.email ?? ''),
     mobile: String(d.mobile ?? ''),
     sellerId: String(d.sellerUniqueId ?? `FNT-SELLER-${String(d.id ?? '').padStart(6, '0')}`),
     emailVerified: Boolean(d.emailVerified),
+    mobileVerified: Boolean(d.mobileVerified),
     registrationDate: formatDate(d.createdAt as string),
     lastLogin: formatDate(d.lastLoginAt as string),
     status: statusRaw === 'suspended' ? 'Inactive' : statusRaw === 'pending' ? 'Pending' : 'Active',
-    avatar: d.profilePicUrl as string | undefined,
+    avatar: resolveSellerProfileImage(profile) || undefined,
+    profilePicUrl: profile.profilePicUrl,
+    profilePicPath: profile.profilePicPath,
+    liveSelfiePath: profile.liveSelfiePath,
     businessName: String(d.businessName ?? '—'),
     businessType: String(d.businessType ?? '—'),
     gstNumber: String(d.gstNumber ?? '—'),
     panNumber: String(d.panNumber ?? '—'),
-    address: String(d.address ?? '—'),
+    hasGst: Boolean(d.hasGst),
+    address: String(d.address ?? '—').replace(/\r\n/g, ', '),
     city: String(d.city ?? '—'),
     state: String(d.state ?? '—'),
     pincode: String(d.pincode ?? '—'),
+    country: String(d.country ?? '—'),
     walletBalance: Number(d.walletBalance ?? 0),
     ifscCode: String(d.ifscCode ?? '—'),
     bankName: String(d.bankName ?? '—'),
     accountHolder: String(d.accountHolder ?? '—'),
     accountNumber: maskAccount(d.accountNumber as string | undefined) || '—',
+    branchName: String(d.branchName ?? '—'),
+    bankVerified: Boolean(d.bankVerified),
+    kycVerified: Boolean(d.kycVerified),
+    profileCompleted: Boolean(d.profileCompleted),
+    referralCode: String(d.referralCode ?? '—'),
+    sellerCategory: String(d.sellerCategory ?? '—'),
+    totalRevenue: Number(d.totalRevenue ?? 0),
+    totalOrders,
+    warehouseAddress: String(d.warehouseAddress ?? '—').replace(/\r\n/g, ', '),
+    warehouseCity: String(d.warehouseCity ?? '—'),
+    warehouseState: String(d.warehouseState ?? '—'),
+    warehouseCountry: String(d.warehouseCountry ?? '—'),
+    warehouseArea: String(d.warehouseArea ?? '—'),
+    adminRemarks: String(d.adminRemarks ?? '—'),
+    kycRemarks: String(d.kycRemarks ?? '—'),
     productsListingStatus: productCount > 0 ? 'Live' : 'Inactive',
     totalProducts: productCount,
     productStatusDistribution: { active: productCount, inactive: 0, pending: 0 },
-    orderStatusDistribution: { pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0 },
-    totalOrders: 0,
-    verificationDocuments: docs.map((doc) => ({ name: doc.name, available: true })),
-    analyticsData: emptySeries,
-    ordersAnalyticsData: emptySeries,
+    orderStatusDistribution: { pending: 0, processing: 0, shipped: 0, delivered: totalOrders, cancelled: 0 },
+    verificationDocuments: docs.map((doc) => ({
+      name: String(doc.name ?? 'Document'),
+      available: doc.available !== false,
+      url: resolveMediaUrl(doc.url) || undefined,
+    })),
+    analyticsData: {
+      daily: monthlyProducts,
+      weekly: monthlyProducts,
+      monthly: monthlyProducts,
+      yearly: yearlyProducts,
+    },
+    ordersAnalyticsData: {
+      daily: monthlyOrders,
+      weekly: monthlyOrders,
+      monthly: monthlyOrders,
+      yearly: yearlyOrders,
+    },
   };
 }
 
@@ -789,8 +909,15 @@ export default function ViewSeller() {
       try {
         setLoading(true);
         setLoadError(null);
-        const detail = await fetchSellerDetail(sellerId);
-        setSeller(mapDetailToSellerData(detail as Record<string, unknown>));
+        const [detail, monthlyChart, yearlyChart] = await Promise.all([
+          fetchSellerDetail(sellerId),
+          fetchSellerAnalyticsChart({ sellerId, filterType: 'monthly' }).catch(() => null),
+          fetchSellerAnalyticsChart({ sellerId, filterType: 'yearly' }).catch(() => null),
+        ]);
+        setSeller(mapDetailToSellerData(detail as Record<string, unknown>, {
+          monthly: monthlyChart,
+          yearly: yearlyChart,
+        }));
       } catch (e) {
         setLoadError(getApiErrorMessage(e));
       } finally {
@@ -804,11 +931,13 @@ export default function ViewSeller() {
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string>('');
+  const [selectedDocUrl, setSelectedDocUrl] = useState<string>('');
   const [productsExportModal, setProductsExportModal] = useState(false);
   const [ordersExportModal, setOrdersExportModal] = useState(false);
 
-  const openDoc = (name: string) => {
+  const openDoc = (name: string, url?: string) => {
     setSelectedDoc(name);
+    setSelectedDocUrl(url ?? '');
     setDocModalVisible(true);
   };
 
@@ -1009,12 +1138,18 @@ export default function ViewSeller() {
         <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <View style={[styles.profileRow, isMobile && { flexDirection: 'column', alignItems: 'center' }]}>
             <View style={styles.avatarWrap}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {seller.firstName[0]}{seller.lastName[0]}
-                </Text>
-              </View>
-              <Text style={styles.avatarName}>{seller.firstName} {seller.lastName}</Text>
+              <SellerMediaImage
+                seller={{
+                  name: seller.fullName,
+                  avatar: seller.avatar,
+                  profilePicUrl: seller.profilePicUrl,
+                  profilePicPath: seller.profilePicPath,
+                  liveSelfiePath: seller.liveSelfiePath,
+                }}
+                size={80}
+                fallbackBg={COLORS.primary}
+              />
+              <Text style={styles.avatarName}>{seller.fullName}</Text>
               <Text style={styles.avatarEmail}>{seller.email}</Text>
               <Text style={styles.avatarId}>ID: {seller.sellerId}</Text>
               <StatusBadge
@@ -1070,6 +1205,55 @@ export default function ViewSeller() {
             <InfoRow label="State" value={seller.state} isHalf width={width} />
             <InfoRow label="PAN Number" value={seller.panNumber} isHalf width={width} />
             <InfoRow label="Pincode" value={seller.pincode} isHalf width={width} />
+            <InfoRow label="Country" value={seller.country} isHalf width={width} />
+            <InfoRow label="GST Registered" value={seller.hasGst ? 'Yes' : 'No'} isHalf width={width} />
+            <InfoRow label="Seller Category" value={seller.sellerCategory} isHalf width={width} />
+            <InfoRow label="Referral Code" value={seller.referralCode} isHalf width={width} />
+          </View>
+        </View>
+
+        {/* ── Warehouse Information ──────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="geo-alt" title="Warehouse / Pickup Address" />
+          <View style={styles.infoGrid}>
+            <InfoRow label="Address" value={seller.warehouseAddress} isHalf width={width} />
+            <InfoRow label="Area" value={seller.warehouseArea} isHalf width={width} />
+            <InfoRow label="City" value={seller.warehouseCity} isHalf width={width} />
+            <InfoRow label="State" value={seller.warehouseState} isHalf width={width} />
+            <InfoRow label="Country" value={seller.warehouseCountry} isHalf width={width} />
+          </View>
+        </View>
+
+        {/* ── Verification Status ────────────────────────────────────────── */}
+        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <SectionHeader icon="shield-check" title="Verification Status" />
+          <View style={styles.infoGrid}>
+            <InfoRow
+              label="Profile Completed"
+              value={<StatusBadge label={seller.profileCompleted ? 'Yes' : 'No'} color={seller.profileCompleted ? COLORS.success : COLORS.danger} />}
+              isHalf
+              width={width}
+            />
+            <InfoRow
+              label="KYC Verified"
+              value={<StatusBadge label={seller.kycVerified ? 'Verified' : 'Pending'} color={seller.kycVerified ? COLORS.success : COLORS.warning} />}
+              isHalf
+              width={width}
+            />
+            <InfoRow
+              label="Bank Verified"
+              value={<StatusBadge label={seller.bankVerified ? 'Verified' : 'Pending'} color={seller.bankVerified ? COLORS.success : COLORS.warning} />}
+              isHalf
+              width={width}
+            />
+            <InfoRow
+              label="Mobile Verified"
+              value={<StatusBadge label={seller.mobileVerified ? 'Verified' : 'Not Verified'} color={seller.mobileVerified ? COLORS.success : COLORS.danger} />}
+              isHalf
+              width={width}
+            />
+            <InfoRow label="KYC Remarks" value={seller.kycRemarks} isHalf width={width} />
+            <InfoRow label="Admin Remarks" value={seller.adminRemarks} isHalf width={width} />
           </View>
         </View>
 
@@ -1087,6 +1271,25 @@ export default function ViewSeller() {
             <InfoRow label="Bank Name" value={seller.bankName} isHalf width={width} />
             <InfoRow label="Account Holder" value={seller.accountHolder} isHalf width={width} />
             <InfoRow label="Account Number" value={seller.accountNumber} isHalf width={width} />
+            <InfoRow label="Branch" value={seller.branchName} isHalf width={width} />
+            <InfoRow
+              label="Bank Verified"
+              value={<StatusBadge label={seller.bankVerified ? 'Verified' : 'Pending'} color={seller.bankVerified ? COLORS.success : COLORS.warning} />}
+              isHalf
+              width={width}
+            />
+            <InfoRow
+              label="Total Revenue"
+              value={<Text style={[styles.infoValue, { color: COLORS.primary, fontWeight: '700' }]}>₹{seller.totalRevenue.toLocaleString('en-IN')}</Text>}
+              isHalf
+              width={width}
+            />
+            <InfoRow
+              label="Total Orders"
+              value={<Text style={[styles.infoValue, { fontWeight: '700' }]}>{seller.totalOrders}</Text>}
+              isHalf
+              width={width}
+            />
           </View>
         </View>
 
@@ -1128,7 +1331,7 @@ export default function ViewSeller() {
               {doc.available && (
                 <TouchableOpacity
                   style={styles.viewDocBtn}
-                  onPress={() => openDoc(doc.name)}
+                  onPress={() => openDoc(doc.name, doc.url)}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                     <BootstrapIcon name="eye" size={13} color={COLORS.white} />
@@ -1144,6 +1347,7 @@ export default function ViewSeller() {
         <DocumentViewerModal
           visible={docModalVisible}
           docName={selectedDoc}
+          docUrl={selectedDocUrl}
           onClose={() => setDocModalVisible(false)}
         />
 
