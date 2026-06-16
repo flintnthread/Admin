@@ -603,6 +603,7 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
   const c = customer;
 
+  const monthlyData: MonthlyData[] = c.monthlySpending ?? [];
   const weekly   = monthlyData.length
     ? monthlyData[monthlyData.length - 1]?.amount ?? 0
     : 0;
@@ -610,7 +611,6 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
   const yearly   = c.totalSpent;
   const maxSpend = Math.max(weekly, monthly, yearly, 1);
   const avgOrder = c.orders > 0 ? c.totalSpent / c.orders : 0;
-  const monthlyData: MonthlyData[] = c.monthlySpending ?? [];
 
   const memberDays = (() => {
     if (!c.registeredOn) return "N/A";

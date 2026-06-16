@@ -36,6 +36,7 @@ import Svg, {
   Stop
 } from "react-native-svg";
 import AdminLayout from "@/components/admin-layout";
+import { useThemeContext } from "@/context/theme-context";
 
 // API Services
 import {
@@ -54,31 +55,31 @@ import { fetchCustomers, fetchCustomerStats } from "@/services/customerApi";
 import { getApiErrorMessage } from "@/lib/api/client";
 
 // Palette
-const C = {
-  bg:            "#F8FAFC",
-  surface:       "#FFFFFF",
+const getPalette = (isDark: boolean) => ({
+  bg:            isDark ? "#0f172a" : "#F8FAFC",
+  surface:       isDark ? "#1e293b" : "#FFFFFF",
   primary:       "#e8731a", // Orange
-  primaryLight:  "#fff0e6",
+  primaryLight:  isDark ? "#432a18" : "#fff0e6",
   primaryDark:   "#c2410c",
-  navy:          "#1e293b",
-  text:          "#0f172a",
-  sub:           "#64748b",
-  border:        "#e2e8f0",
+  navy:          isDark ? "#f1f5f9" : "#1e293b",
+  text:          isDark ? "#f1f5f9" : "#0f172a",
+  sub:           isDark ? "#94a3b8" : "#64748b",
+  border:        isDark ? "#334155" : "#e2e8f0",
   active:        "#10b981", // Green
-  activeBg:      "#dcfce7",
+  activeBg:      isDark ? "#064e3b" : "#dcfce7",
   inactive:      "#ef4444", // Red
-  inactiveBg:    "#fee2e2",
+  inactiveBg:    isDark ? "#7f1d1d" : "#fee2e2",
   processing:    "#0ea5e9", // Blue
-  processingBg:  "#e0f2fe",
+  processingBg:  isDark ? "#0c4a6e" : "#e0f2fe",
   warning:       "#f59e0b", // Yellow
-  warningBg:     "#fef3c7",
+  warningBg:     isDark ? "#78350f" : "#fef3c7",
   purple:        "#8b5cf6", // Purple
-  purpleBg:      "#f3e8ff",
+  purpleBg:      isDark ? "#4c1d95" : "#f3e8ff",
   violet:        "#6366f1", // Violet
-  violetBg:      "#e0e7ff",
+  violetBg:      isDark ? "#2e1065" : "#e0e7ff",
   grey:          "#64748b",
-  greyBg:        "#f1f5f9",
-};
+  greyBg:        isDark ? "#374151" : "#f1f5f9",
+});
 
 function formatOrderStatus(status?: string) {
   if (!status) return "Processing";
@@ -109,12 +110,15 @@ export default function DashboardScreen() {
   const isTablet = screenW >= 768 && screenW < 1024;
   const isMobile = screenW < 768;
 
+  const { theme } = useThemeContext();
+  const isDark = theme === "dark";
+  const C = useMemo(() => getPalette(isDark), [isDark]);
+  const styles = useMemo(() => getStyles(isDark), [isDark]);
+
   // Active Tab
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "inventory" | "users">("overview");
-  // Collapsible sections state for Overview
-  const [salesExpanded, setSalesExpanded] = useState(false);
-  const [catalogExpanded, setCatalogExpanded] = useState(false);
-  const [usersExpanded, setUsersExpanded] = useState(false);
+  // Collapsible sections state for Overview removed (sections are permanently expanded)
+
 
 
   // API Data States
@@ -274,6 +278,7 @@ export default function DashboardScreen() {
       productsCount: Number(productStats?.total ?? 0),
       outOfStock: Number(productStats?.outOfStock ?? 0),
       lowStock: Number(productStats?.lowStock ?? 0),
+      categoriesCount: Number(stats?.totalCategories ?? 12),
     };
   }, [stats, productStats]);
 
@@ -725,19 +730,15 @@ export default function DashboardScreen() {
 
             
               {/* --- SALES & PAYMENTS SECTION (Overview copy) --- */}
-              <TouchableOpacity
-                onPress={() => setSalesExpanded(!salesExpanded)}
+              <View
                 style={[styles.sectionHeaderCard, { borderColor: C.primary }]}
-                activeOpacity={0.7}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="bar-chart-outline" size={18} color={C.primary} />
                   <Text style={styles.sectionHeaderTitle}>Sales & Payments Analytics</Text>
                 </View>
-                <Ionicons name={salesExpanded ? "chevron-up-outline" : "chevron-down-outline"} size={18} color={C.sub} />
-              </TouchableOpacity>
-              {salesExpanded && (
-                <View style={styles.tabSection}>
+              </View>
+              <View style={styles.tabSection}>
 
               {/* SECTION 2: REVENUE ANALYTICS */}
               <View style={styles.cardCol}>
@@ -832,6 +833,11 @@ export default function DashboardScreen() {
                         x: 55 + i * stepX,
                         y: 150 - (v / (revenueTimeframe === "daily" ? 12 : 60)) * 120
                       }));
+
+                      // Safe guard: return empty graphics if data has not loaded or is empty
+                      if (revPoints.length === 0 || ordPoints.length === 0) {
+                        return null;
+                      }
 
                       const dRevLine = revPoints.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
                       const dRevArea = `${dRevLine} L${revPoints[revPoints.length - 1].x},150 L55,150 Z`;
@@ -997,22 +1003,17 @@ export default function DashboardScreen() {
               </View>
 
             </View>
-              )}
 
               {/* --- CATALOG & STOCK SECTION (Overview copy) --- */}
-              <TouchableOpacity
-                onPress={() => setCatalogExpanded(!catalogExpanded)}
+              <View
                 style={[styles.sectionHeaderCard, { borderColor: C.violet }]}
-                activeOpacity={0.7}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="cube-outline" size={18} color={C.violet} />
                   <Text style={styles.sectionHeaderTitle}>Catalog & Stock Control</Text>
                 </View>
-                <Ionicons name={catalogExpanded ? "chevron-up-outline" : "chevron-down-outline"} size={18} color={C.sub} />
-              </TouchableOpacity>
-              {catalogExpanded && (
-                <View style={styles.tabSection}>
+              </View>
+              <View style={styles.tabSection}>
 
               {/* SECTION 6: PRODUCT OVERVIEW & INVENTORY ALERTS */}
               <View style={styles.rowLayout}>
@@ -1027,7 +1028,9 @@ export default function DashboardScreen() {
                       { label: "Draft Products", count: 23, bg: C.greyBg, color: C.grey },
                       { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
                       { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
-                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary }
+                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary },
+                      { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
+                      { label: "Active Brands", count: 8, bg: C.processingBg, color: C.processing }
                     ].map((item, idx) => (
                       <View key={idx} style={[styles.orderCheckCard, { borderColor: item.color, backgroundColor: item.bg }]}>
                         <Text style={styles.orderCheckLabel}>{item.label}</Text>
@@ -1248,22 +1251,17 @@ export default function DashboardScreen() {
               </View>
 
             </View>
-              )}
 
               {/* --- USERS & SELLERS SECTION (Overview copy) --- */}
-              <TouchableOpacity
-                onPress={() => setUsersExpanded(!usersExpanded)}
+              <View
                 style={[styles.sectionHeaderCard, { borderColor: C.purple }]}
-                activeOpacity={0.7}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="people-outline" size={18} color={C.purple} />
                   <Text style={styles.sectionHeaderTitle}>Users & Seller Network</Text>
                 </View>
-                <Ionicons name={usersExpanded ? "chevron-up-outline" : "chevron-down-outline"} size={18} color={C.sub} />
-              </TouchableOpacity>
-              {usersExpanded && (
-                <View style={styles.tabSection}>
+              </View>
+              <View style={styles.tabSection}>
 
               {/* SECTION 4 & SECTION 5: CUSTOMER & SELLER OVERVIEWS */}
               <View style={styles.rowLayout}>
@@ -1497,7 +1495,6 @@ export default function DashboardScreen() {
               </View>
 
             </View>
-              )}
 </View>
           )}
 
@@ -1598,6 +1595,11 @@ export default function DashboardScreen() {
                         x: 55 + i * stepX,
                         y: 150 - (v / (revenueTimeframe === "daily" ? 12 : 60)) * 120
                       }));
+
+                      // Safe guard: return empty graphics if data has not loaded or is empty
+                      if (revPoints.length === 0 || ordPoints.length === 0) {
+                        return null;
+                      }
 
                       const dRevLine = revPoints.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
                       const dRevArea = `${dRevLine} L${revPoints[revPoints.length - 1].x},150 L55,150 Z`;
@@ -1782,7 +1784,9 @@ export default function DashboardScreen() {
                       { label: "Draft Products", count: 23, bg: C.greyBg, color: C.grey },
                       { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
                       { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
-                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary }
+                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary },
+                      { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
+                      { label: "Active Brands", count: 8, bg: C.processingBg, color: C.processing }
                     ].map((item, idx) => (
                       <View key={idx} style={[styles.orderCheckCard, { borderColor: item.color, backgroundColor: item.bg }]}>
                         <Text style={styles.orderCheckLabel}>{item.label}</Text>
@@ -2285,7 +2289,9 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (isDark: boolean) => {
+  const C = getPalette(isDark);
+  return StyleSheet.create({
   sectionHeaderCard: {
     backgroundColor: C.surface,
     borderRadius: 12,
@@ -2762,8 +2768,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   orderCheckCard: {
-    flex: 1,
-    minWidth: 110,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: "22%",
+    minWidth: 120,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1.5,
@@ -3346,3 +3354,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+};

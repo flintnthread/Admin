@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
+import { useThemeContext } from "@/context/theme-context";
 
 type Props = {
   /** Whether the sidebar is in collapsed (icon-only) mode – desktop only */
@@ -167,10 +169,18 @@ export default function AdminSidebar({
     if (path) router.push(path as never);
   };
 
+  const colors = useTheme();
+  const { theme } = useThemeContext();
+  const isDark = theme === "dark";
+
   return (
-    <View style={[styles.sidebar, collapsed && styles.sidebarCollapsed]}>
+    <View style={[
+      styles.sidebar, 
+      collapsed && styles.sidebarCollapsed,
+      { backgroundColor: colors.surface, borderRightColor: colors.border }
+    ]}>
       {/* Header row: logo + collapse toggle */}
-      <View style={styles.sidebarHeader}>
+      <View style={[styles.sidebarHeader, { borderBottomColor: colors.border }]}>
         {!collapsed && (
           <Image
             source={require("../../assets/images/logo.jpg")}
@@ -179,11 +189,11 @@ export default function AdminSidebar({
           />
         )}
         {isLargeScreen && (
-          <TouchableOpacity onPress={onToggleCollapse} style={styles.collapseBtn}>
+          <TouchableOpacity onPress={onToggleCollapse} style={[styles.collapseBtn, { backgroundColor: isDark ? "#374151" : "#F9FAFB", borderColor: colors.border }]}>
             <Feather
               name={collapsed ? "chevron-right" : "chevron-left"}
               size={16}
-              color="#6B7280"
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -502,7 +512,7 @@ export default function AdminSidebar({
                   <Feather
                     name={item.icon as any}
                     size={18}
-                    color={!hasChildren && isActive((item as any).path) ? "#EA580C" : ((item as any).color || "#6B7280")}
+                    color={!hasChildren && isActive((item as any).path) ? "#EA580C" : ((item as any).color || colors.textSecondary)}
                   />
                   {!collapsed && (
                     <>
@@ -510,6 +520,7 @@ export default function AdminSidebar({
                         style={[
                           styles.menuItemText,
                           !hasChildren && isActive((item as any).path) && styles.menuItemTextActive,
+                          !isActive((item as any).path) && { color: isDark ? "#D1D5DB" : "#4B5563" }
                         ]}
                       >
                         {item.label}
@@ -518,7 +529,7 @@ export default function AdminSidebar({
                         <Feather
                           name={isExpanded ? "chevron-down" : "chevron-right"}
                           size={14}
-                          color="#6B7280"
+                          color={colors.textSecondary}
                           style={styles.chevron}
                         />
                       )}
@@ -540,13 +551,14 @@ export default function AdminSidebar({
                         <Feather
                           name={child.icon as any}
                           size={14}
-                          color={isActive(child.path) ? "#EA580C" : ((child as any).color || "#6B7280")}
+                          color={isActive(child.path) ? "#EA580C" : ((child as any).color || colors.textSecondary)}
                         />
                         {!collapsed && (
                           <Text
                             style={[
                               styles.subMenuItemText,
                               isActive(child.path) && styles.subMenuItemTextActive,
+                              !isActive(child.path) && { color: isDark ? "#9CA3AF" : "#4B5563" }
                             ]}
                           >
                             {child.label}

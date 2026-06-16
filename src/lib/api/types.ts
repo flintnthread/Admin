@@ -186,6 +186,11 @@ export type JobOpening = {
   departmentId?: number;
   title?: string;
   description?: string;
+  requirements?: string;
+  responsibilities?: string;
+  experienceRequired?: string;
+  salaryRange?: string;
+  vacancies?: number;
   location?: string;
   employmentType?: string;
   status?: string;
