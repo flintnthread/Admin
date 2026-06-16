@@ -20,6 +20,7 @@ import {
   type ProductStatus,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
 import { fetchProductStats, fetchProducts, type ProductListRow } from '@/services/productApi';
 
@@ -71,14 +72,14 @@ const DEFAULT_STATS: ProductStats = {
   all: 0,
 };
 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/96?text=Product';
+const PLACEHOLDER_IMAGE = '';
 
 function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): ApprovalProduct {
   return {
     id: row.id,
     name: row.name,
     description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
-    image: row.image || PLACEHOLDER_IMAGE,
+    image: resolveMediaUrl(row.image) || PLACEHOLDER_IMAGE,
     seller: row.seller,
     email: '',
     category: row.category,

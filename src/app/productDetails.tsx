@@ -25,10 +25,11 @@ import {
   type ProductVariant,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { resolveMediaUrl } from '@/lib/api/media';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/600?text=Product';
+const PLACEHOLDER_IMAGE = '';
 
 type ApiImage = { url?: string };
 type ApiVariant = {
@@ -200,7 +201,9 @@ function mapApiProductDetail(data: Record<string, unknown>): {
   extras: ProductDetailExtras;
 } {
   const images = (data.images as ApiImage[] | undefined) ?? [];
-  const gallery = images.map((img) => String(img.url ?? '')).filter(Boolean);
+  const gallery = images
+    .map((img) => resolveMediaUrl(String(img.url ?? '')))
+    .filter(Boolean);
   const primaryImage = gallery[0] ?? PLACEHOLDER_IMAGE;
   const variantsRaw = (data.variants as ApiVariant[] | undefined) ?? [];
   const gst = Number(data.gstPercentage ?? 18);

@@ -1,6 +1,14 @@
 import { adminApiRequest } from "@/lib/api/client";
 import type { PageResponse, SellerSummary } from "@/lib/api/types";
 
+export async function fetchApprovedSellers(size = 500): Promise<SellerSummary[]> {
+  const [activePage, suspendedPage] = await Promise.all([
+    fetchSellers({ status: "active", size }),
+    fetchSellers({ status: "suspended", size }),
+  ]);
+  return [...(activePage.items ?? []), ...(suspendedPage.items ?? [])];
+}
+
 export async function fetchSellers(params?: {
   status?: string;
   search?: string;
