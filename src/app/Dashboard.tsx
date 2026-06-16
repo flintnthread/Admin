@@ -19,7 +19,8 @@ import {
   TextInput,
   Image,
   Pressable,
-  Modal
+  Modal,
+  Alert,
 } from "react-native";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -36,6 +37,7 @@ import Svg, {
   Stop
 } from "react-native-svg";
 import AdminLayout from "@/components/admin-layout";
+import { useAuth } from "@/context/auth-context";
 import { useThemeContext } from "@/context/theme-context";
 
 // API Services
@@ -46,6 +48,12 @@ import {
   fetchDashboardTopSellers,
   fetchDashboardInventoryAlerts,
   fetchDashboardActivity,
+  fetchDashboardPayments,
+  fetchDashboardCustomerInsights,
+  fetchDashboardSellerInsights,
+  type DashboardPaymentsSummary,
+  type DashboardCustomerInsights,
+  type DashboardSellerInsights,
 } from "@/services/dashboardApi";
 import { formatDate } from "@/lib/format";
 import { fetchOrders } from "@/services/orderApi";
@@ -98,6 +106,13 @@ function formatPaymentMethod(method?: string) {
   return "Online";
 }
 
+function renderProductThumb(image?: string, size = 18) {
+  if (image && (image.startsWith("http://") || image.startsWith("https://"))) {
+    return <Image source={{ uri: image }} style={{ width: size, height: size, borderRadius: 4 }} resizeMode="cover" />;
+  }
+  return <Text style={{ fontSize: size }}>📦</Text>;
+}
+
 function chartYLabels(maxVal: number) {
   const step = maxVal / 5;
   return Array.from({ length: 6 }, (_, i) => `₹${Math.round(maxVal - step * i)}`);
@@ -105,6 +120,7 @@ function chartYLabels(maxVal: number) {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
   const { width: screenW } = useWindowDimensions();
   const isLargeScreen = screenW >= 1024;
   const isTablet = screenW >= 768 && screenW < 1024;
@@ -134,6 +150,11 @@ export default function DashboardScreen() {
   const [topSellers, setTopSellers] = useState<any[]>([]);
   const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [paymentsSummary, setPaymentsSummary] = useState<DashboardPaymentsSummary | null>(null);
+  const [customerInsights, setCustomerInsights] = useState<DashboardCustomerInsights | null>(null);
+  const [sellerInsights, setSellerInsights] = useState<DashboardSellerInsights | null>(null);
+
+  const currentYear = new Date().getFullYear();
 
   // UX Controls
   const [loading, setLoading] = useState(true);
@@ -169,6 +190,7 @@ export default function DashboardScreen() {
 
   // Load Data from APIs
   const loadData = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     try {
@@ -185,6 +207,9 @@ export default function DashboardScreen() {
         topSellersRes,
         alertsRes,
         activityRes,
+        paymentsRes,
+        customerInsightsRes,
+        sellerInsightsRes,
       ] = await Promise.allSettled([
         fetchDashboardStats(),
         fetchOrders({ page: 0, size: 20 }),
@@ -198,6 +223,9 @@ export default function DashboardScreen() {
         fetchDashboardTopSellers(10),
         fetchDashboardInventoryAlerts(10),
         fetchDashboardActivity(10),
+        fetchDashboardPayments(),
+        fetchDashboardCustomerInsights(),
+        fetchDashboardSellerInsights(),
       ]);
 
       if (statsRes.status === "fulfilled") setStats(statsRes.value);
@@ -225,17 +253,21 @@ export default function DashboardScreen() {
       if (topSellersRes.status === "fulfilled") setTopSellers(topSellersRes.value || []);
       if (alertsRes.status === "fulfilled") setInventoryAlerts(alertsRes.value || []);
       if (activityRes.status === "fulfilled") setNotifications(activityRes.value || []);
+      if (paymentsRes.status === "fulfilled") setPaymentsSummary(paymentsRes.value);
+      if (customerInsightsRes.status === "fulfilled") setCustomerInsights(customerInsightsRes.value);
+      if (sellerInsightsRes.status === "fulfilled") setSellerInsights(sellerInsightsRes.value);
     } catch (err) {
       console.error("Dashboard enhancement fetch error:", err);
       setError(getApiErrorMessage(err, "Failed to load dashboard data."));
     } finally {
       setLoading(false);
     }
-  }, [revenueTimeframe]);
+  }, [revenueTimeframe, token]);
 
   useEffect(() => {
+    if (authLoading || !token) return;
     loadData();
-  }, [loadData]);
+  }, [loadData, authLoading, token]);
 
   // Format helper
   const rupee = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -272,15 +304,105 @@ export default function DashboardScreen() {
       allTimeOrders: Number(stats?.totalOrders ?? stats?.allTimeOrders ?? 0),
       pendingOrders: Number(stats?.pendingOrders ?? 0),
       processingCount: Number(stats?.processingCount ?? stats?.processingOrders ?? 0),
+      shippedOrders: Number(stats?.shippedOrders ?? 0),
+      deliveredOrders: Number(stats?.deliveredOrders ?? stats?.completedOrders ?? 0),
+      cancelledOrders: Number(stats?.cancelledOrders ?? 0),
       returnedCount: Number(stats?.returnedCount ?? stats?.returnedOrders ?? 0),
       returnedBg: "#fef3c7",
       returned: "#d97706",
       productsCount: Number(productStats?.total ?? 0),
+      publishedCount: Number(productStats?.active ?? productStats?.approved ?? 0),
+      draftCount: Number(productStats?.pending ?? 0) + Number(productStats?.underReview ?? 0),
+      hiddenCount: Number(productStats?.inactive ?? 0) + Number(productStats?.rejected ?? 0),
       outOfStock: Number(productStats?.outOfStock ?? 0),
       lowStock: Number(productStats?.lowStock ?? 0),
-      categoriesCount: Number(stats?.totalCategories ?? 12),
+      categoriesCount: Number(stats?.totalCategories ?? 0),
+      yearRevenue: Number(stats?.yearRevenue ?? 0),
+      yearOrders: Number(stats?.yearOrders ?? 0),
     };
   }, [stats, productStats]);
+
+  const orderStatusRows = useMemo(() => [
+    { label: "Pending", count: d.pendingOrders, bg: C.warningBg, border: C.warning },
+    { label: "Processing", count: d.processingCount, bg: C.processingBg, border: C.processing },
+    { label: "Shipped", count: d.shippedOrders, bg: C.violetBg, border: C.violet },
+    { label: "Delivered", count: d.deliveredOrders, bg: C.activeBg, border: C.active },
+    { label: "Cancelled", count: d.cancelledOrders, bg: C.inactiveBg, border: C.inactive },
+    { label: "Returned", count: d.returnedCount, bg: d.returnedBg, border: d.returned },
+  ], [d, C]);
+
+  const orderDonutData = useMemo(() => {
+    const values = [
+      d.cancelledOrders,
+      d.deliveredOrders,
+      d.pendingOrders,
+      d.shippedOrders,
+      d.processingCount,
+    ];
+    const total = values.reduce((a, b) => a + b, 0);
+    return { values, total };
+  }, [d]);
+
+  const paymentRows = useMemo(() => {
+    const p = paymentsSummary;
+    return [
+      { label: "COD Orders", val: `${count(p?.codOrders ?? 0)} orders`, sum: rupee(Number(p?.codAmount ?? 0)) },
+      { label: "Online Payments", val: `${count(p?.onlineOrders ?? 0)} payments`, sum: rupee(Number(p?.onlineAmount ?? 0)) },
+      { label: "Pending Payments", val: `${count(p?.pendingPayments ?? 0)} pending`, sum: rupee(Number(p?.pendingPaymentAmount ?? 0)) },
+      { label: "Refunded Payments", val: `${count(p?.refundedOrders ?? 0)} refunds`, sum: rupee(Number(p?.refundedAmount ?? 0)) },
+      { label: "Total Collections", val: "All receipts", sum: rupee(Number(p?.totalCollections ?? d.allTimeRevenue)) },
+    ];
+  }, [paymentsSummary, d.allTimeRevenue]);
+
+  const refundRows = useMemo(() => {
+    const p = paymentsSummary;
+    return [
+      { label: "Pending Refunds", val: `${count(p?.pendingRefunds ?? 0)} request`, color: C.warning },
+      { label: "Approved Refunds", val: `${count(p?.approvedRefunds ?? 0)} refunds`, color: C.active },
+      { label: "Rejected Refunds", val: `${count(p?.rejectedRefunds ?? 0)} cases`, color: C.inactive },
+      { label: "Returned Order Rate", val: `${p?.returnedOrderRate ?? 0}% rate`, color: C.primary },
+    ];
+  }, [paymentsSummary, C]);
+
+  const catalogMetricRows = useMemo(() => [
+    { label: "Total Products", count: d.productsCount, bg: C.violetBg, color: C.violet },
+    { label: "Published Items", count: d.publishedCount, bg: C.activeBg, color: C.active },
+    { label: "Draft Products", count: d.draftCount, bg: C.greyBg, color: C.grey },
+    { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
+    { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
+    { label: "Hidden Catalog", count: d.hiddenCount, bg: C.primaryLight, color: C.primary },
+    { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
+  ], [d, C]);
+
+  const customerMetricRows = useMemo(() => {
+    const ci = customerInsights;
+    return [
+      { label: "Total Registered Customers", count: ci?.total ?? customerStats?.total ?? 0 },
+      { label: "New Customers Registered Today", count: ci?.newToday ?? 0 },
+      { label: "New Customers This Week", count: ci?.newWeek ?? 0 },
+      { label: "New Customers This Month", count: ci?.newMonth ?? 0 },
+      { label: "Active Customers (90 days)", count: ci?.activeCustomers ?? 0 },
+      { label: "Inactive Customers (90+ days)", count: ci?.inactiveCustomers ?? 0 },
+    ];
+  }, [customerInsights, customerStats]);
+
+  const sellerMetricRows = useMemo(() => {
+    const si = sellerInsights;
+    return [
+      { label: "Total Sellers Enrolled", count: si?.registered ?? sellerStats?.total ?? sellerStats?.registered ?? 0 },
+      { label: "Active Sellers", count: si?.active ?? sellerStats?.active ?? sellerStats?.approved ?? 0 },
+      { label: "Inactive Sellers (No Products)", count: si?.inactiveNoProducts ?? 0 },
+      { label: "Pending Verification Sellers", count: si?.pending ?? sellerStats?.pending ?? 0 },
+      { label: "Top Performing Sellers (With Sales)", count: si?.topPerformers ?? 0 },
+    ];
+  }, [sellerInsights, sellerStats]);
+
+  const performanceRows = useMemo(() => [
+    { label: "Today", sales: rupee(d.todayRevenue), ords: d.todayOrders },
+    { label: "This Week", sales: rupee(d.weekRevenue), ords: d.weekOrders },
+    { label: "This Month", sales: rupee(d.monthRevenue), ords: d.monthOrders },
+    { label: `This Year (${currentYear})`, sales: rupee(d.yearRevenue), ords: d.yearOrders },
+  ], [d, currentYear]);
 
   // SECTION 2: Chart Timeframe calculations
   const revenueChartData = useMemo(() => {
@@ -294,6 +416,13 @@ export default function DashboardScreen() {
     };
   }, [revenueChart]);
 
+  const orderVolumeBars = useMemo(() => {
+    const orders = revenueChartData.orders;
+    if (!orders.length) return [0];
+    const max = Math.max(...orders, 1);
+    return orders.map((v) => Math.round((v / max) * 75));
+  }, [revenueChartData.orders]);
+
   // SECTION 7: Top Selling Products dataset
   const topProductsRaw = useMemo(() => {
     return topProducts.map((p) => ({
@@ -303,7 +432,7 @@ export default function DashboardScreen() {
       revenue: Number(p.revenue ?? 0),
       stock: p.stock ?? "In Stock",
       stockCount: Number(p.stockCount ?? 0),
-      image: p.image || "📦",
+      image: p.image || "",
     }));
   }, [topProducts]);
 
@@ -334,7 +463,7 @@ export default function DashboardScreen() {
       business: s.business || "—",
       orders: Number(s.orders ?? 0),
       revenue: Number(s.revenue ?? 0),
-      rating: s.rating || "4.5",
+      rating: s.rating ? String(s.rating) : "—",
       status: s.status || "Active",
     }));
   }, [topSellers]);
@@ -364,7 +493,7 @@ export default function DashboardScreen() {
       name: c.name || "Customer",
       email: c.email || "—",
       date: formatDate(c.lastOrderAt || c.createdAt),
-      status: "Active",
+      status: Number(c.orderCount ?? 0) > 1 ? "Returning" : "Active",
     }));
   }, [customers]);
 
@@ -380,23 +509,18 @@ export default function DashboardScreen() {
   }, [inventoryAlerts]);
 
   const restockProduct = (id: number) => {
-    setInventoryAlerts((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, qty: Number(item.qty ?? 0) + 50, type: "Restock Scheduled", severity: "Low" }
-          : item
-      )
-    );
+    router.push(`/productDetails?id=${id}`);
   };
 
   // Coupon Creation trigger
   const handleCreateCoupon = () => {
     if (!couponCode || !couponDiscount) return;
     setCouponModalVisible(false);
-    setNotifications(prev => [
-      { id: Date.now(), type: "customer", message: `Coupon '${couponCode}' with ${couponDiscount}% discount created!`, read: false, time: "Just now" },
-      ...prev
-    ]);
+    if (Platform.OS === "web") {
+      window.alert("Coupons are not stored in the database yet. No coupon was created.");
+    } else {
+      Alert.alert("Not available", "Coupons are not stored in the database yet.");
+    }
     setCouponCode("");
     setCouponDiscount("");
   };
@@ -519,7 +643,21 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {/* TAB 1: OVERVIEW */}
+          {(authLoading || loading) && (
+            <View style={{ paddingVertical: 12, alignItems: "center" }}>
+              <ActivityIndicator size="small" color={C.primary} />
+              <Text style={{ color: C.sub, marginTop: 6 }}>Loading dashboard from server…</Text>
+            </View>
+          )}
+
+          {error ? (
+            <TouchableOpacity onPress={() => void loadData()} style={[styles.sectionHeaderCard, { borderColor: C.inactive, marginBottom: 12 }]}>
+              <Text style={{ color: C.inactive, fontWeight: "600" }}>{error}</Text>
+              <Text style={{ color: C.primary, marginTop: 4 }}>Tap to retry</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {/* HEADER ROW continued */}
           {activeTab === "overview" && (
             <View style={styles.tabSection}>
 
@@ -660,32 +798,11 @@ export default function DashboardScreen() {
                 </View>
               </View>
 
-              {/* LIVE ACTIVITY, PERFORMANCE SUMMARY, & COUPONS */}
+              {/* PERFORMANCE SUMMARY & ORDER DISCOUNTS */}
               <View style={styles.rowLayout}>
 
-                {/* SECTION 13: Live Website Activity */}
-                <View style={[styles.cardCol, { flex: 1 }]}>
-                  <Text style={styles.cardColTitle}>📈 Live Website Traffic</Text>
-                  <View style={styles.liveActivityList}>
-                    {[
-                      { label: "Currently Online", val: "14", isOnline: true },
-                      { label: "Visitors Today", val: "1,204", isOnline: false },
-                      { label: "Visitors This Week", val: "8,924", isOnline: false },
-                      { label: "Visitors This Month", val: "32,940", isOnline: false }
-                    ].map((item, idx) => (
-                      <View key={idx} style={styles.liveActivityRow}>
-                        <View style={styles.liveActivityLeft}>
-                          {item.isOnline && <View style={styles.greenPulseDot} />}
-                          <Text style={styles.liveActivityLabel}>{item.label}</Text>
-                        </View>
-                        <Text style={styles.liveActivityValue}>{item.val}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
                 {/* SECTION 18: Performance Summary */}
-                <View style={[styles.cardCol, { flex: 1.5 }]}>
+                <View style={[styles.cardCol, { flex: 2 }]}>
                   <Text style={styles.cardColTitle}>📊 Store Performance Summary</Text>
                   <View style={styles.perfTable}>
                     <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
@@ -693,12 +810,7 @@ export default function DashboardScreen() {
                       <Text style={[styles.tableHdrCell, { flex: 2, textAlign: "right" }]}>Sales (Revenue)</Text>
                       <Text style={[styles.tableHdrCell, { flex: 1.5, textAlign: "right" }]}>Total Orders</Text>
                     </View>
-                    {[
-                      { label: "Today", sales: rupee(d.todayRevenue), ords: d.todayOrders },
-                      { label: "This Week", sales: rupee(d.weekRevenue), ords: d.weekOrders },
-                      { label: "This Month", sales: rupee(d.monthRevenue), ords: d.monthOrders },
-                      { label: "This Year (2026)", sales: rupee(d.allTimeRevenue), ords: d.allTimeOrders }
-                    ].map((row, idx) => (
+                    {performanceRows.map((row, idx) => (
                       <View key={idx} style={styles.tableRowData}>
                         <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "600" }]}>{row.label}</Text>
                         <Text style={[styles.tableCellText, { flex: 2, textAlign: "right", color: C.active, fontWeight: "600" }]}>{row.sales}</Text>
@@ -708,15 +820,14 @@ export default function DashboardScreen() {
                   </View>
                 </View>
 
-                {/* SECTION 16: Coupon Overview */}
+                {/* Order discounts from orders table */}
                 <View style={[styles.cardCol, { flex: 1 }]}>
-                  <Text style={styles.cardColTitle}>🏷️ Promotion & Coupon Tracker</Text>
+                  <Text style={styles.cardColTitle}>🏷️ Order Discounts (Database)</Text>
                   <View style={styles.liveActivityList}>
                     {[
-                      { label: "Active Coupon Codes", val: "6 codes", color: C.active },
-                      { label: "Expired Coupons", val: "14 codes", color: C.sub },
-                      { label: "Total Coupon Redemptions", val: "189 uses", color: C.primary },
-                      { label: "Total Coupon Discount Given", val: rupee(3420), color: C.inactive }
+                      { label: "Total Discount Given", val: rupee(Number(paymentsSummary?.totalDiscountGiven ?? 0)), color: C.primary },
+                      { label: "Refunded Order Amount", val: rupee(Number(paymentsSummary?.refundedAmount ?? 0)), color: C.inactive },
+                      { label: "Pending Payment Amount", val: rupee(Number(paymentsSummary?.pendingPaymentAmount ?? 0)), color: C.warning },
                     ].map((item, idx) => (
                       <View key={idx} style={styles.liveActivityRow}>
                         <Text style={styles.liveActivityLabel}>{item.label}</Text>
@@ -895,14 +1006,7 @@ export default function DashboardScreen() {
                   
                   {/* Status checklist grid */}
                   <View style={styles.ordersChecklistGrid}>
-                    {[
-                      { label: "Pending", count: d.pendingOrders, bg: C.warningBg, border: C.warning },
-                      { label: "Processing", count: d.processingCount, bg: C.processingBg, border: C.processing },
-                      { label: "Shipped", count: 2, bg: C.violetBg, border: C.violet },
-                      { label: "Delivered", count: 18, bg: C.activeBg, border: C.active },
-                      { label: "Cancelled", count: 35, bg: C.inactiveBg, border: C.inactive },
-                      { label: "Returned", count: d.returnedCount, bg: C.returnedBg, border: C.returned }
-                    ].map((item, idx) => (
+                    {orderStatusRows.map((item, idx) => (
                       <View key={idx} style={[styles.orderCheckCard, { borderColor: item.border, backgroundColor: item.bg }]}>
                         <Text style={styles.orderCheckLabel}>{item.label}</Text>
                         <Text style={[styles.orderCheckCount, { color: item.border }]}>{item.count} orders</Text>
@@ -913,13 +1017,13 @@ export default function DashboardScreen() {
                   {/* Donut and Bar SVG Charts side by side */}
                   <View style={styles.doubleChartWrap}>
                     <View style={styles.doubleChartBox}>
-                      <DonutChart data={[35, 18, 3, 2, 1]} total={59} colors={[C.inactive, C.active, C.primary, C.purple, C.processing]} />
+                      <DonutChart data={orderDonutData.values} total={orderDonutData.total || 1} colors={[C.inactive, C.active, C.primary, C.purple, C.processing]} />
                       <Text style={styles.chartSubtitleLabel}>Order Ratios</Text>
                     </View>
                     <View style={styles.doubleChartBox}>
                       {/* Responsive Vertical Bar Chart */}
                       <Svg width={140} height={110} viewBox="0 0 100 80">
-                        {[15, 30, 45, 60, 50, 75].map((val, idx) => {
+                        {orderVolumeBars.map((val, idx) => {
                           const barH = (val / 80) * 60;
                           return (
                             <Rect
@@ -945,13 +1049,7 @@ export default function DashboardScreen() {
                   
                   {/* Payment stats checklist */}
                   <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "COD Orders", val: "18 orders", sum: rupee(3204) },
-                      { label: "Online Payments", val: "39 payments", sum: rupee(13492) },
-                      { label: "Pending Payments", val: "0 pending", sum: rupee(0) },
-                      { label: "Refunded Payments", val: "5 refunds", sum: rupee(1490) },
-                      { label: "Total Collections", val: "All receipts", sum: rupee(d.allTimeRevenue) }
-                    ].map((item, idx) => (
+                    {paymentRows.map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
                         <View>
                           <Text style={styles.paymentMetricLabel}>{item.label}</Text>
@@ -964,15 +1062,15 @@ export default function DashboardScreen() {
 
                   {/* Payment Chart */}
                   <View style={styles.pieContainer}>
-                    <PieChart values={[39, 18]} colors={[C.active, C.primary]} />
+                    <PieChart values={[paymentsSummary?.onlineOrders ?? 0, paymentsSummary?.codOrders ?? 0]} colors={[C.active, C.primary]} />
                     <View style={styles.pieLegends}>
                       <View style={styles.legendRow}>
                         <View style={[styles.legendDot, { backgroundColor: C.active }]} />
-                        <Text style={styles.legendText}>Online (68%)</Text>
+                        <Text style={styles.legendText}>Online ({paymentsSummary?.onlinePercent ?? 0}%)</Text>
                       </View>
                       <View style={styles.legendRow}>
                         <View style={[styles.legendDot, { backgroundColor: C.primary }]} />
-                        <Text style={styles.legendText}>COD (32%)</Text>
+                        <Text style={styles.legendText}>COD ({paymentsSummary?.codPercent ?? 0}%)</Text>
                       </View>
                     </View>
                   </View>
@@ -982,12 +1080,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1 }]}>
                   <Text style={styles.cardColTitle}>🔄 Refunds & Returns Logs</Text>
                   <View style={styles.liveActivityList}>
-                    {[
-                      { label: "Pending Refunds", val: "3 request", color: C.warning },
-                      { label: "Approved Refunds", val: "22 refunds", color: C.active },
-                      { label: "Rejected Refunds", val: "2 cases", color: C.inactive },
-                      { label: "Returned Order Rate", val: "5.4% rate", color: C.primary }
-                    ].map((item, idx) => (
+                    {refundRows.map((item, idx) => (
                       <View key={idx} style={styles.liveActivityRow}>
                         <Text style={styles.liveActivityLabel}>{item.label}</Text>
                         <Text style={[styles.liveActivityValue, { color: item.color }]}>{item.val}</Text>
@@ -1022,16 +1115,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1.5 }]}>
                   <Text style={styles.cardColTitle}>📦 Catalog & Products Metrics</Text>
                   <View style={styles.ordersChecklistGrid}>
-                    {[
-                      { label: "Total Products", count: d.productsCount, bg: C.violetBg, color: C.violet },
-                      { label: "Published Items", count: 685, bg: C.activeBg, color: C.active },
-                      { label: "Draft Products", count: 23, bg: C.greyBg, color: C.grey },
-                      { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
-                      { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
-                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary },
-                      { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
-                      { label: "Active Brands", count: 8, bg: C.processingBg, color: C.processing }
-                    ].map((item, idx) => (
+                    {catalogMetricRows.map((item, idx) => (
                       <View key={idx} style={[styles.orderCheckCard, { borderColor: item.color, backgroundColor: item.bg }]}>
                         <Text style={styles.orderCheckLabel}>{item.label}</Text>
                         <Text style={[styles.orderCheckCount, { color: item.color }]}>{item.count} items</Text>
@@ -1152,7 +1236,7 @@ export default function DashboardScreen() {
                     {paginatedProducts.map((p, idx) => (
                       <View key={p.id} style={styles.tableRowData}>
                         <View style={{ width: 50, alignItems: "center" }}>
-                          <Text style={{ fontSize: 18 }}>{p.image}</Text>
+                          {renderProductThumb(p.image, 18)}
                         </View>
                         <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
                           {p.name}
@@ -1209,7 +1293,7 @@ export default function DashboardScreen() {
                     {filteredProducts.slice(0, mobileProdCount).map(p => (
                       <View key={p.id} style={styles.mobileProductCard}>
                         <View style={styles.mobileProductCardHeader}>
-                          <Text style={{ fontSize: 24 }}>{p.image}</Text>
+                          {renderProductThumb(p.image, 24)}
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={styles.mobileCardProdName} numberOfLines={1}>{p.name}</Text>
                             <Text style={styles.mobileCardProdId}>ID: {p.id}</Text>
@@ -1270,14 +1354,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1.2 }]}>
                   <Text style={styles.cardColTitle}>👥 Customer Base Analytics</Text>
                   <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "Total Registered Customers", count: customerStats?.total ?? 0 },
-                      { label: "New Customers Registered Today", count: 4 },
-                      { label: "New Customers This Week", count: 18 },
-                      { label: "New Customers This Month", count: 42 },
-                      { label: "Active Customers (Placed Order)", count: 112 },
-                      { label: "Inactive Customers (No Order)", count: 92 }
-                    ].map((item, idx) => (
+                    {customerMetricRows.map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
                         <Text style={styles.paymentMetricLabel}>{item.label}</Text>
                         <Text style={[styles.paymentMetricVal, { color: C.primary }]}>{count(item.count)}</Text>
@@ -1290,13 +1367,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1.2 }]}>
                   <Text style={styles.cardColTitle}>🏪 Seller Network Summary</Text>
                   <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? sellerStats?.registered ?? 0 },
-                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? sellerStats?.approved ?? 0 },
-                      { label: "Inactive Sellers (No Products)", count: 70 },
-                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 0 },
-                      { label: "Top Performing Sellers (Verified)", count: 10 }
-                    ].map((item, idx) => (
+                    {sellerMetricRows.map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
                         <Text style={styles.paymentMetricLabel}>{item.label}</Text>
                         <Text style={[styles.paymentMetricVal, { color: C.purple }]}>{count(item.count)}</Text>
@@ -1657,14 +1728,7 @@ export default function DashboardScreen() {
                   
                   {/* Status checklist grid */}
                   <View style={styles.ordersChecklistGrid}>
-                    {[
-                      { label: "Pending", count: d.pendingOrders, bg: C.warningBg, border: C.warning },
-                      { label: "Processing", count: d.processingCount, bg: C.processingBg, border: C.processing },
-                      { label: "Shipped", count: 2, bg: C.violetBg, border: C.violet },
-                      { label: "Delivered", count: 18, bg: C.activeBg, border: C.active },
-                      { label: "Cancelled", count: 35, bg: C.inactiveBg, border: C.inactive },
-                      { label: "Returned", count: d.returnedCount, bg: C.returnedBg, border: C.returned }
-                    ].map((item, idx) => (
+                    {orderStatusRows.map((item, idx) => (
                       <View key={idx} style={[styles.orderCheckCard, { borderColor: item.border, backgroundColor: item.bg }]}>
                         <Text style={styles.orderCheckLabel}>{item.label}</Text>
                         <Text style={[styles.orderCheckCount, { color: item.border }]}>{item.count} orders</Text>
@@ -1675,13 +1739,13 @@ export default function DashboardScreen() {
                   {/* Donut and Bar SVG Charts side by side */}
                   <View style={styles.doubleChartWrap}>
                     <View style={styles.doubleChartBox}>
-                      <DonutChart data={[35, 18, 3, 2, 1]} total={59} colors={[C.inactive, C.active, C.primary, C.purple, C.processing]} />
+                      <DonutChart data={orderDonutData.values} total={orderDonutData.total || 1} colors={[C.inactive, C.active, C.primary, C.purple, C.processing]} />
                       <Text style={styles.chartSubtitleLabel}>Order Ratios</Text>
                     </View>
                     <View style={styles.doubleChartBox}>
                       {/* Responsive Vertical Bar Chart */}
                       <Svg width={140} height={110} viewBox="0 0 100 80">
-                        {[15, 30, 45, 60, 50, 75].map((val, idx) => {
+                        {orderVolumeBars.map((val, idx) => {
                           const barH = (val / 80) * 60;
                           return (
                             <Rect
@@ -1707,13 +1771,7 @@ export default function DashboardScreen() {
                   
                   {/* Payment stats checklist */}
                   <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "COD Orders", val: "18 orders", sum: rupee(3204) },
-                      { label: "Online Payments", val: "39 payments", sum: rupee(13492) },
-                      { label: "Pending Payments", val: "0 pending", sum: rupee(0) },
-                      { label: "Refunded Payments", val: "5 refunds", sum: rupee(1490) },
-                      { label: "Total Collections", val: "All receipts", sum: rupee(d.allTimeRevenue) }
-                    ].map((item, idx) => (
+                    {paymentRows.map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
                         <View>
                           <Text style={styles.paymentMetricLabel}>{item.label}</Text>
@@ -1726,15 +1784,15 @@ export default function DashboardScreen() {
 
                   {/* Payment Chart */}
                   <View style={styles.pieContainer}>
-                    <PieChart values={[39, 18]} colors={[C.active, C.primary]} />
+                    <PieChart values={[paymentsSummary?.onlineOrders ?? 0, paymentsSummary?.codOrders ?? 0]} colors={[C.active, C.primary]} />
                     <View style={styles.pieLegends}>
                       <View style={styles.legendRow}>
                         <View style={[styles.legendDot, { backgroundColor: C.active }]} />
-                        <Text style={styles.legendText}>Online (68%)</Text>
+                        <Text style={styles.legendText}>Online ({paymentsSummary?.onlinePercent ?? 0}%)</Text>
                       </View>
                       <View style={styles.legendRow}>
                         <View style={[styles.legendDot, { backgroundColor: C.primary }]} />
-                        <Text style={styles.legendText}>COD (32%)</Text>
+                        <Text style={styles.legendText}>COD ({paymentsSummary?.codPercent ?? 0}%)</Text>
                       </View>
                     </View>
                   </View>
@@ -1744,12 +1802,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1 }]}>
                   <Text style={styles.cardColTitle}>🔄 Refunds & Returns Logs</Text>
                   <View style={styles.liveActivityList}>
-                    {[
-                      { label: "Pending Refunds", val: "3 request", color: C.warning },
-                      { label: "Approved Refunds", val: "22 refunds", color: C.active },
-                      { label: "Rejected Refunds", val: "2 cases", color: C.inactive },
-                      { label: "Returned Order Rate", val: "5.4% rate", color: C.primary }
-                    ].map((item, idx) => (
+                    {refundRows.map((item, idx) => (
                       <View key={idx} style={styles.liveActivityRow}>
                         <Text style={styles.liveActivityLabel}>{item.label}</Text>
                         <Text style={[styles.liveActivityValue, { color: item.color }]}>{item.val}</Text>
@@ -1778,16 +1831,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1.5 }]}>
                   <Text style={styles.cardColTitle}>📦 Catalog & Products Metrics</Text>
                   <View style={styles.ordersChecklistGrid}>
-                    {[
-                      { label: "Total Products", count: d.productsCount, bg: C.violetBg, color: C.violet },
-                      { label: "Published Items", count: 685, bg: C.activeBg, color: C.active },
-                      { label: "Draft Products", count: 23, bg: C.greyBg, color: C.grey },
-                      { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
-                      { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
-                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary },
-                      { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
-                      { label: "Active Brands", count: 8, bg: C.processingBg, color: C.processing }
-                    ].map((item, idx) => (
+                    {catalogMetricRows.map((item, idx) => (
                       <View key={idx} style={[styles.orderCheckCard, { borderColor: item.color, backgroundColor: item.bg }]}>
                         <Text style={styles.orderCheckLabel}>{item.label}</Text>
                         <Text style={[styles.orderCheckCount, { color: item.color }]}>{item.count} items</Text>
@@ -1908,7 +1952,7 @@ export default function DashboardScreen() {
                     {paginatedProducts.map((p, idx) => (
                       <View key={p.id} style={styles.tableRowData}>
                         <View style={{ width: 50, alignItems: "center" }}>
-                          <Text style={{ fontSize: 18 }}>{p.image}</Text>
+                          {renderProductThumb(p.image, 18)}
                         </View>
                         <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
                           {p.name}
@@ -1965,7 +2009,7 @@ export default function DashboardScreen() {
                     {filteredProducts.slice(0, mobileProdCount).map(p => (
                       <View key={p.id} style={styles.mobileProductCard}>
                         <View style={styles.mobileProductCardHeader}>
-                          <Text style={{ fontSize: 24 }}>{p.image}</Text>
+                          {renderProductThumb(p.image, 24)}
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={styles.mobileCardProdName} numberOfLines={1}>{p.name}</Text>
                             <Text style={styles.mobileCardProdId}>ID: {p.id}</Text>
@@ -2020,14 +2064,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1.2 }]}>
                   <Text style={styles.cardColTitle}>👥 Customer Base Analytics</Text>
                   <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "Total Registered Customers", count: customerStats?.total ?? 0 },
-                      { label: "New Customers Registered Today", count: 4 },
-                      { label: "New Customers This Week", count: 18 },
-                      { label: "New Customers This Month", count: 42 },
-                      { label: "Active Customers (Placed Order)", count: 112 },
-                      { label: "Inactive Customers (No Order)", count: 92 }
-                    ].map((item, idx) => (
+                    {customerMetricRows.map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
                         <Text style={styles.paymentMetricLabel}>{item.label}</Text>
                         <Text style={[styles.paymentMetricVal, { color: C.primary }]}>{count(item.count)}</Text>
@@ -2040,13 +2077,7 @@ export default function DashboardScreen() {
                 <View style={[styles.cardCol, { flex: 1.2 }]}>
                   <Text style={styles.cardColTitle}>🏪 Seller Network Summary</Text>
                   <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? sellerStats?.registered ?? 0 },
-                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? sellerStats?.approved ?? 0 },
-                      { label: "Inactive Sellers (No Products)", count: 70 },
-                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 0 },
-                      { label: "Top Performing Sellers (Verified)", count: 10 }
-                    ].map((item, idx) => (
+                    {sellerMetricRows.map((item, idx) => (
                       <View key={idx} style={styles.paymentMetricRow}>
                         <Text style={styles.paymentMetricLabel}>{item.label}</Text>
                         <Text style={[styles.paymentMetricVal, { color: C.purple }]}>{count(item.count)}</Text>

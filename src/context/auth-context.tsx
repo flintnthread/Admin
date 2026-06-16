@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { getApiErrorMessage } from "@/lib/api/client";
+import { getApiErrorMessage, onAdminSessionCleared } from "@/lib/api/client";
 import {
   clearAdminSession,
   hydrateAdminSession,
@@ -34,6 +34,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null | false>(null);
   const [user, setUser] = useState<AdminSessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    return onAdminSessionCleared(() => {
+      setToken(false);
+      setUser(null);
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

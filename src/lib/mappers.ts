@@ -11,6 +11,7 @@ import type {
   SupportTicketSummary,
 } from "@/lib/api/types";
 import type { PendingProfileSeller } from "@/services/sellerApi";
+import { resolveMediaUrl, resolveSellerProfileImage } from "@/lib/api/media";
 import { formatDate, formatRupee, initialsFromName, maskAccount } from "@/lib/format";
 
 export function mapSellerToApprovedRow(s: SellerSummary) {
@@ -18,13 +19,13 @@ export function mapSellerToApprovedRow(s: SellerSummary) {
     id: s.id,
     name: s.fullName ?? "Seller",
     email: s.email ?? "",
-    avatar: s.profilePicUrl ?? "",
+    avatar: resolveSellerProfileImage(s),
     businessName: s.businessName ?? "—",
     businessType: s.businessType ?? s.sellerCategory?.toUpperCase() ?? "—",
     products: Number(s.productCount ?? 0),
     walletBalance: Number(s.walletBalance ?? 0),
     joinDate: formatDate(s.createdAt),
-    revenue: 0,
+    revenue: Number(s.totalRevenue ?? 0),
     state: s.state ?? "—",
     city: s.city ?? "—",
     status: s.status === "suspended" ? ("Blocked" as const) : ("Active" as const),
@@ -89,7 +90,7 @@ export function mapProductListToApprovalRow(
     seller: p.sellerName ?? `Seller #${p.sellerId ?? "—"}`,
     status: mapProductStatus(p.status),
     submittedAt: formatDate(p.createdAt),
-    image: p.imageUrl ?? "",
+    image: resolveMediaUrl(p.imageUrl),
     category: p.categoryName ?? "—",
     price: p.price != null ? formatRupee(p.price) : "—",
   };
@@ -188,9 +189,15 @@ export function mapBankPendingRow(s: SellerSummary) {
 }
 
 export function mapSellerListRow(s: SellerSummary, index: number) {
-  const kyc: "Not Submitted" | "Submitted" | "Approved" | "Pending" =
-    s.kycVerified ? "Approved" : s.kycCompleted ? "Pending" : "Not Submitted";
+  const kyc: "Not Submitted" | "Submitted" | "Approved" | "Pending" = s.kycVerified
+    ? "Approved"
+    : s.kycCompleted
+      ? "Submitted"
+      : s.profileCompleted
+        ? "Pending"
+        : "Not Submitted";
   const productCount = Number(s.productCount ?? 0);
+  const imageUrl = resolveSellerProfileImage(s);
   return {
     id: s.sellerUniqueId ?? `FNT-SELLER-${String(s.id).padStart(6, "0")}`,
     numericId: s.id,
@@ -199,8 +206,8 @@ export function mapSellerListRow(s: SellerSummary, index: number) {
     email: s.email ?? "",
     mobile: s.mobile ?? "",
     business: s.businessName ?? "—",
-    sain: s.referralCode ?? s.email ?? "—",
-    status: (s.status === "suspended" ? "Inactive" : "Active") as "Active" | "Inactive",
+    sain: s.referralCode ?? s.sellerUniqueId ?? "—",
+    status: (s.status === "suspended" || s.status === "inactive" ? "Inactive" : "Active") as "Active" | "Inactive",
     kyc,
     products: {
       status: (productCount > 0 ? "Done" : "Not Started") as "Done" | "Not Started" | "Pending",
@@ -208,7 +215,18 @@ export function mapSellerListRow(s: SellerSummary, index: number) {
     },
     wallet: formatRupee(s.walletBalance),
     registered: formatDate(s.createdAt),
-    banner: s.profilePicUrl,
+    banner: imageUrl || undefined,
+    avatar: imageUrl || undefined,
+    profilePicPath: s.profilePicPath,
+    liveSelfiePath: s.liveSelfiePath,
+    profilePicUrl: s.profilePicUrl,
+    city: s.city ?? "—",
+    state: s.state ?? "—",
+    businessType: s.businessType ?? "—",
+    revenue: Number(s.totalRevenue ?? 0),
+    totalOrders: Number(s.totalOrders ?? 0),
+    country: s.country ?? "—",
+    bankVerified: Boolean(s.bankVerified),
   };
 }
 
@@ -413,7 +431,7 @@ export function mapProductListRow(p: Record<string, unknown>) {
     price: Number(p.price ?? 0),
     stock,
     status: displayStatus as "Active" | "Inactive" | "Out of Stock",
-    image: String(p.imageUrl ?? ""),
+    image: resolveMediaUrl(String(p.imageUrl ?? "")),
     updated: String(p.updatedLabel ?? formatDate(p.updatedAt as string)),
   };
 }

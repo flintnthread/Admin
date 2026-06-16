@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { resolveMediaUrl } from '@/lib/api/media';
 import { fetchPendingProfileDetail } from '@/services/sellerApi';
 import {
     Dimensions,
@@ -185,8 +186,13 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
           city: String(d.warehouseCity ?? d.city ?? '—'),
           area: String(d.warehouseArea ?? '—'),
           pincode: String(d.pincode ?? '—'),
-          profileImage: (d.profilePicUrl as string) || null,
-          documents: Array.isArray(d.documents) ? d.documents as { name: string; url?: string }[] : [],
+          profileImage: resolveMediaUrl(d.profilePicUrl as string) || null,
+          documents: Array.isArray(d.documents)
+            ? (d.documents as { name: string; url?: string }[]).map((doc) => ({
+                name: doc.name,
+                url: resolveMediaUrl(doc.url) || undefined,
+              }))
+            : [],
         });
       } catch (e) {
         setLoadError(getApiErrorMessage(e));

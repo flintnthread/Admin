@@ -1,4 +1,5 @@
 import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { fetchSellerBankDetails } from "@/services/sellerApi";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -102,8 +103,8 @@ export default function BankProof() {
       try {
         const detail = await fetchSellerBankDetails(sellerId);
         setSellerName(String(detail.fullName ?? "Seller"));
-        setBankProofUrl(detail.bankProofUrl as string | undefined);
-        setCancelledChequeUrl(detail.cancelledChequeUrl as string | undefined);
+        setBankProofUrl(resolveMediaUrl(detail.bankProofUrl as string) || undefined);
+        setCancelledChequeUrl(resolveMediaUrl(detail.cancelledChequeUrl as string) || undefined);
       } catch (e) {
         setError(getApiErrorMessage(e));
       } finally {

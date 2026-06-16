@@ -16,6 +16,7 @@ import {
     useWindowDimensions,
     View,
 } from "react-native";
+import ApiDevHint from "@/components/api-dev-hint";
 import { useAuth, useAuthErrorMessage } from "../context/auth-context";
 
 // --- MOBILE LOGIN SCREEN ---
@@ -116,6 +117,8 @@ function MobileLoginScreen() {
             <Text style={stylesMobile.subtitle}>
               {"Welcome back. Sign in to continue to the admin portal."}
             </Text>
+
+            <ApiDevHint />
 
             {/* Form Fields Container */}
             <View style={stylesMobile.formContainer}>
@@ -400,6 +403,8 @@ function WebLoginScreen() {
               <Text style={stylesWeb.webSubtitle}>
                 {"Enter your email address and password\nto access admin panel."}
               </Text>
+
+              <ApiDevHint />
 
               <View style={stylesWeb.formFields}>
                 {/* Email Wrapper */}

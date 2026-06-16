@@ -46,6 +46,54 @@ export type DashboardActivity = {
   time: string;
 };
 
+export type DashboardPaymentsSummary = {
+  codOrders: number;
+  codAmount: number;
+  onlineOrders: number;
+  onlineAmount: number;
+  pendingPayments: number;
+  pendingPaymentAmount: number;
+  refundedOrders: number;
+  refundedAmount: number;
+  totalDiscountGiven: number;
+  onlinePercent: number;
+  codPercent: number;
+  pendingRefunds: number;
+  approvedRefunds: number;
+  rejectedRefunds: number;
+  returnedOrderRate: number;
+  totalCollections: number;
+};
+
+export type DashboardCustomerInsights = {
+  total: number;
+  newToday: number;
+  newWeek: number;
+  newMonth: number;
+  activeCustomers: number;
+  inactiveCustomers: number;
+};
+
+export type DashboardSellerInsights = {
+  registered: number;
+  active: number;
+  inactiveNoProducts: number;
+  pending: number;
+  topPerformers: number;
+};
+
+export async function fetchDashboardPayments(): Promise<DashboardPaymentsSummary> {
+  return adminApiRequest<DashboardPaymentsSummary>("/api/admin/dashboard/payments");
+}
+
+export async function fetchDashboardCustomerInsights(): Promise<DashboardCustomerInsights> {
+  return adminApiRequest<DashboardCustomerInsights>("/api/admin/dashboard/customer-insights");
+}
+
+export async function fetchDashboardSellerInsights(): Promise<DashboardSellerInsights> {
+  return adminApiRequest<DashboardSellerInsights>("/api/admin/dashboard/seller-insights");
+}
+
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   return adminApiRequest<DashboardStats>("/api/admin/dashboard/stats");
 }
