@@ -2789,7 +2789,7 @@ const AddNewProduct: React.FC = () => {
     const leftAction =
         step === 0 ? (
             <TouchableOpacity style={isDesktop ? ds.cancelBtn : sc.cancelBtn} onPress={resetForm}>
-                <AppText style={isDesktop ? ds.cancelTxt : sc.cancelTxt}>Back</AppText>
+                <AppText style={isDesktop ? ds.cancelTxt : sc.cancelTxt}>Cancel</AppText>
             </TouchableOpacity>
         ) : (
             <TouchableOpacity style={isDesktop ? ds.prevBtn : sc.prevBtn} onPress={() => setStep((s) => s - 1)}>
@@ -2812,7 +2812,7 @@ const AddNewProduct: React.FC = () => {
         );
 
     const actionBar = (
-        <View style={isDesktop ? ds.bar : [sc.bar, { backgroundColor: 'transparent', borderTopWidth: 0, shadowOpacity: 0, elevation: 0, paddingBottom: 24 }]}>
+        <View style={isDesktop ? ds.bar : sc.bar}>
             <View style={isDesktop ? ds.barLeft : sc.barLeft}>{leftAction}</View>
             <View style={isDesktop ? ds.barRight : sc.barRight}>{rightAction}</View>
         </View>
@@ -2858,9 +2858,9 @@ const AddNewProduct: React.FC = () => {
                         </TouchableOpacity>
                     </View>
                     <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} isDesktop />
-                    <View style={[ds.mainColumn, { flex: 1, overflow: 'hidden' as any }]}>
-                        <View style={[ds.mainScroll, { flex: 1 }]}>{stepContent}</View>
-                        <View style={[ds.barWrap, { backgroundColor: 'transparent', borderTopWidth: 0 }]}>{actionBar}</View>
+                    <View style={ds.mainColumn}>
+                        <View style={ds.mainScroll}>{stepContent}</View>
+                        <View style={ds.barWrap}>{actionBar}</View>
                     </View>
                     <ToastContainer toasts={toasts} onRemove={removeToast} />
                     {sweetAlert}

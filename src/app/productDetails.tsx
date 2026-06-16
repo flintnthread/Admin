@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AdminLayout from '@/components/admin-layout';
 
 import {
   getVariantStats,
@@ -789,13 +790,15 @@ function SectionCard({
   title,
   icon,
   children,
+  flex,
 }: {
   title: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   children: ReactNode;
+  flex?: number;
 }) {
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, flex ? { flex } : null]}>
       <View style={styles.sectionHeader}>
         <MaterialCommunityIcons name={icon} size={18} color={PALETTE.purple} />
         <Text style={styles.sectionTitle}>{title}</Text>
@@ -903,32 +906,37 @@ export default function ProductDetailsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.notFound}>
-          <ActivityIndicator size="large" color={PALETTE.purple} />
-          <Text style={styles.notFoundText}>Loading product…</Text>
-        </View>
-      </SafeAreaView>
+      <AdminLayout>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.notFound}>
+            <ActivityIndicator size="large" color={PALETTE.purple} />
+            <Text style={styles.notFoundText}>Loading product…</Text>
+          </View>
+        </SafeAreaView>
+      </AdminLayout>
     );
   }
 
   if (error || !product) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>{error ?? 'Product not found'}</Text>
-          <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : router.back())}>
-            <Text style={styles.backBtnLightText}>{error ? 'Retry' : 'Go Back'}</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <AdminLayout>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.notFound}>
+            <Text style={styles.notFoundText}>{error ?? 'Product not found'}</Text>
+            <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : router.back())}>
+              <Text style={styles.backBtnLightText}>{error ? 'Retry' : 'Go Back'}</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </AdminLayout>
     );
   }
 
   const contentMax = isWide ? Math.min(width, 1200) : width;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AdminLayout>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -1194,7 +1202,7 @@ export default function ProductDetailsScreen() {
             </SectionCard>
 
             <View style={[styles.twoCol, !isWide && styles.twoColMobile]}>
-              <SectionCard title="Classification" icon="tag-outline">
+              <SectionCard title="Classification" icon="tag-outline" flex={1}>
                 <InfoRow label="Category" value={product.categoryLabel} />
                 <InfoRow label="Subcategory" value={product.subcategory} />
                 <InfoRow label="Color" value={product.color} />
@@ -1206,7 +1214,7 @@ export default function ProductDetailsScreen() {
                 <InfoRow label="Warranty" value={product.warranty} />
               </SectionCard>
 
-              <SectionCard title="Inventory" icon="warehouse">
+              <SectionCard title="Inventory" icon="warehouse" flex={1}>
                 <InfoRow label="Stock Quantity" value={`${product.stock} units`} valueColor={PALETTE.green} />
                 <InfoRow label="Status" value={product.stockStatus} valueColor={PALETTE.red} />
                 <InfoRow label="DB Status" value={product.dbStatus} />
@@ -1239,7 +1247,8 @@ export default function ProductDetailsScreen() {
         {activeTab === 'sizechart' && extras && <SizeChartTab isWide={isWide} extras={extras} />}
       </ScrollView>
 
-    </SafeAreaView>
+      </SafeAreaView>
+    </AdminLayout>
   );
 }
 

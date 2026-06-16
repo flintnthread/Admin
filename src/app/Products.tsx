@@ -132,8 +132,9 @@ const PRODUCT_ACTIONS = [
 
 const truncateTitle = (title: string) => {
     if (!title) return "";
-    const words = title.split(" ");
-    return words.length > 3 ? words.slice(0, 3).join(" ") + "....." : title;
+    let cleanTitle = title.replace(/[\x00-\x1F\x7F-\x9F\u2018-\u201F\u00B4\u0060\u25A1\uFFFD\u0092]/g, "'").replace(/&#39;|&apos;|&rsquo;|&#8217;|&#x2019;/gi, "'");
+    const words = cleanTitle.split(" ");
+    return words.length > 3 ? words.slice(0, 3).join(" ") + "....." : cleanTitle;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -569,7 +570,7 @@ const ProductActionSheet: React.FC<ActionSheetProps> = ({ product, onClose, onDe
             setTimeout(() => onUpdateLocation(product.id), 200);
         } else if (label === "Reviews") {
             onClose();
-            // ── TODO: navigate to reviews ──
+            router.push('/Reviews');
         } else {
             onClose();
         }
@@ -657,7 +658,7 @@ const WebProductActionPopup: React.FC<ActionSheetProps> = ({ product, onClose, o
             setTimeout(() => onUpdateLocation(product.id), 200);
         } else if (label === "Reviews") {
             onClose();
-            // ── TODO: navigate to reviews ──
+            router.push('/Reviews');
         } else {
             onClose();
         }
@@ -910,7 +911,7 @@ const WebProductsScreen: React.FC = () => {
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={wst.navBulkBtn}
-                            onPress={() => { /* TODO: navigate to bulk upload */ }}
+                            onPress={() => router.push('/Bulkupload')}
                             activeOpacity={0.85}
                         >
                             <MaterialCommunityIcons name="cloud-upload-outline" size={16} color={C.white} />
@@ -1690,7 +1691,7 @@ const MobileProductsScreen: React.FC = () => {
                     <TouchableOpacity
                         style={s.actionCard}
                         activeOpacity={0.75}
-                        onPress={() => { /* TODO: navigate to bulk upload */ }}
+                        onPress={() => router.push('/Bulkupload')}
                     >
                         <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}>
                             <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} />

@@ -297,7 +297,7 @@ export default function JobApplicationsScreen() {
   return (
     <AdminLayout>
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+        <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
         <ScrollView style={styles.root} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
         {/* ── Header ── */}
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 16 : 12,
     paddingBottom: 16,
-    backgroundColor: '#1F2937',
+    backgroundColor: '#151D4F',
     flexDirection: 'column',
     gap: 8,
   },

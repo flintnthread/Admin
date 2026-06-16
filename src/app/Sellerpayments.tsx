@@ -331,10 +331,6 @@ const SellerPaymentsScreen: React.FC = () => {
                         <Text style={styles.headerSubtitle}>Dashboard › Seller Payments</Text>
                     </View>
                 </View>
-                <TouchableOpacity style={styles.exportBtn}>
-                    <Feather name="download" size={14} color={PRIMARY} />
-                    <Text style={styles.exportBtnText}>Export</Text>
-                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 250 }]} showsVerticalScrollIndicator={false}>
@@ -677,7 +673,7 @@ const SellerPaymentsScreen: React.FC = () => {
   return (
     <AdminLayout>
       <View style={styles.webLayout}>
-        <StatusBar barStyle="dark-content" backgroundColor={BG_PAGE} />
+        <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
         <View style={styles.webColumn}>
           {MainContent}
         </View>
@@ -699,12 +695,12 @@ const styles = StyleSheet.create({
     mainWeb: { backgroundColor: BG_CARD, margin: 16, borderRadius: 20, overflow: "hidden", shadowColor: DARK, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5 },
 
     // Header
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: BG_CARD, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
     headerWeb: { paddingHorizontal: 28, paddingVertical: 22 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
-    headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT_HEAD, letterSpacing: -0.5 },
-    headerSubtitle: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
+    headerTitle: { fontSize: 20, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
+    headerSubtitle: { fontSize: 12, color: "#D1D5DB", marginTop: 2 },
     exportBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
     exportBtnText: { fontSize: 12, fontWeight: "700", color: PRIMARY },
 
