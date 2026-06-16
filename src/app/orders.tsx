@@ -1,859 +1,609 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, Alert, Image, Modal, Platform,
+  ScrollView, StatusBar, StyleSheet, Text, TextInput,
+  TouchableOpacity, View, useWindowDimensions,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, Circle, Rect, Polyline } from "react-native-svg";
 import AdminLayout from "../components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
 
-// ─── Color Palette ────────────────────────────────────────────────────────────
-
+// ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
-  brand: "#D97706",
-  brandDark: "#B45309",
-  brandLight: "#FFFBF5",
-  brandMid: "#FEF3C7",
-  navy: "#1D324E",
-  navyLight: "#EBF0F7",
-  navyMid: "#2E4A6E",
-  white: "#FFFFFF",
-  bg: "#F4F6FA",
-  card: "#FFFFFF",
-  border: "#E8ECF2",
-  borderLight: "#F0F2F7",
-  textPrimary: "#111827",
-  textSecondary: "#4B5563",
-  textMuted: "#9CA3AF",
-  green: "#166534",
-  greenBg: "#DCFCE7",
-  greenLight: "#F0FDF4",
-  greenBorder: "#BBF7D0",
-  amber: "#92400E",
-  amberBg: "#FEF3C7",
-  amberLight: "#FFFBF5",
-  red: "#DC2626",
-  redBg: "#FEE2E2",
-  cyan: "#0369A1",
-  cyanBg: "#E0F2FE",
-  purple: "#5B21B6",
-  purpleBg: "#EDE9FE",
-};
-
-// ─── SVG Icons ────────────────────────────────────────────────────────────────
-
-const Icon = {
-  Calendar: ({ size = 11, color = C.textMuted }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  Shop: ({ size = 12, color = C.brand }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M2.97 1.35A1 1 0 0 1 3.73 1h8.54a1 1 0 0 1 .76.35l2.609 3.044A1.5 1.5 0 0 1 16 5.37v.255a2.375 2.375 0 0 1-4.25 1.458A2.371 2.371 0 0 1 9.875 8 2.37 2.37 0 0 1 8 7.083 2.37 2.37 0 0 1 6.125 8a2.37 2.37 0 0 1-1.875-.917A2.375 2.375 0 0 1 0 5.625V5.37a1.5 1.5 0 0 1 .361-.976L2.97 1.35zm1.5 2.437-.396 1.107A1.375 1.375 0 0 0 5.375 6.5h.25a1.375 1.375 0 0 0 1.373-1.28L6.89 3.787 4.47 3.787zM7.11 3.787l-.112 1.433A1.375 1.375 0 0 0 8.375 6.5h-.75a1.375 1.375 0 0 0 1.377-1.28L8.89 3.787H7.11zm2.42 0-.112 1.433A1.375 1.375 0 0 0 10.875 6.5h.25a1.375 1.375 0 0 0 1.301-1.793L12.03 3.787H9.53zM3.53 3.787H1.03l.396 1.107A1.375 1.375 0 0 0 2.875 6.5h.25a1.375 1.375 0 0 0 1.301-1.793L3.53 3.787zM1 7.5V14a1 1 0 0 0 1 1h3v-4h2v4h7a1 1 0 0 0 1-1V7.5A2.375 2.375 0 0 1 13.625 8a2.37 2.37 0 0 1-1.875-.917A2.37 2.37 0 0 1 9.875 8 2.37 2.37 0 0 1 8 7.083 2.37 2.37 0 0 1 6.125 8a2.37 2.37 0 0 1-1.875-.917A2.375 2.375 0 0 1 1 7.5z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  FileText: ({ size = 13, color = C.textMuted }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z"
-        fill={color}
-      />
-      <Path
-        d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  Download: ({ size = 13, color = C.green }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"
-        fill={color}
-      />
-      <Path
-        d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  Eye: ({ size = 13, color = C.brand }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"
-        fill={color}
-      />
-      <Path
-        d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  ChevronRight: ({ size = 13, color = C.brand }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  CheckCircle: ({ size = 12, color = C.green }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"
-        fill={color}
-      />
-      <Path
-        d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"
-        fill={color}
-      />
-    </Svg>
-  ),
-  Truck: ({ size = 12, color = C.textSecondary }) => (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path
-        d="M0 3.5A1.5 1.5 0 0 1 1.5 2h9A1.5 1.5 0 0 1 12 3.5V5h1.02a1.5 1.5 0 0 1 1.17.563l1.481 1.85a1.5 1.5 0 0 1 .329.938V10.5a1.5 1.5 0 0 1-1.5 1.5H14a2 2 0 1 1-4 0H5a2 2 0 1 1-3.998-.085A1.5 1.5 0 0 1 0 10.5v-7zm1.294 7.456A1.999 1.999 0 0 1 4.732 11h5.536a2.01 2.01 0 0 1 .732-.732V3.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .294.456zM12 10a2 2 0 0 1 1.732 1h.768a.5.5 0 0 0 .5-.5V8.35a.5.5 0 0 0-.11-.312l-1.48-1.85A.5.5 0 0 0 13.02 6H12v4zm-9 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"
-        fill={color}
-      />
-    </Svg>
-  ),
+  navy:         "#1d324e",
+  navyMid:      "#2E4A6E",
+  navyLight:    "#e8ecf2",
+  navyLighter:  "#f0f3f7",
+  primary:      "#ef7b1a",
+  primaryLight: "#FFF0EA",
+  primaryMid:   "#FED7AA",
+  bg:           "#F4F6FA",
+  surface:      "#FFFFFF",
+  border:       "#E8ECF2",
+  borderLight:  "#F0F2F7",
+  text:         "#1C2B4A",
+  textSub:      "#4B5563",
+  textMuted:    "#9CA3AF",
+  green:        "#10B981",
+  greenBg:      "#ECFDF5",
+  greenDark:    "#065F46",
+  amber:        "#D97706",
+  amberBg:      "#FEF3C7",
+  amberDark:    "#92400E",
+  red:          "#EF4444",
+  redBg:        "#FEE2E2",
+  cyan:         "#0369A1",
+  cyanBg:       "#E0F2FE",
+  purple:       "#5B21B6",
+  purpleBg:     "#EDE9FE",
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 type PaymentType = "Cash on Delivery" | "Online Payment" | "UPI" | "Card";
-type OrderStatus =
-  | "Processing"
-  | "Pending"
-  | "Completed"
-  | "Cancelled"
-  | "Shipped";
+type OrderStatus = "Processing" | "Pending" | "Completed" | "Cancelled" | "Shipped";
 type GSTStatus = "Filed" | "Not Filed";
 
 interface Product {
-  id: string;
-  name: string;
-  image: string;
-  seller: string;
-  sellerEmail: string;
+  id: string; name: string; image: string;
+  seller: string; sellerEmail: string; price?: number;
+}
+interface SellerGroup {
+  seller: { name: string; email: string };
+  products: Product[];
+}
+interface Order {
+  id: string; orderNumber: string; date: string; time: string;
+  customer: { name: string; email: string };
+  sellerGroups: SellerGroup[];
+  amount: number; paymentType: PaymentType;
+  status: OrderStatus; gstStatus: GSTStatus;
 }
 
-interface Order {
-  id: string;
-  orderNumber: string;
-  date: string;
-  time: string;
-  customer: { name: string; email: string };
-  sellers: { name: string; email: string }[];
-  products: Product[];
-  amount: number;
-  paymentType: PaymentType;
-  status: OrderStatus;
-  gstStatus: GSTStatus;
-  hasInvoice: boolean;
-}
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+const IC = {
+  Search: () => (
+    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+      <Path d="M7.333 12.667A5.333 5.333 0 1 0 7.333 2a5.333 5.333 0 0 0 0 10.667ZM14 14l-2.9-2.9" stroke="#9CA3AF" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  Order: ({ color = "#FFF" }: { color?: string }) => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M3 6h18M16 10a4 4 0 0 1-8 0" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  Grid: ({ active }: { active: boolean }) => (
+    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+      <Rect x="1" y="1" width="6.5" height="6.5" rx="1.5" stroke={active ? "#FFF" : "#6B7280"} strokeWidth={1.6} />
+      <Rect x="10.5" y="1" width="6.5" height="6.5" rx="1.5" stroke={active ? "#FFF" : "#6B7280"} strokeWidth={1.6} />
+      <Rect x="1" y="10.5" width="6.5" height="6.5" rx="1.5" stroke={active ? "#FFF" : "#6B7280"} strokeWidth={1.6} />
+      <Rect x="10.5" y="10.5" width="6.5" height="6.5" rx="1.5" stroke={active ? "#FFF" : "#6B7280"} strokeWidth={1.6} />
+    </Svg>
+  ),
+  List: ({ active }: { active: boolean }) => (
+    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+      <Path d="M5 4.5h12M5 9h12M5 13.5h12" stroke={active ? "#FFF" : "#6B7280"} strokeWidth={1.6} strokeLinecap="round" />
+      <Circle cx="2" cy="4.5" r="1" fill={active ? "#FFF" : "#6B7280"} />
+      <Circle cx="2" cy="9" r="1" fill={active ? "#FFF" : "#6B7280"} />
+      <Circle cx="2" cy="13.5" r="1" fill={active ? "#FFF" : "#6B7280"} />
+    </Svg>
+  ),
+  ChevDown: ({ color = C.textMuted }: { color?: string }) => (
+    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+      <Path d="M4 6l4 4 4-4" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  ChevLeft: () => (
+    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+      <Path d="M10 12L6 8l4-4" stroke={C.text} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  ChevRight: ({ color = C.text }: { color?: string }) => (
+    <Svg width={14} height={14} viewBox="0 0 16 16" fill="none">
+      <Path d="M6 4l4 4-4 4" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  Eye: ({ color = "#FFF" }: { color?: string }) => (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+      <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth={2} />
+    </Svg>
+  ),
+  Shop: ({ color = C.primary, size = 13 }: { color?: string; size?: number }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M3 6h18M16 10a4 4 0 0 1-8 0" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  File: ({ color = C.navy }: { color?: string }) => (
+    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+      <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="14 2 14 8 20 8" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  Truck: ({ color = C.primary }: { color?: string }) => (
+    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+      <Rect x="1" y="3" width="15" height="13" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 8h4l3 3v5h-7V8z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="5.5" cy="18.5" r="2.5" stroke={color} strokeWidth={1.8} />
+      <Circle cx="18.5" cy="18.5" r="2.5" stroke={color} strokeWidth={1.8} />
+    </Svg>
+  ),
+  Check: ({ color = C.green }: { color?: string }) => (
+    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+      <Path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="22 4 12 14.01 9 11.01" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  User: ({ color = C.navy }: { color?: string }) => (
+    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+      <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="7" r="4" stroke={color} strokeWidth={1.8} />
+    </Svg>
+  ),
+  Calendar: ({ color = C.textMuted }: { color?: string }) => (
+    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="4" width="18" height="18" rx="2" stroke={color} strokeWidth={1.6} />
+      <Path d="M16 2v4M8 2v4M3 10h18" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  ),
+  X: ({ color = "#FFF" }: { color?: string }) => (
+    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+      <Path d="M12 4L4 12M4 4l8 8" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  ),
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtCur = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+const getInitials = (name: string) =>
+  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-const fmtCur = (n: number) => `₹${n.toLocaleString("en-IN")}.00`;
-
+// ─── Mapper ───────────────────────────────────────────────────────────────────
 function toUiOrder(row: ReturnType<typeof mapOrderRow>, raw: OrderSummary): Order {
   const createdAt = raw.createdAt ? new Date(raw.createdAt) : null;
-  const validDate = createdAt && !Number.isNaN(createdAt.getTime());
-
+  const valid = createdAt && !Number.isNaN(createdAt.getTime());
   const statusMap: Record<string, OrderStatus> = {
-    processing: "Processing",
-    pending: "Pending",
-    completed: "Completed",
-    cancelled: "Cancelled",
-    shipped: "Shipped",
+    processing: "Processing", pending: "Pending", completed: "Completed",
+    cancelled: "Cancelled", shipped: "Shipped",
   };
-  const normalizedStatus = (raw.orderStatus ?? "").toLowerCase();
-  const status = statusMap[normalizedStatus] ?? "Pending";
-
-  const paymentMap: Record<string, PaymentType> = {
-    cod: "Cash on Delivery",
-    cash_on_delivery: "Cash on Delivery",
-    upi: "UPI",
-    card: "Card",
-    online: "Online Payment",
+  const payMap: Record<string, PaymentType> = {
+    cod: "Cash on Delivery", cash_on_delivery: "Cash on Delivery",
+    upi: "UPI", card: "Card", online: "Online Payment",
   };
-  const payKey = (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase();
-  const paymentType = paymentMap[payKey] ?? "Cash on Delivery";
-
   return {
     id: String(row.id),
     orderNumber: row.orderId.startsWith("#") ? row.orderId : `#${row.orderId}`,
-    date: validDate
-      ? createdAt!.toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : row.date,
-    time: validDate
-      ? createdAt!.toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "",
+    date: valid ? createdAt!.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : row.date,
+    time: valid ? createdAt!.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "",
     customer: { name: row.customer, email: row.email },
-    sellers: [],
-    products: [],
-    amount:
-      typeof raw.totalAmount === "number"
-        ? raw.totalAmount
-        : Number(raw.totalAmount ?? 0),
-    paymentType,
-    status,
+    sellerGroups: [],
+    amount: typeof raw.totalAmount === "number" ? raw.totalAmount : Number(raw.totalAmount ?? 0),
+    paymentType: payMap[(raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase()] ?? "Cash on Delivery",
+    status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
     gstStatus: row.gstStatus?.toLowerCase() === "filed" ? "Filed" : "Not Filed",
-    hasInvoice: false,
   };
 }
 
-/** Returns up to 2 initials from a name */
-const getInitials = (name: string) =>
-  name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-const STATUS_CFG: Record<
-  OrderStatus,
-  { bg: string; text: string; dot: string }
-> = {
-  Processing: { bg: C.cyanBg, text: C.cyan, dot: C.cyan },
-  Pending: { bg: C.amberBg, text: C.amber, dot: C.amber },
-  Completed: { bg: C.greenBg, text: C.green, dot: C.green },
-  Cancelled: { bg: C.redBg, text: C.red, dot: C.red },
-  Shipped: { bg: C.purpleBg, text: C.purple, dot: C.purple },
+// ─── Status config ────────────────────────────────────────────────────────────
+const STATUS_CFG: Record<OrderStatus, { bg: string; text: string; dot: string }> = {
+  Processing: { bg: C.cyanBg,   text: C.cyan,   dot: C.cyan   },
+  Pending:    { bg: C.amberBg,  text: C.amber,  dot: C.amber  },
+  Completed:  { bg: C.greenBg,  text: C.green,  dot: C.green  },
+  Cancelled:  { bg: C.redBg,    text: C.red,    dot: C.red    },
+  Shipped:    { bg: C.purpleBg, text: C.purple, dot: C.purple },
 };
 
+const STATUS_FILTERS  = ["All", "Processing", "Pending", "Completed", "Shipped", "Cancelled"];
+const PAYMENT_FILTERS = ["All Payments", "Cash on Delivery", "Online Payment", "UPI", "Card"];
+const ORDERS_PAGE_SIZE = 20;
+
+// ─── Portal Dropdown — uses Modal so it escapes ALL overflow clipping ─────────
+const Dropdown = ({
+  value, placeholder, options, onChange,
+}: {
+  value: string; placeholder: string; options: string[]; onChange: (v: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState({ x: 0, y: 0, w: 0 });
+  const [hovered, setHovered] = useState<string | null>(null);
+  const ref = useRef<View>(null);
+
+  const openMenu = () => {
+    ref.current?.measureInWindow((x, y, width, height) => {
+      const sw = typeof window !== "undefined" ? window.innerWidth : 420;
+      const menuW = Math.max(width, 180);
+      const clampX = Math.min(x, sw - menuW - 8);
+      setMenu({ x: clampX, y: y + height + 4, w: menuW });
+      setOpen(true);
+    });
+  };
+
+  return (
+    <View ref={ref} collapsable={false}>
+      <TouchableOpacity
+        style={[s.ddTrigger, open && s.ddTriggerOpen]}
+        onPress={openMenu}
+        activeOpacity={0.85}
+      >
+        <Text style={[s.ddVal, !value && s.ddPh]} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+        <IC.ChevDown color={open ? C.navy : C.textMuted} />
+      </TouchableOpacity>
+
+      {/* ── Full-screen Modal so menu renders above EVERYTHING ── */}
+      <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
+        {/* Backdrop — tap outside to close */}
+        <TouchableOpacity
+          style={s.ddBackdrop}
+          activeOpacity={1}
+          onPress={() => setOpen(false)}
+        />
+        {/* Floating menu positioned by measureInWindow coords */}
+        <View style={[s.ddMenuWrap, { top: menu.y, left: menu.x, width: menu.w }]}>
+          <ScrollView
+            style={{ maxHeight: 240 }}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {options.map((opt) => {
+              const isActive  = value === opt;
+              const isHovered = hovered === opt;
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  style={[
+                    s.ddItem,
+                    isActive  && s.ddItemActive,
+                    isHovered && !isActive && s.ddItemHover,
+                  ]}
+                  onPress={() => { onChange(opt); setOpen(false); setHovered(null); }}
+                  onPressIn={() => setHovered(opt)}
+                  onPressOut={() => setHovered(null)}
+                >
+                  <Text style={[s.ddItemText, isActive && s.ddItemTextActive]}>{opt}</Text>
+                  {isActive && <View style={s.ddActiveDot} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }: { status: OrderStatus }) => {
   const c = STATUS_CFG[status];
   return (
-    <View style={[ss.badge, { backgroundColor: c.bg }]}>
-      <View style={[ss.badgeDot, { backgroundColor: c.dot }]} />
-      <Text style={[ss.badgeTxt, { color: c.text }]}>{status}</Text>
+    <View style={[s.badge, { backgroundColor: c.bg }]}>
+      <View style={[s.badgeDot, { backgroundColor: c.dot }]} />
+      <Text style={[s.badgeText, { color: c.text }]}>{status}</Text>
     </View>
   );
 };
 
 // ─── GST Badge ────────────────────────────────────────────────────────────────
-
-const GSTBadge = ({
-  status,
-  onMark,
-}: {
-  status: GSTStatus;
-  onMark: () => void;
-}) => {
-  if (status === "Filed") {
-    return (
-      <View style={ss.gstFiled}>
-        <Icon.CheckCircle size={12} color={C.green} />
-        <Text style={[ss.gstTxt, { color: C.green }]}>Filed</Text>
-      </View>
-    );
-  }
-  return (
-    <TouchableOpacity
-      onPress={onMark}
-      activeOpacity={0.75}
-      style={ss.gstUnfiled}
-    >
-      <Text style={[ss.gstTxt, { color: C.amber }]}>Mark Filed</Text>
+const GSTBadge = ({ status, onMark }: { status: GSTStatus; onMark: () => void }) =>
+  status === "Filed" ? (
+    <View style={s.gstFiled}>
+      <IC.Check color={C.green} />
+      <Text style={[s.gstText, { color: C.greenDark }]}>Filed</Text>
+    </View>
+  ) : (
+    <TouchableOpacity onPress={onMark} style={s.gstUnfiled} activeOpacity={0.75}>
+      <Text style={[s.gstText, { color: C.amberDark }]}>Mark Filed</Text>
     </TouchableOpacity>
   );
-};
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
+// ─── Seller block (shared between grid card + mobile card) ────────────────────
+const SellerBlock = ({ group, isLast }: { group: SellerGroup; isLast: boolean }) => (
+  <View style={[s.sellerBlock, !isLast && s.sellerBlockBorder]}>
+    <View style={s.sellerRow}>
+      <View style={s.sellerIcon}><IC.Shop color={C.primary} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.sellerName} numberOfLines={1}>{group.seller.name}</Text>
+        <Text style={s.sellerEmail} numberOfLines={1}>{group.seller.email}</Text>
+      </View>
+      <TouchableOpacity style={s.docBtn}>
+        <IC.File color={C.navy} /><Text style={s.docBtnTxt}>Invoice</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[s.docBtn, { borderColor: C.primaryMid }]}>
+        <IC.Truck color={C.primary} /><Text style={[s.docBtnTxt, { color: C.primary }]}>Label</Text>
+      </TouchableOpacity>
+    </View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={s.productRow}>
+        {group.products.length === 0
+          ? <View style={s.thumbEmpty}><IC.Shop color={C.textMuted} size={16} /></View>
+          : group.products.map((p) => (
+              <View key={p.id} style={s.productItem}>
+                {p.image
+                  ? <Image source={{ uri: p.image }} style={s.thumb} resizeMode="cover" />
+                  : <View style={s.thumbEmpty}><IC.Shop color={C.textMuted} size={14} /></View>
+                }
+                {!!p.name && <Text style={s.productName} numberOfLines={2}>{p.name}</Text>}
+                {p.price !== undefined && <Text style={s.productPrice}>{fmtCur(p.price)}</Text>}
+              </View>
+            ))
+        }
+      </View>
+    </ScrollView>
+  </View>
+);
 
-export const OrderCard = ({
-  order,
-  onView,
-  onGST,
+// ─── GRID CARD (used for both mobile + web grid view) ────────────────────────
+const OrderGridCard = ({
+  order, onView, onGST, isWeb,
 }: {
-  order: Order;
-  onView: (o: Order) => void;
-  onGST: (id: string) => void;
+  order: Order; onView: () => void; onGST: () => void; isWeb: boolean;
 }) => {
+  // Collect up to 4 product images for the image strip at top
+  const allImages = order.sellerGroups.flatMap((g) => g.products.map((p) => p.image)).filter(Boolean).slice(0, 4);
+
   return (
-    <View style={ss.card}>
-      {/* ── Header: order ID + status badge ── */}
-      <View style={ss.cardHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={ss.orderIdLabel}>ORDER ID</Text>
-          <Text style={ss.orderNum}>{order.orderNumber}</Text>
-          <View style={ss.dateRow}>
-            <Icon.Calendar size={11} color={C.textMuted} />
-            <Text style={ss.dateText}>
-              {" "}
-              {order.date} · {order.time}
-            </Text>
+    <View style={[s.gridCard, isWeb && s.gridCardWeb]}>
+      {/* ── Product image strip ── */}
+      <View style={s.gridImgStrip}>
+        {allImages.length === 0 ? (
+          <View style={s.gridImgPlaceholder}>
+            <IC.Order color={C.textMuted} />
           </View>
-        </View>
-        <StatusBadge status={order.status} />
-      </View>
-
-      <View style={ss.divider} />
-
-      {/* ── Products ── */}
-      <View style={ss.section}>
-        <Text style={ss.sectionLabel}>PRODUCTS</Text>
-        <View style={ss.productRow}>
-          {order.products.map((p) => (
-            <Image
-              key={p.id}
-              source={{ uri: p.image }}
-              style={ss.productThumb}
-            />
-          ))}
+        ) : allImages.length === 1 ? (
+          <Image source={{ uri: allImages[0] }} style={s.gridImgFull} resizeMode="cover" />
+        ) : (
+          <View style={s.gridImgGrid}>
+            {allImages.map((img, i) => (
+              <Image key={i} source={{ uri: img }} style={[s.gridImgQuad, i > 0 && { marginLeft: 2 }]} resizeMode="cover" />
+            ))}
+          </View>
+        )}
+        {/* Status pill overlay */}
+        <View style={s.gridStatusPill}>
+          <StatusBadge status={order.status} />
         </View>
       </View>
 
-      <View style={ss.divider} />
-
-      {/* ── Sellers ── */}
-      <View style={ss.section}>
-        <Text style={ss.sectionLabel}>
-          {order.sellers.length > 1 ? "SELLERS" : "SELLER"}
-        </Text>
-        {order.sellers.map((s, i) => (
-          <View key={i} style={[ss.sellerRow, i > 0 && { marginTop: 6 }]}>
-            <View style={ss.sellerIconWrap}>
-              <Icon.Shop size={12} color={C.brand} />
-            </View>
-            <Text style={ss.sellerName} numberOfLines={1}>
-              {s.name}
-            </Text>
+      {/* ── Body ── */}
+      <View style={s.gridBody}>
+        {/* Order # + date */}
+        <View style={s.gridOrderRow}>
+          <Text style={s.gridOrderNum}>{order.orderNumber}</Text>
+          <View style={s.dateRow}>
+            <IC.Calendar />
+            <Text style={s.dateText}> {order.date}</Text>
           </View>
-        ))}
-      </View>
+        </View>
 
-      <View style={ss.divider} />
-
-      {/* ── Customer ── */}
-      <View style={ss.section}>
-        <Text style={ss.sectionLabel}>CUSTOMER</Text>
-        <View style={ss.customerRow}>
-          <View style={ss.avatar}>
-            <Text style={ss.avatarTxt}>{getInitials(order.customer.name)}</Text>
+        {/* Customer */}
+        <View style={s.customerRow}>
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{getInitials(order.customer.name)}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={ss.customerName} numberOfLines={1}>
-              {order.customer.name}
-            </Text>
-            <Text style={ss.customerEmail} numberOfLines={1}>
-              {order.customer.email}
-            </Text>
+            <Text style={s.customerName} numberOfLines={1}>{order.customer.name}</Text>
+            <Text style={s.customerEmail} numberOfLines={1}>{order.customer.email}</Text>
+          </View>
+        </View>
+
+        {/* Sellers summary */}
+        {order.sellerGroups.length > 0 && (
+          <View style={s.gridSellers}>
+            {order.sellerGroups.map((g, i) => (
+              <View key={i} style={s.gridSellerChip}>
+                <IC.Shop color={C.primary} size={10} />
+                <Text style={s.gridSellerChipText} numberOfLines={1}>{g.seller.name}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Amount + payment */}
+        <View style={s.gridAmountRow}>
+          <Text style={s.gridAmount}>{fmtCur(order.amount)}</Text>
+          <Text style={s.gridPayment}>{order.paymentType}</Text>
+        </View>
+
+        {/* GST + doc buttons */}
+        <View style={s.gridFooterRow}>
+          <GSTBadge status={order.gstStatus} onMark={onGST} />
+          <View style={s.gridDocBtns}>
+            <TouchableOpacity style={s.docBtn}>
+              <IC.File color={C.navy} /><Text style={s.docBtnTxt}>Invoice</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.docBtn, { borderColor: C.primaryMid }]}>
+              <IC.Truck color={C.primary} /><Text style={[s.docBtnTxt, { color: C.primary }]}>Label</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* ── Amount strip ── */}
-      <View style={ss.amountStrip}>
-        <View>
-          <Text style={ss.amountLabel}>Total Amount</Text>
-          <Text style={ss.amountVal}>{fmtCur(order.amount)}</Text>
-        </View>
-        <View style={ss.paymentChip}>
-          <Icon.Truck size={12} color={C.textSecondary} />
-          <Text style={ss.paymentChipTxt}>{order.paymentType}</Text>
-        </View>
-      </View>
-
-      {/* ── Footer: Payment | GST Filed | Invoice ── */}
-      <View style={ss.footer}>
-        <View style={ss.footerCell}>
-          <Text style={ss.footerLabel}>PAYMENT</Text>
-          <Text style={ss.footerValue}>{order.paymentType}</Text>
-        </View>
-
-        <View style={ss.footerDivider} />
-
-        <View style={ss.footerCell}>
-          <Text style={ss.footerLabel}>GST FILED</Text>
-          <View style={{ marginTop: 5 }}>
-            <GSTBadge status={order.gstStatus} onMark={() => onGST(order.id)} />
-          </View>
-        </View>
-
-        <View style={ss.footerDivider} />
-
-        <View style={ss.footerCell}>
-          <Text style={ss.footerLabel}>INVOICE / LABEL</Text>
-          {order.hasInvoice ? (
-            <View style={[ss.iconRow, { marginTop: 5 }]}>
-              <TouchableOpacity style={ss.iconBtn}>
-                <Icon.FileText size={13} color={C.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[ss.iconBtn, ss.iconBtnGreen]}>
-                <Icon.Download size={13} color={C.green} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Text style={ss.noInvoice}>—</Text>
-          )}
-        </View>
-      </View>
-
-      {/* ── View Details ── */}
-      <TouchableOpacity
-        style={ss.viewBtn}
-        onPress={() => onView(order)}
-        activeOpacity={0.8}
-      >
-        <Icon.Eye size={13} color={C.brand} />
-        <Text style={ss.viewBtnTxt}>View Order Details</Text>
-        <Icon.ChevronRight size={13} color={C.brand} />
+      {/* ── View button ── */}
+      <TouchableOpacity style={s.gridViewBtn} onPress={onView} activeOpacity={0.85}>
+        <IC.Eye />
+        <Text style={s.gridViewBtnText}>View Order Details</Text>
+        <IC.ChevRight color="#FFF" />
       </TouchableOpacity>
     </View>
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── LIST TABLE ROW ───────────────────────────────────────────────────────────
+const ListRow = ({
+  order, idx, onView, onGST,
+}: {
+  order: Order; idx: number; onView: () => void; onGST: () => void;
+}) => {
+  // First product image (for the Order column)
+  const firstImg = order.sellerGroups.flatMap((g) => g.products.map((p) => p.image)).filter(Boolean)[0];
 
-const ss = StyleSheet.create({
-  card: {
-    backgroundColor: C.white,
-    marginHorizontal: 14,
-    marginBottom: 14,
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: C.border,
-    overflow: "hidden",
-    shadowColor: C.navy,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-  },
+  return (
+    <View style={[s.tRow, idx % 2 === 1 && s.tRowAlt]}>
 
-  // Header
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    padding: 14,
-    gap: 10,
-  },
-  orderIdLabel: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: C.textMuted,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    marginBottom: 3,
-  },
-  orderNum: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: C.navy,
-    letterSpacing: -0.2,
-    marginBottom: 4,
-    fontVariant: ["tabular-nums"],
-  },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dateText: {
-    fontSize: 11,
-    color: C.textMuted,
-  },
+      {/* Order # + first product image */}
+      <View style={[s.cell, s.cOrder]}>
+        <View style={s.listOrderCell}>
+          {firstImg
+            ? <Image source={{ uri: firstImg }} style={s.listProductImg} resizeMode="cover" />
+            : <View style={s.listProductImgEmpty}><IC.Order color={C.textMuted} /></View>
+          }
+          <View style={{ flex: 1 }}>
+            <Text style={s.tdOrderNum}>{order.orderNumber}</Text>
+            <View style={s.dateRow}>
+              <IC.Calendar />
+              <Text style={s.dateText}> {order.date}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
 
-  // Badge
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  badgeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    opacity: 0.8,
-  },
-  badgeTxt: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
+      {/* Customer */}
+      <View style={[s.cell, s.cCustomer]}>
+        <View style={s.customerRow}>
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{getInitials(order.customer.name)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.tdName} numberOfLines={1}>{order.customer.name}</Text>
+            <Text style={s.tdEmail} numberOfLines={1}>{order.customer.email}</Text>
+          </View>
+        </View>
+      </View>
 
-  divider: {
-    height: 0.5,
-    backgroundColor: C.borderLight,
-    marginHorizontal: 0,
-  },
+      {/* Sellers + product thumbs grouped by seller */}
+      <View style={[s.cell, s.cSellers]}>
+        {order.sellerGroups.length === 0 ? (
+          <Text style={s.tdMuted}>—</Text>
+        ) : (
+          order.sellerGroups.map((g, i) => (
+            <View
+              key={i}
+              style={[
+                s.webSellerGroup,
+                i > 0 && { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.borderLight },
+              ]}
+            >
+              <View style={s.webSellerHeader}>
+                <View style={s.sellerIcon}><IC.Shop color={C.primary} /></View>
+                <Text style={s.tdName} numberOfLines={1}>{g.seller.name}</Text>
+              </View>
+              <View style={s.webProductRow}>
+                {g.products.slice(0, 4).map((p) =>
+                  p.image
+                    ? <Image key={p.id} source={{ uri: p.image }} style={s.webThumb} resizeMode="cover" />
+                    : <View key={p.id} style={s.webThumbEmpty} />
+                )}
+              </View>
+              <View style={s.webDocsRow}>
+                <TouchableOpacity style={s.docBtnSm}>
+                  <IC.File color={C.navy} /><Text style={s.docBtnSmTxt}>Invoice</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.docBtnSm, { borderColor: C.primaryMid }]}>
+                  <IC.Truck color={C.primary} /><Text style={[s.docBtnSmTxt, { color: C.primary }]}>Label</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
 
-  // Section
-  section: {
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  sectionLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: C.textMuted,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
+      {/* Amount */}
+      <View style={[s.cell, s.cAmount]}>
+        <Text style={s.tdAmount}>{fmtCur(order.amount)}</Text>
+        <Text style={s.tdPayment}>{order.paymentType}</Text>
+      </View>
 
-  // Products
-  productRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  productThumb: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 0.5,
-    borderColor: C.border,
-    backgroundColor: C.bg,
-  },
+      {/* Status */}
+      <View style={[s.cell, s.cStatus]}>
+        <StatusBadge status={order.status} />
+      </View>
 
-  // Seller
-  sellerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sellerIconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    backgroundColor: C.brandLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sellerName: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: C.textPrimary,
-    flex: 1,
-  },
+      {/* GST */}
+      <View style={[s.cell, s.cGst]}>
+        <GSTBadge status={order.gstStatus} onMark={onGST} />
+      </View>
 
-  // Customer
-  customerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: C.navyLight,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  avatarTxt: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: C.navyMid,
-  },
-  customerName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: C.textPrimary,
-  },
-  customerEmail: {
-    fontSize: 10,
-    color: C.textMuted,
-    marginTop: 1,
-  },
+      {/* Action */}
+      <View style={[s.cell, s.cAction, { alignItems: "center" }]}>
+        <TouchableOpacity style={s.viewBtnSm} onPress={onView} activeOpacity={0.85}>
+          <IC.Eye /><Text style={s.viewBtnSmText}>View</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
-  // Amount strip
-  amountStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: (C as any).amountStripBg ?? "#FFFBF5",
-    borderTopWidth: 0.5,
-    borderBottomWidth: 0.5,
-    borderColor: C.borderLight,
-  },
-  amountLabel: {
-    fontSize: 10,
-    color: C.textMuted,
-    marginBottom: 2,
-  },
-  amountVal: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: C.brand,
-    letterSpacing: -0.5,
-  },
-  paymentChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: C.white,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: C.border,
-  },
-  paymentChipTxt: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.textSecondary,
-  },
-
-  // Footer
-  footer: {
-    flexDirection: "row",
-  },
-  footerCell: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  footerDivider: {
-    width: 0.5,
-    backgroundColor: C.borderLight,
-    marginVertical: 8,
-  },
-  footerLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: C.textMuted,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-  footerValue: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.textSecondary,
-    marginTop: 3,
-  },
-
-  // GST
-  gstFiled: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: C.greenBg,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  gstUnfiled: {
-    backgroundColor: C.amberBg,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  gstTxt: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-
-  // Invoice icons
-  iconRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  iconBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    backgroundColor: C.bg,
-    borderWidth: 0.5,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconBtnGreen: {
-    backgroundColor: C.greenLight,
-    borderColor: C.greenBorder,
-  },
-  noInvoice: {
-    color: C.textMuted,
-    fontSize: 13,
-    marginTop: 5,
-  },
-
-  // View Details button
-  viewBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderTopWidth: 0.5,
-    borderTopColor: C.border,
-    backgroundColor: C.brandLight,
-    gap: 5,
-  },
-  viewBtnTxt: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: C.brand,
-  },
-
-  stateBox: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 48,
-    marginHorizontal: 14,
-    gap: 12,
-    backgroundColor: C.white,
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: C.border,
-  },
-  stateText: {
-    fontSize: 14,
-    color: C.textSecondary,
-  },
-  errorText: {
-    fontSize: 14,
-    color: C.red,
-    textAlign: "center",
-    paddingHorizontal: 24,
-  },
-  retryBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: C.brand,
-  },
-  retryBtnText: {
-    color: C.white,
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  pagination: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 12,
-    marginHorizontal: 14,
-    marginTop: 4,
-    marginBottom: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: C.white,
-    borderRadius: 16,
-    borderWidth: 0.5,
-    borderColor: C.border,
-  },
-  paginationInfo: {
-    fontSize: 13,
-    color: C.textSecondary,
-  },
-  paginationControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  pageBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: C.white,
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageNum: {
-    minWidth: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: C.white,
-    paddingHorizontal: 6,
-  },
-  pageNumActive: {
-    backgroundColor: C.brand,
-    borderColor: C.brand,
-  },
-  pageNumText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: C.navy,
-  },
-  pageNumTextActive: { color: C.white },
-  pageEllipsis: {
-    fontSize: 13,
-    color: C.textMuted,
-    paddingHorizontal: 4,
-  },
-});
-
-const ORDERS_PAGE_SIZE = 20;
-
-function buildOrderPageNumbers(current: number, total: number): (number | "ellipsis")[] {
+// ─── Pagination ───────────────────────────────────────────────────────────────
+function buildPages(curr: number, total: number): (number | "…")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages: (number | "ellipsis")[] = [1];
-  if (current > 3) pages.push("ellipsis");
-  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p += 1) {
-    pages.push(p);
-  }
-  if (current < total - 2) pages.push("ellipsis");
-  if (total > 1) pages.push(total);
-  return pages;
+  const out: (number | "…")[] = [1];
+  if (curr > 3) out.push("…");
+  for (let p = Math.max(2, curr - 1); p <= Math.min(total - 1, curr + 1); p++) out.push(p);
+  if (curr < total - 2) out.push("…");
+  if (total > 1) out.push(total);
+  return out;
 }
 
-export default function OrdersScreen({ navigation }: { navigation?: any }) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+const PaginationBar = ({
+  page, total, rangeStart, rangeEnd, totalEl, onPrev, onNext, onPage,
+}: {
+  page: number; total: number; rangeStart: number; rangeEnd: number;
+  totalEl: number; onPrev: () => void; onNext: () => void; onPage: (p: number) => void;
+}) => (
+  <View style={s.pagination}>
+    <Text style={s.paginationInfo}>Showing {rangeStart}–{rangeEnd} of {totalEl} orders</Text>
+    {total > 1 && (
+      <View style={s.paginationControls}>
+        <TouchableOpacity style={[s.pageBtn, page <= 1 && s.pageBtnOff]} onPress={onPrev} disabled={page <= 1}>
+          <IC.ChevLeft />
+        </TouchableOpacity>
+        {buildPages(page, total).map((n, i) =>
+          n === "…" ? (
+            <Text key={`e${i}`} style={s.pageEllipsis}>…</Text>
+          ) : (
+            <TouchableOpacity key={n} style={[s.pageBtn, n === page && s.pageBtnActive]} onPress={() => onPage(n as number)}>
+              <Text style={[s.pageBtnText, n === page && s.pageBtnTextActive]}>{n}</Text>
+            </TouchableOpacity>
+          )
+        )}
+        <TouchableOpacity style={[s.pageBtn, page >= total && s.pageBtnOff]} onPress={onNext} disabled={page >= total}>
+          <IC.ChevRight />
+        </TouchableOpacity>
+      </View>
+    )}
+  </View>
+);
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+export default function OrdersScreen({ navigation }: { navigation?: any }) {
+  const { width } = useWindowDimensions();
+  const isWeb = width >= 768;
+
+  const [orders,       setOrders]       = useState<Order[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const [totalElements,setTotalElements]= useState(0);
+  const [totalPages,   setTotalPages]   = useState(0);
+  const [search,       setSearch]       = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [payFilter,    setPayFilter]    = useState("All Payments");
+  const [viewMode,     setViewMode]     = useState<"grid" | "list">("list");
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
     try {
       const page = await fetchOrders({ page: currentPage - 1, size: ORDERS_PAGE_SIZE });
       setOrders(page.items.map((item) => toUiOrder(mapOrderRow(item), item)));
       setTotalElements(page.totalElements);
       setTotalPages(page.totalPages);
-      if (currentPage > page.totalPages && page.totalPages > 0) {
-        setCurrentPage(page.totalPages);
-      }
+      if (currentPage > page.totalPages && page.totalPages > 0) setCurrentPage(page.totalPages);
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load orders."));
     } finally {
@@ -861,31 +611,16 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
     }
   }, [currentPage]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  useEffect(() => { load(); }, [load]);
 
-  const pageNumbers = useMemo(
-    () => buildOrderPageNumbers(currentPage, totalPages),
-    [currentPage, totalPages],
-  );
-  const rangeStart =
-    totalElements === 0 ? 0 : (currentPage - 1) * ORDERS_PAGE_SIZE + 1;
-  const rangeEnd = Math.min(currentPage * ORDERS_PAGE_SIZE, totalElements);
-
-  const handleView = useCallback(
-    (o: Order) => {
-      if (navigation) navigation.navigate("OrderDetails", { order: o });
-    },
-    [navigation],
-  );
+  const handleView = useCallback((o: Order) => {
+    if (navigation) navigation.navigate("OrderDetails", { order: o });
+  }, [navigation]);
 
   const handleGST = useCallback(async (id: string) => {
     try {
       await updateOrderGstStatus(Number(id), "Filed");
-      setOrders((prev) =>
-        prev.map((o) => (o.id === id ? { ...o, gstStatus: "Filed" } : o)),
-      );
+      setOrders((prev) => prev.map((o) => o.id === id ? { ...o, gstStatus: "Filed" } : o));
     } catch (err) {
       const msg = getApiErrorMessage(err, "Failed to update GST status.");
       if (Platform.OS === "web") window.alert(msg);
@@ -893,96 +628,547 @@ export default function OrdersScreen({ navigation }: { navigation?: any }) {
     }
   }, []);
 
+  const filtered = useMemo(() => orders.filter((o) => {
+    const q = search.toLowerCase();
+    return (
+      (!search || o.orderNumber.toLowerCase().includes(q) || o.customer.name.toLowerCase().includes(q)) &&
+      (statusFilter === "All" || o.status === statusFilter) &&
+      (payFilter === "All Payments" || o.paymentType === payFilter)
+    );
+  }), [orders, search, statusFilter, payFilter]);
+
+  const rangeStart = totalElements === 0 ? 0 : (currentPage - 1) * ORDERS_PAGE_SIZE + 1;
+  const rangeEnd   = Math.min(currentPage * ORDERS_PAGE_SIZE, totalElements);
+
   return (
     <AdminLayout>
-      <View style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      <ScrollView
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={ss.stateBox}>
-            <ActivityIndicator size="large" color={C.brand} />
-            <Text style={ss.stateText}>Loading orders…</Text>
-          </View>
-        ) : error ? (
-          <View style={ss.stateBox}>
-            <Text style={ss.errorText}>{error}</Text>
-            <TouchableOpacity style={ss.retryBtn} onPress={loadOrders} activeOpacity={0.8}>
-              <Text style={ss.retryBtnText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : orders.length === 0 ? (
-          <View style={ss.stateBox}>
-            <Text style={ss.stateText}>No orders found</Text>
-          </View>
-        ) : (
-          <>
-            {orders.map((o) => (
-              <OrderCard
-                key={o.id}
-                order={o}
-                onView={handleView}
-                onGST={handleGST}
-              />
-            ))}
-            {totalPages > 0 && (
-              <View style={ss.pagination}>
-                <Text style={ss.paginationInfo}>
-                  Showing {rangeStart} to {rangeEnd} of {totalElements} orders
-                </Text>
-                {totalPages > 1 && (
-                  <View style={ss.paginationControls}>
-                    <TouchableOpacity
-                      style={[ss.pageBtn, currentPage <= 1 && ss.pageBtnDisabled]}
-                      disabled={currentPage <= 1}
-                      onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    >
-                      <Text style={ss.pageNumText}>‹</Text>
-                    </TouchableOpacity>
-                    {pageNumbers.map((num, index) =>
-                      num === "ellipsis" ? (
-                        <Text key={`e-${index}`} style={ss.pageEllipsis}>
-                          ...
-                        </Text>
-                      ) : (
-                        <TouchableOpacity
-                          key={num}
-                          style={[ss.pageNum, num === currentPage && ss.pageNumActive]}
-                          onPress={() => setCurrentPage(num)}
-                        >
-                          <Text
-                            style={[
-                              ss.pageNumText,
-                              num === currentPage && ss.pageNumTextActive,
-                            ]}
-                          >
-                            {num}
-                          </Text>
-                        </TouchableOpacity>
-                      ),
-                    )}
-                    <TouchableOpacity
-                      style={[
-                        ss.pageBtn,
-                        currentPage >= totalPages && ss.pageBtnDisabled,
-                      ]}
-                      disabled={currentPage >= totalPages}
-                      onPress={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
-                    >
-                      <Text style={ss.pageNumText}>›</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+
+          {/* ── Header ── */}
+          <View style={s.pageHeader}>
+            <View style={s.pageHeaderLeft}>
+              <View style={s.pageIconWrap}><IC.Order /></View>
+              <View>
+                <Text style={s.pageTitle}>Orders</Text>
+                <Text style={s.pageSub}>Manage and track all customer orders</Text>
               </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+            </View>
+            <View style={s.statChip}>
+              <Text style={s.statChipNum}>{totalElements}</Text>
+              <Text style={s.statChipLabel}>Total</Text>
+            </View>
+          </View>
+
+          {/* ── Toolbar: search · status · payment · view toggle ── */}
+          <View style={s.toolbar}>
+            <View style={s.searchBox}>
+              <IC.Search />
+              <TextInput
+                style={s.searchInput}
+                placeholder="Search orders or customers…"
+                placeholderTextColor="#9CA3AF"
+                value={search}
+                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+              />
+            </View>
+            <View style={s.toolbarRight}>
+              <View style={{ minWidth: 140 }}>
+                <Dropdown
+                  value={statusFilter === "All" ? "" : statusFilter}
+                  placeholder="All Statuses"
+                  options={STATUS_FILTERS}
+                  onChange={(v) => { setStatusFilter(v || "All"); setCurrentPage(1); }}
+                />
+              </View>
+              <View style={{ minWidth: 160 }}>
+                <Dropdown
+                  value={payFilter === "All Payments" ? "" : payFilter}
+                  placeholder="All Payments"
+                  options={PAYMENT_FILTERS}
+                  onChange={(v) => { setPayFilter(v || "All Payments"); setCurrentPage(1); }}
+                />
+              </View>
+              {/* Grid / List toggle */}
+              <View style={s.viewToggle}>
+                <TouchableOpacity
+                  style={[s.vtBtn, viewMode === "grid" && s.vtBtnActive]}
+                  onPress={() => setViewMode("grid")}
+                >
+                  <IC.Grid active={viewMode === "grid"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.vtBtn, viewMode === "list" && s.vtBtnActive]}
+                  onPress={() => setViewMode("list")}
+                >
+                  <IC.List active={viewMode === "list"} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Content ── */}
+          {loading ? (
+            <View style={s.stateBox}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <Text style={s.stateText}>Loading orders…</Text>
+            </View>
+          ) : error ? (
+            <View style={s.stateBox}>
+              <Text style={s.errorText}>{error}</Text>
+              <TouchableOpacity style={s.retryBtn} onPress={load}>
+                <Text style={s.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View style={s.stateBox}>
+              <IC.Order color={C.textMuted} />
+              <Text style={s.stateText}>No orders found</Text>
+              <Text style={s.stateSub}>Try adjusting your filters</Text>
+            </View>
+          ) : viewMode === "grid" ? (
+            /* ── GRID VIEW — works on both mobile + web ── */
+            <View style={[s.gridContainer, isWeb && s.gridContainerWeb]}>
+              {filtered.map((o) => (
+                <OrderGridCard
+                  key={o.id}
+                  order={o}
+                  isWeb={isWeb}
+                  onView={() => handleView(o)}
+                  onGST={() => handleGST(o.id)}
+                />
+              ))}
+            </View>
+          ) : (
+            /* ── LIST VIEW ── */
+            isWeb ? (
+              /* Web: full table */
+              <View style={s.tableWrap}>
+                <View style={s.tHead}>
+                  <Text style={[s.th, s.cOrder]}>Order</Text>
+                  <Text style={[s.th, s.cCustomer]}>Customer</Text>
+                  <Text style={[s.th, s.cSellers]}>Sellers & Products</Text>
+                  <Text style={[s.th, s.cAmount]}>Amount</Text>
+                  <Text style={[s.th, s.cStatus]}>Status</Text>
+                  <Text style={[s.th, s.cGst]}>GST</Text>
+                  <Text style={[s.th, s.cAction, { textAlign: "center" }]}>Action</Text>
+                </View>
+                {filtered.map((o, idx) => (
+                  <ListRow
+                    key={o.id} order={o} idx={idx}
+                    onView={() => handleView(o)}
+                    onGST={() => handleGST(o.id)}
+                  />
+                ))}
+              </View>
+            ) : (
+              /* Mobile list: stacked cards (same as old MobileOrderCard) */
+              <View style={s.cardList}>
+                {filtered.map((o) => (
+                  <View key={o.id} style={s.card}>
+                    {/* Header */}
+                    <View style={s.cardHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.orderLabel}>ORDER ID</Text>
+                        <Text style={s.orderNum}>{o.orderNumber}</Text>
+                        <View style={s.dateRow}>
+                          <IC.Calendar /><Text style={s.dateText}> {o.date} · {o.time}</Text>
+                        </View>
+                      </View>
+                      <StatusBadge status={o.status} />
+                    </View>
+
+                    {/* Customer */}
+                    <View style={s.cardSection}>
+                      <Text style={s.sectionLabel}>CUSTOMER</Text>
+                      <View style={s.customerRow}>
+                        <View style={s.avatar}>
+                          <Text style={s.avatarText}>{getInitials(o.customer.name)}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.customerName} numberOfLines={1}>{o.customer.name}</Text>
+                          <Text style={s.customerEmail} numberOfLines={1}>{o.customer.email}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Seller groups */}
+                    {o.sellerGroups.length > 0 && (
+                      <View style={s.cardSection}>
+                        <Text style={s.sectionLabel}>
+                          {o.sellerGroups.length > 1 ? `SELLERS (${o.sellerGroups.length})` : "SELLER"}
+                        </Text>
+                        {o.sellerGroups.map((g, i) => (
+                          <SellerBlock key={i} group={g} isLast={i === o.sellerGroups.length - 1} />
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Amount */}
+                    <View style={s.amountStrip}>
+                      <View>
+                        <Text style={s.amountLabel}>Order Total</Text>
+                        <Text style={s.amountVal}>{fmtCur(o.amount)}</Text>
+                      </View>
+                      <Text style={s.payText}>{o.paymentType}</Text>
+                    </View>
+
+                    {/* Footer */}
+                    <View style={s.cardFooter}>
+                      <GSTBadge status={o.gstStatus} onMark={() => handleGST(o.id)} />
+                      <TouchableOpacity style={s.viewBtn} onPress={() => handleView(o)} activeOpacity={0.85}>
+                        <IC.Eye /><Text style={s.viewBtnText}>View Details</Text>
+                        <IC.ChevRight color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )
+          )}
+
+          {/* ── Pagination ── */}
+          {!loading && !error && totalPages > 0 && (
+            <PaginationBar
+              page={currentPage} total={totalPages}
+              rangeStart={rangeStart} rangeEnd={rangeEnd} totalEl={totalElements}
+              onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onPage={setCurrentPage}
+            />
+          )}
+        </ScrollView>
       </View>
     </AdminLayout>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  scrollContent: { padding: 20, paddingBottom: 48 },
+
+  // Header
+  pageHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: C.navy, borderRadius: 14,
+    paddingHorizontal: 20, paddingVertical: 16, marginBottom: 16,
+  },
+  pageHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  pageIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center",
+  },
+  pageTitle: { fontSize: 20, fontWeight: "700", color: "#FFF", letterSpacing: -0.3 },
+  pageSub:   { fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 },
+  statChip: {
+    backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 8, alignItems: "center",
+  },
+  statChipNum:   { fontSize: 18, fontWeight: "700", color: "#FFF" },
+  statChipLabel: { fontSize: 10, color: "rgba(255,255,255,0.65)", marginTop: 1 },
+
+  // Toolbar
+  toolbar: {
+    flexDirection: "row", gap: 8, marginBottom: 14,
+    alignItems: "center", flexWrap: "wrap", width: "100%",
+  },
+  searchBox: {
+    flex: 1, minWidth: 180,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: C.surface, borderRadius: 10,
+    borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, height: 42,
+  },
+  searchInput:  { flex: 1, fontSize: 14, color: C.text, outlineStyle: "none" } as any,
+  toolbarRight: { flexDirection: "row", gap: 8, alignItems: "center", flexShrink: 0, flexWrap: "wrap" },
+  viewToggle:   { flexDirection: "row", backgroundColor: C.navyLight, borderRadius: 10, padding: 3 },
+  vtBtn:        { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  vtBtnActive:  { backgroundColor: C.navy },
+
+  // Dropdown
+  ddTrigger: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: C.surface, borderRadius: 10,
+    borderWidth: 1, borderColor: C.border,
+    paddingHorizontal: 12, height: 42,
+  },
+  ddTriggerOpen: { borderColor: C.navy },
+  ddVal:  { fontSize: 13, color: C.text, flex: 1 },
+  ddPh:   { color: "#9CA3AF" },
+  // Full-screen dismiss layer
+  ddBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  // Floating menu — absolutely positioned via measureInWindow
+  ddMenuWrap: {
+    position: "absolute",
+    backgroundColor: C.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: C.navy, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16, shadowRadius: 16, elevation: 20, overflow: "hidden",
+  },
+  ddItem: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 14, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  ddItemActive:    { backgroundColor: C.navyLight },
+  ddItemHover:     { backgroundColor: C.navyLighter },
+  ddItemText:      { fontSize: 13, color: C.text },
+  ddItemTextActive:{ color: C.navy, fontWeight: "700" },
+  ddActiveDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: C.navy },
+
+  // Shared badges
+  badge: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start",
+  },
+  badgeDot:  { width: 5, height: 5, borderRadius: 3 },
+  badgeText: { fontSize: 11, fontWeight: "700" },
+  gstFiled: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: C.greenBg, paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 7, alignSelf: "flex-start",
+  },
+  gstUnfiled: {
+    backgroundColor: C.amberBg, paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 7, alignSelf: "flex-start",
+  },
+  gstText: { fontSize: 11, fontWeight: "600" },
+
+  // Shared seller block
+  sellerBlock:       { paddingBottom: 10, marginBottom: 4 },
+  sellerBlockBorder: { borderBottomWidth: 1, borderBottomColor: C.borderLight, marginBottom: 10 },
+  sellerRow:         { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 8 },
+  sellerIcon: {
+    width: 24, height: 24, borderRadius: 7,
+    backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center",
+  },
+  sellerName:  { fontSize: 12, fontWeight: "700", color: C.text, flex: 1 },
+  sellerEmail: { fontSize: 10, color: C.textMuted },
+  productRow:  { flexDirection: "row", gap: 8, paddingBottom: 4 },
+  productItem: { alignItems: "center", width: 58 },
+  thumb: {
+    width: 50, height: 50, borderRadius: 10,
+    borderWidth: 1, borderColor: C.border,
+  },
+  thumbEmpty: {
+    width: 50, height: 50, borderRadius: 10,
+    backgroundColor: C.navyLighter, alignItems: "center", justifyContent: "center",
+  },
+  productName:  { fontSize: 9,  color: C.textSub, marginTop: 4, textAlign: "center" },
+  productPrice: { fontSize: 10, fontWeight: "600", color: C.primary, marginTop: 2 },
+  docBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 8, paddingVertical: 5,
+    borderWidth: 1, borderColor: C.navyLight, borderRadius: 7,
+    backgroundColor: C.surface,
+  },
+  docBtnTxt: { fontSize: 10, fontWeight: "600", color: C.navy },
+
+  // ── GRID ────────────────────────────────────────────────────────────────────
+  gridContainer:    { flexDirection: "column", gap: 14 },
+  gridContainerWeb: {
+    flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "flex-start",
+  },
+  gridCard: {
+    backgroundColor: C.surface, borderRadius: 18,
+    borderWidth: 1, borderColor: C.border,
+    overflow: "hidden",
+    shadowColor: C.navy, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    width: "100%",
+  },
+  gridCardWeb: {
+    ...(Platform.OS === "web"
+      ? { width: "calc(33.33% - 11px)" as any, minWidth: 280, flexShrink: 0 }
+      : {}),
+  },
+  // Image strip at top of grid card
+  gridImgStrip: {
+    height: 180, backgroundColor: C.navyLighter, position: "relative",
+    borderTopLeftRadius: 17, borderTopRightRadius: 17, overflow: "hidden",
+  },
+  gridImgPlaceholder: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+  },
+  gridImgFull: { width: "100%", height: "100%" },
+  gridImgGrid: {
+    flex: 1, flexDirection: "row",
+  },
+  gridImgQuad: { flex: 1, height: "100%" },
+  gridStatusPill: {
+    position: "absolute", top: 10, right: 10,
+  },
+  gridBody: { padding: 14, gap: 10 },
+  gridOrderRow: { gap: 3 },
+  gridOrderNum: { fontSize: 15, fontWeight: "700", color: C.navy, letterSpacing: -0.2 },
+  gridSellers: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  gridSellerChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: C.primaryLight, borderRadius: 6,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  gridSellerChipText: { fontSize: 10, fontWeight: "600", color: C.primary },
+  gridAmountRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+  gridAmount:   { fontSize: 20, fontWeight: "700", color: C.primary, letterSpacing: -0.5 },
+  gridPayment:  { fontSize: 11, color: C.textMuted },
+  gridFooterRow:{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  gridDocBtns:  { flexDirection: "row", gap: 6 },
+  gridViewBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: C.navy, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: C.border,
+  },
+  gridViewBtnText: { fontSize: 13, fontWeight: "700", color: "#FFF" },
+
+  // Shared customer / date rows
+  customerRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  avatar: {
+    width: 32, height: 32, borderRadius: 9,
+    backgroundColor: C.navyLight, alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  avatarText:    { fontSize: 11, fontWeight: "700", color: C.navyMid },
+  customerName:  { fontSize: 13, fontWeight: "600", color: C.text },
+  customerEmail: { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  dateRow:       { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  dateText:      { fontSize: 11, color: C.textMuted },
+
+  // ── MOBILE LIST CARD ────────────────────────────────────────────────────────
+  cardList: { gap: 14 },
+  card: {
+    backgroundColor: C.surface, borderRadius: 18,
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: C.navy, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3, overflow: "hidden",
+  },
+  cardHeader: {
+    flexDirection: "row", alignItems: "flex-start",
+    padding: 16, gap: 10,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  orderLabel: { fontSize: 9, fontWeight: "700", color: C.textMuted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 },
+  orderNum:   { fontSize: 14, fontWeight: "700", color: C.navy, letterSpacing: -0.2, marginBottom: 2 },
+  cardSection: {
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  sectionLabel: { fontSize: 9, fontWeight: "700", color: C.textMuted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 },
+  amountStrip: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: C.primaryLight,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.primaryMid,
+  },
+  amountLabel: { fontSize: 10, color: C.textMuted, marginBottom: 2 },
+  amountVal:   { fontSize: 22, fontWeight: "700", color: C.primary, letterSpacing: -0.5 },
+  payText:     { fontSize: 11, color: C.textSub, fontWeight: "500" },
+  cardFooter:  {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  viewBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: C.navy, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+  },
+  viewBtnText: { fontSize: 13, fontWeight: "700", color: "#FFF" },
+
+  // ── WEB TABLE ────────────────────────────────────────────────────────────────
+  tableWrap: {
+    backgroundColor: C.surface, borderRadius: 14,
+    borderWidth: 1, borderColor: C.border,
+    overflow: "hidden", width: "100%",
+  },
+  tHead: {
+    flexDirection: "row", backgroundColor: C.navy,
+    borderTopLeftRadius: 13, borderTopRightRadius: 13,
+  },
+  th: {
+    paddingVertical: 14, paddingHorizontal: 14,
+    fontSize: 11, fontWeight: "700", color: "#FFF",
+    textTransform: "uppercase", letterSpacing: 0.6,
+  },
+  tRow: {
+    flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    alignItems: "flex-start", backgroundColor: C.surface, minHeight: 72,
+  },
+  tRowAlt: { backgroundColor: C.navyLighter },
+  cell:    { paddingVertical: 14, paddingHorizontal: 14, justifyContent: "center" },
+
+  // Column widths
+  cOrder:    { width: 180 },
+  cCustomer: { flex: 1.2, minWidth: 150 },
+  cSellers:  { flex: 2,   minWidth: 220 },
+  cAmount:   { width: 130 },
+  cStatus:   { width: 120 },
+  cGst:      { width: 110 },
+  cAction:   { width: 90  },
+
+  // List column content
+  listOrderCell: { flexDirection: "row", alignItems: "center", gap: 10 },
+  listProductImg: {
+    width: 48, height: 48, borderRadius: 10,
+    borderWidth: 1, borderColor: C.border, flexShrink: 0,
+  },
+  listProductImgEmpty: {
+    width: 48, height: 48, borderRadius: 10,
+    backgroundColor: C.navyLighter, alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  tdOrderNum: { fontSize: 13, fontWeight: "700", color: C.navy, marginBottom: 2 },
+  tdName:     { fontSize: 13, fontWeight: "600", color: C.text },
+  tdEmail:    { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  tdAmount:   { fontSize: 15, fontWeight: "700", color: C.primary },
+  tdPayment:  { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  tdMuted:    { fontSize: 12, color: C.textMuted },
+  webSellerGroup:  {},
+  webSellerHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 },
+  webProductRow:   { flexDirection: "row", gap: 4, marginBottom: 5 },
+  webThumb:        { width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: C.border },
+  webThumbEmpty:   { width: 34, height: 34, borderRadius: 8, backgroundColor: C.navyLighter },
+  webDocsRow:      { flexDirection: "row", gap: 5 },
+  docBtnSm: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    paddingHorizontal: 6, paddingVertical: 4,
+    borderWidth: 1, borderColor: C.navyLight, borderRadius: 6, backgroundColor: C.surface,
+  },
+  docBtnSmTxt: { fontSize: 9, fontWeight: "600", color: C.navy },
+  viewBtnSm: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: C.navy, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
+  },
+  viewBtnSmText: { fontSize: 12, fontWeight: "700", color: "#FFF" },
+
+  // Pagination
+  pagination: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    flexWrap: "wrap", gap: 12, marginTop: 16,
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: C.surface, borderRadius: 14,
+    borderWidth: 1, borderColor: C.border,
+  },
+  paginationInfo:     { fontSize: 13, color: C.textSub },
+  paginationControls: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pageBtn: {
+    width: 34, height: 34, borderRadius: 8,
+    borderWidth: 1, borderColor: C.border,
+    alignItems: "center", justifyContent: "center", backgroundColor: C.surface,
+  },
+  pageBtnActive:     { backgroundColor: C.navy, borderColor: C.navy },
+  pageBtnOff:        { opacity: 0.35 },
+  pageBtnText:       { fontSize: 13, fontWeight: "600", color: C.text },
+  pageBtnTextActive: { color: "#FFF" },
+  pageEllipsis:      { fontSize: 13, color: C.textMuted, paddingHorizontal: 2 },
+
+  // State boxes
+  stateBox: {
+    alignItems: "center", justifyContent: "center",
+    paddingVertical: 60, gap: 12,
+    backgroundColor: C.surface, borderRadius: 18,
+    borderWidth: 1, borderColor: C.border,
+  },
+  stateText:  { fontSize: 15, fontWeight: "600", color: C.textSub },
+  stateSub:   { fontSize: 13, color: C.textMuted },
+  errorText:  { fontSize: 14, color: C.red, textAlign: "center", paddingHorizontal: 24 },
+  retryBtn:   { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 9, backgroundColor: C.navy },
+  retryText:  { color: "#FFF", fontWeight: "700", fontSize: 13 },
+});
+
