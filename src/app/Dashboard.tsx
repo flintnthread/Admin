@@ -103,6 +103,8 @@ function chartYLabels(maxVal: number) {
   return Array.from({ length: 6 }, (_, i) => `₹${Math.round(maxVal - step * i)}`);
 }
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { width: screenW } = useWindowDimensions();
@@ -117,6 +119,78 @@ export default function DashboardScreen() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "inventory" | "users">("overview");
+
+  // Dynamic header height measurement
+  const [headerHeight, setHeaderHeight] = useState(130);
+
+  // ScrollView ref and layout position tracking
+  const scrollViewRef = React.useRef<ScrollView>(null);
+  const [sectionOffsets, setSectionOffsets] = useState<Record<string, number>>({
+    overview: 0,
+    sales: 0,
+    inventory: 0,
+    users: 0,
+  });
+
+  // Programmatical scrolling lock to avoid layout fights
+  const [isManualScrolling, setIsManualScrolling] = useState(false);
+  const manualScrollTimeoutRef = React.useRef<any>(null);
+
+  const handleTabPress = useCallback((key: "overview" | "sales" | "inventory" | "users") => {
+    setIsManualScrolling(true);
+    setActiveTab(key);
+
+    const paddingTopVal = headerHeight + 10;
+    const absolutePosition = (sectionOffsets[key] || 0) + paddingTopVal;
+    
+    // Position the section heading directly below the fixed header (scroll offset equal to header height)
+    const targetY = Math.max(0, absolutePosition - headerHeight);
+
+    scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
+
+    if (manualScrollTimeoutRef.current) {
+      clearTimeout(manualScrollTimeoutRef.current);
+    }
+    manualScrollTimeoutRef.current = setTimeout(() => {
+      setIsManualScrolling(false);
+    }, 1000);
+  }, [sectionOffsets, headerHeight]);
+
+  const handleScroll = useCallback((event: any) => {
+    if (isManualScrolling) return;
+    const y = event.nativeEvent.contentOffset.y;
+
+    const paddingTopVal = headerHeight + 10;
+    const getAbsoluteY = (k: string) => {
+      return (sectionOffsets[k] || 0) + paddingTopVal;
+    };
+
+    // A section is active when its heading reaches the bottom of the fixed header (with a 20px tolerance)
+    const threshold = headerHeight + 20;
+
+    const sorted = [
+      { key: "overview", y: getAbsoluteY("overview") },
+      { key: "sales", y: getAbsoluteY("sales") },
+      { key: "inventory", y: getAbsoluteY("inventory") },
+      { key: "users", y: getAbsoluteY("users") },
+    ].sort((a, b) => b.y - a.y);
+
+    for (const section of sorted) {
+      if (y >= section.y - threshold) {
+        setActiveTab(section.key as any);
+        break;
+      }
+    }
+  }, [sectionOffsets, isManualScrolling, headerHeight]);
+
+  useEffect(() => {
+    return () => {
+      if (manualScrollTimeoutRef.current) {
+        clearTimeout(manualScrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Collapsible sections state for Overview removed (sections are permanently expanded)
 
 
@@ -146,6 +220,288 @@ export default function DashboardScreen() {
   const [endDate, setEndDate] = useState("31/12/2026");
   const [revenueTimeframe, setRevenueTimeframe] = useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
   const [activeRevenueLegends, setActiveRevenueLegends] = useState({ revenue: true, orders: true });
+  // Local loading state for revenue chart only
+  const [chartLoading, setChartLoading] = useState(false);
+
+  // Custom Date Picker States
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerTarget, setDatePickerTarget] = useState<"start" | "end">("start");
+  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
+  const [pickerYear, setPickerYear] = useState(2026);
+  const [pickerMode, setPickerMode] = useState<"days" | "months" | "years">("days");
+
+  // Refs for the date inputs and the active dropdown card
+  const startButtonRef = React.useRef<any>(null);
+  const endButtonRef = React.useRef<any>(null);
+  const datePickerRef = React.useRef<any>(null);
+
+  const parseDateStr = useCallback((str: string): Date => {
+    const parts = str.split("/");
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      return new Date(year, month, day);
+    }
+    return new Date();
+  }, []);
+
+  const formatDateStr = useCallback((date: Date): string => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }, []);
+
+  const openDatePicker = useCallback((target: "start" | "end") => {
+    if (datePickerVisible && datePickerTarget === target) {
+      setDatePickerVisible(false);
+    } else {
+      setDatePickerTarget(target);
+      const currentDate = parseDateStr(target === "start" ? startDate : endDate);
+      setPickerMonth(currentDate.getMonth());
+      setPickerYear(currentDate.getFullYear());
+      setPickerMode("days");
+      setDatePickerVisible(true);
+    }
+  }, [datePickerVisible, datePickerTarget, startDate, endDate, parseDateStr]);
+
+  // Listen for clicks outside the date picker dropdown and Escape keypresses (Web support)
+  useEffect(() => {
+    if (Platform.OS !== "web" || !datePickerVisible) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDatePickerVisible(false);
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (datePickerRef.current) {
+        const target = e.target as HTMLElement;
+        const isInsideCalendar = datePickerRef.current.contains(target);
+        const isInsideStartBtn = startButtonRef.current && startButtonRef.current.contains(target);
+        const isInsideEndBtn = endButtonRef.current && endButtonRef.current.contains(target);
+
+        if (!isInsideCalendar && !isInsideStartBtn && !isInsideEndBtn) {
+          setDatePickerVisible(false);
+        }
+      }
+    };
+
+    // Minor delay to prevent handling the click event that triggers the open
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }, 10);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [datePickerVisible]);
+
+  const handlePrevMonth = useCallback(() => {
+    setPickerMonth(prev => {
+      if (prev === 0) {
+        setPickerYear(y => y - 1);
+        return 11;
+      }
+      return prev - 1;
+    });
+  }, []);
+
+  const handleNextMonth = useCallback(() => {
+    setPickerMonth(prev => {
+      if (prev === 11) {
+        setPickerYear(y => y + 1);
+        return 0;
+      }
+      return prev + 1;
+    });
+  }, []);
+
+  const getDaysInMonth = useCallback((month: number, year: number) => {
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const days = [];
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({
+        day: prevMonthDays - i,
+        month: month === 0 ? 11 : month - 1,
+        year: month === 0 ? year - 1 : year,
+        isCurrentMonth: false
+      });
+    }
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({
+        day: i,
+        month,
+        year,
+        isCurrentMonth: true
+      });
+    }
+    
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({
+        day: i,
+        month: month === 11 ? 0 : month + 1,
+        year: month === 11 ? year + 1 : year,
+        isCurrentMonth: false
+      });
+    }
+    
+    return days;
+  }, []);
+
+  const renderPickerHeader = () => {
+    if (pickerMode === "days") {
+      return (
+        <View style={styles.calHeader}>
+          <TouchableOpacity onPress={handlePrevMonth} style={styles.calHeaderBtn}>
+            <Ionicons name="chevron-back-outline" size={18} color={C.text} />
+          </TouchableOpacity>
+          <View style={styles.calHeaderTitleRow}>
+            <TouchableOpacity onPress={() => setPickerMode("months")} style={styles.calHeaderTextBtn}>
+              <Text style={styles.calHeaderTitleText}>{MONTHS[pickerMonth]}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPickerMode("years")} style={styles.calHeaderTextBtn}>
+              <Text style={styles.calHeaderTitleText}>{pickerYear}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={handleNextMonth} style={styles.calHeaderBtn}>
+            <Ionicons name="chevron-forward-outline" size={18} color={C.text} />
+          </TouchableOpacity>
+        </View>
+      );
+    } else if (pickerMode === "months") {
+      return (
+        <View style={styles.calHeader}>
+          <Text style={styles.calHeaderTitleTextSingle}>Select Month</Text>
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.calHeader}>
+          <Text style={styles.calHeaderTitleTextSingle}>Select Year</Text>
+        </View>
+      );
+    }
+  };
+
+  const renderCalendarContent = () => {
+    if (pickerMode === "days") {
+      const days = getDaysInMonth(pickerMonth, pickerYear);
+      const selectedDate = parseDateStr(datePickerTarget === "start" ? startDate : endDate);
+      
+      return (
+        <View style={styles.calDaysContainer}>
+          <View style={styles.calWeekdaysRow}>
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
+              <Text key={d} style={styles.calWeekdayText}>{d}</Text>
+            ))}
+          </View>
+          <ScrollView style={styles.calGridScroll} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
+            <View style={styles.calGrid}>
+              {days.map((item, idx) => {
+                const isSelected = selectedDate.getDate() === item.day &&
+                                  selectedDate.getMonth() === item.month &&
+                                  selectedDate.getFullYear() === item.year;
+                                  
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      styles.calDayCell,
+                      !item.isCurrentMonth && styles.calDayCellMuted,
+                      isSelected && styles.calDayCellSelected
+                    ]}
+                    onPress={() => {
+                      const newDate = new Date(item.year, item.month, item.day);
+                      if (datePickerTarget === "start") {
+                        setStartDate(formatDateStr(newDate));
+                      } else {
+                        setEndDate(formatDateStr(newDate));
+                      }
+                      setDatePickerVisible(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.calDayText,
+                      !item.isCurrentMonth && styles.calDayTextMuted,
+                      isSelected && styles.calDayTextSelected
+                    ]}>
+                      {item.day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      );
+    } else if (pickerMode === "months") {
+      return (
+        <ScrollView style={styles.calGridScroll} nestedScrollEnabled={true} showsVerticalScrollIndicator={false}>
+          <View style={styles.calMonthsGrid}>
+            {MONTHS.map((m, idx) => (
+              <TouchableOpacity
+                key={m}
+                style={[
+                  styles.calMonthCell,
+                  pickerMonth === idx && styles.calMonthCellSelected
+                ]}
+                onPress={() => {
+                  setPickerMonth(idx);
+                  setPickerMode("days");
+                }}
+              >
+                <Text style={[
+                  styles.calMonthText,
+                  pickerMonth === idx && styles.calMonthTextSelected
+                ]}>
+                  {m.slice(0, 3)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      );
+    } else {
+      const years = Array.from({ length: 15 }, (_, i) => 2020 + i);
+      return (
+        <View style={styles.calYearsContainer}>
+          <ScrollView style={styles.calYearsScroll} nestedScrollEnabled contentContainerStyle={styles.calYearsGrid}>
+            {years.map(y => (
+              <TouchableOpacity
+                key={y}
+                style={[
+                  styles.calYearCell,
+                  pickerYear === y && styles.calYearCellSelected
+                ]}
+                onPress={() => {
+                  setPickerYear(y);
+                  setPickerMode("days");
+                }}
+              >
+                <Text style={[
+                  styles.calYearText,
+                  pickerYear === y && styles.calYearTextSelected
+                ]}>
+                  {y}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      );
+    }
+  };
 
   // Tab 3 Controls: Top Selling Products
   const [prodSearch, setProdSearch] = useState("");
@@ -167,7 +523,7 @@ export default function DashboardScreen() {
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState("");
 
-  // Load Data from APIs
+  // Load Data from APIs (initial load, excludes revenue chart)
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -180,7 +536,6 @@ export default function DashboardScreen() {
         custRes,
         custStatsRes,
         sellersListRes,
-        chartRes,
         topProductsRes,
         topSellersRes,
         alertsRes,
@@ -193,7 +548,6 @@ export default function DashboardScreen() {
         fetchCustomers("", 0, 20),
         fetchCustomerStats(),
         fetchSellers({ page: 0, size: 20 }),
-        fetchDashboardRevenueChart(revenueTimeframe),
         fetchDashboardTopProducts(10),
         fetchDashboardTopSellers(10),
         fetchDashboardInventoryAlerts(10),
@@ -220,7 +574,6 @@ export default function DashboardScreen() {
       if (custRes.status === "fulfilled") setCustomers(custRes.value.items || []);
       if (custStatsRes.status === "fulfilled") setCustomerStats(custStatsRes.value);
       if (sellersListRes.status === "fulfilled") setSellers(sellersListRes.value.items || []);
-      if (chartRes.status === "fulfilled") setRevenueChart(chartRes.value);
       if (topProductsRes.status === "fulfilled") setTopProducts(topProductsRes.value || []);
       if (topSellersRes.status === "fulfilled") setTopSellers(topSellersRes.value || []);
       if (alertsRes.status === "fulfilled") setInventoryAlerts(alertsRes.value || []);
@@ -231,8 +584,32 @@ export default function DashboardScreen() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Separate chart data loader
+  const loadChartData = useCallback(async (tf) => {
+    setChartLoading(true);
+    try {
+      const res = await fetchDashboardRevenueChart(tf);
+      setRevenueChart(res);
+    } catch (e) {
+      console.error("Revenue chart fetch error:", e);
+    } finally {
+      setChartLoading(false);
+    }
+  }, []);
+
+  // Initial load of chart with default timeframe
+  useEffect(() => {
+    loadChartData(revenueTimeframe);
+  }, []);
+
+  // Load chart whenever timeframe changes
+  useEffect(() => {
+    loadChartData(revenueTimeframe);
   }, [revenueTimeframe]);
 
+  // Run initial data load once on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -489,9 +866,14 @@ export default function DashboardScreen() {
 
   return (
     <AdminLayout>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.container}>
-
+      <View style={styles.screenWrapper}>
+        <View
+          style={styles.headerContainer}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            setHeaderHeight(h);
+          }}
+        >
           {/* HEADER ROW */}
           <View style={styles.headerCard}>
             <View>
@@ -500,28 +882,59 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.tabButtons}>
               {[
-                { key: "overview", label: "Overview", icon: "grid-outline" },
-                { key: "sales", label: "Sales & Payments", icon: "bar-chart-outline" },
-                { key: "inventory", label: "Catalog & Stock", icon: "cube-outline" },
-                { key: "users", label: "Users & Sellers", icon: "people-outline" }
-              ].map(tab => (
-                <TouchableOpacity
-                  key={tab.key}
-                  onPress={() => setActiveTab(tab.key as any)}
-                  style={[styles.tabButton, activeTab === tab.key && styles.tabButtonActive]}
-                >
-                  <Ionicons name={tab.icon as any} size={14} color={activeTab === tab.key ? "#FFF" : C.sub} />
-                  <Text style={[styles.tabButtonText, activeTab === tab.key && styles.tabButtonTextActive]}>
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                { key: "overview", label: "Overview", icon: "grid-outline", color: C.active, bg: C.activeBg },
+                { key: "sales", label: "Sales & Payments", icon: "bar-chart-outline", color: C.primary, bg: C.primaryLight },
+                { key: "inventory", label: "Catalog & Stock", icon: "cube-outline", color: C.violet, bg: C.violetBg },
+                { key: "users", label: "Users & Sellers", icon: "people-outline", color: C.purple, bg: C.purpleBg }
+              ].map(tab => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    onPress={() => handleTabPress(tab.key as any)}
+                    style={[
+                      styles.tabButton,
+                      isActive && { backgroundColor: tab.bg }
+                    ]}
+                  >
+                    <Ionicons name={tab.icon as any} size={14} color={tab.color} />
+                    <Text
+                      style={[
+                        styles.tabButtonText,
+                        isActive && { color: tab.color, fontWeight: "700" }
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
+        </View>
 
-          {/* TAB 1: OVERVIEW */}
-          {activeTab === "overview" && (
-            <View style={styles.tabSection}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          {/* Spacer to push content below the fixed header */}
+          <View style={{ height: headerHeight + 10 }} />
+          <View style={styles.container}>
+
+            {/* SECTION 1: OVERVIEW */}
+            <View
+              key={`overview-${loading}`}
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y;
+                setSectionOffsets(prev => ({ ...prev, overview: y }));
+              }}
+              style={styles.tabSection}
+            >
+
 
               {/* SECTION 1: 12 TOP STATISTICS CARDS */}
               <View style={styles.statsCardGrid}>
@@ -593,7 +1006,7 @@ export default function DashboardScreen() {
                       { label: "Add Seller", icon: "storefront-outline", color: C.active, action: () => router.push("/approveseller" as any) },
                       { label: "Create Coupon", icon: "pricetag-outline", color: C.processing, action: () => setCouponModalVisible(true) },
                       { label: "View Orders", icon: "receipt-outline", color: C.purple, action: () => router.push("/orders" as any) },
-                      { label: "Manage Inventory", icon: "stats-chart-outline", color: C.warning, action: () => setActiveTab("inventory") }
+                      { label: "Manage Inventory", icon: "stats-chart-outline", color: C.warning, action: () => handleTabPress("inventory") }
                     ].map((act, idx) => (
                       <TouchableOpacity key={idx} onPress={act.action} style={styles.quickActionItem} activeOpacity={0.8}>
                         <View style={[styles.quickActionIconCircle, { backgroundColor: act.color + "15" }]}>
@@ -617,7 +1030,7 @@ export default function DashboardScreen() {
                       </View>
                     )}
                   </View>
-                  <ScrollView style={styles.notifScroll} nestedScrollEnabled>
+                  <ScrollView style={styles.notifScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                     {notifications.map(n => (
                       <View key={n.id} style={[styles.notifItemRow, n.read && styles.notifItemRead]}>
                         <View style={styles.notifIconWrap}>
@@ -727,9 +1140,18 @@ export default function DashboardScreen() {
                 </View>
 
               </View>
+            </View>
 
-            
-              {/* --- SALES & PAYMENTS SECTION (Overview copy) --- */}
+            {/* SECTION 2: SALES & PAYMENTS */}
+            <View
+              key={`sales-${loading}`}
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y;
+                setSectionOffsets(prev => ({ ...prev, sales: y }));
+              }}
+              style={[styles.tabSection, styles.sectionSpacing, { zIndex: datePickerVisible ? 500 : 1 }]}
+            >
+              {/* --- SALES & PAYMENTS SECTION --- */}
               <View
                 style={[styles.sectionHeaderCard, { borderColor: C.primary }]}
               >
@@ -738,11 +1160,11 @@ export default function DashboardScreen() {
                   <Text style={styles.sectionHeaderTitle}>Sales & Payments Analytics</Text>
                 </View>
               </View>
-              <View style={styles.tabSection}>
+              <View style={[styles.tabSection, { zIndex: datePickerVisible ? 501 : 1 }]}>
 
               {/* SECTION 2: REVENUE ANALYTICS */}
-              <View style={styles.cardCol}>
-                <View style={styles.revenueHeaderRow}>
+              <View style={[styles.cardCol, { zIndex: datePickerVisible ? 502 : 1 }]}>
+                <View style={[styles.revenueHeaderRow, { zIndex: datePickerVisible ? 503 : 1 }]}>
                   <View>
                     <Text style={styles.cardColTitle}>Revenue & Orders Trend Analysis</Text>
                     <Text style={styles.revenueSub}>Date range: {startDate} to {endDate}</Text>
@@ -750,10 +1172,40 @@ export default function DashboardScreen() {
 
                   <View style={styles.revenueHeaderActions}>
                     {/* Date Filters Inputs */}
-                    <View style={styles.dateFilterContainer}>
-                      <TextInput style={styles.dateInputText} value={startDate} onChangeText={setStartDate} placeholder="Start Date" />
+                    <View style={[styles.dateFilterContainer, { zIndex: 100 }]}>
+                      <View style={{ position: "relative", zIndex: datePickerVisible && datePickerTarget === "start" ? 101 : 1 }}>
+                        <TouchableOpacity
+                          ref={startButtonRef}
+                          onPress={() => openDatePicker("start")}
+                          style={styles.dateInputClickable}
+                        >
+                          <Ionicons name="calendar-outline" size={12} color={C.sub} />
+                          <Text style={styles.dateInputClickableText}>{startDate}</Text>
+                        </TouchableOpacity>
+                        {datePickerVisible && datePickerTarget === "start" && (
+                          <View ref={datePickerRef} style={[styles.calCardDropdown, { left: 0 }]}>
+                            {renderPickerHeader()}
+                            {renderCalendarContent()}
+                          </View>
+                        )}
+                      </View>
                       <Text style={styles.dateDivider}>to</Text>
-                      <TextInput style={styles.dateInputText} value={endDate} onChangeText={setEndDate} placeholder="End Date" />
+                      <View style={{ position: "relative", zIndex: datePickerVisible && datePickerTarget === "end" ? 101 : 1 }}>
+                        <TouchableOpacity
+                          ref={endButtonRef}
+                          onPress={() => openDatePicker("end")}
+                          style={styles.dateInputClickable}
+                        >
+                          <Ionicons name="calendar-outline" size={12} color={C.sub} />
+                          <Text style={styles.dateInputClickableText}>{endDate}</Text>
+                        </TouchableOpacity>
+                        {datePickerVisible && datePickerTarget === "end" && (
+                          <View ref={datePickerRef} style={[styles.calCardDropdown, { right: 0 }]}>
+                            {renderPickerHeader()}
+                            {renderCalendarContent()}
+                          </View>
+                        )}
+                      </View>
                     </View>
 
                     {/* Timeframe selector */}
@@ -1001,10 +1453,19 @@ export default function DashboardScreen() {
                 </View>
 
               </View>
-
+            </View>
             </View>
 
-              {/* --- CATALOG & STOCK SECTION (Overview copy) --- */}
+            {/* SECTION 3: CATALOG & STOCK */}
+            <View
+              key={`inventory-${loading}`}
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y;
+                setSectionOffsets(prev => ({ ...prev, inventory: y }));
+              }}
+              style={[styles.tabSection, styles.sectionSpacing]}
+            >
+              {/* --- CATALOG & STOCK SECTION --- */}
               <View
                 style={[styles.sectionHeaderCard, { borderColor: C.violet }]}
               >
@@ -1249,10 +1710,19 @@ export default function DashboardScreen() {
                   </View>
                 )}
               </View>
-
+            </View>
             </View>
 
-              {/* --- USERS & SELLERS SECTION (Overview copy) --- */}
+            {/* SECTION 4: USERS & SELLERS */}
+            <View
+              key={`users-${loading}`}
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y;
+                setSectionOffsets(prev => ({ ...prev, users: y }));
+              }}
+              style={[styles.tabSection, styles.sectionSpacing]}
+            >
+              {/* --- USERS & SELLERS SECTION --- */}
               <View
                 style={[styles.sectionHeaderCard, { borderColor: C.purple }]}
               >
@@ -1308,7 +1778,11 @@ export default function DashboardScreen() {
                 {/* SECTION 10: RECENT CUSTOMERS (Last 10) */}
                 <View style={[styles.cardCol, { flex: 1.5 }]}>
                   <Text style={styles.cardColTitle}>🆕 Newly Registered Customers (Last 10)</Text>
-                  <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
+                  <ScrollView
+                    style={{ maxHeight: 220 }}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                  >
                     {recentCustomersList.map(c => (
                       <View key={c.id} style={styles.customerListRow}>
                         <View style={styles.avatarCircleSmall}>
@@ -1494,758 +1968,10 @@ export default function DashboardScreen() {
                 </View>
               </View>
 
-            </View>
-</View>
-          )}
-
-          {/* TAB 2: SALES & ORDERS */}
-          {activeTab === "sales" && (
-            <View style={styles.tabSection}>
-
-              {/* SECTION 2: REVENUE ANALYTICS */}
-              <View style={styles.cardCol}>
-                <View style={styles.revenueHeaderRow}>
-                  <View>
-                    <Text style={styles.cardColTitle}>Revenue & Orders Trend Analysis</Text>
-                    <Text style={styles.revenueSub}>Date range: {startDate} to {endDate}</Text>
-                  </View>
-
-                  <View style={styles.revenueHeaderActions}>
-                    {/* Date Filters Inputs */}
-                    <View style={styles.dateFilterContainer}>
-                      <TextInput style={styles.dateInputText} value={startDate} onChangeText={setStartDate} placeholder="Start Date" />
-                      <Text style={styles.dateDivider}>to</Text>
-                      <TextInput style={styles.dateInputText} value={endDate} onChangeText={setEndDate} placeholder="End Date" />
-                    </View>
-
-                    {/* Timeframe selector */}
-                    <View style={styles.tabToggles}>
-                      {(["daily", "weekly", "monthly", "yearly"] as const).map(mode => (
-                        <TouchableOpacity
-                          key={mode}
-                          onPress={() => setRevenueTimeframe(mode)}
-                          style={[styles.tabToggleBtn, revenueTimeframe === mode && styles.tabToggleBtnActive]}
-                        >
-                          <Text style={[styles.tabToggleText, revenueTimeframe === mode && styles.tabToggleTextActive]}>
-                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-
-                {/* Legends Selector */}
-                <View style={styles.legendsRowWrap}>
-                  <TouchableOpacity
-                    onPress={() => setActiveRevenueLegends(p => ({ ...p, revenue: !p.revenue }))}
-                    style={[styles.legendSelectorBtn, !activeRevenueLegends.revenue && styles.legendSelectorDisabled]}
-                  >
-                    <View style={[styles.legendMarkerDot, { backgroundColor: C.primary }]} />
-                    <Text style={styles.legendSelectorLabel}>Revenue (₹)</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setActiveRevenueLegends(p => ({ ...p, orders: !p.orders }))}
-                    style={[styles.legendSelectorBtn, !activeRevenueLegends.orders && styles.legendSelectorDisabled]}
-                  >
-                    <View style={[styles.legendMarkerDot, { backgroundColor: C.processing }]} />
-                    <Text style={styles.legendSelectorLabel}>Orders Count</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Responsive SVG Chart */}
-                <View style={styles.chartContainer}>
-                  <Svg viewBox="0 0 520 200" width="100%" height={200}>
-                    <Defs>
-                      <SvgGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0%" stopColor={C.primary} stopOpacity="0.3" />
-                        <Stop offset="100%" stopColor={C.primary} stopOpacity="0.0" />
-                      </SvgGradient>
-                      <SvgGradient id="ordGrad" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0%" stopColor={C.processing} stopOpacity="0.3" />
-                        <Stop offset="100%" stopColor={C.processing} stopOpacity="0.0" />
-                      </SvgGradient>
-                    </Defs>
-
-                    {/* Y Grid Lines */}
-                    {revenueChartData.yLabels.map((lbl, idx) => {
-                      const y = 20 + idx * 26;
-                      return (
-                        <G key={idx}>
-                          <Line x1={55} y1={y} x2={500} y2={y} stroke="#E2E8F0" strokeWidth={0.8} strokeDasharray="3 3" />
-                          <SvgText x={45} y={y + 3} textAnchor="end" fontSize={9} fill={C.sub}>
-                            {lbl}
-                          </SvgText>
-                        </G>
-                      );
-                    })}
-
-                    {/* Paths rendering */}
-                    {(() => {
-                      const stepX = 435 / (revenueChartData.labels.length - 1 || 1);
-                      
-                      // Revenue Points
-                      const revPoints = revenueChartData.revenue.map((v, i) => ({
-                        x: 55 + i * stepX,
-                        y: 150 - (v / revenueChartData.maxVal) * 120
-                      }));
-
-                      // Orders Points (Scaled to fit)
-                      const ordPoints = revenueChartData.orders.map((v, i) => ({
-                        x: 55 + i * stepX,
-                        y: 150 - (v / (revenueTimeframe === "daily" ? 12 : 60)) * 120
-                      }));
-
-                      // Safe guard: return empty graphics if data has not loaded or is empty
-                      if (revPoints.length === 0 || ordPoints.length === 0) {
-                        return null;
-                      }
-
-                      const dRevLine = revPoints.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-                      const dRevArea = `${dRevLine} L${revPoints[revPoints.length - 1].x},150 L55,150 Z`;
-
-                      const dOrdLine = ordPoints.map((p, idx) => `${idx === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-                      const dOrdArea = `${dOrdLine} L${ordPoints[ordPoints.length - 1].x},150 L55,150 Z`;
-
-                      return (
-                        <G>
-                          {/* Revenue Graph */}
-                          {activeRevenueLegends.revenue && (
-                            <G>
-                              <Path d={dRevArea} fill="url(#revGrad)" />
-                              <Path d={dRevLine} fill="none" stroke={C.primary} strokeWidth={2.5} />
-                              {revPoints.map((p, i) => (
-                                <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill={C.primary} stroke="#FFF" strokeWidth={1} />
-                              ))}
-                            </G>
-                          )}
-
-                          {/* Orders Graph */}
-                          {activeRevenueLegends.orders && (
-                            <G>
-                              <Path d={dOrdArea} fill="url(#ordGrad)" />
-                              <Path d={dOrdLine} fill="none" stroke={C.processing} strokeWidth={2} strokeDasharray="3 3" />
-                              {ordPoints.map((p, i) => (
-                                <Circle key={i} cx={p.x} cy={p.y} r={3} fill={C.processing} stroke="#FFF" strokeWidth={1} />
-                              ))}
-                            </G>
-                          )}
-                        </G>
-                      );
-                    })()}
-
-                    {/* X Axis Labels */}
-                    {revenueChartData.labels.map((lbl, idx) => {
-                      const stepX = 435 / (revenueChartData.labels.length - 1 || 1);
-                      const x = 55 + idx * stepX;
-                      return (
-                        <SvgText key={idx} x={x} y={168} textAnchor="middle" fontSize={8} fill={C.sub}>
-                          {lbl}
-                        </SvgText>
-                      );
-                    })}
-                  </Svg>
-                </View>
-              </View>
-
-              {/* ORDERS OVERVIEW & REFUNDS */}
-              <View style={styles.rowLayout}>
-
-                {/* SECTION 3: Orders Overview & charts */}
-                <View style={[styles.cardCol, { flex: 1.5 }]}>
-                  <Text style={styles.cardColTitle}>📦 Orders Distribution & Statuses</Text>
-                  
-                  {/* Status checklist grid */}
-                  <View style={styles.ordersChecklistGrid}>
-                    {[
-                      { label: "Pending", count: d.pendingOrders, bg: C.warningBg, border: C.warning },
-                      { label: "Processing", count: d.processingCount, bg: C.processingBg, border: C.processing },
-                      { label: "Shipped", count: 2, bg: C.violetBg, border: C.violet },
-                      { label: "Delivered", count: 18, bg: C.activeBg, border: C.active },
-                      { label: "Cancelled", count: 35, bg: C.inactiveBg, border: C.inactive },
-                      { label: "Returned", count: d.returnedCount, bg: C.returnedBg, border: C.returned }
-                    ].map((item, idx) => (
-                      <View key={idx} style={[styles.orderCheckCard, { borderColor: item.border, backgroundColor: item.bg }]}>
-                        <Text style={styles.orderCheckLabel}>{item.label}</Text>
-                        <Text style={[styles.orderCheckCount, { color: item.border }]}>{item.count} orders</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* Donut and Bar SVG Charts side by side */}
-                  <View style={styles.doubleChartWrap}>
-                    <View style={styles.doubleChartBox}>
-                      <DonutChart data={[35, 18, 3, 2, 1]} total={59} colors={[C.inactive, C.active, C.primary, C.purple, C.processing]} />
-                      <Text style={styles.chartSubtitleLabel}>Order Ratios</Text>
-                    </View>
-                    <View style={styles.doubleChartBox}>
-                      {/* Responsive Vertical Bar Chart */}
-                      <Svg width={140} height={110} viewBox="0 0 100 80">
-                        {[15, 30, 45, 60, 50, 75].map((val, idx) => {
-                          const barH = (val / 80) * 60;
-                          return (
-                            <Rect
-                              key={idx}
-                              x={10 + idx * 14}
-                              y={70 - barH}
-                              width={8}
-                              height={barH}
-                              fill={idx % 2 === 0 ? C.primary : C.processing}
-                              rx={2}
-                            />
-                          );
-                        })}
-                      </Svg>
-                      <Text style={styles.chartSubtitleLabel}>Orders Volume</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* SECTION 12: PAYMENT OVERVIEW */}
-                <View style={[styles.cardCol, { flex: 1.2 }]}>
-                  <Text style={styles.cardColTitle}>💳 Payments & Channels</Text>
-                  
-                  {/* Payment stats checklist */}
-                  <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "COD Orders", val: "18 orders", sum: rupee(3204) },
-                      { label: "Online Payments", val: "39 payments", sum: rupee(13492) },
-                      { label: "Pending Payments", val: "0 pending", sum: rupee(0) },
-                      { label: "Refunded Payments", val: "5 refunds", sum: rupee(1490) },
-                      { label: "Total Collections", val: "All receipts", sum: rupee(d.allTimeRevenue) }
-                    ].map((item, idx) => (
-                      <View key={idx} style={styles.paymentMetricRow}>
-                        <View>
-                          <Text style={styles.paymentMetricLabel}>{item.label}</Text>
-                          <Text style={styles.paymentMetricSub}>{item.val}</Text>
-                        </View>
-                        <Text style={styles.paymentMetricVal}>{item.sum}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* Payment Chart */}
-                  <View style={styles.pieContainer}>
-                    <PieChart values={[39, 18]} colors={[C.active, C.primary]} />
-                    <View style={styles.pieLegends}>
-                      <View style={styles.legendRow}>
-                        <View style={[styles.legendDot, { backgroundColor: C.active }]} />
-                        <Text style={styles.legendText}>Online (68%)</Text>
-                      </View>
-                      <View style={styles.legendRow}>
-                        <View style={[styles.legendDot, { backgroundColor: C.primary }]} />
-                        <Text style={styles.legendText}>COD (32%)</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-
-                {/* SECTION 17: Refund & Returns cards */}
-                <View style={[styles.cardCol, { flex: 1 }]}>
-                  <Text style={styles.cardColTitle}>🔄 Refunds & Returns Logs</Text>
-                  <View style={styles.liveActivityList}>
-                    {[
-                      { label: "Pending Refunds", val: "3 request", color: C.warning },
-                      { label: "Approved Refunds", val: "22 refunds", color: C.active },
-                      { label: "Rejected Refunds", val: "2 cases", color: C.inactive },
-                      { label: "Returned Order Rate", val: "5.4% rate", color: C.primary }
-                    ].map((item, idx) => (
-                      <View key={idx} style={styles.liveActivityRow}>
-                        <Text style={styles.liveActivityLabel}>{item.label}</Text>
-                        <Text style={[styles.liveActivityValue, { color: item.color }]}>{item.val}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  <View style={styles.refundGraphicWrapper}>
-                    <Ionicons name="swap-horizontal-outline" size={28} color={C.primary} />
-                    <Text style={styles.refundGraphicText}>Automated Return Tracking Active</Text>
-                  </View>
-                </View>
-
-              </View>
+            
 
             </View>
-          )}
-
-          {/* TAB 3: CATALOG & INVENTORY */}
-          {activeTab === "inventory" && (
-            <View style={styles.tabSection}>
-
-              {/* SECTION 6: PRODUCT OVERVIEW & INVENTORY ALERTS */}
-              <View style={styles.rowLayout}>
-                
-                {/* SECTION 6: Product Overview Counts */}
-                <View style={[styles.cardCol, { flex: 1.5 }]}>
-                  <Text style={styles.cardColTitle}>📦 Catalog & Products Metrics</Text>
-                  <View style={styles.ordersChecklistGrid}>
-                    {[
-                      { label: "Total Products", count: d.productsCount, bg: C.violetBg, color: C.violet },
-                      { label: "Published Items", count: 685, bg: C.activeBg, color: C.active },
-                      { label: "Draft Products", count: 23, bg: C.greyBg, color: C.grey },
-                      { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
-                      { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
-                      { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary },
-                      { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
-                      { label: "Active Brands", count: 8, bg: C.processingBg, color: C.processing }
-                    ].map((item, idx) => (
-                      <View key={idx} style={[styles.orderCheckCard, { borderColor: item.color, backgroundColor: item.bg }]}>
-                        <Text style={styles.orderCheckLabel}>{item.label}</Text>
-                        <Text style={[styles.orderCheckCount, { color: item.color }]}>{item.count} items</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {/* SECTION 11: CRITICAL INVENTORY ALERTS */}
-                <View style={[styles.cardCol, { flex: 2 }]}>
-                  <Text style={styles.cardColTitle}>⚠️ Critical Stock alerts & Restock Triggers</Text>
-                  <View style={styles.tableWrapper}>
-                    <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
-                      <Text style={[styles.tableHdrCell, { flex: 2 }]}>Product</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Status</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Quantity</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Severity</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Action</Text>
-                    </View>
-
-                    {inventoryAlertsView.map(item => (
-                      <View key={item.id} style={styles.tableRowData}>
-                        <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <View style={[styles.tableCellText, { flex: 1.2, alignItems: "center" }]}>
-                          <View style={[styles.statusBadgeCell, { backgroundColor: item.bg }]}>
-                            <Text style={[styles.statusBadgeText, { color: item.badgeColor }]}>{item.type}</Text>
-                          </View>
-                        </View>
-                        <Text style={[styles.tableCellText, { flex: 1, textAlign: "center", fontWeight: "700" }]}>
-                          {item.qty}
-                        </Text>
-                        <View style={[styles.tableCellText, { flex: 1.2, alignItems: "center" }]}>
-                          <Text style={{
-                            fontSize: 10,
-                            fontWeight: "700",
-                            color: item.severity === "High" ? C.inactive : item.severity === "Medium" ? C.warning : C.active
-                          }}>
-                            {item.severity}
-                          </Text>
-                        </View>
-                        <View style={[styles.tableCellText, { flex: 1.2, alignItems: "center" }]}>
-                          {item.qty < 50 ? (
-                            <TouchableOpacity onPress={() => restockProduct(item.id)} style={styles.restockActionBtn}>
-                              <Text style={styles.restockActionBtnText}>Restock</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <Ionicons name="checkmark-circle" size={16} color={C.active} />
-                          )}
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-              </View>
-
-              {/* SECTION 7: TOP SELLING PRODUCTS (Top 10; Web: table with search/sort/page; Mobile: list) */}
-              <View style={styles.sectionCard}>
-                <View style={styles.tableFilterHeader}>
-                  <Text style={styles.sectionTitle}>🏆 Top 10 Selling Products List</Text>
-                  
-                  <View style={styles.tableHeaderControls}>
-                    {/* Search field */}
-                    <View style={styles.searchContainer}>
-                      <Ionicons name="search-outline" size={14} color={C.sub} />
-                      <TextInput
-                        style={styles.searchBarInput}
-                        value={prodSearch}
-                        onChangeText={(text) => { setProdSearch(text); setProdPage(0); }}
-                        placeholder="Search products..."
-                      />
-                    </View>
-
-                    {/* Sort buttons (Web only) */}
-                    {isLargeScreen && (
-                      <View style={styles.sortToggleRow}>
-                        <Text style={styles.sortLabel}>Sort:</Text>
-                        {[
-                          { key: "name", label: "Name" },
-                          { key: "sales", label: "Sales" },
-                          { key: "revenue", label: "Revenue" }
-                        ].map(sField => (
-                          <TouchableOpacity
-                            key={sField.key}
-                            onPress={() => {
-                              if (prodSortField === sField.key) {
-                                setProdSortAsc(!prodSortAsc);
-                              } else {
-                                setProdSortField(sField.key as any);
-                                setProdSortAsc(false);
-                              }
-                            }}
-                            style={[styles.sortFieldBtn, prodSortField === sField.key && styles.sortFieldBtnActive]}
-                          >
-                            <Text style={[styles.sortFieldBtnText, prodSortField === sField.key && styles.sortFieldBtnTextActive]}>
-                              {sField.label} {prodSortField === sField.key && (prodSortAsc ? "▲" : "▼")}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Web View Table */}
-                {!isMobile ? (
-                  <View style={styles.tableWrapper}>
-                    <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
-                      <Text style={[styles.tableHdrCell, { width: 50, textAlign: "center" }]}>Img</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 2 }]}>Product Name</Text>
-                      <Text style={[styles.tableHdrCell, { width: 100, textAlign: "center" }]}>Units Sold</Text>
-                      <Text style={[styles.tableHdrCell, { width: 120, textAlign: "right" }]}>Revenue</Text>
-                      <Text style={[styles.tableHdrCell, { width: 120, textAlign: "center" }]}>Stock Status</Text>
-                    </View>
-
-                    {paginatedProducts.map((p, idx) => (
-                      <View key={p.id} style={styles.tableRowData}>
-                        <View style={{ width: 50, alignItems: "center" }}>
-                          <Text style={{ fontSize: 18 }}>{p.image}</Text>
-                        </View>
-                        <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
-                          {p.name}
-                        </Text>
-                        <Text style={[styles.tableCellText, { width: 100, textAlign: "center", fontWeight: "700" }]}>
-                          {p.sales} units
-                        </Text>
-                        <Text style={[styles.tableCellText, { width: 120, textAlign: "right", color: C.active, fontWeight: "700" }]}>
-                          {rupee(p.revenue)}
-                        </Text>
-                        <View style={{ width: 120, alignItems: "center" }}>
-                          <View style={[
-                            styles.statusBadgeCell,
-                            { backgroundColor: p.stock === "In Stock" ? C.activeBg : p.stock === "Low Stock" ? C.warningBg : C.inactiveBg }
-                          ]}>
-                            <Text style={[
-                              styles.statusBadgeText,
-                              { color: p.stock === "In Stock" ? C.active : p.stock === "Low Stock" ? C.warning : C.inactive }
-                            ]}>
-                              {p.stock} ({p.stockCount})
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-
-                    {/* Pagination */}
-                    <View style={styles.paginationRow}>
-                      <Text style={styles.paginationSummary}>
-                        Showing {prodPage * 5 + 1} - {Math.min((prodPage + 1) * 5, filteredProducts.length)} of {filteredProducts.length} items
-                      </Text>
-                      <View style={{ flexDirection: "row", gap: 8 }}>
-                        <TouchableOpacity
-                          disabled={prodPage === 0}
-                          onPress={() => setProdPage(p => p - 1)}
-                          style={[styles.pageBtnLink, prodPage === 0 && styles.pageBtnLinkDisabled]}
-                        >
-                          <Text style={styles.pageBtnLinkText}>Prev</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          disabled={(prodPage + 1) * 5 >= filteredProducts.length}
-                          onPress={() => setProdPage(p => p + 1)}
-                          style={[styles.pageBtnLink, (prodPage + 1) * 5 >= filteredProducts.length && styles.pageBtnLinkDisabled]}
-                        >
-                          <Text style={styles.pageBtnLinkText}>Next</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                  </View>
-                ) : (
-                  // Mobile View Card List with simulated infinite scroll load-more button
-                  <View style={styles.mobileCardListWrap}>
-                    {filteredProducts.slice(0, mobileProdCount).map(p => (
-                      <View key={p.id} style={styles.mobileProductCard}>
-                        <View style={styles.mobileProductCardHeader}>
-                          <Text style={{ fontSize: 24 }}>{p.image}</Text>
-                          <View style={{ flex: 1, gap: 2 }}>
-                            <Text style={styles.mobileCardProdName} numberOfLines={1}>{p.name}</Text>
-                            <Text style={styles.mobileCardProdId}>ID: {p.id}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.mobileProductCardBody}>
-                          <View>
-                            <Text style={styles.mobileCardSubVal}>Sales: <Text style={{ fontWeight: "700" }}>{p.sales}</Text></Text>
-                            <Text style={styles.mobileCardSubVal}>Revenue: <Text style={{ fontWeight: "700", color: C.active }}>{rupee(p.revenue)}</Text></Text>
-                          </View>
-                          <View style={[
-                            styles.statusBadgeCell,
-                            { backgroundColor: p.stock === "In Stock" ? C.activeBg : p.stock === "Low Stock" ? C.warningBg : C.inactiveBg }
-                          ]}>
-                            <Text style={[
-                              styles.statusBadgeText,
-                              { color: p.stock === "In Stock" ? C.active : p.stock === "Low Stock" ? C.warning : C.inactive }
-                            ]}>
-                              {p.stock} ({p.stockCount})
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-
-                    {/* Load More Trigger representing Infinite Scroll */}
-                    {mobileProdCount < filteredProducts.length ? (
-                      <TouchableOpacity
-                        onPress={() => setMobileProdCount(c => c + 3)}
-                        style={styles.loadMoreInfiniteBtn}
-                      >
-                        <Text style={styles.loadMoreInfiniteBtnText}>Load More (Infinite Scroll)...</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={styles.noMoreItemsText}>All products loaded.</Text>
-                    )}
-                  </View>
-                )}
-              </View>
-
-            </View>
-          )}
-
-          {/* TAB 4: USERS & PARTNERS */}
-          {activeTab === "users" && (
-            <View style={styles.tabSection}>
-
-              {/* SECTION 4 & SECTION 5: CUSTOMER & SELLER OVERVIEWS */}
-              <View style={styles.rowLayout}>
-
-                {/* SECTION 4: Customer Analytics Card */}
-                <View style={[styles.cardCol, { flex: 1.2 }]}>
-                  <Text style={styles.cardColTitle}>👥 Customer Base Analytics</Text>
-                  <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "Total Registered Customers", count: customerStats?.total ?? 0 },
-                      { label: "New Customers Registered Today", count: 4 },
-                      { label: "New Customers This Week", count: 18 },
-                      { label: "New Customers This Month", count: 42 },
-                      { label: "Active Customers (Placed Order)", count: 112 },
-                      { label: "Inactive Customers (No Order)", count: 92 }
-                    ].map((item, idx) => (
-                      <View key={idx} style={styles.paymentMetricRow}>
-                        <Text style={styles.paymentMetricLabel}>{item.label}</Text>
-                        <Text style={[styles.paymentMetricVal, { color: C.primary }]}>{count(item.count)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {/* SECTION 5: Seller Analytics Card */}
-                <View style={[styles.cardCol, { flex: 1.2 }]}>
-                  <Text style={styles.cardColTitle}>🏪 Seller Network Summary</Text>
-                  <View style={styles.paymentOverviewList}>
-                    {[
-                      { label: "Total Sellers Enrolled", count: sellerStats?.total ?? sellerStats?.registered ?? 0 },
-                      { label: "Active Sellers (With Products)", count: sellerStats?.active ?? sellerStats?.approved ?? 0 },
-                      { label: "Inactive Sellers (No Products)", count: 70 },
-                      { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 0 },
-                      { label: "Top Performing Sellers (Verified)", count: 10 }
-                    ].map((item, idx) => (
-                      <View key={idx} style={styles.paymentMetricRow}>
-                        <Text style={styles.paymentMetricLabel}>{item.label}</Text>
-                        <Text style={[styles.paymentMetricVal, { color: C.purple }]}>{count(item.count)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                {/* SECTION 10: RECENT CUSTOMERS (Last 10) */}
-                <View style={[styles.cardCol, { flex: 1.5 }]}>
-                  <Text style={styles.cardColTitle}>🆕 Newly Registered Customers (Last 10)</Text>
-                  <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
-                    {recentCustomersList.map(c => (
-                      <View key={c.id} style={styles.customerListRow}>
-                        <View style={styles.avatarCircleSmall}>
-                          <Text style={styles.avatarCircleText}>
-                            {c.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <Text style={styles.customerRowName}>{c.name}</Text>
-                          <Text style={styles.customerRowEmail}>{c.email}</Text>
-                        </View>
-                        <View style={{ alignItems: "flex-end", gap: 2 }}>
-                          <Text style={styles.customerRowDate}>{c.date}</Text>
-                          <View style={styles.customerRowStatusBadge}>
-                            <Text style={styles.customerRowStatusBadgeText}>{c.status}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-
-              </View>
-
-              {/* SECTION 8: TOP SELLERS (Top 10; Web: Advanced Table; Mobile: cards) */}
-              <View style={styles.sectionCard}>
-                <View style={styles.tableFilterHeader}>
-                  <Text style={styles.sectionTitle}>⭐ Top Sellers (by Revenue)</Text>
-
-                  <View style={styles.tableHeaderControls}>
-                    <View style={styles.searchContainer}>
-                      <Ionicons name="search-outline" size={14} color={C.sub} />
-                      <TextInput
-                        style={styles.searchBarInput}
-                        value={sellerSearch}
-                        onChangeText={setSellerSearch}
-                        placeholder="Search sellers..."
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                {!isMobile ? (
-                  <View style={styles.tableWrapper}>
-                    <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
-                      <Text style={[styles.tableHdrCell, { flex: 1.5 }]}>Seller Name</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1.5 }]}>Business</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Orders</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "right" }]}>Revenue</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Rating</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Status</Text>
-                    </View>
-
-                    {filteredSellers.map((s, idx) => (
-                      <View key={idx} style={styles.tableRowData}>
-                        <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "600" }]} numberOfLines={1}>
-                          {s.name}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.5, color: C.sub }]} numberOfLines={1}>
-                          {s.business}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1, textAlign: "center", fontWeight: "700" }]}>
-                          {s.orders}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "right", color: C.active, fontWeight: "700" }]}>
-                          {rupee(s.revenue)}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1, textAlign: "center", fontWeight: "700", color: "#eab308" }]}>
-                          ★ {s.rating}
-                        </Text>
-                        <View style={[styles.tableCellText, { flex: 1, alignItems: "center" }]}>
-                          <View style={styles.activeSellerBadge}>
-                            <Text style={styles.activeSellerBadgeText}>{s.status}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.mobileCardListWrap}>
-                    {filteredSellers.map(s => (
-                      <View key={s.id} style={styles.mobileProductCard}>
-                        <View style={styles.mobileProductCardHeader}>
-                          <View style={styles.avatarCircleSmall}>
-                            <Text style={styles.avatarCircleText}>S</Text>
-                          </View>
-                          <View style={{ flex: 1, gap: 2 }}>
-                            <Text style={styles.mobileCardProdName}>{s.name}</Text>
-                            <Text style={styles.mobileCardProdId}>{s.business}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.mobileProductCardBody}>
-                          <View>
-                            <Text style={styles.mobileCardSubVal}>Orders: {s.orders}</Text>
-                            <Text style={styles.mobileCardSubVal}>Revenue: <Text style={{ color: C.active, fontWeight: "600" }}>{rupee(s.revenue)}</Text></Text>
-                          </View>
-                          <View style={{ alignItems: "flex-end", gap: 4 }}>
-                            <Text style={{ color: "#eab308", fontWeight: "700", fontSize: 12 }}>★ {s.rating}</Text>
-                            <View style={styles.activeSellerBadge}>
-                              <Text style={styles.activeSellerBadgeText}>{s.status}</Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* SECTION 9: RECENT ORDERS (Last 10 with actions) */}
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionTitle}>📦 Recent Orders Logs (Last 10)</Text>
-                <View style={styles.tableWrapper}>
-                  <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
-                    <Text style={[styles.tableHdrCell, { flex: 1.5 }]}>Order ID</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.8 }]}>Customer</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "right" }]}>Amount</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Status</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Payment</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.5, textAlign: "center" }]}>Date</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 2, textAlign: "center" }]}>Update Status Action</Text>
-                  </View>
-
-                  {recentOrders.map(o => {
-                    let badgeBg = C.processingBg;
-                    let badgeColor = C.processing;
-                    if (o.status === "Completed" || o.status === "Delivered") {
-                      badgeBg = C.activeBg;
-                      badgeColor = C.active;
-                    } else if (o.status === "Cancelled") {
-                      badgeBg = C.inactiveBg;
-                      badgeColor = C.inactive;
-                    } else if (o.status === "Returned") {
-                      badgeBg = C.returnedBg;
-                      badgeColor = C.returned;
-                    } else if (o.status === "Shipped") {
-                      badgeBg = C.purpleBg;
-                      badgeColor = C.purple;
-                    }
-
-                    return (
-                      <View key={o.id} style={styles.tableRowData}>
-                        <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "700" }]} numberOfLines={1}>
-                          {o.id}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.8 }]} numberOfLines={1}>
-                          {o.customer}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "right", fontWeight: "700" }]}>
-                          {rupee(o.amount)}
-                        </Text>
-                        <View style={[styles.tableCellText, { flex: 1.2, alignItems: "center" }]}>
-                          <View style={[styles.statusBadgeCell, { backgroundColor: badgeBg }]}>
-                            <Text style={[styles.statusBadgeText, { color: badgeColor }]}>{o.status}</Text>
-                          </View>
-                        </View>
-                        <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>
-                          {o.payment}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.5, textAlign: "center", color: C.sub }]}>
-                          {o.date}
-                        </Text>
-                        
-                        {/* Inline Actions dropdown simulation */}
-                        <View style={[styles.tableCellText, { flex: 2, flexDirection: "row", justifyContent: "center", gap: 6 }]}>
-                          {[
-                            { code: "Completed", label: "Complete", color: C.active },
-                            { code: "Shipped", label: "Ship", color: C.purple },
-                            { code: "Cancelled", label: "Cancel", color: C.inactive }
-                          ].map(act => (
-                            <TouchableOpacity
-                              key={act.code}
-                              onPress={() => updateOrderStatus(o.id, act.code)}
-                              style={[styles.smallInlineActionBtn, { borderColor: act.color }]}
-                            >
-                              <Text style={[styles.smallInlineActionBtnText, { color: act.color }]}>{act.label}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-
-            </View>
-          )}
+          </View>
 
           {/* FOOTER */}
           <View style={styles.footer}>
@@ -2285,6 +2011,8 @@ export default function DashboardScreen() {
         </Pressable>
       </Modal>
 
+
+      </View>
     </AdminLayout>
   );
 }
@@ -2314,12 +2042,30 @@ const getStyles = (isDark: boolean) => {
     color: C.text,
   },
 
+  screenWrapper: {
+    flex: 1,
+    position: "relative",
+  },
+  headerContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: C.bg,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  sectionSpacing: {
+    marginTop: 30,
+  },
   scroll: {
     flex: 1,
     backgroundColor: C.bg,
   },
   scrollContent: {
-    paddingVertical: 20,
+    paddingBottom: 40,
     paddingHorizontal: 24,
   },
   container: {
@@ -2331,11 +2077,11 @@ const getStyles = (isDark: boolean) => {
 
   // Header styles
   headerCard: {
-    backgroundColor: C.surface,
+    backgroundColor: "#1d324e",
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: "#2a4365",
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
@@ -2346,15 +2092,18 @@ const getStyles = (isDark: boolean) => {
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
     elevation: 2,
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 1600,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: C.text,
+    color: "#FFFFFF",
   },
   headerSubtext: {
     fontSize: 12,
-    color: C.sub,
+    color: "#94a3b8",
     marginTop: 2,
   },
   tabButtons: {
@@ -2388,6 +2137,7 @@ const getStyles = (isDark: boolean) => {
   // Tab Section Wrapper
   tabSection: {
     gap: 20,
+    scrollMarginTop: Platform.OS === "web" ? 146 : undefined,
   },
 
   // KPI Statistics Cards
@@ -2588,6 +2338,9 @@ const getStyles = (isDark: boolean) => {
   },
   notifScroll: {
     maxHeight: 220,
+    // @ts-ignore – web-only scrollbar hiding
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
   },
   notifItemRow: {
     flexDirection: "row",
@@ -2704,6 +2457,209 @@ const getStyles = (isDark: boolean) => {
     fontSize: 11,
     color: C.sub,
     paddingHorizontal: 4,
+  },
+  // Custom Date Picker styles
+  calCard: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 20,
+    width: 320,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 5,
+    gap: 12,
+  },
+  calCardDropdown: {
+    position: "absolute",
+    top: 32,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 12,
+    width: 304,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 10,
+    zIndex: 10000,
+    gap: 8,
+  },
+  calGridScroll: {
+    height: 158,
+    // @ts-ignore – web-only scrollbar hiding
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+  },
+  calTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.text,
+    textAlign: "center",
+  },
+  calHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: C.greyBg,
+    borderRadius: 8,
+    padding: 6,
+  },
+  calHeaderBtn: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  calHeaderTitleRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  calHeaderTextBtn: {
+    paddingHorizontal: 4,
+  },
+  calHeaderTitleText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.text,
+  },
+  calHeaderTitleTextSingle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.text,
+    width: "100%",
+    textAlign: "center",
+  },
+  calDaysContainer: {
+    gap: 8,
+  },
+  calWeekdaysRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  calWeekdayText: {
+    width: 38,
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.sub,
+  },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 4,
+  },
+  calDayCell: {
+    width: 40,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 6,
+  },
+  calDayCellMuted: {
+    opacity: 0.35,
+  },
+  calDayCellSelected: {
+    backgroundColor: C.primary,
+  },
+  calDayText: {
+    fontSize: 12,
+    color: C.text,
+    fontWeight: "500",
+  },
+  calDayTextMuted: {
+    color: C.sub,
+  },
+  calDayTextSelected: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
+  calMonthsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  calMonthCell: {
+    width: 64,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 6,
+    backgroundColor: C.greyBg,
+  },
+  calMonthCellSelected: {
+    backgroundColor: C.primary,
+  },
+  calMonthText: {
+    fontSize: 12,
+    color: C.text,
+    fontWeight: "600",
+  },
+  calMonthTextSelected: {
+    color: "#FFF",
+  },
+  calYearsContainer: {
+    height: 132,
+  },
+  calYearsScroll: {
+    flex: 1,
+  },
+  calYearsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  calYearCell: {
+    width: 64,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 6,
+    backgroundColor: C.greyBg,
+  },
+  calYearCellSelected: {
+    backgroundColor: C.primary,
+  },
+  calYearText: {
+    fontSize: 12,
+    color: C.text,
+    fontWeight: "600",
+  },
+  calYearTextSelected: {
+    color: "#FFF",
+  },
+  calFooterActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+  },
+  calFooterBtnCancel: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  dateInputClickable: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 85,
+    justifyContent: "center",
+  },
+  dateInputClickableText: {
+    fontSize: 11,
+    color: C.text,
+    fontWeight: "500",
   },
   tabToggles: {
     flexDirection: "row",
@@ -2949,6 +2905,10 @@ const getStyles = (isDark: boolean) => {
     marginLeft: 6,
     flex: 1,
     padding: 0,
+    // @ts-ignore – web-only: suppress default browser focus outline
+    outlineStyle: "none",
+    outlineWidth: 0,
+    borderWidth: 0,
   },
   sortToggleRow: {
     flexDirection: "row",

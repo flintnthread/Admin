@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { useColorScheme as useRNColorScheme } from "react-native";
+import React, { createContext, useContext, useState } from "react";
 
 type Theme = "light" | "dark";
 
@@ -12,15 +11,7 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useRNColorScheme();
   const [theme, setTheme] = useState<Theme>("light");
-
-  // Load system scheme initially and on changes
-  useEffect(() => {
-    if (systemScheme) {
-      setTheme(systemScheme);
-    }
-  }, [systemScheme]);
 
   // Keep global flag in sync
   (globalThis as any).isDarkMode = theme === "dark";
