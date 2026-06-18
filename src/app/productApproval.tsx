@@ -175,7 +175,8 @@ function StatCard({
   bg,
   icon,
   onPress,
-  grid,
+  mobile,
+  tablet,
   wide,
 }: {
   count: number;
@@ -184,7 +185,8 @@ function StatCard({
   bg: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   onPress?: () => void;
-  grid?: boolean;
+  mobile?: boolean;
+  tablet?: boolean;
   wide?: boolean;
 }) {
   return (
@@ -192,39 +194,22 @@ function StatCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.statCard,
-        grid && styles.statCardGrid,
+        mobile && styles.statCardMobile,
+        tablet && styles.statCardTablet,
         wide && styles.statCardWide,
         pressed && styles.pressed,
       ]}>
-      {grid ? (
-        <>
-          <View style={styles.statCardTop}>
-            <View style={[styles.statIconWrap, styles.statIconWrapGrid, { backgroundColor: bg }]}>
-              <MaterialCommunityIcons name={icon} size={18} color={color} />
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={16} color={color} />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={[styles.statCount, styles.statCountGrid]}>{count}</Text>
-            <Text style={[styles.statLabel, styles.statLabelGrid]} numberOfLines={2}>
-              {label}
-            </Text>
-          </View>
-        </>
-      ) : (
-        <>
-          <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
-            <MaterialCommunityIcons name={icon} size={22} color={color} />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={styles.statCount}>{count}</Text>
-            <Text style={styles.statLabel} numberOfLines={2}>
-              {label}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={18} color={color} />
-        </>
-      )}
+      <View style={styles.statCardTop}>
+        <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
+          <MaterialCommunityIcons name={icon} size={16} color={color} />
+        </View>
+        <Text style={[styles.statCount, { color }]}>{count}</Text>
+      </View>
+      <View style={styles.statContent}>
+        <Text style={styles.statLabel} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -434,13 +419,16 @@ function StatsRow({
   stats,
   onFilter,
   isWide,
+  isMobile,
+  isTablet,
 }: {
   stats: ProductStats;
   onFilter: (f: FilterKey) => void;
   isWide: boolean;
+  isMobile: boolean;
+  isTablet: boolean;
 }) {
-  const isCompact = !isWide;
-  const cardProps = { grid: isCompact, wide: isWide };
+  const cardProps = { mobile: isMobile, tablet: isTablet, wide: isWide };
   const cards = (
     <>
       <StatCard
@@ -482,11 +470,7 @@ function StatsRow({
     </>
   );
 
-  if (isCompact) {
-    return <View style={styles.statsGridCompact}>{cards}</View>;
-  }
-
-  return <View style={[styles.statsGrid, styles.statsGridWide]}>{cards}</View>;
+  return <View style={styles.statsGrid}>{cards}</View>;
 }
 
 function StatusTabs({
@@ -945,7 +929,7 @@ export default function ProductApprovalScreen() {
           showsVerticalScrollIndicator={false}>
           <PageHeader isWide={isWide} />
 
-          <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
+          <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} isMobile={isMobile} isTablet={isTablet} />
 
           <FilterSection
             stats={stats}
@@ -1183,9 +1167,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#1d324e',
     paddingHorizontal: 32,
     paddingTop: 24,
-    paddingBottom: 20,
-    borderRadius: 12,
-    marginBottom: 20,
+    paddingBottom: 68,
+    borderRadius: 22,
+    marginBottom: 0,
     gap: 12,
   },
   pageHeaderWide: {
@@ -1248,93 +1232,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // Stats — 2×2 grid on mobile & tablet (native + web responsive)
-  statsGridCompact: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    width: '100%',
-    alignSelf: 'stretch',
-  },
+  // Stats — responsive grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     width: '100%',
-  },
-  statsGridWide: {
-    flexWrap: 'nowrap',
+    marginTop: -42,
+    zIndex: 10,
+    paddingHorizontal: 6,
   },
   statCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: PALETTE.cardBg,
-    borderRadius: 12,
-    padding: 14,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: PALETTE.border,
-    flex: 1,
-    minWidth: 220,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  statCardGrid: {
-    width: '48%',
-    maxWidth: '48%',
-    flexBasis: '48%',
-    flexGrow: 0,
-    flexShrink: 0,
-    flex: 0,
-    minWidth: 0,
     flexDirection: 'column',
-    alignItems: 'stretch',
+    alignItems: 'flex-start',
+    backgroundColor: PALETTE.cardBg,
+    borderRadius: 14,
     padding: 12,
-    gap: 8,
-  },
-  statCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statIconWrapGrid: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-  },
-  statCountGrid: {
-    fontSize: 20,
-  },
-  statLabelGrid: {
-    fontSize: 11,
-    lineHeight: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statCardWide: {
     flex: 1,
     minWidth: 0,
   },
+  statCardTablet: {
+    width: '48%',
+    flexGrow: 1,
+  },
+  statCardMobile: {
+    width: '100%',
+  },
+  statCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 10,
+  },
   statIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statContent: {
-    flex: 1,
   },
   statCount: {
     fontSize: 22,
     fontWeight: '800',
-    color: PALETTE.textPrimary,
+  },
+  statContent: {
+    width: '100%',
   },
   statLabel: {
     fontSize: 12,
     color: PALETTE.textSecondary,
-    marginTop: 2,
+    fontWeight: '600',
   },
 
   // Queue / filters
@@ -1715,7 +1670,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tableColProduct: {
-    width: 280,
+    width: 320,
+    paddingRight: 24,
   },
   tableColSeller: {
     width: 160,
