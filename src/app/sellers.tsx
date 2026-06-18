@@ -843,8 +843,8 @@ export default function SellersScreen() {
 
           <View style={SS.viewToggle}>
             <Text style={SS.viewLabel}>View:</Text>
-              <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
-                <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
+            <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
+              <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
             </TouchableOpacity>
             <TouchableOpacity style={[SS.vBtn, viewMode === 'list' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('list')}>
               <IconList size={17} color={viewMode === 'list' ? '#FFF' : C.sub} />
@@ -952,34 +952,34 @@ export default function SellersScreen() {
 // ─────────────────────────── ROOT STYLES ─────────────────────────────────────
 const SS = StyleSheet.create({
 
-  root:       { flex:1, backgroundColor:C.bg },
-  topBar:     { height:56, backgroundColor:'#1d324e', flexDirection:'row', alignItems:'center', paddingHorizontal:16 },
-  logoBox:    { width:40, height:40, borderRadius:8, backgroundColor:'rgba(255,255,255,0.2)', justifyContent:'center', alignItems:'center' },
-  backButton: { flexDirection:'row', alignItems:'center', marginRight:10 },
-  backButtonText: { color:'#FFF', fontSize:14, fontWeight:'600', marginLeft:4 },
-  titleBar:   { backgroundColor:C.card, paddingHorizontal:20, paddingTop:14, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border },
-  breadcrumb: { flexDirection:'row', alignItems:'center', marginBottom:10 },
-  bcLink:     { fontSize:12, color:C.primary, fontWeight:'500' },
-  bcSep:      { fontSize:12, color:C.muted, marginHorizontal:2 },
-  bcCur:      { fontSize:12, color:C.sub },
-  titleRow:   { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
-  pageTitle:  { fontSize:22, fontWeight:'800', color:C.text },
-  pill:       { backgroundColor:C.primaryLight, borderWidth:1.5, borderColor:C.primary, borderRadius:20, paddingHorizontal:10, paddingVertical:3 },
-  pillTxt:    { fontSize:11, color:C.primary, fontWeight:'700' },
-  exportBtn:  { backgroundColor:C.primary, paddingHorizontal:14, paddingVertical:9, borderRadius:8, flexDirection:'row', alignItems:'center' },
-  exportTxt:  { color:'#FFF', fontSize:13, fontWeight:'700' },
-  toolbar:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:20, paddingVertical:14, backgroundColor:C.card, borderBottomWidth:1, borderBottomColor:C.border },
-  searchBox:  { flex:1, maxWidth:700, flexDirection:'row', alignItems:'center', backgroundColor:C.bg, borderWidth:1, borderColor:C.border, borderRadius:8, paddingHorizontal:12, height:42 },
-  searchInput:{ flex:1, fontSize:14, color:C.text, height:42, marginLeft:8 },
-  clearBtn:   { padding:4 },
-  viewToggle: { flexDirection:'row', alignItems:'center', gap:6, marginLeft:14 },
-  viewLabel:  { fontSize:13, color:C.sub, fontWeight:'500', marginRight:2 },
-  vBtn:       { width:36, height:36, borderRadius:7, backgroundColor:C.bg, borderWidth:1, borderColor:C.border, justifyContent:'center', alignItems:'center' },
-  vBtnOn:     { backgroundColor:C.primary, borderColor:C.primary },
-  content:    { paddingVertical:20, paddingBottom:50 },
-  listBox:    { backgroundColor:C.card, marginHorizontal:20, borderRadius:12, overflow:'hidden', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:10, elevation:3 },
-  footer:     { flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:20, paddingTop:20, gap:12, flexWrap:'wrap' },
-  footTxt:    { fontSize:13, color:C.sub },
-  empty:      { padding:40, alignItems:'center' },
-  emptyTxt:   { fontSize:14, color:C.muted, textAlign:'center' },
+  root: { flex: 1, backgroundColor: C.bg },
+  topBar: { height: 56, backgroundColor: '#1d324e', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  logoBox: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  backButton: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+  backButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600', marginLeft: 4 },
+  titleBar: { backgroundColor: C.card, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  breadcrumb: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  bcLink: { fontSize: 12, color: C.primary, fontWeight: '500' },
+  bcSep: { fontSize: 12, color: C.muted, marginHorizontal: 2 },
+  bcCur: { fontSize: 12, color: C.sub },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pageTitle: { fontSize: 22, fontWeight: '800', color: C.text },
+  pill: { backgroundColor: C.primaryLight, borderWidth: 1.5, borderColor: C.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  pillTxt: { fontSize: 11, color: C.primary, fontWeight: '700' },
+  exportBtn: { backgroundColor: C.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+  exportTxt: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+  searchBox: { flex: 1, maxWidth: 700, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
+  searchInput: { flex: 1, fontSize: 14, color: C.text, height: 42, marginLeft: 8 },
+  clearBtn: { padding: 4 },
+  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 14 },
+  viewLabel: { fontSize: 13, color: C.sub, fontWeight: '500', marginRight: 2 },
+  vBtn: { width: 36, height: 36, borderRadius: 7, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center' },
+  vBtnOn: { backgroundColor: C.primary, borderColor: C.primary },
+  content: { paddingVertical: 20, paddingBottom: 50 },
+  listBox: { backgroundColor: C.card, marginHorizontal: 20, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, gap: 12, flexWrap: 'wrap' },
+  footTxt: { fontSize: 13, color: C.sub },
+  empty: { padding: 40, alignItems: 'center' },
+  emptyTxt: { fontSize: 14, color: C.muted, textAlign: 'center' },
 });
