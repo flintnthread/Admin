@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -59,7 +60,28 @@ const ImagePicker = {
         return { cancelled: true };
     },
     async launchImageLibraryAsync(_: any): Promise<ImagePickerResult> {
-        return { cancelled: true };
+        if (Platform.OS === 'web') {
+            return new Promise((resolve) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*,video/*';
+                input.onchange = (e: any) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            resolve({ cancelled: false, assets: [{ uri: ev.target?.result as string }] });
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        resolve({ cancelled: true });
+                    }
+                };
+                input.oncancel = () => resolve({ cancelled: true });
+                input.click();
+            });
+        }
+        return { cancelled: false, assets: [{ uri: "https://picsum.photos/400" }] };
     },
 } as const;
 
@@ -96,10 +118,36 @@ class ApiError extends Error {
 
 const applyDeliverySelection = (value: string, onChange: (field: string, value: any) => void) => {
     onChange("deliveryOption", value);
+    if (value === "Standard Delivery") {
+        onChange("minDays", "3");
+        onChange("maxDays", "5");
+        onChange("deliveryInfo", "Delivered via standard shipping partners.");
+    } else if (value === "Express Delivery") {
+        onChange("minDays", "1");
+        onChange("maxDays", "2");
+        onChange("deliveryInfo", "Expedited shipping for fast delivery.");
+    } else if (value === "Same Day Delivery") {
+        onChange("minDays", "0");
+        onChange("maxDays", "1");
+        onChange("deliveryInfo", "Orders placed before 2 PM will be delivered the same day.");
+    } else if (value === "Pickup Only") {
+        onChange("minDays", "0");
+        onChange("maxDays", "0");
+        onChange("deliveryInfo", "Customer must pick up the item from our store.");
+    }
 };
 
 const applyReturnPolicySelection = (value: string, onChange: (field: string, value: any) => void) => {
     onChange("returnPolicy", value);
+    if (value === "7 Days Return") {
+        onChange("returnPolicyText", "Returns accepted within 7 days of delivery. Product must be in original condition with tags attached.");
+    } else if (value === "14 Days Return") {
+        onChange("returnPolicyText", "Returns accepted within 14 days of delivery. Product must be unused and in original packaging.");
+    } else if (value === "30 Days Return") {
+        onChange("returnPolicyText", "Enjoy peace of mind with our 30-day return policy. Returns accepted for unused items with original tags.");
+    } else if (value === "No Return") {
+        onChange("returnPolicyText", "This item is non-returnable unless defective or damaged upon arrival.");
+    }
 };
 
 /** React 19 + RN Animated typing compatibility */
@@ -119,14 +167,14 @@ const DUMMY_PRIMARY_IMAGE_URI =
 const getStepScrollContent = (isDesktop: boolean) =>
     isDesktop
         ? {
-              paddingHorizontal: 32,
-              paddingTop: 24,
-              paddingBottom: 80,
-              width: "100%" as const,
-              maxWidth: CONTENT_MAX,
-              alignSelf: "center" as const,
-              ...(Platform.OS === "web" ? ({ alignSelf: "center", marginHorizontal: "auto" } as object) : {}),
-          }
+            paddingHorizontal: 32,
+            paddingTop: 24,
+            paddingBottom: 80,
+            width: "100%" as const,
+            maxWidth: CONTENT_MAX,
+            alignSelf: "center" as const,
+            ...(Platform.OS === "web" ? ({ alignSelf: "center", marginHorizontal: "auto" } as object) : {}),
+        }
         : { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 48 };
 
 // ─── Design Tokens ───────────────────────────────────────────
@@ -1900,10 +1948,14 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
     const upVariant = (id: string, field: string, value: string | number | undefined) => {
         setVariants((p: Variant[]) => p.map((v: Variant) => {
             if (v.id !== id) return v;
-            const u = { ...v, [field]: value };
+            let cleanVal = value;
+            if (typeof value === "string" && ["mrp", "sellingPrice", "stock", "discount"].includes(field)) {
+                cleanVal = value.replace(/[^0-9.]/g, "").replace(/(\..*?)\..*/g, "$1");
+            }
+            const u = { ...v, [field]: cleanVal };
             if (field === "mrp" || field === "sellingPrice") {
-                const mrpRaw = field === "mrp" ? value : u.mrp;
-                const spRaw = field === "sellingPrice" ? value : u.sellingPrice;
+                const mrpRaw = field === "mrp" ? cleanVal : u.mrp;
+                const spRaw = field === "sellingPrice" ? cleanVal : u.sellingPrice;
                 const mrp = parseFloat(String(mrpRaw ?? "")) || 0;
                 const sp = parseFloat(String(spRaw ?? "")) || 0;
                 if (mrp > 0 && sp > 0 && sp <= mrp) u.discount = String(Math.round(((mrp - sp) / mrp) * 100));
@@ -2009,7 +2061,7 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
 // ─────────────────────────────────────────────────────────────
 // STEP 3 — Images
 // ─────────────────────────────────────────────────────────────
-const StepImages = ({ data, onChange, errors, isDesktop = false }: any) => {
+const StepImages = ({ data, onChange, errors, isDesktop = false, actionBar }: any) => {
     const hasErr = errors.some((e: string) => e.toLowerCase().includes("primary"));
     const [srcModal, setSrcModal] = useState(false);
 
@@ -2130,7 +2182,7 @@ const ig = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────
 // STEP 4 — Details
 // ─────────────────────────────────────────────────────────────
-const StepDetails = ({ data, onChange, errors, validationTrigger = 0, isDesktop = false }: any) => {
+const StepDetails = ({ data, onChange, errors, validationTrigger = 0, isDesktop = false, actionBar }: any) => {
     const scrollRef = useRef<ScrollView>(null);
     const fieldRefs = useRef<Record<string, any>>({});
 
@@ -2642,7 +2694,13 @@ const AddNewProduct: React.FC = () => {
         setBasicData(p => ({ ...p, [k]: cleanVal }));
         setBasicErrors(prev => prev.filter(e => !e.toLowerCase().includes(k.toLowerCase())));
     };
-    const upDetails = (k: string, v: any) => setDetailsData(p => ({ ...p, [k]: v }));
+    const upDetails = (k: string, v: any) => {
+        let cleanVal = v;
+        if (["weight", "length", "width", "height"].includes(k)) {
+            cleanVal = String(v).replace(/[^0-9.]/g, "").replace(/(\..*?)\..*/g, "$1");
+        }
+        setDetailsData(p => ({ ...p, [k]: cleanVal }));
+    };
     const rmVariant = (id: string) => setVariants(p => p.filter(v => v.id !== id));
 
     const handleTabPress = (i: number) => { if (i <= maxUnlocked) setStep(i); };
@@ -2731,7 +2789,7 @@ const AddNewProduct: React.FC = () => {
     const leftAction =
         step === 0 ? (
             <TouchableOpacity style={isDesktop ? ds.cancelBtn : sc.cancelBtn} onPress={resetForm}>
-                <AppText style={isDesktop ? ds.cancelTxt : sc.cancelTxt}>Cancel</AppText>
+                <AppText style={isDesktop ? ds.cancelTxt : sc.cancelTxt}>Back</AppText>
             </TouchableOpacity>
         ) : (
             <TouchableOpacity style={isDesktop ? ds.prevBtn : sc.prevBtn} onPress={() => setStep((s) => s - 1)}>
@@ -2754,7 +2812,7 @@ const AddNewProduct: React.FC = () => {
         );
 
     const actionBar = (
-        <View style={isDesktop ? ds.bar : sc.bar}>
+        <View style={isDesktop ? ds.bar : [sc.bar, { backgroundColor: 'transparent', borderTopWidth: 0, shadowOpacity: 0, elevation: 0, paddingBottom: 24 }]}>
             <View style={isDesktop ? ds.barLeft : sc.barLeft}>{leftAction}</View>
             <View style={isDesktop ? ds.barRight : sc.barRight}>{rightAction}</View>
         </View>
@@ -2762,10 +2820,10 @@ const AddNewProduct: React.FC = () => {
 
     const stepContent = (
         <>
-            {step === 0 && <StepBasicInfo data={basicData} onChange={upBasic} errors={basicErrors} validationTrigger={validationTrigger} catalog={catalog} isDesktop={isDesktop} />}
-            {step === 1 && <StepVariants variants={variants} setVariants={setVariants} rmVariant={rmVariant} errors={variantErrors} catalog={catalog} isDesktop={isDesktop} />}
-            {step === 2 && <StepImages data={imagesData} onChange={(k: string, v: any) => setImagesData((p) => ({ ...p, [k]: v }))} errors={imageErrors} isDesktop={isDesktop} />}
-            {step === 3 && <StepDetails data={detailsData} onChange={upDetails} errors={detailErrors} validationTrigger={validationTrigger} isDesktop={isDesktop} />}
+            {step === 0 && <StepBasicInfo data={basicData} onChange={upBasic} errors={basicErrors} validationTrigger={validationTrigger} catalog={catalog} isDesktop={isDesktop} actionBar={actionBar} />}
+            {step === 1 && <StepVariants variants={variants} setVariants={setVariants} rmVariant={rmVariant} errors={variantErrors} catalog={catalog} isDesktop={isDesktop} actionBar={actionBar} />}
+            {step === 2 && <StepImages data={imagesData} onChange={(k: string, v: any) => setImagesData((p) => ({ ...p, [k]: v }))} errors={imageErrors} isDesktop={isDesktop} actionBar={actionBar} />}
+            {step === 3 && <StepDetails data={detailsData} onChange={upDetails} errors={detailErrors} validationTrigger={validationTrigger} isDesktop={isDesktop} actionBar={actionBar} />}
         </>
     );
 
@@ -2784,53 +2842,55 @@ const AddNewProduct: React.FC = () => {
 
     if (isDesktop) {
         return (
-            <View style={[ds.page, { display: 'flex' as any, flexDirection: 'column' }]}>
-                <StatusBar barStyle="dark-content" backgroundColor={C.white} />
-                <View style={ds.topBar}>
-                    <TouchableOpacity onPress={resetForm} style={ds.topBtn}>
-                        <Ionicons name="arrow-back" size={22} color={C.navy} />
-                    </TouchableOpacity>
-                    <View style={ds.topCenter}>
-                        <AppText style={ds.topTitle}>Add New Product</AppText>
-                        <AppText style={ds.topSub}>{STEPS[step]?.label} · Step {step + 1} of {STEPS.length}</AppText>
+            <AdminLayout>
+                <View style={[ds.page, { display: 'flex' as any, flexDirection: 'column' }]}>
+                    <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+                    <View style={ds.topBar}>
+                        <TouchableOpacity onPress={resetForm} style={ds.topBtn}>
+                            <Ionicons name="arrow-back" size={22} color={C.navy} />
+                        </TouchableOpacity>
+                        <View style={ds.topCenter}>
+                            <AppText style={ds.topTitle}>Add New Product</AppText>
+                            <AppText style={ds.topSub}>{STEPS[step]?.label} · Step {step + 1} of {STEPS.length}</AppText>
+                        </View>
+                        <TouchableOpacity onPress={resetForm} style={ds.topBtn}>
+                            <Ionicons name="close" size={22} color={C.textMid} />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={resetForm} style={ds.topBtn}>
-                        <Ionicons name="close" size={22} color={C.textMid} />
-                    </TouchableOpacity>
+                    <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} isDesktop />
+                    <View style={[ds.mainColumn, { flex: 1, overflow: 'hidden' as any }]}>
+                        <View style={[ds.mainScroll, { flex: 1 }]}>{stepContent}</View>
+                        <View style={[ds.barWrap, { backgroundColor: 'transparent', borderTopWidth: 0 }]}>{actionBar}</View>
+                    </View>
+                    <ToastContainer toasts={toasts} onRemove={removeToast} />
+                    {sweetAlert}
                 </View>
-                <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} isDesktop />
-                <View style={[ds.mainColumn, { flex: 1, overflow: 'hidden' as any }]}>
-                    <View style={[ds.mainScroll, { flex: 1 }]}>{stepContent}</View>
-                    <View style={ds.barWrap}>{actionBar}</View>
-                </View>
-                <ToastContainer toasts={toasts} onRemove={removeToast} />
-                {sweetAlert}
-            </View>
+            </AdminLayout>
         );
     }
 
     return (
         <AdminLayout>
-        <SafeAreaView style={sc.root}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
-            <View style={sc.header}>
-                <TouchableOpacity onPress={resetForm} style={sc.hBtn}>
-                    <Ionicons name="chevron-back" size={22} color={C.white} />
-                </TouchableOpacity>
-                <View style={sc.hCenter}>
-                    <AppText style={sc.hTitle}>Add New Product</AppText>
-                    <AppText style={sc.hSub}>Step {step + 1} of {STEPS.length}</AppText>
+            <SafeAreaView style={sc.root}>
+                <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
+                <View style={sc.header}>
+                    <TouchableOpacity onPress={resetForm} style={sc.hBtn}>
+                        <Ionicons name="chevron-back" size={22} color={C.white} />
+                    </TouchableOpacity>
+                    <View style={sc.hCenter}>
+                        <AppText style={sc.hTitle}>Add New Product</AppText>
+                        <AppText style={sc.hSub}>Step {step + 1} of {STEPS.length}</AppText>
+                    </View>
+                    <TouchableOpacity onPress={resetForm} style={sc.hBtn}>
+                        <Ionicons name="close" size={22} color={C.white} />
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={resetForm} style={sc.hBtn}>
-                    <Ionicons name="close" size={22} color={C.white} />
-                </TouchableOpacity>
-            </View>
-            <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} />
-            <View style={{ flex: 1, backgroundColor: C.bg }}>{stepContent}</View>
-            {actionBar}
-            <ToastContainer toasts={toasts} onRemove={removeToast} />
-            {sweetAlert}
-        </SafeAreaView>
+                <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} />
+                <View style={{ flex: 1, backgroundColor: C.bg }}>{stepContent}</View>
+                {actionBar}
+                <ToastContainer toasts={toasts} onRemove={removeToast} />
+                {sweetAlert}
+            </SafeAreaView>
         </AdminLayout>
     );
 };
@@ -2851,12 +2911,12 @@ const at = StyleSheet.create({
     fieldFocused: { borderColor: C.navy, backgroundColor: C.white },
     fieldError: { borderColor: C.red, backgroundColor: "#FFF8F8" },
     fieldPfx: { fontFamily: fontFamilies.semiBold, fontSize: 14, color: C.textMid, marginRight: 6 },
-    fieldInput: { flex: 1, fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, paddingVertical: 10 },
+    fieldInput: { flex: 1, fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, paddingVertical: 10, ...(Platform.OS === 'web' && { outlineStyle: 'none' } as any) },
     drop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.inputBg, borderWidth: 1.2, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, minHeight: 44 },
     dropText: { fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, flex: 1 },
     dropPh: { color: C.textPlaceholder },
     hsnWrap: { flexDirection: "row", alignItems: "center", backgroundColor: C.inputBg, borderWidth: 1.2, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, minHeight: 44 },
-    hsnInput: { flex: 1, fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, paddingVertical: 10 },
+    hsnInput: { flex: 1, fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, paddingVertical: 10, ...(Platform.OS === 'web' && { outlineStyle: 'none' } as any) },
     row2: { flexDirection: "row", gap: 10 },
     row3: { flexDirection: "row", gap: 8 },
     edCard: { borderWidth: 1.2, borderColor: C.border, borderRadius: 10, overflow: "hidden" },
@@ -2864,7 +2924,7 @@ const at = StyleSheet.create({
     tbBtn: { paddingHorizontal: 7, paddingVertical: 5, borderRadius: 6, minWidth: 28, alignItems: "center", justifyContent: "center" },
     tbTxt: { fontFamily: fontFamilies.medium, fontSize: 13, color: C.textMid },
     tbSep: { width: 1, height: 16, backgroundColor: C.border, marginHorizontal: 4 },
-    edInput: { paddingHorizontal: 12, paddingVertical: 10, fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, minHeight: 56 },
+    edInput: { paddingHorizontal: 12, paddingVertical: 10, fontFamily: fontFamilies.regular, fontSize: 13, color: C.textDark, minHeight: 56, ...(Platform.OS === 'web' && { outlineStyle: 'none' } as any) },
     edFoot: { paddingHorizontal: 12, paddingBottom: 8, alignItems: "flex-end" },
     radioRow: { flexDirection: "row", gap: 10, marginTop: 10 },
     radioPill: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.2, borderColor: C.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
@@ -2926,7 +2986,7 @@ const dt = StyleSheet.create({
     sizeTableRowAlt: { backgroundColor: "#FAFBFE" },
     sizeTableTd: { padding: 5, borderRightWidth: 1, borderRightColor: C.border, justifyContent: "center" },
     sizeTableTdAction: { width: 56, minWidth: 56, alignItems: "center", justifyContent: "center", paddingVertical: 6 },
-    sizeTableInput: { backgroundColor: C.inputBg, borderWidth: 1, borderColor: C.border, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 7, fontFamily: fontFamilies.regular, fontSize: 12, color: C.textDark, minHeight: 34 },
+    sizeTableInput: { backgroundColor: C.inputBg, borderWidth: 1, borderColor: C.border, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 7, fontFamily: fontFamilies.regular, fontSize: 12, color: C.textDark, minHeight: 34, ...(Platform.OS === 'web' && { outlineStyle: 'none' } as any) },
     sizeTableDelBtn: { padding: 6, borderRadius: 8, backgroundColor: C.redPale },
     sizeEmptyHint: { marginTop: 8, padding: 14, borderRadius: 12, backgroundColor: C.navyGhost, borderWidth: 1, borderColor: C.navyBorder },
     sizeEmptyHintTxt: { fontFamily: fontFamilies.regular, fontSize: 12, color: C.textMid, textAlign: "center", lineHeight: 18 },

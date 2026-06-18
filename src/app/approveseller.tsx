@@ -9,14 +9,15 @@ import {
   Image,
   useWindowDimensions,
   Alert,
-  Modal
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
-import { useAsyncLoad } from "@/hooks/useAsyncLoad";
+import { useAuth } from "@/context/auth-context";
 import {
-  fetchSellers,
+  fetchApprovedSellers,
   blockSeller,
   unblockSeller,
   fetchPendingProfileSellers,
@@ -65,7 +66,11 @@ export default function ApprovedSellersScreen() {
   const isLargeScreen = windowWidth >= 1024;
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const showPending = tab === "pending";
+  const { token, isLoading: authLoading } = useAuth();
 
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
@@ -118,55 +123,48 @@ export default function ApprovedSellersScreen() {
     );
   }, [pendingSellers, pendingSearchQuery]);
 
-  const { data, loading, error, reload, setData } = useAsyncLoad(
-    async () => {
-      const page = await fetchSellers({ size: 500 });
-      return (page.items ?? [])
-        .filter((s) => s.status === "active" || s.status === "suspended")
-        .map(mapSellerToApprovedRow);
-    },
-    []
-  );
-  const sellers: Seller[] = data ?? [];
+  const loadApprovedSellers = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const items = await fetchApprovedSellers(500);
+      setSellers(items.map(mapSellerToApprovedRow));
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to load approved sellers."));
+      setSellers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
 
   const loadPendingSellers = useCallback(async () => {
+    if (!token) return;
     setPendingLoading(true);
     setPendingError(null);
     try {
       const rows = await fetchPendingProfileSellers();
-      const mapped = await Promise.all(
-        rows.map(async (row) => {
-          const base = mapPendingProfileRow(row);
-          try {
-            const detail = await fetchPendingProfileDetail(row.sellerId);
-            return {
-              ...base,
-              businessType: String(detail.businessType ?? "—"),
-              state: String(detail.state ?? "—"),
-              city: String(detail.city ?? "—"),
-              bankName: String(detail.bankName ?? "—"),
-              accountNumber: String(detail.accountNumber ?? "—"),
-              ifscCode: String(detail.ifscCode ?? "—"),
-              holderName: String(detail.accountHolder ?? "—"),
-            };
-          } catch {
-            return base;
-          }
-        })
-      );
-      setPendingSellers(mapped);
+      setPendingSellers(rows.map(mapPendingProfileRow));
     } catch (e) {
-      setPendingError(getApiErrorMessage(e));
+      setPendingError(getApiErrorMessage(e, "Failed to load pending sellers."));
+      setPendingSellers([]);
     } finally {
       setPendingLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
-    if (showPending) {
-      void loadPendingSellers();
-    }
-  }, [showPending, loadPendingSellers]);
+    if (authLoading || !token) return;
+    void loadPendingSellers();
+  }, [authLoading, token, loadPendingSellers]);
+
+  useEffect(() => {
+    if (authLoading || !token || showPending) return;
+    void loadApprovedSellers();
+  }, [authLoading, token, showPending, loadApprovedSellers]);
+
+  const reload = loadApprovedSellers;
+  const setData = setSellers;
 
   const openPendingDetail = async (pending: PendingSeller) => {
     try {
@@ -200,7 +198,7 @@ export default function ApprovedSellersScreen() {
               await approveSellerProfile(pending.id);
               setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
               setShowPendingModal(false);
-              await reload();
+              void loadApprovedSellers();
               Alert.alert("Success", "Seller approved successfully!");
             } catch (e) {
               Alert.alert("Error", getApiErrorMessage(e));
@@ -313,20 +311,25 @@ export default function ApprovedSellersScreen() {
     setCurrentPage(1);
   };
 
-  const handleConfirmDeactivate = () => {
+  const handleConfirmDeactivate = async () => {
     if (!deactivateSeller) return;
-    setData((prev: Seller[] | null) =>
-      prev ? prev.map((s: Seller) => (s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s)) : prev
-    );
-    setDeactivateModalVisible(false);
-    setDeactivateSeller(null);
-    setDeactivateReason("");
-    showToast("Seller successfully blocked!", "success");
+    try {
+      await blockSeller(deactivateSeller.id);
+      setData((prev) =>
+        prev.map((s) => (s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s))
+      );
+      setDeactivateModalVisible(false);
+      setDeactivateSeller(null);
+      setDeactivateReason("");
+      showToast("Seller successfully blocked!", "success");
+    } catch (e) {
+      showToast(getApiErrorMessage(e, "Failed to block seller."), "error");
+    }
   };
 
   const handleConfirmDelete = () => {
     if (!deleteSeller) return;
-    setData((prev: Seller[] | null) => (prev ? prev.filter((s: Seller) => s.id !== deleteSeller.id) : prev));
+    setData((prev) => prev.filter((s) => s.id !== deleteSeller.id));
     setDeleteModalVisible(false);
     setDeleteSeller(null);
     setDeleteReason("");
@@ -351,7 +354,7 @@ export default function ApprovedSellersScreen() {
             if (!seller) return null;
 
             const handleUpdateSellerStatus = () => {
-              setData((prev: Seller[] | null) => (prev ? prev.map((s: Seller) => s.id === seller.id ? { ...s, status: adminStatus } : s) : prev));
+              setData((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: adminStatus } : s));
               showToast(`Seller status updated to ${adminStatus}!`, "success");
             };
 
@@ -901,6 +904,17 @@ export default function ApprovedSellersScreen() {
             </View>
 
             {/* --- PENDING TABLE --- */}
+            {pendingError ? (
+              <TouchableOpacity onPress={() => void loadPendingSellers()}>
+                <Text style={styles.loadErrorText}>{pendingError} — Tap to retry</Text>
+              </TouchableOpacity>
+            ) : null}
+            {pendingLoading ? (
+              <View style={{ padding: 24, alignItems: "center" }}>
+                <ActivityIndicator size="small" color="#EA580C" />
+                <Text style={styles.emptyText}>Loading pending sellers...</Text>
+              </View>
+            ) : (
             <View style={styles.tableCard}>
               <View style={styles.tableHeaderRow}>
                 <Text style={[styles.tableTh, { flex: 0.8 }]}>ID</Text>
@@ -927,10 +941,7 @@ export default function ApprovedSellersScreen() {
                   <View style={[styles.tableCellActions, { flex: 1.2, justifyContent: "center" }]}>
                     <TouchableOpacity
                       style={styles.pendingViewBtn}
-                      onPress={() => {
-                        setSelectedPendingSeller(seller);
-                        setShowPendingModal(true);
-                      }}
+                      onPress={() => void openPendingDetail(seller)}
                     >
                       <Text style={styles.pendingViewBtnText}>View</Text>
                     </TouchableOpacity>
@@ -938,12 +949,13 @@ export default function ApprovedSellersScreen() {
                 </View>
               ))}
 
-              {filteredPendingSellers.length === 0 && (
+              {filteredPendingSellers.length === 0 && !pendingLoading && (
                 <View style={styles.emptyTable}>
                   <Text style={styles.emptyText}>No pending sellers found.</Text>
                 </View>
               )}
             </View>
+            )}
 
             {/* --- FOOTER PAGINATION --- */}
             <View style={[styles.pagination, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
@@ -986,98 +998,40 @@ export default function ApprovedSellersScreen() {
                   
                   {/* Title & Breadcrumbs */}
                   <View style={styles.bannerTitleContainer}>
-                    <Text style={styles.bannerTitle}>
-                      {showPending ? "Pending Sellers" : "Approved Sellers"}
-                    </Text>
+                    <Text style={styles.bannerTitle}>Approved Sellers</Text>
                     <View style={styles.breadcrumbs}>
                       <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
                       <Text style={styles.breadcrumbActive}>Dashboard</Text>
                       <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                      <Text style={styles.breadcrumbText}>
-                        {showPending ? "Pending Sellers" : "Approved Sellers"}
-                      </Text>
+                      <Text style={styles.breadcrumbText}>Approved Sellers</Text>
                     </View>
                   </View>
                 </View>
 
                 <TouchableOpacity
                   style={styles.bannerActionBtn}
-                  onPress={() => router.push(showPending ? "/approveseller" : "/approveseller?tab=pending")}
+                  onPress={() => router.push("/approveseller?tab=pending")}
                 >
-                  <Feather
-                    name={showPending ? "check" : "clock"}
-                    size={14}
-                    color="#FFFFFF"
-                    style={styles.bannerActionIcon}
-                  />
-                  <Text style={styles.bannerActionBtnText}>
-                    {showPending ? "Approved Sellers" : "Pending Sellers"}
-                  </Text>
+                  <Feather name="clock" size={14} color="#FFFFFF" style={styles.bannerActionIcon} />
+                  <Text style={styles.bannerActionBtnText}>Pending Sellers</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {showPending ? (
-              <>
-                <View style={styles.toolbar}>
-                  <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search pending sellers..."
-                      placeholderTextColor="#9CA3AF"
-                      value={pendingSearchQuery}
-                      onChangeText={setPendingSearchQuery}
-                    />
-                  </View>
-                </View>
-
-                {pendingError ? (
-                  <Text style={styles.loadErrorText}>{pendingError}</Text>
-                ) : null}
-
-                {pendingLoading ? (
-                  <Text style={styles.emptyText}>Loading pending sellers...</Text>
-                ) : (
-                  <View style={styles.tableCard}>
-                    <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableTh, { flex: 1.2 }]}>Seller</Text>
-                      <Text style={[styles.tableTh, { flex: 1.4 }]}>Business</Text>
-                      <Text style={[styles.tableTh, { flex: 1.4 }]}>Email</Text>
-                      <Text style={[styles.tableTh, { flex: 1 }]}>Submitted</Text>
-                      <Text style={[styles.tableTh, { flex: 0.6, textAlign: "center" }]}>Action</Text>
-                    </View>
-                    {filteredPendingSellers.map((pending, idx) => (
-                      <View key={pending.id} style={[styles.tableRow, idx % 2 === 1 && styles.rowAltBg]}>
-                        <Text style={[styles.tableCellText, { flex: 1.2 }]} numberOfLines={1}>{pending.name}</Text>
-                        <Text style={[styles.tableCellText, { flex: 1.4 }]} numberOfLines={1}>{pending.businessName}</Text>
-                        <Text style={[styles.tableCellText, { flex: 1.4 }]} numberOfLines={1}>{pending.email}</Text>
-                        <Text style={[styles.tableCellText, { flex: 1 }]} numberOfLines={1}>{pending.submittedOn}</Text>
-                        <TouchableOpacity
-                          style={[styles.pendingViewBtn, { flex: 0.6 }]}
-                          onPress={() => void openPendingDetail(pending)}
-                        >
-                          <Text style={styles.pendingViewBtnText}>Review</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                    {filteredPendingSellers.length === 0 && !pendingLoading ? (
-                      <View style={styles.emptyTable}>
-                        <Text style={styles.emptyText}>No pending seller requests found.</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                )}
-              </>
-            ) : (
-              <>
-
-            {error ? <Text style={styles.loadErrorText}>{error}</Text> : null}
+            {error ? (
+              <TouchableOpacity onPress={() => void reload()}>
+                <Text style={styles.loadErrorText}>{error} — Tap to retry</Text>
+              </TouchableOpacity>
+            ) : null}
             {loading ? (
-              <Text style={styles.emptyText}>Loading approved sellers...</Text>
+              <View style={{ padding: 24, alignItems: "center" }}>
+                <ActivityIndicator size="small" color="#EA580C" />
+                <Text style={styles.emptyText}>Loading approved sellers...</Text>
+              </View>
             ) : null}
 
-            {/* --- DATA VIEW CONTROLS TOOLBAR --- */}
+            {!loading && !error ? (
+              <>
             <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
               {/* Search Box */}
               <View style={styles.searchContainer}>
@@ -1275,11 +1229,17 @@ export default function ApprovedSellersScreen() {
                             setDeactivateReason("");
                             setDeactivateModalVisible(true);
                           } else {
-                            // Directly unblock
-                            setData((prev: Seller[] | null) =>
-                              prev ? prev.map((s: Seller) => (s.id === seller.id ? { ...s, status: "Active" } : s)) : prev
-                            );
-                            showToast("Seller successfully unblocked!", "success");
+                            void (async () => {
+                              try {
+                                await unblockSeller(seller.id);
+                                setData((prev) =>
+                                  prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
+                                );
+                                showToast("Seller successfully unblocked!", "success");
+                              } catch (e) {
+                                showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
+                              }
+                            })();
                           }
                         }}
                       >
@@ -1396,11 +1356,17 @@ export default function ApprovedSellersScreen() {
                             setDeactivateReason("");
                             setDeactivateModalVisible(true);
                           } else {
-                            // Directly unblock
-                            setData((prev: Seller[] | null) =>
-                              prev ? prev.map((s: Seller) => (s.id === seller.id ? { ...s, status: "Active" } : s)) : prev
-                            );
-                            showToast("Seller successfully unblocked!", "success");
+                            void (async () => {
+                              try {
+                                await unblockSeller(seller.id);
+                                setData((prev) =>
+                                  prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
+                                );
+                                showToast("Seller successfully unblocked!", "success");
+                              } catch (e) {
+                                showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
+                              }
+                            })();
                           }
                         }}
                       >
@@ -1501,10 +1467,9 @@ export default function ApprovedSellersScreen() {
               </View>
             )}
           </>
+            ) : null}
+          </>
         )}
-
-              </>
-            )}
 
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>

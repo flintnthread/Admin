@@ -24,6 +24,8 @@ export type SellerSummary = {
   createdAt?: string;
   updatedAt?: string;
   profilePicUrl?: string;
+  profilePicPath?: string;
+  liveSelfiePath?: string;
   bankName?: string;
   accountHolder?: string;
   accountNumber?: string;
@@ -35,6 +37,9 @@ export type SellerSummary = {
   city?: string;
   state?: string;
   businessType?: string;
+  totalRevenue?: number;
+  totalOrders?: number;
+  country?: string;
 };
 
 export type ProductSummary = {
@@ -60,6 +65,21 @@ export type OrderSummary = {
   shippingState?: string;
   gstStatus?: string;
   createdAt?: string;
+  products?: OrderProductPreview[];
+  sellers?: OrderSellerPreview[];
+};
+
+export type OrderProductPreview = {
+  id?: number;
+  name?: string;
+  imageUrl?: string;
+  sellerName?: string;
+};
+
+export type OrderSellerPreview = {
+  id?: number;
+  name?: string;
+  email?: string;
 };
 
 export type CustomerSummary = {
