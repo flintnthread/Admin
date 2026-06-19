@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
@@ -100,6 +101,8 @@ export default function ApprovedSellersScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteSeller, setDeleteSeller] = useState<Seller | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  // --- DOCUMENT PREVIEW STATE ---
+  const [previewDoc, setPreviewDoc] = useState<{name: string, url: string} | null>(null);
 
   // --- TOAST SYSTEM STATE & HELPERS ---
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
@@ -185,55 +188,29 @@ export default function ApprovedSellersScreen() {
     }
   };
 
-  const handleApprovePending = (pending: PendingSeller) => {
-    Alert.alert(
-      "Approve Seller",
-      `Are you sure you want to approve ${pending.name} (${pending.businessName})?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Approve",
-          onPress: async () => {
-            try {
-              await approveSellerProfile(pending.id);
-              setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
-              setShowPendingModal(false);
-              void loadApprovedSellers();
-              Alert.alert("Success", "Seller approved successfully!");
-            } catch (e) {
-              Alert.alert("Error", getApiErrorMessage(e));
-            }
-          },
-        },
-      ]
-    );
+  const handleApprovePending = async (pending: PendingSeller) => {
+    try {
+      await approveSellerProfile(pending.id);
+      setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
+      setShowPendingModal(false);
+      void loadApprovedSellers();
+      showToast("Seller approved successfully!", "success");
+    } catch (e) {
+      showToast(getApiErrorMessage(e, "Failed to approve seller."), "error");
+    }
   };
 
-  const handleRejectPending = (pending: PendingSeller) => {
-    Alert.alert(
-      "Reject Seller",
-      `Are you sure you want to reject ${pending.name} (${pending.businessName})?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reject",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await rejectSellerProfile(pending.id, "Rejected by admin");
-              setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
-              setShowPendingModal(false);
-              Alert.alert("Rejected", "Seller request has been rejected.");
-            } catch (e) {
-              Alert.alert("Error", getApiErrorMessage(e));
-            }
-          },
-        },
-      ]
-    );
+  const handleRejectPending = async (pending: PendingSeller) => {
+    try {
+      await rejectSellerProfile(pending.id, "Rejected by admin");
+      setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
+      setShowPendingModal(false);
+      showToast("Seller request has been rejected.", "success");
+    } catch (e) {
+      showToast(getApiErrorMessage(e, "Failed to reject seller."), "error");
+    }
   };
 
-  
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [sortBy, setSortBy] = useState("Name");
@@ -337,7 +314,41 @@ export default function ApprovedSellersScreen() {
   };
 
   const handleExportCSV = () => {
-    Alert.alert("Export Successful", "All approved sellers have been exported to CSV.");
+    if (sellers.length === 0) {
+      Alert.alert("No Data", "There are no approved sellers to export.");
+      return;
+    }
+
+    const headers = ["ID", "Name", "Business Name", "Email", "State", "City", "Status", "Products", "Wallet Balance", "Revenue", "Join Date"];
+    const rows = sellers.map(s => [
+      s.id,
+      `"${s.name.replace(/"/g, '""')}"`,
+      `"${s.businessName.replace(/"/g, '""')}"`,
+      `"${s.email.replace(/"/g, '""')}"`,
+      `"${s.state.replace(/"/g, '""')}"`,
+      `"${s.city.replace(/"/g, '""')}"`,
+      s.status,
+      s.products,
+      s.walletBalance,
+      s.revenue,
+      s.joinDate
+    ].join(","));
+
+    const csv = [headers.join(","), ...rows].join("\n");
+
+    if (Platform.OS === "web") {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "approved_sellers.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast("Sellers exported to CSV successfully!", "success");
+    } else {
+      Alert.alert("Export Successful", "CSV export is primarily supported on the web platform.");
+    }
   };
 
   // --- SUB-COMPONENTS ---
@@ -371,7 +382,7 @@ export default function ApprovedSellersScreen() {
                       <Text style={styles.headerBackBtnText}>Back</Text>
                     </TouchableOpacity>
                     <View style={styles.avatarWrapper}>
-                      <Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />
+                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />) : (<View style={[styles.detailsAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={32} color="#9CA3AF" /></View>)}
                       <View style={styles.statusDotActive} />
                     </View>
                     <View style={styles.detailsMeta}>
@@ -620,7 +631,7 @@ export default function ApprovedSellersScreen() {
                         <Text style={styles.sidebarCardTitle}>Profile Picture</Text>
                       </View>
                       <View style={styles.sidebarCardBody}>
-                        <Image source={{ uri: seller.avatar }} style={styles.sidebarProfileImg} />
+                        {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sidebarProfileImg} />) : (<View style={[styles.sidebarProfileImg, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={80} color="#9CA3AF" /></View>)}
                       </View>
                     </View>
 
@@ -642,7 +653,7 @@ export default function ApprovedSellersScreen() {
                             <Text style={styles.docLabel}>{docName}</Text>
                             <TouchableOpacity
                               style={styles.docViewBtn}
-                              onPress={() => Alert.alert("Document View", `Opening preview for ${docName}...`)}
+                              onPress={() => setPreviewDoc({ name: docName, url: 'https://via.placeholder.com/800x600.png?text=' + encodeURIComponent(docName) })}
                             >
                               <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
                               <Text style={styles.docViewBtnText}>View</Text>
@@ -652,13 +663,13 @@ export default function ApprovedSellersScreen() {
 
                         <Text style={styles.docSectionSubTitle}>Business Proof Documents (Multiple)</Text>
                         <View style={styles.docThumbnailRow}>
-                          <Image source={{ uri: seller.avatar }} style={styles.docThumbnail} />
+                          {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.docThumbnail} />) : (<View style={[styles.docThumbnail, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="image" size={40} color="#9CA3AF" /></View>)}
                         </View>
 
                         <Text style={styles.docSectionSubTitle}>Live Selfie Documents</Text>
                         <View style={styles.selfieThumbnailRow}>
                           {[1, 2, 3, 4, 5].map((idx) => (
-                            <Image key={idx} source={{ uri: seller.avatar }} style={styles.selfieThumbnail} />
+                            (seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image key={idx} source={{ uri: seller.avatar }} style={styles.selfieThumbnail} />) : (<View key={idx} style={[styles.selfieThumbnail, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="camera" size={20} color="#9CA3AF" /></View>)
                           ))}
                         </View>
                       </View>
@@ -676,7 +687,7 @@ export default function ApprovedSellersScreen() {
                   <View style={[styles.adminActionsBody, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
                     {/* Left Form (2/3 width) */}
                     <View style={{ flex: isLargeScreen ? 2 : 1 }}>
-                      <View style={[styles.rowLayout, { gap: 16, flexWrap: "wrap", marginBottom: 16 }]}>
+                      <View style={[styles.rowLayout, { gap: 16, flexWrap: "wrap", marginBottom: 16, zIndex: 100, position: "relative" }]}>
                         {/* Update Status Dropdown */}
                         <View style={{ flex: 1, minWidth: 200, position: "relative" }}>
                           <Text style={styles.formLabel}>Update Status</Text>
@@ -846,9 +857,9 @@ export default function ApprovedSellersScreen() {
             <View style={styles.pageHeaderCard}>
               <View style={styles.bannerTop}>
                 <TouchableOpacity
-                  style={styles.bannerBackBtn}
-                  onPress={() => router.back()}
-                >
+                    style={styles.bannerBackBtn}
+                    onPress={() => router.push("/approveseller")}
+                  >
                   <Feather name="arrow-left" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
                   <Text style={styles.bannerBackBtnText}>Back</Text>
                 </TouchableOpacity>
@@ -1041,7 +1052,11 @@ export default function ApprovedSellersScreen() {
                   placeholder="Search approved sellers..."
                   placeholderTextColor="#9CA3AF"
                   value={searchQuery}
-                  onChangeText={setSearchQuery}
+                  onChangeText={(text) => {
+                    setSearchQuery(text);
+                    setActiveSearch(text);
+                    setCurrentPage(1);
+                  }}
                   onSubmitEditing={handleApplyFilter}
                 />
                 {searchQuery ? (
@@ -1186,7 +1201,7 @@ export default function ApprovedSellersScreen() {
                 {paginatedSellers.map((seller) => (
                   <View key={seller.id} style={[styles.tableRow, seller.status === "Blocked" && styles.rowBlocked]}>
                     <View style={[styles.tableCell, { flex: 2.2, flexDirection: "row", alignItems: "center" }]}>
-                      <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />
+                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
                       <View style={styles.sellerMeta}>
                         <Text style={styles.sellerName}>{seller.name}</Text>
                         <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
@@ -1196,11 +1211,11 @@ export default function ApprovedSellersScreen() {
                     <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
                     <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      ₹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </Text>
                     <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>{seller.joinDate}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      ₹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </Text>
                     <View style={[styles.tableCellActions, { flex: 1.6 }]}>
                       <TouchableOpacity
@@ -1282,7 +1297,7 @@ export default function ApprovedSellersScreen() {
                     ]}
                   >
                     <View style={styles.cardHeader}>
-                      <Image source={{ uri: seller.avatar }} style={styles.cardAvatar} />
+                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.cardAvatar} />) : (<View style={[styles.cardAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={20} color="#9CA3AF" /></View>)}
                       <View style={styles.cardTitleContainer}>
                         <Text style={styles.cardName}>{seller.name}</Text>
                         <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>
@@ -1314,13 +1329,13 @@ export default function ApprovedSellersScreen() {
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Wallet Balance:</Text>
                         <Text style={styles.cardCurrency}>
-                          â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          ₹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Revenue:</Text>
                         <Text style={styles.cardCurrency}>
-                          â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          ₹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                     </View>
@@ -1808,6 +1823,33 @@ export default function ApprovedSellersScreen() {
         </Modal>
       )}
 
+            {/* --- DOCUMENT PREVIEW MODAL --- */}
+      {previewDoc && (
+        <Modal
+          visible={!!previewDoc}
+          onRequestClose={() => setPreviewDoc(null)}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: '80%', maxWidth: 800, padding: 0 }]}>
+              <View style={[styles.modalHeader, { padding: 20 }]}>
+                <Text style={styles.modalTitle}>{previewDoc.name} Preview</Text>
+                <TouchableOpacity onPress={() => setPreviewDoc(null)}>
+                  <Feather name="x" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ width: '100%', height: 500, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
+                <Image 
+                  source={{ uri: previewDoc.url }} 
+                  style={{ width: '100%', height: '100%', resizeMode: 'contain' }} 
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* --- TOAST CONTAINER --- */}
       <View style={styles.toastContainer} pointerEvents="box-none">
         {toasts.map((toast) => (
@@ -1865,8 +1907,9 @@ const styles = StyleSheet.create({
   bannerTop: {
     height: 100,
     backgroundColor: "#1d324e",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "flex-start",
+    paddingTop: 24,
     paddingHorizontal: 20,
   },
   bannerBackBtn: {
@@ -1998,6 +2041,7 @@ const styles = StyleSheet.create({
     height: "100%",
     fontSize: 14,
     color: "#1E293B",
+    ...(Platform.OS === "web" ? { outlineStyle: "none" } : {}),
   },
   clearSearchBtn: {
     padding: 4,
@@ -3319,7 +3363,7 @@ const styles = StyleSheet.create({
   },
   toastContainer: {
     position: "absolute",
-    top: 90,
+    top: 24,
     right: 24,
     zIndex: 9999,
     gap: 10,
