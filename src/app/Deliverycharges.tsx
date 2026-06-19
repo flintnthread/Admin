@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Swal from "sweetalert2";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -342,6 +343,7 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
 const sc = StyleSheet.create({
   card: {
     flex: 1,
+    maxWidth: 320,
     backgroundColor: T.card,
     borderRadius: 14,
     padding: 14,
@@ -562,6 +564,9 @@ const DeliveryChargesScreen: React.FC = () => {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
+
+  const filteredSlabs = slabs.filter(s => filterStatus === "All" || s.status === filterStatus);
 
   const loadSlabs = useCallback(async () => {
     setLoading(true);
@@ -604,12 +609,28 @@ const DeliveryChargesScreen: React.FC = () => {
       }
       await loadSlabs();
       const msg = editingSlabId != null ? "Delivery charge updated successfully!" : "Delivery charge added successfully!";
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Success", msg);
+      if (Platform.OS === "web") {
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: msg,
+          confirmButtonColor: "#1E2B6B",
+        });
+      } else {
+        Alert.alert("Success", msg);
+      }
     } catch (e) {
       const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Error", msg);
+      if (Platform.OS === "web") {
+        Swal.fire({
+          icon: "error",
+          title: "Error!",
+          text: msg,
+          confirmButtonColor: "#1E2B6B",
+        });
+      } else {
+        Alert.alert("Error", msg);
+      }
     }
   };
 
@@ -659,49 +680,45 @@ const DeliveryChargesScreen: React.FC = () => {
   const MainContent = (
     <View style={{ flex: 1 }}>
 
-      {/* ── Page Header (sticky outside ScrollView) ── */}
-      <View style={[styles.pageHead, !isWeb && { flexDirection: "column", alignItems: "stretch", padding: 16, borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
+      {/* ── Page Header ── */}
+      <View style={[styles.pageHead, !isWeb && { flexDirection: "column", alignItems: "stretch", padding: 16, marginHorizontal: 0, marginTop: 0, borderRadius: 0, marginBottom: 12 }]}>
         {!isWeb ? (
           <>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <View style={[styles.pageTag, { marginBottom: 0 }]}>
-                <Feather name="truck" size={11} color={T.orange} />
-                <Text style={styles.pageTagTxt}>Delivery</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <View>
+                <Text style={[styles.pageTitle, { fontSize: 20 }]}>Delivery Charges</Text>
+                <Text style={styles.pageSub}>Manage weight slabs and charges</Text>
               </View>
-              <TouchableOpacity style={[styles.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
-                <Feather name="plus" size={14} color="#fff" />
-                <Text style={[styles.addBtnTxt, { fontSize: 12 }]}>Add</Text>
+              <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+                <Feather name="plus" size={14} color="#1E2B6B" />
+                <Text style={styles.addBtnWhiteTxt}>Add</Text>
               </TouchableOpacity>
-            </View>
-            <View>
-              <Text style={[styles.pageTitle, { fontSize: 20 }]}>Delivery Charges</Text>
-              <Text style={styles.pageSub}>Manage delivery charges based on weight slabs and location.</Text>
             </View>
           </>
         ) : (
           <>
             <View style={styles.pageHeadLeft}>
-              <View style={styles.pageTag}>
-                <Feather name="truck" size={11} color={T.orange} />
-                <Text style={styles.pageTagTxt}>Delivery</Text>
+              <View style={styles.breadcrumb}>
+                <Text style={styles.breadcrumbDim}>Dashboard</Text>
+                <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.breadcrumbActive}>Delivery Charges</Text>
               </View>
               <Text style={styles.pageTitle}>Delivery Charges</Text>
-              <Text style={styles.pageSub}>Manage delivery charges based on weight slabs and location.</Text>
             </View>
-            <TouchableOpacity style={styles.addBtn} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
-              <Feather name="plus" size={15} color="#fff" />
-              <Text style={styles.addBtnTxt}>Add New Charge</Text>
+            <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+              <Feather name="plus" size={15} color="#1E2B6B" />
+              <Text style={styles.addBtnWhiteTxt}>Add New Charge</Text>
             </TouchableOpacity>
           </>
         )}
       </View>
 
+      <StatsFooter slabs={slabs} isWeb={isWeb} />
       <ScrollView
         style={styles.listContent}
         contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }}
         showsVerticalScrollIndicator={false}
       >
-        <StatsFooter slabs={slabs} isWeb={isWeb} />
 
         {/* ── Toolbar (Search + Filter) ── */}
         <View style={styles.toolBar}>
@@ -713,6 +730,25 @@ const DeliveryChargesScreen: React.FC = () => {
               placeholderTextColor="#000"
             />
           </View>
+          
+          <View style={{ flexDirection: "row", gap: 8, marginRight: 8 }}>
+            {(["All", "Active", "Inactive"] as const).map(status => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  styles.statusFilterBtn,
+                  filterStatus === status && styles.statusFilterBtnActive,
+                ]}
+                onPress={() => setFilterStatus(status)}
+              >
+                <Text style={[
+                  styles.statusFilterTxt,
+                  filterStatus === status && styles.statusFilterTxtActive,
+                ]}>{status}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.filterGroup}>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <TouchableOpacity
@@ -747,7 +783,7 @@ const DeliveryChargesScreen: React.FC = () => {
             ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
             : { gap: 12 }
           }>
-            {slabs.map((item) => (
+            {filteredSlabs.map((item) => (
               <View
                 key={item.id}
                 style={isWeb ? { width: "calc(33.33% - 10px)" as any } : undefined}
@@ -774,7 +810,7 @@ const DeliveryChargesScreen: React.FC = () => {
                   <Text style={[styles.th, { width: 90 }]}>Status</Text>
                   <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>Action</Text>
                 </View>
-                {slabs.map((slab, idx) => (
+                {filteredSlabs.map((slab, idx) => (
                   <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                     <Text style={[styles.td, { width: 140, fontWeight: '700', color: T.textH }]}>{slab.label}</Text>
                     <Text style={[styles.td, { width: 160 }]}>{slab.range}</Text>
@@ -844,48 +880,55 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
-  // ── NEW UI STYLES (MATCHING DEPARTMENTS) ──
+  // ── PAGE HEADER (MATCHING PRODUCTS SCREEN) ──
   pageHead: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    backgroundColor: T.navy,
-    padding: 24,
-    borderRadius: 16,
-    marginBottom: 24,
+    backgroundColor: "#151D4F",
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    paddingBottom: 68,
+    borderRadius: 22,
+    marginHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 0,
+    zIndex: 1,
+    shadowColor: "#151D4F",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
   pageHeadLeft: {
     flex: 1,
   },
-  pageTag: {
+  breadcrumb: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(239, 123, 26, 0.15)",
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 8,
+    gap: 6,
+    marginBottom: 6,
   },
-  pageTagTxt: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: T.orange,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+  breadcrumbDim: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.75)",
+  },
+  breadcrumbActive: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.5,
-    lineHeight: 26,
   },
   pageSub: {
     fontSize: 12,
-    color: "#D1D5DB",
+    color: "rgba(255,255,255,0.6)",
     marginTop: 4,
     fontWeight: "400",
   },
@@ -905,11 +948,53 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.2,
   },
+  addBtnWhite: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexShrink: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  addBtnWhiteTxt: {
+    color: "#1E2B6B",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  pageTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(239, 123, 26, 0.15)",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  pageTagTxt: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: T.orange,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
 
   statsRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 8,
+    marginTop: -52,
+    marginHorizontal: 16,
+    zIndex: 10,
+    justifyContent: "center",
   },
 
   toolBar: {
@@ -934,6 +1019,28 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: "#000",
+    outlineStyle: "none" as any,
+  },
+  statusFilterBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+  },
+  statusFilterBtnActive: {
+    backgroundColor: "#151D4F",
+    borderColor: "#151D4F",
+  },
+  statusFilterTxt: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: T.textM,
+  },
+  statusFilterTxtActive: {
+    color: "#FFFFFF",
   },
   filterGroup: {
     flexDirection: "row",
@@ -1127,6 +1234,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 8,
     paddingBottom: 80,
+    zIndex: 20,
+    elevation: 20,
   },
   webListContent: {
     paddingHorizontal: 24,

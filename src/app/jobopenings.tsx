@@ -1401,7 +1401,7 @@ const JobOpeningsScreen: React.FC = () => {
     const MainContent = (
         <Container style={s.safe}>
             {WebStyles}
-            <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
+            <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
             {/* ── TOP BAR ── */}
             <View style={s.topBar}>
@@ -1766,7 +1766,7 @@ const s = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-        backgroundColor: "#1F2937", // T.navy
+        backgroundColor: "#151D4F", // deep navy
         padding: 24,
         borderRadius: 16,
     },

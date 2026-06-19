@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AdminLayout from '@/components/admin-layout';
 
 import {
   type ApprovalProduct,
@@ -30,7 +30,7 @@ const PALETTE = {
   purple: '#5E35B1',
   purpleLight: '#EDE9FE',
   purpleDark: '#4C1D95',
-  orange: '#F59E0B',
+  orange: '#F97316',
   orangeLight: '#FEF3C7',
   blue: '#3B82F6',
   blueLight: '#DBEAFE',
@@ -430,7 +430,7 @@ function StatusTabs({
   isMobile: boolean;
 }) {
   const tabs: { key: FilterKey; label: string; count: number; color: string; bg: string }[] = [
-    { key: 'all', label: 'All', count: stats.all, color: '#FFF', bg: PALETTE.purple },
+    { key: 'all', label: 'All', count: stats.all, color: '#FFF', bg: PALETTE.orange },
     { key: 'pending', label: 'Pending', count: stats.pending, color: PALETTE.orange, bg: PALETTE.orangeLight },
     { key: 'review', label: 'Review', count: stats.review, color: PALETTE.blue, bg: PALETTE.blueLight },
     { key: 'approved', label: 'Approved', count: stats.approved, color: PALETTE.green, bg: PALETTE.greenLight },
@@ -445,7 +445,7 @@ function StatusTabs({
         onPress={() => onChange(tab.key)}
         style={[
           styles.statusTab,
-          isActive && tab.key === 'all' && { backgroundColor: PALETTE.purple },
+          isActive && tab.key === 'all' && { backgroundColor: PALETTE.orange },
           isActive && tab.key !== 'all' && { backgroundColor: tab.bg, borderColor: tab.color },
           !isActive && { borderColor: tab.color, backgroundColor: '#FFF' },
         ]}>
@@ -500,7 +500,7 @@ function FilterSection({
       <View style={styles.queueHeader}>
         <Text style={styles.queueTitle}>Product Approval Queue</Text>
         <Pressable style={styles.filterIconBtn}>
-          <MaterialCommunityIcons name="filter-variant" size={18} color={PALETTE.purple} />
+          <MaterialCommunityIcons name="filter-variant" size={18} color={PALETTE.orange} />
         </Pressable>
       </View>
 
@@ -571,7 +571,7 @@ function ProductCard({ product }: { product: Product }) {
       <View style={styles.sellerActionRow}>
         <View style={styles.sellerRow}>
           <View style={styles.sellerIcon}>
-            <MaterialCommunityIcons name="store" size={14} color={PALETTE.purple} />
+            <MaterialCommunityIcons name="store" size={14} color={PALETTE.orange} />
           </View>
           <View style={styles.sellerInfo}>
             <Text style={styles.sellerName} numberOfLines={1}>
@@ -609,11 +609,6 @@ function ProductTable({
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Pressable style={styles.tableColCheck} onPress={onToggleAll}>
-              <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
-                {allSelected && <MaterialCommunityIcons name="check" size={12} color="#FFF" />}
-              </View>
-            </Pressable>
             <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
             <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
             <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
@@ -624,18 +619,6 @@ function ProductTable({
 
           {products.map((product) => (
             <View key={product.id} style={styles.tableRow}>
-              <Pressable style={styles.tableColCheck} onPress={() => onToggle(product.id)}>
-                <View
-                  style={[
-                    styles.checkbox,
-                    selected.has(product.id) && styles.checkboxChecked,
-                  ]}>
-                  {selected.has(product.id) && (
-                    <MaterialCommunityIcons name="check" size={12} color="#FFF" />
-                  )}
-                </View>
-              </Pressable>
-
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
                 <Image
                   source={{ uri: product.image }}
@@ -644,7 +627,7 @@ function ProductTable({
                 />
                 <View style={styles.tableProductInfo}>
                   <View style={styles.productNameRow}>
-                    <Text style={styles.productName}>{product.name}</Text>
+                    <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
                     {product.isNew && <NewBadge />}
                   </View>
                   <Text style={styles.productDesc} numberOfLines={2}>
@@ -859,9 +842,11 @@ export default function ProductApprovalScreen() {
   const contentMaxWidth = isWide ? Math.min(width, 1400) : width;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <AdminLayout>
       <View style={styles.screen}>
-        {isWide ? <WebTopBar /> : <MobileTopBar />}
+        <PageHeader isWide={isWide} />
+
+        <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
 
         <ScrollView
           style={styles.scroll}
@@ -870,9 +855,6 @@ export default function ProductApprovalScreen() {
             { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' },
           ]}
           showsVerticalScrollIndicator={false}>
-          <PageHeader isWide={isWide} />
-
-          <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
 
           <FilterSection
             stats={stats}
@@ -887,7 +869,7 @@ export default function ProductApprovalScreen() {
 
           {loading ? (
             <View style={styles.stateBox}>
-              <ActivityIndicator size="large" color={PALETTE.purple} />
+              <ActivityIndicator size="large" color={PALETTE.orange} />
               <Text style={styles.stateText}>Loading products…</Text>
             </View>
           ) : error ? (
@@ -921,19 +903,15 @@ export default function ProductApprovalScreen() {
               onPageChange={setCurrentPage}
             />
           )}
-        </ScrollView>
+          </ScrollView>
       </View>
-    </SafeAreaView>
+    </AdminLayout>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: PALETTE.pageBg,
-  },
   screen: {
     flex: 1,
     backgroundColor: PALETTE.pageBg,
@@ -944,7 +922,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 32,
-    gap: 16,
+    paddingTop: 8,
   },
   pressed: {
     opacity: 0.85,
@@ -1107,8 +1085,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingTop: 8,
+    paddingTop: 24,
+    paddingBottom: 68,
+    paddingHorizontal: 32,
     gap: 12,
+    backgroundColor: '#151D4F',
+    borderRadius: 22,
+    marginHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 0,
+    zIndex: 1,
+    shadowColor: '#151D4F',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
   pageHeaderWide: {
     alignItems: 'center',
@@ -1123,18 +1114,18 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 14,
-    backgroundColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: PALETTE.textPrimary,
+    color: '#FFFFFF',
   },
   breadcrumb: {
     fontSize: 13,
-    color: PALETTE.textMuted,
+    color: 'rgba(255,255,255,0.65)',
     marginTop: 2,
   },
   pageHeaderActions: {
@@ -1162,7 +1153,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
   },
   headerPurpleText: {
     color: '#FFF',
@@ -1177,12 +1168,20 @@ const styles = StyleSheet.create({
     gap: 10,
     width: '100%',
     alignSelf: 'stretch',
+    marginTop: -52,
+    paddingHorizontal: 24,
+    zIndex: 10,
+    marginBottom: 8,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     width: '100%',
+    marginTop: -52,
+    paddingHorizontal: 24,
+    zIndex: 10,
+    marginBottom: 8,
   },
   statsGridWide: {
     flexWrap: 'nowrap',
@@ -1287,7 +1286,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: PALETTE.purpleLight,
+    backgroundColor: PALETTE.orangeLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1368,7 +1367,7 @@ const styles = StyleSheet.create({
     color: PALETTE.textPrimary,
   },
   searchBtn: {
-    backgroundColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
     paddingHorizontal: 16,
     paddingVertical: 10,
     alignItems: 'center',
@@ -1455,6 +1454,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   statusBadgeText: {
     fontSize: 11,
@@ -1480,7 +1480,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: PALETTE.purpleLight,
+    backgroundColor: PALETTE.orangeLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1499,7 +1499,7 @@ const styles = StyleSheet.create({
   },
   sellerCategory: {
     fontSize: 11,
-    color: PALETTE.purple,
+    color: PALETTE.orange,
     fontWeight: '500',
     marginTop: 2,
   },
@@ -1539,7 +1539,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
     alignSelf: 'flex-start',
   },
   activateText: {
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   table: {
-    minWidth: 960,
+    width: '100%',
   },
   tableHeader: {
     flexDirection: 'row',
@@ -1602,22 +1602,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tableColProduct: {
-    width: 280,
+    flex: 2,
   },
   tableColSeller: {
-    width: 160,
+    flex: 1,
   },
   tableColCategory: {
-    width: 150,
+    flex: 1,
   },
   tableColStatus: {
-    width: 100,
+    flex: 1,
   },
   tableColDate: {
-    width: 170,
+    flex: 1,
   },
   tableColActions: {
-    width: 220,
+    flex: 1.5,
   },
   checkbox: {
     width: 18,
@@ -1629,8 +1629,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: PALETTE.purple,
-    borderColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
+    borderColor: PALETTE.orange,
   },
   tableCellProduct: {
     flexDirection: 'row',
@@ -1699,8 +1699,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   pageNumActive: {
-    backgroundColor: PALETTE.purple,
-    borderColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
+    borderColor: PALETTE.orange,
   },
   pageNumText: {
     fontSize: 13,
@@ -1740,7 +1740,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: PALETTE.purple,
+    backgroundColor: PALETTE.orange,
   },
   retryBtnText: {
     color: '#FFF',

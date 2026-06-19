@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapFaqCategoryRow, mapFaqQuestionRow } from "@/lib/mappers";
 import {
@@ -312,7 +312,8 @@ const QuestionRow: React.FC<{
             </View>
             {/* Category */}
             <View style={qSt.cellCat}>
-                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "â€”"}</Text>
+                {cat?.icon && <Feather name={cat.icon as any} size={14} color={accentColor} style={{ marginRight: 6 }} />}
+                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "—"}</Text>
             </View>
             {/* Question */}
             <View style={qSt.cellQuestion}>
@@ -371,8 +372,15 @@ const QuestionGridCard: React.FC<{
     return (
         <View style={[gSt.card, { borderTopColor: accentColor }]}>
             <View style={gSt.cardHeader}>
-                <View style={[gSt.indexBadge, { backgroundColor: accentColor + "18" }]}>
-                    <Text style={[gSt.indexText, { color: accentColor }]}>Q{index}</Text>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <View style={[gSt.indexBadge, { backgroundColor: accentColor + "18" }]}>
+                        <Text style={[gSt.indexText, { color: accentColor }]}>Q{index}</Text>
+                    </View>
+                    {cat?.icon && (
+                        <View style={[gSt.iconBadge, { backgroundColor: accentColor + "18" }]}>
+                            <Feather name={cat.icon as any} size={12} color={accentColor} />
+                        </View>
+                    )}
                 </View>
                 <View style={[gSt.statusPill, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
                     <View style={[gSt.statusDot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
@@ -527,22 +535,22 @@ const FaqQuestionsScreen: React.FC = () => {
     return (
         <AdminLayout>
             <View style={st.root}>
-                <StatusBar barStyle="dark-content" backgroundColor={BG_PAGE} />
+                <StatusBar barStyle="light-content" backgroundColor={NAVY} />
 
                 {/* â”€â”€ PAGE HEADER â”€â”€ */}
-                <View style={[st.header, isWeb && st.headerWeb]}>
+                <View style={[st.header, isWeb && st.headerWeb, { backgroundColor: NAVY, borderBottomColor: NAVY }]}>
                     <View style={st.headerLeft}>
-                        <View style={[st.headerIcon, { backgroundColor: selectedCat?.color ?? PRIMARY }]}>
+                        <View style={[st.headerIcon, { backgroundColor: PRIMARY }]}>
                             <Feather name="help-circle" size={22} color="#fff" />
                         </View>
                         <View>
-                            <Text style={st.headerTitle}>FAQ Questions</Text>
-                            <Text style={st.headerBreadcrumb}>
-                                <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  â€º  FAQ Questions"}
+                            <Text style={[st.headerTitle, { color: "#fff" }]}>FAQ Questions</Text>
+                            <Text style={[st.headerBreadcrumb, { color: "rgba(255,255,255,0.6)" }]}>
+                                <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  ›  FAQ Questions"}
                             </Text>
                         </View>
                     </View>
-                    <TouchableOpacity style={[st.addBtn, { backgroundColor: selectedCat?.color ?? PRIMARY }]}
+                    <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY }]}
                         onPress={() => { setEditModal(null); setAddModal(true); }}>
                         <Feather name="plus" size={14} color="#fff" />
                         <Text style={st.addBtnText}>Add Question</Text>
@@ -568,15 +576,15 @@ const FaqQuestionsScreen: React.FC = () => {
                                 return (
                                     <TouchableOpacity key={cat.id}
                                         style={[st.catBtn,
-                                        { borderColor: cat.color },
-                                        isSelected && { backgroundColor: cat.color }]}
+                                        { borderColor: isSelected ? NAVY : PRIMARY },
+                                        isSelected && { backgroundColor: NAVY }]}
                                         onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); }}>
-                                        <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : cat.color + "18" }]}>
-                                            <Feather name={cat.icon as any} size={14} color={isSelected ? "#fff" : cat.color} />
+                                        <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
+                                            <Feather name={cat.icon as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
                                         </View>
                                         <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
-                                        <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : cat.color + "20" }]}>
-                                            <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : cat.color }]}>{catQCount}</Text>
+                                        <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
+                                            <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : PRIMARY }]}>{catQCount}</Text>
                                         </View>
                                     </TouchableOpacity>
                                 );
@@ -849,6 +857,7 @@ const gSt = StyleSheet.create({
     card: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, borderTopWidth: 3, padding: 14, flex: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, gap: 8 },
     cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     indexBadge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    iconBadge: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
     indexText: { fontSize: 11, fontWeight: "800" },
     statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
     statusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -876,7 +885,7 @@ const qSt = StyleSheet.create({
 
     // Cells
     cellId: { width: 60, paddingRight: 24 },
-    cellCat: { width: 200, paddingRight: 24 },
+    cellCat: { width: 200, paddingRight: 24, flexDirection: "row", alignItems: "center" },
     cellQuestion: { flex: 1, paddingRight: 28 },
     cellOrder: { width: 80, alignItems: "center", paddingRight: 24 },
     cellStatus: { width: 100, paddingRight: 24 },

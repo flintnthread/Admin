@@ -25,8 +25,8 @@ type Props = {
 const NAV_ITEMS = {
   GENERAL: [
 
-    { label: "Dashboard", icon: "home", path: "/Dashboard" },
-    { label: "SEO Engine", icon: "globe", path: null },
+    { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
+    { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
 
   ],
   "EMPLOYEE MANAGEMENT": [
@@ -76,15 +76,15 @@ const NAV_ITEMS = {
       color: "#3B82F6",
       path: null,
       children: [
-        { label: "Ads Dashboard", icon: "none", path: null },
-        { label: "Ad Placements", icon: "none", path: null },
-        { label: "Performance Ads", icon: "none", path: null },
-        { label: "Campaigns & Packages", icon: "none", path: null },
-        { label: "Ads Types & Details", icon: "none", path: null },
-        { label: "Orders Management", icon: "none", path: null },
-        { label: "Payments Management", icon: "none", path: null },
-        { label: "Customers Management", icon: "none", path: null },
-        { label: "Notifications", icon: "none", path: null },
+        { label: "Ads Dashboard", icon: "pie-chart", path: null, color: "#8B5CF6" },
+        { label: "Ad Placements", icon: "layout", path: null, color: "#EC4899" },
+        { label: "Performance Ads", icon: "trending-up", path: null, color: "#F59E0B" },
+        { label: "Campaigns & Packages", icon: "package", path: null, color: "#10B981" },
+        { label: "Ads Types & Details", icon: "list", path: null, color: "#06B6D4" },
+        { label: "Orders Management", icon: "shopping-cart", path: null, color: "#F97316" },
+        { label: "Payments Management", icon: "credit-card", path: null, color: "#84CC16" },
+        { label: "Customers Management", icon: "users", path: null, color: "#3B82F6" },
+        { label: "Notifications", icon: "bell", path: null, color: "#EAB308" },
       ]
     }
   ],
@@ -126,14 +126,7 @@ const NAV_ITEMS = {
       label: "Locations",
       icon: "map-pin",
       color: "#10B981",
-      path: null,
-      children: [
-        { label: "Countries", icon: "globe", path: "/locations", color: "#22C55E" },
-        { label: "States", icon: "map", path: null, color: "#84CC16" },
-        { label: "Cities", icon: "navigation", path: null, color: "#EAB308" },
-        { label: "Areas", icon: "compass", path: null, color: "#F59E0B" },
-        { label: "Pincodes", icon: "hash", path: null, color: "#F97316" }
-      ]
+      path: "/locations"
     },
     {
       label: "Careers Management",
@@ -155,7 +148,7 @@ export default function AdminSidebar({
   isLargeScreen,
 }: Props) {
   const pathname = usePathname();
-  const [ecommerceExpanded, setEcommerceExpanded] = React.useState(true);
+  const [ecommerceExpanded, setEcommerceExpanded] = React.useState(false);
   const [expandedItems, setExpandedItems] = React.useState<Record<string, boolean>>({});
 
   const toggleExpanded = (label: string) => {
@@ -202,7 +195,7 @@ export default function AdminSidebar({
       {/* Scrollable nav items */}
       <ScrollView 
         style={styles.navScroll} 
-        contentContainerStyle={{ paddingBottom: 80 }} 
+        contentContainerStyle={{ paddingBottom: 0 }} 
         showsVerticalScrollIndicator={false}
       >
 
@@ -442,7 +435,7 @@ export default function AdminSidebar({
                       </Text>
                       {hasChildren && (
                         <Feather
-                          name={isExpanded ? "chevron-up" : "chevron-down"}
+                          name={isExpanded ? "chevron-down" : "chevron-right"}
                           size={14}
                           color="#6B7280"
                           style={styles.chevron}
@@ -491,7 +484,7 @@ export default function AdminSidebar({
         </View>
 
         {/* CUSTOM */}
-        <View style={[styles.section, { marginBottom: 30 }]}>
+        <View style={styles.section}>
           {!collapsed && <Text style={styles.sectionTitle}>CUSTOM</Text>}
           {NAV_ITEMS.CUSTOM.map((item) => {
             const hasChildren = 'children' in item;
