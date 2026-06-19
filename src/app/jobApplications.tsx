@@ -117,8 +117,10 @@ function StatCard({ label, count, color, icon, isWeb }: { label: string, count: 
       <View style={[styles.statIcon, { backgroundColor: color + '18' }]}>
         <Text style={{ fontSize: 18 }}>{icon}</Text>
       </View>
-      <Text style={[styles.statCount, { color }]}>{count}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <View>
+        <Text style={[styles.statCount, { color }]}>{count}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -303,19 +305,14 @@ export default function JobApplicationsScreen() {
         {/* ── Header ── */}
         <View style={[styles.header, isWeb && styles.headerWeb]}>
           <View>
-            <Text style={styles.breadcrumb}>
-              <Text style={styles.breadLink}>Dashboard</Text>
-              {'  ›  '}
-              <Text style={styles.breadLink}>Careers</Text>
-              {'  ›  '}
-              <Text style={styles.breadCurrent}>Applications</Text>
-            </Text>
+
             <Text style={styles.pageTitle}>Job Applications</Text>
           </View>
         </View>
 
         {/* ── Stat Cards ── */}
         <ScrollView
+          style={{ zIndex: 10, elevation: 10, marginTop: -42, overflow: 'visible' }}
           horizontal={!isWeb}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={[styles.statRow, isWeb && styles.statRowWeb]}
@@ -435,7 +432,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 16 : 12,
-    paddingBottom: 16,
+    paddingBottom: 48,
     backgroundColor: '#151D4F',
     flexDirection: 'column',
     gap: 8,
@@ -448,6 +445,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 28,
     marginTop: 24,
     borderRadius: 16,
+    paddingBottom: 48,
   },
   breadcrumb: { fontSize: 12, color: '#D1D5DB', marginBottom: 4 },
   breadLink: { color: '#E8631A' },
@@ -469,17 +467,23 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 10,
     flexDirection: 'row',
+    alignSelf: 'center',
   },
   statRowWeb: {
     paddingHorizontal: 28,
     flexWrap: 'nowrap',
+    maxWidth: 1000,
+    alignSelf: 'center',
+    width: '100%',
   },
   statCard: {
     backgroundColor: C.white,
     borderRadius: 14,
     padding: 14,
     minWidth: 120,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     borderTopWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -497,7 +501,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
   },
   statCount: {
     fontSize: 26,
