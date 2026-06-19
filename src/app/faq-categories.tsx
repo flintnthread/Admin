@@ -46,6 +46,24 @@ const TEXT_HEAD  = "#1a2b4a";
 const TEXT_BODY  = "#4a5568";
 const TEXT_MUTED = "#a0aec0";
 
+// Valid Feather icon names used for category cards
+const VALID_FEATHER_ICONS = new Set([
+    "help-circle", "grid", "check-circle", "slash", "package", "shopping-cart",
+    "shopping-bag", "truck", "credit-card", "tag", "star", "heart", "box",
+    "layers", "settings", "user", "users", "shield", "lock", "alert-circle",
+    "info", "book", "file-text", "folder", "archive", "clipboard", "calendar",
+    "clock", "map-pin", "phone", "mail", "message-circle", "bell", "gift",
+    "home", "globe", "tool", "zap", "activity", "award", "briefcase",
+    "coffee", "compass", "database", "disc", "dollar-sign", "download",
+    "edit", "eye", "feather", "flag", "headphones", "image", "key",
+    "life-buoy", "link", "list", "mic", "monitor", "music", "navigation",
+    "percent", "pie-chart", "play", "printer", "radio", "refresh-cw",
+    "repeat", "search", "send", "server", "share", "smile", "sun",
+    "thermometer", "thumbs-up", "trending-up", "umbrella", "upload",
+    "video", "wifi", "wind", "x-circle", "aperture", "bar-chart",
+]);
+const safeIcon = (name: string): string => VALID_FEATHER_ICONS.has(name) ? name : "help-circle";
+
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type CategoryStatus = "Active" | "Inactive";
 
@@ -157,7 +175,7 @@ const GridCard: React.FC<{
             {/* Top row: icon + action buttons */}
             <View style={cSt.topRow}>
                 <View style={[cSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                    <Feather name={cat.icon as any} size={20} color={cat.color} />
+                    <Feather name={safeIcon(cat.icon) as any} size={20} color={cat.color} />
                 </View>
                 <View style={cSt.actionBtns}>
                     <TouchableOpacity style={cSt.iconBtn} onPress={onEdit}>
@@ -212,7 +230,7 @@ const ListRow: React.FC<{
     return (
         <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
             <View style={[lSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                <Feather name={cat.icon as any} size={18} color={cat.color} />
+                <Feather name={safeIcon(cat.icon) as any} size={18} color={cat.color} />
             </View>
             <View style={lSt.info}>
                 <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
@@ -554,11 +572,11 @@ const st = StyleSheet.create({
     scrollContent: { padding: 16, gap: 14 },
 
     // Stats
-    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4, marginTop: -42, marginHorizontal: 6, zIndex: 10 },
-    statCard:    { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "column", alignItems: "center", gap: 10, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
-    statIconWrap:{ width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-    statValue:   { fontSize: 26, fontWeight: "800", textAlign: "center" },
-    statLabel:   { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", textAlign: "center", letterSpacing: 0.5 },
+    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4, marginTop: -42, marginHorizontal: 16, zIndex: 10, maxWidth: 900, alignSelf: "center", width: "100%" },
+    statCard:    { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
+    statIconWrap:{ width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    statValue:   { fontSize: 22, fontWeight: "800" },
+    statLabel:   { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", letterSpacing: 0.5 },
 
     // Stats Single Card (Mobile)
     statsCardSingle: { backgroundColor: BG_CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2, marginBottom: 4 },
