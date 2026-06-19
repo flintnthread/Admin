@@ -6,18 +6,18 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    useWindowDimensions,
-    View
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 
@@ -675,6 +675,8 @@ export default function OrderDetailScreen() {
   const { width } = useWindowDimensions();
   const { isMobile, isTablet, isDesktop, isWide } = useLayout(width);
   const router = useRouter();
+  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+  const displayOrderId = orderId ?? ORDER.id;
 
   const [status, setStatus] = useState<OrderStatus>(ORDER.status);
   const px = isMobile ? 14 : isTablet ? 20 : 28;
@@ -733,7 +735,7 @@ export default function OrderDetailScreen() {
               {/* Order ID */}
               <View style={s.actionOrderId}>
                 <Text style={s.actionOrderLbl}>Order</Text>
-                <Text style={s.actionOrderNum}>#{ORDER.id}</Text>
+                <Text style={s.actionOrderNum}>#{displayOrderId}</Text>
               </View>
 
               {/* Buttons */}
@@ -771,7 +773,7 @@ export default function OrderDetailScreen() {
               <View style={s.cardBody}>
                 <InfoRow
                   label="Order ID"
-                  value={`#${ORDER.id}`}
+                  value={`#${displayOrderId}`}
                   valueStyle={{ color: C.primary, fontWeight: "700" }}
                 />
                 <InfoRow label="Order Date" value={ORDER.date} />
