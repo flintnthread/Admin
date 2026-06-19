@@ -1,5 +1,5 @@
-import { getApiErrorMessage } from '@/lib/api/client';
 import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/format';
 import { fetchShiprocketSellers, type ShiprocketSellerRow } from '@/services/sellerApi';
 import { useRouter } from 'expo-router';
@@ -471,13 +471,13 @@ const SellerShiprocket: React.FC<Props> = () => {
                     color={selectedIds.has(seller.id) ? '#4F46E5' : '#9CA3AF'}
                   />
                 </View>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 2, fontWeight: '600' }]}>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 2, fontWeight: '600', paddingRight: 24 }]}>
                   {seller.businessName}
                 </Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.contactPerson}</Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.phone}</Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.city}</Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.state}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.contactPerson}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.phone}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.city}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.state}</Text>
                 <View style={[styles.tableCell, { flex: 1 }]}>
                   <View style={styles.statusBadgeRed}>
                     <Text style={[styles.statusBadgeText, { fontSize: fontSize.xs }]}>Not Uploaded</Text>
@@ -581,9 +581,9 @@ const SellerShiprocket: React.FC<Props> = () => {
                 <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 2, fontWeight: '600', color: '#1E3A5F' }]}>
                   {seller.businessName}
                 </Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.contactPerson}</Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.city}</Text>
-                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1 }]}>{seller.state}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.contactPerson}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.city}</Text>
+                <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, paddingRight: 24 }]}>{seller.state}</Text>
                 <Text style={[styles.tableCell, { fontSize: fontSize.sm, flex: 1, color: '#6B7280' }]}>{seller.uploadedAt}</Text>
                 <View style={[styles.tableCell, { flex: 1 }]}>
                   <View style={styles.statusBadgeGreen}>
@@ -602,39 +602,38 @@ const SellerShiprocket: React.FC<Props> = () => {
   return (
     <AdminLayout>
       <View style={styles.root}>
-      {/* Orange gradient top bar */}
-      <View style={styles.topAccentBar} />
+        {/* Header */}
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Page header */}
-        <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: 16 }]}>
-          {renderHeader()}
-        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Page header */}
+          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: 16 }]}>
+            {renderHeader()}
+          </View>
 
-        {loadError ? (
-          <Text style={{ color: '#DC2626', marginHorizontal: contentPadding, marginTop: 8 }}>{loadError}</Text>
-        ) : null}
+          {loadError ? (
+            <Text style={{ color: '#DC2626', marginHorizontal: contentPadding, marginTop: 8 }}>{loadError}</Text>
+          ) : null}
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 24 }} />
-        ) : null}
+          {loading ? (
+            <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 24 }} />
+          ) : null}
 
-        {/* Stats */}
-        {!loading ? renderStatCards() : null}
+          {/* Stats */}
+          {!loading ? renderStatCards() : null}
 
-        {/* Steps guide */}
-        {!loading ? renderStepsGuide() : null}
+          {/* Steps guide */}
+          {!loading ? renderStepsGuide() : null}
 
-        {/* Pending sellers */}
-        {!loading ? renderPendingSellers() : null}
+          {/* Pending sellers */}
+          {!loading ? renderPendingSellers() : null}
 
-        {/* Uploaded sellers */}
-        {!loading ? renderUploadedSellers() : null}
-      </ScrollView>
+          {/* Uploaded sellers */}
+          {!loading ? renderUploadedSellers() : null}
+        </ScrollView>
       </View>
     </AdminLayout>
   );
@@ -657,9 +656,9 @@ const styles = StyleSheet.create({
 
   // ── Header ──────────────────────────────────────────────────────────────
   pageHeaderWrapper: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1d324e',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#16283d',
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -690,7 +689,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontWeight: '700',
-    color: '#1E3A5F',
+    color: '#FFFFFF',
     letterSpacing: -0.3,
   },
   breadcrumb: {
@@ -699,13 +698,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   breadcrumbLink: {
-    color: '#6B7280',
+    color: '#94A3B8',
   },
   breadcrumbSep: {
-    color: '#9CA3AF',
+    color: '#64748B',
   },
   breadcrumbCurrent: {
-    color: '#374151',
+    color: '#CBD5E1',
     fontWeight: '500',
   },
   profileBadge: {
@@ -939,7 +938,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    paddingRight: 8,
+    paddingRight: 16,
   },
   tableRow: {
     flexDirection: 'row',
@@ -956,7 +955,7 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     color: '#374151',
-    paddingRight: 8,
+    paddingRight: 16,
   },
 
   // ── Seller Cards (mobile/tablet) ─────────────────────────────────────────
