@@ -378,6 +378,23 @@ const FaqCategoriesScreen: React.FC = () => {
                     </TouchableOpacity>
                 </View>
 
+                {/* ── WEB STAT CARDS (overlapping header) ── */}
+                {isWeb && (
+                    <View style={st.statsRow}>
+                        {stats.map((s, i) => (
+                            <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
+                                <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
+                                    <Feather name={s.icon as any} size={22} color={s.color} />
+                                </View>
+                                <View>
+                                    <Text style={[st.statValue, { color: s.color }]}>{s.value}</Text>
+                                    <Text style={st.statLabel}>{s.label.toUpperCase()}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
                 <ScrollView style={st.scroll}
                     contentContainerStyle={[st.scrollContent, !isWeb && { paddingBottom: 100 }]}
                     showsVerticalScrollIndicator={false}>
@@ -386,22 +403,8 @@ const FaqCategoriesScreen: React.FC = () => {
                         <Text style={{ color: ACCENT_RED, marginBottom: 12, paddingHorizontal: 16 }}>{loadError}</Text>
                     ) : null}
 
-                    {/* ── STAT CARDS ── */}
-                    {isWeb ? (
-                        <View style={st.statsRow}>
-                            {stats.map((s, i) => (
-                                <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
-                                    <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
-                                        <Feather name={s.icon as any} size={22} color={s.color} />
-                                    </View>
-                                    <View>
-                                        <Text style={[st.statValue, { color: s.color }]}>{s.value}</Text>
-                                        <Text style={st.statLabel}>{s.label.toUpperCase()}</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    ) : (
+                    {/* ── MOBILE STAT CARDS ── */}
+                    {!isWeb && (
                         <View style={st.statsCardSingle}>
                             {stats.map((s, i) => (
                                 <React.Fragment key={i}>
@@ -551,7 +554,7 @@ const st = StyleSheet.create({
     scrollContent: { padding: 16, gap: 14 },
 
     // Stats
-    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4 },
+    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4, marginTop: -42, marginHorizontal: 6, zIndex: 10 },
     statCard:    { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "column", alignItems: "center", gap: 10, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     statIconWrap:{ width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
     statValue:   { fontSize: 26, fontWeight: "800", textAlign: "center" },
