@@ -900,11 +900,11 @@ const styles = StyleSheet.create({
   deleteBtn: { backgroundColor: C.red, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
 
   // ── Pagination ──
-  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
-  paginationText: { color: C.subtext, fontSize: 13 },
-  pageBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: C.border, justifyContent: "center", alignItems: "center" },
-  pageActive: { width: 32, height: 32, borderRadius: 8, backgroundColor: C.orange, justifyContent: "center", alignItems: "center" },
-  pageActiveText: { color: C.white, fontWeight: "700", fontSize: 14 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16, padding: 16, backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2, flexWrap: 'wrap', gap: 12 },
+  paginationText: { color: C.subtext, fontSize: 13, fontWeight: "500" },
+  pageBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: '#FFF', borderWidth: 1, borderColor: C.border, justifyContent: "center", alignItems: "center" },
+  pageActive: { width: 32, height: 32, borderRadius: 6, backgroundColor: '#1d324e', borderColor: '#1d324e', borderWidth: 1, justifyContent: "center", alignItems: "center" },
+  pageActiveText: { color: C.white, fontWeight: "700", fontSize: 13 },
 
   // ── Bottom Nav (mobile) ──
   bottomNav: { flexDirection: "row", backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border, paddingBottom: Platform.OS === "ios" ? 20 : 6, paddingTop: 8, position: "absolute", bottom: 0, left: 0, right: 0 },

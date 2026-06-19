@@ -879,7 +879,7 @@ const S = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 8,
     borderWidth: 1.5, borderColor: "#eee", gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#333", padding: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: "#333", padding: 0, outlineStyle: "none" } as any,
   viewToggle: { flexDirection: "row", gap: 6 },
   viewBtn: {
     width: 36, height: 36, borderRadius: 8,
@@ -946,24 +946,29 @@ const S = StyleSheet.create({
 
   // Pagination
   paginationRow: {
-    flexDirection: "row", gap: 4, flexWrap: "wrap", justifyContent: "center", marginTop: 8,
+    flexDirection: "row", gap: 4, flexWrap: "wrap", justifyContent: "center",
   },
   pageBtn: {
-    minWidth: 34, height: 34, borderRadius: 8,
-    borderWidth: 1.5, borderColor: "#e0e0e0", backgroundColor: "#fff",
+    minWidth: 32, height: 32, borderRadius: 6,
+    borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center", paddingHorizontal: 4,
   },
-  pageBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  pageBtnActive: { backgroundColor: "#1d324e", borderColor: "#1d324e" },
   pageBtnDisabled: { opacity: 0.35 },
-  pageBtnText: { fontSize: 14, color: "#333", fontWeight: "500" },
+  pageBtnText: { fontSize: 13, color: "#374151", fontWeight: "600" },
 
   // Footer
   footerRow: {
     marginTop: 16, flexDirection: "row", flexWrap: "wrap",
-    alignItems: "center", justifyContent: "space-between",
-    gap: 8, paddingBottom: 16,
+    alignItems: "center", justifyContent: "space-between", gap: 12,
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
   },
-  footerText: { fontSize: 13, color: "#888" },
+  footerText: { fontSize: 13, color: "#666" },
 
   // Empty
   emptyBox: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
@@ -997,7 +1002,8 @@ const S = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === "ios" ? 12 : 9,
     fontSize: 14, color: "#333", backgroundColor: "#fafafa",
-  },
+    outlineStyle: "none",
+  } as any,
   statusToggleRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   statusToggleBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 8,
