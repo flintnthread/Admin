@@ -311,7 +311,8 @@ const SparklineChart: React.FC<{
   color: string;
   tooltipIndex: number | null;
   onPointPress: (index: number | null) => void;
-}> = ({ data, width, height, color, tooltipIndex, onPointPress }) => {
+  tooltipLabel?: string;
+}> = ({ data, width, height, color, tooltipIndex, onPointPress, tooltipLabel = 'Products Listed' }) => {
   const padding = { top: 20, bottom: 30, left: 36, right: 16 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
@@ -407,7 +408,7 @@ const SparklineChart: React.FC<{
           style={{
             position: 'absolute',
             left: Math.min(Math.max(getX(tooltipIndex) - 60, 0), width - 130),
-            top: getY(data[tooltipIndex].value) - 52,
+            top: getY(data[tooltipIndex].value) < 60 ? getY(data[tooltipIndex].value) + 15 : getY(data[tooltipIndex].value) - 52,
             backgroundColor: '#1A1A1A',
             borderRadius: 6,
             padding: 8,
@@ -421,7 +422,7 @@ const SparklineChart: React.FC<{
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 4 }} />
             <Text style={{ color: COLORS.white, fontSize: 11 }}>
-              Products Listed: {data[tooltipIndex].value}
+              {tooltipLabel}: {data[tooltipIndex].value}
             </Text>
           </View>
         </View>
@@ -1056,7 +1057,7 @@ export default function ViewSeller() {
             </Text>
           </View>
 
-          <View style={{ marginTop: 8, overflow: 'hidden' }}>
+          <View style={{ marginTop: 8, zIndex: 10 }}>
             <SparklineChart
               data={currentData}
               width={chartWidth}
@@ -1064,6 +1065,7 @@ export default function ViewSeller() {
               color={COLORS.primaryLight}
               tooltipIndex={tooltipIndex}
               onPointPress={setTooltipIndex}
+              tooltipLabel={analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
             />
           </View>
         </View>

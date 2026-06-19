@@ -919,14 +919,6 @@ export default function SellersDashboard() {
             <View style={styles.headerContainer}>
               <View style={styles.pageHeader}>
                 <View>
-                  {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <Ionicons name="home" size={12} color={ORANGE} />
-                  <Text style={styles.breadcrumb}>Dashboard</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={styles.breadcrumb}>Sellers</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={{ fontSize: 12, color: "#94A3B8" }}>Sellers Graph</Text>
-                </View> */}
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Ionicons name="bar-chart" size={20} color={ORANGE} />
                     <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
@@ -940,6 +932,22 @@ export default function SellersDashboard() {
             </View>
 
             {errorBanner}
+
+            {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }}>
+              {statCards.map(c => (
+                <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                    <Text style={styles.statValue}>{c.value}</Text>
+                    {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                  </View>
+                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                    <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                  </View>
+                </View>
+              ))}
+            </View>
 
             {/* ── DESKTOP: All Filters in ONE Row ── */}
             <View style={[styles.card, { marginBottom: 14 }]}>
@@ -998,22 +1006,6 @@ export default function SellersDashboard() {
                 {fromDate && ` · From: ${fromDate}`}
                 {toDate && ` · To: ${toDate}`}
               </Text>
-            </View>
-
-            {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
-              {statCards.map(c => (
-                <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                    <Text style={styles.statValue}>{c.value}</Text>
-                    {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
-                  </View>
-                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                    <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
-                  </View>
-                </View>
-              ))}
             </View>
 
             {/* ── DESKTOP: Chart + Key Insights side by side ── */}
@@ -1202,7 +1194,7 @@ export default function SellersDashboard() {
   }
 
   /* ────────────────────────────────────────────────────────────────────
-     MOBILE / TABLET LAYOUT  (unchanged)
+     MOBILE / TABLET LAYOUT
   ──────────────────────────────────────────────────────────────────── */
   return (
     <AdminLayout>
@@ -1216,14 +1208,6 @@ export default function SellersDashboard() {
           <View style={styles.headerContainer}>
             <View style={styles.pageHeader}>
               <View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <Ionicons name="home" size={12} color={ORANGE} />
-                  <Text style={styles.breadcrumb}>Dashboard</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={styles.breadcrumb}>Sellers</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={{ fontSize: 12, color: "#94A3B8" }}>Sellers Graph</Text>
-                </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="bar-chart" size={20} color={ORANGE} />
                   <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
@@ -1237,6 +1221,22 @@ export default function SellersDashboard() {
           </View>
 
           {errorBanner}
+
+          {/* ── Stat Cards (mobile: 2-col grid) ── */}
+          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }]}>
+            {statCards.map(c => (
+              <View key={c.label} style={[styles.statCard]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                  <Text style={styles.statValue}>{c.value}</Text>
+                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                </View>
+                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                  <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
+                </View>
+              </View>
+            ))}
+          </View>
 
           {/* ── Filters Card ── */}
           <View style={styles.card}>
@@ -1488,8 +1488,9 @@ const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: "#1d324e",
     padding: 16,
+    paddingBottom: 48,
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 0,
   },
 
   card: {
@@ -1582,7 +1583,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 9,
     paddingHorizontal: 10, backgroundColor: "#fff", gap: 6,
   },
-  searchInput: { flex: 1, fontSize: 13, color: "#374151", paddingVertical: 9 },
+  searchInput: { flex: 1, fontSize: 13, color: "#374151", paddingVertical: 9, outlineStyle: "none" } as any,
   searchControlsRow: { flexDirection: "row", gap: 8, marginBottom: 12, alignItems: "center" },
   showingText: { fontSize: 12, color: "#64748B", marginBottom: 12 },
   clearBtn: {
@@ -1674,7 +1675,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, borderRadius: 8,
     backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 9,
   },
-  dateInput: { flex: 1, fontSize: 13, color: "#374151" },
+  dateInput: { flex: 1, fontSize: 13, color: "#374151", outlineStyle: "none" } as any,
 
   /* DatePicker Modal */
   datePickerOverlay: {
