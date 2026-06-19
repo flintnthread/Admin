@@ -178,19 +178,19 @@ const styles = StyleSheet.create({
   
   header: {
     marginBottom: 24,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#151D4F",
     padding: 18,
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowColor: "#151D4F",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 3,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: TITLE_DARK,
+    color: "#FFFFFF",
     marginBottom: 6,
   },
   breadcrumb: {
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   breadcrumbCurrent: {
     fontSize: 12,
-    color: TEXT_MUTED,
+    color: "rgba(255, 255, 255, 0.7)",
   },
 
   card: {
