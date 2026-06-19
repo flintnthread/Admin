@@ -17,6 +17,7 @@ import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { resolveMediaUrl } from "@/lib/api/media";
+import { mapOrderRow } from "@/lib/mappers";
 import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
 
 // ─── Color Palette ────────────────────────────────────────────────────────────

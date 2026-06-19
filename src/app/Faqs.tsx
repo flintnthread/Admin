@@ -312,7 +312,8 @@ const QuestionRow: React.FC<{
             </View>
             {/* Category */}
             <View style={qSt.cellCat}>
-                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "â€”"}</Text>
+                {cat?.icon && <Feather name={cat.icon as any} size={14} color={accentColor} style={{ marginRight: 6 }} />}
+                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "—"}</Text>
             </View>
             {/* Question */}
             <View style={qSt.cellQuestion}>
@@ -371,8 +372,15 @@ const QuestionGridCard: React.FC<{
     return (
         <View style={[gSt.card, { borderTopColor: accentColor }]}>
             <View style={gSt.cardHeader}>
-                <View style={[gSt.indexBadge, { backgroundColor: accentColor + "18" }]}>
-                    <Text style={[gSt.indexText, { color: accentColor }]}>Q{index}</Text>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    <View style={[gSt.indexBadge, { backgroundColor: accentColor + "18" }]}>
+                        <Text style={[gSt.indexText, { color: accentColor }]}>Q{index}</Text>
+                    </View>
+                    {cat?.icon && (
+                        <View style={[gSt.iconBadge, { backgroundColor: accentColor + "18" }]}>
+                            <Feather name={cat.icon as any} size={12} color={accentColor} />
+                        </View>
+                    )}
                 </View>
                 <View style={[gSt.statusPill, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
                     <View style={[gSt.statusDot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
@@ -849,6 +857,7 @@ const gSt = StyleSheet.create({
     card: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, borderTopWidth: 3, padding: 14, flex: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, gap: 8 },
     cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     indexBadge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    iconBadge: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
     indexText: { fontSize: 11, fontWeight: "800" },
     statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
     statusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -876,7 +885,7 @@ const qSt = StyleSheet.create({
 
     // Cells
     cellId: { width: 60, paddingRight: 24 },
-    cellCat: { width: 200, paddingRight: 24 },
+    cellCat: { width: 200, paddingRight: 24, flexDirection: "row", alignItems: "center" },
     cellQuestion: { flex: 1, paddingRight: 28 },
     cellOrder: { width: 80, alignItems: "center", paddingRight: 24 },
     cellStatus: { width: 100, paddingRight: 24 },

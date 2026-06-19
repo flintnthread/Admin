@@ -866,14 +866,7 @@ const WebProductsScreen: React.FC = () => {
     const catTree       = filterCategory !== "All" ? (CATEGORY_TREE[filterCategory] ?? {}) : {};
     const subSubOptions = filterSubcategory !== "All" ? (catTree[filterSubcategory] ?? []) : [];
 
-    if (loading && products.length === 0) {
-        return (
-            <View style={[wst.root, { alignItems: "center", justifyContent: "center" }]}>
-                <ActivityIndicator size="large" color={C.navy} />
-                <Text style={{ marginTop: 12, fontFamily: "Outfit_500Medium", color: C.textMid }}>Loading products…</Text>
-            </View>
-        );
-    }
+
 
     return (
         <AdminLayout>
@@ -1613,15 +1606,7 @@ const MobileProductsScreen: React.FC = () => {
     const subcatOptions     = filterCategory !== "All" ? (SUBCATEGORIES[filterCategory] ?? ["All"]) : ["All"];
     const currentSortOption = SORT_OPTIONS.find(o => o.value === sortBy);
 
-    if (loading && products.length === 0) {
-        return (
-            <SafeAreaView style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
-                <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
-                <ActivityIndicator size="large" color={C.navy} />
-                <Text style={{ marginTop: 12, fontFamily: "Outfit_500Medium", color: C.textMid }}>Loading products…</Text>
-            </SafeAreaView>
-        );
-    }
+
 
     return (
         <AdminLayout>

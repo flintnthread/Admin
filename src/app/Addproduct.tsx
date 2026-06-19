@@ -1549,7 +1549,7 @@ const SIZE_TABLE_COLS = [
 // ─────────────────────────────────────────────────────────────
 // STEP 1 — Basic Info
 // ─────────────────────────────────────────────────────────────
-const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isDesktop = false }: any) => {
+const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isDesktop = false, actionBar }: any) => {
     const [catPick, setCatPick] = useState(false);
     const [subPick, setSubPick] = useState(false);
     const [matPick, setMatPick] = useState(false);
@@ -1832,6 +1832,7 @@ const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isD
             <PM visible={matPick} title="Select Material" options={MATERIAL_TYPES} selected={data.materialType}
                 onSelect={(v: string) => { onChange("materialType", v); const hsn = getHsnForMaterial(v); if (hsn) onChange("hsnCode", hsn); }}
                 onClose={() => setMatPick(false)} />
+            {actionBar}
         </ScrollView>
     );
 };
@@ -1919,7 +1920,7 @@ type Variant = {
     images: string[]; videoUrl: string;
 };
 
-const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false }: any) => {
+const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar }: any) => {
     const [clrPick, setClrPick] = useState<string | null>(null);
     const [szPick, setSzPick] = useState<string | null>(null);
 
@@ -2054,6 +2055,7 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                     upVariant(szPick, "sizeId", size?.id);
                 }}
                 onClose={() => setSzPick(null)} />
+            {actionBar}
         </ScrollView>
     );
 };
@@ -2148,6 +2150,7 @@ const StepImages = ({ data, onChange, errors, isDesktop = false, actionBar }: an
                 )}
                 <ImageSourcePickerModal visible={srcModal} onClose={() => setSrcModal(false)} title="Add Video" onCamera={() => pickVideo("camera")} onGallery={() => pickVideo("gallery")} galleryHint="Pick a video from your library" />
             </Card>
+            {actionBar}
         </ScrollView>
     );
 };
@@ -2492,6 +2495,7 @@ const StepDetails = ({ data, onChange, errors, validationTrigger = 0, isDesktop 
                     </TouchableOpacity>
                 </View>
             </FormPopupModal>
+            {actionBar}
         </ScrollView>
     );
 };
@@ -2860,7 +2864,6 @@ const AddNewProduct: React.FC = () => {
                     <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} isDesktop />
                     <View style={ds.mainColumn}>
                         <View style={ds.mainScroll}>{stepContent}</View>
-                        <View style={ds.barWrap}>{actionBar}</View>
                     </View>
                     <ToastContainer toasts={toasts} onRemove={removeToast} />
                     {sweetAlert}
@@ -2887,7 +2890,6 @@ const AddNewProduct: React.FC = () => {
                 </View>
                 <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} />
                 <View style={{ flex: 1, backgroundColor: C.bg }}>{stepContent}</View>
-                {actionBar}
                 <ToastContainer toasts={toasts} onRemove={removeToast} />
                 {sweetAlert}
             </SafeAreaView>
@@ -3013,17 +3015,17 @@ const ds = StyleSheet.create({
     mainColumn: { flex: 1, minWidth: 0, width: "100%", backgroundColor: C.bg },
     mainScroll: { flex: 1 },
     stepScroll: { flex: 1 },
-    barWrap: { backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 32, paddingVertical: 16, width: "100%" },
-    bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: CONTENT_MAX, alignSelf: "center" },
+    barWrap: { width: "100%" },
+    bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, backgroundColor: C.white, borderWidth: 1, borderColor: C.border, borderRadius: 16, shadowColor: "#0F1A4A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, marginTop: 24, marginBottom: 12, width: "100%", maxWidth: CONTENT_MAX, alignSelf: "center" },
     barLeft: { alignItems: "flex-start" },
     barRight: { alignItems: "flex-end" },
-    cancelBtn: { minWidth: 140, paddingHorizontal: 28, alignItems: "center", justifyContent: "center", borderWidth: 1.2, borderColor: C.border, borderRadius: 12, paddingVertical: 14, backgroundColor: C.white },
+    cancelBtn: { minWidth: 120, paddingHorizontal: 28, alignItems: "center", justifyContent: "center", borderWidth: 1.2, borderColor: C.border, borderRadius: 12, paddingVertical: 14, backgroundColor: C.white },
     cancelTxt: { fontFamily: fontFamilies.semiBold, fontSize: 14, color: C.textMid },
-    prevBtn: { minWidth: 140, paddingHorizontal: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.2, borderColor: C.navyBorder, borderRadius: 12, paddingVertical: 14, backgroundColor: C.white },
+    prevBtn: { minWidth: 120, paddingHorizontal: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.2, borderColor: C.navyBorder, borderRadius: 12, paddingVertical: 14, backgroundColor: C.white },
     prevTxt: { fontFamily: fontFamilies.semiBold, fontSize: 14, color: C.navy },
-    nextBtn: { minWidth: 180, paddingHorizontal: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.navy, borderRadius: 12, paddingVertical: 14, shadowColor: C.navyDeep, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6 },
+    nextBtn: { minWidth: 140, paddingHorizontal: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.navy, borderRadius: 12, paddingVertical: 14, shadowColor: C.navyDeep, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6 },
     nextTxt: { fontFamily: fontFamilies.bold, fontSize: 15, color: C.white },
-    saveBtn: { minWidth: 200, paddingHorizontal: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.accent5, borderRadius: 12, paddingVertical: 14, shadowColor: C.accent5, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
+    saveBtn: { minWidth: 160, paddingHorizontal: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.accent5, borderRadius: 12, paddingVertical: 14, shadowColor: C.accent5, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
     saveTxt: { fontFamily: fontFamilies.bold, fontSize: 15, color: C.white },
     card: { borderRadius: 20, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 22, marginBottom: 20, shadowOpacity: 0.08, shadowRadius: 16 },
     fieldWrap: { minHeight: 48, borderRadius: 12, paddingHorizontal: 14 },
@@ -3037,14 +3039,14 @@ const sc = StyleSheet.create({
     hCenter: { flex: 1, alignItems: "center" },
     hTitle: { fontFamily: fontFamilies.bold, fontSize: 17, color: C.white },
     hSub: { fontFamily: fontFamilies.regular, fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 1 },
-    bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border, shadowColor: "#000", shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 10 },
+    bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, backgroundColor: C.white, borderWidth: 1, borderColor: C.border, borderRadius: 16, shadowColor: "#0F1A4A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, marginTop: 24, marginBottom: 12 },
     barLeft: { alignItems: "flex-start" },
     barRight: { alignItems: "flex-end" },
     cancelBtn: { minWidth: 120, paddingHorizontal: 20, alignItems: "center", justifyContent: "center", borderWidth: 1.2, borderColor: C.border, borderRadius: 12, paddingVertical: 13 },
     cancelTxt: { fontFamily: fontFamilies.semiBold, fontSize: 14, color: C.textMid },
-    prevBtn: { minWidth: 110, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 1.2, borderColor: C.navyBorder, borderRadius: 12, paddingVertical: 13 },
+    prevBtn: { minWidth: 120, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 1.2, borderColor: C.navyBorder, borderRadius: 12, paddingVertical: 13 },
     prevTxt: { fontFamily: fontFamilies.semiBold, fontSize: 14, color: C.navy },
-    nextBtn: { minWidth: 150, paddingHorizontal: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: C.navy, borderRadius: 12, paddingVertical: 13 },
+    nextBtn: { minWidth: 140, paddingHorizontal: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: C.navy, borderRadius: 12, paddingVertical: 13 },
     nextTxt: { fontFamily: fontFamilies.bold, fontSize: 14, color: C.white },
     saveBtn: { minWidth: 160, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.navy, borderRadius: 12, paddingVertical: 13 },
     saveTxt: { fontFamily: fontFamilies.bold, fontSize: 14, color: C.white },

@@ -221,11 +221,9 @@ const SellerPaymentsScreen: React.FC = () => {
     const [totalElements, setTotalElements] = useState(0);
     const [search, setSearch] = useState("");
     const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Cancelled">("All");
-    const [paymentDropdownOpen, setPaymentDropdownOpen] = useState(false);
     const [filterReminderBucket, setFilterReminderBucket] = useState<"All" | "green" | "orange" | "red">("All");
-    const [reminderBucketDropdownOpen, setReminderBucketDropdownOpen] = useState(false);
     const [sortPriority, setSortPriority] = useState<"Priority (Red first)" | "Date: Newest First" | "Date: Oldest First">("Priority (Red first)");
-    const [priorityDropdownOpen, setPriorityDropdownOpen] = useState(false);
+    const [openDropdown, setOpenDropdown] = useState<"payment" | "reminder" | "priority" | null>(null);
     const [payModalOrder, setPayModalOrder] = useState<SellerOrder | null>(null);
 
     const apiStatus =
@@ -333,6 +331,52 @@ const SellerPaymentsScreen: React.FC = () => {
                 </View>
             </View>
 
+            {/* Stats Card — outside ScrollView so it can overlap the header */}
+            <View style={[styles.statsCardSingle, !isWeb && { flexDirection: "column", gap: 16 }, isWeb && { justifyContent: "space-between" }]}>
+                <View style={{ flexDirection: isWeb ? "row" : "column", gap: isWeb ? 24 : 16, alignItems: isWeb ? "center" : "stretch", flex: isWeb ? 1 : undefined }}>
+                    {[
+                        { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
+                        { icon: "clock", label: "Pending", value: String(stats.pending), color: "#f472b6" },
+                        { icon: "check-circle", label: "Paid", value: String(stats.paid), color: "#7dd3fc" },
+                        { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
+                    ].map((s, i) => (
+                        <React.Fragment key={i}>
+                            <View style={[styles.statBlockSingle]}>
+                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
+                                    <Feather name={s.icon as any} size={20} color="#ffffff" />
+                                </View>
+                                <View style={styles.statTextWrapperSingle}>
+                                    <Text style={styles.statValueSingle}>{s.value}</Text>
+                                    <Text style={styles.statLabelSingle}>{s.label}</Text>
+                                </View>
+                            </View>
+                            {i < 3 && <View style={[styles.statDividerSingle, !isWeb && { width: "100%", height: 1, marginVertical: 0 }]} />}
+                        </React.Fragment>
+                    ))}
+                </View>
+
+                {/* Legend Section Inside Card */}
+                <View style={{ flexDirection: isWeb ? 'row' : 'column', alignItems: isWeb ? 'center' : 'stretch', gap: isWeb ? 24 : 12, flexShrink: 0, paddingLeft: isWeb ? 12 : 0, marginTop: isWeb ? 0 : 16 }}>
+                    {isWeb && <View style={styles.statDividerSingle} />}
+                    <View style={{ gap: 6, justifyContent: 'center', width: isWeb ? 300 : '100%' }}>
+                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                            <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
+                                <Text style={[styles.legendText, { textAlign: 'center' }]}>Green (0-2d): 0</Text>
+                            </View>
+                            <View style={[styles.legendBadge, { backgroundColor: "#fbbf24", flex: 1, minWidth: 90 }]}>
+                                <Text style={[styles.legendText, { textAlign: 'center' }]}>Orange (3-4d): 0</Text>
+                            </View>
+                            <View style={[styles.legendBadge, { backgroundColor: "#f87171", flex: 1, minWidth: 90 }]}>
+                                <Text style={[styles.legendText, { textAlign: 'center' }]}>Red (5+d): 0</Text>
+                            </View>
+                        </View>
+                        <View style={[styles.legendBadge, { backgroundColor: "#475569" }]}>
+                            <Text style={[styles.legendText, { textAlign: 'center' }]}>Red and pending are prioritized on top; paid rows are moved down</Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+
             <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 250 }]} showsVerticalScrollIndicator={false}>
 
                 {loading && (
@@ -346,52 +390,6 @@ const SellerPaymentsScreen: React.FC = () => {
                         </TouchableOpacity>
                     </View>
                 ) : null}
-
-                {/* Stats */}
-                <View style={[styles.statsCardSingle, !isWeb && { flexDirection: "column", gap: 16 }, isWeb && { justifyContent: "space-between" }]}>
-                    <View style={{ flexDirection: isWeb ? "row" : "column", gap: isWeb ? 24 : 16, alignItems: isWeb ? "center" : "stretch", flex: isWeb ? 1 : undefined }}>
-                        {[
-                            { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
-                            { icon: "clock", label: "Pending", value: String(stats.pending), color: "#f472b6" },
-                            { icon: "check-circle", label: "Paid", value: String(stats.paid), color: "#7dd3fc" },
-                            { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
-                        ].map((s, i) => (
-                            <React.Fragment key={i}>
-                                <View style={[styles.statBlockSingle]}>
-                                    <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
-                                        <Feather name={s.icon as any} size={20} color="#ffffff" />
-                                    </View>
-                                    <View style={styles.statTextWrapperSingle}>
-                                        <Text style={styles.statValueSingle}>{s.value}</Text>
-                                        <Text style={styles.statLabelSingle}>{s.label}</Text>
-                                    </View>
-                                </View>
-                                {i < 3 && <View style={[styles.statDividerSingle, !isWeb && { width: "100%", height: 1, marginVertical: 0 }]} />}
-                            </React.Fragment>
-                        ))}
-                    </View>
-
-                    {/* Legend Section Inside Card */}
-                    <View style={{ flexDirection: isWeb ? 'row' : 'column', alignItems: isWeb ? 'center' : 'stretch', gap: isWeb ? 24 : 12, flexShrink: 0, paddingLeft: isWeb ? 12 : 0, marginTop: isWeb ? 0 : 16 }}>
-                        {isWeb && <View style={styles.statDividerSingle} />}
-                        <View style={{ gap: 6, justifyContent: 'center', width: isWeb ? 300 : '100%' }}>
-                            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                                <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
-                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Green (0-2d): 0</Text>
-                                </View>
-                                <View style={[styles.legendBadge, { backgroundColor: "#fbbf24", flex: 1, minWidth: 90 }]}>
-                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Orange (3-4d): 0</Text>
-                                </View>
-                                <View style={[styles.legendBadge, { backgroundColor: "#f87171", flex: 1, minWidth: 90 }]}>
-                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Red (5+d): 0</Text>
-                                </View>
-                            </View>
-                            <View style={[styles.legendBadge, { backgroundColor: "#475569" }]}>
-                                <Text style={[styles.legendText, { textAlign: 'center' }]}>Red and pending are prioritized on top; paid rows are moved down</Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
 
                 {/* Search + Filter */}
                 <View style={[styles.webFilterSection, { zIndex: 999, elevation: 999 }]}>
@@ -412,7 +410,7 @@ const SellerPaymentsScreen: React.FC = () => {
                             <View style={{ position: 'relative', zIndex: 1000, elevation: 1000 }}>
                                 <TouchableOpacity 
                                     style={styles.webSelectBox}
-                                    onPress={() => setPaymentDropdownOpen(!paymentDropdownOpen)}
+                                    onPress={() => setOpenDropdown(openDropdown === "payment" ? null : "payment")}
                                 >
                                     <Text style={styles.webSelectText}>
                                         {filterPayment === "All" ? "All Payments" : filterPayment}
@@ -420,7 +418,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                     <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                 </TouchableOpacity>
 
-                                {paymentDropdownOpen && (
+                                {openDropdown === "payment" && (
                                     <View style={[styles.webDropdownMenu, !isWeb && { position: "relative", top: 0, left: 0, marginTop: 4, elevation: 0, shadowOpacity: 0 }]}>
                                         {(["All", "Pending", "Paid", "Cancelled"] as const).map(option => (
                                             <TouchableOpacity 
@@ -431,7 +429,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                                 ]}
                                                 onPress={() => {
                                                     setFilterPayment(option);
-                                                    setPaymentDropdownOpen(false);
+                                                    setOpenDropdown(null);
                                                 }}
                                             >
                                                 <Text style={[
@@ -449,7 +447,7 @@ const SellerPaymentsScreen: React.FC = () => {
                             <View style={{ position: 'relative', zIndex: 999, elevation: 999 }}>
                                 <TouchableOpacity 
                                     style={styles.webSelectBox}
-                                    onPress={() => setReminderBucketDropdownOpen(!reminderBucketDropdownOpen)}
+                                    onPress={() => setOpenDropdown(openDropdown === "reminder" ? null : "reminder")}
                                 >
                                     <Text style={styles.webSelectText}>
                                         {filterReminderBucket === "All" ? "All Reminder Buckets" : filterReminderBucket === "green" ? "Green (0-2 days)" : filterReminderBucket === "orange" ? "Orange (3-4 days)" : "Red (5+ days)"}
@@ -457,7 +455,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                     <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                 </TouchableOpacity>
 
-                                {reminderBucketDropdownOpen && (
+                                {openDropdown === "reminder" && (
                                     <View style={[styles.webDropdownMenu, { width: 180 }, !isWeb && { position: "relative", top: 0, left: 0, marginTop: 4, elevation: 0, shadowOpacity: 0 }]}>
                                         {[
                                             { label: "All Reminder Buckets", value: "All" },
@@ -473,7 +471,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                                 ]}
                                                 onPress={() => {
                                                     setFilterReminderBucket(option.value as any);
-                                                    setReminderBucketDropdownOpen(false);
+                                                    setOpenDropdown(null);
                                                 }}
                                             >
                                                 <Text style={[
@@ -491,13 +489,13 @@ const SellerPaymentsScreen: React.FC = () => {
                             <View style={{ position: 'relative', zIndex: 998, elevation: 998 }}>
                                 <TouchableOpacity 
                                     style={styles.webSelectBox}
-                                    onPress={() => setPriorityDropdownOpen(!priorityDropdownOpen)}
+                                    onPress={() => setOpenDropdown(openDropdown === "priority" ? null : "priority")}
                                 >
                                     <Text style={styles.webSelectText}>{sortPriority}</Text>
                                     <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                 </TouchableOpacity>
 
-                                {priorityDropdownOpen && (
+                                {openDropdown === "priority" && (
                                     <View style={[styles.webDropdownMenu, { width: 170 }, !isWeb && { position: "relative", top: 0, left: 0, marginTop: 4, elevation: 0, shadowOpacity: 0 }]}>
                                         {[
                                             "Priority (Red first)",
@@ -512,7 +510,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                                 ]}
                                                 onPress={() => {
                                                     setSortPriority(option as any);
-                                                    setPriorityDropdownOpen(false);
+                                                    setOpenDropdown(null);
                                                 }}
                                             >
                                                 <Text style={[
@@ -695,8 +693,8 @@ const styles = StyleSheet.create({
     mainWeb: { backgroundColor: BG_CARD, margin: 16, borderRadius: 20, overflow: "hidden", shadowColor: DARK, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5 },
 
     // Header
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-    headerWeb: { paddingHorizontal: 28, paddingVertical: 22 },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, borderRadius: 22, marginHorizontal: 24, marginTop: 24, marginBottom: 0, zIndex: 1, shadowColor: "#151D4F", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    headerWeb: {  },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
@@ -709,7 +707,7 @@ const styles = StyleSheet.create({
     scrollContent: { padding: 16, gap: 14 },
 
     // Stats Single Card
-    statsCardSingle: { flexDirection: "row", backgroundColor: BG_CARD, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, borderWidth: 1, borderColor: BORDER, shadowColor: DARK, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, marginBottom: 16 },
+    statsCardSingle: { flexDirection: "row", backgroundColor: BG_CARD, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, borderWidth: 1, borderColor: BORDER, shadowColor: DARK, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, marginBottom: 16, marginTop: -52, marginHorizontal: 32, zIndex: 10 },
     statBlockSingle: { flexDirection: "row", alignItems: "center", gap: 12 },
     statIconWrapperSingle: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     statTextWrapperSingle: { },
