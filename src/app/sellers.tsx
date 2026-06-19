@@ -523,8 +523,8 @@ const ListHeader = ({ isTablet }: { isTablet: boolean }) => (
   <View style={LV.hrow}>
     <Text style={[LV.hcell, LV.cSno]}>S. No</Text>
     <Text style={[LV.hcell, LV.cId]}>Seller ID</Text>
-    <Text style={[LV.hcell, { flex: 2 }]}>Seller</Text>
-    {!isTablet && <Text style={[LV.hcell, { flex: 2 }]}>Business</Text>}
+    <Text style={[LV.hcell, LV.cSeller]}>Seller</Text>
+    {!isTablet && <Text style={[LV.hcell, LV.cBiz]}>Business</Text>}
     <Text style={[LV.hcell, LV.cStatus]}>Status</Text>
     <Text style={[LV.hcell, LV.cKyc]}>KYC</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cProd]}>Products</Text>}
@@ -579,15 +579,17 @@ const ListRow = ({
     <View style={[LV.row, { backgroundColor: rowBg }]}>
       <Text style={[LV.cell, LV.cSno]}>{seller.serialNo}</Text>
       <View style={LV.cId}><IdBadge id={seller.id} /></View>
-      <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8, minWidth: 0 }}>
-        <SellerAvatar seller={seller} size={34} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={LV.selName} numberOfLines={1}>{seller.name}</Text>
-          <Text style={LV.selEmail} numberOfLines={1}>{seller.email}</Text>
+      <View style={LV.cSeller}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <SellerAvatar seller={seller} size={34} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={LV.selName} numberOfLines={1}>{seller.name}</Text>
+            <Text style={LV.selEmail} numberOfLines={1}>{seller.email}</Text>
+          </View>
         </View>
       </View>
       {!isTablet && (
-        <View style={{ flex: 2, paddingRight: 8 }}>
+        <View style={LV.cBiz}>
           <Text style={LV.bizName} numberOfLines={1}>{seller.business}</Text>
           <Text style={LV.sain} numberOfLines={1}>{seller.sain}</Text>
         </View>
@@ -605,18 +607,20 @@ const ListRow = ({
 };
 
 const LV = StyleSheet.create({
-  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border },
-  hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, minWidth: 1100 },
+  hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, minWidth: 1100 },
   mrow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: C.border },
-  cell: { fontSize: 13, color: C.sub, paddingRight: 8 },
+  cell: { fontSize: 13, color: C.sub, paddingRight: 16 },
   cSno: { width: 44, textAlign: 'center', fontWeight: '600' },
-  cId: { width: 172, paddingRight: 8 },
-  cStatus: { width: 76 },
-  cKyc: { width: 115 },
-  cProd: { width: 120 },
-  cWallet: { width: 76, textAlign: 'right', fontWeight: '700', color: C.green },
-  cDate: { width: 110, fontSize: 11 },
+  cId: { width: 172, paddingRight: 16 },
+  cSeller: { width: 220, paddingRight: 20 },
+  cBiz: { width: 200, paddingRight: 20 },
+  cStatus: { width: 85, paddingRight: 12 },
+  cKyc: { width: 120, paddingRight: 12 },
+  cProd: { width: 130, paddingRight: 12 },
+  cWallet: { width: 80, textAlign: 'right', fontWeight: '700', color: C.green, paddingRight: 24 },
+  cDate: { width: 110, fontSize: 11, paddingRight: 12 },
   cAction: { width: 108, marginLeft: 'auto' },
   avatar: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avTxt: { color: '#FFF', fontWeight: '700', fontSize: 12 },
@@ -901,25 +905,27 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
-              {!isMobile && <ListHeader isTablet={isTablet} />}
-              {paginated.length === 0 ? (
-                <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-              ) : (
-                paginated.map((s, idx) => (
-                  <ListRow
-                    key={s.id}
-                    seller={s}
-                    even={idx % 2 === 0}
-                    isTablet={isTablet}
-                    isMobile={isMobile}
-                    onView={() => doView(s)}
-                    onToggleStatus={() => doToggle(s)}
-                    onDelete={() => doDelete(s)}
-                  />
-                ))
-              )}
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={IS_WEB}>
+              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
+                {!isMobile && <ListHeader isTablet={isTablet} />}
+                {paginated.length === 0 ? (
+                  <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+                ) : (
+                  paginated.map((s, idx) => (
+                    <ListRow
+                      key={s.id}
+                      seller={s}
+                      even={idx % 2 === 0}
+                      isTablet={isTablet}
+                      isMobile={isMobile}
+                      onView={() => doView(s)}
+                      onToggleStatus={() => doToggle(s)}
+                      onDelete={() => doDelete(s)}
+                    />
+                  ))
+                )}
+              </View>
+            </ScrollView>
           )}
 
           {/* Footer */}
