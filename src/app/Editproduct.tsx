@@ -32,6 +32,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -67,10 +68,10 @@ const COLORS = {
 };
 
 const STEP_CONFIG = [
-  { key: 'basic', label: 'Basic Info', color: '#7C3AED', icon: 'ℹ' },
-  { key: 'variants', label: 'Variants', color: '#0891B2', icon: '⚙' },
-  { key: 'images', label: 'Images', color: '#059669', icon: '🖼' },
-  { key: 'details', label: 'Details', color: '#D97706', icon: '📄' },
+  { key: 'basic', label: 'Basic Info', color: '#7C3AED', icon: 'information-outline' },
+  { key: 'variants', label: 'Variants', color: '#0891B2', icon: 'tune-variant' },
+  { key: 'images', label: 'Images', color: '#059669', icon: 'image-multiple-outline' },
+  { key: 'details', label: 'Details', color: '#D97706', icon: 'clipboard-text-outline' },
 ];
 
 const CATEGORIES = [
@@ -375,11 +376,12 @@ const DiscardModal = ({ visible, onDiscard, onKeep }: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepBasic = ({
-  state, setState, openPicker,
+  state, setState, openPicker, actionBar
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   openPicker: (title: string, options: string[], current: string, onSelect: (v: string) => void) => void;
+  actionBar?: React.ReactNode;
 }) => {
   const b = state.basic;
   const update = (field: Partial<BasicInfo>) => setState(s => ({ ...s, isDirty: true, basic: { ...s.basic, ...field } }));
@@ -580,6 +582,7 @@ const StepBasic = ({
           </View>
         )}
       </Card>
+      {actionBar}
       <View style={{ height: 20 }} />
     </ScrollView>
   );
@@ -590,11 +593,12 @@ const StepBasic = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepVariants = ({
-  state, setState, openPicker,
+  state, setState, openPicker, actionBar
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   openPicker: (title: string, options: string[], current: string, onSelect: (v: string) => void) => void;
+  actionBar?: React.ReactNode;
 }) => {
   const updateVariant = (id: string, field: Partial<Variant>) => {
     setState(s => ({
@@ -711,6 +715,7 @@ const StepVariants = ({
       <View style={styles.infoBox}>
         <Text style={styles.infoBoxText}>ℹ Each variant can have its own price, stock, and images. At least one variant is required.</Text>
       </View>
+      {actionBar}
       <View style={{ height: 20 }} />
     </ScrollView>
   );
@@ -721,10 +726,11 @@ const StepVariants = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepImages = ({
-  state, setState,
+  state, setState, actionBar
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
+  actionBar?: React.ReactNode;
 }) => {
   const [manageVisible, setManageVisible] = useState(false);
 
@@ -895,6 +901,8 @@ const StepImages = ({
           </View>
         </Pressable>
       </Modal>
+
+      {actionBar}
       <View style={{ height: 20 }} />
     </ScrollView>
   );
@@ -905,11 +913,12 @@ const StepImages = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepDetails = ({
-  state, setState, openPicker,
+  state, setState, openPicker, actionBar
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   openPicker: (title: string, options: string[], current: string, onSelect: (v: string) => void) => void;
+  actionBar?: React.ReactNode;
 }) => {
   const [customPolicyVisible, setCustomPolicyVisible] = useState(false);
   const [customPolicyText, setCustomPolicyText] = useState(state.details.returnPolicyText);
@@ -980,6 +989,7 @@ const StepDetails = ({
             </FieldWrap>
           </View>
         </View>
+        <FieldLabel text="Delivery Notes" />
         <FieldWrap>
           <TextInput style={[styles.input, { minHeight: 72, textAlignVertical: 'top', paddingTop: 10 }]} value={d.deliveryInfo} onChangeText={v => updateDetails({ deliveryInfo: v })} multiline maxLength={1000} placeholder="Extra delivery notes…" placeholderTextColor={COLORS.textPh} />
         </FieldWrap>
@@ -1124,6 +1134,7 @@ const StepDetails = ({
         </Pressable>
       </Modal>
 
+      {actionBar}
       <View style={{ height: 20 }} />
     </ScrollView>
   );
@@ -1139,6 +1150,7 @@ export default function EditProduct() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDiscard, setShowDiscard] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const [barW, setBarW] = useState(300);
 
   useEffect(() => {
     const productId = Number(params.productId);
@@ -1207,7 +1219,7 @@ export default function EditProduct() {
     } else if (state.isDirty) {
       setShowDiscard(true);
     } else {
-      router.back();
+      router.push('/Products');
     }
   };
 
@@ -1238,6 +1250,33 @@ export default function EditProduct() {
 
   const currentStep = STEP_CONFIG[state.step];
 
+  const actionBar = (
+    <View style={styles.actionBar}>
+      {state.step === 0 ? (
+        <TouchableOpacity style={styles.btnCancel} onPress={handleBack}>
+          <Text style={styles.btnCancelText}>Cancel</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.btnPrev} onPress={handleBack}>
+          <Text style={styles.btnPrevText}>‹ Back</Text>
+        </TouchableOpacity>
+      )}
+
+      {state.step < 3 ? (
+        <TouchableOpacity style={styles.btnNext} onPress={handleContinue}>
+          <Text style={styles.btnNextText}>Continue ›</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.btnSave, !state.isDirty && styles.btnSaveDim]}
+          onPress={state.isDirty ? handleUpdate : undefined}
+        >
+          <Text style={styles.btnSaveText}>{state.isDirty ? '💾 Update Product' : 'No Changes'}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <AdminLayout>
     <KeyboardAvoidingView
@@ -1248,16 +1287,16 @@ export default function EditProduct() {
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.topBtn} onPress={handleBack}>
-          <Text style={styles.topBtnText}>‹</Text>
+          <Ionicons name="arrow-back" size={22} color={COLORS.navy} />
         </TouchableOpacity>
         <View style={styles.topCenter}>
           <Text style={styles.topTitle}>Edit Product</Text>
           <Text style={styles.topSub}>{currentStep.label} · Step {state.step + 1} of {STEP_CONFIG.length}</Text>
         </View>
-        <TouchableOpacity style={styles.topBtn} onPress={() => state.isDirty ? setShowDiscard(true) : router.back()}>
+        <TouchableOpacity style={styles.topBtn} onPress={() => state.isDirty ? setShowDiscard(true) : router.push('/Products')}>
           {state.isDirty
             ? <View style={styles.dirtyDot} />
-            : <Text style={styles.topBtnText}>✕</Text>
+            : <Ionicons name="close" size={22} color={COLORS.textMid} />
           }
         </TouchableOpacity>
       </View>
@@ -1270,16 +1309,29 @@ export default function EditProduct() {
       )}
 
       {/* Step Progress Bar */}
-      <View style={styles.stepBar}>
+      <View style={styles.stepBar} onLayout={(e) => setBarW(e.nativeEvent.layout.width)}>
+        {STEP_CONFIG.map((_, i) => {
+          if (i === 0) return null;
+          const colW = barW / STEP_CONFIG.length;
+          const cx_prev = colW * (i - 1) + colW / 2;
+          const cx_curr = colW * i + colW / 2;
+          const lx = cx_prev + 19;
+          const lw = cx_curr - 19 - lx;
+          const ly = 10 + 19 - 1.5;
+          if (lw <= 0) return null;
+          const isDone = i <= state.step;
+          return <View key={`seg-${i}`} pointerEvents="none" style={[styles.stepSeg, { left: lx, top: ly, width: lw, backgroundColor: isDone ? STEP_CONFIG[i - 1].color : COLORS.border }]} />;
+        })}
         {STEP_CONFIG.map((s, i) => {
           const isActive = i === state.step;
           const isDone = i < state.step;
+          const iconBg = (isActive || isDone) ? s.color : s.color + '60';
           return (
-            <TouchableOpacity key={s.key} style={styles.stepCol} onPress={() => setState(st => ({ ...st, step: i }))}>
-              <View style={[styles.stepIcon, { backgroundColor: s.color, opacity: isActive || isDone ? 1 : 0.5 }]}>
-                <Text style={styles.stepIconText}>{s.icon}</Text>
+            <TouchableOpacity key={s.key} style={styles.stepCol} onPress={() => setState(st => ({ ...st, step: i }))} activeOpacity={0.75}>
+              <View style={[styles.stepIcon, { backgroundColor: iconBg }, isActive && { shadowColor: s.color, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 7 }]}>
+                <MaterialCommunityIcons name={s.icon as any} size={18} color={COLORS.white} />
               </View>
-              <Text style={[styles.stepLabel, (isActive || isDone) && { color: s.color, fontWeight: isActive ? '700' : '600' }]}>
+              <Text style={[styles.stepLabel, isActive && { color: s.color, fontWeight: '700' }, isDone && { color: s.color, fontWeight: '600' }]}>
                 {s.label}
               </Text>
             </TouchableOpacity>
@@ -1289,36 +1341,10 @@ export default function EditProduct() {
 
       {/* Step Content */}
       <View style={{ flex: 1 }}>
-        {state.step === 0 && <StepBasic state={state} setState={setState} openPicker={openPicker} />}
-        {state.step === 1 && <StepVariants state={state} setState={setState} openPicker={openPicker} />}
-        {state.step === 2 && <StepImages state={state} setState={setState} />}
-        {state.step === 3 && <StepDetails state={state} setState={setState} openPicker={openPicker} />}
-      </View>
-
-      {/* Action Bar */}
-      <View style={styles.actionBar}>
-        {state.step === 0 ? (
-          <TouchableOpacity style={styles.btnCancel} onPress={handleBack}>
-            <Text style={styles.btnCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.btnPrev} onPress={handleBack}>
-            <Text style={styles.btnPrevText}>‹ Back</Text>
-          </TouchableOpacity>
-        )}
-
-        {state.step < 3 ? (
-          <TouchableOpacity style={styles.btnNext} onPress={handleContinue}>
-            <Text style={styles.btnNextText}>Continue ›</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.btnSave, !state.isDirty && styles.btnSaveDim]}
-            onPress={state.isDirty ? handleUpdate : undefined}
-          >
-            <Text style={styles.btnSaveText}>{state.isDirty ? '💾 Update Product' : 'No Changes'}</Text>
-          </TouchableOpacity>
-        )}
+        {state.step === 0 && <StepBasic state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} />}
+        {state.step === 1 && <StepVariants state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} />}
+        {state.step === 2 && <StepImages state={state} setState={setState} actionBar={actionBar} />}
+        {state.step === 3 && <StepDetails state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} />}
       </View>
 
       {/* Toasts */}
@@ -1350,7 +1376,7 @@ export default function EditProduct() {
 
       <DiscardModal
         visible={showDiscard}
-        onDiscard={() => { setShowDiscard(false); router.back(); }}
+        onDiscard={() => { setShowDiscard(false); router.push('/Products'); }}
         onKeep={() => setShowDiscard(false)}
       />
     </KeyboardAvoidingView>
@@ -1367,23 +1393,24 @@ const styles = StyleSheet.create({
   stepScroll: { padding: 16, paddingBottom: 80 },
 
   // Top Bar
-  topBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.navyDeep, paddingHorizontal: 8, paddingVertical: 12, paddingTop: Platform.OS === 'ios' ? 54 : 12 },
-  topBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  topBtnText: { color: COLORS.white, fontSize: 26, lineHeight: 30 },
-  topCenter: { flex: 1, alignItems: 'center' },
-  topTitle: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
-  topSub: { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
-  dirtyDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.amber, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)' },
+  topBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, paddingHorizontal: 20, paddingVertical: 14, paddingTop: Platform.OS === 'ios' ? 54 : 14, borderBottomWidth: 1, borderBottomColor: COLORS.border, shadowColor: '#0F1A4A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 4 },
+  topBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.navyGhost, alignItems: 'center', justifyContent: 'center' },
+  topBtnText: { color: COLORS.navy, fontSize: 26, lineHeight: 30 },
+  topCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 12 },
+  topTitle: { color: COLORS.textDark, fontSize: 20, fontWeight: '700', letterSpacing: 0.2 },
+  topSub: { color: COLORS.textLight, fontSize: 13, fontWeight: '500', marginTop: 2 },
+  dirtyDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.amber, borderWidth: 1.5, borderColor: COLORS.navyGhost },
 
   // Unsaved Banner
   unsavedBanner: { flexDirection: 'row', alignItems: 'center', padding: 9, paddingHorizontal: 16, backgroundColor: COLORS.amberPale, borderBottomWidth: 1, borderBottomColor: '#FCD34D' },
   unsavedBannerText: { fontSize: 12, color: '#92400E', fontWeight: '500' },
 
   // Step Bar
-  stepBar: { flexDirection: 'row', backgroundColor: COLORS.white, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  stepCol: { flex: 1, alignItems: 'center', gap: 6 },
+  stepBar: { flexDirection: 'row', backgroundColor: COLORS.white, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingTop: 10, paddingBottom: 12, position: 'relative' },
+  stepSeg: { position: 'absolute', height: 3, borderRadius: 1.5, zIndex: 0 },
+  stepCol: { flex: 1, alignItems: 'center', gap: 6, zIndex: 1 },
   stepIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  stepIconText: { fontSize: 18 },
+  stepIconText: { fontSize: 18, color: COLORS.white },
   stepLabel: { fontSize: 10, fontWeight: '500', color: COLORS.textLight, textAlign: 'center' },
 
   // Card
@@ -1399,13 +1426,13 @@ const styles = StyleSheet.create({
   hint: { fontSize: 11, color: COLORS.textLight, marginTop: 4 },
   cardHint: { fontSize: 12, color: COLORS.textLight, marginBottom: 10, fontStyle: 'italic' },
   charCount: { fontSize: 11, color: COLORS.textLight, textAlign: 'right', marginTop: 3 },
-  fieldWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderWidth: 1.2, borderColor: COLORS.border, borderRadius: 10, paddingHorizontal: 12, minHeight: 44 },
-  fieldWrapError: { borderColor: COLORS.red, backgroundColor: '#FFF8F8' },
+  fieldWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderWidth: 0, borderColor: COLORS.border, borderRadius: 10, paddingHorizontal: 12, minHeight: 44 },
+  fieldWrapError: { borderColor: COLORS.red, borderWidth: 1, backgroundColor: '#FFF8F8' },
   fieldPrefix: { fontSize: 14, fontWeight: '600', color: COLORS.textMid, marginRight: 6 },
   input: { flex: 1, fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto', fontSize: 13, color: COLORS.textDark, paddingVertical: 10 },
 
   // Dropdown
-  dropButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.inputBg, borderWidth: 1.2, borderColor: COLORS.border, borderRadius: 10, padding: 12, minHeight: 44 },
+  dropButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.inputBg, borderWidth: 0, borderColor: COLORS.border, borderRadius: 10, padding: 12, minHeight: 44 },
   dropButtonText: { flex: 1, fontSize: 13, color: COLORS.textDark },
   placeholder: { color: COLORS.textPh },
   chevron: { color: COLORS.textLight, fontSize: 20, lineHeight: 22 },
@@ -1472,17 +1499,17 @@ const styles = StyleSheet.create({
   moreImgBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.acc4, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   moreImgBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
   imgPreviewRow: { flexDirection: 'row', gap: 12 },
-  imgPreviewCard: { flex: 1, aspectRatio: 1, borderRadius: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: COLORS.border, backgroundColor: COLORS.inputBg },
+  imgPreviewCard: { flex: 1, aspectRatio: 1, borderRadius: 12, overflow: 'hidden', borderWidth: 0, borderColor: COLORS.border, backgroundColor: COLORS.inputBg },
   imgPreviewCardPrimary: { borderColor: COLORS.navy, borderWidth: 2 },
   moreOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,20,60,0.55)', alignItems: 'center', justifyContent: 'center' },
   moreOverlayText: { fontSize: 13, fontWeight: '700', color: COLORS.white },
   imgHint: { fontSize: 11, color: COLORS.textLight, marginTop: 10, textAlign: 'center' },
-  addBox: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: COLORS.navyBorder, borderRadius: 14, padding: 22, alignItems: 'center', backgroundColor: COLORS.inputBg },
+  addBox: { borderWidth: 0, borderStyle: 'dashed', borderColor: COLORS.navyBorder, borderRadius: 14, padding: 22, alignItems: 'center', backgroundColor: COLORS.inputBg },
   addBoxIcon: { fontSize: 32, marginBottom: 8 },
   addBoxTitle: { fontSize: 13, fontWeight: '600', color: COLORS.textMid },
   addBoxSub: { fontSize: 11, color: COLORS.textLight },
   imgCount: { fontSize: 11.5, color: COLORS.textLight, textAlign: 'right', marginTop: 10 },
-  videoBox: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: COLORS.navyBorder, borderRadius: 14, padding: 24, alignItems: 'center', marginTop: 12 },
+  videoBox: { borderWidth: 0, borderStyle: 'dashed', borderColor: COLORS.navyBorder, borderRadius: 14, padding: 24, alignItems: 'center', marginTop: 12, backgroundColor: COLORS.inputBg },
   videoBoxTitle: { fontSize: 13, fontWeight: '600', color: COLORS.textMid },
   videoBoxSub: { fontSize: 11, color: COLORS.textLight },
   videoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, backgroundColor: COLORS.navyGhost, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: COLORS.navyBorder },
@@ -1490,7 +1517,7 @@ const styles = StyleSheet.create({
   videoSub: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
   videoDeleteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.redPale, alignItems: 'center', justifyContent: 'center' },
   imgGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  imgGridCard: { width: '47%', borderRadius: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: COLORS.border },
+  imgGridCard: { width: '47%', borderRadius: 12, overflow: 'hidden', borderWidth: 0, borderColor: COLORS.border, backgroundColor: COLORS.inputBg },
   imgGridCardPrimary: { borderColor: COLORS.navy, borderWidth: 2 },
   imgRadioRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.border },
   imgRadio: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: COLORS.navyBorder, alignItems: 'center', justifyContent: 'center' },
@@ -1509,20 +1536,20 @@ const styles = StyleSheet.create({
   addRowBtnText: { fontSize: 12.5, fontWeight: '600', color: COLORS.navy },
 
   // Action Bar
-  actionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, paddingHorizontal: 16, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 4 },
-  btnCancel: { flex: 1, borderWidth: 1.2, borderColor: COLORS.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  actionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 20, padding: 16, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 16, shadowColor: '#0F1A4A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, marginTop: 24, marginBottom: 12 },
+  btnCancel: { minWidth: 120, paddingHorizontal: 24, borderWidth: 1.2, borderColor: COLORS.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   btnCancelText: { fontSize: 14, fontWeight: '600', color: COLORS.textMid },
-  btnPrev: { flex: 1, borderWidth: 1.2, borderColor: COLORS.navyBorder, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  btnPrev: { minWidth: 120, paddingHorizontal: 24, borderWidth: 1.2, borderColor: COLORS.navyBorder, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   btnPrevText: { fontSize: 14, fontWeight: '600', color: COLORS.navy },
-  btnNext: { flex: 1, backgroundColor: COLORS.navy, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  btnNext: { minWidth: 140, paddingHorizontal: 24, backgroundColor: COLORS.navy, borderRadius: 12, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   btnNextText: { fontSize: 14, fontWeight: '700', color: COLORS.white },
-  btnSave: { flex: 1, backgroundColor: COLORS.navy, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  btnSave: { minWidth: 160, paddingHorizontal: 24, backgroundColor: COLORS.navy, borderRadius: 12, paddingVertical: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   btnSaveDim: { backgroundColor: COLORS.navyLight, opacity: 0.6 },
   btnSaveText: { fontSize: 14, fontWeight: '700', color: COLORS.white },
 
   // Modals
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(10,20,60,0.35)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: COLORS.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '75%' },
+  modalOverlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', padding: 20 },
+  modalSheet: { backgroundColor: COLORS.white, borderRadius: 28, maxHeight: '85%', width: '100%', maxWidth: 450, alignSelf: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
   modalDrag: { width: 40, height: 4, borderRadius: 2, backgroundColor: COLORS.border, alignSelf: 'center', margin: 12 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: 16, fontWeight: '700', color: COLORS.textDark },
