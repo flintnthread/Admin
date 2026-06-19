@@ -288,6 +288,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#1F2937",
     padding: 0,
+    // @ts-ignore – web-only: suppress default browser focus outline
+    outlineStyle: "none",
+    outlineWidth: 0,
+    borderWidth: 0,
   },
   actions: {
     flexDirection: "row",

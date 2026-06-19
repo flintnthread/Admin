@@ -537,8 +537,8 @@ const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
     // Header
-    header:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DARK_NAVY },
-    headerWeb:       { paddingHorizontal: 28, paddingVertical: 20 },
+    header:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
+    headerWeb:       { paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, marginHorizontal: 2, marginTop: 12, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft:      { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon:      { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle:     { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },

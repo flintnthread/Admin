@@ -824,7 +824,7 @@ const DepartmentsScreen: React.FC = () => {
 
     const MainContent = (
         <Container style={s.safe}>
-            <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
+            <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
 
 
@@ -1149,7 +1149,7 @@ const s = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-        backgroundColor: T.navy,
+        backgroundColor: "#151D4F",
         padding: 24,
         borderRadius: 16,
     },

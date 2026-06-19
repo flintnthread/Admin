@@ -24,8 +24,11 @@ type Props = {
 // Navigation items definition
 const NAV_ITEMS = {
   GENERAL: [
-    { label: "Dashboard", icon: "home", path: "/Dashboard" },
-    { label: "SEO Engine", icon: "globe", path: null },
+
+
+    { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
+    { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
+
   ],
   "EMPLOYEE MANAGEMENT": [
     {
@@ -243,7 +246,8 @@ const NAV_ITEMS = {
       label: "Locations",
       icon: "map-pin",
       color: "#10B981",
-      path: null,
+
+      path: "/locations",
       children: [
         {
           label: "Countries",
@@ -256,6 +260,7 @@ const NAV_ITEMS = {
         { label: "Areas", icon: "compass", path: null, color: "#F59E0B" },
         { label: "Pincodes", icon: "hash", path: null, color: "#F97316" },
       ],
+
     },
     {
       label: "Careers Management",
@@ -292,10 +297,12 @@ export default function AdminSidebar({
   isLargeScreen,
 }: Props) {
   const pathname = usePathname();
+
   const [ecommerceExpanded, setEcommerceExpanded] = React.useState(true);
   const [expandedItems, setExpandedItems] = React.useState<
     Record<string, boolean>
   >({});
+
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -648,7 +655,7 @@ export default function AdminSidebar({
                       </Text>
                       {hasChildren && (
                         <Feather
-                          name={isExpanded ? "chevron-up" : "chevron-down"}
+                          name={isExpanded ? "chevron-down" : "chevron-right"}
                           size={14}
                           color="#6B7280"
                           style={styles.chevron}
@@ -710,7 +717,7 @@ export default function AdminSidebar({
         </View>
 
         {/* CUSTOM */}
-        <View style={[styles.section, { marginBottom: 30 }]}>
+        <View style={styles.section}>
           {!collapsed && <Text style={styles.sectionTitle}>CUSTOM</Text>}
           {NAV_ITEMS.CUSTOM.map((item) => {
             const hasChildren = "children" in item;

@@ -22,6 +22,9 @@ import {
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 import AdminLayout from "../components/admin-layout";
 
+
+// ─── Color Palette ────────────────────────────────────────────────────────────
+
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
   navy: "#1E2B6B",
