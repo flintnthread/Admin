@@ -559,7 +559,6 @@ const ListHeader = ({ isTablet }: { isTablet: boolean }) => (
     <Text style={[LV.hcell, LV.cSeller]}>Seller</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cBiz]}>Business</Text>}
     <Text style={[LV.hcell, LV.cStatus]}>Status</Text>
-    <Text style={[LV.hcell, LV.cKyc]}>KYC</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cProd]}>Products</Text>}
     <Text style={[LV.hcell, LV.cWallet]}>Wallet</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cDate]}>Registered</Text>}
@@ -630,7 +629,6 @@ const ListRow = ({
       <View style={LV.cStatus}>
         {seller.status === 'Active' ? <ActiveBadge /> : <InactiveBadge />}
       </View>
-      <View style={LV.cKyc}><KycBadge kyc={seller.kyc} /></View>
       {!isTablet && <View style={LV.cProd}><ProductBadge status={seller.products.status} count={seller.products.count} /></View>}
       <Text style={[LV.cell, LV.cWallet]}>{seller.wallet}</Text>
       {!isTablet && <Text style={[LV.cell, LV.cDate]}>{seller.registered}</Text>}
@@ -640,21 +638,20 @@ const ListRow = ({
 };
 
 const LV = StyleSheet.create({
-  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, minWidth: 1100 },
+  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, width: '100%' },
   hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, minWidth: 1100 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, width: '100%' },
   mrow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   cell: { fontSize: 13, color: C.sub, paddingRight: 16 },
   cSno: { width: 44, textAlign: 'center', fontWeight: '600' },
-  cId: { width: 172, paddingRight: 16 },
-  cSeller: { width: 220, paddingRight: 20 },
-  cBiz: { width: 200, paddingRight: 20 },
-  cStatus: { width: 85, paddingRight: 12 },
-  cKyc: { width: 120, paddingRight: 12 },
+  cId: { width: 140, paddingRight: 16 },
+  cSeller: { width: 180, paddingRight: 20 },
+  cBiz: { width: 120, paddingRight: 20 },
+  cStatus: { width: 80, paddingRight: 12 },
   cProd: { width: 130, paddingRight: 12 },
-  cWallet: { width: 80, textAlign: 'right', fontWeight: '700', color: C.green, paddingRight: 24 },
-  cDate: { width: 110, fontSize: 11, paddingRight: 12 },
-  cAction: { width: 108, marginLeft: 'auto' },
+  cWallet: { width: 140, textAlign: 'left', fontWeight: '700', color: C.green, paddingRight: 12 },
+  cDate: { width: 120, fontSize: 11, paddingRight: 12 },
+  cAction: { width: 100, marginLeft: 'auto' },
   avatar: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avTxt: { color: '#FFF', fontWeight: '700', fontSize: 12 },
   selName: { fontSize: 13, fontWeight: '700', color: C.text },
@@ -949,29 +946,24 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            /* @ts-ignore */
-            <View className="orange-scrollbar">
-              <ScrollView horizontal showsHorizontalScrollIndicator={IS_WEB}>
-                <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
-                  {!isMobile && <ListHeader isTablet={isTablet} />}
-                  {paginated.length === 0 ? (
-                    <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-                  ) : (
-                    paginated.map((s, idx) => (
-                      <ListRow
-                        key={s.id}
-                        seller={s}
-                        even={idx % 2 === 0}
-                        isTablet={isTablet}
-                        isMobile={isMobile}
-                        onView={() => doView(s)}
-                        onToggleStatus={() => doToggle(s)}
-                        onDelete={() => doDelete(s)}
-                      />
-                    ))
-                  )}
-                </View>
-              </ScrollView>
+            <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
+              {!isMobile && <ListHeader isTablet={isTablet} />}
+              {paginated.length === 0 ? (
+                <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+              ) : (
+                paginated.map((s, idx) => (
+                  <ListRow
+                    key={s.id}
+                    seller={s}
+                    even={idx % 2 === 0}
+                    isTablet={isTablet}
+                    isMobile={isMobile}
+                    onView={() => doView(s)}
+                    onToggleStatus={() => doToggle(s)}
+                    onDelete={() => doDelete(s)}
+                  />
+                ))
+              )}
             </View>
           )}
 

@@ -278,7 +278,7 @@ const ColorFormModal = ({ mode, initial, onSave, onClose }: ColorModalProps) => 
               </View>
             )}
             <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Color Code</Text>
-            <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
               <View style={[
                 styles.colorSwatchInput,
                 { backgroundColor: isValidHex(code) ? normalizeHex(code) : BRAND },
@@ -1043,10 +1043,10 @@ const styles = StyleSheet.create({
   // Column widths
   colId: { width: 95, flexShrink: 0 },
   colName: { flex: 1, minWidth: 80, paddingRight: 24 },
-  colPreview: { width: 140, flexShrink: 0, alignItems: "center" },
-  colCode: { width: 130, flexShrink: 0, paddingHorizontal: 4 },
-  colDate: { width: 145, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
-  colStatus: { width: 90, flexShrink: 0, paddingHorizontal: 4 },
+  colPreview: { width: 160, flexShrink: 0, alignItems: "center" },
+  colCode: { width: 160, flexShrink: 0, paddingLeft: 16, paddingRight: 12 },
+  colDate: { width: 175, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 },
+  colStatus: { width: 120, flexShrink: 0, paddingHorizontal: 12 },
   colAction: { width: 104, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
 
   // Cell content
