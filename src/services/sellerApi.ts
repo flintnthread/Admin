@@ -2,11 +2,35 @@ import { adminApiRequest } from "@/lib/api/client";
 import type { PageResponse, SellerSummary } from "@/lib/api/types";
 
 export async function fetchApprovedSellers(size = 500): Promise<SellerSummary[]> {
-  const [activePage, suspendedPage] = await Promise.all([
-    fetchSellers({ status: "active", size }),
-    fetchSellers({ status: "suspended", size }),
-  ]);
-  return [...(activePage.items ?? []), ...(suspendedPage.items ?? [])];
+  const page = await adminApiRequest<PageResponse<SellerSummary>>(
+    `/api/admin/sellers/approved?page=0&size=${size}`
+  );
+  return page.items ?? [];
+}
+
+export type ApprovedSellerLocationStat = { name: string; count: number };
+
+export async function fetchApprovedSellerLocationStats(): Promise<{
+  stateCounts: ApprovedSellerLocationStat[];
+  cityCounts: ApprovedSellerLocationStat[];
+}> {
+  const raw = await adminApiRequest<Record<string, unknown>>("/api/admin/sellers/approved/location-stats");
+  const parseRows = (key: string): ApprovedSellerLocationStat[] => {
+    const rows = raw[key];
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .map((row) => {
+        const r = row as Record<string, unknown>;
+        const name = String(r.name ?? "").trim();
+        if (!name) return null;
+        return { name, count: Number(r.count) || 0 };
+      })
+      .filter((row): row is ApprovedSellerLocationStat => row != null);
+  };
+  return {
+    stateCounts: parseRows("stateCounts"),
+    cityCounts: parseRows("cityCounts"),
+  };
 }
 
 export async function fetchSellers(params?: {
@@ -57,6 +81,12 @@ export type SellerGraphRow = SellerSummary & {
   shipDate?: string | null;
 };
 
+export type SellerGraphNameOption = {
+  id: number;
+  fullName: string;
+  businessName?: string | null;
+};
+
 function buildGraphQuery(filters?: SellerGraphFilters): string {
   const q = new URLSearchParams();
   if (filters?.filterType) q.set("filterType", filters.filterType);
@@ -80,6 +110,23 @@ export async function fetchSellersForGraph(params?: {
   q.set("page", String(params?.page ?? 0));
   q.set("size", String(params?.size ?? 20));
   return adminApiRequest(`/api/admin/sellers/graph?${q}`);
+}
+
+export async function fetchSellerGraphNames(): Promise<SellerGraphNameOption[]> {
+  const rows = await adminApiRequest<unknown[]>("/api/admin/sellers/graph/names");
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => {
+      const r = row as Record<string, unknown>;
+      const id = Number(r.id);
+      if (!Number.isFinite(id)) return null;
+      return {
+        id,
+        fullName: String(r.fullName ?? `Seller #${id}`),
+        businessName: r.businessName != null ? String(r.businessName) : null,
+      };
+    })
+    .filter((row): row is SellerGraphNameOption => row != null);
 }
 
 export async function fetchSellerAnalyticsSummary(

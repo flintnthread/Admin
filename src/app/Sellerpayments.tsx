@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/admin-layout";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapPayoutToPaymentRow } from "@/lib/mappers";
 import { fetchPayoutStats, fetchPayouts, markPayoutPaid } from "@/services/payoutApi";
@@ -19,7 +20,7 @@ import {
 } from "react-native";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type PaymentStatus = "Pending" | "Paid";
+type PaymentStatus = "Pending" | "Paid" | "Cancelled";
 type ReminderBucket = "green" | "orange" | "red";
 
 interface SellerOrder {
@@ -59,10 +60,11 @@ const getReminderStyle = (bucket: ReminderBucket) => {
     return { bg: "#fce8e8", color: "#b91c1c", dot: "#ef4444" };
 };
 
-const getPaymentStyle = (status: PaymentStatus) =>
-    status === "Paid"
-        ? { bg: "#e8f7ee", color: "#1a7a45" }
-        : { bg: PRIMARY_LIGHT, color: PRIMARY };
+const getPaymentStyle = (status: PaymentStatus) => {
+    if (status === "Paid") return { bg: "#e8f7ee", color: "#1a7a45" };
+    if (status === "Cancelled") return { bg: "#fce8e8", color: "#b91c1c" };
+    return { bg: PRIMARY_LIGHT, color: PRIMARY };
+};
 
 // ─── ORDER CARD ───────────────────────────────────────────────────────────────
 const OrderCard: React.FC<{
@@ -211,11 +213,12 @@ const PayModal: React.FC<{
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 const SellerPaymentsScreen: React.FC = () => {
+    const { token, isLoading: authLoading } = useAuth();
     const isWeb = Platform.OS === "web";
     const [orders, setOrders] = useState<SellerOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0 });
+    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0, greenCount: 0, orangeCount: 0, redCount: 0 });
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
@@ -235,6 +238,7 @@ const SellerPaymentsScreen: React.FC = () => {
         undefined;
 
     const loadPayments = useCallback(async () => {
+        if (!token) return;
         setLoading(true);
         setError(null);
         try {
@@ -253,17 +257,21 @@ const SellerPaymentsScreen: React.FC = () => {
                 pending: Number(apiStats.pending ?? 0),
                 paid: Number(apiStats.paid ?? 0),
                 totalPaidAmount: Number(apiStats.totalPaidAmount ?? 0),
+                greenCount: Number(apiStats.greenCount ?? 0),
+                orangeCount: Number(apiStats.orangeCount ?? 0),
+                redCount: Number(apiStats.redCount ?? 0),
             });
         } catch (e) {
             setError(getApiErrorMessage(e, "Failed to load seller payments."));
         } finally {
             setLoading(false);
         }
-    }, [apiStatus, currentPage]);
+    }, [apiStatus, currentPage, token]);
 
     useEffect(() => {
-        loadPayments();
-    }, [loadPayments]);
+        if (authLoading || !token) return;
+        void loadPayments();
+    }, [authLoading, token, loadPayments]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -339,9 +347,9 @@ const SellerPaymentsScreen: React.FC = () => {
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 250 }]} showsVerticalScrollIndicator={false}>
 
-                {loading && (
+                {loading || authLoading ? (
                     <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 24 }} />
-                )}
+                ) : null}
                 {error ? (
                     <View style={{ marginBottom: 12, gap: 8 }}>
                         <Text style={{ color: "#DC2626", fontSize: 13 }}>{error}</Text>
@@ -381,13 +389,13 @@ const SellerPaymentsScreen: React.FC = () => {
                         <View style={{ gap: 6, justifyContent: 'center', width: isWeb ? 300 : '100%' }}>
                             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                                 <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
-                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Green (0-2d): 0</Text>
+                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Green (0-2d): {stats.greenCount}</Text>
                                 </View>
                                 <View style={[styles.legendBadge, { backgroundColor: "#fbbf24", flex: 1, minWidth: 90 }]}>
-                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Orange (3-4d): 0</Text>
+                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Orange (3-4d): {stats.orangeCount}</Text>
                                 </View>
                                 <View style={[styles.legendBadge, { backgroundColor: "#f87171", flex: 1, minWidth: 90 }]}>
-                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Red (5+d): 0</Text>
+                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Red (5+d): {stats.redCount}</Text>
                                 </View>
                             </View>
                             <View style={[styles.legendBadge, { backgroundColor: "#475569" }]}>

@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/context/auth-context';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { mapContactToCustomerTicket } from '@/lib/mappers';
-import { fetchContact, replyContact, updateContactStatus } from '@/services/contactApi';
+import { mapCustomerSupportTicket } from '@/lib/mappers';
+import {
+  fetchCustomerSupportTicket,
+  replyCustomerSupportTicket,
+  updateCustomerSupportTicketStatus,
+} from '@/services/customerSupportApi';
 import {
   View,
   Text,
@@ -11,6 +16,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AdminLayout from '@/components/admin-layout';
@@ -202,7 +208,7 @@ const InfoRow = ({
 
 // ─── Status Dropdown ──────────────────────────────────────────────────────────
 
-const STATUS_UPDATE_OPTIONS = ['In Progress', 'Closed'];
+const STATUS_UPDATE_OPTIONS = ['Open', 'In Progress', 'Closed'];
 
 const StatusDropdown = ({
   value,
@@ -256,31 +262,43 @@ const StatusDropdown = ({
 
 export default function CustomerSupportTicketDetails() {
   const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
   const { ticketId } = useLocalSearchParams<{ ticketId: string }>();
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
-  const [ticket, setTicket] = useState<ReturnType<typeof mapContactToCustomerTicket> | null>(null);
+  const [ticket, setTicket] = useState<ReturnType<typeof mapCustomerSupportTicket> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [response, setResponse] = useState('');
   const [updateStatus, setUpdateStatus] = useState('In Progress');
   const [submitting, setSubmitting] = useState(false);
 
+  const loadTicket = async (id: number) => {
+    setLoading(true);
+    try {
+      setLoadError(null);
+      const detail = await fetchCustomerSupportTicket(id);
+      const mapped = mapCustomerSupportTicket(detail);
+      setTicket(mapped);
+      setUpdateStatus(mapped.status === 'Closed' ? 'Closed' : mapped.status === 'Open' ? 'Open' : 'In Progress');
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e, 'Failed to load ticket details.'));
+      setTicket(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    if (authLoading || !token) return;
     const id = Number(ticketId);
-    if (!id || Number.isNaN(id)) return;
-    void (async () => {
-      try {
-        setLoadError(null);
-        const detail = await fetchContact(id);
-        const mapped = mapContactToCustomerTicket(detail);
-        setTicket(mapped);
-        setUpdateStatus(mapped.status === 'Closed' ? 'Closed' : 'In Progress');
-      } catch (e) {
-        setLoadError(getApiErrorMessage(e));
-      }
-    })();
-  }, [ticketId]);
+    if (!id || Number.isNaN(id)) {
+      setLoading(false);
+      return;
+    }
+    void loadTicket(id);
+  }, [ticketId, authLoading, token]);
 
   const handleSubmit = async () => {
     if (!response.trim()) {
@@ -291,12 +309,14 @@ export default function CustomerSupportTicketDetails() {
     if (!id || Number.isNaN(id)) return;
     setSubmitting(true);
     try {
-      await replyContact(id, response.trim());
-      if (updateStatus === 'Closed') {
-        await updateContactStatus(id, true);
-      }
-      const detail = await fetchContact(id);
-      setTicket(mapContactToCustomerTicket(detail));
+      await replyCustomerSupportTicket(id, response.trim());
+      const statusMap: Record<string, string> = {
+        Open: 'open',
+        'In Progress': 'in_progress',
+        Closed: 'closed',
+      };
+      await updateCustomerSupportTicketStatus(id, statusMap[updateStatus] ?? 'in_progress');
+      await loadTicket(id);
       setResponse('');
       Alert.alert('Success', 'Response submitted and status updated.');
     } catch (e) {
@@ -307,6 +327,10 @@ export default function CustomerSupportTicketDetails() {
   };
 
   const handleViewCustomer = () => {
+    if (ticket?.customerId) {
+      router.push({ pathname: '/customerDetails', params: { id: String(ticket.customerId) } });
+      return;
+    }
     router.push('/customerDetails');
   };
 
@@ -326,7 +350,7 @@ export default function CustomerSupportTicketDetails() {
             <BackArrowIcon />
           </TouchableOpacity>
           <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>Ticket #{ticketId || '—'}</Text>
+            <Text style={styles.headerTitle}>{ticket?.id ?? `Ticket #${ticketId || '—'}`}</Text>
             <Text style={styles.headerSubtitle}>Support ticket details</Text>
           </View>
         </View>
@@ -335,6 +359,12 @@ export default function CustomerSupportTicketDetails() {
           <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
         ) : null}
 
+        {loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+            <ActivityIndicator size="large" color="#1E3A5F" />
+            <Text style={{ marginTop: 12, color: '#6B7280' }}>Loading ticket details...</Text>
+          </View>
+        ) : (
         <View style={[styles.grid, isWeb && styles.gridWeb]}>
 
           <View style={[styles.col, isWeb && styles.colLeft]}>
@@ -370,6 +400,14 @@ export default function CustomerSupportTicketDetails() {
                 </Text>
               </InfoRow>
               <View style={styles.divider} />
+              <InfoRow label="Phone">
+                <Text style={styles.infoText}>{ticket?.phone ?? '—'}</Text>
+              </InfoRow>
+              <View style={styles.divider} />
+              <InfoRow label="Customer ID">
+                <Text style={styles.infoText}>{ticket?.customerId ?? '—'}</Text>
+              </InfoRow>
+              <View style={styles.divider} />
               <View style={styles.viewCustomerRow}>
                 <TouchableOpacity
                   style={styles.viewCustomerBtn}
@@ -385,32 +423,37 @@ export default function CustomerSupportTicketDetails() {
           {/* Right Column */}
           <View style={[styles.col, isWeb && styles.colRight]}>
 
-            {/* CARD 3 — Message */}
-            <Card icon={<SubjectIcon />} title="Customer Message">
+            <Card icon={<SubjectIcon />} title="Conversation">
               <View style={styles.messageSubjectBox}>
                 <Text style={styles.messageSubject}>
                   {ticket?.subject ?? '—'}
                 </Text>
               </View>
-              <View style={styles.messageMeta}>
-                <View style={styles.messageAvatar}>
-                  <Text style={styles.messageAvatarText}>
-                    {(ticket?.customer ?? 'C').slice(0, 2).toUpperCase()}
-                  </Text>
+              {(ticket?.messages ?? []).map((msg) => (
+                <View
+                  key={msg.id}
+                  style={[
+                    styles.threadMessage,
+                    msg.sender === 'admin' ? styles.threadMessageAdmin : styles.threadMessageCustomer,
+                  ]}
+                >
+                  <View style={styles.messageMeta}>
+                    <View style={[
+                      styles.messageAvatar,
+                      msg.sender === 'admin' && { backgroundColor: '#F97316' },
+                    ]}>
+                      <Text style={styles.messageAvatarText}>
+                        {msg.senderName.slice(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.messageAuthor}>{msg.senderName}</Text>
+                      <Text style={styles.messageDate}>{msg.timestamp}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.messageBody}>{msg.text}</Text>
                 </View>
-                <View>
-                  <Text style={styles.messageAuthor}>{ticket?.customer ?? '—'}</Text>
-                  <Text style={styles.messageDate}>{ticket?.created ?? '—'}</Text>
-                </View>
-              </View>
-              <Text style={styles.messageBody}>
-                {ticket?.message ?? '—'}
-              </Text>
-              {ticket?.adminNotes ? (
-                <Text style={[styles.messageBody, { marginTop: 12, color: '#6B7280' }]}>
-                  Admin notes: {ticket.adminNotes}
-                </Text>
-              ) : null}
+              ))}
             </Card>
 
             {/* CARD 4 — Add Response */}
@@ -455,6 +498,7 @@ export default function CustomerSupportTicketDetails() {
 
           </View>
         </View>
+        )}
       </ScrollView>
     </AdminLayout>
   );
@@ -674,6 +718,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4B5563',
     lineHeight: 22,
+  },
+  threadMessage: {
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  threadMessageCustomer: {
+    backgroundColor: '#F8FAFC',
+  },
+  threadMessageAdmin: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
   },
 
   // Response Form

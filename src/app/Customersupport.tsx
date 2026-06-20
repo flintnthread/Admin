@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '@/context/auth-context';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { mapContactToCustomerTicket } from '@/lib/mappers';
-import { fetchContactStats, fetchContacts } from '@/services/contactApi';
+import { mapCustomerSupportTicket } from '@/lib/mappers';
+import {
+  fetchCustomerSupportStats,
+  fetchCustomerSupportTickets,
+  type CustomerSupportStats,
+} from '@/services/customerSupportApi';
 import {
   View,
   Text,
@@ -11,9 +16,7 @@ import {
   Modal,
   StyleSheet,
   useWindowDimensions,
-  Platform,
-  FlatList,
-  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AdminLayout from '@/components/admin-layout';
@@ -230,7 +233,7 @@ const FilterModal = ({ visible, title, options, selected, onSelect, onClose, isW
 
 // â”€â”€â”€ Mobile Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type TicketType = ReturnType<typeof mapContactToCustomerTicket>;
+type TicketType = ReturnType<typeof mapCustomerSupportTicket>;
 
 interface MobileCardProps {
   ticket: TicketType;
@@ -339,43 +342,58 @@ const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
 
 export default function CustomerSupportTickets() {
   const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
-  const [tickets, setTickets] = useState<ReturnType<typeof mapContactToCustomerTicket>[]>([]);
+  const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [stats, setStats] = useState<CustomerSupportStats | null>(null);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
 
   const loadTickets = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
     try {
       setLoadError(null);
-      const res = await fetchContacts(0, 300);
-      setTickets((res.items ?? []).map(mapContactToCustomerTicket));
-      await fetchContactStats();
+      const [listRes, statsRes] = await Promise.all([
+        fetchCustomerSupportTickets({
+          status: selectedStatus || undefined,
+          type: selectedType || undefined,
+          search: searchQ || undefined,
+          page: 0,
+          size: 500,
+        }),
+        fetchCustomerSupportStats(),
+      ]);
+      setTickets((listRes.items ?? []).map(mapCustomerSupportTicket));
+      setStats(statsRes);
     } catch (e) {
-      setLoadError(getApiErrorMessage(e));
+      setLoadError(getApiErrorMessage(e, 'Failed to load support tickets.'));
       setTickets([]);
+      setStats(null);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [token, selectedStatus, selectedType, searchQ]);
 
   useEffect(() => {
+    if (authLoading || !token) return;
     void loadTickets();
-  }, [loadTickets]);
+  }, [authLoading, token, loadTickets]);
 
-  const filtered = tickets.filter((t) => {
-    const matchSearch =
-      !search ||
-      t.subject.toLowerCase().includes(search.toLowerCase()) ||
-      t.customer.toLowerCase().includes(search.toLowerCase()) ||
-      t.id.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !selectedStatus || t.status === selectedStatus;
-    const matchType = !selectedType || t.type === selectedType;
-    return matchSearch && matchStatus && matchType;
-  });
+  const filtered = tickets;
+
+  const handleSearch = useCallback((value: string) => {
+    setSearch(value);
+    setSearchQ(value);
+  }, []);
 
   const handleView = (ticket: (typeof tickets)[0]) => {
     router.push({
@@ -393,7 +411,33 @@ export default function CustomerSupportTickets() {
     <AdminLayout>
       <ScrollView style={styles.root} contentContainerStyle={styles.rootContent} showsVerticalScrollIndicator={false}>
         {loadError ? (
-          <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{loadError}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => void loadTickets()}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {stats ? (
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.total}</Text>
+              <Text style={styles.statLabel}>Total</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={[styles.statValue, { color: '#16A34A' }]}>{stats.open}</Text>
+              <Text style={styles.statLabel}>Open</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={[styles.statValue, { color: '#CA8A04' }]}>{stats.inProgress}</Text>
+              <Text style={styles.statLabel}>In Progress</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={[styles.statValue, { color: '#6B7280' }]}>{stats.closed}</Text>
+              <Text style={styles.statLabel}>Closed</Text>
+            </View>
+          </View>
         ) : null}
         <View style={styles.pageHeader}>
           <View style={styles.pageHeaderLeft}>
@@ -415,7 +459,9 @@ export default function CustomerSupportTickets() {
               placeholder="Search tickets by ID, subject or customer..."
               placeholderTextColor="#9CA3AF"
               value={search}
-              onChangeText={setSearch}
+              onChangeText={handleSearch}
+              onSubmitEditing={() => setSearchQ(search)}
+              returnKeyType="search"
             />
           </View>
 
@@ -443,8 +489,13 @@ export default function CustomerSupportTickets() {
           </View>
         </View>
 
-        {/* â”€â”€ Content â”€â”€ */}
-        {isWeb ? (
+        {/* Content */}
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#1E3A5F" />
+            <Text style={styles.loadingText}>Loading support tickets...</Text>
+          </View>
+        ) : isWeb ? (
           <WebTable
             tickets={filtered}
             onView={handleView}
@@ -463,7 +514,7 @@ export default function CustomerSupportTickets() {
           </View>
         )}
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <View style={styles.emptyState}>
             <TicketIcon />
             <Text style={styles.emptyTitle}>No tickets found</Text>
@@ -884,5 +935,71 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     color: '#9CA3AF',
+  },
+
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: '#DC2626',
+    fontSize: 14,
+  },
+  retryBtn: {
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 120,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 14,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E3A5F',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  loadingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
   },
 });
