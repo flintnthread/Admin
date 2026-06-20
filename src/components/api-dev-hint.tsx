@@ -1,6 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
-import { getApiDebugInfo, resolveAdminApiBaseUrl } from "@/lib/api/config";
+import React, { useCallback, useEffect, useState } from "react";
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ensureAdminApiReachable,
+  getApiDebugInfo,
+  resolveAdminApiBaseUrl,
+} from "@/lib/api/config";
 
 type HealthState = "checking" | "ok" | "fail";
 
@@ -8,26 +12,44 @@ type HealthState = "checking" | "ok" | "fail";
 export default function ApiDevHint() {
   if (!__DEV__) return null;
 
-  const { baseUrl, platform, devHost } = getApiDebugInfo();
+  const {
+    baseUrl,
+    candidates,
+    platform,
+    devHost,
+    webHost,
+    webPort,
+    portConflict,
+    webDevUrl,
+    isEmulator,
+  } = getApiDebugInfo();
   const [health, setHealth] = useState<HealthState>("checking");
+  const [activeUrl, setActiveUrl] = useState(baseUrl);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+
+  const checkHealth = useCallback(async () => {
+    setHealth("checking");
+    setErrorDetail(null);
+    if (portConflict) {
+      setActiveUrl(resolveAdminApiBaseUrl());
+      setErrorDetail(portConflict);
+      setHealth("fail");
+      return;
+    }
+    try {
+      const url = await ensureAdminApiReachable();
+      setActiveUrl(url);
+      setHealth("ok");
+    } catch (e) {
+      setActiveUrl(resolveAdminApiBaseUrl());
+      setErrorDetail(e instanceof Error ? e.message : "Admin API unreachable");
+      setHealth("fail");
+    }
+  }, [portConflict]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${resolveAdminApiBaseUrl()}/api/admin/health`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-        });
-        if (!cancelled) setHealth(res.ok ? "ok" : "fail");
-      } catch {
-        if (!cancelled) setHealth("fail");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [baseUrl]);
+    void checkHealth();
+  }, [checkHealth]);
 
   const healthLabel =
     health === "checking" ? "Checking…" : health === "ok" ? "Connected" : "Unreachable";
@@ -39,16 +61,33 @@ export default function ApiDevHint() {
     <View style={styles.box}>
       <Text style={styles.title}>Dev API ({platform})</Text>
       <Text style={styles.url} selectable>
-        {baseUrl}
+        API → {activeUrl}
       </Text>
-      {devHost ? (
-        <Text style={styles.meta}>Metro host: {devHost}</Text>
-      ) : Platform.OS !== "web" ? (
+      {webHost ? (
         <Text style={styles.meta}>
-          Set EXPO_PUBLIC_ADMIN_API_BASE_URL in Admin/.env if auto-detect fails
+          Page: {webHost}{webPort ? `:${webPort}` : ""}
         </Text>
       ) : null}
+      {devHost ? <Text style={styles.meta}>Metro / LAN: {devHost}</Text> : null}
+      {isEmulator ? <Text style={styles.meta}>Android emulator → 10.0.2.2:8082</Text> : null}
+      <Text style={styles.meta} numberOfLines={4}>
+        Try: {candidates.join(" → ")}
+      </Text>
       <Text style={[styles.status, { color: healthColor }]}>{healthLabel}</Text>
+      {health === "fail" ? (
+        <Text style={styles.help}>
+          {errorDetail ?? "Cannot reach admin-backend."}
+          {"\n\n"}
+          1) Backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run (port 8082)
+          {"\n"}
+          2) Web UI: cd Admin && npm run web → open {webDevUrl}/login
+          {"\n"}
+          3) Phone: set EXPO_PUBLIC_ADMIN_API_BASE_URL=http://YOUR_PC_IP:8082 in Admin/.env
+        </Text>
+      ) : null}
+      <TouchableOpacity style={styles.retryBtn} onPress={() => void checkHealth()}>
+        <Text style={styles.retryText}>Retry connection</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -85,5 +124,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginTop: 6,
+  },
+  help: {
+    fontSize: 11,
+    color: "#b45309",
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  retryBtn: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "#e2e8f0",
+  },
+  retryText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#334155",
   },
 });
