@@ -9,7 +9,7 @@ import {
     TextInput, Platform, PanResponder, Switch, ActivityIndicator,
 } from "react-native";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 // Fonts are referenced by fontFamily but the expo font package is handled globally in the app.
 
 // ─── NOTE ────────────────────────────────────────────────────────────────────
@@ -776,8 +776,18 @@ const WebProductsScreen: React.FC = () => {
     }, []);
     useEffect(() => { void reload(); }, [reload]);
 
+    const params = useLocalSearchParams<{ tab?: string }>();
     const [viewType, setViewType]               = useState<ViewType>("list");
     const [selectedTab, setSelectedTab]         = useState<TabType>("All Products");
+
+    useEffect(() => {
+        if (params.tab) {
+            const validTabs: TabType[] = ["All Products", "Active", "Inactive", "Out of Stock", "Low Stock"];
+            if (validTabs.includes(params.tab as TabType)) {
+                setSelectedTab(params.tab as TabType);
+            }
+        }
+    }, [params.tab]);
     const [sortBy, setSortBy]                   = useState<SortType>("Latest");
     const [searchQuery, setSearchQuery]         = useState("");
     const [visibleCount, setVisibleCount]       = useState(20);
@@ -1512,8 +1522,18 @@ const MobileProductsScreen: React.FC = () => {
     }, []);
     useEffect(() => { void reload(); }, [reload]);
 
+    const params = useLocalSearchParams<{ tab?: string }>();
     const [viewType, setViewType]               = useState<ViewType>("list");
     const [selectedTab, setSelectedTab]         = useState<TabType>("All Products");
+
+    useEffect(() => {
+        if (params.tab) {
+            const validTabs: TabType[] = ["All Products", "Active", "Inactive", "Out of Stock", "Low Stock"];
+            if (validTabs.includes(params.tab as TabType)) {
+                setSelectedTab(params.tab as TabType);
+            }
+        }
+    }, [params.tab]);
     const [sortBy, setSortBy]                   = useState<SortType>("Latest");
     const [showSortMenu, setShowSortMenu]       = useState(false);
     const [showFilter, setShowFilter]           = useState(false);
