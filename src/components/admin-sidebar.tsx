@@ -171,15 +171,15 @@ const NAV_ITEMS = {
       color: "#3B82F6",
       path: null,
       children: [
-        { label: "Ads Dashboard", icon: "none", path: null },
-        { label: "Ad Placements", icon: "none", path: null },
-        { label: "Performance Ads", icon: "none", path: null },
-        { label: "Campaigns & Packages", icon: "none", path: null },
-        { label: "Ads Types & Details", icon: "none", path: null },
-        { label: "Orders Management", icon: "none", path: null },
-        { label: "Payments Management", icon: "none", path: null },
-        { label: "Customers Management", icon: "none", path: null },
-        { label: "Notifications", icon: "none", path: null },
+        { label: "Ads Dashboard", icon: "pie-chart", path: null, color: "#3B82F6" },
+        { label: "Ad Placements", icon: "layout", path: null, color: "#10B981" },
+        { label: "Performance Ads", icon: "activity", path: null, color: "#F59E0B" },
+        { label: "Campaigns & Packages", icon: "package", path: null, color: "#8B5CF6" },
+        { label: "Ads Types & Details", icon: "layers", path: null, color: "#EC4899" },
+        { label: "Orders Management", icon: "shopping-cart", path: null, color: "#14B8A6" },
+        { label: "Payments Management", icon: "credit-card", path: null, color: "#F97316" },
+        { label: "Customers Management", icon: "users", path: null, color: "#06B6D4" },
+        { label: "Notifications", icon: "bell", path: null, color: "#EAB308" },
       ],
     },
   ],
@@ -246,21 +246,7 @@ const NAV_ITEMS = {
       label: "Locations",
       icon: "map-pin",
       color: "#10B981",
-
       path: "/locations",
-      children: [
-        {
-          label: "Countries",
-          icon: "globe",
-          path: "/locations",
-          color: "#22C55E",
-        },
-        { label: "States", icon: "map", path: null, color: "#84CC16" },
-        { label: "Cities", icon: "navigation", path: null, color: "#EAB308" },
-        { label: "Areas", icon: "compass", path: null, color: "#F59E0B" },
-        { label: "Pincodes", icon: "hash", path: null, color: "#F97316" },
-      ],
-
     },
     {
       label: "Careers Management",
@@ -298,7 +284,7 @@ export default function AdminSidebar({
 }: Props) {
   const pathname = usePathname();
 
-  const [ecommerceExpanded, setEcommerceExpanded] = React.useState(true);
+  const [ecommerceExpanded, setEcommerceExpanded] = React.useState(false);
   const [expandedItems, setExpandedItems] = React.useState<
     Record<string, boolean>
   >({});
@@ -361,7 +347,7 @@ export default function AdminSidebar({
       {/* Scrollable nav items */}
       <ScrollView
         style={styles.navScroll}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* GENERAL */}
@@ -454,7 +440,7 @@ export default function AdminSidebar({
                 <Feather
                   name={ecommerceExpanded ? "chevron-down" : "chevron-right"}
                   size={14}
-                  color="#6B7280"
+                  color={colors.textSecondary}
                   style={styles.chevron}
                 />
               </>
@@ -657,7 +643,7 @@ export default function AdminSidebar({
                         <Feather
                           name={isExpanded ? "chevron-down" : "chevron-right"}
                           size={14}
-                          color="#6B7280"
+                          color={colors.textSecondary}
                           style={styles.chevron}
                         />
                       )}

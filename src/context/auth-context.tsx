@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { getApiErrorMessage, onAdminSessionCleared } from "@/lib/api/client";
+import { ensureAdminApiReachable } from "@/lib/api/config";
 import {
   clearAdminSession,
   hydrateAdminSession,
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
+        await ensureAdminApiReachable();
         const me = await fetchCurrentAdmin();
         if (!cancelled) {
           const sessionUser = toSessionUser(me);

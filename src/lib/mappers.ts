@@ -14,20 +14,26 @@ import type { PendingProfileSeller } from "@/services/sellerApi";
 import { resolveMediaUrl, resolveSellerProfileImage } from "@/lib/api/media";
 import { formatDate, formatRupee, initialsFromName, maskAccount } from "@/lib/format";
 
+function normalizeLocation(value?: string | null): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "null") return "Not provided";
+  return trimmed;
+}
+
 export function mapSellerToApprovedRow(s: SellerSummary) {
   return {
     id: s.id,
     name: s.fullName ?? "Seller",
     email: s.email ?? "",
     avatar: resolveSellerProfileImage(s),
-    businessName: s.businessName ?? "—",
+    businessName: s.businessName?.trim() || "—",
     businessType: s.businessType ?? s.sellerCategory?.toUpperCase() ?? "—",
     products: Number(s.productCount ?? 0),
     walletBalance: Number(s.walletBalance ?? 0),
     joinDate: formatDate(s.createdAt),
     revenue: Number(s.totalRevenue ?? 0),
-    state: s.state ?? "—",
-    city: s.city ?? "—",
+    state: normalizeLocation(s.state),
+    city: normalizeLocation(s.city),
     status: s.status === "suspended" ? ("Blocked" as const) : ("Active" as const),
   };
 }
@@ -135,31 +141,51 @@ function daysSinceIso(date?: string): number {
 }
 
 export function mapPayoutToPaymentRow(p: PayoutSummary) {
-  const paid = p.status?.toLowerCase() === "paid";
-  const days = paid ? 0 : daysSinceIso(p.requestedAt);
-  const reminderBucket = paid
+  const status = (p.status ?? "pending").toLowerCase();
+  const paid = status === "paid";
+  const cancelled = status === "cancelled";
+  const referenceDate = p.deliveryDate ?? p.requestedAt;
+  const days = paid || cancelled ? 0 : daysSinceIso(referenceDate);
+  const reminderBucket = paid || cancelled
     ? ("green" as const)
-    : days >= 7
+    : days >= 5
       ? ("red" as const)
       : days >= 3
         ? ("orange" as const)
         : ("green" as const);
+
+  const orderStatusRaw = (p.orderStatus ?? "").toLowerCase();
+  const orderStatus =
+    orderStatusRaw === "delivered" ? ("Completed" as const) :
+    orderStatusRaw === "processing" || orderStatusRaw === "confirmed" ? ("Processing" as const) :
+    ("Processing" as const);
+
+  const paymentStatus =
+    paid ? ("Paid" as const) :
+    cancelled ? ("Cancelled" as const) :
+    ("Pending" as const);
+
+  const deliveryAt = p.deliveryDate ?? p.paidAt;
+  const deliveryTime = deliveryAt && deliveryAt.includes("T")
+    ? deliveryAt.split("T")[1]?.slice(0, 5) ?? ""
+    : "";
+
   return {
     id: p.id,
-    orderId: p.orderId ? `FNT${p.orderId}` : `PAYOUT-${p.id}`,
+    orderId: p.orderNumber ?? (p.orderId ? `FNT${p.orderId}` : `ORDER-${p.id}`),
     orderDate: formatDate(p.requestedAt),
-    orderStatus: "Completed" as const,
+    orderStatus,
     sellerName: p.sellerName ?? `Seller #${p.sellerId ?? ""}`,
-    sellerEmail: "",
-    sellerPhone: "",
-    customerPaid: formatRupee(p.requestedAmount),
-    deliveryDate: formatDate(p.paidAt ?? p.requestedAt),
-    deliveryTime: "",
-    reminderLabel: paid ? "Paid" : days > 0 ? `${days}d pending` : "Pending",
+    sellerEmail: p.sellerEmail ?? "",
+    sellerPhone: p.sellerPhone ?? "",
+    customerPaid: formatRupee(p.customerPaidAmount ?? p.requestedAmount),
+    deliveryDate: formatDate(deliveryAt ?? p.requestedAt),
+    deliveryTime,
+    reminderLabel: paid ? "Paid" : cancelled ? "Cancelled" : days > 0 ? `${days}d pending` : "Pending",
     reminderDays: days,
     reminderBucket,
-    paymentStatus: paid ? ("Paid" as const) : ("Pending" as const),
-    walletBalance: formatRupee(p.requestedAmount),
+    paymentStatus,
+    walletBalance: formatRupee(p.walletBalance ?? 0),
     transactionRef: p.transactionRef ?? "",
     adminNote: p.adminNote ?? "",
     sellerNote: p.sellerNote ?? "",
@@ -403,6 +429,46 @@ export function mapContactToCustomerTicket(c: ContactMessage) {
   };
 }
 
+export function mapCustomerSupportTicket(t: {
+  id: number;
+  ticketNumber?: string;
+  customerId?: number;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  subject?: string;
+  typeLabel?: string;
+  message?: string;
+  orderId?: number;
+  orderNumber?: string;
+  statusLabel?: string;
+  createdAt?: string;
+  messages?: { id: number | string; senderType?: string; senderName?: string; message?: string; createdAt?: string }[];
+}) {
+  return {
+    id: t.ticketNumber ?? `TKT-${String(t.id).padStart(5, "0")}`,
+    numericId: t.id,
+    customerId: t.customerId,
+    subject: t.subject ?? "—",
+    customer: t.customerName ?? "Customer",
+    email: t.customerEmail ?? "",
+    phone: t.customerPhone ?? "",
+    type: t.typeLabel ?? "Other",
+    order: t.orderNumber ?? (t.orderId ? `#${t.orderId}` : "—"),
+    orderId: t.orderId,
+    status: (t.statusLabel ?? "Open") as "Open" | "In Progress" | "Closed",
+    created: formatDate(t.createdAt),
+    message: t.message ?? "",
+    messages: (t.messages ?? []).map((m, index) => ({
+      id: String(m.id ?? index),
+      sender: m.senderType === "admin" ? ("admin" as const) : ("customer" as const),
+      senderName: m.senderName ?? (m.senderType === "admin" ? "Admin" : "Customer"),
+      text: m.message ?? "",
+      timestamp: formatDate(m.createdAt),
+    })),
+  };
+}
+
 function inferContactType(text: string): string {
   const lower = text.toLowerCase();
   if (lower.includes("deliver") || lower.includes("shipping")) return "Delivery Issue";
@@ -445,6 +511,7 @@ export function mapDeliverySlabRow(s: DeliverySlab) {
     intraCity: Number(s.intraCityCharge ?? 0),
     metroMetro: Number(s.metroMetroCharge ?? 0),
     active: s.active !== false,
+    custom: s.custom === true,
     sortOrder: s.sortOrder ?? 0,
   };
 }
