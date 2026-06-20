@@ -461,7 +461,7 @@ function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: 
 }
 
 // ─── Web Grid Card ────────────────────────────────────────────────────────────
-function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void; cardWidth: number }) {
+function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void; cardWidth?: number }) {
   const bg = AVATAR_BG[index % AVATAR_BG.length];
   return (
     <View style={[styles.gridCard, { width: cardWidth }]}>
