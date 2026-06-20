@@ -158,9 +158,9 @@ const INITIAL_SIZES: SizeItem[] = [
 const PAGE_SIZE = 12;
 
 const CARD_GRADIENTS: [string, string][] = [
-  ["#d4691e", "#8b3e0f"],
-  ["#c8611a", "#7a360a"],
-  ["#e07820", "#9a4a12"],
+  ["#1d324e", "#101d2e"],
+  ["#1d324e", "#14243a"],
+  ["#1d324e", "#192c46"],
 ];
 
 function todayStr(): string {
@@ -287,7 +287,7 @@ const ListRow: React.FC<{
   onDelete: (s: SizeItem) => void;
 }> = ({ item, idx, onEdit, onDelete }) => (
   <View style={[S.listRow, { backgroundColor: idx % 2 === 0 ? "#fff" : "#fdfaf8" }]}>
-    <Text style={[S.listCell, { width: 70, color: "#999", fontSize: 12 }]}>{item.id}</Text>
+    <Text style={[S.listCell, { width: 95, color: "#999", fontSize: 12 }]}>{item.id}</Text>
     <Text style={[S.listCell, { flex: 1.5, fontWeight: "700", color: "#111" }]} numberOfLines={1}>
       {item.name}
     </Text>
@@ -301,7 +301,7 @@ const ListRow: React.FC<{
         {item.createdDate}
       </Text>
     </View>
-    <View style={{ width: 72, alignItems: "flex-start" }}>
+    <View style={{ width: 150, alignItems: "flex-start" }}>
       <StatusBadge status={item.status} />
     </View>
     <View style={S.listActions}>
@@ -665,7 +665,7 @@ export default function SizesManagement() {
 
         {/* ── BANNER ── */}
         <LinearGradient
-          colors={["#0f2d6b", "#08275c"]}
+          colors={["#1d324e", "#15253b"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={S.banner}
@@ -681,14 +681,6 @@ export default function SizesManagement() {
         <View style={[S.titleCard, { marginHorizontal: PADDING }]}>
           <View style={{ flex: 1 }}>
             <Text style={S.pageTitle}>Sizes Management</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
-              <Text style={S.breadcrumbLink}>Dashboard</Text>
-              {/* Bootstrap: chevron-right */}
-              <BI name="chevron-right" size={10} color="#bbb" />
-              <Text style={S.breadcrumbLink}>Categories</Text>
-              <BI name="chevron-right" size={10} color="#bbb" />
-              <Text style={S.breadcrumbCurrent}>Sizes</Text>
-            </View>
           </View>
           {/* Bootstrap: plus-lg on Add button */}
           <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
@@ -778,11 +770,11 @@ export default function SizesManagement() {
                 ListHeaderComponent={
                   <View style={{ paddingHorizontal: PADDING }}>
                     <View style={S.listHeader}>
-                      <Text style={[S.listHeaderCell, { width: 70 }]}>ID</Text>
+                      <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                      <Text style={[S.listHeaderCell, { width: 72 }]}>Status</Text>
+                      <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
                       <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
                     </View>
                   </View>
