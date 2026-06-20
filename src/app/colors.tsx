@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * ColorsScreen – React Native
  * Responsive list view table matching Flint & Thread admin design.
@@ -539,13 +540,31 @@ const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
 
   return (
     <View style={styles.tableHeader}>
-      {showId && <Text style={[styles.headerCell, styles.colId]}>ID</Text>}
-      <Text style={[styles.headerCell, styles.colName]}>COLOR NAME</Text>
-      <Text style={[styles.headerCell, styles.colPreview, { textAlign: "center" }]}>COLOR PREVIEW</Text>
-      <Text style={[styles.headerCell, styles.colCode]}>COLOR CODE</Text>
-      {showDate && <Text style={[styles.headerCell, styles.colDate]}>CREATED DATE</Text>}
-      <Text style={[styles.headerCell, styles.colStatus]}>STATUS</Text>
-      <Text style={[styles.headerCell, styles.colAction, { textAlign: "right" }]}>ACTION</Text>
+      {showId && (
+        <View style={styles.colId}>
+          <Text style={styles.headerCell}>ID</Text>
+        </View>
+      )}
+      <View style={styles.colName}>
+        <Text style={styles.headerCell}>COLOR NAME</Text>
+      </View>
+      <View style={styles.colPreview}>
+        <Text style={[styles.headerCell, { textAlign: "center", width: "100%" }]}>COLOR PREVIEW</Text>
+      </View>
+      <View style={styles.colCode}>
+        <Text style={styles.headerCell}>COLOR CODE</Text>
+      </View>
+      {showDate && (
+        <View style={styles.colDate}>
+          <Text style={styles.headerCell}>CREATED DATE</Text>
+        </View>
+      )}
+      <View style={styles.colStatus}>
+        <Text style={styles.headerCell}>STATUS</Text>
+      </View>
+      <View style={styles.colAction}>
+        <Text style={[styles.headerCell, { textAlign: "right", width: "100%" }]}>ACTION</Text>
+      </View>
     </View>
   );
 };
@@ -627,6 +646,7 @@ export default function ColorsScreen() {
   const PADDING = 16;
   const cardWidth = (width - PADDING * 2 - GAP * (numCols - 1)) / numCols;
 
+  const [containerWidth, setContainerWidth] = useState(width);
   const [colors, setColors] = useState<ColorItem[]>(SEED_COLORS);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [search, setSearch] = useState("");
@@ -682,27 +702,18 @@ export default function ColorsScreen() {
       item={item}
       isLast={index === pageItems.length - 1}
       isEven={index % 2 === 0}
-      screenWidth={width}
+      screenWidth={viewMode === "list" ? Math.max(containerWidth, 850) : width}
       onEdit={() => setEditTarget(item)}
       onDelete={() => setDeleteTarget(item)}
     />
-  ), [pageItems.length, width]);
+  ), [pageItems.length, viewMode, containerWidth, width]);
 
   // ── Shared header + toolbar + footer sections ──────────────────────────────
   const HeaderSection = (
-    <View style={{ paddingHorizontal: PADDING }}>
-      {/* Page Header Card */}
-      <View style={styles.headerCard}>
-        <View style={styles.headerIcon}>
-          <Ionicons name={BI.palette as any} size={26} color={BRAND} />
-        </View>
-        <View style={styles.headerContent}>
-          <Text style={styles.pageTitle}>Colors Management</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
-            <Ionicons name={BI.houseDoor as any} size={12} color={BRAND} />
-            <Text style={{ fontSize: 12, color: BRAND }}>Dashboard</Text>
-            <Text style={{ fontSize: 12, color: "#aaa" }}>›  Colors</Text>
-          </View>
+    <>
+      <View style={styles.webPageHeader}>
+        <View>
+          <Text style={styles.webPageTitle}>Colors Management</Text>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
           <Ionicons name={BI.plus as any} size={18} color="#fff" />
@@ -710,39 +721,41 @@ export default function ColorsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Toolbar */}
-      <View style={styles.toolbar}>
-        <View style={styles.searchBox}>
-          <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
-          <TextInput
-            value={search}
-            onChangeText={handleSearch}
-            placeholder="Search colors..."
-            placeholderTextColor="#bbb"
-            style={styles.searchInput}
-          />
-          {!!search && (
-            <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+      <View style={{ paddingHorizontal: PADDING, marginTop: 24 }}>
+        {/* Toolbar */}
+        <View style={styles.toolbar}>
+          <View style={styles.searchBox}>
+            <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
+            <TextInput
+              value={search}
+              onChangeText={handleSearch}
+              placeholder="Search colors..."
+              placeholderTextColor="#bbb"
+              style={styles.searchInput}
+            />
+            {!!search && (
+              <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
+              onPress={() => setViewMode("grid")}
+            >
+              <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
             </TouchableOpacity>
-          )}
-        </View>
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
-            onPress={() => setViewMode("grid")}
-          >
-            <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
-            onPress={() => setViewMode("list")}
-          >
-            <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
+              onPress={() => setViewMode("list")}
+            >
+              <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </>
   );
 
   const FooterSection = (
@@ -782,12 +795,7 @@ export default function ColorsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 32 }}
         >
-          {/* Hero */}
-          <View style={styles.hero}>
-            <View style={styles.heroBubble1} />
-            <View style={styles.heroBubble2} />
-            <View style={styles.heroBubble3} />
-          </View>
+
 
           {HeaderSection}
 
@@ -820,73 +828,82 @@ export default function ColorsScreen() {
   }
 
   // ── DEFAULT: FlatList for list view (all platforms) and native grid ────────
-  return (
-    <AdminLayout>
-      <StatusBar barStyle="light-content" backgroundColor={BRAND} />
+  const listContent = (
+    <FlatList
+      data={pageItems}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={viewMode === "grid" ? renderGridItem : renderListItem}
+      numColumns={viewMode === "grid" ? numCols : 1}
+      key={`${viewMode}-${numCols}`}
+      contentContainerStyle={{ paddingBottom: 32 }}
+      showsVerticalScrollIndicator={false}
 
-      {/* Hero Banner */}
-      <View style={styles.hero}>
-        <View style={styles.heroBubble1} />
-        <View style={styles.heroBubble2} />
-        <View style={styles.heroBubble3} />
-      </View>
-
-      <FlatList
-        data={pageItems}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={viewMode === "grid" ? renderGridItem : renderListItem}
-        numColumns={viewMode === "grid" ? numCols : 1}
-        key={`${viewMode}-${numCols}`}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-
-        ListHeaderComponent={
-          <View>
-            {HeaderSection}
-            {/* List table header row */}
-            {viewMode === "list" && (
-              <View style={{ paddingHorizontal: PADDING }}>
-                <View style={styles.tableCard}>
-                  <ListHeader screenWidth={width} />
-                </View>
-              </View>
-            )}
-          </View>
-        }
-
-        columnWrapperStyle={viewMode === "grid"
-          ? { gap: GAP, paddingHorizontal: PADDING }
-          : undefined}
-        ItemSeparatorComponent={viewMode === "grid"
-          ? () => <View style={{ height: GAP }} />
-          : undefined}
-
-        CellRendererComponent={viewMode === "list"
-          ? ({ children, style, ...rest }: any) => (
-            <View style={[{ paddingHorizontal: PADDING }, style]} {...rest}>
-              <View style={styles.tableCardRows}>
-                {children}
+      ListHeaderComponent={
+        <View>
+          {HeaderSection}
+          {/* List table header row */}
+          {viewMode === "list" && (
+            <View style={{ paddingHorizontal: PADDING }}>
+              <View style={styles.tableCard}>
+                <ListHeader screenWidth={viewMode === "list" ? Math.max(containerWidth, 850) : width} />
               </View>
             </View>
-          )
-          : undefined}
+          )}
+        </View>
+      }
 
-        ListEmptyComponent={EmptyComponent}
+      columnWrapperStyle={viewMode === "grid"
+        ? { gap: GAP, paddingHorizontal: PADDING }
+        : undefined}
+      ItemSeparatorComponent={viewMode === "grid"
+        ? () => <View style={{ height: GAP }} />
+        : undefined}
 
-        ListFooterComponent={FooterSection}
-      />
+      CellRendererComponent={viewMode === "list"
+        ? ({ children, style, ...rest }: any) => (
+          <View style={[{ paddingHorizontal: PADDING }, style]} {...rest}>
+            <View style={styles.tableCardRows}>
+              {children}
+            </View>
+          </View>
+        )
+        : undefined}
 
-      {/* Modals */}
-      {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
-      {editTarget && (
-        <ColorFormModal
-          mode="edit"
-          initial={editTarget}
-          onSave={handleEdit}
-          onClose={() => setEditTarget(null)}
-        />
-      )}
-      {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+      ListEmptyComponent={EmptyComponent}
+
+      ListFooterComponent={FooterSection}
+    />
+  );
+
+  return (
+    <AdminLayout>
+      <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+        <StatusBar barStyle="light-content" backgroundColor={BRAND} />
+
+
+
+        {viewMode === "list" ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ width: Math.max(containerWidth, 850) }}>
+              {listContent}
+            </View>
+          </ScrollView>
+        ) : (
+          listContent
+        )}
+
+        {/* Modals */}
+        {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
+        {editTarget && (
+          <ColorFormModal
+            mode="edit"
+            initial={editTarget}
+            onSave={handleEdit}
+            onClose={() => setEditTarget(null)}
+          />
+        )}
+        {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
+      </View>
     </AdminLayout>
   );
 }
@@ -895,7 +912,7 @@ export default function ColorsScreen() {
 // Styles
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  
+
   safe: { flex: 1, backgroundColor: "#f5f6fa" },
 
   // Hero
@@ -935,6 +952,14 @@ const styles = StyleSheet.create({
     flexShrink: 0, marginLeft: 12,
   },
   addBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+
+  webPageHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 28, paddingVertical: 20,
+    backgroundColor: "#1d324e",
+    borderBottomWidth: 1, borderBottomColor: "#e5e7eb",
+  },
+  webPageTitle: { fontSize: 22, fontWeight: "800", color: "#fff" },
 
   // Toolbar
   toolbar: {
@@ -1016,13 +1041,13 @@ const styles = StyleSheet.create({
   listRowBorder: { borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
 
   // Column widths
-  colId: { width: 54, flexShrink: 0 },
-  colName: { flex: 1, minWidth: 80, paddingRight: 8 },
-  colPreview: { width: 80, flexShrink: 0, alignItems: "center" },
-  colCode: { width: 110, flexShrink: 0, paddingHorizontal: 4 },
+  colId: { width: 95, flexShrink: 0 },
+  colName: { flex: 1, minWidth: 80, paddingRight: 24 },
+  colPreview: { width: 140, flexShrink: 0, alignItems: "center" },
+  colCode: { width: 130, flexShrink: 0, paddingHorizontal: 4 },
   colDate: { width: 145, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
   colStatus: { width: 90, flexShrink: 0, paddingHorizontal: 4 },
-  colAction: { width: 80, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
+  colAction: { width: 104, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
 
   // Cell content
   cellId: { fontSize: 13, fontWeight: "600", color: "#64748b" },

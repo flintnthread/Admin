@@ -1486,7 +1486,7 @@ const styles = StyleSheet.create({
   },
 
   headerContainer: {
-    backgroundColor: DARK_NAV,
+    backgroundColor: "#1d324e",
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,

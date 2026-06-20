@@ -90,7 +90,21 @@ function avatarColor(name: string) {
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return C.avatarPalette[Math.abs(h) % C.avatarPalette.length];
 }
-function rupee(n: number) { return "₹" + n.toLocaleString("en-IN"); }
+
+// Whole-rupee formatting — drops paise so values stay compact in tight spaces.
+function rupee(n: number) {
+  return "₹" + Math.round(n).toLocaleString("en-IN");
+}
+
+// Compact Indian-style formatting for fixed-width spaces like grid cards —
+// ₹38.1K, ₹2.4L, ₹1.2Cr — so a large totalSpent never overflows or wraps.
+function rupeeCompact(n: number) {
+  const abs = Math.abs(n);
+  if (abs >= 1e7) return "₹" + (n / 1e7).toFixed(2).replace(/\.00$/, "") + "Cr";
+  if (abs >= 1e5) return "₹" + (n / 1e5).toFixed(2).replace(/\.00$/, "") + "L";
+  if (abs >= 1e3) return "₹" + (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  return "₹" + Math.round(n).toLocaleString("en-IN");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOTSTRAP SVG ICONS
@@ -127,6 +141,16 @@ const ExportIcon = ({ size = 15, color = "#fff" }: IP) => (
     <Path fill={color} d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/>
   </Svg>
 );
+const CheckCircleIcon = ({ size = 15, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path fill={color} d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+  </Svg>
+);
+const WalletIcon = ({ size = 15, color = "#fff" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path fill={color} d="M0 3a2 2 0 0 1 2-2h13.5a.5.5 0 0 1 0 1H15v2a1 1 0 0 1 1 1v8.5a1.5 1.5 0 0 1-1.5 1.5h-12A2.5 2.5 0 0 1 0 12.5zm1 1.732V12.5A1.5 1.5 0 0 0 2.5 14h12a.5.5 0 0 0 .5-.5V5H2a2 2 0 0 1-1-.268M1 3a1 1 0 0 0 1 1h12V2H2a1 1 0 0 0-1 1"/>
+  </Svg>
+);
 // ─────────────────────────────────────────────────────────────────────────────
 // AVATAR
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,7 +177,7 @@ function StatusPill({ status }: { status: "Active" | "Inactive" }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STAT CHIP
+// STAT CHIP  (legacy — no longer rendered, kept in case you want it elsewhere)
 // ─────────────────────────────────────────────────────────────────────────────
 function StatChip({ label, value, valueColor = C.text }: { label: string; value: string | number; valueColor?: string }) {
   return (
@@ -165,7 +189,53 @@ function StatChip({ label, value, valueColor = C.text }: { label: string; value:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRID CARD  (web / tablet only — unchanged)
+// STAT CARD (overlapping header card — Product Management style)
+// ─────────────────────────────────────────────────────────────────────────────
+function StatCard({
+  icon,
+  iconBg,
+  value,
+  label,
+  sub,
+  valueColor = C.text,
+  compact = false,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  value: string | number;
+  label: string;
+  sub?: string;
+  valueColor?: string;
+  compact?: boolean;
+}) {
+  if (compact) {
+    // Tiny version — used on mobile so all 4 fit in a single row
+    return (
+      <View style={s.statCardCompact}>
+        <View style={[s.statCardIconBoxCompact, { backgroundColor: iconBg }]}>{icon}</View>
+        <Text style={[s.statCardValueCompact, { color: valueColor }]} numberOfLines={1}>
+          {value}
+        </Text>
+        <Text style={s.statCardLabelCompact} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={s.statCard}>
+      <View style={s.statCardTop}>
+        <View style={[s.statCardIconBox, { backgroundColor: iconBg }]}>{icon}</View>
+        <Text style={[s.statCardValue, { color: valueColor }]}>{value}</Text>
+      </View>
+      <Text style={s.statCardLabel}>{label}</Text>
+      {sub ? <Text style={s.statCardSub}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRID CARD  (web / tablet only)
 // ─────────────────────────────────────────────────────────────────────────────
 function GridCard({ c, onView }: { c: Customer; onView: () => void }) {
   return (
@@ -187,17 +257,31 @@ function GridCard({ c, onView }: { c: Customer; onView: () => void }) {
         <Text style={s.infoTxtCenter}>{c.phone}</Text>
       </View>
       <View style={s.gStatsRow}>
-        <View style={[s.gStatCell, { flex: 0.7 }]}>
-          <Text style={[s.gStatVal, { color: c.orders > 0 ? C.primary : C.sub }]}>{c.orders}</Text>
+        <View style={[s.gStatCell, { flex: 0.6 }]}>
+          <Text
+            style={[s.gStatVal, { color: c.orders > 0 ? C.primary : C.sub }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {c.orders}
+          </Text>
           <Text style={s.gStatLbl}>Orders</Text>
         </View>
         <View style={s.gStatDivider} />
-        <View style={[s.gStatCell, { flex: 0.9 }]}>
-          <Text style={s.gStatVal}>{rupee(c.totalSpent)}</Text>
+        <View style={[s.gStatCell, { flex: 1.1 }]}>
+          <Text
+            style={s.gStatVal}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {rupeeCompact(c.totalSpent)}
+          </Text>
           <Text style={s.gStatLbl}>Spent</Text>
         </View>
         <View style={s.gStatDivider} />
-        <View style={[s.gStatCell, { flex: 1.4 }]}>
+        <View style={[s.gStatCell, { flex: 1.3 }]}>
           <Text style={s.gStatVal} numberOfLines={1}>{c.lastOrder ?? "N/A"}</Text>
           <Text style={s.gStatLbl}>Last Order</Text>
         </View>
@@ -236,7 +320,7 @@ function ListRow({ c, onView, isDesktop }: { c: Customer; onView: () => void; is
         <Text style={[s.lOrders, { color: c.orders > 0 ? C.primary : C.sub }]}>{c.orders} {c.orders === 1 ? "order" : "orders"}</Text>
       </View>
       <View style={[s.lCol, { flex: 1, alignItems: "center" }]}>
-        <Text style={s.lSpent}>{rupee(c.totalSpent)}</Text>
+        <Text style={s.lSpent} numberOfLines={1}>{rupee(c.totalSpent)}</Text>
       </View>
       <View style={[s.lCol, { flex: 1.2, alignItems: "center" }]}>
         <Text style={s.lDate}>{c.lastOrder ?? "N/A"}</Text>
@@ -296,7 +380,14 @@ function MobileListCard({ c, onView }: { c: Customer; onView: () => void }) {
         </View>
         <View style={s.mDivider} />
         <View style={s.mStatBox}>
-          <Text style={s.mStatVal}>{rupee(c.totalSpent)}</Text>
+          <Text
+            style={s.mStatVal}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {rupeeCompact(c.totalSpent)}
+          </Text>
           <Text style={s.mStatLbl}>Spent</Text>
         </View>
         <View style={s.mDivider} />
@@ -387,7 +478,14 @@ function MobileTableRow({ c, onView, isEven }: { c: Customer; onView: () => void
 
       {/* Spent */}
       <View style={[mt.td, { width: COL.spent, alignItems: "center" }]}>
-        <Text style={[mt.cellTxt, { fontWeight: "700", color: C.text }]}>{rupee(c.totalSpent)}</Text>
+        <Text
+          style={[mt.cellTxt, { fontWeight: "700", color: C.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {rupeeCompact(c.totalSpent)}
+        </Text>
       </View>
 
       {/* Last Order */}
@@ -492,6 +590,10 @@ export default function CustomerManagementScreen() {
   const inactive = 0;
   const revenue  = customerStats.revenue;
 
+  // Range shown by the "Showing X–Y of Z" label
+  const rangeStart = total === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd    = Math.min(safePage * PAGE_SIZE, total);
+
   // ── Card column width — auto-fit with gap ─────────────────────────────────
   // Gap between cards is 14px. We derive the exact % so cards fill the row.
   const GAP = 14;
@@ -510,29 +612,80 @@ export default function CustomerManagementScreen() {
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
-      <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
-        <View style={[s.headerInner, { paddingHorizontal: px }]}>
-          <View style={s.hLeft}>
-            <View style={s.hIcon}><PeopleIcon size={isMobile ? 17 : 21} /></View>
-            <View>
-              <Text style={[s.hTitle, { fontSize: isMobile ? 16 : 20 }]}>Customer Management</Text>
-              <Text style={s.hSub}>Manage and track all your customers</Text>
-            </View>
-          </View>
-          {/* <TouchableOpacity style={s.exportBtn} activeOpacity={0.8} onPress={() => {}}>
-            <ExportIcon size={14} />
-            {!isMobile && <Text style={s.exportTxt}>Export</Text>}
-          </TouchableOpacity> */}
-        </View>
-      </View>
-
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600 }}>
+        {/* ══ HEADER (now scrolls away with content) ═══════════════════════ */}
+        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
+          <View
+            style={[
+              s.header,
+              {
+                paddingTop: Platform.OS === "ios" ? 50 : 16,
+                marginTop: isMobile ? 12 : 18,
+              },
+            ]}
+          >
+            <View style={[s.headerInner, { paddingHorizontal: isMobile ? 16 : 22 }]}>
+              <View style={s.hLeft}>
+                <View style={s.hIcon}><PeopleIcon size={isMobile ? 17 : 21} /></View>
+                <View>
+                  <Text style={[s.hTitle, { fontSize: isMobile ? 16 : 20 }]}>Customer Management</Text>
+                  <Text style={s.hSub}>Manage and track all your customers</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ══ OVERLAPPING STAT CARDS ════════════════════════════════════════ */}
+        <View
+          style={[
+            s.statCardsWrap,
+            { paddingHorizontal: px + 10 },
+            isMobile && s.statCardsWrapMobile,
+          ]}
+        >
+          <StatCard
+            compact={isMobile}
+            icon={<PeopleIcon color={C.primary} size={isMobile ? 13 : 16} />}
+            iconBg={C.primaryLight}
+            value={total}
+            label="Total Customers"
+            sub="All registered customers"
+          />
+          <StatCard
+            compact={isMobile}
+            icon={<CheckCircleIcon color={C.active} size={isMobile ? 13 : 16} />}
+            iconBg={C.activeLight}
+            value={active}
+            label="Active"
+            valueColor={C.active}
+            sub="Currently active"
+          />
+          <StatCard
+            compact={isMobile}
+            icon={<BanIcon color={C.inactive} size={isMobile ? 13 : 16} />}
+            iconBg={C.inactiveLight}
+            value={inactive}
+            label="Inactive"
+            valueColor={C.inactive}
+            sub="Needs attention"
+          />
+          <StatCard
+            compact={isMobile}
+            icon={<WalletIcon color={C.navy} size={isMobile ? 13 : 16} />}
+            iconBg="rgba(29,50,78,0.08)"
+            value={rupee(revenue)}
+            label="Revenue"
+            valueColor={C.primary}
+            sub="Total lifetime revenue"
+          />
+        </View>
+
+        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
 
           {/* ══ TOOLBAR ═════════════════════════════════════════════════════ */}
           <View style={s.toolbar}>
@@ -557,19 +710,6 @@ export default function CustomerManagementScreen() {
               )}
             </View>
 
-            {/* Stat chips — hidden on mobile */}
-            {!isMobile && (
-              <View style={s.statChipsRow}>
-                <StatChip label="Total"    value={total}          valueColor={C.text}    />
-                <View style={s.statDivider} />
-                <StatChip label="Active"   value={active}         valueColor={C.active}  />
-                <View style={s.statDivider} />
-                <StatChip label="Inactive" value={inactive}       valueColor={C.inactive}/>
-                <View style={s.statDivider} />
-                <StatChip label="Revenue"  value={rupee(revenue)} valueColor={C.primary} />
-              </View>
-            )}
-
             {/* Grid / List toggle */}
             <View style={s.toggle}>
               {(["grid", "list"] as const).map((mode) => (
@@ -586,18 +726,6 @@ export default function CustomerManagementScreen() {
               ))}
             </View>
           </View>
-
-          {/* Mobile stat chips */}
-          {isMobile && (
-            <View style={s.mobileStatRow}>
-              {([["Total", total, C.text], ["Active", active, C.active], ["Inactive", inactive, C.inactive]] as [string, number, string][]).map(([lbl, val, clr]) => (
-                <View key={lbl} style={s.mobileStatChip}>
-                  <Text style={[s.mobileStatVal, { color: clr }]}>{val}</Text>
-                  <Text style={s.mobileStatLbl}>{lbl}</Text>
-                </View>
-              ))}
-            </View>
-          )}
 
           {loading ? (
             <View style={s.stateBox}>
@@ -675,37 +803,45 @@ export default function CustomerManagementScreen() {
 
           {/* ══ PAGINATION ══════════════════════════════════════════════════ */}
           {!loading && !error && totalPages > 1 && (
-            <View style={s.pgWrap}>
-              <TouchableOpacity
-                style={[s.pgBtn, safePage === 1 && s.pgBtnDisabled]}
-                onPress={() => safePage > 1 && setPage(safePage - 1)}
-                activeOpacity={0.7}
-              >
-                <Svg width={13} height={13} viewBox="0 0 16 16">
-                  <Path fill={safePage === 1 ? C.border : C.sub} d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
-                </Svg>
-              </TouchableOpacity>
+            <View style={[s.pgWrap, isMobile && s.pgWrapMobile]}>
+              <Text style={s.pgInfo}>
+                Showing {rangeStart}–{rangeEnd} of {total} customers
+              </Text>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <View style={s.pgControls}>
                 <TouchableOpacity
-                  key={p}
-                  style={[s.pgBtn, safePage === p && s.pgBtnActive]}
-                  onPress={() => setPage(p)}
+                  style={[s.pgBtn, safePage === 1 && s.pgBtnDisabled]}
+                  onPress={() => safePage > 1 && setPage(safePage - 1)}
                   activeOpacity={0.7}
+                  disabled={safePage === 1}
                 >
-                  <Text style={[s.pgBtnTxt, safePage === p && s.pgBtnTxtActive]}>{p}</Text>
+                  <Svg width={13} height={13} viewBox="0 0 16 16">
+                    <Path fill={safePage === 1 ? C.border : C.sub} d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
+                  </Svg>
                 </TouchableOpacity>
-              ))}
 
-              <TouchableOpacity
-                style={[s.pgBtn, safePage === totalPages && s.pgBtnDisabled]}
-                onPress={() => safePage < totalPages && setPage(safePage + 1)}
-                activeOpacity={0.7}
-              >
-                <Svg width={13} height={13} viewBox="0 0 16 16">
-                  <Path fill={safePage === totalPages ? C.border : C.sub} d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
-                </Svg>
-              </TouchableOpacity>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[s.pgBtn, safePage === p && s.pgBtnActive]}
+                    onPress={() => setPage(p)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.pgBtnTxt, safePage === p && s.pgBtnTxtActive]}>{p}</Text>
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  style={[s.pgBtn, safePage === totalPages && s.pgBtnDisabled]}
+                  onPress={() => safePage < totalPages && setPage(safePage + 1)}
+                  activeOpacity={0.7}
+                  disabled={safePage === totalPages}
+                >
+                  <Svg width={13} height={13} viewBox="0 0 16 16">
+                    <Path fill={safePage === totalPages ? C.border : C.sub} d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+                  </Svg>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -721,15 +857,31 @@ export default function CustomerManagementScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   scroll:        { flex: 1 },
-  scrollContent: { paddingTop: 18 },
+  scrollContent: { paddingTop: 0 },
 
-  // Header
-  header:      { backgroundColor: C.navy, paddingBottom: 14 },
+  // Header — rounded on all four corners, top and bottom
+  header:      { backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
   headerInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hLeft:       { flexDirection: "row", alignItems: "center", gap: 11 },
   hIcon:       { width: 40, height: 40, borderRadius: 11, backgroundColor: C.primary, alignItems: "center", justifyContent: "center" },
   hTitle:      { color: "#fff", fontWeight: "700", letterSpacing: -0.3 },
   hSub:        { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
+
+  // Overlapping stat cards — desktop / tablet
+  statCardsWrap:   { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 10, marginTop: -32, marginBottom: 14 },
+  statCard:        { flex: 1, minWidth: 130, maxWidth: 230, backgroundColor: C.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 4 },
+  statCardTop:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  statCardIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  statCardValue:   { fontSize: 17, fontWeight: "800" },
+  statCardLabel:   { fontSize: 12, fontWeight: "700", color: C.text },
+  statCardSub:     { fontSize: 10, color: C.sub, marginTop: 1 },
+
+  // Overlapping stat cards — mobile (compact, single row of 4)
+  statCardsWrapMobile:    { flexWrap: "nowrap", gap: 6, marginTop: -26 },
+  statCardCompact:        { flex: 1, alignItems: "center", backgroundColor: C.surface, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 2, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6, elevation: 3, gap: 4 },
+  statCardIconBoxCompact: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  statCardValueCompact:   { fontSize: 14, fontWeight: "800" },
+  statCardLabelCompact:   { fontSize: 9, fontWeight: "600", color: C.sub, textAlign: "center" },
 
   // Toolbar
   toolbar:  { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
@@ -746,7 +898,7 @@ const s = StyleSheet.create({
   toggleBtn:    { width: 38, alignItems: "center", justifyContent: "center" },
   toggleActive: { backgroundColor: C.navy },
 
-  // Mobile stat chips
+  // Mobile stat chips (legacy — no longer rendered)
   mobileStatRow:  { flexDirection: "row", gap: 8, marginBottom: 14 },
   mobileStatChip: { flex: 1, backgroundColor: C.surface, borderRadius: 10, padding: 10, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.04, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
   mobileStatVal:  { fontSize: 17, fontWeight: "700" },
@@ -778,7 +930,7 @@ const s = StyleSheet.create({
   gCardCenter:  { alignItems: "center", marginBottom: 11 },
   gCardName:    { marginTop: 8, fontSize: 14, fontWeight: "700", color: C.text, textAlign: "center" },
   gStatsRow:    { flexDirection: "row", backgroundColor: C.cardBg, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 4, marginVertical: 8, alignItems: "center" },
-  gStatCell:    { flex: 1, alignItems: "center" },
+  gStatCell:    { flex: 1, alignItems: "center", paddingHorizontal: 2 },
   gStatVal:     { fontSize: 12, fontWeight: "700", color: C.text },
   gStatLbl:     { fontSize: 10, color: C.sub, marginTop: 2 },
   gStatDivider: { width: 1, height: 24, backgroundColor: C.border },
@@ -817,8 +969,11 @@ const s = StyleSheet.create({
   mBtn:     { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 9, paddingVertical: 10 },
 
   // Pagination
-  pgWrap:        { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 20, gap: 6, flexWrap: "wrap" },
-  pgBtn:         { minWidth: 36, height: 36, borderRadius: 9, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
+  pgWrap:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, flexWrap: "wrap", gap: 12, marginTop: 16, backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3 },
+  pgWrapMobile:  { flexDirection: "column", alignItems: "flex-start", gap: 14 },
+  pgInfo:        { fontSize: 13, color: C.sub },
+  pgControls:    { flexDirection: "row", alignItems: "center", gap: 8 },
+  pgBtn:         { minWidth: 36, height: 36, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.surface, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
   pgBtnActive:   { backgroundColor: C.navy, borderColor: C.navy },
   pgBtnDisabled: { opacity: 0.35 },
   pgBtnTxt:      { fontSize: 13, fontWeight: "600", color: C.sub },

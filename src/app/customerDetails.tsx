@@ -46,7 +46,7 @@ export type Customer = {
 };
 
 type Address = { line1: string; line2?: string; city: string; state: string; pincode: string; country?: string };
-type Order   = { id: string; date: string; items: number; amount: number; payment: string; status: "Completed" | "Pending" | "Cancelled" | "Processing" };
+type Order   = { id: string; date: string; items: number; amount: number; payment: string; status: "Ordered" | "Processing" | "Delivered" | "Cancelled" | "Returned" /*| "Replacement"*/ };
 type MonthlyData = { month: string; amount: number };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,12 +146,14 @@ function formatPaymentLabel(method: string) {
 
 function mapOrderStatus(status: string): Order["status"] {
   const normalized = status.toLowerCase();
-  if (normalized.includes("complete") || normalized.includes("deliver")) return "Completed";
-  if (normalized.includes("cancel")) return "Cancelled";
-  if (normalized.includes("process") || normalized.includes("pending") || normalized.includes("ship")) {
+  if (normalized.includes("deliver"))  return "Delivered";
+  if (normalized.includes("cancel"))   return "Cancelled";
+  if (normalized.includes("return"))   return "Returned";
+  // if (normalized.includes("replace"))  return "Replacement";
+  if (normalized.includes("process") || normalized.includes("ship") || normalized.includes("pending")) {
     return "Processing";
   }
-  return "Pending";
+  return "Ordered";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,6 +178,12 @@ const DeleteIcon     = ({ size = 15, color = "#fff" }: IP) => <Svg width={size} 
 const ViewAllIcon    = ({ size = 15, color = "#fff" }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5zm1 .5v1.308l4.372 4.858A.5.5 0 0 1 7 8.5v5.306l2-.666V8.5a.5.5 0 0 1 .128-.334L13.5 3.308V2z"/></Svg>;
 const CheckIcon      = ({ size = 14, color = C.green }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></Svg>;
 const CodIcon        = ({ size = 14, color = C.sub }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/><Path fill={color} d="M0 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V6a2 2 0 0 1-2-2z"/></Svg>;
+
+// ── New icons for the order-status overview cards ──────────────────────────
+const ClockIcon      = ({ size = 16, color = C.primary }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71zM8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zm7-8A7 7 0 1 0 1 8a7 7 0 0 0 14 0z"/></Svg>;
+const BanIcon         = ({ size = 16, color = C.red }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M15 8a6.97 6.97 0 0 0-1.71-4.584l-9.874 9.875A7 7 0 0 0 15 8M2.71 12.584l9.874-9.875a7 7 0 0 0-9.874 9.875M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0"/></Svg>;
+const ReplyIcon       = ({ size = 16, color = C.primary }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M5.921 11.9 1.353 8.62a.719.719 0 0 1 0-1.238L5.921 4.1A.716.716 0 0 1 7 4.719V6c1.5 0 6 0 7 8-2.5-4.5-7-4-7-4v1.281c0 .56-.606.898-1.079.62z"/></Svg>;
+const SwapIcon        = ({ size = 16, color = C.primary }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5zm14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5z"/></Svg>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CARD WRAPPER
@@ -217,16 +225,47 @@ function StatusPill({ status }: { status: "Active" | "Inactive" }) {
 }
 function OrderStatusPill({ status }: { status: Order["status"] }) {
   const map: Record<Order["status"], { bg: string; color: string }> = {
-    Completed:  { bg: C.activeLight,   color: C.green   },
-    Pending:    { bg: "#FEF9C3",       color: "#CA8A04" },
-    Processing: { bg: "#EFF6FF",       color: "#3B82F6" },
-    Cancelled:  { bg: C.inactiveLight, color: C.red     },
+    Ordered:     { bg: "#EFF6FF",       color: "#3B82F6" },
+    Processing:  { bg: "#FEF9C3",       color: "#CA8A04" },
+    Delivered:   { bg: C.activeLight,   color: C.green   },
+    Cancelled:   { bg: C.inactiveLight, color: C.red     },
+    Returned:    { bg: "#F3E8FF",       color: "#8B5CF6" },
+    // Replacement: { bg: C.primaryLight,  color: C.primary },
   };
   const { bg, color } = map[status];
   return (
     <View style={[s.orderStatus, { backgroundColor: bg, borderColor: color }]}>
       <CheckIcon size={12} color={color} />
       <Text style={[s.orderStatusTxt, { color }]}>{status}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MINI STAT CARD  (overlapping order-status cards under the header)
+// ─────────────────────────────────────────────────────────────────────────────
+function MiniStatCard({
+  icon,
+  iconBg,
+  value,
+  label,
+  valueColor = C.text,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  value: string | number;
+  label: string;
+  valueColor?: string;
+}) {
+  return (
+    <View style={s.statCard}>
+      <View style={[s.statCardIconBox, { backgroundColor: iconBg }]}>{icon}</View>
+      <Text style={[s.statCardValue, { color: valueColor }]} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={s.statCardLabel} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -612,6 +651,18 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
   const maxSpend = Math.max(weekly, monthly, yearly, 1);
   const avgOrder = c.orders > 0 ? c.totalSpent / c.orders : 0;
 
+  // ── Order-status breakdown for the overlapping stat cards ────────────────
+  const orderList    = c.orderHistory ?? [];
+  const totalOrders  = c.orders;
+  const statusCounts = {
+    ordered:     orderList.filter((o) => o.status === "Ordered").length,
+    processing:  orderList.filter((o) => o.status === "Processing").length,
+    delivered:   orderList.filter((o) => o.status === "Delivered").length,
+    cancelled:   orderList.filter((o) => o.status === "Cancelled").length,
+    returned:    orderList.filter((o) => o.status === "Returned").length,
+    // replacement: orderList.filter((o) => o.status === "Replacement").length,
+  };
+
   const memberDays = (() => {
     if (!c.registeredOn) return "N/A";
     const parts = c.registeredOn.split(" ");
@@ -626,13 +677,10 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
   const OrderHistoryActions = (
     <View style={s.orderActions}>
       <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.green }]} activeOpacity={0.8}>
-        <BackupIcon size={13} /><Text style={s.orderActionTxt}>Backup</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.red }]} activeOpacity={0.8}>
-        <DeleteIcon size={13} /><Text style={s.orderActionTxt}>Delete</Text>
+        <BackupIcon size={13} /><Text style={s.orderActionTxt}>Export CSV</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.primary }]} activeOpacity={0.8}>
-        <ViewAllIcon size={13} /><Text style={s.orderActionTxt}>View All</Text>
+        <BarChartIcon size={13} color="#fff" /><Text style={s.orderActionTxt}>View Analytics</Text>
       </TouchableOpacity>
     </View>
   );
@@ -641,23 +689,90 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
-        <View style={[s.headerInner, { paddingHorizontal: px }]}>
-          <View style={s.headerLeft}>
-            <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.8}>
-              <BackIcon size={18} color="#fff" />
-            </TouchableOpacity>
-            <View>
-              <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>Customer Details</Text>
-              <Text style={s.hSub}>#{c.id} · {c.name}</Text>
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ══ HEADER — floats with margin, rounded on all corners (now scrolls) ══ */}
+        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px, backgroundColor: "#FFFFFF" }}>
+          <View
+            style={[
+              s.header,
+              {
+                paddingTop: Platform.OS === "ios" ? 50 : 16,
+                marginTop: isMobile ? 12 : 18,
+              },
+            ]}
+          >
+          <View style={[s.headerInner, { paddingHorizontal: isMobile ? 16 : 22 }]}>
+            <View style={s.headerLeft}>
+              <TouchableOpacity style={s.backBtn} onPress={onBack} activeOpacity={0.8}>
+                <BackIcon size={18} color="#fff" />
+              </TouchableOpacity>
+              <View>
+                <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>Customer Details</Text>
+                <Text style={s.hSub}>#{c.id} · {c.name}</Text>
+              </View>
             </View>
           </View>
         </View>
+
+        {/* ══ OVERLAPPING ORDER-STATUS STAT CARDS ════════════════════════ */}
+        <View style={[s.statCardsWrap, { paddingHorizontal: 10 }, isMobile && s.statCardsWrapMobile]}>
+          <MiniStatCard
+            icon={<CartIcon color={C.navy} size={15} />}
+            iconBg="rgba(29,50,78,0.08)"
+            value={totalOrders}
+            label="Total Orders"
+            valueColor={C.navy}
+          />
+          <MiniStatCard
+            icon={<BagIcon color="#3B82F6" size={15} />}
+            iconBg="#EFF6FF"
+            value={statusCounts.ordered}
+            label="Ordered"
+            valueColor="#3B82F6"
+          />
+          <MiniStatCard
+            icon={<ClockIcon color="#CA8A04" size={15} />}
+            iconBg="#FEF9C3"
+            value={statusCounts.processing}
+            label="Processing"
+            valueColor="#CA8A04"
+          />
+          <MiniStatCard
+            icon={<CheckIcon color={C.green} size={15} />}
+            iconBg={C.activeLight}
+            value={statusCounts.delivered}
+            label="Delivered"
+            valueColor={C.green}
+          />
+          <MiniStatCard
+            icon={<BanIcon color={C.red} size={15} />}
+            iconBg={C.inactiveLight}
+            value={statusCounts.cancelled}
+            label="Cancelled"
+            valueColor={C.red}
+          />
+          <MiniStatCard
+            icon={<ReplyIcon color="#8B5CF6" size={15} />}
+            iconBg="#F3E8FF"
+            value={statusCounts.returned}
+            label="Returned"
+            valueColor="#8B5CF6"
+          />
+          {/* <MiniStatCard
+            icon={<SwapIcon color={C.primary} size={15} />}
+            iconBg={C.primaryLight}
+            value={statusCounts.replacement}
+            label="Replacement"
+            valueColor={C.primary}
+          /> */}
+        </View>
       </View>
 
-      <ScrollView style={s.scroll} contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]} showsVerticalScrollIndicator={false}>
-        <View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%" }]}>
-
+<View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%", paddingHorizontal: px }]}>
           {/* Profile card */}
           <Card style={s.profileCard}>
             <View style={s.profileInner}>
@@ -848,15 +963,23 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 // STYLES
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  scroll:        { flex: 1, backgroundColor: C.bg },
-  scrollContent: { paddingTop: 20 },
+  scroll:        { flex: 1, backgroundColor: "#FFFFFF" },
+  scrollContent: { paddingTop: 0, backgroundColor: "#FFFFFF" },
   body:          { gap: 16 },
-  header:        { backgroundColor: C.navy, paddingBottom: 14 },
+  header:        { backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
   headerInner:   { flexDirection: "row", alignItems: "center" },
   headerLeft:    { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   backBtn:       { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   hTitle:        { color: "#fff", fontWeight: "700", letterSpacing: -0.3 },
   hSub:          { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
+
+  // Overlapping order-status stat cards
+  statCardsWrap:       { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: -30, marginBottom: 16 },
+  statCardsWrapMobile: { gap: 8, marginTop: -24 },
+  statCard:            { flex: 1, minWidth: 100, maxWidth: 150, alignItems: "center", backgroundColor: C.surface, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, gap: 4 },
+  statCardIconBox:     { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  statCardValue:       { fontSize: 15, fontWeight: "800" },
+  statCardLabel:       { fontSize: 10, fontWeight: "600", color: C.sub, textAlign: "center" },
 
   card:           { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, overflow: "hidden" },
   cardHeader:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14, backgroundColor: C.cardBg, borderBottomWidth: 1, borderBottomColor: C.border, flexWrap: "wrap", gap: 10 },

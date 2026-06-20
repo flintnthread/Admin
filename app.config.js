@@ -3,6 +3,11 @@ module.exports = ({ config }) => ({
   ...config,
   expo: {
     ...config.expo,
+
+    plugins: [
+      ...(config.expo?.plugins ?? []),
+      "expo-font",
+    ],
     android: {
       ...config.expo?.android,
       // Dev API uses http:// on port 8082 (admin-backend)

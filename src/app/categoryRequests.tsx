@@ -567,6 +567,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 24,
+    backgroundColor: '#151D4F',
+    padding: 20,
+    borderRadius: 14,
   },
   pageHeaderLeft: {
     flexDirection: 'row',
@@ -584,7 +587,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
     letterSpacing: -0.3,
   },
   pageSubtitle: {

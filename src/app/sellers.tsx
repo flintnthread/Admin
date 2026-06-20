@@ -523,8 +523,8 @@ const ListHeader = ({ isTablet }: { isTablet: boolean }) => (
   <View style={LV.hrow}>
     <Text style={[LV.hcell, LV.cSno]}>S. No</Text>
     <Text style={[LV.hcell, LV.cId]}>Seller ID</Text>
-    <Text style={[LV.hcell, { flex: 2 }]}>Seller</Text>
-    {!isTablet && <Text style={[LV.hcell, { flex: 2 }]}>Business</Text>}
+    <Text style={[LV.hcell, LV.cSeller]}>Seller</Text>
+    {!isTablet && <Text style={[LV.hcell, LV.cBiz]}>Business</Text>}
     <Text style={[LV.hcell, LV.cStatus]}>Status</Text>
     <Text style={[LV.hcell, LV.cKyc]}>KYC</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cProd]}>Products</Text>}
@@ -579,15 +579,17 @@ const ListRow = ({
     <View style={[LV.row, { backgroundColor: rowBg }]}>
       <Text style={[LV.cell, LV.cSno]}>{seller.serialNo}</Text>
       <View style={LV.cId}><IdBadge id={seller.id} /></View>
-      <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8, minWidth: 0 }}>
-        <SellerAvatar seller={seller} size={34} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={LV.selName} numberOfLines={1}>{seller.name}</Text>
-          <Text style={LV.selEmail} numberOfLines={1}>{seller.email}</Text>
+      <View style={LV.cSeller}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <SellerAvatar seller={seller} size={34} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={LV.selName} numberOfLines={1}>{seller.name}</Text>
+            <Text style={LV.selEmail} numberOfLines={1}>{seller.email}</Text>
+          </View>
         </View>
       </View>
       {!isTablet && (
-        <View style={{ flex: 2, paddingRight: 8 }}>
+        <View style={LV.cBiz}>
           <Text style={LV.bizName} numberOfLines={1}>{seller.business}</Text>
           <Text style={LV.sain} numberOfLines={1}>{seller.sain}</Text>
         </View>
@@ -605,18 +607,20 @@ const ListRow = ({
 };
 
 const LV = StyleSheet.create({
-  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border },
-  hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, minWidth: 1100 },
+  hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, minWidth: 1100 },
   mrow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: C.border },
-  cell: { fontSize: 13, color: C.sub, paddingRight: 8 },
+  cell: { fontSize: 13, color: C.sub, paddingRight: 16 },
   cSno: { width: 44, textAlign: 'center', fontWeight: '600' },
-  cId: { width: 172, paddingRight: 8 },
-  cStatus: { width: 76 },
-  cKyc: { width: 115 },
-  cProd: { width: 120 },
-  cWallet: { width: 76, textAlign: 'right', fontWeight: '700', color: C.green },
-  cDate: { width: 110, fontSize: 11 },
+  cId: { width: 172, paddingRight: 16 },
+  cSeller: { width: 220, paddingRight: 20 },
+  cBiz: { width: 200, paddingRight: 20 },
+  cStatus: { width: 85, paddingRight: 12 },
+  cKyc: { width: 120, paddingRight: 12 },
+  cProd: { width: 130, paddingRight: 12 },
+  cWallet: { width: 80, textAlign: 'right', fontWeight: '700', color: C.green, paddingRight: 24 },
+  cDate: { width: 110, fontSize: 11, paddingRight: 12 },
   cAction: { width: 108, marginLeft: 'auto' },
   avatar: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avTxt: { color: '#FFF', fontWeight: '700', fontSize: 12 },
@@ -843,8 +847,8 @@ export default function SellersScreen() {
 
           <View style={SS.viewToggle}>
             <Text style={SS.viewLabel}>View:</Text>
-              <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
-                <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
+            <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
+              <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
             </TouchableOpacity>
             <TouchableOpacity style={[SS.vBtn, viewMode === 'list' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('list')}>
               <IconList size={17} color={viewMode === 'list' ? '#FFF' : C.sub} />
@@ -901,25 +905,27 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
-              {!isMobile && <ListHeader isTablet={isTablet} />}
-              {paginated.length === 0 ? (
-                <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-              ) : (
-                paginated.map((s, idx) => (
-                  <ListRow
-                    key={s.id}
-                    seller={s}
-                    even={idx % 2 === 0}
-                    isTablet={isTablet}
-                    isMobile={isMobile}
-                    onView={() => doView(s)}
-                    onToggleStatus={() => doToggle(s)}
-                    onDelete={() => doDelete(s)}
-                  />
-                ))
-              )}
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={IS_WEB}>
+              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
+                {!isMobile && <ListHeader isTablet={isTablet} />}
+                {paginated.length === 0 ? (
+                  <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+                ) : (
+                  paginated.map((s, idx) => (
+                    <ListRow
+                      key={s.id}
+                      seller={s}
+                      even={idx % 2 === 0}
+                      isTablet={isTablet}
+                      isMobile={isMobile}
+                      onView={() => doView(s)}
+                      onToggleStatus={() => doToggle(s)}
+                      onDelete={() => doDelete(s)}
+                    />
+                  ))
+                )}
+              </View>
+            </ScrollView>
           )}
 
           {/* Footer */}
@@ -952,34 +958,34 @@ export default function SellersScreen() {
 // ─────────────────────────── ROOT STYLES ─────────────────────────────────────
 const SS = StyleSheet.create({
 
-  root:       { flex:1, backgroundColor:C.bg },
-  topBar:     { height:56, backgroundColor:'#1d324e', flexDirection:'row', alignItems:'center', paddingHorizontal:16 },
-  logoBox:    { width:40, height:40, borderRadius:8, backgroundColor:'rgba(255,255,255,0.2)', justifyContent:'center', alignItems:'center' },
-  backButton: { flexDirection:'row', alignItems:'center', marginRight:10 },
-  backButtonText: { color:'#FFF', fontSize:14, fontWeight:'600', marginLeft:4 },
-  titleBar:   { backgroundColor:C.card, paddingHorizontal:20, paddingTop:14, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border },
-  breadcrumb: { flexDirection:'row', alignItems:'center', marginBottom:10 },
-  bcLink:     { fontSize:12, color:C.primary, fontWeight:'500' },
-  bcSep:      { fontSize:12, color:C.muted, marginHorizontal:2 },
-  bcCur:      { fontSize:12, color:C.sub },
-  titleRow:   { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
-  pageTitle:  { fontSize:22, fontWeight:'800', color:C.text },
-  pill:       { backgroundColor:C.primaryLight, borderWidth:1.5, borderColor:C.primary, borderRadius:20, paddingHorizontal:10, paddingVertical:3 },
-  pillTxt:    { fontSize:11, color:C.primary, fontWeight:'700' },
-  exportBtn:  { backgroundColor:C.primary, paddingHorizontal:14, paddingVertical:9, borderRadius:8, flexDirection:'row', alignItems:'center' },
-  exportTxt:  { color:'#FFF', fontSize:13, fontWeight:'700' },
-  toolbar:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:20, paddingVertical:14, backgroundColor:C.card, borderBottomWidth:1, borderBottomColor:C.border },
-  searchBox:  { flex:1, maxWidth:700, flexDirection:'row', alignItems:'center', backgroundColor:C.bg, borderWidth:1, borderColor:C.border, borderRadius:8, paddingHorizontal:12, height:42 },
-  searchInput:{ flex:1, fontSize:14, color:C.text, height:42, marginLeft:8 },
-  clearBtn:   { padding:4 },
-  viewToggle: { flexDirection:'row', alignItems:'center', gap:6, marginLeft:14 },
-  viewLabel:  { fontSize:13, color:C.sub, fontWeight:'500', marginRight:2 },
-  vBtn:       { width:36, height:36, borderRadius:7, backgroundColor:C.bg, borderWidth:1, borderColor:C.border, justifyContent:'center', alignItems:'center' },
-  vBtnOn:     { backgroundColor:C.primary, borderColor:C.primary },
-  content:    { paddingVertical:20, paddingBottom:50 },
-  listBox:    { backgroundColor:C.card, marginHorizontal:20, borderRadius:12, overflow:'hidden', shadowColor:'#000', shadowOffset:{width:0,height:2}, shadowOpacity:0.06, shadowRadius:10, elevation:3 },
-  footer:     { flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:20, paddingTop:20, gap:12, flexWrap:'wrap' },
-  footTxt:    { fontSize:13, color:C.sub },
-  empty:      { padding:40, alignItems:'center' },
-  emptyTxt:   { fontSize:14, color:C.muted, textAlign:'center' },
+  root: { flex: 1, backgroundColor: C.bg },
+  topBar: { height: 56, backgroundColor: '#1d324e', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  logoBox: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  backButton: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+  backButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600', marginLeft: 4 },
+  titleBar: { backgroundColor: C.card, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  breadcrumb: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  bcLink: { fontSize: 12, color: C.primary, fontWeight: '500' },
+  bcSep: { fontSize: 12, color: C.muted, marginHorizontal: 2 },
+  bcCur: { fontSize: 12, color: C.sub },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pageTitle: { fontSize: 22, fontWeight: '800', color: C.text },
+  pill: { backgroundColor: C.primaryLight, borderWidth: 1.5, borderColor: C.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  pillTxt: { fontSize: 11, color: C.primary, fontWeight: '700' },
+  exportBtn: { backgroundColor: C.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+  exportTxt: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+  searchBox: { flex: 1, maxWidth: 700, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
+  searchInput: { flex: 1, fontSize: 14, color: C.text, height: 42, marginLeft: 8 },
+  clearBtn: { padding: 4 },
+  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 14 },
+  viewLabel: { fontSize: 13, color: C.sub, fontWeight: '500', marginRight: 2 },
+  vBtn: { width: 36, height: 36, borderRadius: 7, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center' },
+  vBtnOn: { backgroundColor: C.primary, borderColor: C.primary },
+  content: { paddingVertical: 20, paddingBottom: 50 },
+  listBox: { backgroundColor: C.card, marginHorizontal: 20, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, gap: 12, flexWrap: 'wrap' },
+  footTxt: { fontSize: 13, color: C.sub },
+  empty: { padding: 40, alignItems: 'center' },
+  emptyTxt: { fontSize: 14, color: C.muted, textAlign: 'center' },
 });

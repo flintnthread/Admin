@@ -5,6 +5,7 @@ import { View, Text, ScrollView } from "react-native";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { patchComponents } from "@/lib/patch-components";
+import { useFonts } from "expo-font";
 
 // Safely execute component patching and capture errors to prevent white screen
 try {
@@ -82,6 +83,14 @@ function ProtectedNavigator() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    "bootstrap-icons": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/fonts/bootstrap-icons.woff2",
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <ErrorBoundary>
       <AuthProvider>
