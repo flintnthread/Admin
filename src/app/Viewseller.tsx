@@ -146,7 +146,6 @@ interface SellerData {
     delivered: number;
     cancelled: number;
   };
-  totalOrders: number;
   verificationDocuments: {
     name: string;
     available: boolean;
@@ -585,22 +584,22 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
                 <Text style={{ color: COLORS.textMuted, fontSize: 14 }}>No document image available</Text>
               </View>
             ) : (
-            <ScrollView
-              contentContainerStyle={modalStyles.imgScrollContent}
-              maximumZoomScale={3}
-              minimumZoomScale={0.5}
-              bouncesZoom
-              centerContent
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-            >
-              <Animated.View style={{ transform: [{ scale }] }}>
-                <Image
-                  source={{ uri: imageUri }}
-                  style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
-                />
-              </Animated.View>
-            </ScrollView>
+              <ScrollView
+                contentContainerStyle={modalStyles.imgScrollContent}
+                maximumZoomScale={3}
+                minimumZoomScale={0.5}
+                bouncesZoom
+                centerContent
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+              >
+                <Animated.View style={{ transform: [{ scale }] }}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
+                  />
+                </Animated.View>
+              </ScrollView>
             )}
           </View>
 
@@ -700,9 +699,6 @@ const CsvExportModal: React.FC<{
           <ScrollView style={csvModalStyles.content}>
             <Text style={csvModalStyles.csvText}>{content}</Text>
           </ScrollView>
-          <TouchableOpacity style={csvModalStyles.closeBtnBottom} onPress={onClose}>
-            <Text style={csvModalStyles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -720,6 +716,7 @@ const csvModalStyles = StyleSheet.create({
   modal: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
+    overflow: 'hidden',
     width: '100%',
     maxWidth: 600,
     maxHeight: '80%',
@@ -873,11 +870,47 @@ function mapDetailToSellerData(
     totalProducts: productCount,
     productStatusDistribution: { active: productCount, inactive: 0, pending: 0 },
     orderStatusDistribution: { pending: 0, processing: 0, shipped: 0, delivered: totalOrders, cancelled: 0 },
-    verificationDocuments: docs.map((doc) => ({
-      name: String(doc.name ?? 'Document'),
-      available: doc.available !== false,
-      url: resolveMediaUrl(doc.url) || undefined,
-    })),
+    verificationDocuments: (() => {
+      const defaultDocNames = [
+        'Aadhaar Front',
+        'Aadhaar Back',
+        'PAN Card',
+        'Cancelled Cheque',
+        'Business Proof',
+        'Bank Proof',
+      ];
+      const apiDocsByName = new Map<string, { url?: string; available?: boolean }>();
+      docs.forEach((doc) => {
+        if (doc.name) {
+          apiDocsByName.set(doc.name, doc);
+        }
+      });
+      const finalDocs: { name: string; available: boolean; url?: string }[] = [];
+      defaultDocNames.forEach((name) => {
+        if (apiDocsByName.has(name)) {
+          const apiDoc = apiDocsByName.get(name)!;
+          finalDocs.push({
+            name,
+            available: apiDoc.available !== false,
+            url: resolveMediaUrl(apiDoc.url) || undefined,
+          });
+          apiDocsByName.delete(name);
+        } else {
+          finalDocs.push({
+            name,
+            available: false,
+          });
+        }
+      });
+      apiDocsByName.forEach((apiDoc, name) => {
+        finalDocs.push({
+          name,
+          available: apiDoc.available !== false,
+          url: resolveMediaUrl(apiDoc.url) || undefined,
+        });
+      });
+      return finalDocs;
+    })(),
     analyticsData: {
       daily: monthlyProducts,
       weekly: monthlyProducts,
@@ -984,16 +1017,6 @@ export default function ViewSeller() {
               <BootstrapIcon name="person-circle" size={32} color={COLORS.white} />
               <View style={{ marginLeft: 8 }}>
                 <Text style={styles.pageHeaderTitle}>Seller Details</Text>
-                <View style={styles.breadcrumb}>
-                  <BootstrapIcon name="house" size={11} color="rgba(255,255,255,0.7)" />
-                  <Text style={[styles.breadcrumbItem, { marginLeft: 3 }]}>Dashboard</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={styles.breadcrumbItem}>Ecommerce</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={styles.breadcrumbItem}>Sellers List</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={[styles.breadcrumbItem, { color: 'rgba(255,255,255,0.5)' }]}>Seller Details</Text>
-                </View>
               </View>
             </View>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
@@ -1159,10 +1182,10 @@ export default function ViewSeller() {
                 color={seller.status === 'Active' ? COLORS.success : seller.status === 'Pending' ? COLORS.warning : COLORS.danger}
               />
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <TouchableOpacity style={styles.actionBtn}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/sellerprofile')}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <BootstrapIcon name="arrow-down-circle" size={13} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Download</Text>
+                    <BootstrapIcon name="file-earmark-text" size={13} color={COLORS.white} />
+                    <Text style={styles.actionBtnText}>Export CSV</Text>
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F97316' }]} onPress={() => router.push('/sellers')}>
@@ -1311,14 +1334,14 @@ export default function ViewSeller() {
               isHalf
               width={width}
             />
+            <TouchableOpacity
+              style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1d324e' }]}
+              onPress={() => router.push('/Products')}
+            >
+              <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
+              <Text style={styles.actionBtnText}>View All Products</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1E3A5F' }]}
-            onPress={() => router.push('/productApproval')}
-          >
-            <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
-            <Text style={styles.actionBtnText}>View All Products</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Verification Documents ─────────────────────────────────────── */}
@@ -1330,17 +1353,15 @@ export default function ViewSeller() {
                 <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
                 <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
               </View>
-              {doc.available && (
-                <TouchableOpacity
-                  style={styles.viewDocBtn}
-                  onPress={() => openDoc(doc.name, doc.url)}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <BootstrapIcon name="eye" size={13} color={COLORS.white} />
-                    <Text style={styles.viewDocBtnText}>View</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.viewDocBtn}
+                onPress={() => openDoc(doc.name, doc.url)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <BootstrapIcon name="eye" size={13} color={COLORS.white} />
+                  <Text style={styles.viewDocBtnText}>View</Text>
+                </View>
+              </TouchableOpacity>
             </View>
           ))}
         </View>
@@ -1751,7 +1772,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   viewDocBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#1d324e',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 5,

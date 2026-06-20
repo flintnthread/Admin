@@ -949,27 +949,30 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={IS_WEB}>
-              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
-                {!isMobile && <ListHeader isTablet={isTablet} />}
-                {paginated.length === 0 ? (
-                  <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-                ) : (
-                  paginated.map((s, idx) => (
-                    <ListRow
-                      key={s.id}
-                      seller={s}
-                      even={idx % 2 === 0}
-                      isTablet={isTablet}
-                      isMobile={isMobile}
-                      onView={() => doView(s)}
-                      onToggleStatus={() => doToggle(s)}
-                      onDelete={() => doDelete(s)}
-                    />
-                  ))
-                )}
-              </View>
-            </ScrollView>
+            /* @ts-ignore */
+            <View className="orange-scrollbar">
+              <ScrollView horizontal showsHorizontalScrollIndicator={IS_WEB}>
+                <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
+                  {!isMobile && <ListHeader isTablet={isTablet} />}
+                  {paginated.length === 0 ? (
+                    <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+                  ) : (
+                    paginated.map((s, idx) => (
+                      <ListRow
+                        key={s.id}
+                        seller={s}
+                        even={idx % 2 === 0}
+                        isTablet={isTablet}
+                        isMobile={isMobile}
+                        onView={() => doView(s)}
+                        onToggleStatus={() => doToggle(s)}
+                        onDelete={() => doDelete(s)}
+                      />
+                    ))
+                  )}
+                </View>
+              </ScrollView>
+            </View>
           )}
 
           {/* Footer */}
@@ -1071,7 +1074,7 @@ const SS = StyleSheet.create({
     justifyContent: 'center',
   },
   pageTitle: { fontSize: 22, fontWeight: '800', color: '#FFF' },
-  exportBtn: { backgroundColor: C.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+  exportBtn: { backgroundColor: C.green, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
   exportTxt: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
   searchBox: { flex: 1, maxWidth: 1000, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
