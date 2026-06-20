@@ -290,7 +290,9 @@ const ViewModal = ({ seller, onClose }: { seller: Seller | null; onClose: () => 
               <Text style={VM.closeX}>✕</Text>
             </TouchableOpacity>
           </View>
-          {seller.banner ? (
+          {seller.profilePicPath || seller.profilePicUrl || seller.liveSelfiePath ? (
+            <SellerMediaImage seller={seller} size={160} style={VM.banner} borderRadius={0} resizeMode="cover" />
+          ) : seller.banner ? (
             <Image source={{ uri: seller.banner }} style={VM.banner} />
           ) : null}
           <ScrollView style={{ maxHeight: 320 }}>

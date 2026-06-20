@@ -18,6 +18,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/context/auth-context";
 import {
   fetchApprovedSellers,
+  fetchApprovedSellerLocationStats,
   blockSeller,
   unblockSeller,
   fetchPendingProfileSellers,
@@ -27,6 +28,7 @@ import {
 } from "@/services/sellerApi";
 import { mapPendingProfileRow, mapSellerToApprovedRow } from "@/lib/mappers";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { formatRupee } from "@/lib/format";
 
 type Seller = {
   id: number;
@@ -69,6 +71,10 @@ export default function ApprovedSellersScreen() {
   const { token, isLoading: authLoading } = useAuth();
 
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [locationStats, setLocationStats] = useState<{
+    stateCounts: { name: string; count: number }[];
+    cityCounts: { name: string; count: number }[];
+  }>({ stateCounts: [], cityCounts: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingSellers, setPendingSellers] = useState<PendingSeller[]>([]);
@@ -128,11 +134,16 @@ export default function ApprovedSellersScreen() {
     setLoading(true);
     setError(null);
     try {
-      const items = await fetchApprovedSellers(500);
+      const [items, stats] = await Promise.all([
+        fetchApprovedSellers(500),
+        fetchApprovedSellerLocationStats(),
+      ]);
       setSellers(items.map(mapSellerToApprovedRow));
+      setLocationStats(stats);
     } catch (e) {
       setError(getApiErrorMessage(e, "Failed to load approved sellers."));
       setSellers([]);
+      setLocationStats({ stateCounts: [], cityCounts: [] });
     } finally {
       setLoading(false);
     }
@@ -271,28 +282,9 @@ export default function ApprovedSellersScreen() {
     return result;
   }, [sellers, activeSearch, sortBy]);
 
-  // Insights counts
-  const stateCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    filteredSellers.forEach((s) => {
-      counts[s.state] = (counts[s.state] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .map(([state, count]) => ({ state, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [filteredSellers]);
-
-  const cityCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    filteredSellers.forEach((s) => {
-      counts[s.city] = (counts[s.city] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .map(([city, count]) => ({ city, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [filteredSellers]);
+  // Location insights from backend (excludes null/empty state & city)
+  const stateCounts = locationStats.stateCounts;
+  const cityCounts = locationStats.cityCounts;
 
   const totalPages = Math.ceil(filteredSellers.length / itemsPerPage);
   const paginatedSellers = useMemo(() => {
@@ -1135,13 +1127,13 @@ export default function ApprovedSellersScreen() {
                     <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
                   </View>
                   {stateCounts.map((item, idx) => (
-                    <View key={item.state} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
-                      <Text style={styles.insightsTdText}>{item.state}</Text>
+                    <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                      <Text style={styles.insightsTdText}>{item.name}</Text>
                       <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
                     </View>
                   ))}
                   {stateCounts.length === 0 && (
-                    <Text style={styles.emptyInsights}>No dynamic state data</Text>
+                    <Text style={styles.emptyInsights}>No state data available</Text>
                   )}
                 </View>
 
@@ -1156,13 +1148,13 @@ export default function ApprovedSellersScreen() {
                     <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
                   </View>
                   {cityCounts.map((item, idx) => (
-                    <View key={item.city} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
-                      <Text style={styles.insightsTdText}>{item.city}</Text>
+                    <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                      <Text style={styles.insightsTdText}>{item.name}</Text>
                       <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
                     </View>
                   ))}
                   {cityCounts.length === 0 && (
-                    <Text style={styles.emptyInsights}>No dynamic city data</Text>
+                    <Text style={styles.emptyInsights}>No city data available</Text>
                   )}
                 </View>
               </View>
@@ -1196,11 +1188,11 @@ export default function ApprovedSellersScreen() {
                     <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
                     <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {formatRupee(seller.walletBalance)}
                     </Text>
                     <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>{seller.joinDate}</Text>
                     <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {formatRupee(seller.revenue)}
                     </Text>
                     <View style={[styles.tableCellActions, { flex: 1.6 }]}>
                       <TouchableOpacity
@@ -1314,13 +1306,13 @@ export default function ApprovedSellersScreen() {
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Wallet Balance:</Text>
                         <Text style={styles.cardCurrency}>
-                          â‚¹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          {formatRupee(seller.walletBalance)}
                         </Text>
                       </View>
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Revenue:</Text>
                         <Text style={styles.cardCurrency}>
-                          â‚¹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          {formatRupee(seller.revenue)}
                         </Text>
                       </View>
                     </View>

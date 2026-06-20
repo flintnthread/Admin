@@ -1,5 +1,9 @@
 import { Platform } from "react-native";
-import { resolveAdminApiBaseUrl } from "./config";
+import {
+  ensureAdminApiReachable,
+  getAdminApiBaseUrlCandidates,
+  resolveAdminApiBaseUrl,
+} from "./config";
 import { clearAdminSession, getAdminToken } from "./session";
 
 type SessionListener = () => void;
@@ -44,6 +48,22 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     throw new AdminApiError("Not signed in. Please log in again.", 401);
   }
 
+  // Login and other unauthenticated calls probe candidates so mobile/web find the right host.
+  if (!auth) {
+    try {
+      await ensureAdminApiReachable();
+    } catch {
+      const tried = getAdminApiBaseUrlCandidates().join(", ");
+      const hint =
+        Platform.OS === "web"
+          ? "\n• Start admin-backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run"
+          : "\n• Set EXPO_PUBLIC_ADMIN_API_BASE_URL=http://YOUR_PC_IP:8082 in Admin/.env";
+      throw new AdminApiError(
+        `Cannot reach admin API. Tried: ${tried}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
+      );
+    }
+  }
+
   const baseUrl = resolveAdminApiBaseUrl();
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
@@ -65,12 +85,13 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     res = await fetch(url, { ...init, headers });
   } catch {
     const debug = resolveAdminApiBaseUrl();
+    const tried = getAdminApiBaseUrlCandidates().join(", ");
     const hint =
       Platform.OS === "web"
-        ? "\n• On a phone browser, open the app using your PC LAN IP (not localhost)"
-        : "\n• Use Expo Go (auto-detects PC IP) or set EXPO_PUBLIC_ADMIN_API_BASE_URL in Admin/.env to http://YOUR_PC_IP:8082";
+        ? "\n• Start admin-backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run"
+        : "\n• Set EXPO_PUBLIC_ADMIN_API_BASE_URL=http://YOUR_PC_IP:8082 in Admin/.env";
     throw new AdminApiError(
-      `Cannot reach admin API at ${debug}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
+      `Cannot reach admin API at ${debug}. Also tried: ${tried}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
     );
   }
 
@@ -94,5 +115,21 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     return undefined as T;
   }
 
-  return res.json() as Promise<T>;
+  const contentType = res.headers.get("content-type") ?? "";
+  const raw = await res.text();
+  if (!contentType.includes("application/json") && raw.trimStart().startsWith("<")) {
+    throw new AdminApiError(
+      `Admin API returned HTML instead of JSON at ${url}. Start admin-backend on port 8082 and open the Admin app on a different port (not 8082).`,
+      res.status
+    );
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new AdminApiError(
+      `Invalid JSON from admin API at ${url}. Ensure admin-backend is running on port 8082.`,
+      res.status
+    );
+  }
 }

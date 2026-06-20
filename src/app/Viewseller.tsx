@@ -1,7 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
+import { useAuth } from "@/context/auth-context";
 import SellerMediaImage from "@/components/SellerMediaImage";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { resolveMediaUrl, resolveSellerProfileImage } from '@/lib/api/media';
+import { buildMediaUrlCandidates, isPdfMedia, resolveMediaUrl, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   fetchSellerAnalyticsChart,
@@ -150,6 +151,7 @@ interface SellerData {
     name: string;
     available: boolean;
     url?: string;
+    path?: string;
   }[];
   analyticsData: {
     daily: ChartDataPoint[];
@@ -524,6 +526,20 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
 
   const scale = useRef(new Animated.Value(1)).current;
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [imageIndex, setImageIndex] = useState(0);
+
+  const candidates = React.useMemo(
+    () => buildMediaUrlCandidates(docUrl, docUrl),
+    [docUrl],
+  );
+  const imageUri = candidates[imageIndex] ?? "";
+  const isPdf = isPdfMedia(docUrl);
+
+  useEffect(() => {
+    setImageIndex(0);
+    setZoomLevel(1);
+    scale.setValue(1);
+  }, [docUrl, visible, scale]);
 
   const zoomIn = () => {
     const next = Math.min(zoomLevel + 0.25, 3);
@@ -542,8 +558,6 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
 
   const modalW = isMobile ? screenW - 24 : Math.min(screenW - 64, 800);
   const imgH = isMobile ? 220 : 340;
-
-  const imageUri = resolveMediaUrl(docUrl);
 
   return (
     <Modal
@@ -583,6 +597,26 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
               <View style={modalStyles.imgScrollContent}>
                 <Text style={{ color: COLORS.textMuted, fontSize: 14 }}>No document image available</Text>
               </View>
+            ) : isPdf ? (
+              <View style={modalStyles.imgScrollContent}>
+                <Text style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 12 }}>PDF document</Text>
+                {Platform.OS === "web" ? (
+                  <iframe
+                    src={imageUri}
+                    title={docName}
+                    style={{ width: "100%", height: imgH - 40, border: "none" } as any}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      if (typeof window !== "undefined") window.open(imageUri, "_blank");
+                    }}
+                  >
+                    <Text style={styles.actionBtnText}>Open PDF</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : (
               <ScrollView
                 contentContainerStyle={modalStyles.imgScrollContent}
@@ -597,6 +631,9 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
                   <Image
                     source={{ uri: imageUri }}
                     style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
+                    onError={() => {
+                      if (imageIndex < candidates.length - 1) setImageIndex((i) => i + 1);
+                    }}
                   />
                 </Animated.View>
               </ScrollView>
@@ -803,10 +840,12 @@ function mapDetailToSellerData(
 ): SellerData {
   const emptySeries = { daily: [] as ChartDataPoint[], weekly: [] as ChartDataPoint[], monthly: [] as ChartDataPoint[], yearly: [] as ChartDataPoint[] };
   const docs = Array.isArray(d.documents)
-    ? (d.documents as { name?: string; url?: string; available?: boolean }[])
+    ? (d.documents as { name?: string; url?: string; path?: string; available?: boolean }[])
     : [];
   const productCount = Number(d.productCount ?? 0);
   const totalOrders = Number(d.totalOrders ?? 0);
+  const productDist = (d.productStatusDistribution ?? {}) as Record<string, number>;
+  const orderDist = (d.orderStatusDistribution ?? {}) as Record<string, number>;
   const statusRaw = String(d.status ?? 'active').toLowerCase();
   const names = splitSellerName(d);
   const profile = {
@@ -868,8 +907,18 @@ function mapDetailToSellerData(
     kycRemarks: String(d.kycRemarks ?? '—'),
     productsListingStatus: productCount > 0 ? 'Live' : 'Inactive',
     totalProducts: productCount,
-    productStatusDistribution: { active: productCount, inactive: 0, pending: 0 },
-    orderStatusDistribution: { pending: 0, processing: 0, shipped: 0, delivered: totalOrders, cancelled: 0 },
+    productStatusDistribution: {
+      active: Number(productDist.active ?? productCount),
+      inactive: Number(productDist.inactive ?? 0),
+      pending: Number(productDist.pending ?? 0),
+    },
+    orderStatusDistribution: {
+      pending: Number(orderDist.pending ?? 0),
+      processing: Number(orderDist.processing ?? 0),
+      shipped: Number(orderDist.shipped ?? 0),
+      delivered: Number(orderDist.delivered ?? 0),
+      cancelled: Number(orderDist.cancelled ?? 0),
+    },
     verificationDocuments: (() => {
       const defaultDocNames = [
         'Aadhaar Front',
@@ -879,20 +928,22 @@ function mapDetailToSellerData(
         'Business Proof',
         'Bank Proof',
       ];
-      const apiDocsByName = new Map<string, { url?: string; available?: boolean }>();
+      const apiDocsByName = new Map<string, { url?: string; path?: string; available?: boolean }>();
       docs.forEach((doc) => {
         if (doc.name) {
           apiDocsByName.set(doc.name, doc);
         }
       });
-      const finalDocs: { name: string; available: boolean; url?: string }[] = [];
+      const finalDocs: { name: string; available: boolean; url?: string; path?: string }[] = [];
       defaultDocNames.forEach((name) => {
         if (apiDocsByName.has(name)) {
           const apiDoc = apiDocsByName.get(name)!;
+          const rawPath = String(apiDoc.path ?? apiDoc.url ?? "");
           finalDocs.push({
             name,
             available: apiDoc.available !== false,
-            url: resolveMediaUrl(apiDoc.url) || undefined,
+            path: rawPath || undefined,
+            url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
           });
           apiDocsByName.delete(name);
         } else {
@@ -903,10 +954,12 @@ function mapDetailToSellerData(
         }
       });
       apiDocsByName.forEach((apiDoc, name) => {
+        const rawPath = String(apiDoc.path ?? apiDoc.url ?? "");
         finalDocs.push({
           name,
           available: apiDoc.available !== false,
-          url: resolveMediaUrl(apiDoc.url) || undefined,
+          path: rawPath || undefined,
+          url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
         });
       });
       return finalDocs;
@@ -928,6 +981,7 @@ function mapDetailToSellerData(
 
 export default function ViewSeller() {
   const params = useLocalSearchParams<{ sellerId?: string }>();
+  const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const [seller, setSeller] = useState<SellerData>(() => mapDetailToSellerData({}));
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -935,8 +989,8 @@ export default function ViewSeller() {
 
   useEffect(() => {
     const sellerId = Number(params.sellerId);
-    if (!sellerId || Number.isNaN(sellerId)) {
-      setLoading(false);
+    if (!sellerId || Number.isNaN(sellerId) || authLoading || !token) {
+      if (!authLoading && !token) setLoading(false);
       return;
     }
     void (async () => {
@@ -958,7 +1012,7 @@ export default function ViewSeller() {
         setLoading(false);
       }
     })();
-  }, [params.sellerId]);
+  }, [params.sellerId, authLoading, token]);
 
   const [analyticsTab, setAnalyticsTab] = useState<'products' | 'orders'>('products');
   const [periodTab, setPeriodTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
@@ -969,9 +1023,9 @@ export default function ViewSeller() {
   const [productsExportModal, setProductsExportModal] = useState(false);
   const [ordersExportModal, setOrdersExportModal] = useState(false);
 
-  const openDoc = (name: string, url?: string) => {
+  const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
-    setSelectedDocUrl(url ?? '');
+    setSelectedDocUrl(path || url || '');
     setDocModalVisible(true);
   };
 
@@ -998,7 +1052,7 @@ export default function ViewSeller() {
     { value: seller.orderStatusDistribution.cancelled, color: COLORS.danger, label: 'Cancelled' },
   ];
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -1353,15 +1407,17 @@ export default function ViewSeller() {
                 <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
                 <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.viewDocBtn}
-                onPress={() => openDoc(doc.name, doc.url)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <BootstrapIcon name="eye" size={13} color={COLORS.white} />
-                  <Text style={styles.viewDocBtnText}>View</Text>
-                </View>
-              </TouchableOpacity>
+              {doc.available && (
+                <TouchableOpacity
+                  style={styles.viewDocBtn}
+                  onPress={() => openDoc(doc.name, doc.url, doc.path)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <BootstrapIcon name="eye" size={13} color={COLORS.white} />
+                    <Text style={styles.viewDocBtnText}>View</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
           ))}
         </View>
