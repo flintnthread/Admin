@@ -1,3 +1,4 @@
+// @ts-nocheck
 // SizesManagement.tsx
 // React Native — Full Bootstrap Icons via @expo/vector-icons
 //
@@ -213,12 +214,17 @@ const GridCard: React.FC<{
   cardWidth: number;
 }> = ({ item, idx, onEdit, onDelete, cardWidth }) => {
   const [showActions, setShowActions] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const colors = CARD_GRADIENTS[idx % CARD_GRADIENTS.length];
+
+  const visibleActions = showActions || isHovered;
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() => setShowActions(p => !p)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={[S.gridCard, { width: cardWidth }]}
     >
       <LinearGradient
@@ -226,20 +232,20 @@ const GridCard: React.FC<{
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={S.gridCardTop}
-      > 
-     
-        {showActions ? (
+      >
+
+        {visibleActions ? (
           <View style={S.gridCardActions}>
             <TouchableOpacity
               style={S.cardActionBtn}
-              onPress={() => { setShowActions(false); onEdit(item); }}
+              onPress={() => { setShowActions(false); setIsHovered(false); onEdit(item); }}
             >
               {/* Bootstrap: pencil-square */}
               <BI name="pencil-square" size={17} color="#444" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[S.cardActionBtn, { marginLeft: 10 }]}
-              onPress={() => { setShowActions(false); onDelete(item); }}
+              onPress={() => { setShowActions(false); setIsHovered(false); onDelete(item); }}
             >
               {/* Bootstrap: trash3 */}
               <BI name="trash3" size={17} color="#e53935" />
@@ -281,7 +287,7 @@ const ListRow: React.FC<{
   onDelete: (s: SizeItem) => void;
 }> = ({ item, idx, onEdit, onDelete }) => (
   <View style={[S.listRow, { backgroundColor: idx % 2 === 0 ? "#fff" : "#fdfaf8" }]}>
-    <Text style={[S.listCell, { width: 42, color: "#999", fontSize: 12 }]}>{item.id}</Text>
+    <Text style={[S.listCell, { width: 70, color: "#999", fontSize: 12 }]}>{item.id}</Text>
     <Text style={[S.listCell, { flex: 1.5, fontWeight: "700", color: "#111" }]} numberOfLines={1}>
       {item.name}
     </Text>
@@ -658,13 +664,13 @@ export default function SizesManagement() {
 
 
         {/* ── BANNER ── */}
-         <LinearGradient
+        <LinearGradient
           colors={["#0f2d6b", "#08275c"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={S.banner}
-        > 
-         
+        >
+
           <View style={S.bannerIconBox}>
             {/* Bootstrap: grid-3x3 */}
             <BI name="grid-3x3" size={22} color="#fff" />
@@ -763,45 +769,45 @@ export default function SizesManagement() {
           />
         ) : (
           /* ── LIST VIEW ── */
-          <FlatList
-            key="list"
-            data={paginated}
-            keyExtractor={item => String(item.id)}
-            ListHeaderComponent={
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ minWidth: Math.max(width - PADDING * 2, 660), paddingHorizontal: PADDING }}>
-                  <View style={S.listHeader}>
-                    <Text style={[S.listHeaderCell, { width: 42 }]}>ID</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                    <Text style={[S.listHeaderCell, { width: 72 }]}>Status</Text>
-                    <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ width: Math.max(containerWidth, 800) }}>
+              <FlatList
+                key="list"
+                data={paginated}
+                keyExtractor={item => String(item.id)}
+                ListHeaderComponent={
+                  <View style={{ paddingHorizontal: PADDING }}>
+                    <View style={S.listHeader}>
+                      <Text style={[S.listHeaderCell, { width: 70 }]}>ID</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
+                      <Text style={[S.listHeaderCell, { width: 72 }]}>Status</Text>
+                      <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+                    </View>
                   </View>
-                </View>
-              </ScrollView>
-            }
-            renderItem={({ item, index }) => (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ minWidth: Math.max(width - PADDING * 2, 660), paddingHorizontal: PADDING }}>
-                  <ListRow
-                    item={item}
-                    idx={index}
-                    onEdit={s => setModal({ type: "edit", size: s })}
-                    onDelete={s => setModal({ type: "delete", size: s })}
-                  />
-                </View>
-              </ScrollView>
-            )}
-            ListEmptyComponent={
-              <View style={S.emptyBox}>
-                <BI name="search" size={40} color="#ccc" />
-                <Text style={S.emptyText}>No sizes found</Text>
-              </View>
-            }
-            ListFooterComponent={Footer}
-            contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
-          />
+                }
+                renderItem={({ item, index }) => (
+                  <View style={{ paddingHorizontal: PADDING }}>
+                    <ListRow
+                      item={item}
+                      idx={index}
+                      onEdit={s => setModal({ type: "edit", size: s })}
+                      onDelete={s => setModal({ type: "delete", size: s })}
+                    />
+                  </View>
+                )}
+                ListEmptyComponent={
+                  <View style={S.emptyBox}>
+                    <BI name="search" size={40} color="#ccc" />
+                    <Text style={S.emptyText}>No sizes found</Text>
+                  </View>
+                }
+                ListFooterComponent={Footer}
+                contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
+              />
+            </View>
+          </ScrollView>
         )}
       </View>
 
@@ -873,7 +879,7 @@ const S = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 8,
     borderWidth: 1.5, borderColor: "#eee", gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#333", padding: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: "#333", padding: 0, outlineStyle: "none" } as any,
   viewToggle: { flexDirection: "row", gap: 6 },
   viewBtn: {
     width: 36, height: 36, borderRadius: 8,
@@ -940,24 +946,29 @@ const S = StyleSheet.create({
 
   // Pagination
   paginationRow: {
-    flexDirection: "row", gap: 4, flexWrap: "wrap", justifyContent: "center", marginTop: 8,
+    flexDirection: "row", gap: 4, flexWrap: "wrap", justifyContent: "center",
   },
   pageBtn: {
-    minWidth: 34, height: 34, borderRadius: 8,
-    borderWidth: 1.5, borderColor: "#e0e0e0", backgroundColor: "#fff",
+    minWidth: 32, height: 32, borderRadius: 6,
+    borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center", paddingHorizontal: 4,
   },
-  pageBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  pageBtnActive: { backgroundColor: "#1d324e", borderColor: "#1d324e" },
   pageBtnDisabled: { opacity: 0.35 },
-  pageBtnText: { fontSize: 14, color: "#333", fontWeight: "500" },
+  pageBtnText: { fontSize: 13, color: "#374151", fontWeight: "600" },
 
   // Footer
   footerRow: {
     marginTop: 16, flexDirection: "row", flexWrap: "wrap",
-    alignItems: "center", justifyContent: "space-between",
-    gap: 8, paddingBottom: 16,
+    alignItems: "center", justifyContent: "space-between", gap: 12,
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
   },
-  footerText: { fontSize: 13, color: "#888" },
+  footerText: { fontSize: 13, color: "#666" },
 
   // Empty
   emptyBox: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
@@ -991,7 +1002,8 @@ const S = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === "ios" ? 12 : 9,
     fontSize: 14, color: "#333", backgroundColor: "#fafafa",
-  },
+    outlineStyle: "none",
+  } as any,
   statusToggleRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   statusToggleBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 8,

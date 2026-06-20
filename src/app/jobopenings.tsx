@@ -141,8 +141,10 @@ const StatPill: React.FC<{
         <View style={[sp.iconBox, { backgroundColor: iconBg }]}>
             <Feather name={icon} size={15} color={iconFg} />
         </View>
-        <Text style={sp.val}>{value}</Text>
-        <Text style={sp.lbl}>{label}</Text>
+        <View>
+            <Text style={sp.val}>{value}</Text>
+            <Text style={sp.lbl}>{label}</Text>
+        </View>
     </View>
 );
 
@@ -154,8 +156,9 @@ const sp = StyleSheet.create({
         borderWidth: 1,
         borderColor: T.border,
         padding: 13,
+        flexDirection: "row",
         alignItems: "center",
-        gap: 4,
+        gap: 12,
     },
     iconBox: {
         width: 34,
@@ -163,7 +166,6 @@ const sp = StyleSheet.create({
         borderRadius: 10,
         alignItems: "center",
         justifyContent: "center",
-        marginBottom: 2,
     },
     val: {
         fontSize: 19,
@@ -1401,23 +1403,8 @@ const JobOpeningsScreen: React.FC = () => {
     const MainContent = (
         <Container style={s.safe}>
             {WebStyles}
-            <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
+            <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
-            {/* ── TOP BAR ── */}
-            <View style={s.topBar}>
-                <View style={s.crumb}>
-                    <Text style={s.crumbItem}>Dashboard</Text>
-                    <Feather name="chevron-right" size={12} color={T.textHint} />
-                    <Text style={s.crumbItem}>Careers</Text>
-                    <Feather name="chevron-right" size={12} color={T.textHint} />
-                    <Text style={[s.crumbItem, { color: T.textH, fontWeight: "600" }]}>Job Openings</Text>
-                </View>
-                <View style={s.topBarRight}>
-                    <TouchableOpacity style={s.iconBtn}>
-                        <Feather name="bell" size={16} color={T.textM} />
-                    </TouchableOpacity>
-                </View>
-            </View>
 
             <ScrollView
                 style={{ flex: 1 }}
@@ -1766,8 +1753,9 @@ const s = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-        backgroundColor: "#1F2937", // T.navy
+        backgroundColor: "#151D4F", // deep navy
         padding: 24,
+        paddingBottom: 48,
         borderRadius: 16,
     },
     pageHeadLeft: { flex: 1 },
@@ -1823,6 +1811,11 @@ const s = StyleSheet.create({
     statsRow: {
         flexDirection: "row",
         gap: 8,
+        marginTop: -42,
+        zIndex: 10,
+        maxWidth: 900,
+        alignSelf: "center",
+        width: "100%",
     },
 
     // Search + filters

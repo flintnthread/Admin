@@ -46,6 +46,24 @@ const TEXT_HEAD  = "#1a2b4a";
 const TEXT_BODY  = "#4a5568";
 const TEXT_MUTED = "#a0aec0";
 
+// Valid Feather icon names used for category cards
+const VALID_FEATHER_ICONS = new Set([
+    "help-circle", "grid", "check-circle", "slash", "package", "shopping-cart",
+    "shopping-bag", "truck", "credit-card", "tag", "star", "heart", "box",
+    "layers", "settings", "user", "users", "shield", "lock", "alert-circle",
+    "info", "book", "file-text", "folder", "archive", "clipboard", "calendar",
+    "clock", "map-pin", "phone", "mail", "message-circle", "bell", "gift",
+    "home", "globe", "tool", "zap", "activity", "award", "briefcase",
+    "coffee", "compass", "database", "disc", "dollar-sign", "download",
+    "edit", "eye", "feather", "flag", "headphones", "image", "key",
+    "life-buoy", "link", "list", "mic", "monitor", "music", "navigation",
+    "percent", "pie-chart", "play", "printer", "radio", "refresh-cw",
+    "repeat", "search", "send", "server", "share", "smile", "sun",
+    "thermometer", "thumbs-up", "trending-up", "umbrella", "upload",
+    "video", "wifi", "wind", "x-circle", "aperture", "bar-chart",
+]);
+const safeIcon = (name: string): string => VALID_FEATHER_ICONS.has(name) ? name : "help-circle";
+
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type CategoryStatus = "Active" | "Inactive";
 
@@ -157,7 +175,7 @@ const GridCard: React.FC<{
             {/* Top row: icon + action buttons */}
             <View style={cSt.topRow}>
                 <View style={[cSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                    <Feather name={cat.icon as any} size={20} color={cat.color} />
+                    <Feather name={safeIcon(cat.icon) as any} size={20} color={cat.color} />
                 </View>
                 <View style={cSt.actionBtns}>
                     <TouchableOpacity style={cSt.iconBtn} onPress={onEdit}>
@@ -212,7 +230,7 @@ const ListRow: React.FC<{
     return (
         <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
             <View style={[lSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                <Feather name={cat.icon as any} size={18} color={cat.color} />
+                <Feather name={safeIcon(cat.icon) as any} size={18} color={cat.color} />
             </View>
             <View style={lSt.info}>
                 <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
@@ -378,6 +396,23 @@ const FaqCategoriesScreen: React.FC = () => {
                     </TouchableOpacity>
                 </View>
 
+                {/* ── WEB STAT CARDS (overlapping header) ── */}
+                {isWeb && (
+                    <View style={st.statsRow}>
+                        {stats.map((s, i) => (
+                            <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
+                                <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
+                                    <Feather name={s.icon as any} size={22} color={s.color} />
+                                </View>
+                                <View>
+                                    <Text style={[st.statValue, { color: s.color }]}>{s.value}</Text>
+                                    <Text style={st.statLabel}>{s.label.toUpperCase()}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
                 <ScrollView style={st.scroll}
                     contentContainerStyle={[st.scrollContent, !isWeb && { paddingBottom: 100 }]}
                     showsVerticalScrollIndicator={false}>
@@ -386,22 +421,8 @@ const FaqCategoriesScreen: React.FC = () => {
                         <Text style={{ color: ACCENT_RED, marginBottom: 12, paddingHorizontal: 16 }}>{loadError}</Text>
                     ) : null}
 
-                    {/* ── STAT CARDS ── */}
-                    {isWeb ? (
-                        <View style={st.statsRow}>
-                            {stats.map((s, i) => (
-                                <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
-                                    <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
-                                        <Feather name={s.icon as any} size={22} color={s.color} />
-                                    </View>
-                                    <View>
-                                        <Text style={[st.statValue, { color: s.color }]}>{s.value}</Text>
-                                        <Text style={st.statLabel}>{s.label.toUpperCase()}</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    ) : (
+                    {/* ── MOBILE STAT CARDS ── */}
+                    {!isWeb && (
                         <View style={st.statsCardSingle}>
                             {stats.map((s, i) => (
                                 <React.Fragment key={i}>
@@ -537,8 +558,8 @@ const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
     // Header
-    header:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: DARK_NAVY },
-    headerWeb:       { paddingHorizontal: 28, paddingVertical: 20 },
+    header:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
+    headerWeb:       { paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, marginHorizontal: 2, marginTop: 12, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft:      { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon:      { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle:     { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },
@@ -551,11 +572,11 @@ const st = StyleSheet.create({
     scrollContent: { padding: 16, gap: 14 },
 
     // Stats
-    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4 },
-    statCard:    { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "column", alignItems: "center", gap: 10, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
-    statIconWrap:{ width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-    statValue:   { fontSize: 26, fontWeight: "800", textAlign: "center" },
-    statLabel:   { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", textAlign: "center", letterSpacing: 0.5 },
+    statsRow:    { flexDirection: "row", gap: 12, marginBottom: 4, marginTop: -42, marginHorizontal: 16, zIndex: 10, maxWidth: 900, alignSelf: "center", width: "100%" },
+    statCard:    { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
+    statIconWrap:{ width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    statValue:   { fontSize: 22, fontWeight: "800" },
+    statLabel:   { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", letterSpacing: 0.5 },
 
     // Stats Single Card (Mobile)
     statsCardSingle: { backgroundColor: BG_CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2, marginBottom: 4 },

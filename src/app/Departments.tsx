@@ -513,8 +513,10 @@ const StatCard: React.FC<{
         <View style={[sc.iconWrap, { backgroundColor: iconBg }]}>
             <Feather name={icon} size={16} color={iconFg} />
         </View>
-        <Text style={sc.value}>{value}</Text>
-        <Text style={sc.label}>{label}</Text>
+        <View>
+            <Text style={sc.value}>{value}</Text>
+            <Text style={sc.label}>{label}</Text>
+        </View>
     </View>
 );
 
@@ -524,7 +526,9 @@ const sc = StyleSheet.create({
         backgroundColor: T.card,
         borderRadius: 14,
         padding: 14,
+        flexDirection: "row",
         alignItems: "center",
+        gap: 12,
         borderWidth: 1,
         borderColor: T.border,
     },
@@ -534,7 +538,6 @@ const sc = StyleSheet.create({
         borderRadius: 10,
         alignItems: "center",
         justifyContent: "center",
-        marginBottom: 8,
     },
     value: {
         fontSize: 20,
@@ -824,7 +827,7 @@ const DepartmentsScreen: React.FC = () => {
 
     const MainContent = (
         <Container style={s.safe}>
-            <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
+            <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
 
 
@@ -1149,8 +1152,9 @@ const s = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-        backgroundColor: T.navy,
+        backgroundColor: "#151D4F",
         padding: 24,
+        paddingBottom: 48,
         borderRadius: 16,
     },
     pageHeadLeft: {
@@ -1204,10 +1208,14 @@ const s = StyleSheet.create({
         letterSpacing: -0.2,
     },
 
-    // ── Stats ──
     statsRow: {
         flexDirection: "row",
         gap: 10,
+        marginTop: -42,
+        zIndex: 10,
+        maxWidth: 900,
+        alignSelf: "center",
+        width: "100%",
     },
 
     // ── Toolbar ──
