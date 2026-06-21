@@ -87,12 +87,6 @@ const NAV_ITEMS = {
         color: "#d63031",
       },
       {
-        label: "Refund Management",
-        icon: "rotate-ccw",
-        path: null,
-        color: "#e67e22",
-      },
-      {
         label: "Delivery Charges",
         icon: "truck",
         path: "/Deliverycharges",
@@ -284,18 +278,31 @@ export default function AdminSidebar({
 }: Props) {
   const pathname = usePathname();
 
-  const [ecommerceExpanded, setEcommerceExpanded] = React.useState(false);
-  const [expandedItems, setExpandedItems] = React.useState<
-    Record<string, boolean>
-  >({});
+  const isActive = (path: string | null) =>
+    !!path && (pathname === path || pathname.startsWith(path + "/"));
 
+  const [ecommerceExpanded, setEcommerceExpanded] = React.useState(() => {
+    return NAV_ITEMS.APPS.children.some((child) => isActive(child.path));
+  });
+
+  const [expandedItems, setExpandedItems] = React.useState<Record<string, boolean>>(() => {
+    const initialState: Record<string, boolean> = {};
+    NAV_ITEMS.ADVERTISING.forEach((item) => {
+      if ("children" in item && item.children.some((c) => isActive(c.path))) {
+        initialState[item.label] = true;
+      }
+    });
+    NAV_ITEMS.CUSTOM.forEach((item) => {
+      if ("children" in item && item.children.some((c) => isActive(c.path))) {
+        initialState[item.label] = true;
+      }
+    });
+    return initialState;
+  });
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
   };
-
-  const isActive = (path: string | null) =>
-    !!path && (pathname === path || pathname.startsWith(path + "/"));
 
   const navigate = (path: string | null) => {
     if (path) router.push(path as never);
@@ -667,25 +674,19 @@ export default function AdminSidebar({
                         ]}
                         onPress={() => navigate(child.path)}
                       >
-                        {child.icon !== "none" && (
-                          <Feather
-                            name={child.icon as any}
-                            size={14}
-                            color={
-                              isActive(child.path)
-                                ? "#EA580C"
-                                : (child as any).color || "#6B7280"
-                            }
-                          />
-                        )}
+                        <Feather
+                          name={child.icon as any}
+                          size={14}
+                          color={
+                            isActive(child.path)
+                              ? "#EA580C"
+                              : (child as any).color || "#6B7280"
+                          }
+                        />
                         {!collapsed && (
                           <Text
                             style={[
                               styles.subMenuItemText,
-                              child.icon === "none" && {
-                                marginLeft: 30,
-                                color: "#9CA3AF",
-                              },
                               isActive(child.path) &&
                                 styles.subMenuItemTextActive,
                             ]}

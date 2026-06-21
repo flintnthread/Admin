@@ -168,7 +168,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   webMainContent: {
-    padding: 30,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 40,
     maxWidth: 1000,
   },
   mobileMainContent: {
@@ -181,6 +183,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#151D4F",
     padding: 18,
     borderRadius: 12,
+    marginHorizontal: 2,
+    marginTop: 12,
     shadowColor: "#151D4F",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

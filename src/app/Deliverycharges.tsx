@@ -348,10 +348,8 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
       <View style={[sc.iconWrap, { backgroundColor: tint }]}>
         <Feather name={icon} size={16} color={txtColor} />
       </View>
-      <View>
-        <Text style={sc.value}>{value}</Text>
-        <Text style={sc.label}>{label}</Text>
-      </View>
+      <Text style={sc.value}>{value}</Text>
+      <Text style={sc.label}>{label}</Text>
     </View>
   );
 };
@@ -363,9 +361,7 @@ const sc = StyleSheet.create({
     backgroundColor: T.card,
     borderRadius: 14,
     padding: 14,
-    flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     borderWidth: 1,
     borderColor: T.border,
   },
@@ -375,6 +371,7 @@ const sc = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 8,
   },
   value: {
     fontSize: 20,
@@ -678,17 +675,33 @@ const DeliveryChargesScreen: React.FC = () => {
       try {
         await deleteDeliverySlab(id);
         await loadSlabs();
-        if (Platform.OS === "web") window.alert("Delivery charge deleted successfully!");
-        else Alert.alert("Deleted", "Delivery charge deleted successfully!");
+        if (Platform.OS === "web") {
+          Swal.fire({
+            icon: "success",
+            title: "Deleted!",
+            text: "Delivery charge deleted successfully!",
+            confirmButtonColor: "#1E2B6B",
+          });
+        } else Alert.alert("Deleted", "Delivery charge deleted successfully!");
       } catch (e) {
         console.warn(getApiErrorMessage(e));
       }
     };
 
     if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this delivery charge?")) {
-        confirmDelete();
-      }
+      Swal.fire({
+        title: "Are you sure?",
+        text: "You won't be able to revert this!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#1E2B6B",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          confirmDelete();
+        }
+      });
     } else {
       Alert.alert(
         "Confirm Delete",
@@ -713,7 +726,7 @@ const DeliveryChargesScreen: React.FC = () => {
                 <Text style={[styles.pageTitle, { fontSize: 20 }]}>Delivery Charges</Text>
                 <Text style={styles.pageSub}>Manage weight slabs and charges</Text>
               </View>
-              <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+              <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}>
                 <Feather name="plus" size={14} color="#1E2B6B" />
                 <Text style={styles.addBtnWhiteTxt}>Add</Text>
               </TouchableOpacity>
@@ -722,14 +735,9 @@ const DeliveryChargesScreen: React.FC = () => {
         ) : (
           <>
             <View style={styles.pageHeadLeft}>
-              <View style={styles.breadcrumb}>
-                <Text style={styles.breadcrumbDim}>Dashboard</Text>
-                <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.breadcrumbActive}>Delivery Charges</Text>
-              </View>
               <Text style={styles.pageTitle}>Delivery Charges</Text>
             </View>
-            <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+            <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}>
               <Feather name="plus" size={15} color="#1E2B6B" />
               <Text style={styles.addBtnWhiteTxt}>Add New Charge</Text>
             </TouchableOpacity>
@@ -738,10 +746,8 @@ const DeliveryChargesScreen: React.FC = () => {
       </View>
 
       <StatsFooter slabs={slabs} isWeb={isWeb} />
-      <ScrollView
-        style={styles.listContent}
-        contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }}
-        showsVerticalScrollIndicator={false}
+      <View
+        style={[styles.listContent, isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }]}
       >
 
         {/* ── Toolbar (Search + Filter) ── */}
@@ -754,7 +760,7 @@ const DeliveryChargesScreen: React.FC = () => {
               placeholderTextColor="#000"
             />
           </View>
-          
+
           <View style={{ flexDirection: "row", gap: 8, marginRight: 8 }}>
             {(["All", "Active", "Inactive"] as const).map(status => (
               <TouchableOpacity
@@ -822,8 +828,8 @@ const DeliveryChargesScreen: React.FC = () => {
             ))}
           </View>
         ) : (
-          <View style={styles.tableCard}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={[styles.tableCard, isWeb && { width: "75%" }]}>
+            <View style={[{ width: "100%", overflowX: "auto" } as any]}>
               <View style={{ minWidth: 880 }}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.th, { width: 140 }]}>Weight Slab</Text>
@@ -857,10 +863,10 @@ const DeliveryChargesScreen: React.FC = () => {
                   </View>
                 ))}
               </View>
-            </ScrollView>
+            </View>
           </View>
         )}
-      </ScrollView>
+      </View>
     </View>
   );
 
@@ -868,7 +874,9 @@ const DeliveryChargesScreen: React.FC = () => {
     <AdminLayout>
       <View style={{ flex: 1 }}>
         <StatusBar barStyle="light-content" backgroundColor="#000080" />
-        {MainContent}
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {MainContent}
+        </ScrollView>
         <DeliveryChargeModal
           visible={editingSlabId !== null}
           onClose={() => setEditingSlabId(null)}
@@ -915,8 +923,8 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     paddingBottom: 68,
     borderRadius: 22,
-    marginHorizontal: 24,
-    marginTop: 24,
+    marginHorizontal: 18,
+    marginTop: 22,
     marginBottom: 0,
     zIndex: 1,
     shadowColor: "#151D4F",

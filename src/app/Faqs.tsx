@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapFaqCategoryRow, mapFaqQuestionRow } from "@/lib/mappers";
 import {
-  createFaq,
-  deleteFaq,
-  fetchFaqCategories,
-  fetchFaqs,
-  updateFaq,
+    createFaq,
+    deleteFaq,
+    fetchFaqCategories,
+    fetchFaqs,
+    updateFaq,
 } from "@/services/faqApi";
 import {
     View,
@@ -537,191 +537,163 @@ const FaqQuestionsScreen: React.FC = () => {
             <View style={st.root}>
                 <StatusBar barStyle="light-content" backgroundColor={NAVY} />
 
-                {/* â”€â”€ PAGE HEADER â”€â”€ */}
-                <View style={[st.header, isWeb && st.headerWeb, { backgroundColor: NAVY, borderBottomColor: NAVY }]}>
-                    <View style={st.headerLeft}>
-                        <View style={[st.headerIcon, { backgroundColor: PRIMARY }]}>
-                            <Feather name="help-circle" size={22} color="#fff" />
-                        </View>
-                        <View>
-                            <Text style={[st.headerTitle, { color: "#fff" }]}>FAQ Questions</Text>
-                            <Text style={[st.headerBreadcrumb, { color: "rgba(255,255,255,0.6)" }]}>
-                                <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  ›  FAQ Questions"}
-                            </Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY }]}
-                        onPress={() => { setEditModal(null); setAddModal(true); }}>
-                        <Feather name="plus" size={14} color="#fff" />
-                        <Text style={st.addBtnText}>Add Question</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <ScrollView style={st.scroll}
-                    contentContainerStyle={[st.scrollContent, !isWeb && { paddingBottom: 120 }]}
-                    showsVerticalScrollIndicator={false}>
-
-                    {loadError ? (
-                        <Text style={{ color: ACCENT_RED, marginBottom: 12 }}>{loadError}</Text>
-                    ) : null}
-
-                    {/* CATEGORY TABS */}
-                    <View style={st.catSection}>
-                        <Text style={st.sectionLabel}>SELECT CATEGORY</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={st.catScrollContent}>
-                            {categories.map(cat => {
-                                const catQCount = questions.filter(q => q.categoryId === cat.id).length;
-                                const isSelected = cat.id === selectedCatId;
-                                return (
-                                    <TouchableOpacity key={cat.id}
-                                        style={[st.catBtn,
-                                        { borderColor: isSelected ? NAVY : PRIMARY },
-                                        isSelected && { backgroundColor: NAVY }]}
-                                        onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); }}>
-                                        <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
-                                            <Feather name={cat.icon as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
-                                        </View>
-                                        <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
-                                        <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
-                                            <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : PRIMARY }]}>{catQCount}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
-                    </View>
-
-                    {/* â”€â”€ SELECTED CATEGORY HERO â”€â”€ */}
-                    <View style={[st.heroCard, { borderLeftColor: selectedCat?.color ?? PRIMARY }]}>
-                        <View style={st.heroLeft}>
-                            <View style={[st.heroIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
-                                <Feather name={(selectedCat?.icon ?? "help-circle") as any} size={28} color={selectedCat?.color ?? PRIMARY} />
+                <ScrollView style={st.scroll} showsVerticalScrollIndicator={false}>
+                    {/* ——— PAGE HEADER ——— */}
+                    <View style={[st.header, isWeb && st.headerWeb, { backgroundColor: NAVY, borderBottomColor: NAVY }]}>
+                        <View style={st.headerLeft}>
+                            <View style={[st.headerIcon, { backgroundColor: PRIMARY }]}>
+                                <Feather name="help-circle" size={22} color="#fff" />
                             </View>
                             <View>
-                                <Text style={st.heroTitle}>{selectedCat?.name}</Text>
-                                <Text style={st.heroSub}>{catQuestions.length} questions  Â·  {activeCount} active</Text>
+                                <Text style={[st.headerTitle, { color: "#fff" }]}>FAQ Questions</Text>
+                                <Text style={[st.headerBreadcrumb, { color: "rgba(255,255,255,0.6)" }]}>
+                                    <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  ›  FAQ Questions"}
+                                </Text>
                             </View>
                         </View>
-                        <View style={[st.heroBadge, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
-                            <Text style={[st.heroBadgeText, { color: selectedCat?.color ?? PRIMARY }]}>{catQuestions.length} FAQs</Text>
-                        </View>
-                    </View>
-
-                    {/* â”€â”€ SEARCH + FILTER TOOLBAR â”€â”€ */}
-                    <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
-                        <View style={[st.searchWrap, !isWeb && { minWidth: "100%" as any }]}>
-                            <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
-                            <TextInput style={st.searchInput}
-                                placeholder="Search questions..."
-                                placeholderTextColor={TEXT_MUTED}
-                                value={search}
-                                onChangeText={setSearch} />
-                            {search.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearch("")}>
-                                    <Feather name="x-circle" size={14} color={TEXT_MUTED} />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        <View style={st.chips}>
-                            {(["All", "Active", "Inactive"] as const).map(f => (
-                                <TouchableOpacity key={f}
-                                    style={[st.chip,
-                                    statusFilter === f && { backgroundColor: selectedCat?.color ?? PRIMARY, borderColor: selectedCat?.color ?? PRIMARY }]}
-                                    onPress={() => setStatusFilter(f)}>
-                                    <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                        <TouchableOpacity style={st.expandAllBtn}
-                            onPress={() => {
-                                if (expandedIds.size === filtered.length) setExpandedIds(new Set());
-                                else setExpandedIds(new Set(filtered.map(q => q.id)));
-                            }}>
-                            <Feather name={expandedIds.size === filtered.length ? "minimize-2" : "maximize-2"} size={13} color={TEXT_BODY} />
-                            <Text style={st.expandAllTxt}>{expandedIds.size === filtered.length ? "Collapse" : "Expand"} All</Text>
+                        <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY }]}
+                            onPress={() => { setEditModal(null); setAddModal(true); }}>
+                            <Feather name="plus" size={14} color="#fff" />
+                            <Text style={st.addBtnText}>Add Question</Text>
                         </TouchableOpacity>
-
-                        {/* View mode toggle */}
-                        <View style={st.viewToggle}>
-                            <TouchableOpacity
-                                style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
-                                onPress={() => setViewMode("list")}>
-                                <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
-                                onPress={() => setViewMode("grid")}>
-                                <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
-                            </TouchableOpacity>
-                        </View>
                     </View>
 
-                    {/* â”€â”€ RESULT COUNT â”€â”€ */}
-                    <Text style={st.resultCount}>
-                        Showing <Text style={{ color: selectedCat?.color ?? PRIMARY, fontWeight: "700" }}>{filtered.length}</Text> questions
-                    </Text>
+                    <View style={[st.scrollContent, !isWeb && { paddingBottom: 120 }]}>
 
-                    {/* â”€â”€ QUESTIONS LIST / GRID â”€â”€ */}
-                    {filtered.length === 0 ? (
-                        <View style={st.empty}>
-                            <View style={[st.emptyIconWrap, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "15" }]}>
-                                <Feather name="inbox" size={36} color={selectedCat?.color ?? TEXT_MUTED} />
-                            </View>
-                            <Text style={st.emptyTitle}>No questions found</Text>
-                            <Text style={st.emptySubtitle}>Try adjusting your search or add a new question</Text>
-                            <TouchableOpacity style={[st.emptyAddBtn, { backgroundColor: selectedCat?.color ?? PRIMARY }]}
-                                onPress={() => { setEditModal(null); setAddModal(true); }}>
-                                <Feather name="plus" size={14} color="#fff" />
-                                <Text style={st.emptyAddTxt}>Add Question</Text>
-                            </TouchableOpacity>
+                        {loadError ? (
+                            <Text style={{ color: ACCENT_RED, marginBottom: 12 }}>{loadError}</Text>
+                        ) : null}
+
+                        {/* CATEGORY TABS */}
+                        <View style={st.catSection}>
+                            <Text style={st.sectionLabel}>SELECT CATEGORY</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={st.catScrollContent}>
+                                {categories.map(cat => {
+                                    const catQCount = questions.filter(q => q.categoryId === cat.id).length;
+                                    const isSelected = cat.id === selectedCatId;
+                                    return (
+                                        <TouchableOpacity key={cat.id}
+                                            style={[st.catBtn,
+                                            { borderColor: isSelected ? NAVY : PRIMARY },
+                                            isSelected && { backgroundColor: NAVY }]}
+                                            onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); }}>
+                                            <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
+                                                <Feather name={cat.icon as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
+                                            </View>
+                                            <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
+                                            <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
+                                                <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : PRIMARY }]}>{catQCount}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
                         </View>
-                    ) : viewMode === "grid" ? (
-                        <View style={st.gridContainer}>
-                            {filtered.map((q, idx) => (
-                                <View key={q.id} style={[st.gridItem, !isWeb && { width: "100%" as any }]}>
-                                    <QuestionGridCard
-                                        q={q}
-                                        cat={selectedCat}
-                                        index={idx + 1}
-                                        onView={() => setViewModal(q)}
-                                        onEdit={() => { setEditModal(q); setAddModal(true); }}
-                                        onDelete={() => setDeleteModal(q)}
-                                    />
+
+                        {/* â”€â”€ SELECTED CATEGORY HERO â”€â”€ */}
+                        <View style={[st.heroCard, { borderLeftColor: selectedCat?.color ?? PRIMARY }]}>
+                            <View style={st.heroLeft}>
+                                <View style={[st.heroIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
+                                    <Feather name={(selectedCat?.icon ?? "help-circle") as any} size={28} color={selectedCat?.color ?? PRIMARY} />
                                 </View>
-                            ))}
+                                <View>
+                                    <Text style={st.heroTitle}>{selectedCat?.name}</Text>
+                                    <Text style={st.heroSub}>{catQuestions.length} questions  Â·  {activeCount} active</Text>
+                                </View>
+                            </View>
+                            <View style={[st.heroBadge, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
+                                <Text style={[st.heroBadgeText, { color: selectedCat?.color ?? PRIMARY }]}>{catQuestions.length} FAQs</Text>
+                            </View>
                         </View>
-                    ) : (
-                        <View style={st.tableWrap}>
-                            {isWeb ? (
-                                <View style={{ width: "100%" }}>
-                                    {/* Table header */}
-                                    <View style={qSt.headerRow}>
-                                        <Text style={[qSt.headerCell, { width: 60 }]}>ID</Text>
-                                        <Text style={[qSt.headerCell, { width: 200 }]}>Category</Text>
-                                        <Text style={[qSt.headerCell, { flex: 1 }]}>Question</Text>
-                                        <Text style={[qSt.headerCell, { width: 80 }]}>Sort Order</Text>
-                                        <Text style={[qSt.headerCell, { width: 100 }]}>Status</Text>
-                                        <Text style={[qSt.headerCell, { width: 70 }]}>Seller</Text>
-                                        <Text style={[qSt.headerCell, { width: 110 }]}>Created Date</Text>
-                                        <Text style={[qSt.headerCell, { width: 110 }]}>Action</Text>
-                                    </View>
-                                    {filtered.map((q, idx) => (
-                                        <QuestionRow
-                                            key={q.id}
+
+                        {/* â”€â”€ SEARCH + FILTER TOOLBAR â”€â”€ */}
+                        <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
+                            <View style={[st.searchWrap, !isWeb && { minWidth: "100%" as any }]}>
+                                <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
+                                <TextInput style={st.searchInput}
+                                    placeholder="Search questions..."
+                                    placeholderTextColor={TEXT_MUTED}
+                                    value={search}
+                                    onChangeText={setSearch} />
+                                {search.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearch("")}>
+                                        <Feather name="x-circle" size={14} color={TEXT_MUTED} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            <View style={st.chips}>
+                                {(["All", "Active", "Inactive"] as const).map(f => (
+                                    <TouchableOpacity key={f}
+                                        style={[st.chip,
+                                        statusFilter === f && { backgroundColor: selectedCat?.color ?? PRIMARY, borderColor: selectedCat?.color ?? PRIMARY }]}
+                                        onPress={() => setStatusFilter(f)}>
+                                        <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            <TouchableOpacity style={st.expandAllBtn}
+                                onPress={() => {
+                                    if (expandedIds.size === filtered.length) setExpandedIds(new Set());
+                                    else setExpandedIds(new Set(filtered.map(q => q.id)));
+                                }}>
+                                <Feather name={expandedIds.size === filtered.length ? "minimize-2" : "maximize-2"} size={13} color={TEXT_BODY} />
+                                <Text style={st.expandAllTxt}>{expandedIds.size === filtered.length ? "Collapse" : "Expand"} All</Text>
+                            </TouchableOpacity>
+
+                            {/* View mode toggle */}
+                            <View style={st.viewToggle}>
+                                <TouchableOpacity
+                                    style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
+                                    onPress={() => setViewMode("list")}>
+                                    <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
+                                    onPress={() => setViewMode("grid")}>
+                                    <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* â”€â”€ RESULT COUNT â”€â”€ */}
+                        <Text style={st.resultCount}>
+                            Showing <Text style={{ color: selectedCat?.color ?? PRIMARY, fontWeight: "700" }}>{filtered.length}</Text> questions
+                        </Text>
+
+                        {/* â”€â”€ QUESTIONS LIST / GRID â”€â”€ */}
+                        {filtered.length === 0 ? (
+                            <View style={st.empty}>
+                                <View style={[st.emptyIconWrap, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "15" }]}>
+                                    <Feather name="inbox" size={36} color={selectedCat?.color ?? TEXT_MUTED} />
+                                </View>
+                                <Text style={st.emptyTitle}>No questions found</Text>
+                                <Text style={st.emptySubtitle}>Try adjusting your search or add a new question</Text>
+                                <TouchableOpacity style={[st.emptyAddBtn, { backgroundColor: selectedCat?.color ?? PRIMARY }]}
+                                    onPress={() => { setEditModal(null); setAddModal(true); }}>
+                                    <Feather name="plus" size={14} color="#fff" />
+                                    <Text style={st.emptyAddTxt}>Add Question</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : viewMode === "grid" ? (
+                            <View style={st.gridContainer}>
+                                {filtered.map((q, idx) => (
+                                    <View key={q.id} style={[st.gridItem, !isWeb && { width: "100%" as any }]}>
+                                        <QuestionGridCard
                                             q={q}
                                             cat={selectedCat}
-                                            index={idx}
-                                            onToggleSeller={() => setQuestions(prev => prev.map(x => x.id === q.id ? { ...x, isForSeller: !x.isForSeller } : x))}
+                                            index={idx + 1}
                                             onView={() => setViewModal(q)}
                                             onEdit={() => { setEditModal(q); setAddModal(true); }}
                                             onDelete={() => setDeleteModal(q)}
                                         />
-                                    ))}
-                                </View>
-                            ) : (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    <View style={{ minWidth: 900 }}>
+                                    </View>
+                                ))}
+                            </View>
+                        ) : (
+                            <View style={st.tableWrap}>
+                                {isWeb ? (
+                                    <View style={{ width: "100%" }}>
                                         {/* Table header */}
                                         <View style={qSt.headerRow}>
                                             <Text style={[qSt.headerCell, { width: 60 }]}>ID</Text>
@@ -746,10 +718,38 @@ const FaqQuestionsScreen: React.FC = () => {
                                             />
                                         ))}
                                     </View>
-                                </ScrollView>
-                            )}
-                        </View>
-                    )}
+                                ) : (
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                        <View style={{ minWidth: 900 }}>
+                                            {/* Table header */}
+                                            <View style={qSt.headerRow}>
+                                                <Text style={[qSt.headerCell, { width: 60 }]}>ID</Text>
+                                                <Text style={[qSt.headerCell, { width: 200 }]}>Category</Text>
+                                                <Text style={[qSt.headerCell, { flex: 1 }]}>Question</Text>
+                                                <Text style={[qSt.headerCell, { width: 80 }]}>Sort Order</Text>
+                                                <Text style={[qSt.headerCell, { width: 100 }]}>Status</Text>
+                                                <Text style={[qSt.headerCell, { width: 70 }]}>Seller</Text>
+                                                <Text style={[qSt.headerCell, { width: 110 }]}>Created Date</Text>
+                                                <Text style={[qSt.headerCell, { width: 110 }]}>Action</Text>
+                                            </View>
+                                            {filtered.map((q, idx) => (
+                                                <QuestionRow
+                                                    key={q.id}
+                                                    q={q}
+                                                    cat={selectedCat}
+                                                    index={idx}
+                                                    onToggleSeller={() => setQuestions(prev => prev.map(x => x.id === q.id ? { ...x, isForSeller: !x.isForSeller } : x))}
+                                                    onView={() => setViewModal(q)}
+                                                    onEdit={() => { setEditModal(q); setAddModal(true); }}
+                                                    onDelete={() => setDeleteModal(q)}
+                                                />
+                                            ))}
+                                        </View>
+                                    </ScrollView>
+                                )}
+                            </View>
+                        )}
+                    </View>
                 </ScrollView>
 
                 {/* â”€â”€ MODALS â”€â”€ */}
@@ -788,7 +788,7 @@ const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: BG_CARD, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-    headerWeb: { paddingHorizontal: 28, paddingVertical: 20 },
+    headerWeb: { paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, marginHorizontal: 18, marginTop: 22, borderRadius: 22, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT_HEAD, letterSpacing: -0.3 },
