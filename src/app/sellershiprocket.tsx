@@ -259,12 +259,12 @@ const SellerShiprocket: React.FC<Props> = () => {
     <View
       style={[
         styles.statsRow,
-        { paddingHorizontal: contentPadding, marginTop: 16 },
+        { paddingHorizontal: contentPadding, marginTop: -42, zIndex: 10, elevation: 10 },
         isMobile && styles.statsRowMobile,
       ]}
     >
       {/* Pending Upload */}
-      <View style={[styles.statCard, styles.statCardPending, { borderRadius: cardRadius, flex: 1 }]}>
+      <View style={[styles.statCard, styles.statCardPending, { borderRadius: cardRadius, width: isMobile ? '100%' : 420 }]}>
         <View style={styles.statCardContent}>
           <View>
             <Text style={[styles.statLabel, { fontSize: fontSize.sm }]}>
@@ -286,7 +286,7 @@ const SellerShiprocket: React.FC<Props> = () => {
         style={[
           styles.statCard,
           styles.statCardUploaded,
-          { borderRadius: cardRadius, flex: 1, marginLeft: isMobile ? 0 : 12, marginTop: isMobile ? 10 : 0 },
+          { borderRadius: cardRadius, width: isMobile ? '100%' : 420, marginLeft: isMobile ? 0 : 16, marginTop: isMobile ? 10 : 0 },
         ]}
       >
         <View style={styles.statCardContent}>
@@ -301,7 +301,7 @@ const SellerShiprocket: React.FC<Props> = () => {
               Profile Completed Sellers
             </Text>
           </View>
-          <BsIcon name="check-circle" size={isMobile ? 28 : 36} color="#059669" />
+          <BsIcon name="check-circle" size={isMobile ? 28 : 36} color="#EA580C" />
         </View>
       </View>
     </View>
@@ -434,8 +434,8 @@ const SellerShiprocket: React.FC<Props> = () => {
         </View>
       ) : (
         // Table view for laptop & desktop
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: isLaptop ? 700 : 900 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: '100%' }}>
+          <View style={{ width: '100%', minWidth: isLaptop ? 700 : 900 }}>
             {/* Table head */}
             <View style={[styles.tableHead, { paddingHorizontal: 16 }]}>
               <TouchableOpacity style={{ width: 36 }} onPress={toggleSelectAll}>
@@ -523,7 +523,7 @@ const SellerShiprocket: React.FC<Props> = () => {
   const renderUploadedSellers = () => (
     <View style={[styles.section, { marginHorizontal: contentPadding, marginTop: 20, marginBottom: 32, borderRadius: cardRadius }]}>
       <View style={styles.sectionHeaderUploaded}>
-        <BsIcon name="check-circle" size={15} color="#059669" />
+        <BsIcon name="check-circle" size={15} color="#EA580C" />
         <Text style={[styles.sectionTitle, { fontSize: fontSize.base, marginLeft: 6 }]}>
           Recently Uploaded Profile Completed Sellers
         </Text>
@@ -564,8 +564,8 @@ const SellerShiprocket: React.FC<Props> = () => {
         </View>
       ) : (
         // Table view
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: isLaptop ? 750 : 950 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: '100%' }}>
+          <View style={{ width: '100%', minWidth: isLaptop ? 750 : 950 }}>
             <View style={[styles.tableHead, { paddingHorizontal: 16 }]}>
               {['Business Name', 'Contact Person', 'City', 'State', 'Uploaded At', 'Status'].map((h) => (
                 <Text key={h} style={[styles.tableHeadCell, { fontSize: fontSize.xs, flex: h === 'Business Name' ? 2 : 1 }]}>
@@ -610,7 +610,7 @@ const SellerShiprocket: React.FC<Props> = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Page header */}
-          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: 16 }]}>
+          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: 68 }]}>
             {renderHeader()}
           </View>
 
@@ -654,16 +654,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Header ──────────────────────────────────────────────────────────────
   pageHeaderWrapper: {
-    backgroundColor: '#1d324e',
-    borderBottomWidth: 1,
-    borderBottomColor: '#16283d',
+    backgroundColor: '#151D4F',
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    marginHorizontal: 24,
+    marginTop: 24,
+    borderRadius: 22,
   },
   header: {
     flexDirection: 'row',
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   profileBadge: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#FFEDD5',
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   profileBadgeText: {
-    color: '#059669',
+    color: '#C2410C',
     fontWeight: '600',
   },
   headerActions: {
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: '#059669',
+    backgroundColor: '#EA580C',
   },
   btnSuccessText: {
     color: '#fff',
@@ -773,6 +773,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
+    justifyContent: 'center',
   },
   statsRowMobile: {
     flexDirection: 'column',
@@ -787,12 +788,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statCardPending: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   statCardUploaded: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#A7F3D0',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   statCardContent: {
     flexDirection: 'row',
@@ -810,7 +811,7 @@ const styles = StyleSheet.create({
     lineHeight: 48,
   },
   statValueGreen: {
-    color: '#059669',
+    color: '#EA580C',
   },
   statSubLabel: {
     color: '#9CA3AF',
@@ -901,18 +902,18 @@ const styles = StyleSheet.create({
   sectionHeaderPending: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
+    borderBottomColor: '#E5E7EB',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   sectionHeaderUploaded: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#A7F3D0',
+    borderBottomColor: '#E5E7EB',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -1018,7 +1019,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   statusBadgeGreen: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#FFEDD5',
     borderRadius: 20,
     paddingHorizontal: 9,
     paddingVertical: 3,

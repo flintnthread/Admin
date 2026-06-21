@@ -214,11 +214,13 @@ const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: 
       {statsData.map((stat, index) => (
         <View key={index} style={styles.statsContainer}>
           <View style={[styles.statIconCircle, { backgroundColor: stat.tint }]}>
-            <Feather name={stat.icon} size={14} color={stat.textColor} />
+            <Feather name={stat.icon} size={18} color={stat.textColor} />
           </View>
-          <Text style={[styles.statValue, { color: stat.textColor }]}>{stat.value}</Text>
-          <Text style={styles.statLabel}>{stat.label}</Text>
-          <Text style={styles.statSub}>{stat.sub}</Text>
+          <View style={styles.statTextWrapper}>
+            <Text style={[styles.statValue, { color: stat.textColor }]}>{stat.value}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+            <Text style={styles.statSub}>{stat.sub}</Text>
+          </View>
         </View>
       ))}
     </View>
@@ -785,6 +787,10 @@ const ContactMessagesScreen: React.FC = () => {
         </Text>
       ) : null}
 
+      <View style={{ marginHorizontal: isWeb ? 24 : 14, marginTop: isWeb ? -42 : -32, zIndex: 10, elevation: 10 }}>
+        <StatsHeader stats={contactStats} />
+      </View>
+
       {/* ── Mobile Controls ── */}
       {!isWeb && (
         <View style={styles.mobileControlsContainer}>
@@ -899,8 +905,7 @@ const ContactMessagesScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        {/* Stats */}
-        <StatsHeader stats={contactStats} />
+        {/* Stats moved to header overlap */}
 
         {loading ? (
           <Text style={styles.resultCount}>Loading contact messages…</Text>
@@ -1106,15 +1111,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#1F2937",
+    backgroundColor: "#151D4F",
     paddingHorizontal: 18,
     paddingVertical: 16,
+    paddingBottom: 40,
     borderBottomWidth: 0,
   },
   webHeader: {
-    backgroundColor: "#1F2937",
+    backgroundColor: "#151D4F",
     paddingTop: 24,
     paddingHorizontal: 24,
+    paddingBottom: 50,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
   },
@@ -1480,10 +1487,12 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flex: 1,
+    flexDirection: "row",
+    gap: 12,
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
     paddingVertical: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -1506,29 +1515,29 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER,
   },
   statIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 5,
+  },
+  statTextWrapper: {
+    flex: 1,
+    alignItems: "flex-start",
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
-    textAlign: "center",
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: TEXT_PRIMARY,
     fontWeight: "600",
-    textAlign: "center",
     marginTop: 2,
   },
   statSub: {
-    fontSize: 9,
+    fontSize: 10,
     color: TEXT_MUTED,
-    textAlign: "center",
   },
 
   // ── Table ──

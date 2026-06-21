@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 // ─── THEME (matches SellerPaymentsScreen) ─────────────────────────────────────
 const PRIMARY = "#ef7b1a";
@@ -27,6 +28,7 @@ const BORDER = "#ede5de";
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type PaymentStatus = "Pending" | "Paid";
 type ReminderBucket = "green" | "orange" | "red";
+type CityType = "Intra-City" | "Metro-Metro";
 
 interface SellerOrder {
     id: number;
@@ -44,6 +46,16 @@ interface SellerOrder {
     reminderBucket: ReminderBucket;
     paymentStatus: PaymentStatus;
     walletBalance: string;
+    // ── Customer & shipping (new) ──────────────────────────────────────────
+    customerName: string;
+    customerPhone: string;
+    customerEmail?: string;
+    shippingAddressLine1: string;
+    shippingAddressLine2: string;
+    shippingCity: string;
+    shippingState: string;
+    shippingPincode: string;
+    cityType: CityType;
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -57,6 +69,9 @@ const getPaymentColor = (status: PaymentStatus) =>
     status === "Paid"
         ? { bg: "#e8f7ee", color: "#1a7a45" }
         : { bg: PRIMARY_LIGHT, color: PRIMARY };
+
+const getInitials = (name: string) =>
+    name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
 // ─── SECTION HEADER ───────────────────────────────────────────────────────────
 const SectionHeader: React.FC<{ icon: string; title: string; accent?: string }> = ({
@@ -94,6 +109,29 @@ const infoStyles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#f3ece6" },
     label: { fontSize: 12, color: TEXT_MUTED, fontWeight: "600", flex: 1 },
     value: { fontSize: 13, flex: 1, textAlign: "right" },
+});
+
+// ─── ADDRESS CHIP (new — used by Customer & Shipping card) ───────────────────
+const AddressChip: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <View style={addressChipStyles.chip}>
+        <Text style={addressChipStyles.label}>{label}</Text>
+        <Text style={addressChipStyles.value} numberOfLines={1}>{value}</Text>
+    </View>
+);
+
+const addressChipStyles = StyleSheet.create({
+    chip: {
+        flex: 1,
+        minWidth: 100,
+        backgroundColor: BG_PAGE,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: BORDER,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+    },
+    label: { fontSize: 10, color: TEXT_MUTED, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 3 },
+    value: { fontSize: 13, color: TEXT_HEAD, fontWeight: "700" },
 });
 
 // ─── ACTION BUTTON ────────────────────────────────────────────────────────────
@@ -141,15 +179,75 @@ interface SellerPaymentDetailScreenProps {
     onBack: () => void;
 }
 
+// ─── CUSTOMER & SHIPPING CARD (new — shared between web/mobile) ──────────────
+const CustomerShippingCard: React.FC<{ order: SellerOrder }> = ({ order }) => {
+    const customerInitials = getInitials(order.customerName);
+    return (
+        <View style={styles.card}>
+            <SectionHeader icon="map-pin" title="Customer & Shipping" accent="#0f766e" />
+
+            <View style={styles.avatarRow}>
+                <View style={[styles.avatar, { backgroundColor: "#0f766e" }]}>
+                    <Text style={styles.avatarText}>{customerInitials}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.avatarName}>{order.customerName}</Text>
+                    <Text style={styles.avatarSub}>{order.customerPhone}</Text>
+                    {order.customerEmail ? <Text style={styles.avatarSub}>{order.customerEmail}</Text> : null}
+                </View>
+                <View style={[styles.cityTypePill, { backgroundColor: order.cityType === "Intra-City" ? PRIMARY_LIGHT : "#e6f1fb" }]}>
+                    <Text style={[styles.cityTypeText, { color: order.cityType === "Intra-City" ? PRIMARY : "#185fa5" }]}>
+                        {order.cityType}
+                    </Text>
+                </View>
+            </View>
+
+            <View style={styles.addressBlock}>
+                <View style={styles.addressBlockHeader}>
+                    <Feather name="home" size={12} color={TEXT_MUTED} />
+                    <Text style={styles.addressBlockLabel}>Delivery address</Text>
+                </View>
+                <Text style={styles.addressFreeText}>
+                    {order.shippingAddressLine1}
+                    {order.shippingAddressLine2 ? `, ${order.shippingAddressLine2}` : ""}
+                </Text>
+
+                <View style={styles.addressChipsRow}>
+                    <AddressChip label="City" value={order.shippingCity} />
+                    <AddressChip label="State" value={order.shippingState} />
+                    <AddressChip label="Pincode" value={order.shippingPincode} />
+                </View>
+            </View>
+        </View>
+    );
+};
+
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
-const SellerPaymentDetailScreen: React.FC<SellerPaymentDetailScreenProps> = ({ order, onBack }) => {
+const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps>> = ({ order: propOrder, onBack: propOnBack }) => {
     const isWeb = Platform.OS === "web";
     const [regenLoading, setRegenLoading] = useState(false);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
 
+    const params = useLocalSearchParams();
+    const router = useRouter();
+
+    const orderRaw = params.orderData ? JSON.parse(params.orderData as string) : null;
+    const order = propOrder || orderRaw;
+    const onBack = propOnBack || (() => router.back());
+
+    if (!order) {
+        return (
+            <AdminLayout>
+                <View style={[styles.root, isWeb && styles.rootWeb, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text>Loading order details...</Text>
+                </View>
+            </AdminLayout>
+        );
+    }
+
     const remStyle = getReminderColor(order.reminderBucket);
     const payStyle = getPaymentColor(order.paymentStatus);
-    const initials = order.sellerName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+    const initials = getInitials(order.sellerName);
 
     // ── Parse numeric amounts from formatted string like "₹1,200.00" ──────────
     const parseAmount = (str: string) => {
@@ -280,6 +378,9 @@ const SellerPaymentDetailScreen: React.FC<SellerPaymentDetailScreenProps> = ({ o
                                     </View>
                                     <InfoRow label="Wallet Balance" value={order.walletBalance} valueColor="#1d4ed8" bold />
                                 </View>
+
+                                {/* Customer & Shipping card (new) */}
+                                <CustomerShippingCard order={order} />
                             </View>
 
                             {/* RIGHT column */}
@@ -395,6 +496,9 @@ const SellerPaymentDetailScreen: React.FC<SellerPaymentDetailScreenProps> = ({ o
                                 </View>
                                 <InfoRow label="Wallet Balance" value={order.walletBalance} valueColor="#1d4ed8" bold />
                             </View>
+
+                            {/* Customer & Shipping (new) */}
+                            <CustomerShippingCard order={order} />
 
                             {/* Cost breakdown */}
                             <View style={styles.card}>
@@ -551,6 +655,27 @@ const styles = StyleSheet.create({
     avatarText: { color: "#fff", fontSize: 17, fontWeight: "800" },
     avatarName: { fontSize: 15, fontWeight: "800", color: TEXT_HEAD, marginBottom: 3 },
     avatarSub: { fontSize: 12, color: TEXT_MUTED, marginBottom: 1 },
+
+    // City type pill (new — Customer & Shipping card)
+    cityTypePill: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        alignSelf: "flex-start",
+    },
+    cityTypeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
+
+    // Address block (new — Customer & Shipping card)
+    addressBlock: {
+        marginTop: 4,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: "#f3ece6",
+    },
+    addressBlockHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+    addressBlockLabel: { fontSize: 11, color: TEXT_MUTED, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+    addressFreeText: { fontSize: 13, color: TEXT_BODY, fontWeight: "600", lineHeight: 19, marginBottom: 12 },
+    addressChipsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
 
     // Total row
     totalRow: {

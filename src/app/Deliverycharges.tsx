@@ -334,10 +334,8 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
       <View style={[sc.iconWrap, { backgroundColor: tint }]}>
         <Feather name={icon} size={16} color={txtColor} />
       </View>
-      <View>
-        <Text style={sc.value}>{value}</Text>
-        <Text style={sc.label}>{label}</Text>
-      </View>
+      <Text style={sc.value}>{value}</Text>
+      <Text style={sc.label}>{label}</Text>
     </View>
   );
 };
@@ -349,9 +347,7 @@ const sc = StyleSheet.create({
     backgroundColor: T.card,
     borderRadius: 14,
     padding: 14,
-    flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     borderWidth: 1,
     borderColor: T.border,
   },
@@ -361,6 +357,7 @@ const sc = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 8,
   },
   value: {
     fontSize: 20,
@@ -733,7 +730,7 @@ const DeliveryChargesScreen: React.FC = () => {
               placeholderTextColor="#000"
             />
           </View>
-          
+
           <View style={{ flexDirection: "row", gap: 8, marginRight: 8 }}>
             {(["All", "Active", "Inactive"] as const).map(status => (
               <TouchableOpacity
