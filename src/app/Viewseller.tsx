@@ -1065,7 +1065,7 @@ export default function ViewSeller() {
       <ScrollView style={styles.root} contentContainerStyle={styles.container}>
 
         {/* ── Page Header — dark blue container ──────────────────────────── */}
-        <View style={styles.pageHeaderContainer}>
+        <View style={[styles.pageHeaderContainer, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <View style={[styles.pageHeader, { paddingHorizontal: isMobile ? 16 : 24 }]}>
             <View style={styles.pageHeaderLeft}>
               <BootstrapIcon name="person-circle" size={32} color={COLORS.white} />
@@ -1470,16 +1470,17 @@ const styles = StyleSheet.create({
 
   // ── Page header container — dark blue background ──────────────────────────
   pageHeaderContainer: {
-    backgroundColor: COLORS.headerBg,   // #1E2A45 dark navy
+    backgroundColor: '#1d324e',
+    borderRadius: 12,
+    marginTop: 16,
     paddingTop: 20,
     paddingBottom: 20,
     marginBottom: 16,
-    // Subtle bottom shadow to lift it above content
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   pageHeader: {
     flexDirection: 'row',

@@ -972,13 +972,13 @@ const styles = StyleSheet.create({
   webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },
   webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
   headerIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
     backgroundColor: C.orange,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
+    marginRight: 12,
   },
 
   // ── Web Stats Row ──

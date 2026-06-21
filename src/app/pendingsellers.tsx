@@ -121,11 +121,16 @@ export default function PendingSellersScreen() {
         {/* ── Dark-blue header container ── */}
         <View style={styles.headerContainer}>
           <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Pending seller profiles</Text>
-              <Text style={styles.subtitle}>
-                Sellers who completed KYC and are waiting for admin approval
-              </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+              <View style={styles.headerIconBox}>
+                <Feather name="users" size={20} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>Pending seller profiles</Text>
+                <Text style={styles.subtitle}>
+                  Sellers who completed KYC and are waiting for admin approval
+                </Text>
+              </View>
             </View>
             <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
               <Feather name="refresh-cw" size={16} color={ORANGE} />
@@ -287,8 +292,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 12,
+  },
+  headerIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: ORANGE,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
   title: { fontSize: 22, fontWeight: "800", color: "#ffffff" },
   subtitle: { fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 4, maxWidth: 520 },
