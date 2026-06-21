@@ -2,24 +2,11 @@
  * customerAnalytics.tsx
  * 360° single-customer analytics dashboard (mock data only, no backend)
  * React Native + Expo + TypeScript
- * Bootstrap-style single-path SVG icons, hand-rolled SVG charts — no external libraries
+ * Fully interactive hand-rolled SVG charts with hover crosshairs, tooltips, drill-downs,
+ * time-filtering (7D, 30D, 90D, 6M, 1Y, All), fullscreen mode, legend toggles,
+ * and PDF/CSV export features.
  *
- * Enterprise dashboard layout (Shopify Admin / Stripe Dashboard inspired):
- *  - Customer Hero with avatar, identity, health score, quick actions
- *  - Sticky horizontal section navigation (RN-safe via stickyHeaderIndices,
- *    no position:"sticky" hacks) that scrolls the page to each section and
- *    tracks which section is currently in view
- *  - KPI grid: 1 col (mobile) / 2 col (tablet) / 4 col (desktop+), via
- *    numeric flexBasis + gap (NOT CSS calc()) so React Native's Yoga layout
- *    engine resolves rows correctly on every platform, including web.
- *  - Chart grid: 1 / 2 / 3 columns, same numeric-flexBasis + gap technique.
- *  - Line/bar charts measure their own rendered width (onLayout) and build a
- *    matching SVG viewBox, so stroke width, dot radius, and padding stay
- *    visually consistent at any container size instead of stretching/squashing.
- *  - Shared, memoized presentational primitives (Card, KPI, StatPair, etc.)
- *    keep the JSX in the screen body declarative and free of duplication.
- *
- * Theme: navy / orange palette, matching OrdersScreen.tsx and orderDetails.tsx.
+ * Enterprise dashboard layout inspired by Shopify/Stripe/HubSpot.
  */
 
 import AdminLayout from "@/components/admin-layout";
@@ -29,6 +16,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useEffect,
 } from "react";
 import {
   LayoutChangeEvent,
@@ -43,11 +31,27 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  Modal,
+  Share,
+  Animated,
 } from "react-native";
-import Svg, { Circle, Path, Rect } from "react-native-svg";
+import Svg, {
+  Circle,
+  Path,
+  Rect,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+  Line,
+  G,
+  Text as SvgText,
+} from "react-native-svg";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { LinearGradient } from "expo-linear-gradient";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PALETTE — matches OrdersScreen.tsx / orderDetails.tsx
+// PALETTE
 // ─────────────────────────────────────────────────────────────────────────────
 const C = {
   navy: "#1E2B6B",
@@ -78,8 +82,6 @@ const C = {
   textLight: "#9CA3AF",
 };
 
-// Semantic aliases so the body of the file reads cleanly while only ever
-// pulling colors from the shared palette above.
 const primary = C.orange;
 const primaryLight = C.orangePale;
 const navy = C.navy;
@@ -111,53 +113,51 @@ const CHART_COLORS = [primary, blue, green, purple, yellow, pink, teal, red];
 const STICKY_NAV_HEIGHT = 52;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAYOUT / RESPONSIVE BREAKPOINTS
+// RESPONSIVE LAYOUT BREAKPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 function useLayout(w: number) {
   return {
-    isMobile: w < 480,
-    isTablet: w >= 480 && w < 1024,
+    isMobile: w < 540,
+    isTablet: w >= 540 && w < 1024,
     isDesktop: w >= 1024,
     isWide: w >= 768,
   };
 }
 
-// Resolve a column count to a numeric flexBasis percentage. Deliberately a
-// plain number (not a CSS calc() string) — React Native's Yoga layout engine
-// resolves `gap` against the flex container natively on every platform
-// (iOS / Android / web), so a numeric basis is both simpler and more portable
-// than a calc() expression that only ever worked on react-native-web.
 function basisForColumns(cols: number): number {
   switch (cols) {
     case 1:
       return 100;
     case 2:
-      return 50;
+      return 48.5; // Leave room for flex gaps on Web
     case 3:
-      return 33.333;
+      return 31.5; // Leave room for flex gaps on Web
+    case 4:
+      return 23.5; // Leave room for flex gaps on Web
     default:
-      return 25;
+      return 23.5;
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
+// FORMATTERS & PRNG
 // ─────────────────────────────────────────────────────────────────────────────
 function rupee(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
 }
+
 function avatarColor(name: string) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return avatarPalette[Math.abs(h) % avatarPalette.length];
 }
-// Deterministic seeded PRNG so mock numbers stay stable for a given customer
-// instead of reshuffling on every re-render.
+
 function seedFromString(str: string) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
   return h || 1;
 }
+
 function mulberry32(seed: number) {
   let a = seed;
   return function () {
@@ -170,7 +170,7 @@ function mulberry32(seed: number) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ICONS — Bootstrap-style single-path SVGs
+// ICONS (Bootstrap SVGs)
 // ─────────────────────────────────────────────────────────────────────────────
 type IP = { size?: number; color?: string };
 
@@ -446,6 +446,26 @@ const ActivityIcon = ({ size = 14, color = primary }: IP) => (
     />
   </Svg>
 );
+const MaximizeIcon = ({ size = 14, color = primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path
+      fill={color}
+      d="M1.5 1c-.276 0-.5.224-.5.5v4a.5.5 0 0 0 1 0V2.707l3.146 3.147a.5.5 0 1 0 .708-.708L2.707 2H5.5a.5.5 0 0 0 0-1H1.5zm9.5 0a.5.5 0 0 0 0 1h2.793l-3.147 3.146a.5.5 0 1 0 .708.708L14 2.707V5.5a.5.5 0 0 0 1 0v-4c0-.276-.224-.5-.5-.5H11zM1.5 10a.5.5 0 0 0-.5.5v4c0 .276.224.5.5.5h4a.5.5 0 0 0 0-1H2.707l3.146-3.146a.5.5 0 1 0-.708-.708L2 13.293V10.5a.5.5 0 0 0-.5-.5zm13 0a.5.5 0 0 0-.5.5v2.793l-3.146-3.147a.5.5 0 0 0-.708.708L13.293 15H10.5a.5.5 0 0 0 0 1h4c.276 0 .5-.224.5-.5v-4a.5.5 0 0 0-.5-.5z"
+    />
+  </Svg>
+);
+const DownloadIcon = ({ size = 14, color = primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path
+      fill={color}
+      d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"
+    />
+    <Path
+      fill={color}
+      d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"
+    />
+  </Svg>
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -466,17 +486,16 @@ type SectionId =
   | "behaviour"
   | "payments"
   | "returns"
-  | "address"
-  | "reviews"
-  | "support"
+  | "orders"
   | "timeline"
-  | "risk"
+  | "profile"
   | "insights"
-  | "actions"
-  | "orders";
+  | "actions";
+
+type TimeFrame = "7D" | "30D" | "90D" | "6M" | "1Y" | "All";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA BUILDER — deterministic per customer, no backend calls
+// MOCK DATA BUILDER
 // ─────────────────────────────────────────────────────────────────────────────
 function buildMockAnalytics(customerId: string, name: string) {
   const rng = mulberry32(seedFromString(customerId + name));
@@ -809,8 +828,69 @@ function buildMockAnalytics(customerId: string, name: string) {
 }
 type CustomerAnalytics = ReturnType<typeof buildMockAnalytics>;
 
+// Timeframe filtering helper
+function getFilteredData(
+  baseData: ChartPoint[],
+  timeframe: TimeFrame,
+  metricType: "spend" | "orders" | "freq" | "time",
+  seedValue: number
+): ChartPoint[] {
+  if (timeframe === "All" || timeframe === "1Y") {
+    return baseData;
+  }
+
+  const rng = mulberry32(seedValue);
+  const between = (min: number, max: number) =>
+    Math.round(min + rng() * (max - min));
+
+  let count = 6;
+  let labels: string[] = [];
+
+  switch (timeframe) {
+    case "7D":
+      count = 7;
+      labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      break;
+    case "30D":
+      count = 5;
+      labels = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"];
+      break;
+    case "90D":
+      count = 6;
+      labels = ["W1", "W2", "W3", "W4", "W5", "W6"];
+      break;
+    case "6M":
+      count = 6;
+      labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+      break;
+    default:
+      return baseData;
+  }
+
+  let minVal = 0;
+  let maxVal = 100;
+  if (metricType === "spend") {
+    minVal = 500;
+    maxVal = 20000;
+  } else if (metricType === "orders") {
+    minVal = 0;
+    maxVal = 5;
+  } else if (metricType === "freq") {
+    minVal = 0;
+    maxVal = 3;
+  } else {
+    minVal = 5;
+    maxVal = 45;
+  }
+
+  return labels.map((l) => ({
+    label: l,
+    value: between(minVal, maxVal),
+  }));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARED CARD / SECTION PIECES — memoized presentational primitives
+// SHARED PRESENTATIONAL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 const Card = React.memo(function Card({
   children,
@@ -864,9 +944,6 @@ const TrendTag = React.memo(function TrendTag({
   );
 });
 
-// Numeric flexBasis (resolved by the caller via basisForColumns) + minWidth
-// guarantees content never clips on very narrow phones while still wrapping
-// cleanly into rows on tablet/desktop, all without a single calc() string.
 const KpiCard = React.memo(function KpiCard({
   icon,
   iconBg,
@@ -876,6 +953,7 @@ const KpiCard = React.memo(function KpiCard({
   trend,
   trendVal,
   basisPct,
+  onPress,
 }: {
   icon: React.ReactNode;
   iconBg: string;
@@ -885,9 +963,14 @@ const KpiCard = React.memo(function KpiCard({
   trend: Trend;
   trendVal: string;
   basisPct: number;
+  onPress?: () => void;
 }) {
   return (
-    <View style={[s.kpiCard, { flexBasis: `${basisPct}%` as const }]}>
+    <TouchableOpacity
+      activeOpacity={onPress ? 0.85 : 1}
+      onPress={onPress}
+      style={[s.kpiCard, { flexBasis: `${basisPct}%` as const, flexGrow: 1, flexShrink: 1 }]}
+    >
       <View style={s.kpiTop}>
         <View style={[s.kpiIconBox, { backgroundColor: iconBg }]}>{icon}</View>
         <TrendTag trend={trend} value={trendVal} />
@@ -901,7 +984,7 @@ const KpiCard = React.memo(function KpiCard({
       <Text style={s.kpiSub} numberOfLines={1}>
         {subText}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -949,12 +1032,17 @@ const MiniStatTrio = React.memo(function MiniStatTrio({
   );
 });
 
-const BarList = React.memo(function BarList({ data }: { data: ChartPoint[] }) {
+const BarList = React.memo(function BarList({ data, onRowPress }: { data: ChartPoint[]; onRowPress?: (row: ChartPoint) => void }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <View style={{ gap: 10 }}>
       {data.map((d, i) => (
-        <View key={d.label} style={s.barListRow}>
+        <TouchableOpacity
+          key={d.label}
+          activeOpacity={onRowPress ? 0.75 : 1}
+          onPress={() => onRowPress?.(d)}
+          style={s.barListRow}
+        >
           <Text style={s.barListLbl} numberOfLines={1}>
             {d.label}
           </Text>
@@ -970,7 +1058,7 @@ const BarList = React.memo(function BarList({ data }: { data: ChartPoint[] }) {
             />
           </View>
           <Text style={s.barListVal}>{d.value}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -994,43 +1082,95 @@ const Badge = React.memo(function Badge({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RESPONSIVE CHART CONTAINER WITH LABELS + TOOLTIP
-// Measures its own rendered width via onLayout so the SVG viewBox always
-// matches the real pixel width (no stretch/squash at any breakpoint).
-// Renders an axis-label row under the plot and supports a tap/hover tooltip
-// that surfaces the exact value for a given point or bar.
+// EXPORTING HELPERS (CSV / PDF)
 // ─────────────────────────────────────────────────────────────────────────────
-function MeasuredChart({
-  plotHeight = 140,
-  render,
-}: {
+const shareData = async (title: string, data: ChartPoint[]) => {
+  const csvString = "Label,Value\n" + data.map(d => `"${d.label}",${d.value}`).join("\n");
+  try {
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${title.replace(/\s+/g, '_')}_data.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      await Share.share({
+        message: csvString,
+        title: `${title} CSV Export`,
+      });
+    }
+  } catch (error) {
+    console.error("Export error:", error);
+  }
+};
+
+const printDataPDF = async (title: string, data: ChartPoint[], customerId: string) => {
+  const rows = data.map(d => `
+    <tr>
+      <td style="padding: 8px; border-bottom: 1px solid #E5E7EB; font-family: system-ui;">${d.label}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #E5E7EB; text-align: right; font-weight: bold; font-family: system-ui;">${d.value.toLocaleString()}</td>
+    </tr>
+  `).join("");
+
+  const html = `
+    <html>
+      <body style="font-family: system-ui, sans-serif; padding: 24px; color: #111827;">
+        <h1 style="color: #1E2B6B; font-size: 24px; margin-bottom: 4px;">Customer Analytics Export</h1>
+        <h2 style="color: #F97316; font-size: 14px; margin-top: 0; margin-bottom: 24px;">Report: ${title} &middot; Customer #${customerId}</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #F3F4F6;">
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #E5E7EB;">Metric label</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #E5E7EB;">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+        <p style="margin-top: 40px; text-align: center; font-size: 11px; color: #9CA3AF;">Generated dynamically via Admin Panel Dashboard.</p>
+      </body>
+    </html>
+  `;
+
+  try {
+    if (Platform.OS === 'web') {
+      await Print.printAsync({ html });
+    } else {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri);
+    }
+  } catch (error) {
+    console.error("PDF Print error:", error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESPONSIVE INTERACTIVE CHARTS
+// ─────────────────────────────────────────────────────────────────────────────
+interface MeasuredChartProps {
   plotHeight?: number;
   render: (width: number, height: number) => React.ReactNode;
-}) {
+}
+function MeasuredChart({ plotHeight = 140, render }: MeasuredChartProps) {
   const [w, setW] = useState(0);
-  const onLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      const next = Math.round(e.nativeEvent.layout.width);
-      if (next > 0 && next !== w) setW(next);
-    },
-    [w],
-  );
-  // Narrow cards (3-col desktop grid) get a slightly shorter plot so
-  // proportions stay natural instead of looking artificially tall.
-  const effectivePlotHeight =
-    w > 0 && w < 280 ? Math.max(100, plotHeight - 24) : plotHeight;
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const next = Math.round(e.nativeEvent.layout.width);
+    if (next > 0 && next !== w) setW(next);
+  }, [w]);
+
+  const effectivePlotHeight = w > 0 && w < 280 ? Math.max(100, plotHeight - 20) : plotHeight;
   return (
     <View onLayout={onLayout} style={{ width: "100%" }}>
-      {w > 0 ? (
-        render(w, effectivePlotHeight)
-      ) : (
-        <View style={{ height: effectivePlotHeight }} />
-      )}
+      {w > 0 ? render(w, effectivePlotHeight) : <View style={{ height: effectivePlotHeight }} />}
     </View>
   );
 }
 
-// Shared tooltip bubble: a small pill that floats above the active point/bar.
+// Chart Tooltip card
 const ChartTooltip = React.memo(function ChartTooltip({
   x,
   plotWidth,
@@ -1044,103 +1184,147 @@ const ChartTooltip = React.memo(function ChartTooltip({
   value: string;
   color: string;
 }) {
-  const bubbleW = 88;
+  const bubbleW = 100;
   const left = Math.min(Math.max(x - bubbleW / 2, 0), plotWidth - bubbleW);
   return (
-    <View
-      pointerEvents="none"
-      style={[s.tooltipBubble, { left, width: bubbleW, borderColor: color }]}
-    >
-      <Text style={s.tooltipLabel} numberOfLines={1}>
-        {label}
-      </Text>
-      <Text style={[s.tooltipValue, { color }]} numberOfLines={1}>
-        {value}
-      </Text>
+    <View pointerEvents="none" style={[s.tooltipBubble, { left, width: bubbleW, borderColor: color }]}>
+      <Text style={s.tooltipLabel} numberOfLines={1}>{label}</Text>
+      <Text style={[s.tooltipValue, { color }]} numberOfLines={1}>{value}</Text>
     </View>
   );
 });
 
+// Advanced Interactive Line Chart Svg Component
+interface SvgChartProps {
+  data: ChartPoint[];
+  color?: string;
+  width: number;
+  height: number;
+  formatValue: (v: number) => string;
+  onPointPress?: (p: ChartPoint) => void;
+  onHoverValueChange?: (val: string | null) => void;
+}
 function LineChartSvg({
   data,
   color = primary,
   width,
-  height = 140,
-  activeIdx,
-  onActivate,
+  height,
   formatValue,
-}: {
-  data: ChartPoint[];
-  color?: string;
-  width: number;
-  height?: number;
-  activeIdx: number | null;
-  onActivate: (i: number | null) => void;
-  formatValue: (v: number) => string;
-}) {
-  const padX = Math.max(8, width * 0.025);
-  const padY = 14;
+  onPointPress,
+  onHoverValueChange,
+}: SvgChartProps) {
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const padX = Math.max(12, width * 0.04);
+  const padY = 20;
+
+  // Simple transition animation on filter update
+  const growAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    growAnim.setValue(0);
+    Animated.timing(growAnim, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: false,
+    }).start();
+  }, [data]);
+
   const max = Math.max(...data.map((d) => d.value), 1);
   const step = (width - padX * 2) / Math.max(data.length - 1, 1);
-  const pts = data.map((d, i) => ({
-    x: padX + i * step,
-    y: padY + (1 - d.value / max) * (height - padY * 2),
-  }));
-  const line = pts
-    .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
-    .join(" ");
-  const area =
-    line +
-    ` L ${pts[pts.length - 1].x} ${height - padY} L ${pts[0].x} ${height - padY} Z`;
-  const dotR = Math.max(2.5, Math.min(3.5, width / 110));
-  const activeDotR = dotR + 1.5;
-  const strokeW = Math.max(1.8, Math.min(2.5, width / 160));
-  const hitW = Math.max(step, 18);
+
+  const pts = useMemo(() => {
+    return data.map((d, i) => ({
+      x: padX + i * step,
+      y: padY + (1 - d.value / max) * (height - padY * 2),
+    }));
+  }, [data, padX, step, max, height]);
+
+  const linePath = useMemo(() => {
+    if (pts.length === 0) return "";
+    return pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+  }, [pts]);
+
+  const areaPath = useMemo(() => {
+    if (pts.length === 0) return "";
+    return `${linePath} L ${pts[pts.length - 1].x} ${height - padY} L ${pts[0].x} ${height - padY} Z`;
+  }, [linePath, pts, height]);
+
+  // Touch handlers to compute index
+  const handleTouch = (evt: any) => {
+    const locX = evt.nativeEvent.locationX;
+    const innerX = locX - padX;
+    const innerWidth = width - padX * 2;
+    const index = Math.round((innerX / innerWidth) * (data.length - 1));
+    const clamped = Math.max(0, Math.min(data.length - 1, index));
+    if (clamped !== activeIdx) {
+      setActiveIdx(clamped);
+      if (onHoverValueChange) {
+        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setActiveIdx(null);
+    if (onHoverValueChange) {
+      onHoverValueChange(null);
+    }
+  };
 
   return (
-    <View>
-      <View style={{ width, height }}>
+    <View style={{ width, height: height + 24 }}>
+      {/* Chart Canvas Area */}
+      <View
+        onTouchStart={handleTouch}
+        onTouchMove={handleTouch}
+        onTouchEnd={handleTouchEnd}
+        style={{ width, height, position: "relative" }}
+      >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-          <Path d={area} fill={color} fillOpacity={0.12} />
-          <Path
-            d={line}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeW}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {pts.map((p, i) =>
-            data[i].value > 0 ? (
-              <Circle
-                key={i}
-                cx={p.x}
-                cy={p.y}
-                r={activeIdx === i ? activeDotR : dotR}
-                fill={color}
-                stroke={activeIdx === i ? "#fff" : "none"}
-                strokeWidth={activeIdx === i ? 2 : 0}
-              />
-            ) : null,
+          <Defs>
+            <SvgLinearGradient id={`areaGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor={color} stopOpacity={0.24} />
+              <Stop offset="100%" stopColor={color} stopOpacity={0.0} />
+            </SvgLinearGradient>
+          </Defs>
+
+          {/* Grid lines */}
+          <Line x1={padX} y1={padY} x2={width - padX} y2={padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="4,4" />
+          <Line x1={padX} y1={height / 2} x2={width - padX} y2={height / 2} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="4,4" />
+          <Line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="4,4" />
+
+          {/* Paths */}
+          <Path d={areaPath} fill={`url(#areaGrad-${color})`} />
+          <Path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+
+          {/* Active Crosshair line */}
+          {activeIdx !== null && pts[activeIdx] && (
+            <Line
+              x1={pts[activeIdx].x}
+              y1={padY}
+              x2={pts[activeIdx].x}
+              y2={height - padY}
+              stroke={color}
+              strokeWidth={1.5}
+              strokeDasharray="3,3"
+            />
           )}
-        </Svg>
-        {/* Invisible tap targets, one per point, positioned to match the SVG coords */}
-        <View style={StyleSheet.absoluteFillObject}>
+
+          {/* Plot Dots */}
           {pts.map((p, i) => (
-            <Pressable
+            <Circle
               key={i}
-              onPress={() => onActivate(activeIdx === i ? null : i)}
-              style={{
-                position: "absolute",
-                left: p.x - hitW / 2,
-                top: 0,
-                width: hitW,
-                height,
-              }}
+              cx={p.x}
+              cy={p.y}
+              r={activeIdx === i ? 6 : 4}
+              fill={activeIdx === i ? "#fff" : color}
+              stroke={color}
+              strokeWidth={activeIdx === i ? 3 : 0}
+              onPress={() => onPointPress?.(data[i])}
             />
           ))}
-        </View>
-        {activeIdx !== null && (
+        </Svg>
+
+        {activeIdx !== null && pts[activeIdx] && (
           <ChartTooltip
             x={pts[activeIdx].x}
             plotWidth={width}
@@ -1150,6 +1334,8 @@ function LineChartSvg({
           />
         )}
       </View>
+
+      {/* Axis Rows */}
       <View style={[s.axisRow, { paddingHorizontal: padX }]}>
         {data.map((d, i) => (
           <Text
@@ -1157,6 +1343,7 @@ function LineChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
+              { flex: 1, textAlign: "center" }
             ]}
             numberOfLines={1}
           >
@@ -1168,71 +1355,83 @@ function LineChartSvg({
   );
 }
 
+// Advanced Interactive Bar Chart Svg Component
 function BarChartSvg({
   data,
   color = primary,
   width,
-  height = 140,
-  activeIdx,
-  onActivate,
+  height,
   formatValue,
-}: {
-  data: ChartPoint[];
-  color?: string;
-  width: number;
-  height?: number;
-  activeIdx: number | null;
-  onActivate: (i: number | null) => void;
-  formatValue: (v: number) => string;
-}) {
-  const padX = Math.max(6, width * 0.02);
-  const padY = 8;
+  onPointPress,
+  onHoverValueChange,
+}: SvgChartProps) {
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const padX = Math.max(12, width * 0.03);
+  const padY = 16;
+
   const max = Math.max(...data.map((d) => d.value), 1);
   const slot = (width - padX * 2) / data.length;
-  const barW = Math.max(4, slot * 0.55);
-  const bars = data.map((d, i) => {
-    const h = Math.max(
-      (d.value / max) * (height - padY * 2),
-      d.value > 0 ? 3 : 0,
-    );
-    const x = padX + i * slot + (slot - barW) / 2;
-    const y = height - padY - h;
-    return { x, y, h, d };
-  });
+  const barW = Math.max(6, slot * 0.6);
+
+  const bars = useMemo(() => {
+    return data.map((d, i) => {
+      const h = Math.max((d.value / max) * (height - padY * 2), d.value > 0 ? 4 : 0);
+      const x = padX + i * slot + (slot - barW) / 2;
+      const y = height - padY - h;
+      return { x, y, h, d, index: i };
+    });
+  }, [data, max, slot, barW, padX, height]);
+
+  const handleTouch = (evt: any) => {
+    const locX = evt.nativeEvent.locationX;
+    const innerX = locX - padX;
+    const index = Math.floor(innerX / slot);
+    const clamped = Math.max(0, Math.min(data.length - 1, index));
+    if (clamped !== activeIdx) {
+      setActiveIdx(clamped);
+      if (onHoverValueChange) {
+        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setActiveIdx(null);
+    if (onHoverValueChange) {
+      onHoverValueChange(null);
+    }
+  };
 
   return (
-    <View>
-      <View style={{ width, height }}>
+    <View style={{ width, height: height + 24 }}>
+      <View
+        onTouchStart={handleTouch}
+        onTouchMove={handleTouch}
+        onTouchEnd={handleTouchEnd}
+        style={{ width, height, position: "relative" }}
+      >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-          {bars.map((b, i) => (
+          {/* Horizontal lines */}
+          <Line x1={padX} y1={padY} x2={width - padX} y2={padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="3,3" />
+          <Line x1={padX} y1={height / 2} x2={width - padX} y2={height / 2} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="3,3" />
+          <Line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="3,3" />
+
+          {bars.map((b) => (
             <Rect
-              key={i}
+              key={b.index}
               x={b.x}
               y={b.y}
               width={barW}
               height={b.h}
               rx={3}
               fill={color}
-              opacity={activeIdx === i ? 1 : 0.55 + 0.45 * (b.d.value / max)}
+              opacity={activeIdx === b.index ? 1.0 : 0.65}
+              onPress={() => onPointPress?.(b.d)}
             />
           ))}
         </Svg>
-        <View style={StyleSheet.absoluteFillObject}>
-          {bars.map((b, i) => (
-            <Pressable
-              key={i}
-              onPress={() => onActivate(activeIdx === i ? null : i)}
-              style={{
-                position: "absolute",
-                left: padX + i * slot,
-                top: 0,
-                width: slot,
-                height,
-              }}
-            />
-          ))}
-        </View>
-        {activeIdx !== null && (
+
+        {activeIdx !== null && bars[activeIdx] && (
           <ChartTooltip
             x={bars[activeIdx].x + barW / 2}
             plotWidth={width}
@@ -1242,6 +1441,7 @@ function BarChartSvg({
           />
         )}
       </View>
+
       <View style={[s.axisRow, { paddingHorizontal: padX }]}>
         {data.map((d, i) => (
           <Text
@@ -1249,6 +1449,7 @@ function BarChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
+              { flex: 1, textAlign: "center" }
             ]}
             numberOfLines={1}
           >
@@ -1260,69 +1461,14 @@ function BarChartSvg({
   );
 }
 
-function MiniLineChart({
-  data,
-  color = primary,
-  plotHeight = 140,
-  formatValue = (v: number) => String(v),
-}: {
-  data: ChartPoint[];
-  color?: string;
-  plotHeight?: number;
-  formatValue?: (v: number) => string;
-}) {
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  return (
-    <MeasuredChart
-      plotHeight={plotHeight}
-      render={(w, h) => (
-        <LineChartSvg
-          data={data}
-          color={color}
-          width={w}
-          height={h}
-          activeIdx={activeIdx}
-          onActivate={setActiveIdx}
-          formatValue={formatValue}
-        />
-      )}
-    />
-  );
-}
-function MiniBarChart({
-  data,
-  color = primary,
-  plotHeight = 140,
-  formatValue = (v: number) => String(v),
-}: {
-  data: ChartPoint[];
-  color?: string;
-  plotHeight?: number;
-  formatValue?: (v: number) => string;
-}) {
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
-  return (
-    <MeasuredChart
-      plotHeight={plotHeight}
-      render={(w, h) => (
-        <BarChartSvg
-          data={data}
-          color={color}
-          width={w}
-          height={h}
-          activeIdx={activeIdx}
-          onActivate={setActiveIdx}
-          formatValue={formatValue}
-        />
-      )}
-    />
-  );
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+// POLAR MATH & DONUT SLICE RENDERER
+// ─────────────────────────────────────────────────────────────────────────────
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
+
 function donutSlicePath(
   cx: number,
   cy: number,
@@ -1347,6 +1493,7 @@ function donutSlicePath(
     "Z",
   ].join(" ");
 }
+
 const RingChart = React.memo(function RingChart({
   data,
   donut = true,
@@ -1356,29 +1503,29 @@ const RingChart = React.memo(function RingChart({
   donut?: boolean;
   size?: number;
 }) {
-  const total = Math.max(
-    data.reduce((sum, d) => sum + d.value, 0),
-    1,
-  );
+  const total = Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
   const cx = size / 2,
     cy = size / 2,
     rOuter = size / 2 - 4,
     rInner = donut ? rOuter * 0.55 : 0;
   let angle = 0;
+
+  if (data.length === 0) {
+    return (
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ fontSize: 12, color: C.textLight }}>No Active Slices</Text>
+      </View>
+    );
+  }
+
   const slices = data.map((d) => {
     const sweep = (d.value / total) * 360;
     const gap = sweep < 359 ? 1.5 : 0;
-    const path = donutSlicePath(
-      cx,
-      cy,
-      rOuter,
-      rInner,
-      angle,
-      angle + sweep - gap,
-    );
+    const path = donutSlicePath(cx, cy, rOuter, rInner, angle, angle + sweep - gap);
     angle += sweep;
     return { path, color: d.color };
   });
+
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       {slices.map((sl, i) => (
@@ -1387,34 +1534,44 @@ const RingChart = React.memo(function RingChart({
     </Svg>
   );
 });
+
 const LegendList = React.memo(function LegendList({
   data,
+  hiddenLabels,
+  onToggleLabel,
 }: {
   data: SlicePoint[];
+  hiddenLabels: Set<string>;
+  onToggleLabel: (label: string) => void;
 }) {
-  const total = Math.max(
-    data.reduce((sum, d) => sum + d.value, 0),
-    1,
-  );
+  const total = Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
   return (
     <View style={{ gap: 8, width: "100%" }}>
-      {data.map((d) => (
-        <View key={d.label} style={s.legendRow}>
-          <View style={[s.legendDot, { backgroundColor: d.color }]} />
-          <Text style={s.legendLbl} numberOfLines={1}>
-            {d.label}
-          </Text>
-          <Text style={s.legendVal}>
-            {Math.round((d.value / total) * 100)}%
-          </Text>
-        </View>
-      ))}
+      {data.map((d) => {
+        const isHidden = hiddenLabels.has(d.label);
+        return (
+          <TouchableOpacity
+            key={d.label}
+            activeOpacity={0.7}
+            onPress={() => onToggleLabel(d.label)}
+            style={[s.legendRow, isHidden && { opacity: 0.4 }]}
+          >
+            <View style={[s.legendDot, { backgroundColor: isHidden ? C.border : d.color }]} />
+            <Text style={[s.legendLbl, isHidden && { textDecorationLine: "line-through" }]} numberOfLines={1}>
+              {d.label}
+            </Text>
+            <Text style={s.legendVal}>
+              {isHidden ? "0%" : `${Math.round((d.value / total) * 100)}%`}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ORDER STATUS CHIP / TIMELINE / ACTION ICON LOOKUPS
+// ORDER STATUS CHIPS / TIMELINE LOOKUPS
 // ─────────────────────────────────────────────────────────────────────────────
 const ORDER_STATUS_CFG: Record<
   RecentOrder["status"],
@@ -1456,6 +1613,7 @@ const TIMELINE_ICON_CFG: Record<string, { icon: React.ReactNode; bg: string }> =
     address: { icon: <MapPinIcon size={13} color={teal} />, bg: tealLight },
     return: { icon: <ReplyIcon size={13} color={red} />, bg: inactiveLight },
   };
+
 const ACTION_ICON_CFG: Record<string, React.ReactNode> = {
   gift: <GiftIcon size={16} color="#fff" />,
   crown: <CrownIcon size={16} color="#fff" />,
@@ -1466,8 +1624,7 @@ const ACTION_ICON_CFG: Record<string, React.ReactNode> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SECTION WRAPPER — reports its own vertical offset so the sticky nav can
-// scroll to it and so the scroll handler can detect which section is active.
+// PAGE WRAPPER / STICKY NAV
 // ─────────────────────────────────────────────────────────────────────────────
 function PageSection({
   id,
@@ -1485,13 +1642,6 @@ function PageSection({
   return <View onLayout={handleLayout}>{children}</View>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STICKY HORIZONTAL SECTION NAVIGATION
-// Implemented with React Native's native `stickyHeaderIndices` prop on the
-// page ScrollView (works on iOS, Android, and web — no position:"sticky"
-// hacks required). Tapping a tab smooth-scrolls the page to that section;
-// the active tab is derived from the current scroll offset.
-// ─────────────────────────────────────────────────────────────────────────────
 const SectionNav = React.memo(function SectionNav({
   sections,
   activeId,
@@ -1518,10 +1668,7 @@ const SectionNav = React.memo(function SectionNav({
               activeOpacity={0.75}
             >
               {sec.icon}
-              <Text
-                style={[s.navTabTxt, isActive && s.navTabTxtActive]}
-                numberOfLines={1}
-              >
+              <Text style={[s.navTabTxt, isActive && s.navTabTxtActive]} numberOfLines={1}>
                 {sec.label}
               </Text>
             </TouchableOpacity>
@@ -1533,7 +1680,147 @@ const SectionNav = React.memo(function SectionNav({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN SCREEN
+// DRILL-DOWN & FULLSCREEN MODALS
+// ─────────────────────────────────────────────────────────────────────────────
+interface DrillDownModalProps {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  dataPoint: ChartPoint | null;
+  customerId: string;
+  customerName: string;
+}
+const DrillDownModal = React.memo(function DrillDownModal({
+  visible,
+  onClose,
+  title,
+  dataPoint,
+  customerId,
+  customerName,
+}: DrillDownModalProps) {
+  if (!dataPoint) return null;
+
+  // Generate deterministic breakout orders
+  const rng = mulberry32(seedFromString(dataPoint.label + customerId));
+  const between = (min: number, max: number) => Math.round(min + rng() * (max - min));
+  const ordersCount = between(1, 3);
+  const simulatedOrders = Array.from({ length: ordersCount }, (_, i) => ({
+    id: `FNT${20260000 + between(1000, 9999)}${i}`,
+    date: `${between(1, 28)} ${dataPoint.label.substring(0, 3)} 2026`,
+    amount: Math.round(dataPoint.value / ordersCount),
+    status: (i === 0 ? "Delivered" : "Processing") as RecentOrder["status"],
+  }));
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={s.modalOverlay}>
+        <View style={s.modalContent}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>{title} Detail Breakdown</Text>
+            <TouchableOpacity onPress={onClose} style={s.closeBtn}>
+              <Text style={s.closeBtnTxt}>Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={s.modalBody}>
+            <View style={s.breakoutSummary}>
+              <View>
+                <Text style={s.breakoutLbl}>Interval / Category</Text>
+                <Text style={s.breakoutVal}>{dataPoint.label}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={s.breakoutLbl}>Calculated Value</Text>
+                <Text style={[s.breakoutVal, { color: primary }]}>
+                  {dataPoint.value > 100 ? rupee(dataPoint.value) : dataPoint.value}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={s.modalSubheading}>Simulated Transactions ({simulatedOrders.length})</Text>
+            <View style={{ gap: 8 }}>
+              {simulatedOrders.map((o) => (
+                <View key={o.id} style={s.breakoutRow}>
+                  <View>
+                    <Text style={s.breakoutRowId}>{o.id}</Text>
+                    <Text style={s.breakoutRowSub}>{o.date}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={s.breakoutRowAmt}>{rupee(o.amount)}</Text>
+                    <OrderStatusChip status={o.status} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+interface FullscreenChartModalProps {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  data: ChartPoint[];
+  exportCSV: () => void;
+  exportPDF: () => void;
+}
+const FullscreenChartModal = React.memo(function FullscreenChartModal({
+  visible,
+  onClose,
+  title,
+  children,
+  data,
+  exportCSV,
+  exportPDF,
+}: FullscreenChartModalProps) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent>
+      <View style={s.modalOverlay}>
+        <View style={[s.modalContent, { height: "70%", maxHeight: 600 }]}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Fullscreen: {title}</Text>
+            <TouchableOpacity onPress={onClose} style={s.closeBtn}>
+              <Text style={s.closeBtnTxt}>Exit</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={s.modalBody} contentContainerStyle={{ gap: 20 }}>
+            <View style={s.fullscreenChartContainer}>{children}</View>
+
+            <View style={s.fullscreenActions}>
+              <TouchableOpacity onPress={exportCSV} style={s.actionOutline}>
+                <DownloadIcon size={12} color={primary} />
+                <Text style={s.actionOutlineTxt}>CSV Export</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={exportPDF} style={s.actionOutline}>
+                <DownloadIcon size={12} color={blue} />
+                <Text style={s.actionOutlineTxt}>PDF Export</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={s.modalSubheading}>Dataset</Text>
+            <View style={s.datasetTable}>
+              {data.map((d) => (
+                <View key={d.label} style={s.datasetRow}>
+                  <Text style={s.datasetCellLabel}>{d.label}</Text>
+                  <Text style={s.datasetCellValue}>
+                    {d.value > 100 ? rupee(d.value) : d.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN SCREEN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CustomerAnalyticsScreen() {
   const { id, name, email, phone } = useLocalSearchParams<{
@@ -1545,55 +1832,94 @@ export default function CustomerAnalyticsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { isMobile, isTablet, isDesktop, isWide } = useLayout(width);
-  const px = isMobile ? 14 : isTablet ? 20 : 28;
+  const px = isMobile ? 12 : isTablet ? 18 : 24;
 
   const customerId = id ?? "0";
   const customerName = name ?? "Customer";
   const customerEmail = email ?? "—";
   const customerPhone = phone ?? "—";
 
-  const data: CustomerAnalytics = useMemo(
+  // Build raw mock analytics
+  const data = useMemo(
     () => buildMockAnalytics(customerId, customerName),
     [customerId, customerName],
   );
 
-  // 1 / 2 / 4 column KPI grid via numeric flexBasis (no calc()).
-  const kpiCols = isMobile ? 1 : isTablet ? 2 : 4;
-  const kpiBasis = basisForColumns(kpiCols);
+  // Timeframe states for charts
+  const [spendTF, setSpendTF] = useState<TimeFrame>("All");
+  const [ordersTF, setOrdersTF] = useState<TimeFrame>("All");
+  const [freqTF, setFreqTF] = useState<TimeFrame>("All");
+  const [distTF, setDistTF] = useState<TimeFrame>("All");
 
-  // Chart grid: 1 col mobile / 2 col tablet / 3 col desktop+, same technique.
-  const chartCols = isMobile ? 1 : isTablet ? 2 : 3;
-  const chartBasis = basisForColumns(chartCols);
+  const spendData = useMemo(() => {
+    return getFilteredData(data.monthlySpend, spendTF, "spend", seedFromString(customerId + "spend"));
+  }, [data.monthlySpend, spendTF, customerId]);
 
-  const behaviourCols = isMobile ? 1 : isTablet ? 2 : 4;
-  const behaviourBasis = basisForColumns(behaviourCols);
+  const ordersData = useMemo(() => {
+    return getFilteredData(data.monthlyOrders, ordersTF, "orders", seedFromString(customerId + "orders"));
+  }, [data.monthlyOrders, ordersTF, customerId]);
 
+  const freqData = useMemo(() => {
+    return getFilteredData(data.orderFrequency, freqTF, "freq", seedFromString(customerId + "freq"));
+  }, [data.orderFrequency, freqTF, customerId]);
+
+  const distData = useMemo(() => {
+    return getFilteredData(data.purchaseTime, distTF, "time", seedFromString(customerId + "time"));
+  }, [data.purchaseTime, distTF, customerId]);
+
+  // Legend toggle state
+  const [hiddenStatusLabels, setHiddenStatusLabels] = useState<Set<string>>(new Set());
+  const [hiddenPaymentLabels, setHiddenPaymentLabels] = useState<Set<string>>(new Set());
+
+  const activeOrderStatus = useMemo(() => {
+    return data.orderStatusBreakdown.filter(item => !hiddenStatusLabels.has(item.label));
+  }, [data.orderStatusBreakdown, hiddenStatusLabels]);
+
+  const activePaymentMethods = useMemo(() => {
+    return data.paymentMethods.filter(item => !hiddenPaymentLabels.has(item.label));
+  }, [data.paymentMethods, hiddenPaymentLabels]);
+
+  // Live KPI scrubbing displays
+  const [spendLiveKPI, setSpendLiveKPI] = useState<string | null>(null);
+  const [ordersLiveKPI, setOrdersLiveKPI] = useState<string | null>(null);
+  const [freqLiveKPI, setFreqLiveKPI] = useState<string | null>(null);
+  const [distLiveKPI, setDistLiveKPI] = useState<string | null>(null);
+
+  // Fullscreen modals states
+  const [fullscreenChartTitle, setFullscreenChartTitle] = useState<string | null>(null);
+  const [fullscreenData, setFullscreenData] = useState<ChartPoint[]>([]);
+  const [fullscreenRender, setFullscreenRender] = useState<((w: number, h: number) => React.ReactNode) | null>(null);
+
+  // Drill-down Modal state
+  const [drilldownPoint, setDrilldownPoint] = useState<ChartPoint | null>(null);
+  const [drilldownTitle, setDrilldownTitle] = useState<string>("");
+
+  // Grid responsiveness basis
+  const kpiBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : 4);
+  const chartBasis = isMobile ? 100 : 48.5;
+  const behaviourBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : 4);
   const actionBasis = isMobile ? 50 : isTablet ? 31.5 : 23.5;
 
-  // ── Sticky section navigation: scroll-position tracking ────────────────
+  // Sticky Section scroll logic
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Partial<Record<SectionId, number>>>({});
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
 
-  const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode }[] =
-    useMemo(
-      () => [
-        { id: "overview", label: "Overview", icon: <BarChartFillIcon size={13} /> },
-        { id: "analytics", label: "Analytics", icon: <GraphUpIcon size={13} /> },
-        { id: "behaviour", label: "Behaviour", icon: <PersonIcon size={13} /> },
-        { id: "payments", label: "Payments", icon: <CreditCardIcon size={13} /> },
-        { id: "returns", label: "Returns", icon: <ReplyIcon size={13} /> },
-        { id: "address", label: "Address", icon: <MapPinIcon size={13} /> },
-        { id: "reviews", label: "Reviews", icon: <StarFillIcon size={13} /> },
-        { id: "support", label: "Support", icon: <TicketIcon size={13} /> },
-        { id: "timeline", label: "Timeline", icon: <ActivityIcon size={13} /> },
-        { id: "risk", label: "Risk", icon: <ShieldIcon size={13} /> },
-        { id: "insights", label: "AI Insights", icon: <SparkleIcon size={13} /> },
-        { id: "actions", label: "Actions", icon: <ArrowUpRightIcon size={13} color={primary} /> },
-        { id: "orders", label: "Orders", icon: <BagIcon size={13} /> },
-      ],
-      [],
-    );
+  const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode }[] = useMemo(
+    () => [
+      { id: "overview", label: "Overview", icon: <BarChartFillIcon size={13} /> },
+      { id: "analytics", label: "Analytics", icon: <GraphUpIcon size={13} /> },
+      { id: "behaviour", label: "Behaviour", icon: <PersonIcon size={13} /> },
+      { id: "payments", label: "Payments", icon: <CreditCardIcon size={13} /> },
+      { id: "returns", label: "Returns", icon: <ReplyIcon size={13} /> },
+      { id: "orders", label: "Orders", icon: <BagIcon size={13} /> },
+      { id: "timeline", label: "Timeline", icon: <ActivityIcon size={13} /> },
+      { id: "profile", label: "Profile", icon: <ShieldIcon size={13} /> },
+      { id: "insights", label: "Insights", icon: <SparkleIcon size={13} /> },
+      { id: "actions", label: "Actions", icon: <ArrowUpRightIcon size={13} color={primary} /> },
+    ],
+    [],
+  );
 
   const handleMeasure = useCallback((id: SectionId, y: number) => {
     sectionOffsets.current[id] = y;
@@ -1622,32 +1948,25 @@ export default function CustomerAnalyticsScreen() {
     [SECTIONS],
   );
 
-  const kpis: {
-    icon: React.ReactNode;
-    iconBg: string;
-    title: string;
-    value: string;
-    sub: string;
-    trend: Trend;
-    trendVal: string;
-  }[] = useMemo(
+  // Dynamic status-based KPI definitions
+  const kpis = useMemo(
     () => [
       {
         icon: <WalletIcon color={primary} size={18} />,
         iconBg: primaryLight,
         title: "Lifetime Spend",
-        value: rupee(data.lifetimeSpend),
-        sub: "All-time total",
-        trend: "up",
+        value: spendLiveKPI ? spendLiveKPI : rupee(data.lifetimeSpend),
+        sub: spendLiveKPI ? "Live Hover Value" : "All-time total",
+        trend: "up" as Trend,
         trendVal: "+12%",
       },
       {
         icon: <BagIcon color={navy} size={18} />,
         iconBg: "rgba(30,43,107,0.08)",
         title: "Total Orders",
-        value: String(data.totalOrders),
-        sub: "All-time orders",
-        trend: "up",
+        value: ordersLiveKPI ? ordersLiveKPI : String(data.totalOrders),
+        sub: ordersLiveKPI ? "Live Hover Value" : "All-time orders",
+        trend: "up" as Trend,
         trendVal: "+4",
       },
       {
@@ -1656,7 +1975,7 @@ export default function CustomerAnalyticsScreen() {
         title: "Average Order Value",
         value: rupee(data.avgOrderValue),
         sub: "Per order",
-        trend: "flat",
+        trend: "flat" as Trend,
         trendVal: "0%",
       },
       {
@@ -1665,7 +1984,7 @@ export default function CustomerAnalyticsScreen() {
         title: "Delivered Orders",
         value: String(data.delivered),
         sub: "Successfully delivered",
-        trend: "up",
+        trend: "up" as Trend,
         trendVal: "+6%",
       },
       {
@@ -1674,7 +1993,7 @@ export default function CustomerAnalyticsScreen() {
         title: "Processing Orders",
         value: String(data.processing),
         sub: "Currently in progress",
-        trend: "flat",
+        trend: "flat" as Trend,
         trendVal: "0",
       },
       {
@@ -1683,7 +2002,7 @@ export default function CustomerAnalyticsScreen() {
         title: "Cancelled Orders",
         value: String(data.cancelled),
         sub: "Cancelled by customer",
-        trend: "down",
+        trend: "down" as Trend,
         trendVal: "-2%",
       },
       {
@@ -1692,7 +2011,7 @@ export default function CustomerAnalyticsScreen() {
         title: "Returned Orders",
         value: String(data.returned),
         sub: "Returned items",
-        trend: "down",
+        trend: "down" as Trend,
         trendVal: "-1%",
       },
       {
@@ -1701,29 +2020,11 @@ export default function CustomerAnalyticsScreen() {
         title: "Refund Amount",
         value: rupee(data.refundAmount),
         sub: "Total refunded",
-        trend: "down",
+        trend: "down" as Trend,
         trendVal: "-3%",
       },
-      {
-        icon: <ActivityIcon color={primary} size={18} />,
-        iconBg: primaryLight,
-        title: "Purchase Frequency",
-        value: data.behaviour.currentStreak,
-        sub: "Current streak",
-        trend: "up",
-        trendVal: "+1",
-      },
-      {
-        icon: <CalendarIcon color={navy} size={18} />,
-        iconBg: "rgba(30,43,107,0.08)",
-        title: "Last Order Date",
-        value: data.lastPurchase,
-        sub: "Most recent purchase",
-        trend: "flat",
-        trendVal: "—",
-      },
     ],
-    [data],
+    [data, spendLiveKPI, ordersLiveKPI],
   );
 
   const initials = useMemo(
@@ -1737,13 +2038,19 @@ export default function CustomerAnalyticsScreen() {
     [customerName],
   );
 
-  const goToOrders = useCallback(
-    () =>
-      router.push({
-        pathname: "/customerDetails",
-        params: { id: customerId },
-      }),
-    [router, customerId],
+  // Time filter rendering
+  const renderTimeFilters = (current: TimeFrame, setFilter: (tf: TimeFrame) => void) => (
+    <View style={s.tfRow}>
+      {(["7D", "30D", "90D", "6M", "1Y", "All"] as TimeFrame[]).map((tf) => (
+        <TouchableOpacity
+          key={tf}
+          onPress={() => setFilter(tf)}
+          style={[s.tfBtn, current === tf && s.tfBtnActive]}
+        >
+          <Text style={[s.tfBtnTxt, current === tf && s.tfBtnTxtActive]}>{tf}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 
   return (
@@ -1758,28 +2065,21 @@ export default function CustomerAnalyticsScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={32}
       >
-        {/* ══ HERO ════════════════════════════════════════════════════════ */}
-        <View
-          style={{
-            alignSelf: "center",
-            width: "100%",
-            maxWidth: 1600,
-            paddingHorizontal: px,
-            backgroundColor: surface,
-          }}
-        >
-          <View
+        {/* ══ HERO SECTION ════════════════════════════════════════════════ */}
+        <View style={s.heroOuter}>
+          <LinearGradient
+            colors={[C.navyDeep, C.navy, C.navyLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={[
               s.header,
               {
-                paddingTop: Platform.OS === "ios" ? 50 : 16,
+                paddingTop: Platform.OS === "ios" ? 50 : 20,
                 marginTop: isMobile ? 12 : 18,
               },
             ]}
           >
-            <View
-              style={[s.headerTop, { paddingHorizontal: isMobile ? 16 : 22 }]}
-            >
+            <View style={s.headerTop}>
               <TouchableOpacity
                 style={s.backBtn}
                 onPress={() => router.back()}
@@ -1787,27 +2087,12 @@ export default function CustomerAnalyticsScreen() {
               >
                 <BackIcon size={18} />
               </TouchableOpacity>
-              <Text style={s.headerCrumb}>Customer Analytics</Text>
+              <Text style={s.headerCrumb}>Customer Analytics Suite</Text>
             </View>
 
-            {/* Profile row stacks to a column below tablet width so the
-                health box never squeezes against the identity block. */}
-            <View
-              style={[
-                s.headerProfile,
-                !isWide && {
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                },
-              ]}
-            >
+            <View style={[s.headerProfile, !isWide && { flexDirection: "column", alignItems: "flex-start" }]}>
               <View style={s.headerProfileLeft}>
-                <View
-                  style={[
-                    s.avatar,
-                    { backgroundColor: avatarColor(customerName) },
-                  ]}
-                >
+                <View style={[s.avatar, { backgroundColor: avatarColor(customerName) }]}>
                   <Text style={s.avatarTxt}>{initials}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -1823,35 +2108,24 @@ export default function CustomerAnalyticsScreen() {
                     )}
                   </View>
                   <Text style={s.headerSub}>
-                    Customer #{customerId} · {data.status}
+                    Customer ID #{customerId} &middot; Status: {data.status}
                   </Text>
                   <View style={s.headerMetaRow}>
                     <View style={s.headerMetaItem}>
-                      <EnvelopeIcon size={11} color="rgba(255,255,255,0.65)" />
-                      <Text style={s.headerMetaTxt} numberOfLines={1}>
-                        {customerEmail}
-                      </Text>
+                      <EnvelopeIcon size={11} color="rgba(255,255,255,0.7)" />
+                      <Text style={s.headerMetaTxt} numberOfLines={1}>{customerEmail}</Text>
                     </View>
                     <View style={s.headerMetaItem}>
-                      <PhoneIcon size={11} color="rgba(255,255,255,0.65)" />
+                      <PhoneIcon size={11} color="rgba(255,255,255,0.7)" />
                       <Text style={s.headerMetaTxt}>{customerPhone}</Text>
                     </View>
                   </View>
                 </View>
               </View>
 
-              <View
-                style={[
-                  s.headerRight,
-                  !isWide && {
-                    width: "100%",
-                    marginTop: 14,
-                    alignItems: "flex-start",
-                  },
-                ]}
-              >
+              <View style={[s.headerRight, !isWide && { width: "100%", marginTop: 14, alignItems: "flex-start" }]}>
                 <View style={s.healthBox}>
-                  <Text style={s.healthLabel}>Health Score</Text>
+                  <Text style={s.healthLabel}>Account Health</Text>
                   <Text
                     style={[
                       s.healthVal,
@@ -1865,7 +2139,7 @@ export default function CustomerAnalyticsScreen() {
                       },
                     ]}
                   >
-                    {data.healthScore}
+                    {data.healthScore}%
                   </Text>
                 </View>
                 <View style={s.quickActions}>
@@ -1878,7 +2152,12 @@ export default function CustomerAnalyticsScreen() {
                   <TouchableOpacity
                     style={s.quickBtnWide}
                     activeOpacity={0.8}
-                    onPress={goToOrders}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/customerDetails",
+                        params: { id: customerId },
+                      })
+                    }
                   >
                     <BagIcon size={13} color="#fff" />
                     <Text style={s.quickBtnTxt}>View Orders</Text>
@@ -1890,40 +2169,27 @@ export default function CustomerAnalyticsScreen() {
             <View style={[s.headerFootRow, isMobile && { flexWrap: "wrap" }]}>
               <View style={s.headerFootItem}>
                 <CalendarIcon size={12} color="rgba(255,255,255,0.7)" />
-                <Text style={s.headerFootTxt}>
-                  Customer since {data.customerSince}
-                </Text>
+                <Text style={s.headerFootTxt}>Customer Since: {data.customerSince}</Text>
               </View>
               <View style={s.headerFootItem}>
                 <ClockIcon size={12} color="rgba(255,255,255,0.7)" />
-                <Text style={s.headerFootTxt}>
-                  Last purchase {data.lastPurchase}
-                </Text>
+                <Text style={s.headerFootTxt}>Last Purchase: {data.lastPurchase}</Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
         </View>
 
-        {/* ══ STICKY SECTION NAV (direct ScrollView child — index 1) ══════ */}
+        {/* ══ STICKY NAVIGATION BAR ═════════════════════════════════════ */}
         <SectionNav
           sections={SECTIONS}
           activeId={activeSection}
           onSelect={handleSelectSection}
         />
 
-        {/* ══ BODY ══════════════════════════════════════════════════════ */}
-        <View
-          style={[
-            s.body,
-            {
-              maxWidth: 1600,
-              alignSelf: "center",
-              width: "100%",
-              paddingHorizontal: px,
-            },
-          ]}
-        >
-          {/* ══ OVERVIEW — KPI GRID ═══════════════════════════════════════ */}
+        {/* ══ DASHBOARD BODY CONTAINER ══════════════════════════════════ */}
+        <View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%", paddingHorizontal: px }]}>
+          
+          {/* ══ KPI OVERVIEW GRID ═════════════════════════════════════════ */}
           <PageSection id="overview" onMeasure={handleMeasure}>
             <View style={[s.kpiGrid, { gap: 12 }]}>
               {kpis.map((k) => (
@@ -1932,164 +2198,300 @@ export default function CustomerAnalyticsScreen() {
             </View>
           </PageSection>
 
-          {/* ══ ANALYTICS — time series + distribution charts ════════════ */}
+          {/* ══ ANALYTICS CHARTS ══════════════════════════════════════════ */}
           <PageSection id="analytics" onMeasure={handleMeasure}>
             <View style={{ gap: 16 }}>
+              {/* Time Series Charts Grid */}
               <View style={[s.chartGrid, { gap: 16 }]}>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
+                {/* Spending Line Chart */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader
                     icon={<GraphUpIcon color={primary} size={16} />}
-                    title="Monthly Spending Trend"
+                    title="Spending Trend"
+                    right={
+                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setFullscreenChartTitle("Monthly Spending Trend");
+                            setFullscreenData(spendData);
+                            setFullscreenRender(() => (w: number, h: number) => (
+                              <LineChartSvg
+                                data={spendData}
+                                color={primary}
+                                width={w}
+                                height={h}
+                                formatValue={rupee}
+                                onPointPress={(p) => {
+                                  setDrilldownPoint(p);
+                                  setDrilldownTitle("Monthly Spending");
+                                }}
+                              />
+                            ));
+                          }}
+                        >
+                          <MaximizeIcon size={14} color={C.textLight} />
+                        </TouchableOpacity>
+                      </View>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <MiniLineChart
-                      data={data.monthlySpend}
-                      color={primary}
-                      formatValue={(v) => rupee(v)}
+                    {renderTimeFilters(spendTF, setSpendTF)}
+                    <MeasuredChart
+                      plotHeight={150}
+                      render={(w, h) => (
+                        <LineChartSvg
+                          data={spendData}
+                          color={primary}
+                          width={w}
+                          height={h}
+                          formatValue={rupee}
+                          onHoverValueChange={setSpendLiveKPI}
+                          onPointPress={(p) => {
+                            setDrilldownPoint(p);
+                            setDrilldownTitle("Monthly Spending");
+                          }}
+                        />
+                      )}
                     />
                   </View>
                 </Card>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
+
+                {/* Orders Bar Chart */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader
                     icon={<BarChartFillIcon color={blue} size={16} />}
-                    title="Monthly Orders"
+                    title="Orders Placed"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFullscreenChartTitle("Orders Count");
+                          setFullscreenData(ordersData);
+                          setFullscreenRender(() => (w: number, h: number) => (
+                            <BarChartSvg
+                              data={ordersData}
+                              color={blue}
+                              width={w}
+                              height={h}
+                              formatValue={(v) => `${v} orders`}
+                              onPointPress={(p) => {
+                                setDrilldownPoint(p);
+                                setDrilldownTitle("Orders Placed");
+                              }}
+                            />
+                          ));
+                        }}
+                      >
+                        <MaximizeIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <MiniBarChart
-                      data={data.monthlyOrders}
-                      color={blue}
-                      formatValue={(v) => `${v} order${v === 1 ? "" : "s"}`}
+                    {renderTimeFilters(ordersTF, setOrdersTF)}
+                    <MeasuredChart
+                      plotHeight={150}
+                      render={(w, h) => (
+                        <BarChartSvg
+                          data={ordersData}
+                          color={blue}
+                          width={w}
+                          height={h}
+                          formatValue={(v) => `${v} orders`}
+                          onHoverValueChange={setOrdersLiveKPI}
+                          onPointPress={(p) => {
+                            setDrilldownPoint(p);
+                            setDrilldownTitle("Orders Placed");
+                          }}
+                        />
+                      )}
                     />
                   </View>
                 </Card>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
+
+                {/* Frequency Line Chart */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader
                     icon={<GraphUpIcon color={green} size={16} />}
                     title="Order Frequency"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFullscreenChartTitle("Order Frequency");
+                          setFullscreenData(freqData);
+                          setFullscreenRender(() => (w: number, h: number) => (
+                            <LineChartSvg
+                              data={freqData}
+                              color={green}
+                              width={w}
+                              height={h}
+                              formatValue={(v) => `${v} orders/wk`}
+                              onPointPress={(p) => {
+                                setDrilldownPoint(p);
+                                setDrilldownTitle("Order Frequency");
+                              }}
+                            />
+                          ));
+                        }}
+                      >
+                        <MaximizeIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <MiniLineChart
-                      data={data.orderFrequency}
-                      color={green}
-                      formatValue={(v) => `${v} order${v === 1 ? "" : "s"}`}
+                    {renderTimeFilters(freqTF, setFreqTF)}
+                    <MeasuredChart
+                      plotHeight={150}
+                      render={(w, h) => (
+                        <LineChartSvg
+                          data={freqData}
+                          color={green}
+                          width={w}
+                          height={h}
+                          formatValue={(v) => `${v} orders/wk`}
+                          onHoverValueChange={setFreqLiveKPI}
+                          onPointPress={(p) => {
+                            setDrilldownPoint(p);
+                            setDrilldownTitle("Order Frequency");
+                          }}
+                        />
+                      )}
                     />
                   </View>
                 </Card>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
+
+                {/* Distribution Bar Chart */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader
                     icon={<ClockIcon color={yellow} size={16} />}
-                    title="Purchase Time Distribution"
+                    title="Purchase Time Breakdown"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFullscreenChartTitle("Purchase Time");
+                          setFullscreenData(distData);
+                          setFullscreenRender(() => (w: number, h: number) => (
+                            <BarChartSvg
+                              data={distData}
+                              color={yellow}
+                              width={w}
+                              height={h}
+                              formatValue={(v) => `${v}% of orders`}
+                              onPointPress={(p) => {
+                                setDrilldownPoint(p);
+                                setDrilldownTitle("Purchase Time Distribution");
+                              }}
+                            />
+                          ));
+                        }}
+                      >
+                        <MaximizeIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <MiniBarChart
-                      data={data.purchaseTime}
-                      color={yellow}
-                      formatValue={(v) => `${v}%`}
+                    {renderTimeFilters(distTF, setDistTF)}
+                    <MeasuredChart
+                      plotHeight={150}
+                      render={(w, h) => (
+                        <BarChartSvg
+                          data={distData}
+                          color={yellow}
+                          width={w}
+                          height={h}
+                          formatValue={(v) => `${v}% of orders`}
+                          onHoverValueChange={setDistLiveKPI}
+                          onPointPress={(p) => {
+                            setDrilldownPoint(p);
+                            setDrilldownTitle("Purchase Time Distribution");
+                          }}
+                        />
+                      )}
                     />
                   </View>
                 </Card>
               </View>
 
+              {/* Categorical Distribution Grid */}
               <View style={[s.chartGrid, { gap: 16 }]}>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
-                  <SectionHeader
-                    icon={<PieChartIcon color={purple} size={16} />}
-                    title="Order Status"
-                  />
+                {/* Order Status Donut Chart */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                  <SectionHeader icon={<PieChartIcon color={purple} size={16} />} title="Order Status Distribution" />
                   <View style={[s.cardBody, s.ringCardBody]}>
-                    <RingChart data={data.orderStatusBreakdown} donut />
+                    <RingChart data={activeOrderStatus} donut />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
-                      <LegendList data={data.orderStatusBreakdown} />
+                      <LegendList
+                        data={data.orderStatusBreakdown}
+                        hiddenLabels={hiddenStatusLabels}
+                        onToggleLabel={(lbl) => {
+                          setHiddenStatusLabels((prev) => {
+                            const copy = new Set(prev);
+                            if (copy.has(lbl)) copy.delete(lbl);
+                            else copy.add(lbl);
+                            return copy;
+                          });
+                        }}
+                      />
                     </View>
                   </View>
                 </Card>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
-                  <SectionHeader
-                    icon={<CreditCardIcon color={navy} size={16} />}
-                    title="Payment Method Distribution"
-                  />
+
+                {/* Payment Methods Donut Chart */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                  <SectionHeader icon={<CreditCardIcon color={navy} size={16} />} title="Preferred Payment Methods" />
                   <View style={[s.cardBody, s.ringCardBody]}>
-                    <RingChart data={data.paymentMethods} donut={false} />
+                    <RingChart data={activePaymentMethods} donut={false} />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
-                      <LegendList data={data.paymentMethods} />
+                      <LegendList
+                        data={data.paymentMethods}
+                        hiddenLabels={hiddenPaymentLabels}
+                        onToggleLabel={(lbl) => {
+                          setHiddenPaymentLabels((prev) => {
+                            const copy = new Set(prev);
+                            if (copy.has(lbl)) copy.delete(lbl);
+                            else copy.add(lbl);
+                            return copy;
+                          });
+                        }}
+                      />
                     </View>
                   </View>
                 </Card>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
-                  <SectionHeader
-                    icon={<TagIcon color={teal} size={16} />}
-                    title="Purchase Categories"
-                  />
-                  <View style={[s.cardBody, s.ringCardBody]}>
-                    <BarList data={data.categories} />
+
+                {/* Purchase Categories List */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                  <SectionHeader icon={<TagIcon color={teal} size={16} />} title="Purchase Categories" />
+                  <View style={[s.cardBody, { paddingVertical: 20 }]}>
+                    <BarList
+                      data={data.categories}
+                      onRowPress={(p) => {
+                        setDrilldownPoint(p);
+                        setDrilldownTitle("Category Purchases");
+                      }}
+                    />
                   </View>
                 </Card>
-                <Card
-                  style={{
-                    flexBasis: `${chartBasis}%` as const,
-                    minWidth: 260,
-                  }}
-                >
-                  <SectionHeader
-                    icon={<HeartIcon color={pink} size={16} />}
-                    title="Favourite Brands"
-                  />
-                  <View style={[s.cardBody, s.ringCardBody]}>
-                    <BarList data={data.brands} />
+
+                {/* Favourite Brands List */}
+                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                  <SectionHeader icon={<HeartIcon color={pink} size={16} />} title="Favourite Brands" />
+                  <View style={[s.cardBody, { paddingVertical: 20 }]}>
+                    <BarList
+                      data={data.brands}
+                      onRowPress={(p) => {
+                        setDrilldownPoint(p);
+                        setDrilldownTitle("Brand Purchases");
+                      }}
+                    />
                   </View>
                 </Card>
               </View>
             </View>
           </PageSection>
 
-          {/* ══ BEHAVIOUR ═════════════════════════════════════════════════ */}
+          {/* ══ CUSTOMER BEHAVIOUR ════════════════════════════════════════ */}
           <PageSection id="behaviour" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader
-                icon={<PersonIcon size={16} />}
-                title="Customer Behaviour"
-              />
-              <View
-                style={[
-                  s.cardBody,
-                  { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-                ]}
-              >
+              <SectionHeader icon={<PersonIcon size={16} />} title="Customer Behaviour Metrics" />
+              <View style={[s.cardBody, { flexDirection: "row", flexWrap: "wrap", gap: 12 }]}>
                 {[
                   ["Most Purchased Category", data.behaviour.mostPurchasedCategory],
                   ["Favourite Brand", data.behaviour.favouriteBrand],
@@ -2100,10 +2502,7 @@ export default function CustomerAnalyticsScreen() {
                   ["Longest Purchase Gap", data.behaviour.longestGap],
                   ["Current Purchase Streak", data.behaviour.currentStreak],
                 ].map(([label, value]) => (
-                  <View
-                    key={label}
-                    style={{ flexBasis: `${behaviourBasis}%` as const, minWidth: 130 }}
-                  >
+                  <View key={label} style={{ flexBasis: `${behaviourBasis}%` as const, minWidth: 130 }}>
                     <StatPair label={label} value={value} />
                   </View>
                 ))}
@@ -2111,13 +2510,10 @@ export default function CustomerAnalyticsScreen() {
             </Card>
           </PageSection>
 
-          {/* ══ PAYMENTS ═══════════════════════════════════════════════════ */}
+          {/* ══ PAYMENTS DETAIL ═══════════════════════════════════════════ */}
           <PageSection id="payments" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader
-                icon={<CreditCardIcon size={16} />}
-                title="Payments"
-              />
+              <SectionHeader icon={<CreditCardIcon size={16} />} title="Financial Transactions" />
               <View style={s.cardBody}>
                 <MiniStatTrio
                   items={[
@@ -2141,9 +2537,7 @@ export default function CustomerAnalyticsScreen() {
                 <View style={{ gap: 8 }}>
                   {data.paymentsData.refundHistory.map((r, i) => (
                     <View key={i} style={s.listRow}>
-                      <Text style={s.listRowMain} numberOfLines={1}>
-                        {r.reason}
-                      </Text>
+                      <Text style={s.listRowMain} numberOfLines={1}>{r.reason}</Text>
                       <Text style={s.listRowSub}>{r.date}</Text>
                       <Text style={s.listRowAmt}>{rupee(r.amount)}</Text>
                     </View>
@@ -2153,10 +2547,10 @@ export default function CustomerAnalyticsScreen() {
             </Card>
           </PageSection>
 
-          {/* ══ RETURNS ════════════════════════════════════════════════════ */}
+          {/* ══ RETURNS DETAIL ════════════════════════════════════════════ */}
           <PageSection id="returns" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<ReplyIcon size={16} />} title="Returns" />
+              <SectionHeader icon={<ReplyIcon size={16} />} title="Returns Log" />
               <View style={s.cardBody}>
                 <MiniStatTrio
                   items={[
@@ -2176,136 +2570,74 @@ export default function CustomerAnalyticsScreen() {
                     },
                   ]}
                 />
-                <Text style={s.subHeading}>Top Return Reasons</Text>
+                <Text style={s.subHeading}>Primary Return Reasons</Text>
                 <BarList data={data.returnsData.reasons} />
               </View>
             </Card>
           </PageSection>
 
-          {/* ══ ADDRESS ════════════════════════════════════════════════════ */}
-          <PageSection id="address" onMeasure={handleMeasure}>
+          {/* ══ RECENT ORDERS LIST ════════════════════════════════════════ */}
+          <PageSection id="orders" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<MapPinIcon size={16} />} title="Address" />
-              <View style={s.cardBody}>
-                <StatPair
-                  label="Primary Address"
-                  value={data.addressData.primary}
-                />
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 12,
-                    marginTop: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <View style={{ flex: 1, minWidth: 140 }}>
-                    <StatPair
-                      label="Saved Addresses"
-                      value={String(data.addressData.savedCount)}
-                    />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 140 }}>
-                    <StatPair
-                      label="Most Delivered Location"
-                      value={data.addressData.mostDelivered}
-                    />
-                  </View>
-                </View>
-                <Text style={s.subHeading}>Recent Delivery Locations</Text>
-                <View
-                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-                >
-                  {data.addressData.recentLocations.map((loc, i) => (
-                    <View key={i} style={s.chipOutline}>
-                      <MapPinIcon size={11} />
-                      <Text style={s.chipOutlineTxt}>{loc}</Text>
+              <SectionHeader icon={<BagIcon size={16} />} title="Recent Customer Orders" />
+              <View style={{ padding: 0 }}>
+                {isDesktop ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator
+                    style={{ width: "100%" }}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                  >
+                    <View style={[s.orderTable, { minWidth: 720, width: "100%" }]}>
+                      <View style={[s.orderTableRow, s.orderTableHead]}>
+                        <Text style={[s.orderTableHdr, { flex: 1.6 }]}>Order ID</Text>
+                        <Text style={s.orderTableHdr}>Date</Text>
+                        <Text style={s.orderTableHdr}>Amount</Text>
+                        <Text style={[s.orderTableHdr, { flex: 1.2 }]}>Status</Text>
+                        <Text style={s.orderTableHdr}>Payment</Text>
+                        <Text style={[s.orderTableHdr, { flex: 0.6, textAlign: "center" }]}>Action</Text>
+                      </View>
+                      {data.recentOrders.map((o) => (
+                        <View key={o.id} style={s.orderTableRow}>
+                          <Text style={[s.orderIdText, { flex: 1.6 }]} numberOfLines={1}>{o.id}</Text>
+                          <Text style={s.orderTableCell}>{o.date}</Text>
+                          <Text style={[s.orderTableCell, { fontWeight: "700", color: text }]}>{rupee(o.amount)}</Text>
+                          <View style={{ flex: 1.2 }}>
+                            <OrderStatusChip status={o.status} />
+                          </View>
+                          <Text style={s.orderTableCell}>{o.payment}</Text>
+                          <View style={{ flex: 0.6, alignItems: "center" }}>
+                            <TouchableOpacity
+                              style={s.eyeBtn}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                setDrilldownPoint({ label: o.id, value: o.amount });
+                                setDrilldownTitle("Order Details");
+                              }}
+                            >
+                              <EyeIcon size={14} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
-              </View>
-            </Card>
-          </PageSection>
-
-          {/* ══ REVIEWS ════════════════════════════════════════════════════ */}
-          <PageSection id="reviews" onMeasure={handleMeasure}>
-            <Card>
-              <SectionHeader
-                icon={<StarFillIcon size={16} />}
-                title="Reviews"
-              />
-              <View style={s.cardBody}>
-                <MiniStatTrio
-                  items={[
-                    {
-                      label: "Reviews Submitted",
-                      value: String(data.reviewsData.submitted),
-                    },
-                    {
-                      label: "Avg Rating",
-                      value: data.reviewsData.avgRating + "★",
-                      color: "#F59E0B",
-                    },
-                    {
-                      label: "Photo Reviews",
-                      value: String(data.reviewsData.photoReviews),
-                    },
-                  ]}
-                />
-                <View style={{ marginTop: 14 }}>
-                  <StatPair
-                    label="Helpful Votes"
-                    value={String(data.reviewsData.helpfulVotes)}
-                  />
-                </View>
-              </View>
-            </Card>
-          </PageSection>
-
-          {/* ══ SUPPORT ════════════════════════════════════════════════════ */}
-          <PageSection id="support" onMeasure={handleMeasure}>
-            <Card>
-              <SectionHeader icon={<TicketIcon size={16} />} title="Support" />
-              <View style={s.cardBody}>
-                <MiniStatTrio
-                  items={[
-                    {
-                      label: "Total Tickets",
-                      value: String(data.supportData.tickets),
-                    },
-                    {
-                      label: "Resolved",
-                      value: String(data.supportData.resolved),
-                      color: green,
-                    },
-                    {
-                      label: "Pending",
-                      value: String(data.supportData.pending),
-                      color: data.supportData.pending > 0 ? "#F59E0B" : green,
-                    },
-                  ]}
-                />
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 12,
-                    marginTop: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <View style={{ flex: 1, minWidth: 160 }}>
-                    <StatPair
-                      label="Average Resolution Time"
-                      value={data.supportData.avgResolutionTime}
-                    />
+                  </ScrollView>
+                ) : (
+                  <View style={{ padding: 14, gap: 10 }}>
+                    {data.recentOrders.map((o) => (
+                      <View key={o.id} style={s.orderMobileCard}>
+                        <View style={s.omTop}>
+                          <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
+                          <OrderStatusChip status={o.status} />
+                        </View>
+                        <View style={s.omRow}>
+                          <Text style={s.omSub}>{o.date} &middot; {o.payment}</Text>
+                          <Text style={s.omAmt}>{rupee(o.amount)}</Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                  <View style={{ flex: 1, minWidth: 160 }}>
-                    <StatPair
-                      label="Latest Ticket"
-                      value={data.supportData.latestTicket}
-                    />
-                  </View>
-                </View>
+                )}
               </View>
             </Card>
           </PageSection>
@@ -2313,25 +2645,15 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ ACTIVITY TIMELINE ═════════════════════════════════════════ */}
           <PageSection id="timeline" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader
-                icon={<ActivityIcon size={16} />}
-                title="Activity Timeline"
-              />
+              <SectionHeader icon={<ActivityIcon size={16} />} title="Historical Timeline" />
               <View style={s.cardBody}>
                 {data.timeline.map((ev, i) => {
-                  const cfg =
-                    TIMELINE_ICON_CFG[ev.type] ?? TIMELINE_ICON_CFG.order;
+                  const cfg = TIMELINE_ICON_CFG[ev.type] ?? TIMELINE_ICON_CFG.order;
                   return (
                     <View key={i} style={s.tlRow}>
                       <View style={s.tlLeft}>
-                        <View
-                          style={[s.tlIconBox, { backgroundColor: cfg.bg }]}
-                        >
-                          {cfg.icon}
-                        </View>
-                        {i < data.timeline.length - 1 && (
-                          <View style={s.tlLine} />
-                        )}
+                        <View style={[s.tlIconBox, { backgroundColor: cfg.bg }]}>{cfg.icon}</View>
+                        {i < data.timeline.length - 1 && <View style={s.tlLine} />}
                       </View>
                       <View style={s.tlContent}>
                         <Text style={s.tlTitle}>{ev.title}</Text>
@@ -2344,38 +2666,54 @@ export default function CustomerAnalyticsScreen() {
             </Card>
           </PageSection>
 
-          {/* ══ RISK ANALYSIS ═════════════════════════════════════════════ */}
-          <PageSection id="risk" onMeasure={handleMeasure}>
+          {/* ══ CUSTOMER PROFILE CARD ═════════════════════════════════════ */}
+          <PageSection id="profile" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader
-                icon={<ShieldIcon size={16} />}
-                title="Risk Analysis"
-              />
-              <View
-                style={[
-                  s.cardBody,
-                  { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-                ]}
-              >
-                {data.riskBadges.map((b) => (
-                  <Badge
-                    key={b.label}
-                    label={b.label}
-                    color={b.color}
-                    bg={b.bg}
-                  />
-                ))}
+              <SectionHeader icon={<ShieldIcon size={16} />} title="Customer Identity & Risk Profile" />
+              <View style={s.cardBody}>
+                <StatPair label="Primary shipping address" value={data.addressData.primary} />
+                <View style={{ flexDirection: "row", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <StatPair label="Saved Addresses" value={`${data.addressData.savedCount} locations`} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <StatPair label="Most Delivered City" value={data.addressData.mostDelivered} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <StatPair label="Loyalty Tier" value={data.loyaltyData.tier} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <StatPair label="Loyalty Points" value={String(data.loyaltyData.points)} />
+                  </View>
+                </View>
+
+                {/* Risk Badges */}
+                <Text style={s.subHeading}>System Risk Analysis Indicators</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                  {data.riskBadges.map((b) => (
+                    <Badge key={b.label} label={b.label} color={b.color} bg={b.bg} />
+                  ))}
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap", borderTopWidth: 1, borderTopColor: border, paddingTop: 14 }}>
+                  <View style={{ flex: 1, minWidth: 130 }}>
+                    <StatPair label="Feedback Rating" value={`${data.reviewsData.avgRating}★ (${data.reviewsData.submitted} reviews)`} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 130 }}>
+                    <StatPair label="Pending Support Tickets" value={String(data.supportData.pending)} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 130 }}>
+                    <StatPair label="Loyalty Savings" value={rupee(data.loyaltyData.lifetimeSavings)} />
+                  </View>
+                </View>
               </View>
             </Card>
           </PageSection>
 
-          {/* ══ AI INSIGHTS ════════════════════════════════════════════════ */}
+          {/* ══ AI INSIGHTS ═══════════════════════════════════════════════ */}
           <PageSection id="insights" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader
-                icon={<SparkleIcon size={16} />}
-                title="AI Insights"
-              />
+              <SectionHeader icon={<SparkleIcon size={16} />} title="Predictive AI Insights" />
               <View style={[s.cardBody, { gap: 10 }]}>
                 {data.aiInsights.map((txt, i) => (
                   <View key={i} style={s.insightRow}>
@@ -2394,26 +2732,16 @@ export default function CustomerAnalyticsScreen() {
             <Card>
               <SectionHeader
                 icon={<ArrowUpRightIcon size={16} color={primary} />}
-                title="Recommended Actions"
+                title="Recommended Engagement Actions"
               />
-              <View
-                style={[
-                  s.cardBody,
-                  { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-                ]}
-              >
+              <View style={[s.cardBody, { flexDirection: "row", flexWrap: "wrap", gap: 10 }]}>
                 {data.recommendedActions.map((a) => (
                   <TouchableOpacity
                     key={a.label}
-                    style={[
-                      s.actionCard,
-                      { flexBasis: `${actionBasis}%` as const, minWidth: 110 },
-                    ]}
+                    style={[s.actionCard, { flexBasis: `${actionBasis}%` as const, minWidth: 110 }]}
                     activeOpacity={0.85}
                   >
-                    <View
-                      style={[s.actionIconBox, { backgroundColor: a.color }]}
-                    >
+                    <View style={[s.actionIconBox, { backgroundColor: a.color }]}>
                       {ACTION_ICON_CFG[a.icon]}
                     </View>
                     <Text style={s.actionLabel}>{a.label}</Text>
@@ -2423,109 +2751,53 @@ export default function CustomerAnalyticsScreen() {
             </Card>
           </PageSection>
 
-          {/* ══ RECENT ORDERS ══════════════════════════════════════════════ */}
-          <PageSection id="orders" onMeasure={handleMeasure}>
-            <Card>
-              <SectionHeader
-                icon={<BagIcon size={16} />}
-                title="Recent Orders"
-              />
-              <View style={{ padding: 0 }}>
-                {isDesktop ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View style={[s.orderTable, { minWidth: 720 }]}>
-                      <View style={[s.orderTableRow, s.orderTableHead]}>
-                        <Text style={[s.orderTableHdr, { flex: 1.6 }]}>
-                          Order ID
-                        </Text>
-                        <Text style={s.orderTableHdr}>Date</Text>
-                        <Text style={s.orderTableHdr}>Amount</Text>
-                        <Text style={[s.orderTableHdr, { flex: 1.2 }]}>
-                          Status
-                        </Text>
-                        <Text style={s.orderTableHdr}>Payment</Text>
-                        <Text
-                          style={[
-                            s.orderTableHdr,
-                            { flex: 0.6, textAlign: "center" },
-                          ]}
-                        >
-                          Action
-                        </Text>
-                      </View>
-                      {data.recentOrders.map((o) => (
-                        <View key={o.id} style={s.orderTableRow}>
-                          <Text
-                            style={[s.orderIdText, { flex: 1.6 }]}
-                            numberOfLines={1}
-                          >
-                            {o.id}
-                          </Text>
-                          <Text style={s.orderTableCell}>{o.date}</Text>
-                          <Text
-                            style={[
-                              s.orderTableCell,
-                              { fontWeight: "700", color: text },
-                            ]}
-                          >
-                            {rupee(o.amount)}
-                          </Text>
-                          <View style={{ flex: 1.2 }}>
-                            <OrderStatusChip status={o.status} />
-                          </View>
-                          <Text style={s.orderTableCell}>{o.payment}</Text>
-                          <View style={{ flex: 0.6, alignItems: "center" }}>
-                            <TouchableOpacity
-                              style={s.eyeBtn}
-                              activeOpacity={0.8}
-                            >
-                              <EyeIcon size={14} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                ) : (
-                  <View style={{ padding: 14, gap: 10 }}>
-                    {data.recentOrders.map((o) => (
-                      <View key={o.id} style={s.orderMobileCard}>
-                        <View style={s.omTop}>
-                          <Text style={s.omId} numberOfLines={1}>
-                            {o.id}
-                          </Text>
-                          <OrderStatusChip status={o.status} />
-                        </View>
-                        <View style={s.omRow}>
-                          <Text style={s.omSub}>
-                            {o.date} · {o.payment}
-                          </Text>
-                          <Text style={s.omAmt}>{rupee(o.amount)}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </Card>
-          </PageSection>
-
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+
+      {/* Interactive Drill Down Detail Modal */}
+      <DrillDownModal
+        visible={!!drilldownPoint}
+        onClose={() => setDrilldownPoint(null)}
+        title={drilldownTitle}
+        dataPoint={drilldownPoint}
+        customerId={customerId}
+        customerName={customerName}
+      />
+
+      {/* Chart Fullscreen Viewer Modal */}
+      <FullscreenChartModal
+        visible={!!fullscreenChartTitle}
+        onClose={() => {
+          setFullscreenChartTitle(null);
+          setFullscreenRender(null);
+        }}
+        title={fullscreenChartTitle ?? ""}
+        data={fullscreenData}
+        exportCSV={() => shareData(fullscreenChartTitle ?? "Chart", fullscreenData)}
+        exportPDF={() => printDataPDF(fullscreenChartTitle ?? "Chart", fullscreenData, customerId)}
+      >
+        {fullscreenChartTitle && fullscreenRender && (
+          <MeasuredChart
+            plotHeight={280}
+            render={(w, h) => fullscreenRender(w, h)}
+          />
+        )}
+      </FullscreenChartModal>
     </AdminLayout>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STYLES
+// STYLESHEET
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: surface },
   scrollContent: { paddingTop: 0, backgroundColor: surface },
   body: { gap: 16, paddingTop: 16 },
 
-  header: { backgroundColor: navy, paddingBottom: 26, borderRadius: 24 },
+  heroOuter: { width: "100%", alignSelf: "center", maxWidth: 1600 },
+  header: { paddingBottom: 26, borderRadius: 24, paddingHorizontal: 20 },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -2536,21 +2808,20 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerCrumb: {
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 
   headerProfile: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    paddingHorizontal: 22,
     gap: 16,
   },
   headerProfileLeft: {
@@ -2567,15 +2838,17 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.25)",
   },
-  avatarTxt: { color: "#fff", fontWeight: "700", fontSize: 22 },
+  avatarTxt: { color: "#fff", fontWeight: "800", fontSize: 24 },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     flexWrap: "wrap",
   },
-  headerName: { color: "#fff", fontSize: 19, fontWeight: "800", flexShrink: 1 },
+  headerName: { color: "#fff", fontSize: 21, fontWeight: "800", flexShrink: 1 },
   vipBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -2586,7 +2859,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
   },
   vipTxt: { color: navyDeep, fontSize: 10, fontWeight: "800" },
-  headerSub: { color: "rgba(255,255,255,0.55)", fontSize: 12, marginTop: 2 },
+  headerSub: { color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 },
   headerMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2599,15 +2872,16 @@ const s = StyleSheet.create({
     gap: 6,
     maxWidth: "100%",
   },
-  headerMetaTxt: { color: "rgba(255,255,255,0.75)", fontSize: 12 },
+  headerMetaTxt: { color: "rgba(255,255,255,0.85)", fontSize: 12 },
 
   headerRight: { alignItems: "flex-end", gap: 10 },
   healthBox: { alignItems: "flex-end" },
   healthLabel: {
-    color: "rgba(255,255,255,0.55)",
+    color: "rgba(255,255,255,0.6)",
     fontSize: 10,
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
+    fontWeight: "700",
   },
   healthVal: { fontSize: 22, fontWeight: "800", marginTop: 2 },
   quickActions: { flexDirection: "row", gap: 8 },
@@ -2615,9 +2889,11 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   quickBtnWide: {
     height: 34,
@@ -2634,16 +2910,15 @@ const s = StyleSheet.create({
   headerFootRow: {
     flexDirection: "row",
     gap: 20,
-    paddingHorizontal: 22,
-    marginTop: 16,
+    marginTop: 18,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.12)",
+    borderTopColor: "rgba(255,255,255,0.15)",
   },
   headerFootItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  headerFootTxt: { color: "rgba(255,255,255,0.7)", fontSize: 11 },
+  headerFootTxt: { color: "rgba(255,255,255,0.75)", fontSize: 11 },
 
-  // ── Sticky horizontal section nav ───────────────────────────────────────
+  // Sticky horizontal nav
   navWrap: {
     backgroundColor: surface,
     borderBottomWidth: 1,
@@ -2651,10 +2926,10 @@ const s = StyleSheet.create({
     height: STICKY_NAV_HEIGHT,
     justifyContent: "center",
     shadowColor: navyDeep,
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
-    elevation: 2,
+    elevation: 3,
   },
   navScrollContent: {
     paddingHorizontal: 16,
@@ -2679,19 +2954,19 @@ const s = StyleSheet.create({
   navTabTxt: { fontSize: 12, fontWeight: "600", color: sub },
   navTabTxtActive: { color: primary, fontWeight: "800" },
 
-  // ── KPI grid (1 / 2 / 4 columns via numeric flexBasis) ──────────────────
+  // KPI Grid
   kpiGrid: { flexDirection: "row", flexWrap: "wrap" },
   kpiCard: {
     backgroundColor: surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: border,
-    padding: 14,
+    padding: 16,
     gap: 6,
     minWidth: 140,
     shadowColor: navyDeep,
     shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     elevation: 3,
   },
@@ -2707,7 +2982,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  kpiValue: { fontSize: 18, fontWeight: "800", color: text, marginTop: 4 },
+  kpiValue: { fontSize: 19, fontWeight: "800", color: text, marginTop: 4 },
   kpiTitle: { fontSize: 12, fontWeight: "700", color: text },
   kpiSub: { fontSize: 11, color: sub },
   trendTag: {
@@ -2720,7 +2995,7 @@ const s = StyleSheet.create({
   },
   trendTagTxt: { fontSize: 10, fontWeight: "700" },
 
-  // ── Chart grid: 1 / 2 / 3 columns via numeric flexBasis ─────────────────
+  // Chart Grid
   chartGrid: { flexDirection: "row", flexWrap: "wrap" },
   card: {
     backgroundColor: surface,
@@ -2728,8 +3003,8 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: border,
     shadowColor: navyDeep,
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     elevation: 3,
     overflow: "hidden",
@@ -2765,6 +3040,12 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
+  tfRow: { flexDirection: "row", gap: 6, marginBottom: 12, flexWrap: "wrap" },
+  tfBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: cardBg },
+  tfBtnActive: { backgroundColor: primary },
+  tfBtnTxt: { fontSize: 11, fontWeight: "700", color: sub },
+  tfBtnTxtActive: { color: "#fff" },
+
   statPair: { gap: 3 },
   statPairLbl: { fontSize: 11, color: sub },
   statPairVal: { fontSize: 13, fontWeight: "700", color: text },
@@ -2781,8 +3062,8 @@ const s = StyleSheet.create({
   miniTrioLbl: { fontSize: 10, color: sub, marginTop: 3, textAlign: "center" },
   miniTrioDiv: { width: 1, height: 28, backgroundColor: border },
 
-  barListRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  barListLbl: { width: 92, fontSize: 12, color: text },
+  barListRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 },
+  barListLbl: { width: 100, fontSize: 12, color: text },
   barListTrack: {
     flex: 1,
     height: 8,
@@ -2792,7 +3073,7 @@ const s = StyleSheet.create({
   },
   barListFill: { height: "100%", borderRadius: 4 },
   barListVal: {
-    width: 26,
+    width: 32,
     textAlign: "right",
     fontSize: 12,
     fontWeight: "700",
@@ -2810,7 +3091,7 @@ const s = StyleSheet.create({
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
   badgeTxt: { fontSize: 12, fontWeight: "700" },
 
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendLbl: { flex: 1, fontSize: 12, color: text },
   legendVal: { fontSize: 12, fontWeight: "700", color: sub },
@@ -2826,18 +3107,6 @@ const s = StyleSheet.create({
   listRowMain: { flex: 1.4, fontSize: 12, color: text, fontWeight: "600" },
   listRowSub: { flex: 1, fontSize: 11, color: sub },
   listRowAmt: { fontSize: 12, fontWeight: "700", color: text },
-
-  chipOutline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderColor: border,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  chipOutlineTxt: { fontSize: 11, color: text },
 
   tlRow: { flexDirection: "row", gap: 12, minHeight: 56 },
   tlLeft: { alignItems: "center", width: 26 },
@@ -2902,6 +3171,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     zIndex: 100,
+    top: 6,
+    borderWidth: 1,
   },
   tooltipLabel: {
     fontSize: 11,
@@ -2916,13 +3187,17 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
 
-  axisRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  axisLabel: { fontSize: 11, color: sub, textAlign: "center", minWidth: 30 },
+  axisRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
+  axisLabel: { fontSize: 10, color: sub, minWidth: 24 },
 
   ringCardBody: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     paddingVertical: 20,
+    paddingHorizontal: 16,
+    gap: 16,
+    flexWrap: "wrap",
   },
 
   orderTable: { borderTopWidth: 1, borderTopColor: border },
@@ -2986,4 +3261,105 @@ const s = StyleSheet.create({
   },
   omSub: { fontSize: 11, color: sub },
   omAmt: { fontSize: 13, fontWeight: "700", color: text },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    width: "100%",
+    maxHeight: 500,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: border,
+    backgroundColor: cardBg,
+  },
+  modalTitle: { fontSize: 16, fontWeight: "800", color: navyDeep },
+  closeBtn: { padding: 8, backgroundColor: border, borderRadius: 8 },
+  closeBtnTxt: { fontSize: 12, fontWeight: "700", color: text },
+  modalBody: { padding: 20 },
+
+  breakoutSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: cardBg,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: border,
+  },
+  breakoutLbl: { fontSize: 11, color: sub },
+  breakoutVal: { fontSize: 18, fontWeight: "800", color: navyDeep, marginTop: 4 },
+
+  modalSubheading: { fontSize: 14, fontWeight: "700", color: text, marginBottom: 10, marginTop: 12 },
+  breakoutRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: cardBg,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: border,
+  },
+  breakoutRowId: { fontSize: 13, fontWeight: "700", color: primary },
+  breakoutRowSub: { fontSize: 11, color: sub, marginTop: 2 },
+  breakoutRowAmt: { fontSize: 13, fontWeight: "800", color: text, marginBottom: 4 },
+
+  fullscreenChartContainer: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: border,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullscreenActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  actionOutline: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    backgroundColor: cardBg,
+  },
+  actionOutlineTxt: { fontSize: 12, fontWeight: "700", color: text },
+
+  datasetTable: {
+    borderWidth: 1,
+    borderColor: border,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  datasetRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: border,
+  },
+  datasetCellLabel: { fontSize: 12, color: text },
+  datasetCellValue: { fontSize: 12, fontWeight: "800", color: navyDeep },
 });

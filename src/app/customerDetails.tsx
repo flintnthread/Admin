@@ -89,6 +89,18 @@ function useLayout(w: number) {
   return { isMobile: w < 480, isTablet: w >= 480 && w < 1024, isDesktop: w >= 1024, cols: w < 768 ? 1 : w < 1280 ? 2 : 3 };
 }
 
+// Builds a compact page-number list with ellipses for large page counts,
+// e.g. [1, "…", 4, 5, 6, "…", 12]
+function getPageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "…")[] = [1];
+  if (current > 3) pages.push("…");
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) pages.push(p);
+  if (current < total - 2) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+
 function mapApiCustomerDetail(data: Record<string, unknown>): Customer {
   const address: Address | undefined = data.address1
     ? {
@@ -184,6 +196,10 @@ const ClockIcon      = ({ size = 16, color = C.primary }: IP) => <Svg width={siz
 const BanIcon         = ({ size = 16, color = C.red }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M15 8a6.97 6.97 0 0 0-1.71-4.584l-9.874 9.875A7 7 0 0 0 15 8M2.71 12.584l9.874-9.875a7 7 0 0 0-9.874 9.875M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0"/></Svg>;
 const ReplyIcon       = ({ size = 16, color = C.primary }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M5.921 11.9 1.353 8.62a.719.719 0 0 1 0-1.238L5.921 4.1A.716.716 0 0 1 7 4.719V6c1.5 0 6 0 7 8-2.5-4.5-7-4-7-4v1.281c0 .56-.606.898-1.079.62z"/></Svg>;
 const SwapIcon        = ({ size = 16, color = C.primary }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5zm14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5z"/></Svg>;
+
+// ── Pagination chevrons ─────────────────────────────────────────────────────
+const ChevronLeftIcon  = ({ size = 14, color = C.text }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></Svg>;
+const ChevronRightIcon = ({ size = 14, color = C.text }: IP) => <Svg width={size} height={size} viewBox="0 0 16 16"><Path fill={color} d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/></Svg>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CARD WRAPPER
@@ -566,9 +582,81 @@ const ch = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PAGINATION BAR  (matches the customerManagement.tsx pattern)
+// ─────────────────────────────────────────────────────────────────────────────
+function PaginationBar({
+  page,
+  totalPages,
+  rangeStart,
+  rangeEnd,
+  total,
+  label,
+  onPrev,
+  onNext,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  rangeStart: number;
+  rangeEnd: number;
+  total: number;
+  label: string;
+  onPrev: () => void;
+  onNext: () => void;
+  onPage: (p: number) => void;
+}) {
+  const pageNumbers = getPageNumbers(page, totalPages);
+  return (
+    <View style={s.paginationBar}>
+      <Text style={s.paginationText}>
+        Showing {rangeStart}–{rangeEnd} of {total} {label}
+      </Text>
+      <View style={s.paginationControls}>
+        <TouchableOpacity
+          style={[s.pageBtn, page === 1 && s.pageBtnDisabled]}
+          onPress={onPrev}
+          disabled={page === 1}
+          activeOpacity={0.7}
+        >
+          <ChevronLeftIcon size={13} color={page === 1 ? C.sub : C.text} />
+        </TouchableOpacity>
+
+        {pageNumbers.map((p, idx) =>
+          p === "…" ? (
+            <View key={`ellipsis-${idx}`} style={s.pageEllipsis}>
+              <Text style={s.pageEllipsisTxt}>…</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              key={p}
+              style={[s.pageNumBtn, p === page && s.pageNumBtnActive]}
+              onPress={() => onPage(p)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.pageNumTxt, p === page && s.pageNumTxtActive]}>{p}</Text>
+            </TouchableOpacity>
+          )
+        )}
+
+        <TouchableOpacity
+          style={[s.pageBtn, page === totalPages && s.pageBtnDisabled]}
+          onPress={onNext}
+          disabled={page === totalPages}
+          activeOpacity={0.7}
+        >
+          <ChevronRightIcon size={13} color={page === totalPages ? C.sub : C.text} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 type Props = { customer?: Customer; onBack?: () => void };
+
+const ORDERS_PER_PAGE = 10;
 
 export default function CustomerDetailScreen({ customer: customerProp, onBack: onBackProp }: Props) {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -579,6 +667,7 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
   const [customer, setCustomer] = useState<Customer | null>(customerProp ?? null);
   const [loading, setLoading] = useState(Boolean(id) && !customerProp);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const onBack = onBackProp ?? (() => router.back());
 
@@ -609,6 +698,11 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
       setCustomer(customerProp);
     }
   }, [id, customerProp, loadCustomer]);
+
+  // Reset to page 1 whenever we land on a different customer
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [id]);
 
   const px  = isMobile ? 14 : isTablet ? 20 : 28;
 
@@ -655,13 +749,21 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
   const orderList    = c.orderHistory ?? [];
   const totalOrders  = c.orders;
   const statusCounts = {
-    ordered:     orderList.filter((o) => o.status === "Ordered").length,
+    pending:     orderList.filter((o) => o.status === "Ordered").length,
     processing:  orderList.filter((o) => o.status === "Processing").length,
     delivered:   orderList.filter((o) => o.status === "Delivered").length,
     cancelled:   orderList.filter((o) => o.status === "Cancelled").length,
     returned:    orderList.filter((o) => o.status === "Returned").length,
     // replacement: orderList.filter((o) => o.status === "Replacement").length,
   };
+
+  // ── Order History pagination ──────────────────────────────────────────────
+  const totalOrderRecords = orderList.length;
+  const totalOrderPages   = Math.max(1, Math.ceil(totalOrderRecords / ORDERS_PER_PAGE));
+  const safePage           = Math.min(currentPage, totalOrderPages);
+  const paginatedOrders    = orderList.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  const rangeStart         = totalOrderRecords === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1;
+  const rangeEnd           = Math.min(safePage * ORDERS_PER_PAGE, totalOrderRecords);
 
   const memberDays = (() => {
     if (!c.registeredOn) return "N/A";
@@ -730,8 +832,8 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
           <MiniStatCard
             icon={<BagIcon color="#3B82F6" size={15} />}
             iconBg="#EFF6FF"
-            value={statusCounts.ordered}
-            label="Ordered"
+            value={statusCounts.pending}
+            label="Pending"
             valueColor="#3B82F6"
           />
           <MiniStatCard
@@ -876,73 +978,87 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
             <CardHeader icon={<BagIcon />} title="Order History" right={OrderHistoryActions} isMobile={isMobile} />
             <View style={s.cardBody}>
               {c.orderHistory && c.orderHistory.length > 0 ? (
-                isMobile ? (
-                  c.orderHistory.map((o) => (
-                    <View key={o.id} style={s.orderMobileCard}>
-                      <View style={s.omHeader}>
-                        <View style={s.omHeaderLeft}>
-                          <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
+                <>
+                  {isMobile ? (
+                    paginatedOrders.map((o) => (
+                      <View key={o.id} style={s.orderMobileCard}>
+                        <View style={s.omHeader}>
+                          <View style={s.omHeaderLeft}>
+                            <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
+                          </View>
+                          <OrderStatusPill status={o.status} />
                         </View>
-                        <OrderStatusPill status={o.status} />
+                        <View style={s.omInfoStrip}>
+                          <View style={s.omInfoRow}>
+                            <View style={s.omInfoCell}>
+                              <Text style={s.omInfoLbl}>Date</Text>
+                              <Text style={s.omInfoVal}>{o.date}</Text>
+                            </View>
+                            <View style={s.omInfoCell}>
+                              <Text style={s.omInfoLbl}>Items</Text>
+                              <Text style={[s.omInfoVal, { color: C.primary }]}>{o.items} item{o.items !== 1 ? "s" : ""}</Text>
+                            </View>
+                          </View>
+                          <View style={s.omInfoRow}>
+                            <View style={s.omInfoCell}>
+                              <Text style={s.omInfoLbl}>Amount</Text>
+                              <Text style={[s.omInfoVal, { color: C.text, fontWeight: "700" }]}>{rupee(o.amount)}</Text>
+                            </View>
+                            <View style={s.omInfoCell}>
+                              <Text style={s.omInfoLbl}>Payment</Text>
+                              <Text style={s.omInfoVal}>{o.payment}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        <TouchableOpacity style={s.orderViewBtn} activeOpacity={0.8}>
+                          <EyeIcon size={14} />
+                          <Text style={s.orderViewTxt}>View Order Details</Text>
+                        </TouchableOpacity>
                       </View>
-                      <View style={s.omInfoStrip}>
-                        <View style={s.omInfoRow}>
-                          <View style={s.omInfoCell}>
-                            <Text style={s.omInfoLbl}>Date</Text>
-                            <Text style={s.omInfoVal}>{o.date}</Text>
-                          </View>
-                          <View style={s.omInfoCell}>
-                            <Text style={s.omInfoLbl}>Items</Text>
-                            <Text style={[s.omInfoVal, { color: C.primary }]}>{o.items} item{o.items !== 1 ? "s" : ""}</Text>
-                          </View>
-                        </View>
-                        <View style={s.omInfoRow}>
-                          <View style={s.omInfoCell}>
-                            <Text style={s.omInfoLbl}>Amount</Text>
-                            <Text style={[s.omInfoVal, { color: C.text, fontWeight: "700" }]}>{rupee(o.amount)}</Text>
-                          </View>
-                          <View style={s.omInfoCell}>
-                            <Text style={s.omInfoLbl}>Payment</Text>
-                            <Text style={s.omInfoVal}>{o.payment}</Text>
-                          </View>
-                        </View>
+                    ))
+                  ) : (
+                    <View style={s.orderTable}>
+                      <View style={[s.orderTableRow, s.orderTableHead]}>
+                        <Text style={[s.orderTableHdr, { flex: 2.5 }]}>Order #</Text>
+                        <Text style={s.orderTableHdr}>Date</Text>
+                        <Text style={s.orderTableHdr}>Items</Text>
+                        <Text style={s.orderTableHdr}>Amount</Text>
+                        <Text style={s.orderTableHdr}>Payment</Text>
+                        <Text style={[s.orderTableHdr, { flex: 1.3 }]}>Status</Text>
+                        <Text style={[s.orderTableHdr, { flex: 0.7, textAlign: "center" }]}>Action</Text>
                       </View>
-                      <TouchableOpacity style={s.orderViewBtn} activeOpacity={0.8}>
-                        <EyeIcon size={14} />
-                        <Text style={s.orderViewTxt}>View Order Details</Text>
-                      </TouchableOpacity>
+                      {paginatedOrders.map((o) => (
+                        <View key={o.id} style={s.orderTableRow}>
+                          <Text style={[s.orderIdText, { flex: 2.5 }]}>{o.id}</Text>
+                          <Text style={s.orderTableCell}>{o.date}</Text>
+                          <View style={{ flex: 1 }}>
+                            <View style={s.itemsBadge}><CartIcon size={12} color={C.primary} /><Text style={s.itemsBadgeTxt}>{o.items} item{o.items !== 1 ? "s" : ""}</Text></View>
+                          </View>
+                          <Text style={[s.orderTableCell, { fontWeight: "700", color: C.text }]}>{rupee(o.amount)}</Text>
+                          <View style={{ flex: 1 }}>
+                            <View style={s.codBadge}><CodIcon size={13} /><Text style={s.codTxt}>{o.payment}</Text></View>
+                          </View>
+                          <View style={{ flex: 1.3 }}><OrderStatusPill status={o.status} /></View>
+                          <View style={{ flex: 0.7, alignItems: "center" }}>
+                            <TouchableOpacity style={s.eyeBtn} activeOpacity={0.8}><EyeIcon size={15} /></TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
                     </View>
-                  ))
-                ) : (
-                  <View style={s.orderTable}>
-                    <View style={[s.orderTableRow, s.orderTableHead]}>
-                      <Text style={[s.orderTableHdr, { flex: 2.5 }]}>Order #</Text>
-                      <Text style={s.orderTableHdr}>Date</Text>
-                      <Text style={s.orderTableHdr}>Items</Text>
-                      <Text style={s.orderTableHdr}>Amount</Text>
-                      <Text style={s.orderTableHdr}>Payment</Text>
-                      <Text style={[s.orderTableHdr, { flex: 1.3 }]}>Status</Text>
-                      <Text style={[s.orderTableHdr, { flex: 0.7, textAlign: "center" }]}>Action</Text>
-                    </View>
-                    {c.orderHistory.map((o) => (
-                      <View key={o.id} style={s.orderTableRow}>
-                        <Text style={[s.orderIdText, { flex: 2.5 }]}>{o.id}</Text>
-                        <Text style={s.orderTableCell}>{o.date}</Text>
-                        <View style={{ flex: 1 }}>
-                          <View style={s.itemsBadge}><CartIcon size={12} color={C.primary} /><Text style={s.itemsBadgeTxt}>{o.items} item{o.items !== 1 ? "s" : ""}</Text></View>
-                        </View>
-                        <Text style={[s.orderTableCell, { fontWeight: "700", color: C.text }]}>{rupee(o.amount)}</Text>
-                        <View style={{ flex: 1 }}>
-                          <View style={s.codBadge}><CodIcon size={13} /><Text style={s.codTxt}>{o.payment}</Text></View>
-                        </View>
-                        <View style={{ flex: 1.3 }}><OrderStatusPill status={o.status} /></View>
-                        <View style={{ flex: 0.7, alignItems: "center" }}>
-                          <TouchableOpacity style={s.eyeBtn} activeOpacity={0.8}><EyeIcon size={15} /></TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )
+                  )}
+
+                  <PaginationBar
+                    page={safePage}
+                    totalPages={totalOrderPages}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    total={totalOrderRecords}
+                    label="orders"
+                    onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    onNext={() => setCurrentPage((p) => Math.min(totalOrderPages, p + 1))}
+                    onPage={(p) => setCurrentPage(p)}
+                  />
+                </>
               ) : (
                 <View style={s.noOrders}>
                   <Text style={{ fontSize: 32 }}>📦</Text>
@@ -1054,6 +1170,19 @@ const s = StyleSheet.create({
   codBadge:       { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F3F4F6", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" },
   codTxt:         { fontSize: 12, color: C.sub, fontWeight: "600" },
   eyeBtn:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.navy, alignItems: "center", justifyContent: "center" },
+
+  // Pagination bar (Order History)
+  paginationBar:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 12, marginTop: 8 },
+  paginationText:     { fontSize: 13, color: C.sub },
+  paginationControls: { flexDirection: "row", alignItems: "center", gap: 8 },
+  pageBtn:            { width: 32, height: 32, borderRadius: 9, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", backgroundColor: C.surface },
+  pageBtnDisabled:    { opacity: 0.4 },
+  pageNumBtn:         { width: 32, height: 32, borderRadius: 9, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", backgroundColor: C.surface },
+  pageNumBtnActive:   { backgroundColor: C.navy, borderColor: C.navy },
+  pageNumTxt:         { fontSize: 13, fontWeight: "700", color: C.text },
+  pageNumTxtActive:   { color: "#fff" },
+  pageEllipsis:       { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  pageEllipsisTxt:    { fontSize: 13, color: C.sub, fontWeight: "700" },
 
   orderStatus:    { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, alignSelf: "flex-start" },
   orderStatusTxt: { fontSize: 11, fontWeight: "700" },
