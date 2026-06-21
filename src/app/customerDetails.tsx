@@ -273,8 +273,12 @@ function MiniStatCard({
   label: string;
   valueColor?: string;
 }) {
+  const { width } = useWindowDimensions();
+  const { isMobile, isTablet } = useLayout(width);
+  const flexBasis = isMobile ? "45%" : isTablet ? "30%" : "15%";
+
   return (
-    <View style={s.statCard}>
+    <View style={[s.statCard, { flexBasis }]}>
       <View style={[s.statCardIconBox, { backgroundColor: iconBg }]}>{icon}</View>
       <Text style={[s.statCardValue, { color: valueColor }]} numberOfLines={1}>
         {value}
@@ -781,7 +785,21 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
       <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.green }]} activeOpacity={0.8}>
         <BackupIcon size={13} /><Text style={s.orderActionTxt}>Export CSV</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.primary }]} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={[s.orderActionBtn, { backgroundColor: C.primary }]}
+        activeOpacity={0.8}
+        onPress={() =>
+          router.push({
+            pathname: "/customerAnalytics",
+            params: {
+              id: String(c.id),
+              name: c.name,
+              email: c.email,
+              phone: c.phone,
+            },
+          })
+        }
+      >
         <BarChartIcon size={13} color="#fff" /><Text style={s.orderActionTxt}>View Analytics</Text>
       </TouchableOpacity>
     </View>
@@ -1092,7 +1110,7 @@ const s = StyleSheet.create({
   // Overlapping order-status stat cards
   statCardsWrap:       { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: -30, marginBottom: 16 },
   statCardsWrapMobile: { gap: 8, marginTop: -24 },
-  statCard:            { flex: 1, minWidth: 100, maxWidth: 150, alignItems: "center", backgroundColor: C.surface, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, gap: 4 },
+  statCard:            { flexGrow: 1, flexShrink: 1, alignItems: "center", backgroundColor: C.surface, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, gap: 4 },
   statCardIconBox:     { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   statCardValue:       { fontSize: 15, fontWeight: "800" },
   statCardLabel:       { fontSize: 10, fontWeight: "600", color: C.sub, textAlign: "center" },
