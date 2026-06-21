@@ -34,6 +34,7 @@ import {
   Modal,
   Share,
   Animated,
+  Linking,
 } from "react-native";
 import Svg, {
   Circle,
@@ -1170,26 +1171,70 @@ function MeasuredChart({ plotHeight = 140, render }: MeasuredChartProps) {
   );
 }
 
-// Chart Tooltip card
-const ChartTooltip = React.memo(function ChartTooltip({
-  x,
-  plotWidth,
-  label,
-  value,
-  color,
-}: {
+// Helper to format month abbreviations to full Month Year (e.g. "Jan" to "Jan 2026")
+function formatPeriodLabel(label: string) {
+  const monthMap: Record<string, string> = {
+    Jan: "Jan 2026", Feb: "Feb 2026", Mar: "Mar 2026", Apr: "Apr 2026",
+    May: "May 2026", Jun: "Jun 2026", Jul: "Jul 2026", Aug: "Aug 2026",
+    Sep: "Sep 2026", Oct: "Oct 2026", Nov: "Nov 2026", Dec: "Dec 2026"
+  };
+  return monthMap[label] ?? label;
+}
+
+interface ChartTooltipProps {
   x: number;
+  y: number;
   plotWidth: number;
+  plotHeight: number;
+  metricName: string;
   label: string;
   value: string;
   color: string;
-}) {
-  const bubbleW = 100;
+  pctChange?: string | null;
+  percentageShare?: string | null;
+  contributionStr?: string | null;
+}
+
+// Chart Tooltip card
+const ChartTooltip = React.memo(function ChartTooltip({
+  x,
+  y,
+  plotWidth,
+  plotHeight,
+  metricName,
+  label,
+  value,
+  color,
+  pctChange,
+  percentageShare,
+  contributionStr,
+}: ChartTooltipProps) {
+  const bubbleW = 180;
+  // Dynamic height estimation
+  let bubbleH = 68;
+  if (pctChange) bubbleH += 18;
+  if (percentageShare) bubbleH += 18;
+  if (contributionStr) bubbleH += 18;
+
   const left = Math.min(Math.max(x - bubbleW / 2, 0), plotWidth - bubbleW);
+  const top = y - bubbleH - 12 >= 4 ? y - bubbleH - 12 : y + 16;
+
   return (
-    <View pointerEvents="none" style={[s.tooltipBubble, { left, width: bubbleW, borderColor: color }]}>
-      <Text style={s.tooltipLabel} numberOfLines={1}>{label}</Text>
+    <View pointerEvents="none" style={[s.tooltipBubble, { left, top, width: bubbleW }]}>
+      <Text style={s.tooltipMetricName} numberOfLines={1}>{metricName}</Text>
+      <Text style={s.tooltipLabel} numberOfLines={1}>{formatPeriodLabel(label)}</Text>
       <Text style={[s.tooltipValue, { color }]} numberOfLines={1}>{value}</Text>
+      {pctChange ? (
+        <Text style={[s.tooltipPctChange, { color: pctChange.startsWith("-") ? C.red : C.green }]} numberOfLines={1}>
+          {pctChange}
+        </Text>
+      ) : null}
+      {percentageShare ? (
+        <Text style={s.tooltipPctShare} numberOfLines={1}>{percentageShare}</Text>
+      ) : null}
+      {contributionStr ? (
+        <Text style={s.tooltipContribution} numberOfLines={1}>{contributionStr}</Text>
+      ) : null}
     </View>
   );
 });
@@ -1203,6 +1248,8 @@ interface SvgChartProps {
   formatValue: (v: number) => string;
   onPointPress?: (p: ChartPoint) => void;
   onHoverValueChange?: (val: string | null) => void;
+  metricName: string;
+  timeframe?: TimeFrame;
 }
 function LineChartSvg({
   data,
@@ -1212,6 +1259,8 @@ function LineChartSvg({
   formatValue,
   onPointPress,
   onHoverValueChange,
+  metricName,
+  timeframe,
 }: SvgChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const padX = Math.max(12, width * 0.04);
@@ -1270,13 +1319,49 @@ function LineChartSvg({
     }
   };
 
+  const handleWebMove = (evt: any) => {
+    const rect = evt.currentTarget.getBoundingClientRect();
+    const locX = evt.clientX - rect.left;
+    const innerX = locX - padX;
+    const innerWidth = width - padX * 2;
+    const index = Math.round((innerX / innerWidth) * (data.length - 1));
+    const clamped = Math.max(0, Math.min(data.length - 1, index));
+    if (clamped !== activeIdx) {
+      setActiveIdx(clamped);
+      if (onHoverValueChange) {
+        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+      }
+    }
+  };
+
+  const pointerProps = Platform.OS === 'web' ? {
+    onMouseMove: handleWebMove,
+    onMouseLeave: handleTouchEnd,
+  } : {
+    onTouchStart: handleTouch,
+    onTouchMove: handleTouch,
+    onTouchEnd: handleTouchEnd,
+  };
+
+  // Percentage change from previous period
+  const pctChange = useMemo(() => {
+    if (activeIdx === null || activeIdx === 0 || !data[activeIdx - 1]) return null;
+    const prev = data[activeIdx - 1].value;
+    const curr = data[activeIdx].value;
+    if (prev === 0) {
+      return curr > 0 ? "+100.0% from prev period" : "0.0% from prev period";
+    }
+    const pct = ((curr - prev) / prev) * 100;
+    const sign = pct >= 0 ? "+" : "";
+    const period = timeframe === "7D" ? "day" : (timeframe === "30D" || timeframe === "90D" ? "week" : "month");
+    return `${sign}${pct.toFixed(1)}% from previous ${period}`;
+  }, [activeIdx, data, timeframe]);
+
   return (
     <View style={{ width, height: height + 24 }}>
       {/* Chart Canvas Area */}
       <View
-        onTouchStart={handleTouch}
-        onTouchMove={handleTouch}
-        onTouchEnd={handleTouchEnd}
+        {...pointerProps}
         style={{ width, height, position: "relative" }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -1311,26 +1396,41 @@ function LineChartSvg({
 
           {/* Plot Dots */}
           {pts.map((p, i) => (
-            <Circle
-              key={i}
-              cx={p.x}
-              cy={p.y}
-              r={activeIdx === i ? 6 : 4}
-              fill={activeIdx === i ? "#fff" : color}
-              stroke={color}
-              strokeWidth={activeIdx === i ? 3 : 0}
-              onPress={() => onPointPress?.(data[i])}
-            />
+            <G key={i}>
+              {activeIdx === i && (
+                <Circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={11}
+                  fill={color}
+                  opacity={0.16}
+                  pointerEvents="none"
+                />
+              )}
+              <Circle
+                cx={p.x}
+                cy={p.y}
+                r={activeIdx === i ? 6 : 4}
+                fill={activeIdx === i ? "#fff" : color}
+                stroke={color}
+                strokeWidth={activeIdx === i ? 3.5 : 0}
+                onPress={() => onPointPress?.(data[i])}
+              />
+            </G>
           ))}
         </Svg>
 
         {activeIdx !== null && pts[activeIdx] && (
           <ChartTooltip
             x={pts[activeIdx].x}
+            y={pts[activeIdx].y}
             plotWidth={width}
+            plotHeight={height}
+            metricName={metricName}
             label={data[activeIdx].label}
             value={formatValue(data[activeIdx].value)}
             color={color}
+            pctChange={pctChange}
           />
         )}
       </View>
@@ -1355,7 +1455,6 @@ function LineChartSvg({
   );
 }
 
-// Advanced Interactive Bar Chart Svg Component
 function BarChartSvg({
   data,
   color = primary,
@@ -1364,6 +1463,8 @@ function BarChartSvg({
   formatValue,
   onPointPress,
   onHoverValueChange,
+  metricName,
+  timeframe,
 }: SvgChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const padX = Math.max(12, width * 0.03);
@@ -1381,6 +1482,10 @@ function BarChartSvg({
       return { x, y, h, d, index: i };
     });
   }, [data, max, slot, barW, padX, height]);
+
+  const totalVal = useMemo(() => {
+    return Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
+  }, [data]);
 
   const handleTouch = (evt: any) => {
     const locX = evt.nativeEvent.locationX;
@@ -1402,12 +1507,33 @@ function BarChartSvg({
     }
   };
 
+  const handleWebMove = (evt: any) => {
+    const rect = evt.currentTarget.getBoundingClientRect();
+    const locX = evt.clientX - rect.left;
+    const innerX = locX - padX;
+    const index = Math.floor(innerX / slot);
+    const clamped = Math.max(0, Math.min(data.length - 1, index));
+    if (clamped !== activeIdx) {
+      setActiveIdx(clamped);
+      if (onHoverValueChange) {
+        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+      }
+    }
+  };
+
+  const pointerProps = Platform.OS === 'web' ? {
+    onMouseMove: handleWebMove,
+    onMouseLeave: handleTouchEnd,
+  } : {
+    onTouchStart: handleTouch,
+    onTouchMove: handleTouch,
+    onTouchEnd: handleTouchEnd,
+  };
+
   return (
     <View style={{ width, height: height + 24 }}>
       <View
-        onTouchStart={handleTouch}
-        onTouchMove={handleTouch}
-        onTouchEnd={handleTouchEnd}
+        {...pointerProps}
         style={{ width, height, position: "relative" }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -1423,9 +1549,11 @@ function BarChartSvg({
               y={b.y}
               width={barW}
               height={b.h}
-              rx={3}
+              rx={4}
               fill={color}
-              opacity={activeIdx === b.index ? 1.0 : 0.65}
+              opacity={activeIdx === b.index ? 1.0 : activeIdx === null ? 0.65 : 0.45}
+              stroke={activeIdx === b.index ? color : "none"}
+              strokeWidth={activeIdx === b.index ? 1 : 0}
               onPress={() => onPointPress?.(b.d)}
             />
           ))}
@@ -1434,10 +1562,14 @@ function BarChartSvg({
         {activeIdx !== null && bars[activeIdx] && (
           <ChartTooltip
             x={bars[activeIdx].x + barW / 2}
+            y={bars[activeIdx].y}
             plotWidth={width}
+            plotHeight={height}
+            metricName={metricName}
             label={data[activeIdx].label}
             value={formatValue(data[activeIdx].value)}
             color={color}
+            contributionStr={`${((data[activeIdx].value / totalVal) * 100).toFixed(1)}% of Total`}
           />
         )}
       </View>
@@ -1498,15 +1630,21 @@ const RingChart = React.memo(function RingChart({
   data,
   donut = true,
   size = 150,
+  metricName,
+  unit = "Orders",
 }: {
   data: SlicePoint[];
   donut?: boolean;
   size?: number;
+  metricName: string;
+  unit?: string;
 }) {
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
   const total = Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
   const cx = size / 2,
     cy = size / 2,
-    rOuter = size / 2 - 4,
+    rOuter = size / 2 - 6,
     rInner = donut ? rOuter * 0.55 : 0;
   let angle = 0;
 
@@ -1518,20 +1656,138 @@ const RingChart = React.memo(function RingChart({
     );
   }
 
-  const slices = data.map((d) => {
+  const slices = data.map((d, i) => {
     const sweep = (d.value / total) * 360;
     const gap = sweep < 359 ? 1.5 : 0;
-    const path = donutSlicePath(cx, cy, rOuter, rInner, angle, angle + sweep - gap);
+    const currentStartAngle = angle;
     angle += sweep;
-    return { path, color: d.color };
+    return {
+      d,
+      index: i,
+      sweep,
+      gap,
+      startAngle: currentStartAngle,
+      color: d.color,
+    };
   });
 
+  // Dynamic center text for Donut Chart
+  let centerTextElement = null;
+  if (donut) {
+    if (activeIdx !== null && data[activeIdx]) {
+      const pct = ((data[activeIdx].value / total) * 100).toFixed(1) + "%";
+      centerTextElement = (
+        <G pointerEvents="none">
+          <SvgText
+            x={cx}
+            y={cy - 14}
+            fontSize={9}
+            fontWeight="700"
+            fill={C.textLight}
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {data[activeIdx].label.toUpperCase()}
+          </SvgText>
+          <SvgText
+            x={cx}
+            y={cy + 4}
+            fontSize={15}
+            fontWeight="800"
+            fill={C.textDark}
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {data[activeIdx].value.toLocaleString()}
+          </SvgText>
+          <SvgText
+            x={cx}
+            y={cy + 20}
+            fontSize={10}
+            fontWeight="700"
+            fill={data[activeIdx].color}
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {pct}
+          </SvgText>
+        </G>
+      );
+    } else {
+      centerTextElement = (
+        <G pointerEvents="none">
+          <SvgText
+            x={cx}
+            y={cy - 10}
+            fontSize={9}
+            fontWeight="700"
+            fill={C.textLight}
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            TOTAL
+          </SvgText>
+          <SvgText
+            x={cx}
+            y={cy + 8}
+            fontSize={16}
+            fontWeight="800"
+            fill={C.textDark}
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {total.toLocaleString()}
+          </SvgText>
+        </G>
+      );
+    }
+  }
+
+  const activeSlice = activeIdx !== null ? data[activeIdx] : null;
+  const activePct = activeSlice ? ((activeSlice.value / total) * 100).toFixed(1) + "%" : "";
+  const InteractivePath = Path as any;
+
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {slices.map((sl, i) => (
-        <Path key={i} d={sl.path} fill={sl.color} />
-      ))}
-    </Svg>
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: size, height: size, position: "relative" }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {slices.map((sl, i) => {
+            const isActive = activeIdx === i;
+            const path = donutSlicePath(cx, cy, rOuter, rInner, sl.startAngle, sl.startAngle + sl.sweep - sl.gap);
+
+            return (
+              <G key={i}>
+                <InteractivePath
+                  d={path}
+                  fill={sl.color}
+                  opacity={activeIdx === null || isActive ? 1.0 : 0.6}
+                  onMouseEnter={() => setActiveIdx(i)}
+                  onMouseLeave={() => setActiveIdx(null)}
+                  onPressIn={() => setActiveIdx(i)}
+                  onPressOut={() => setActiveIdx(null)}
+                  onPress={() => setActiveIdx(i)}
+                  style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+                />
+              </G>
+            );
+          })}
+          {centerTextElement}
+        </Svg>
+      </View>
+      
+      {/* Simple un-intrusive text label below the chart */}
+      <View style={{ height: 20, marginTop: 4, justifyContent: "center", alignItems: "center" }}>
+        {activeSlice ? (
+          <Text style={{ fontSize: 11, fontWeight: "700", color: activeSlice.color }}>
+            {activeSlice.label}: {activeSlice.value.toLocaleString()} {unit} ({activePct})
+          </Text>
+        ) : (
+          <Text style={{ fontSize: 10, color: C.textLight, fontStyle: "italic" }}>
+            Hover slices for details
+          </Text>
+        )}
+      </View>
+    </View>
   );
 });
 
@@ -1836,8 +2092,28 @@ export default function CustomerAnalyticsScreen() {
 
   const customerId = id ?? "0";
   const customerName = name ?? "Customer";
-  const customerEmail = email ?? "—";
-  const customerPhone = phone ?? "—";
+
+  const customerEmail = useMemo(() => {
+    if (email && email !== "—" && email !== "") return email;
+    return `${customerName.toLowerCase().replace(/\s+/g, "")}@flintandthread.com`;
+  }, [email, customerName]);
+
+  const customerPhone = useMemo(() => {
+    if (phone && phone !== "—" && phone !== "") return phone;
+    const rng = mulberry32(seedFromString(customerId + "contact"));
+    const num = Math.floor(7000000000 + rng() * 2000000000);
+    return `+91 ${num.toString().replace(/(\d{5})(\d{5})/, "$1 $2")}`;
+  }, [phone, customerId]);
+
+  const handleEmailPress = useCallback(() => {
+    if (Platform.OS === 'web' && typeof window !== "undefined") {
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customerEmail)}`, '_blank');
+    } else {
+      Linking.openURL(`mailto:${customerEmail}`).catch(err =>
+        console.error("Failed to open mail client:", err)
+      );
+    }
+  }, [customerEmail]);
 
   // Build raw mock analytics
   const data = useMemo(
@@ -2074,7 +2350,7 @@ export default function CustomerAnalyticsScreen() {
             style={[
               s.header,
               {
-                paddingTop: Platform.OS === "ios" ? 50 : 20,
+                paddingTop: Platform.OS === "ios" ? 40 : 16,
                 marginTop: isMobile ? 12 : 18,
               },
             ]}
@@ -2111,14 +2387,20 @@ export default function CustomerAnalyticsScreen() {
                     Customer ID #{customerId} &middot; Status: {data.status}
                   </Text>
                   <View style={s.headerMetaRow}>
-                    <View style={s.headerMetaItem}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={handleEmailPress}
+                      style={s.headerMetaItem}
+                    >
                       <EnvelopeIcon size={11} color="rgba(255,255,255,0.7)" />
                       <Text style={s.headerMetaTxt} numberOfLines={1}>{customerEmail}</Text>
-                    </View>
-                    <View style={s.headerMetaItem}>
-                      <PhoneIcon size={11} color="rgba(255,255,255,0.7)" />
-                      <Text style={s.headerMetaTxt}>{customerPhone}</Text>
-                    </View>
+                    </TouchableOpacity>
+                    {Platform.OS !== 'web' && (
+                      <View style={s.headerMetaItem}>
+                        <PhoneIcon size={11} color="rgba(255,255,255,0.7)" />
+                        <Text style={s.headerMetaTxt}>{customerPhone}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -2143,10 +2425,20 @@ export default function CustomerAnalyticsScreen() {
                   </Text>
                 </View>
                 <View style={s.quickActions}>
-                  <TouchableOpacity style={s.quickBtn} activeOpacity={0.8}>
-                    <PhoneIcon size={13} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.quickBtn} activeOpacity={0.8}>
+                  {Platform.OS !== 'web' && (
+                    <TouchableOpacity
+                      style={s.quickBtn}
+                      activeOpacity={0.8}
+                      onPress={() => Linking.openURL('tel:' + customerPhone)}
+                    >
+                      <PhoneIcon size={13} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={s.quickBtn}
+                    activeOpacity={0.8}
+                    onPress={handleEmailPress}
+                  >
                     <EnvelopeIcon size={13} color="#fff" />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -2221,6 +2513,8 @@ export default function CustomerAnalyticsScreen() {
                                 width={w}
                                 height={h}
                                 formatValue={rupee}
+                                metricName="Revenue"
+                                timeframe={spendTF}
                                 onPointPress={(p) => {
                                   setDrilldownPoint(p);
                                   setDrilldownTitle("Monthly Spending");
@@ -2246,6 +2540,8 @@ export default function CustomerAnalyticsScreen() {
                           height={h}
                           formatValue={rupee}
                           onHoverValueChange={setSpendLiveKPI}
+                          metricName="Revenue"
+                          timeframe={spendTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Monthly Spending");
@@ -2272,7 +2568,9 @@ export default function CustomerAnalyticsScreen() {
                               color={blue}
                               width={w}
                               height={h}
-                              formatValue={(v) => `${v} orders`}
+                              formatValue={(v) => `${v.toLocaleString()} Orders`}
+                              metricName="Orders"
+                              timeframe={ordersTF}
                               onPointPress={(p) => {
                                 setDrilldownPoint(p);
                                 setDrilldownTitle("Orders Placed");
@@ -2295,8 +2593,10 @@ export default function CustomerAnalyticsScreen() {
                           color={blue}
                           width={w}
                           height={h}
-                          formatValue={(v) => `${v} orders`}
+                          formatValue={(v) => `${v.toLocaleString()} Orders`}
                           onHoverValueChange={setOrdersLiveKPI}
+                          metricName="Orders"
+                          timeframe={ordersTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Orders Placed");
@@ -2323,7 +2623,9 @@ export default function CustomerAnalyticsScreen() {
                               color={green}
                               width={w}
                               height={h}
-                              formatValue={(v) => `${v} orders/wk`}
+                              formatValue={(v) => `${v.toFixed(1)} orders/wk`}
+                              metricName="Order Frequency"
+                              timeframe={freqTF}
                               onPointPress={(p) => {
                                 setDrilldownPoint(p);
                                 setDrilldownTitle("Order Frequency");
@@ -2346,8 +2648,10 @@ export default function CustomerAnalyticsScreen() {
                           color={green}
                           width={w}
                           height={h}
-                          formatValue={(v) => `${v} orders/wk`}
+                          formatValue={(v) => `${v.toFixed(1)} orders/wk`}
                           onHoverValueChange={setFreqLiveKPI}
+                          metricName="Order Frequency"
+                          timeframe={freqTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Order Frequency");
@@ -2374,7 +2678,9 @@ export default function CustomerAnalyticsScreen() {
                               color={yellow}
                               width={w}
                               height={h}
-                              formatValue={(v) => `${v}% of orders`}
+                              formatValue={(v) => `${v.toFixed(1)}% of orders`}
+                              metricName="Purchase Time Breakdown"
+                              timeframe={distTF}
                               onPointPress={(p) => {
                                 setDrilldownPoint(p);
                                 setDrilldownTitle("Purchase Time Distribution");
@@ -2397,8 +2703,10 @@ export default function CustomerAnalyticsScreen() {
                           color={yellow}
                           width={w}
                           height={h}
-                          formatValue={(v) => `${v}% of orders`}
+                          formatValue={(v) => `${v.toFixed(1)}% of orders`}
                           onHoverValueChange={setDistLiveKPI}
+                          metricName="Purchase Time Breakdown"
+                          timeframe={distTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Purchase Time Distribution");
@@ -2416,7 +2724,7 @@ export default function CustomerAnalyticsScreen() {
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader icon={<PieChartIcon color={purple} size={16} />} title="Order Status Distribution" />
                   <View style={[s.cardBody, s.ringCardBody]}>
-                    <RingChart data={activeOrderStatus} donut />
+                    <RingChart data={activeOrderStatus} donut metricName="Order Status" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
                         data={data.orderStatusBreakdown}
@@ -2438,7 +2746,7 @@ export default function CustomerAnalyticsScreen() {
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader icon={<CreditCardIcon color={navy} size={16} />} title="Preferred Payment Methods" />
                   <View style={[s.cardBody, s.ringCardBody]}>
-                    <RingChart data={activePaymentMethods} donut={false} />
+                    <RingChart data={activePaymentMethods} donut metricName="Payment Method" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
                         data={data.paymentMethods}
@@ -2796,13 +3104,13 @@ const s = StyleSheet.create({
   scrollContent: { paddingTop: 0, backgroundColor: surface },
   body: { gap: 16, paddingTop: 16 },
 
-  heroOuter: { width: "100%", alignSelf: "center", maxWidth: 1600 },
-  header: { paddingBottom: 26, borderRadius: 24, paddingHorizontal: 20 },
+  heroOuter: { width: "100%", alignSelf: "center", maxWidth: 1600, paddingHorizontal: 10 },
+  header: { paddingBottom: 20, borderRadius: 24, paddingHorizontal: 20 },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   backBtn: {
     width: 34,
@@ -2910,8 +3218,8 @@ const s = StyleSheet.create({
   headerFootRow: {
     flexDirection: "row",
     gap: 20,
-    marginTop: 18,
-    paddingTop: 14,
+    marginTop: 14,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.15)",
   },
@@ -3166,25 +3474,53 @@ const s = StyleSheet.create({
 
   tooltipBubble: {
     position: "absolute",
-    backgroundColor: navyDeep,
-    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    zIndex: 100,
-    top: 6,
+    paddingVertical: 10,
+    zIndex: 999,
     borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#1A2B5E",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  tooltipMetricName: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   tooltipLabel: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.7)",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  tooltipValue: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#fff",
+    color: "#111827",
     marginTop: 2,
+  },
+  tooltipValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  tooltipPctChange: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  tooltipPctShare: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginTop: 3,
+  },
+  tooltipContribution: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginTop: 3,
   },
 
   axisRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },

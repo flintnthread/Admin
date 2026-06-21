@@ -1284,23 +1284,6 @@ export default function DashboardScreen() {
                   </View>
                 </View>
 
-                {/* SECTION 16: Coupon Overview */}
-                <View style={[styles.cardCol, { flex: 1 }]}>
-                  <Text style={styles.cardColTitle}>🏷️ Promotion & Coupon Tracker</Text>
-                  <View style={styles.liveActivityList}>
-                    {[
-                      { label: "Active Coupon Codes", val: "6 codes", color: C.active },
-                      { label: "Expired Coupons", val: "14 codes", color: C.sub },
-                      { label: "Total Coupon Redemptions", val: "189 uses", color: C.primary },
-                      { label: "Total Coupon Discount Given", val: rupee(3420), color: C.inactive }
-                    ].map((item, idx) => (
-                      <View key={idx} style={styles.liveActivityRow}>
-                        <Text style={styles.liveActivityLabel}>{item.label}</Text>
-                        <Text style={[styles.liveActivityValue, { color: item.color }]}>{item.val}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
 
               </View>
             </View>

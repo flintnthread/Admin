@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -1192,13 +1192,20 @@ export default function ApprovedSellersScreen() {
 
                 {paginatedSellers.map((seller) => (
                   <View key={seller.id} style={[styles.tableRow, seller.status === "Blocked" && styles.rowBlocked]}>
-                    <View style={[styles.tableCell, { flex: 2.2, flexDirection: "row", alignItems: "center" }]}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={[styles.tableCell, { flex: 2.2, flexDirection: "row", alignItems: "center" }]}
+                      onPress={() => {
+                        setSelectedSellerId(seller.id);
+                        setAdminStatus(seller.status);
+                      }}
+                    >
                       {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
                       <View style={styles.sellerMeta}>
                         <Text style={styles.sellerName}>{seller.name}</Text>
                         <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                     <Text style={[styles.tableCellTextBold, { flex: 2 }]}>{seller.businessName}</Text>
                     <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
                     <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
@@ -1289,11 +1296,20 @@ export default function ApprovedSellersScreen() {
                     ]}
                   >
                     <View style={styles.cardHeader}>
-                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.cardAvatar} />) : (<View style={[styles.cardAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={20} color="#9CA3AF" /></View>)}
-                      <View style={styles.cardTitleContainer}>
-                        <Text style={styles.cardName}>{seller.name}</Text>
-                        <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>
-                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                        onPress={() => {
+                          setSelectedSellerId(seller.id);
+                          setAdminStatus(seller.status);
+                        }}
+                      >
+                        {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.cardAvatar} />) : (<View style={[styles.cardAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={20} color="#9CA3AF" /></View>)}
+                        <View style={styles.cardTitleContainer}>
+                          <Text style={styles.cardName}>{seller.name}</Text>
+                          <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>
+                        </View>
+                      </TouchableOpacity>
                       <View style={[styles.statusBadge, seller.status === "Blocked" && styles.statusBadgeBlocked]}>
                         <Text style={styles.statusBadgeText}>
                           {seller.status === "Blocked" ? "Blocked" : "Active"}
