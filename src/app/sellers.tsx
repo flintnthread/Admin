@@ -16,7 +16,7 @@ import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
 import { buildSellerImageCandidates } from '@/lib/api/media';
 import { mapSellerListRow } from '@/lib/mappers';
-import { blockSeller, fetchSellers, unblockSeller } from '@/services/sellerApi';
+import { blockSeller, fetchSellerAnalyticsSummary, fetchSellers, normalizeSellerGraphSummary, unblockSeller } from '@/services/sellerApi';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -136,6 +136,12 @@ const IconDash = ({ size = 10, color = '#D97706' }) => (
   <Svg width={size} height={size} viewBox="0 0 16 16" fill={color}>
     <Path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
     <Path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8" />
+  </Svg>
+);
+const IconCloseCircle = ({ size = 10, color = '#DC2626' }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill={color}>
+    <Path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+    <Path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708" />
   </Svg>
 );
 
@@ -284,7 +290,9 @@ const ViewModal = ({ seller, onClose }: { seller: Seller | null; onClose: () => 
               <Text style={VM.closeX}>✕</Text>
             </TouchableOpacity>
           </View>
-          {seller.banner ? (
+          {seller.profilePicPath || seller.profilePicUrl || seller.liveSelfiePath ? (
+            <SellerMediaImage seller={seller} size={160} style={VM.banner} borderRadius={0} resizeMode="cover" />
+          ) : seller.banner ? (
             <Image source={{ uri: seller.banner }} style={VM.banner} />
           ) : null}
           <ScrollView style={{ maxHeight: 320 }}>
@@ -331,6 +339,10 @@ const GridCard = ({
   onToggleStatus: () => void;
   onDelete: () => void;
 }) => {
+  const [isImageHovered, setIsImageHovered] = useState(false);
+  const imageHoverProps = IS_WEB
+    ? { onMouseEnter: () => setIsImageHovered(true), onMouseLeave: () => setIsImageHovered(false) }
+    : {};
   const candidates = buildSellerImageCandidates(seller);
   const [bannerIndex, setBannerIndex] = useState(0);
   const bannerUri = candidates[bannerIndex] ?? null;
@@ -342,7 +354,7 @@ const GridCard = ({
   return (
     <View style={[GC.card, { width: cardWidth as any }]}>
       {/* Banner — only real DB image */}
-      <View style={GC.bannerWrap}>
+      <View style={GC.bannerWrap} {...(imageHoverProps as any)}>
         {bannerUri ? (
           <Image
             source={{ uri: bannerUri }}
@@ -355,6 +367,38 @@ const GridCard = ({
           <View style={[GC.banner, GC.bannerEmpty]}>
             <IconPerson size={36} color="rgba(255,255,255,0.9)" />
           </View>
+        )}
+        {/* Hover Overlay with View Option */}
+        {(isImageHovered || !IS_WEB) && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={onView}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 10,
+            }}
+          >
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#fff',
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+              borderRadius: 20,
+              gap: 6,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+              elevation: 4,
+            }}>
+              <IconEye size={16} color="#1E3A8A" />
+              <Text style={{ color: '#1E3A8A', fontWeight: '700', fontSize: 13 }}>View Profile</Text>
+            </View>
+          </TouchableOpacity>
         )}
         {/* S.No badge top-right */}
         <View style={GC.snoBadge}>
@@ -398,37 +442,28 @@ const GridCard = ({
           </View>
         </View>
 
-        {/* Products */}
-        <View style={{ marginTop: 6 }}>
-          <Text style={GC.footLabel}>Products Listing</Text>
-          <ProductBadge status={seller.products.status} count={seller.products.count} />
-        </View>
-
-        <View style={GC.divider} />
-
-        {/* Action Buttons — always visible, always clickable */}
-        <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[GC.actionBtn, { backgroundColor: C.navy }]}
-            onPress={onView}
-          >
-            <IconEye size={15} color="#FFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[GC.actionBtn, { backgroundColor: C.amber }]}
-            onPress={onToggleStatus}
-          >
-            <IconEyeSlash size={15} color="#FFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[GC.actionBtn, { backgroundColor: C.red }]}
-            onPress={onDelete}
-          >
-            <IconTrash size={15} color="#FFF" />
-          </TouchableOpacity>
+        {/* Products Listing Row with Actions */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={GC.footLabel}>Products Listing</Text>
+            <ProductBadge status={seller.products.status} count={seller.products.count} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[GC.actionBtn, { backgroundColor: C.amber }]}
+              onPress={onToggleStatus}
+            >
+              <IconEyeSlash size={15} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[GC.actionBtn, { backgroundColor: C.red }]}
+              onPress={onDelete}
+            >
+              <IconTrash size={15} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -437,7 +472,7 @@ const GridCard = ({
 
 const GC = StyleSheet.create({
   card: { backgroundColor: C.card, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.09, shadowRadius: 10, elevation: 4 },
-  bannerWrap: { height: 130 },
+  bannerWrap: { height: 130, position: 'relative', overflow: 'hidden' },
   banner: { width: '100%', height: 130, resizeMode: 'cover' },
   bannerEmpty: { backgroundColor: C.primary, justifyContent: 'center', alignItems: 'center' },
   snoBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
@@ -526,7 +561,6 @@ const ListHeader = ({ isTablet }: { isTablet: boolean }) => (
     <Text style={[LV.hcell, LV.cSeller]}>Seller</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cBiz]}>Business</Text>}
     <Text style={[LV.hcell, LV.cStatus]}>Status</Text>
-    <Text style={[LV.hcell, LV.cKyc]}>KYC</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cProd]}>Products</Text>}
     <Text style={[LV.hcell, LV.cWallet]}>Wallet</Text>
     {!isTablet && <Text style={[LV.hcell, LV.cDate]}>Registered</Text>}
@@ -597,7 +631,6 @@ const ListRow = ({
       <View style={LV.cStatus}>
         {seller.status === 'Active' ? <ActiveBadge /> : <InactiveBadge />}
       </View>
-      <View style={LV.cKyc}><KycBadge kyc={seller.kyc} /></View>
       {!isTablet && <View style={LV.cProd}><ProductBadge status={seller.products.status} count={seller.products.count} /></View>}
       <Text style={[LV.cell, LV.cWallet]}>{seller.wallet}</Text>
       {!isTablet && <Text style={[LV.cell, LV.cDate]}>{seller.registered}</Text>}
@@ -607,21 +640,20 @@ const ListRow = ({
 };
 
 const LV = StyleSheet.create({
-  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, minWidth: 1100 },
+  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, width: '100%' },
   hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, minWidth: 1100 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, width: '100%' },
   mrow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   cell: { fontSize: 13, color: C.sub, paddingRight: 16 },
   cSno: { width: 44, textAlign: 'center', fontWeight: '600' },
-  cId: { width: 172, paddingRight: 16 },
-  cSeller: { width: 220, paddingRight: 20 },
-  cBiz: { width: 200, paddingRight: 20 },
-  cStatus: { width: 85, paddingRight: 12 },
-  cKyc: { width: 120, paddingRight: 12 },
+  cId: { width: 140, paddingRight: 16 },
+  cSeller: { width: 180, paddingRight: 20 },
+  cBiz: { width: 120, paddingRight: 20 },
+  cStatus: { width: 80, paddingRight: 12 },
   cProd: { width: 130, paddingRight: 12 },
-  cWallet: { width: 80, textAlign: 'right', fontWeight: '700', color: C.green, paddingRight: 24 },
-  cDate: { width: 110, fontSize: 11, paddingRight: 12 },
-  cAction: { width: 108, marginLeft: 'auto' },
+  cWallet: { width: 140, textAlign: 'left', fontWeight: '700', color: C.green, paddingRight: 12 },
+  cDate: { width: 120, fontSize: 11, paddingRight: 12 },
+  cAction: { width: 100, marginLeft: 'auto' },
   avatar: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avTxt: { color: '#FFF', fontWeight: '700', fontSize: 12 },
   selName: { fontSize: 13, fontWeight: '700', color: C.text },
@@ -663,13 +695,13 @@ const Pagination = ({
   );
 };
 const PG = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  btn: { minWidth: 34, height: 34, borderRadius: 7, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 },
-  active: { backgroundColor: C.primary, borderColor: C.primary },
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  btn: { minWidth: 32, height: 32, borderRadius: 6, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
+  active: { backgroundColor: '#1d324e', borderColor: '#1d324e' },
   dis: { opacity: 0.4 },
-  btnTxt: { fontSize: 13, color: C.sub, fontWeight: '600' },
+  btnTxt: { fontSize: 13, color: '#374151', fontWeight: '600' },
   activeTxt: { color: '#FFF' },
-  ellipsis: { fontSize: 13, color: C.muted, paddingHorizontal: 4 },
+  ellipsis: { fontSize: 13, color: '#6B7280', paddingHorizontal: 4 },
 });
 
 // ─────────────────────────── MAIN SCREEN ─────────────────────────────────────
@@ -696,18 +728,23 @@ export default function SellersScreen() {
   const [searchQ, setSearchQ] = useState('');
   const [page, setPage] = useState(1);
   const [viewSeller, setViewSeller] = useState<Seller | null>(null);
+  const [summary, setSummary] = useState<Record<string, number>>({});
 
   const loadSellers = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
       setLoadError(null);
-      const res = await fetchSellers({ status: 'active', search: searchQ || undefined, page: page - 1, size: ipp });
+      const [res, summaryRes] = await Promise.all([
+        fetchSellers({ status: 'active', search: searchQ || undefined, page: page - 1, size: ipp }),
+        fetchSellerAnalyticsSummary().catch(() => ({})),
+      ]);
       const items = (res.items ?? []).map((s, i) => ({
         ...mapSellerListRow(s, (page - 1) * ipp + i),
       }));
       setSellers(items);
       setTotalElements(res.totalElements ?? items.length);
+      setSummary(normalizeSellerGraphSummary(summaryRes));
     } catch (e) {
       setLoadError(getApiErrorMessage(e, 'Failed to load sellers.'));
       setSellers([]);
@@ -791,40 +828,48 @@ export default function SellersScreen() {
       <View style={SS.root}>
         <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
-        {/* Top bar */}
-        <View style={SS.topBar}>
-          <TouchableOpacity style={SS.backButton} onPress={() => router.back()}>
-            <IconChevLeft size={16} color="#FFF" />
-            <Text style={SS.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <View style={[SS.logoBox, { marginLeft: 10 }]}><IconPerson size={22} color="#FFF" /></View>
-        </View>
-
-        {/* Title */}
-        <View style={SS.titleBar}>
-          <View style={SS.breadcrumb}>
-            <Text style={SS.bcLink}>🏠 Dashboard</Text>
-            <Text style={SS.bcSep}> › </Text>
-            <Text style={SS.bcLink}>Ecommerce</Text>
-            <Text style={SS.bcSep}> › </Text>
-            <Text style={SS.bcCur}>Active Sellers</Text>
-          </View>
-
+        {/* ── Header Container (Dark Blue) ── */}
+        <View style={SS.headerContainer}>
           {loadError ? (
             <TouchableOpacity onPress={() => void loadSellers()}>
-              <Text style={{ color: C.red, marginBottom: 8 }}>{loadError} — Tap to retry</Text>
+              <Text style={{ color: '#FCA5A5', marginBottom: 8 }}>{loadError} — Tap to retry</Text>
             </TouchableOpacity>
           ) : null}
-          <View style={[SS.titleRow, isMobile && { flexWrap: 'wrap', gap: 8 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-              <Text style={[SS.pageTitle, isMobile && { fontSize: 18 }]}>Active Sellers</Text>
-              <View style={SS.pill}><Text style={SS.pillTxt}>Active Only</Text></View>
+          <View style={SS.pageHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={SS.headerIconBox}>
+                <IconPerson size={16} color="#FFF" />
+              </View>
+              <Text style={SS.pageTitle}>Active Sellers</Text>
             </View>
             <TouchableOpacity style={SS.exportBtn} onPress={() => router.push('/sellershiprocket')}>
               <IconUpload size={13} color="#FFF" />
               <Text style={SS.exportTxt}>  Export to Shiprocket</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* ── Stat Cards Row ── */}
+        <View style={SS.statGrid}>
+          {[
+            { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
+            { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
+            { label: "Approved Sellers", value: summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#16A34A" />, iconBg: "#DCFCE7", sub: "Approved profiles" },
+            { label: "Rejected Sellers", value: summary.rejected ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.approved ?? 0) - (summary.pending ?? summary.profileCompleted ?? 0)), icon: <IconCloseCircle size={16} color="#DC2626" />, iconBg: "#FEE2E2", sub: "Rejected profiles" },
+            { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
+            { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
+          ].map((c) => (
+            <View key={c.label} style={SS.statCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={SS.statLabel}>{c.label.toUpperCase()}</Text>
+                <Text style={SS.statValue}>{c.value}</Text>
+                <Text style={SS.statSub}>{c.sub}</Text>
+              </View>
+              <View style={[SS.statIconBox, { backgroundColor: c.iconBg }]}>
+                {c.icon}
+              </View>
+            </View>
+          ))}
         </View>
 
         {/* Toolbar */}
@@ -905,27 +950,25 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={IS_WEB}>
-              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
-                {!isMobile && <ListHeader isTablet={isTablet} />}
-                {paginated.length === 0 ? (
-                  <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-                ) : (
-                  paginated.map((s, idx) => (
-                    <ListRow
-                      key={s.id}
-                      seller={s}
-                      even={idx % 2 === 0}
-                      isTablet={isTablet}
-                      isMobile={isMobile}
-                      onView={() => doView(s)}
-                      onToggleStatus={() => doToggle(s)}
-                      onDelete={() => doDelete(s)}
-                    />
-                  ))
-                )}
-              </View>
-            </ScrollView>
+            <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
+              {!isMobile && <ListHeader isTablet={isTablet} />}
+              {paginated.length === 0 ? (
+                <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+              ) : (
+                paginated.map((s, idx) => (
+                  <ListRow
+                    key={s.id}
+                    seller={s}
+                    even={idx % 2 === 0}
+                    isTablet={isTablet}
+                    isMobile={isMobile}
+                    onView={() => doView(s)}
+                    onToggleStatus={() => doToggle(s)}
+                    onDelete={() => doDelete(s)}
+                  />
+                ))
+              )}
+            </View>
           )}
 
           {/* Footer */}
@@ -963,20 +1006,84 @@ const SS = StyleSheet.create({
   logoBox: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   backButton: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
   backButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600', marginLeft: 4 },
-  titleBar: { backgroundColor: C.card, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
-  breadcrumb: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  bcLink: { fontSize: 12, color: C.primary, fontWeight: '500' },
-  bcSep: { fontSize: 12, color: C.muted, marginHorizontal: 2 },
-  bcCur: { fontSize: 12, color: C.sub },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: C.text },
-  pill: { backgroundColor: C.primaryLight, borderWidth: 1.5, borderColor: C.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  pillTxt: { fontSize: 11, color: C.primary, fontWeight: '700' },
-  exportBtn: { backgroundColor: C.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+  headerContainer: {
+    backgroundColor: "#1d324e",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 48,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: -32,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    zIndex: 10,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 150,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5EAF2',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1C1C2E',
+  },
+  statSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  statIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#ef7b1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  pageTitle: { fontSize: 22, fontWeight: '800', color: '#FFF' },
+  exportBtn: { backgroundColor: C.green, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
   exportTxt: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
-  searchBox: { flex: 1, maxWidth: 700, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
-  searchInput: { flex: 1, fontSize: 14, color: C.text, height: 42, marginLeft: 8 },
+  searchBox: { flex: 1, maxWidth: 1000, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
+  searchInput: { flex: 1, fontSize: 14, color: C.text, height: 42, marginLeft: 8, outlineStyle: 'none' } as any,
   clearBtn: { padding: 4 },
   viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 14 },
   viewLabel: { fontSize: 13, color: C.sub, fontWeight: '500', marginRight: 2 },
@@ -984,8 +1091,8 @@ const SS = StyleSheet.create({
   vBtnOn: { backgroundColor: C.primary, borderColor: C.primary },
   content: { paddingVertical: 20, paddingBottom: 50 },
   listBox: { backgroundColor: C.card, marginHorizontal: 20, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, gap: 12, flexWrap: 'wrap' },
-  footTxt: { fontSize: 13, color: C.sub },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, marginHorizontal: 20, marginTop: 16, backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2, gap: 12, flexWrap: 'wrap' },
+  footTxt: { fontSize: 13, color: '#4B5563', fontWeight: '500' },
   empty: { padding: 40, alignItems: 'center' },
   emptyTxt: { fontSize: 14, color: C.muted, textAlign: 'center' },
 });

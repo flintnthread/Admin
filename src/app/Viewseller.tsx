@@ -1,7 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
 import SellerMediaImage from "@/components/SellerMediaImage";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { resolveMediaUrl, resolveSellerProfileImage } from '@/lib/api/media';
+import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   fetchSellerAnalyticsChart,
@@ -146,11 +147,11 @@ interface SellerData {
     delivered: number;
     cancelled: number;
   };
-  totalOrders: number;
   verificationDocuments: {
     name: string;
     available: boolean;
     url?: string;
+    path?: string;
   }[];
   analyticsData: {
     daily: ChartDataPoint[];
@@ -311,7 +312,8 @@ const SparklineChart: React.FC<{
   color: string;
   tooltipIndex: number | null;
   onPointPress: (index: number | null) => void;
-}> = ({ data, width, height, color, tooltipIndex, onPointPress }) => {
+  tooltipLabel?: string;
+}> = ({ data, width, height, color, tooltipIndex, onPointPress, tooltipLabel = 'Products Listed' }) => {
   const padding = { top: 20, bottom: 30, left: 36, right: 16 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
@@ -407,7 +409,7 @@ const SparklineChart: React.FC<{
           style={{
             position: 'absolute',
             left: Math.min(Math.max(getX(tooltipIndex) - 60, 0), width - 130),
-            top: getY(data[tooltipIndex].value) - 52,
+            top: getY(data[tooltipIndex].value) < 60 ? getY(data[tooltipIndex].value) + 15 : getY(data[tooltipIndex].value) - 52,
             backgroundColor: '#1A1A1A',
             borderRadius: 6,
             padding: 8,
@@ -421,7 +423,7 @@ const SparklineChart: React.FC<{
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 4 }} />
             <Text style={{ color: COLORS.white, fontSize: 11 }}>
-              Products Listed: {data[tooltipIndex].value}
+              {tooltipLabel}: {data[tooltipIndex].value}
             </Text>
           </View>
         </View>
@@ -524,6 +526,20 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
 
   const scale = useRef(new Animated.Value(1)).current;
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [imageIndex, setImageIndex] = useState(0);
+
+  const candidates = React.useMemo(
+    () => buildMediaUrlCandidates(docUrl, docUrl),
+    [docUrl],
+  );
+  const imageUri = candidates[imageIndex] ?? "";
+  const isPdf = isPdfMedia(docUrl);
+
+  useEffect(() => {
+    setImageIndex(0);
+    setZoomLevel(1);
+    scale.setValue(1);
+  }, [docUrl, visible, scale]);
 
   const zoomIn = () => {
     const next = Math.min(zoomLevel + 0.25, 3);
@@ -542,8 +558,6 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
 
   const modalW = isMobile ? screenW - 24 : Math.min(screenW - 64, 800);
   const imgH = isMobile ? 220 : 340;
-
-  const imageUri = resolveMediaUrl(docUrl);
 
   return (
     <Modal
@@ -583,23 +597,46 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
               <View style={modalStyles.imgScrollContent}>
                 <Text style={{ color: COLORS.textMuted, fontSize: 14 }}>No document image available</Text>
               </View>
+            ) : isPdf ? (
+              <View style={modalStyles.imgScrollContent}>
+                <Text style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 12 }}>PDF document</Text>
+                {Platform.OS === "web" ? (
+                  <iframe
+                    src={imageUri}
+                    title={docName}
+                    style={{ width: "100%", height: imgH - 40, border: "none" } as any}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      if (typeof window !== "undefined") window.open(imageUri, "_blank");
+                    }}
+                  >
+                    <Text style={styles.actionBtnText}>Open PDF</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : (
-            <ScrollView
-              contentContainerStyle={modalStyles.imgScrollContent}
-              maximumZoomScale={3}
-              minimumZoomScale={0.5}
-              bouncesZoom
-              centerContent
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-            >
-              <Animated.View style={{ transform: [{ scale }] }}>
-                <Image
-                  source={{ uri: imageUri }}
-                  style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
-                />
-              </Animated.View>
-            </ScrollView>
+              <ScrollView
+                contentContainerStyle={modalStyles.imgScrollContent}
+                maximumZoomScale={3}
+                minimumZoomScale={0.5}
+                bouncesZoom
+                centerContent
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+              >
+                <Animated.View style={{ transform: [{ scale }] }}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
+                    onError={() => {
+                      if (imageIndex < candidates.length - 1) setImageIndex((i) => i + 1);
+                    }}
+                  />
+                </Animated.View>
+              </ScrollView>
             )}
           </View>
 
@@ -699,9 +736,6 @@ const CsvExportModal: React.FC<{
           <ScrollView style={csvModalStyles.content}>
             <Text style={csvModalStyles.csvText}>{content}</Text>
           </ScrollView>
-          <TouchableOpacity style={csvModalStyles.closeBtnBottom} onPress={onClose}>
-            <Text style={csvModalStyles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -719,6 +753,7 @@ const csvModalStyles = StyleSheet.create({
   modal: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
+    overflow: 'hidden',
     width: '100%',
     maxWidth: 600,
     maxHeight: '80%',
@@ -805,10 +840,12 @@ function mapDetailToSellerData(
 ): SellerData {
   const emptySeries = { daily: [] as ChartDataPoint[], weekly: [] as ChartDataPoint[], monthly: [] as ChartDataPoint[], yearly: [] as ChartDataPoint[] };
   const docs = Array.isArray(d.documents)
-    ? (d.documents as { name?: string; url?: string; available?: boolean }[])
+    ? (d.documents as { name?: string; url?: string; path?: string; available?: boolean }[])
     : [];
   const productCount = Number(d.productCount ?? 0);
   const totalOrders = Number(d.totalOrders ?? 0);
+  const productDist = (d.productStatusDistribution ?? {}) as Record<string, number>;
+  const orderDist = (d.orderStatusDistribution ?? {}) as Record<string, number>;
   const statusRaw = String(d.status ?? 'active').toLowerCase();
   const names = splitSellerName(d);
   const profile = {
@@ -870,13 +907,63 @@ function mapDetailToSellerData(
     kycRemarks: String(d.kycRemarks ?? '—'),
     productsListingStatus: productCount > 0 ? 'Live' : 'Inactive',
     totalProducts: productCount,
-    productStatusDistribution: { active: productCount, inactive: 0, pending: 0 },
-    orderStatusDistribution: { pending: 0, processing: 0, shipped: 0, delivered: totalOrders, cancelled: 0 },
-    verificationDocuments: docs.map((doc) => ({
-      name: String(doc.name ?? 'Document'),
-      available: doc.available !== false,
-      url: resolveMediaUrl(doc.url) || undefined,
-    })),
+    productStatusDistribution: {
+      active: Number(productDist.active ?? productCount),
+      inactive: Number(productDist.inactive ?? 0),
+      pending: Number(productDist.pending ?? 0),
+    },
+    orderStatusDistribution: {
+      pending: Number(orderDist.pending ?? 0),
+      processing: Number(orderDist.processing ?? 0),
+      shipped: Number(orderDist.shipped ?? 0),
+      delivered: Number(orderDist.delivered ?? 0),
+      cancelled: Number(orderDist.cancelled ?? 0),
+    },
+    verificationDocuments: (() => {
+      const defaultDocNames = [
+        'Aadhaar Front',
+        'Aadhaar Back',
+        'PAN Card',
+        'Cancelled Cheque',
+        'Business Proof',
+        'Bank Proof',
+      ];
+      const apiDocsByName = new Map<string, { url?: string; path?: string; available?: boolean }>();
+      docs.forEach((doc) => {
+        if (doc.name) {
+          apiDocsByName.set(doc.name, doc);
+        }
+      });
+      const finalDocs: { name: string; available: boolean; url?: string; path?: string }[] = [];
+      defaultDocNames.forEach((name) => {
+        if (apiDocsByName.has(name)) {
+          const apiDoc = apiDocsByName.get(name)!;
+          const rawPath = String(apiDoc.path ?? apiDoc.url ?? "");
+          finalDocs.push({
+            name,
+            available: apiDoc.available !== false,
+            path: rawPath || undefined,
+            url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+          });
+          apiDocsByName.delete(name);
+        } else {
+          finalDocs.push({
+            name,
+            available: false,
+          });
+        }
+      });
+      apiDocsByName.forEach((apiDoc, name) => {
+        const rawPath = String(apiDoc.path ?? apiDoc.url ?? "");
+        finalDocs.push({
+          name,
+          available: apiDoc.available !== false,
+          path: rawPath || undefined,
+          url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+        });
+      });
+      return finalDocs;
+    })(),
     analyticsData: {
       daily: monthlyProducts,
       weekly: monthlyProducts,
@@ -894,6 +981,7 @@ function mapDetailToSellerData(
 
 export default function ViewSeller() {
   const params = useLocalSearchParams<{ sellerId?: string }>();
+  const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const [seller, setSeller] = useState<SellerData>(() => mapDetailToSellerData({}));
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -901,8 +989,8 @@ export default function ViewSeller() {
 
   useEffect(() => {
     const sellerId = Number(params.sellerId);
-    if (!sellerId || Number.isNaN(sellerId)) {
-      setLoading(false);
+    if (!sellerId || Number.isNaN(sellerId) || authLoading || !token) {
+      if (!authLoading && !token) setLoading(false);
       return;
     }
     void (async () => {
@@ -924,7 +1012,7 @@ export default function ViewSeller() {
         setLoading(false);
       }
     })();
-  }, [params.sellerId]);
+  }, [params.sellerId, authLoading, token]);
 
   const [analyticsTab, setAnalyticsTab] = useState<'products' | 'orders'>('products');
   const [periodTab, setPeriodTab] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
@@ -935,9 +1023,9 @@ export default function ViewSeller() {
   const [productsExportModal, setProductsExportModal] = useState(false);
   const [ordersExportModal, setOrdersExportModal] = useState(false);
 
-  const openDoc = (name: string, url?: string) => {
+  const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
-    setSelectedDocUrl(url ?? '');
+    setSelectedDocUrl(path || url || '');
     setDocModalVisible(true);
   };
 
@@ -964,7 +1052,7 @@ export default function ViewSeller() {
     { value: seller.orderStatusDistribution.cancelled, color: COLORS.danger, label: 'Cancelled' },
   ];
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -977,22 +1065,12 @@ export default function ViewSeller() {
       <ScrollView style={styles.root} contentContainerStyle={styles.container}>
 
         {/* ── Page Header — dark blue container ──────────────────────────── */}
-        <View style={styles.pageHeaderContainer}>
+        <View style={[styles.pageHeaderContainer, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <View style={[styles.pageHeader, { paddingHorizontal: isMobile ? 16 : 24 }]}>
             <View style={styles.pageHeaderLeft}>
               <BootstrapIcon name="person-circle" size={32} color={COLORS.white} />
               <View style={{ marginLeft: 8 }}>
                 <Text style={styles.pageHeaderTitle}>Seller Details</Text>
-                <View style={styles.breadcrumb}>
-                  <BootstrapIcon name="house" size={11} color="rgba(255,255,255,0.7)" />
-                  <Text style={[styles.breadcrumbItem, { marginLeft: 3 }]}>Dashboard</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={styles.breadcrumbItem}>Ecommerce</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={styles.breadcrumbItem}>Sellers List</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={[styles.breadcrumbItem, { color: 'rgba(255,255,255,0.5)' }]}>Seller Details</Text>
-                </View>
               </View>
             </View>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
@@ -1056,7 +1134,7 @@ export default function ViewSeller() {
             </Text>
           </View>
 
-          <View style={{ marginTop: 8, overflow: 'hidden' }}>
+          <View style={{ marginTop: 8, zIndex: 10 }}>
             <SparklineChart
               data={currentData}
               width={chartWidth}
@@ -1064,6 +1142,7 @@ export default function ViewSeller() {
               color={COLORS.primaryLight}
               tooltipIndex={tooltipIndex}
               onPointPress={setTooltipIndex}
+              tooltipLabel={analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
             />
           </View>
         </View>
@@ -1157,10 +1236,10 @@ export default function ViewSeller() {
                 color={seller.status === 'Active' ? COLORS.success : seller.status === 'Pending' ? COLORS.warning : COLORS.danger}
               />
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <TouchableOpacity style={styles.actionBtn}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/sellerprofile')}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <BootstrapIcon name="arrow-down-circle" size={13} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Download</Text>
+                    <BootstrapIcon name="file-earmark-text" size={13} color={COLORS.white} />
+                    <Text style={styles.actionBtnText}>Export CSV</Text>
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F97316' }]} onPress={() => router.push('/sellers')}>
@@ -1309,14 +1388,14 @@ export default function ViewSeller() {
               isHalf
               width={width}
             />
+            <TouchableOpacity
+              style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1d324e' }]}
+              onPress={() => router.push('/Products')}
+            >
+              <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
+              <Text style={styles.actionBtnText}>View All Products</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1E3A5F' }]}
-            onPress={() => router.push('/productApproval')}
-          >
-            <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
-            <Text style={styles.actionBtnText}>View All Products</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Verification Documents ─────────────────────────────────────── */}
@@ -1331,7 +1410,7 @@ export default function ViewSeller() {
               {doc.available && (
                 <TouchableOpacity
                   style={styles.viewDocBtn}
-                  onPress={() => openDoc(doc.name, doc.url)}
+                  onPress={() => openDoc(doc.name, doc.url, doc.path)}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                     <BootstrapIcon name="eye" size={13} color={COLORS.white} />
@@ -1391,16 +1470,17 @@ const styles = StyleSheet.create({
 
   // ── Page header container — dark blue background ──────────────────────────
   pageHeaderContainer: {
-    backgroundColor: COLORS.headerBg,   // #1E2A45 dark navy
+    backgroundColor: '#1d324e',
+    borderRadius: 12,
+    marginTop: 16,
     paddingTop: 20,
     paddingBottom: 20,
     marginBottom: 16,
-    // Subtle bottom shadow to lift it above content
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   pageHeader: {
     flexDirection: 'row',
@@ -1749,7 +1829,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   viewDocBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#1d324e',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 5,

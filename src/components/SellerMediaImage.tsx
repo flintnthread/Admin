@@ -30,12 +30,7 @@ export default function SellerMediaImage({
   fallbackBg = "#D4690A",
   borderRadius,
 }: Props) {
-  const candidates = React.useMemo(() => {
-    const fromPaths = buildSellerImageCandidates(seller);
-    const direct = [seller.avatar, seller.banner].filter(Boolean) as string[];
-    const all = [...direct, ...fromPaths];
-    return all.filter((url, i) => url && all.indexOf(url) === i);
-  }, [seller]);
+  const candidates = React.useMemo(() => buildSellerImageCandidates(seller), [seller]);
 
   const [index, setIndex] = useState(0);
   const radius = borderRadius ?? (resizeMode === "cover" ? size / 2 : 0);

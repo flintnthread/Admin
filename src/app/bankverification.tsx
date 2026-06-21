@@ -290,7 +290,7 @@ function PagBtn({ iconName, onPress, disabled }: { iconName: string; onPress: ()
       disabled={disabled}
       activeOpacity={0.7}
       style={{
-        width: 32, height: 32, borderRadius: 8,
+        width: 32, height: 32, borderRadius: 6,
         borderWidth: 1, borderColor: BORDER,
         backgroundColor: "#fff",
         alignItems: "center", justifyContent: "center",
@@ -547,28 +547,18 @@ export default function BankVerifications() {
                 <View style={{
                   backgroundColor: "#fff", borderRadius: 14,
                   borderWidth: 1, borderColor: BORDER,
-                  padding: isTablet ? 20 : 14, marginBottom: 14,
+                  padding: isTablet ? 16 : 12, marginBottom: 14,
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  gap: 8,
                 }}>
-                  {/* Status */}
-                  <Text style={styles.filterLabel}>
-                    Status
-                  </Text>
-                  <View style={{ marginBottom: 12 }}>
-                    <Dropdown
-                      value={statusFilter}
-                      onChange={handleStatusChange}
-                      options={STATUS_OPTIONS}
-                      minWidth={160}
-                    />
-                  </View>
-
                   {/* Search */}
-                  <Text style={styles.filterLabel}>Search</Text>
-                  <View style={{ position: "relative", marginBottom: 14 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.filterLabel}>Search</Text>
                     <View style={{
                       flexDirection: "row", alignItems: "center",
                       borderWidth: 1, borderColor: BORDER, borderRadius: 8,
-                      backgroundColor: "#fff", paddingHorizontal: 12,
+                      backgroundColor: "#fff", paddingHorizontal: 10,
                     }}>
                       <Ionicons name="search-outline" size={16} color="#94A3B8" />
                       <TextInput
@@ -579,9 +569,10 @@ export default function BankVerifications() {
                         placeholder="Search by email, name, account, IFSC..."
                         placeholderTextColor="#94A3B8"
                         style={{
-                          flex: 1, fontSize: 14, color: "#374151",
-                          paddingVertical: 10, paddingLeft: 8,
-                        }}
+                          flex: 1, fontSize: 13, color: "#374151",
+                          paddingVertical: 10, paddingLeft: 6,
+                          outlineStyle: "none",
+                        } as any}
                       />
                       {searchInput.length > 0 && (
                         <TouchableOpacity onPress={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}>
@@ -591,18 +582,30 @@ export default function BankVerifications() {
                     </View>
                   </View>
 
+                  {/* Status */}
+                  <View style={{ width: isTablet ? 160 : 110 }}>
+                    <Text style={styles.filterLabel}>Status</Text>
+                    <Dropdown
+                      value={statusFilter}
+                      onChange={handleStatusChange}
+                      options={STATUS_OPTIONS}
+                      minWidth={isTablet ? 160 : 110}
+                    />
+                  </View>
+
                   {/* Filter button */}
                   <TouchableOpacity
                     onPress={doFilter}
                     activeOpacity={0.85}
                     style={{
-                      backgroundColor: BLUE, borderRadius: 9,
-                      paddingVertical: 12,
-                      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                      backgroundColor: BLUE, borderRadius: 8,
+                      paddingVertical: 10,
+                      paddingHorizontal: isTablet ? 16 : 12,
+                      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
                     }}
                   >
                     <Ionicons name="search-outline" size={16} color="#fff" />
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Filter</Text>
+                    {isTablet && <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Filter</Text>}
                   </TouchableOpacity>
                 </View>
 
@@ -711,10 +714,10 @@ export default function BankVerifications() {
                             key={p}
                             onPress={() => setPage(p as number)}
                             style={{
-                              width: 32, height: 32, borderRadius: 8,
+                              width: 32, height: 32, borderRadius: 6,
                               borderWidth: 1,
-                              borderColor: safePage === p ? BLUE : BORDER,
-                              backgroundColor: safePage === p ? BLUE : "#fff",
+                              borderColor: safePage === p ? "#1d324e" : BORDER,
+                              backgroundColor: safePage === p ? "#1d324e" : "#fff",
                               alignItems: "center", justifyContent: "center",
                             }}
                           >
@@ -766,23 +769,13 @@ export default function BankVerifications() {
               backgroundColor: "#fff", borderRadius: 14,
               borderWidth: 1, borderColor: BORDER,
               padding: 20, marginBottom: 14,
+              flexDirection: "row",
+              alignItems: "flex-end",
+              gap: 12,
             }}>
-              {/* Status */}
-              <Text style={styles.filterLabel}>
-                Status
-              </Text>
-              <View style={{ marginBottom: 12 }}>
-                <Dropdown
-                  value={statusFilter}
-                  onChange={handleStatusChange}
-                  options={STATUS_OPTIONS}
-                  minWidth={160}
-                />
-              </View>
-
               {/* Search */}
-              <Text style={styles.filterLabel}>Search</Text>
-              <View style={{ position: "relative", marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.filterLabel}>Search</Text>
                 <View style={{
                   flexDirection: "row", alignItems: "center",
                   borderWidth: 1, borderColor: BORDER, borderRadius: 8,
@@ -799,7 +792,8 @@ export default function BankVerifications() {
                     style={{
                       flex: 1, fontSize: 14, color: "#374151",
                       paddingVertical: 10, paddingLeft: 8,
-                    }}
+                      outlineStyle: "none",
+                    } as any}
                   />
                   {searchInput.length > 0 && (
                     <TouchableOpacity onPress={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}>
@@ -809,98 +803,92 @@ export default function BankVerifications() {
                 </View>
               </View>
 
+              {/* Status */}
+              <View style={{ width: 180 }}>
+                <Text style={styles.filterLabel}>Status</Text>
+                <Dropdown
+                  value={statusFilter}
+                  onChange={handleStatusChange}
+                  options={STATUS_OPTIONS}
+                  minWidth={180}
+                />
+              </View>
+
               {/* Filter button */}
               <TouchableOpacity
                 onPress={doFilter}
                 activeOpacity={0.85}
                 style={{
-                  backgroundColor: BLUE, borderRadius: 9,
-                  paddingVertical: 12,
+                  backgroundColor: BLUE, borderRadius: 8,
+                  paddingVertical: 10,
+                  paddingHorizontal: 20,
                   flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
               >
                 <Ionicons name="search-outline" size={16} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Filter</Text>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Filter</Text>
               </TouchableOpacity>
             </View>
 
             {/* ── Desktop Table ── */}
-            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ marginBottom: 14 }}>
+            <View style={{ marginBottom: 14, width: '100%' }}>
               <View style={{
                 backgroundColor: "#fff", borderRadius: 14,
                 borderWidth: 1, borderColor: BORDER,
                 overflow: "hidden",
-                minWidth: 1100,
+                width: '100%',
               }}>
-              {/* Table Header */}
-              <View style={{
-                flexDirection: "row",
-                backgroundColor: "#1a2332",
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-              }}>
-                <Text style={{ flex: 0.4, fontSize: 12, fontWeight: "600", color: "#fff" }}>ID</Text>
-                <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Seller</Text>
-                <Text style={{ flex: 1.1, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
-                <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
-                <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Attempts</Text>
-                <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Created</Text>
-                <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Verified</Text>
-                <Text style={{ flex: 1.3, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
-              </View>
-
-              {/* Table Rows */}
-              {paginated.map((item, idx) => (
-                <View key={item.id} style={{
+                {/* Table Header */}
+                <View style={{
                   flexDirection: "row",
+                  backgroundColor: "#1a2332",
                   paddingVertical: 12,
                   paddingHorizontal: 16,
-                  borderBottomWidth: 1,
-                  borderBottomColor: BORDER,
-                  backgroundColor: idx % 2 === 0 ? "#fff" : "#F8FAFC",
                 }}>
-                  <Text style={{ flex: 0.4, fontSize: 12, color: "#555", fontWeight: "600" }}>{item.id}</Text>
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.sellerName}</Text>
-                    <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
-                  </View>
-                  <View style={{ flex: 1.1 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
-                    <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
-                  </View>
-                  <View style={{ flex: 0.8 }}>
-                    <StatusBadge status={item.status} small />
-                  </View>
-                  <View style={{ flex: 0.6 }}>
-                    <AttemptsRow attempts={item.attempts} status={item.status} />
-                  </View>
-                  <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.created}</Text>
-                  <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
-                  <View style={{ flex: 1.3, flexDirection: "row", gap: 6 }}>
-                    <TouchableOpacity
-                      onPress={() => goToDetails(item.sellerId)}
-                      style={{
-                        backgroundColor: "#EFF6FF",
-                        borderWidth: 1,
-                        borderColor: "#BFDBFE",
-                        borderRadius: 6,
-                        paddingVertical: 6,
-                        paddingHorizontal: 10,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <Ionicons name="eye-outline" size={12} color={BLUE} />
-                      <Text style={{ fontSize: 11, fontWeight: "700", color: BLUE }}>View</Text>
-                    </TouchableOpacity>
-                    {item.status === "Pending" && (
+                  <Text style={{ flex: 0.4, fontSize: 12, fontWeight: "600", color: "#fff" }}>ID</Text>
+                  <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Seller</Text>
+                  <Text style={{ flex: 0.7, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
+                  <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
+                  <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Attempts</Text>
+                  <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Created</Text>
+                  <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Verified</Text>
+                  <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
+                </View>
+
+                {/* Table Rows */}
+                {paginated.map((item, idx) => (
+                  <View key={item.id} style={{
+                    flexDirection: "row",
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: BORDER,
+                    backgroundColor: idx % 2 === 0 ? "#fff" : "#F8FAFC",
+                  }}>
+                    <Text style={{ flex: 0.4, fontSize: 12, color: "#555", fontWeight: "600" }}>{item.id}</Text>
+                    <View style={{ flex: 1.2 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.sellerName}</Text>
+                      <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
+                    </View>
+                    <View style={{ flex: 0.7 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
+                      <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
+                    </View>
+                    <View style={{ flex: 0.6 }}>
+                      <StatusBadge status={item.status} small />
+                    </View>
+                    <View style={{ flex: 0.6 }}>
+                      <AttemptsRow attempts={item.attempts} status={item.status} />
+                    </View>
+                    <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.created}</Text>
+                    <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
+                    <View style={{ flex: 1.2, flexDirection: "row", gap: 6 }}>
                       <TouchableOpacity
+                        onPress={() => goToDetails(item.sellerId)}
                         style={{
-                          backgroundColor: "#F0FDF4",
+                          backgroundColor: "#EFF6FF",
                           borderWidth: 1,
-                          borderColor: "#BBF7D0",
+                          borderColor: "#BFDBFE",
                           borderRadius: 6,
                           paddingVertical: 6,
                           paddingHorizontal: 10,
@@ -910,51 +898,77 @@ export default function BankVerifications() {
                           gap: 4,
                         }}
                       >
-                        <Ionicons name="checkmark-outline" size={12} color="#16A34A" />
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#16A34A" }}>Verify</Text>
+                        <Ionicons name="eye-outline" size={12} color={BLUE} />
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: BLUE }}>View</Text>
                       </TouchableOpacity>
-                    )}
+                      {item.status === "Pending" && (
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: "#F0FDF4",
+                            borderWidth: 1,
+                            borderColor: "#BBF7D0",
+                            borderRadius: 6,
+                            paddingVertical: 6,
+                            paddingHorizontal: 10,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <Ionicons name="checkmark-outline" size={12} color="#16A34A" />
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#16A34A" }}>Verify</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))}
 
-              {/* Table Footer */}
-              <View style={{
-                flexDirection: "row",
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                backgroundColor: "#fff",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}>
-                <Text style={{ fontSize: 12, color: "#666" }}>
-                  Showing {(safePage - 1) * perPage + 1} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} entries
-                </Text>
-                <View style={{ flexDirection: "row", gap: 4 }}>
-                  <PagBtn iconName="chevron-back" onPress={() => setPage(safePage - 1)} disabled={safePage === 1} />
-                  {pageNums.map((p, i) => (
-                    typeof p === "number" ? (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => setPage(p)}
-                        style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          backgroundColor: p === safePage ? BLUE : "#fff",
-                          borderWidth: 1, borderColor: BORDER,
-                          alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: p === safePage ? "#fff" : "#374151" }}>{p}</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text key={i} style={{ fontSize: 12, color: "#94A3B8", paddingHorizontal: 4 }}>{p}</Text>
-                    )
-                  ))}
-                  <PagBtn iconName="chevron-forward" onPress={() => setPage(safePage + 1)} disabled={safePage === totalPages} />
+                {/* Table Footer */}
+                <View style={{
+                  flexDirection: "row",
+                  padding: 16,
+                  marginTop: 16,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: BORDER,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 3,
+                  elevation: 2,
+                  backgroundColor: "#fff",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}>
+                  <Text style={{ fontSize: 12, color: "#666" }}>
+                    Showing {(safePage - 1) * perPage + 1} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} entries
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    <PagBtn iconName="chevron-back" onPress={() => setPage(safePage - 1)} disabled={safePage === 1} />
+                    {pageNums.map((p, i) => (
+                      typeof p === "number" ? (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() => setPage(p)}
+                          style={{
+                            width: 32, height: 32, borderRadius: 6,
+                            backgroundColor: p === safePage ? "#1d324e" : "#fff",
+                            borderWidth: 1, borderColor: BORDER,
+                            alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: p === safePage ? "#fff" : "#374151" }}>{p}</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text key={i} style={{ fontSize: 12, color: "#94A3B8", paddingHorizontal: 4 }}>{p}</Text>
+                      )
+                    ))}
+                    <PagBtn iconName="chevron-forward" onPress={() => setPage(safePage + 1)} disabled={safePage === totalPages} />
+                  </View>
                 </View>
               </View>
             </View>
-            </ScrollView>
 
             {/* ── Footer ── */}
             <View style={{

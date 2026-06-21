@@ -278,7 +278,7 @@ const ColorFormModal = ({ mode, initial, onSave, onClose }: ColorModalProps) => 
               </View>
             )}
             <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Color Code</Text>
-            <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
               <View style={[
                 styles.colorSwatchInput,
                 { backgroundColor: isValidHex(code) ? normalizeHex(code) : BRAND },
@@ -712,8 +712,14 @@ export default function ColorsScreen() {
   const HeaderSection = (
     <>
       <View style={styles.webPageHeader}>
-        <View>
-          <Text style={styles.webPageTitle}>Colors Management</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+          <View style={styles.headerIconBox}>
+            <Ionicons name={BI.palette as any} size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.webPageTitle}>Colors Management</Text>
+            <Text style={styles.webPageSubtitle}>Manage catalog color variants and status settings</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
           <Ionicons name={BI.plus as any} size={18} color="#fff" />
@@ -945,21 +951,40 @@ const styles = StyleSheet.create({
     marginRight: 12, flexShrink: 0,
   },
   headerContent: { flex: 1, minWidth: 0 },
-  pageTitle: { fontSize: 17, fontWeight: "800", color: "#1a1a2e" },
-  addBtn: {
-    backgroundColor: BRAND, paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 5,
-    flexShrink: 0, marginLeft: 12,
+  headerIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: BRAND,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  addBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  addBtn: {
+    backgroundColor: BRAND,
+    borderWidth: 1.2,
+    borderColor: BRAND,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+    marginLeft: 12,
+  },
+  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 28, paddingVertical: 20,
+    paddingHorizontal: 24, paddingVertical: 20,
     backgroundColor: "#1d324e",
-    borderBottomWidth: 1, borderBottomColor: "#e5e7eb",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
   webPageTitle: { fontSize: 22, fontWeight: "800", color: "#fff" },
+  webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
 
   // Toolbar
   toolbar: {
@@ -974,7 +999,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: "#e0e0e0", paddingHorizontal: 10,
     minWidth: 0,
   },
-  searchInput: { flex: 1, paddingVertical: 8, fontSize: 14, color: "#222" },
+  searchInput: { flex: 1, paddingVertical: 8, fontSize: 14, color: "#222", outlineStyle: "none" } as any,
   viewToggle: { flexDirection: "row", gap: 4, flexShrink: 0 },
   viewBtn: {
     width: 36, height: 36, borderRadius: 8,
@@ -1043,10 +1068,10 @@ const styles = StyleSheet.create({
   // Column widths
   colId: { width: 95, flexShrink: 0 },
   colName: { flex: 1, minWidth: 80, paddingRight: 24 },
-  colPreview: { width: 140, flexShrink: 0, alignItems: "center" },
-  colCode: { width: 130, flexShrink: 0, paddingHorizontal: 4 },
-  colDate: { width: 145, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
-  colStatus: { width: 90, flexShrink: 0, paddingHorizontal: 4 },
+  colPreview: { width: 160, flexShrink: 0, alignItems: "center" },
+  colCode: { width: 160, flexShrink: 0, paddingLeft: 16, paddingRight: 12 },
+  colDate: { width: 175, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 },
+  colStatus: { width: 120, flexShrink: 0, paddingHorizontal: 12 },
   colAction: { width: 104, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
 
   // Cell content
@@ -1134,21 +1159,23 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
-    backgroundColor: "#fff", borderRadius: 12, marginTop: 12,
-    paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    backgroundColor: "#fff", borderRadius: 8, marginTop: 16,
+    padding: 16, gap: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+    borderWidth: 1, borderColor: "#E5E7EB",
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap",
   },
-  footerText: { fontSize: 13, color: "#888", textAlign: "center" },
-  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  footerText: { fontSize: 13, color: "#666" },
+  pagination: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
   pageBtn: {
-    width: 34, height: 34, borderRadius: 8,
-    backgroundColor: "#fff", borderWidth: 1, borderColor: "#e0e0e0",
+    width: 32, height: 32, borderRadius: 6,
+    backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb",
     alignItems: "center", justifyContent: "center",
   },
-  pageBtnActive: { backgroundColor: BRAND, borderColor: BRAND },
+  pageBtnActive: { backgroundColor: "#1d324e", borderColor: "#1d324e" },
   pageBtnDisabled: { opacity: 0.35 },
-  pageBtnText: { fontSize: 13, color: "#555" },
+  pageBtnText: { fontSize: 13, color: "#374151", fontWeight: "600" },
   pageBtnTextActive: { color: "#fff", fontWeight: "700" },
   copyright: { textAlign: "center", color: "#ccc", fontSize: 12, marginTop: 16 },
 
@@ -1174,7 +1201,8 @@ const styles = StyleSheet.create({
   textInput: {
     borderWidth: 1.5, borderColor: "#e0e0e0", borderRadius: 8,
     padding: 10, fontSize: 14, color: "#222", backgroundColor: "#fff",
-  },
+    outlineStyle: "none",
+  } as any,
   inputError: { borderColor: "#e53e3e" },
   errorRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
   errorText: { color: "#e53e3e", fontSize: 12 },

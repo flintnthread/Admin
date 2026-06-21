@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/admin-layout";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapPayoutToPaymentRow } from "@/lib/mappers";
 import { fetchPayoutStats, fetchPayouts, markPayoutPaid } from "@/services/payoutApi";
@@ -20,7 +21,7 @@ import {
 } from "react-native";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type PaymentStatus = "Pending" | "Paid";
+type PaymentStatus = "Pending" | "Paid" | "Cancelled";
 type ReminderBucket = "green" | "orange" | "red";
 
 interface SellerOrder {
@@ -60,10 +61,11 @@ const getReminderStyle = (bucket: ReminderBucket) => {
     return { bg: "#fce8e8", color: "#b91c1c", dot: "#ef4444" };
 };
 
-const getPaymentStyle = (status: PaymentStatus) =>
-    status === "Paid"
-        ? { bg: "#e8f7ee", color: "#1a7a45" }
-        : { bg: PRIMARY_LIGHT, color: PRIMARY };
+const getPaymentStyle = (status: PaymentStatus) => {
+    if (status === "Paid") return { bg: "#e8f7ee", color: "#1a7a45" };
+    if (status === "Cancelled") return { bg: "#fce8e8", color: "#b91c1c" };
+    return { bg: PRIMARY_LIGHT, color: PRIMARY };
+};
 
 // ─── ORDER CARD ───────────────────────────────────────────────────────────────
 const OrderCard: React.FC<{
@@ -212,11 +214,12 @@ const PayModal: React.FC<{
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 const SellerPaymentsScreen: React.FC = () => {
+    const { token, isLoading: authLoading } = useAuth();
     const isWeb = Platform.OS === "web";
     const [orders, setOrders] = useState<SellerOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0 });
+    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0, greenCount: 0, orangeCount: 0, redCount: 0 });
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
@@ -234,6 +237,7 @@ const SellerPaymentsScreen: React.FC = () => {
                     undefined;
 
     const loadPayments = useCallback(async () => {
+        if (!token) return;
         setLoading(true);
         setError(null);
         try {
@@ -252,17 +256,21 @@ const SellerPaymentsScreen: React.FC = () => {
                 pending: Number(apiStats.pending ?? 0),
                 paid: Number(apiStats.paid ?? 0),
                 totalPaidAmount: Number(apiStats.totalPaidAmount ?? 0),
+                greenCount: Number(apiStats.greenCount ?? 0),
+                orangeCount: Number(apiStats.orangeCount ?? 0),
+                redCount: Number(apiStats.redCount ?? 0),
             });
         } catch (e) {
             setError(getApiErrorMessage(e, "Failed to load seller payments."));
         } finally {
             setLoading(false);
         }
-    }, [apiStatus, currentPage]);
+    }, [apiStatus, currentPage, token]);
 
     useEffect(() => {
-        loadPayments();
-    }, [loadPayments]);
+        if (authLoading || !token) return;
+        void loadPayments();
+    }, [authLoading, token, loadPayments]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -383,9 +391,9 @@ const SellerPaymentsScreen: React.FC = () => {
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 250 }]} showsVerticalScrollIndicator={false}>
 
-                {loading && (
+                {loading || authLoading ? (
                     <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 24 }} />
-                )}
+                ) : null}
                 {error ? (
                     <View style={{ marginBottom: 12, gap: 8 }}>
                         <Text style={{ color: "#DC2626", fontSize: 13 }}>{error}</Text>
@@ -394,6 +402,52 @@ const SellerPaymentsScreen: React.FC = () => {
                         </TouchableOpacity>
                     </View>
                 ) : null}
+
+                {/* Stats */}
+                <View style={[styles.statsCardSingle, !isWeb && { flexDirection: "column", gap: 16 }, isWeb && { justifyContent: "space-between" }]}>
+                    <View style={{ flexDirection: isWeb ? "row" : "column", gap: isWeb ? 24 : 16, alignItems: isWeb ? "center" : "stretch", flex: isWeb ? 1 : undefined }}>
+                        {[
+                            { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
+                            { icon: "clock", label: "Pending", value: String(stats.pending), color: "#f472b6" },
+                            { icon: "check-circle", label: "Paid", value: String(stats.paid), color: "#7dd3fc" },
+                            { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
+                        ].map((s, i) => (
+                            <React.Fragment key={i}>
+                                <View style={[styles.statBlockSingle]}>
+                                    <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
+                                        <Feather name={s.icon as any} size={20} color="#ffffff" />
+                                    </View>
+                                    <View style={styles.statTextWrapperSingle}>
+                                        <Text style={styles.statValueSingle}>{s.value}</Text>
+                                        <Text style={styles.statLabelSingle}>{s.label}</Text>
+                                    </View>
+                                </View>
+                                {i < 3 && <View style={[styles.statDividerSingle, !isWeb && { width: "100%", height: 1, marginVertical: 0 }]} />}
+                            </React.Fragment>
+                        ))}
+                    </View>
+
+                    {/* Legend Section Inside Card */}
+                    <View style={{ flexDirection: isWeb ? 'row' : 'column', alignItems: isWeb ? 'center' : 'stretch', gap: isWeb ? 24 : 12, flexShrink: 0, paddingLeft: isWeb ? 12 : 0, marginTop: isWeb ? 0 : 16 }}>
+                        {isWeb && <View style={styles.statDividerSingle} />}
+                        <View style={{ gap: 6, justifyContent: 'center', width: isWeb ? 300 : '100%' }}>
+                            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                                <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
+                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Green (0-2d): {stats.greenCount}</Text>
+                                </View>
+                                <View style={[styles.legendBadge, { backgroundColor: "#fbbf24", flex: 1, minWidth: 90 }]}>
+                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Orange (3-4d): {stats.orangeCount}</Text>
+                                </View>
+                                <View style={[styles.legendBadge, { backgroundColor: "#f87171", flex: 1, minWidth: 90 }]}>
+                                    <Text style={[styles.legendText, { textAlign: 'center' }]}>Red (5+d): {stats.redCount}</Text>
+                                </View>
+                            </View>
+                            <View style={[styles.legendBadge, { backgroundColor: "#475569" }]}>
+                                <Text style={[styles.legendText, { textAlign: 'center' }]}>Red and pending are prioritized on top; paid rows are moved down</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
 
                 {/* Search + Filter */}
                 <View style={[styles.webFilterSection, { zIndex: 999, elevation: 999 }]}>

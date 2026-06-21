@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapDeliverySlabRow } from "@/lib/mappers";
 import {
@@ -54,11 +55,26 @@ interface WeightSlab {
   id: number;
   label: string;
   range: string;
+  minKg: number;
+  maxKg: number;
+  isCustom: boolean;
   iconColor: string;
   iconBg: string;
   intracity: string;
   metroMetro: string;
   status: SlabStatus;
+}
+
+function formatWeightRange(minKg: number, maxKg: number, label: string): string {
+  if (label.trim()) return label;
+  if (maxKg >= 999) return `Above ${minKg}kg`;
+  if (maxKg < 1) {
+    const minG = Math.round(minKg * 1000);
+    const maxG = Math.round(maxKg * 1000);
+    return `${minG} – ${maxG}g`;
+  }
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(n));
+  return `${fmt(minKg)} – ${fmt(maxKg)}kg`;
 }
 
 const SLAB_ICON_STYLES = [
@@ -70,19 +86,17 @@ const SLAB_ICON_STYLES = [
 
 function mapSlabToUi(row: ReturnType<typeof mapDeliverySlabRow>, index: number): WeightSlab {
   const icons = SLAB_ICON_STYLES[index % SLAB_ICON_STYLES.length];
-  const range =
-    row.maxKg > 0
-      ? `${row.minKg} – ${row.maxKg}kg`
-      : row.minKg > 0
-        ? `Above ${row.minKg}kg`
-        : `${row.minKg} – ${row.maxKg}g`;
+  const range = formatWeightRange(row.minKg, row.maxKg, "");
   return {
     id: row.id,
     label: row.label,
     range,
+    minKg: row.minKg,
+    maxKg: row.maxKg,
+    isCustom: row.custom,
     ...icons,
-    intracity: `₹${row.intraCity.toFixed(2)}`,
-    metroMetro: `₹${row.metroMetro.toFixed(2)}`,
+    intracity: row.custom ? "Custom" : `₹${row.intraCity.toFixed(2)}`,
+    metroMetro: row.custom ? "Custom" : `₹${row.metroMetro.toFixed(2)}`,
     status: row.active ? "Active" : "Inactive",
   };
 }
@@ -118,12 +132,12 @@ const StatusBadge: React.FC<{ status: SlabStatus }> = ({ status }) => (
   </View>
 );
 
-const FixedRateBadge: React.FC = () => (
+const FixedRateBadge: React.FC<{ custom?: boolean }> = ({ custom }) => (
   <View style={styles.fixedRateRow}>
     <View style={styles.checkCircle}>
-      <Text style={styles.checkMark}>✓</Text>
+      <Text style={styles.checkMark}>{custom ? "★" : "✓"}</Text>
     </View>
-    <Text style={styles.fixedRateText}>Fixed Rate</Text>
+    <Text style={styles.fixedRateText}>{custom ? "Custom Pricing" : "Fixed Rate"}</Text>
   </View>
 );
 
@@ -299,8 +313,8 @@ const SlabCard: React.FC<{
         {/* Footer meta */}
         <View style={dc.footer}>
           <View style={dc.metaItem}>
-            <Feather name="check-circle" size={11} color={T.textHint} />
-            <Text style={dc.metaTxt}>Fixed Rate</Text>
+            <Feather name={slab.isCustom ? "settings" : "check-circle"} size={11} color={T.textHint} />
+            <Text style={dc.metaTxt}>{slab.isCustom ? "Custom Pricing" : "Fixed Rate"}</Text>
           </View>
           <View style={[
             dc.statusBadge,
@@ -403,6 +417,7 @@ const DeliveryChargeModal: React.FC<{
     intraCity: number;
     metroMetro: number;
     active: boolean;
+    custom: boolean;
   }) => void;
 }> = ({ visible, onClose, slab, isWeb, onSave }) => {
   const isEditing = !!slab;
@@ -418,12 +433,12 @@ const DeliveryChargeModal: React.FC<{
     if (visible) {
       if (slab) {
         setIsActiveStatus(slab.status === "Active");
-        setIsCustomPricing(false);
+        setIsCustomPricing(slab.isCustom);
         setLabel(slab.label);
-        setMinKg("0");
-        setMaxKg("0");
-        setIntraCity(slab.intracity.replace("₹", ""));
-        setMetroMetro(slab.metroMetro.replace("₹", ""));
+        setMinKg(String(slab.minKg));
+        setMaxKg(String(slab.maxKg));
+        setIntraCity(slab.isCustom ? "0" : slab.intracity.replace("₹", ""));
+        setMetroMetro(slab.isCustom ? "0" : slab.metroMetro.replace("₹", ""));
       } else {
         setIsActiveStatus(true);
         setIsCustomPricing(false);
@@ -443,9 +458,10 @@ const DeliveryChargeModal: React.FC<{
       label: label.trim() || "Slab",
       minKg: Number(minKg) || 0,
       maxKg: Number(maxKg) || 0,
-      intraCity: Number(intraCity) || 0,
-      metroMetro: Number(metroMetro) || 0,
+      intraCity: isCustomPricing ? 0 : Number(intraCity) || 0,
+      metroMetro: isCustomPricing ? 0 : Number(metroMetro) || 0,
       active: isActiveStatus,
+      custom: isCustomPricing,
     });
     onClose();
   };
@@ -556,6 +572,7 @@ const DeliveryChargeModal: React.FC<{
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 const DeliveryChargesScreen: React.FC = () => {
+  const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -569,6 +586,7 @@ const DeliveryChargesScreen: React.FC = () => {
   const filteredSlabs = slabs.filter(s => filterStatus === "All" || s.status === filterStatus);
 
   const loadSlabs = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     try {
@@ -579,11 +597,12 @@ const DeliveryChargesScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
-    loadSlabs();
-  }, [loadSlabs]);
+    if (authLoading || !token) return;
+    void loadSlabs();
+  }, [authLoading, token, loadSlabs]);
 
   const saveSlab = async (data: {
     label: string;
@@ -592,6 +611,7 @@ const DeliveryChargesScreen: React.FC = () => {
     intraCity: number;
     metroMetro: number;
     active: boolean;
+    custom: boolean;
   }) => {
     try {
       const payload = {
@@ -601,6 +621,7 @@ const DeliveryChargesScreen: React.FC = () => {
         intraCityCharge: data.intraCity,
         metroMetroCharge: data.metroMetro,
         active: data.active,
+        custom: data.custom,
       };
       if (editingSlabId != null) {
         await updateDeliverySlab(editingSlabId, payload);
@@ -767,7 +788,7 @@ const DeliveryChargesScreen: React.FC = () => {
           </View>
         </View>
 
-        {loading ? (
+        {loading || authLoading ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>Loading delivery charges…</Text>
           </View>
@@ -817,7 +838,7 @@ const DeliveryChargesScreen: React.FC = () => {
                     <Text style={[styles.td, { width: 120, color: T.orange, fontWeight: '700' }]}>{slab.intracity}</Text>
                     <Text style={[styles.td, { width: 120, color: T.navy, fontWeight: '700' }]}>{slab.metroMetro}</Text>
                     <View style={[{ width: 130 }]}>
-                      <FixedRateBadge />
+                      <FixedRateBadge custom={slab.isCustom} />
                     </View>
                     <View style={[{ width: 90 }]}>
                       <StatusBadge status={slab.status} />

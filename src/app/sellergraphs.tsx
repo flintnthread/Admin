@@ -19,12 +19,14 @@ import {
   fetchSellerAnalyticsInsights,
   fetchSellerAnalyticsSummary,
   fetchSellerAnalyticsYears,
+  fetchSellerGraphNames,
   fetchSellers,
   fetchSellersForGraph,
   normalizeSellerGraphChart,
   normalizeSellerGraphSummary,
   type SellerGraphChartData,
   type SellerGraphInsight,
+  type SellerGraphNameOption,
   type SellerGraphRow,
 } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
@@ -170,6 +172,134 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+/* ─── Seller label / filter dropdown ────────────────────────────────── */
+function formatSellerLabel(s: Pick<SellerGraphNameOption, "id" | "fullName" | "businessName">) {
+  const name = (s.fullName ?? "").trim() || `Seller #${s.id}`;
+  const business = (s.businessName ?? "").trim();
+  return business ? `${name} — ${business} (#${s.id})` : `${name} (#${s.id})`;
+}
+
+function SellerFilterDropdown({
+  value,
+  onChange,
+  options,
+  style,
+}: {
+  value: number | null;
+  onChange: (id: number | null) => void;
+  options: SellerGraphNameOption[];
+  style?: object;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = Dimensions.get("window");
+  const isDesktop = screenW >= 1024;
+
+  const display = value == null
+    ? "All Sellers"
+    : formatSellerLabel(options.find((s) => s.id === value) ?? { id: value, fullName: `Seller #${value}` });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((s) => {
+      const label = formatSellerLabel(s).toLowerCase();
+      return label.includes(q) || String(s.id).includes(q);
+    });
+  }, [options, search]);
+
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const { width: screenWidth } = Dimensions.get("window");
+        const menuWidth = Math.min(Math.max(width, 280), screenWidth - 32);
+        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      });
+    }
+    setOpen((o) => !o);
+  };
+
+  const selectSeller = (id: number | null) => {
+    onChange(id);
+    setOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <View style={[{ minWidth: 160 }, style]}>
+      <TouchableOpacity
+        ref={triggerRef as any}
+        activeOpacity={0.8}
+        onPress={handlePress}
+        style={styles.dropdownTrigger}
+      >
+        <Text style={styles.dropdownText} numberOfLines={1}>{display}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => { setOpen(false); setSearch(""); }} />
+        {menuPosition && (
+          <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
+            <View style={[styles.dropdownMenu, isDesktop && styles.dropdownMenuDesktop]}>
+              <View style={styles.sellerSearchBox}>
+                <Ionicons name="search" size={14} color="#94A3B8" />
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search seller name, business, or ID..."
+                  placeholderTextColor="#94A3B8"
+                  style={styles.sellerSearchInput}
+                  autoFocus={Platform.OS === "web"}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearch("")}>
+                    <Ionicons name="close-circle" size={14} color="#94A3B8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
+                <TouchableOpacity
+                  onPress={() => selectSeller(null)}
+                  style={[styles.dropdownItem, value == null && { backgroundColor: ORANGE }]}
+                >
+                  <Text style={{ fontSize: 13, color: value == null ? "#fff" : "#374151", fontWeight: value == null ? "700" : "400" }}>
+                    All Sellers
+                  </Text>
+                </TouchableOpacity>
+                {filtered.map((s) => {
+                  const label = formatSellerLabel(s);
+                  const active = value === s.id;
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      onPress={() => selectSeller(s.id)}
+                      style={[styles.dropdownItem, active && { backgroundColor: ORANGE }]}
+                    >
+                      <Text style={{ fontSize: 13, color: active ? "#fff" : "#374151", fontWeight: active ? "700" : "400" }} numberOfLines={2}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <View style={{ padding: 14, alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: "#94A3B8" }}>No sellers match your search</Text>
+                  </View>
+                )}
+              </ScrollView>
+              <Text style={styles.sellerDropdownCount}>{options.length} sellers in database</Text>
+            </View>
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+}
+
 /* ─── Dropdown ──────────────────────────────────────────────────────── */
 function Dropdown({
   value, onChange, options, style,
@@ -244,7 +374,7 @@ function PagBtn({ iconName, onPress, disabled, active }: {
   return (
     <TouchableOpacity
       onPress={onPress} disabled={disabled}
-      style={[styles.pagBtn, active && { backgroundColor: ORANGE, borderColor: ORANGE }]}
+      style={[styles.pagBtn, active && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
     >
       <Ionicons name={iconName} size={12}
         color={disabled ? "#CBD5E1" : active ? "#fff" : "#374151"} />
@@ -378,6 +508,8 @@ function ChartMarker({ type, cx, cy, color, size = 5 }: {
 }
 
 /* ─── Line Chart ────────────────────────────────────────────────────── */
+const CHART_SERIES_KEYS = ["registered", "profileCompleted", "approved", "productsAdded", "shiprocketUploaded"] as const;
+
 function LineChart({
   width,
   activeSeries,
@@ -398,6 +530,14 @@ function LineChart({
   const yTicks = Array.from({ length: 7 }, (_, i) => i * step);
   const labels = chartData.labels;
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const chartRef = useRef<View>(null);
+
+  const getSeriesValue = useCallback((key: typeof CHART_SERIES_KEYS[number], idx: number): number => {
+    const values = chartData[key];
+    if (!Array.isArray(values) || idx < 0 || idx >= values.length) return 0;
+    const value = values[idx];
+    return typeof value === "number" ? value : Number(value) || 0;
+  }, [chartData]);
 
   const xScale = (i: number) => {
     if (labels.length <= 1) return W / 2;
@@ -408,93 +548,114 @@ function LineChart({
   const visibleSeries = activeSeries === "All Metrics"
     ? SERIES : SERIES.filter(s => s.label === activeSeries);
 
-  const seriesValues = (key: keyof SellerGraphChartData) => {
-    const values = chartData[key];
-    return Array.isArray(values) ? values as number[] : [];
-  };
+  const getPath = (key: typeof CHART_SERIES_KEYS[number]) =>
+    CHART_SERIES_KEYS.includes(key)
+      ? Array.from({ length: labels.length }, (_, i) => getSeriesValue(key, i)).map((v, i) =>
+        `${i === 0 ? "M" : "L"}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`
+      ).join(" ")
+      : "";
 
-  const getPath = (key: keyof SellerGraphChartData) =>
-    seriesValues(key).map((v, i) =>
-      `${i === 0 ? "M" : "L"}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`
-    ).join(" ");
-
-  const handleTouch = (evt: any) => {
-    const touchX = evt.nativeEvent.locationX - padL;
-    const idx = Math.round((touchX / W) * (labels.length - 1));
+  const updateHoverFromX = useCallback((localX: number) => {
+    if (labels.length === 0) return;
+    const clampedX = Math.max(0, Math.min(W, localX));
+    const idx = labels.length <= 1
+      ? 0
+      : Math.round((clampedX / W) * (labels.length - 1));
     setHoveredIdx(Math.max(0, Math.min(labels.length - 1, idx)));
-  };
+  }, [W, labels.length]);
+
+  const handlePointerMove = useCallback((evt: any) => {
+    const localX = typeof evt.nativeEvent?.locationX === "number"
+      ? evt.nativeEvent.locationX - padL
+      : 0;
+    updateHoverFromX(localX);
+  }, [padL, updateHoverFromX]);
+
+  const handleWebMouseMove = useCallback((evt: any) => {
+    if (!chartRef.current) return;
+    chartRef.current.measure((_x, _y, _w, _h, pageX, _pageY) => {
+      const clientX = evt.nativeEvent?.clientX ?? evt.clientX;
+      if (typeof clientX !== "number") return;
+      updateHoverFromX(clientX - pageX - padL);
+    });
+  }, [padL, updateHoverFromX]);
 
   const ttX = hoveredIdx !== null ? xScale(hoveredIdx) : 0;
   const ttRight = ttX > W * 0.55;
-  const ttW = 155, ttLineH = 20, ttPad = 28;
+  const ttW = 168, ttLineH = 20, ttPad = 28;
 
   return (
-    <Svg
-      width={width} height={height}
-      onPress={handleTouch}
-      onResponderMove={(e: any) => {
-        const x = e.nativeEvent.locationX - padL;
-        const idx = Math.round((x / W) * (labels.length - 1));
-        setHoveredIdx(Math.max(0, Math.min(labels.length - 1, idx)));
-      }}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-      onResponderRelease={() => setHoveredIdx(null)}
+    <View
+      ref={chartRef}
+      style={{ width, height }}
+      {...(Platform.OS === "web" ? {
+        onMouseMove: handleWebMouseMove,
+        onMouseLeave: () => setHoveredIdx(null),
+      } as object : {})}
     >
-      <G x={padL} y={padT}>
-        {yTicks.map(t => (
-          <G key={t}>
-            <Line x1={0} x2={W} y1={yScale(t)} y2={yScale(t)}
-              stroke="#E5E7EB" strokeWidth={t === 0 ? 1 : 0.75} />
-            <SvgText x={-6} y={yScale(t) + 4} textAnchor="end"
-              fontSize={10} fill="#9CA3AF">{t}</SvgText>
-          </G>
-        ))}
-        {labels.map((l, i) => (
-          <SvgText key={l} x={xScale(i)} y={H + 16} textAnchor="middle"
-            fontSize={9} fill="#6B7280">{l}</SvgText>
-        ))}
-        {visibleSeries.map(s => (
-          <Path key={s.key} d={getPath(s.key as keyof SellerGraphChartData)} fill="none" stroke={s.color}
-            strokeWidth={2} strokeDasharray={s.dashArray.join(" ") || undefined}
-            strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-        {visibleSeries.map(s =>
-          seriesValues(s.key as keyof SellerGraphChartData).map((v, i) => (
-            <ChartMarker key={`${s.key}-${i}`}
-              type={s.marker} cx={xScale(i)} cy={yScale(v)} color={s.color} size={4} />
-          ))
-        )}
-        {hoveredIdx !== null && (
-          <>
-            <Line x1={xScale(hoveredIdx)} x2={xScale(hoveredIdx)} y1={0} y2={H}
-              stroke="#94A3B8" strokeWidth={1} strokeDasharray="4 3" />
-            {visibleSeries.map(s => (
-              <ChartMarker key={`h-${s.key}`} type={s.marker}
-                cx={xScale(hoveredIdx)}
-                cy={yScale(seriesValues(s.key as keyof SellerGraphChartData)[hoveredIdx] ?? 0)}
-                color={s.color} size={7} />
-            ))}
-            <Rect
-              x={ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8}
-              y={2} width={ttW} height={visibleSeries.length * ttLineH + ttPad}
-              rx={8} fill="white" stroke="#E2E8F0" strokeWidth={1} />
-            <SvgText
-              x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
-              y={17} fontSize={11} fontWeight="bold" fill="#1B2332">
-              {labels[hoveredIdx]} {chartYear}
-            </SvgText>
-            {visibleSeries.map((s, i) => (
-              <SvgText key={s.key}
+      <Svg
+        width={width} height={height}
+        onPress={handlePointerMove}
+        onResponderMove={handlePointerMove}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderRelease={() => setHoveredIdx(null)}
+      >
+        <G x={padL} y={padT}>
+          {yTicks.map(t => (
+            <G key={t}>
+              <Line x1={0} x2={W} y1={yScale(t)} y2={yScale(t)}
+                stroke="#E5E7EB" strokeWidth={t === 0 ? 1 : 0.75} />
+              <SvgText x={-6} y={yScale(t) + 4} textAnchor="end"
+                fontSize={10} fill="#9CA3AF">{t}</SvgText>
+            </G>
+          ))}
+          {labels.map((l, i) => (
+            <SvgText key={`${l}-${i}`} x={xScale(i)} y={H + 16} textAnchor="middle"
+              fontSize={9} fill="#6B7280">{l}</SvgText>
+          ))}
+          {visibleSeries.map(s => (
+            <Path key={s.key} d={getPath(s.key as typeof CHART_SERIES_KEYS[number])} fill="none" stroke={s.color}
+              strokeWidth={2} strokeDasharray={s.dashArray.join(" ") || undefined}
+              strokeLinejoin="round" strokeLinecap="round" />
+          ))}
+          {visibleSeries.map(s =>
+            labels.map((_, i) => (
+              <ChartMarker key={`${s.key}-${i}`}
+                type={s.marker} cx={xScale(i)} cy={yScale(getSeriesValue(s.key as typeof CHART_SERIES_KEYS[number], i))} color={s.color} size={4} />
+            ))
+          )}
+          {hoveredIdx !== null && (
+            <>
+              <Line x1={xScale(hoveredIdx)} x2={xScale(hoveredIdx)} y1={0} y2={H}
+                stroke="#94A3B8" strokeWidth={1} strokeDasharray="4 3" />
+              {visibleSeries.map(s => (
+                <ChartMarker key={`h-${s.key}`} type={s.marker}
+                  cx={xScale(hoveredIdx)}
+                  cy={yScale(getSeriesValue(s.key as typeof CHART_SERIES_KEYS[number], hoveredIdx))}
+                  color={s.color} size={7} />
+              ))}
+              <Rect
+                x={ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8}
+                y={2} width={ttW} height={visibleSeries.length * ttLineH + ttPad}
+                rx={8} fill="white" stroke="#E2E8F0" strokeWidth={1} />
+              <SvgText
                 x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
-                y={31 + i * ttLineH} fontSize={10} fill={s.color}>
-                {s.label}: {seriesValues(s.key as keyof SellerGraphChartData)[hoveredIdx] ?? 0}
+                y={17} fontSize={11} fontWeight="bold" fill="#1B2332">
+                {labels[hoveredIdx]} {chartYear}
               </SvgText>
-            ))}
-          </>
-        )}
-      </G>
-    </Svg>
+              {visibleSeries.map((s, i) => (
+                <SvgText key={s.key}
+                  x={(ttRight ? xScale(hoveredIdx) - ttW - 8 : xScale(hoveredIdx) + 8) + 10}
+                  y={31 + i * ttLineH} fontSize={10} fill={s.color}>
+                  {s.label}: {getSeriesValue(s.key as typeof CHART_SERIES_KEYS[number], hoveredIdx)}
+                </SvgText>
+              ))}
+            </>
+          )}
+        </G>
+      </Svg>
+    </View>
   );
 }
 
@@ -726,7 +887,7 @@ export default function SellersDashboard() {
   const isTablet = screenW >= 768;
   const isDesktop = screenW >= 1024;
 
-  const [sellerFilter, setSellerFilter] = useState("All Sellers");
+  const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
   const [filterType, setFilterType] = useState("Monthly");
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
   const [yearOptions, setYearOptions] = useState<string[]>([String(new Date().getFullYear())]);
@@ -744,7 +905,7 @@ export default function SellersDashboard() {
   const [perPage, setPerPage] = useState(10);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [sellerNameOptions, setSellerNameOptions] = useState<{ id: number; name: string }[]>([]);
+  const [sellerNameOptions, setSellerNameOptions] = useState<SellerGraphNameOption[]>([]);
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [chartData, setChartData] = useState<SellerGraphChartData>(EMPTY_CHART_DATA);
   const [insights, setInsights] = useState<SellerGraphInsight[]>([]);
@@ -753,17 +914,18 @@ export default function SellersDashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
-  const selectedSellerId = useMemo(() => {
-    if (sellerFilter === "All Sellers") return undefined;
-    return sellerNameOptions.find((s) => s.name === sellerFilter)?.id;
-  }, [sellerFilter, sellerNameOptions]);
+  const selectedSellerLabel = useMemo(() => {
+    if (selectedSellerId == null) return "All Sellers";
+    const match = sellerNameOptions.find((s) => s.id === selectedSellerId);
+    return match ? formatSellerLabel(match) : `Seller #${selectedSellerId}`;
+  }, [selectedSellerId, sellerNameOptions]);
 
   const graphFilters = useMemo(() => ({
     filterType,
     year: Number(filterYear) || undefined,
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
-    sellerId: selectedSellerId,
+    sellerId: selectedSellerId ?? undefined,
   }), [filterType, filterYear, fromDate, toDate, selectedSellerId]);
 
   const loadSellerList = useCallback(async () => {
@@ -773,7 +935,7 @@ export default function SellersDashboard() {
       try {
         sellerRes = await fetchSellersForGraph({
           search: searchQ || undefined,
-          sellerId: selectedSellerId,
+          sellerId: selectedSellerId ?? undefined,
           page: page - 1,
           size: perPage,
         });
@@ -792,18 +954,38 @@ export default function SellersDashboard() {
     }
   }, [authLoading, searchQ, selectedSellerId, page, perPage, token]);
 
+  const loadSellerNames = useCallback(async () => {
+    if (!token || authLoading) return;
+    try {
+      const names = await fetchSellerGraphNames();
+      setSellerNameOptions(names);
+    } catch {
+      try {
+        const fallback = await fetchSellersForGraph({ page: 0, size: 1000 });
+        setSellerNameOptions(
+          (fallback.items ?? []).map((s) => ({
+            id: s.id,
+            fullName: s.fullName ?? `Seller #${s.id}`,
+            businessName: s.businessName ?? null,
+          }))
+        );
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    }
+  }, [authLoading, token]);
+
   const loadAnalytics = useCallback(async () => {
     if (!token || authLoading) return;
     setDataLoading(true);
     setLoadError(null);
     const errors: string[] = [];
 
-    const [summaryRes, chartRes, insightsRes, yearsRes, namesRes] = await Promise.allSettled([
+    const [summaryRes, chartRes, insightsRes, yearsRes] = await Promise.allSettled([
       fetchSellerAnalyticsSummary(graphFilters),
       fetchSellerAnalyticsChart(graphFilters),
       fetchSellerAnalyticsInsights(graphFilters),
       fetchSellerAnalyticsYears(),
-      fetchSellersForGraph({ page: 0, size: 500 }).catch(() => fetchSellers({ page: 0, size: 500 })),
     ]);
 
     if (summaryRes.status === "fulfilled") {
@@ -831,20 +1013,17 @@ export default function SellersDashboard() {
       }
     }
 
-    if (namesRes.status === "fulfilled") {
-      setSellerNameOptions(
-        (namesRes.value.items ?? []).map((s) => ({
-          id: s.id,
-          name: s.fullName ?? `Seller #${s.id}`,
-        }))
-      );
-    }
-
     if (errors.length > 0) {
       setLoadError(errors[0]);
     }
     setDataLoading(false);
   }, [authLoading, graphFilters, filterYear, token]);
+
+  useEffect(() => {
+    if (!authLoading && token) {
+      loadSellerNames();
+    }
+  }, [authLoading, loadSellerNames, token]);
 
   useEffect(() => {
     if (!authLoading && token) {
@@ -858,16 +1037,27 @@ export default function SellersDashboard() {
     }
   }, [authLoading, loadSellerList, token]);
 
-  const sellerOptions = useMemo(
-    () => ["All Sellers", ...sellerNameOptions.map((s) => s.name)],
-    [sellerNameOptions]
-  );
+  const doSearch = () => { setSearchQ(search); setPage(1); };
+  const doReset = () => { setSearch(""); setSearchQ(""); setPage(1); setPerPage(10); };
+  const resetAnalyticsFilters = () => {
+    setSelectedSellerId(null);
+    setFilterType("Monthly");
+    setFilterYear(String(new Date().getFullYear()));
+    setFromDate("");
+    setToDate("");
+    setPage(1);
+  };
+  const applyFilters = () => {
+    setPage(1);
+    void loadAnalytics();
+    void loadSellerList();
+  };
 
   const statCards = useMemo(
     () => [
       { iconName: "person-add", label: "Registered", value: String(summary.registered ?? summary.total ?? 0), sub: "All sellers", iconBg: "#FFF7ED", iconColor: ORANGE },
       { iconName: "person-done", label: "Profile Completed", value: String(summary.profileCompleted ?? 0), sub: "Completed profiles", iconBg: "#F0FDF4", iconColor: "#10B981" },
-      { iconName: "shield-checkmark", label: "Approved", value: String(summary.approved ?? summary.active ?? 0), sub: "Active accounts", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
+      { iconName: "shield-checkmark", label: "Approved", value: String(summary.approved ?? summary.active ?? 0), sub: "Admin approved", iconBg: "#EFF6FF", iconColor: "#3B82F6" },
       { iconName: "cube", label: "Products Added", value: String(summary.productsAdded ?? 0), sub: "Listed products", iconBg: "#F5F3FF", iconColor: "#8B5CF6" },
       { iconName: "cloud-upload", label: "Shiprocket Uploaded", value: String(summary.shiprocketUploaded ?? 0), sub: "Warehouse ready", iconBg: "#ECFDF5", iconColor: "#06B6D4" },
       { iconName: "sync", label: "Pending Bank", value: String(summary.pendingBank ?? 0), sub: "Bank review", iconBg: "#FFF7ED", iconColor: ORANGE },
@@ -877,14 +1067,6 @@ export default function SellersDashboard() {
 
   const safePage = Math.min(page, totalPages);
   const paginated = sellers;
-
-  const doSearch = () => { setSearchQ(search); setPage(1); };
-  const doReset = () => { setSearch(""); setSearchQ(""); setPage(1); setPerPage(10); };
-  const applyFilters = () => {
-    setPage(1);
-    void loadAnalytics();
-    void loadSellerList();
-  };
 
   const errorBanner = loadError ? (
     <View style={styles.errorBanner}>
@@ -919,14 +1101,6 @@ export default function SellersDashboard() {
             <View style={styles.headerContainer}>
               <View style={styles.pageHeader}>
                 <View>
-                  {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <Ionicons name="home" size={12} color={ORANGE} />
-                  <Text style={styles.breadcrumb}>Dashboard</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={styles.breadcrumb}>Sellers</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={{ fontSize: 12, color: "#94A3B8" }}>Sellers Graph</Text>
-                </View> */}
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Ionicons name="bar-chart" size={20} color={ORANGE} />
                     <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
@@ -941,6 +1115,22 @@ export default function SellersDashboard() {
 
             {errorBanner}
 
+            {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }}>
+              {statCards.map(c => (
+                <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                    <Text style={styles.statValue}>{c.value}</Text>
+                    {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                  </View>
+                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                    <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                  </View>
+                </View>
+              ))}
+            </View>
+
             {/* ── DESKTOP: All Filters in ONE Row ── */}
             <View style={[styles.card, { marginBottom: 14 }]}>
               <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "nowrap" }}>
@@ -950,7 +1140,11 @@ export default function SellersDashboard() {
                     <Ionicons name="person-outline" size={13} color="#64748B" />
                     <Text style={styles.filterLabelText}>Seller</Text>
                   </View>
-                  <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }} options={sellerOptions} />
+                  <SellerFilterDropdown
+                    value={selectedSellerId}
+                    onChange={(id) => { setSelectedSellerId(id); setPage(1); }}
+                    options={sellerNameOptions}
+                  />
                 </View>
                 {/* Filter type */}
                 <View style={{ flex: 1, minWidth: 110 }}>
@@ -986,6 +1180,13 @@ export default function SellersDashboard() {
                 </View>
                 {/* Apply button */}
                 <TouchableOpacity
+                  style={[styles.resetBtn, { paddingHorizontal: 16, alignSelf: "flex-end", height: 40, justifyContent: "center" }]}
+                  onPress={resetAnalyticsFilters}
+                >
+                  <Ionicons name="refresh" size={14} color="#475569" />
+                  <Text style={styles.resetBtnText}>Reset</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[styles.applyBtn, { paddingHorizontal: 20, alignSelf: "flex-end", height: 40, justifyContent: "center" }]}
                   onPress={applyFilters}
                 >
@@ -994,26 +1195,10 @@ export default function SellersDashboard() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.filterCaption}>
-                Showing analytics for {filterType} · {sellerFilter} · {filterYear}
+                Showing analytics for {filterType} · {selectedSellerLabel} · {filterYear}
                 {fromDate && ` · From: ${fromDate}`}
                 {toDate && ` · To: ${toDate}`}
               </Text>
-            </View>
-
-            {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
-              {statCards.map(c => (
-                <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                    <Text style={styles.statValue}>{c.value}</Text>
-                    {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
-                  </View>
-                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                    <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
-                  </View>
-                </View>
-              ))}
             </View>
 
             {/* ── DESKTOP: Chart + Key Insights side by side ── */}
@@ -1023,7 +1208,7 @@ export default function SellersDashboard() {
                 <View style={styles.chartHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.chartTitle}>Yearly Overview</Text>
-                    <Text style={styles.chartSubtitle}>Performance overview of all sellers for the selected period</Text>
+                    <Text style={styles.chartSubtitle}>Monthly counts for the selected period (hover a point for details)</Text>
                   </View>
                   <Dropdown value={activeSeries} onChange={setActiveSeries}
                     options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
@@ -1121,12 +1306,6 @@ export default function SellersDashboard() {
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.showingText}>
-                {totalSellers === 0
-                  ? "No results found"
-                  : `Showing ${(safePage - 1) * perPage + 1}–${Math.min(safePage * perPage, totalSellers)} of ${totalSellers} entries`}
-              </Text>
-
               {/* Table */}
               <View style={styles.tableContainer}>
                 {/* Table Header */}
@@ -1158,35 +1337,35 @@ export default function SellersDashboard() {
                   ))
                 )}
               </View>
-
-              {/* Pagination */}
-              {totalSellers > 0 && (
-                <View style={styles.paginationRow}>
-                  <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
-                  <View style={{ flexDirection: "row", gap: 4 }}>
-                    <PagBtn iconName="play-skip-back" onPress={() => setPage(1)} disabled={safePage === 1} />
-                    <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                    {pageNums.map((p, i) =>
-                      p === "..." ? (
-                        <View key={"e" + i} style={styles.pagBtn}>
-                          <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          key={`n${p}`}
-                          onPress={() => setPage(p as number)}
-                          style={[styles.pagBtn, safePage === p && { backgroundColor: ORANGE, borderColor: ORANGE }]}
-                        >
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                        </TouchableOpacity>
-                      )
-                    )}
-                    <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                    <PagBtn iconName="play-skip-forward" onPress={() => setPage(totalPages)} disabled={safePage === totalPages} />
-                  </View>
-                </View>
-              )}
             </View>
+
+            {/* Pagination */}
+            {totalSellers > 0 && (
+              <View style={styles.paginationRow}>
+                <Text style={styles.pageText}>
+                  Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
+                </Text>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
+                  {pageNums.map((p, i) =>
+                    p === "..." ? (
+                      <View key={"e" + i} style={styles.pagBtn}>
+                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        key={`n${p}`}
+                        onPress={() => setPage(p as number)}
+                        style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+                </View>
+              </View>
+            )}
 
             {/* ── Footer ── */}
             <Text style={styles.footer}>
@@ -1196,13 +1375,13 @@ export default function SellersDashboard() {
           </ScrollView>
 
           <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
-        </View>
-      </AdminLayout>
+        </View >
+      </AdminLayout >
     );
   }
 
   /* ────────────────────────────────────────────────────────────────────
-     MOBILE / TABLET LAYOUT  (unchanged)
+     MOBILE / TABLET LAYOUT
   ──────────────────────────────────────────────────────────────────── */
   return (
     <AdminLayout>
@@ -1216,14 +1395,6 @@ export default function SellersDashboard() {
           <View style={styles.headerContainer}>
             <View style={styles.pageHeader}>
               <View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <Ionicons name="home" size={12} color={ORANGE} />
-                  <Text style={styles.breadcrumb}>Dashboard</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={styles.breadcrumb}>Sellers</Text>
-                  <Ionicons name="chevron-forward" size={10} color="#94A3B8" />
-                  <Text style={{ fontSize: 12, color: "#94A3B8" }}>Sellers Graph</Text>
-                </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="bar-chart" size={20} color={ORANGE} />
                   <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
@@ -1238,14 +1409,34 @@ export default function SellersDashboard() {
 
           {errorBanner}
 
+          {/* ── Stat Cards (mobile: 2-col grid) ── */}
+          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }]}>
+            {statCards.map(c => (
+              <View key={c.label} style={[styles.statCard]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                  <Text style={styles.statValue}>{c.value}</Text>
+                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                </View>
+                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                  <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
+                </View>
+              </View>
+            ))}
+          </View>
+
           {/* ── Filters Card ── */}
           <View style={styles.card}>
             <View style={styles.filterLabel}>
               <Ionicons name="person-outline" size={13} color="#64748B" />
               <Text style={styles.filterLabelText}>Seller</Text>
             </View>
-            <Dropdown value={sellerFilter} onChange={v => { setSellerFilter(v); setPage(1); }}
-              options={sellerOptions} style={{ marginBottom: 12 }} />
+            <SellerFilterDropdown
+              value={selectedSellerId}
+              onChange={(id) => { setSelectedSellerId(id); setPage(1); }}
+              options={sellerNameOptions}
+              style={{ marginBottom: 12 }}
+            />
 
             <View style={[styles.filterRow]}>
               <View style={{ flex: 1 }}>
@@ -1281,13 +1472,19 @@ export default function SellersDashboard() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
-              <Ionicons name="funnel" size={14} color="#fff" />
-              <Text style={styles.applyBtnText}>Apply Filters</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+              <TouchableOpacity style={[styles.resetBtn, { flex: 1 }]} onPress={resetAnalyticsFilters}>
+                <Ionicons name="refresh" size={14} color="#475569" />
+                <Text style={styles.resetBtnText}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.applyBtn, { flex: 2 }]} onPress={applyFilters}>
+                <Ionicons name="funnel" size={14} color="#fff" />
+                <Text style={styles.applyBtnText}>Apply Filters</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={styles.filterCaption}>
-              Showing analytics for {filterType} · {sellerFilter} · {filterYear}
+              Showing analytics for {filterType} · {selectedSellerLabel} · {filterYear}
               {fromDate && ` · From: ${fromDate}`}
               {toDate && ` · To: ${toDate}`}
             </Text>
@@ -1314,7 +1511,7 @@ export default function SellersDashboard() {
             <View style={styles.chartHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.chartTitle}>Yearly Overview</Text>
-                <Text style={styles.chartSubtitle}>Performance overview of all sellers for the selected period</Text>
+                <Text style={styles.chartSubtitle}>Monthly counts for the selected period (hover a point for details)</Text>
               </View>
               <Dropdown value={activeSeries} onChange={setActiveSeries}
                 options={METRIC_OPTIONS} style={{ minWidth: 140 }} />
@@ -1412,12 +1609,6 @@ export default function SellersDashboard() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.showingText}>
-              {totalSellers === 0
-                ? "No results found"
-                : `Showing ${(safePage - 1) * perPage + 1}–${Math.min(safePage * perPage, totalSellers)} of ${totalSellers} entries`}
-            </Text>
-
             {paginated.length === 0 ? (
               <View style={{ alignItems: "center", paddingVertical: 48 }}>
                 <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
@@ -1433,34 +1624,35 @@ export default function SellersDashboard() {
                 ))}
               </View>
             )}
-
-            {totalSellers > 0 && (
-              <View style={styles.paginationRow}>
-                <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
-                <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                  <PagBtn iconName="play-skip-back" onPress={() => setPage(1)} disabled={safePage === 1} />
-                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                  {pageNums.map((p, i) =>
-                    p === "..." ? (
-                      <View key={"e" + i} style={styles.pagBtn}>
-                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        key={`n${p}`}
-                        onPress={() => setPage(p as number)}
-                        style={[styles.pagBtn, safePage === p && { backgroundColor: ORANGE, borderColor: ORANGE }]}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                  <PagBtn iconName="play-skip-forward" onPress={() => setPage(totalPages)} disabled={safePage === totalPages} />
-                </View>
-              </View>
-            )}
           </View>
+
+          {/* Pagination */}
+          {totalSellers > 0 && (
+            <View style={styles.paginationRow}>
+              <Text style={styles.pageText}>
+                Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
+              </Text>
+              <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
+                <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
+                {pageNums.map((p, i) =>
+                  p === "..." ? (
+                    <View key={"e" + i} style={styles.pagBtn}>
+                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      key={`n${p}`}
+                      onPress={() => setPage(p as number)}
+                      style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                    </TouchableOpacity>
+                  )
+                )}
+                <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+              </View>
+            </View>
+          )}
 
           {/* ── Footer ── */}
           <Text style={styles.footer}>
@@ -1470,8 +1662,8 @@ export default function SellersDashboard() {
         </ScrollView>
 
         <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
-      </View>
-    </AdminLayout>
+      </View >
+    </AdminLayout >
   );
 }
 
@@ -1488,8 +1680,9 @@ const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: "#1d324e",
     padding: 16,
+    paddingBottom: 48,
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 0,
   },
 
   card: {
@@ -1582,7 +1775,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 9,
     paddingHorizontal: 10, backgroundColor: "#fff", gap: 6,
   },
-  searchInput: { flex: 1, fontSize: 13, color: "#374151", paddingVertical: 9 },
+  searchInput: { flex: 1, fontSize: 13, color: "#374151", paddingVertical: 9, outlineStyle: "none" } as any,
   searchControlsRow: { flexDirection: "row", gap: 8, marginBottom: 12, alignItems: "center" },
   showingText: { fontSize: 12, color: "#64748B", marginBottom: 12 },
   clearBtn: {
@@ -1639,9 +1832,17 @@ const styles = StyleSheet.create({
 
   /* Pagination */
   paginationRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: "#F1F5F9",
-    flexWrap: "wrap", gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    flexWrap: "wrap",
+    gap: 8,
   },
   pageText: { fontSize: 12, color: "#64748B" },
   pagBtn: {
@@ -1667,6 +1868,16 @@ const styles = StyleSheet.create({
   },
   dropdownMenuDesktop: { maxWidth: 400 },
   dropdownItem: { paddingVertical: 12, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: BORDER },
+  sellerSearchBox: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    margin: 10, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: BORDER, borderRadius: 8, backgroundColor: "#F8FAFC",
+  },
+  sellerSearchInput: { flex: 1, fontSize: 13, color: "#374151", padding: 0 },
+  sellerDropdownCount: {
+    fontSize: 11, color: "#94A3B8", textAlign: "center",
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: BORDER,
+  },
 
   /* Date Input */
   dateInputContainer: {
@@ -1674,7 +1885,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, borderRadius: 8,
     backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 9,
   },
-  dateInput: { flex: 1, fontSize: 13, color: "#374151" },
+  dateInput: { flex: 1, fontSize: 13, color: "#374151", outlineStyle: "none" } as any,
 
   /* DatePicker Modal */
   datePickerOverlay: {
