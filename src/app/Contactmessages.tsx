@@ -214,11 +214,13 @@ const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: 
       {statsData.map((stat, index) => (
         <View key={index} style={styles.statsContainer}>
           <View style={[styles.statIconCircle, { backgroundColor: stat.tint }]}>
-            <Feather name={stat.icon} size={14} color={stat.textColor} />
+            <Feather name={stat.icon} size={18} color={stat.textColor} />
           </View>
-          <Text style={[styles.statValue, { color: stat.textColor }]}>{stat.value}</Text>
-          <Text style={styles.statLabel}>{stat.label}</Text>
-          <Text style={styles.statSub}>{stat.sub}</Text>
+          <View style={styles.statTextWrapper}>
+            <Text style={[styles.statValue, { color: stat.textColor }]}>{stat.value}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+            <Text style={styles.statSub}>{stat.sub}</Text>
+          </View>
         </View>
       ))}
     </View>
@@ -642,6 +644,7 @@ const ContactMessagesScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [viewMsg, setViewMsg] = useState<ContactMessage | null>(null);
   const [replyMsg, setReplyMsg] = useState<ContactMessage | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const AVATAR_COLORS = [
     { color: "#7C3AED", bg: "#EDE9FE" },
@@ -659,6 +662,10 @@ const ContactMessagesScreen: React.FC = () => {
       m.email.toLowerCase().includes(search.toLowerCase());
     return mf && ms;
   });
+
+  const ITEMS_PER_PAGE = 9;
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedMessages = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleView = (msg: ContactMessage) => {
     setMessages((prev) =>
@@ -743,39 +750,6 @@ const ContactMessagesScreen: React.FC = () => {
           </Text>
         </View>
         <View style={styles.headerActions}>
-          {isWeb && (
-            <View style={styles.viewSwitcher}>
-              <Text style={styles.viewLabel}>View:</Text>
-              <TouchableOpacity
-                style={[
-                  styles.viewButton,
-                  viewMode === "grid" && styles.viewButtonActive,
-                ]}
-                onPress={() => setViewMode("grid")}
-                activeOpacity={0.8}
-              >
-                <Feather
-                  name="grid"
-                  size={16}
-                  color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.viewButton,
-                  viewMode === "list" && styles.viewButtonActive,
-                ]}
-                onPress={() => setViewMode("list")}
-                activeOpacity={0.8}
-              >
-                <Feather
-                  name="list"
-                  size={16}
-                  color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
       </View>
 
@@ -784,6 +758,10 @@ const ContactMessagesScreen: React.FC = () => {
           {loadError}
         </Text>
       ) : null}
+
+      <View style={{ marginHorizontal: isWeb ? 24 : 14, marginTop: isWeb ? -42 : -32, zIndex: 10, elevation: 10 }}>
+        <StatsHeader stats={contactStats} />
+      </View>
 
       {/* ── Mobile Controls ── */}
       {!isWeb && (
@@ -849,6 +827,37 @@ const ContactMessagesScreen: React.FC = () => {
         {/* ── Web Search + Filter ── */}
         {isWeb && (
           <View style={styles.webToolbar}>
+            <View style={styles.viewSwitcher}>
+              <Text style={styles.viewLabel}>View:</Text>
+              <TouchableOpacity
+                style={[
+                  styles.viewButton,
+                  viewMode === "grid" && styles.viewButtonActive,
+                ]}
+                onPress={() => setViewMode("grid")}
+                activeOpacity={0.8}
+              >
+                <Feather
+                  name="grid"
+                  size={16}
+                  color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.viewButton,
+                  viewMode === "list" && styles.viewButtonActive,
+                ]}
+                onPress={() => setViewMode("list")}
+                activeOpacity={0.8}
+              >
+                <Feather
+                  name="list"
+                  size={16}
+                  color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED}
+                />
+              </TouchableOpacity>
+            </View>
             <View style={styles.searchContainerWeb}>
               <Feather name="search" size={16} color={TEXT_MUTED} style={styles.searchIcon} />
               <TextInput
@@ -899,8 +908,7 @@ const ContactMessagesScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        {/* Stats */}
-        <StatsHeader stats={contactStats} />
+        {/* Stats moved to header overlap */}
 
         {loading ? (
           <Text style={styles.resultCount}>Loading contact messages…</Text>
@@ -919,7 +927,7 @@ const ContactMessagesScreen: React.FC = () => {
               !isWeb && { marginHorizontal: 0 },
             ]}
           >
-            {filtered.map((item) => (
+            {paginatedMessages.map((item) => (
               <View
                 key={item.id}
                 style={[
@@ -956,7 +964,7 @@ const ContactMessagesScreen: React.FC = () => {
                 <Text style={[styles.tableHeaderCell, { width: 130, textAlign: "center" }]}>Actions</Text>
               </View>
 
-              {filtered.map((msg) => (
+              {paginatedMessages.map((msg) => (
                 <View key={msg.id} style={[styles.tableRow, { gap: 24 }]}>
                   {/* Sender */}
                   <View style={[styles.tableCellRow, { width: 200 }]}>
@@ -1016,6 +1024,27 @@ const ContactMessagesScreen: React.FC = () => {
               ))}
             </View>
           </ScrollView>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && !loadError && totalPages > 1 && (
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, marginBottom: 24, gap: 16 }}>
+            <TouchableOpacity 
+              disabled={currentPage === 1} 
+              onPress={() => setCurrentPage(p => p - 1)} 
+              style={{ padding: 8, opacity: currentPage === 1 ? 0.5 : 1, backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" }}
+            >
+              <Feather name="chevron-left" size={20} color="#1e293b" />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: "#1e293b" }}>Page {currentPage} of {totalPages}</Text>
+            <TouchableOpacity 
+              disabled={currentPage === totalPages} 
+              onPress={() => setCurrentPage(p => p + 1)} 
+              style={{ padding: 8, opacity: currentPage === totalPages ? 0.5 : 1, backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" }}
+            >
+              <Feather name="chevron-right" size={20} color="#1e293b" />
+            </TouchableOpacity>
+          </View>
         )}
         </>
         )}
@@ -1091,7 +1120,9 @@ const styles = StyleSheet.create({
   },
   webMainContentContainer: {
     backgroundColor: "#FFFFFF",
-    margin: 16,
+    marginTop: 22,
+    marginHorizontal: 18,
+    marginBottom: 16,
     borderRadius: 16,
     overflow: "hidden",
     shadowColor: "#000",
@@ -1106,15 +1137,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#1F2937",
+    backgroundColor: "#151D4F",
     paddingHorizontal: 18,
     paddingVertical: 16,
+    paddingBottom: 40,
     borderBottomWidth: 0,
   },
   webHeader: {
-    backgroundColor: "#1F2937",
+    backgroundColor: "#151D4F",
     paddingTop: 24,
     paddingHorizontal: 24,
+    paddingBottom: 50,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
   },
@@ -1162,7 +1195,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 6,
-    marginRight: 12,
   },
   viewLabel: {
     fontSize: 12,
@@ -1210,7 +1242,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     flex: 1,
-    maxWidth: 400,
   },
   searchIcon: {
     marginRight: 8,
@@ -1242,9 +1273,13 @@ const styles = StyleSheet.create({
   webToolbar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: BORDER,
     marginBottom: 16,
-    gap: 12,
+    gap: 8,
     flexWrap: "wrap" as any,
   },
   filterPills: {
@@ -1289,7 +1324,7 @@ const styles = StyleSheet.create({
   },
   webListContent: {
     paddingHorizontal: 24,
-    paddingTop: 18,
+    paddingTop: 0,
     paddingBottom: 100,
   },
   resultCount: {
@@ -1476,14 +1511,16 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 0,
   },
   statsContainer: {
     flex: 1,
+    flexDirection: "row",
+    gap: 12,
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
     paddingVertical: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -1506,29 +1543,29 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER,
   },
   statIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 5,
+  },
+  statTextWrapper: {
+    flex: 1,
+    alignItems: "flex-start",
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
-    textAlign: "center",
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: TEXT_PRIMARY,
     fontWeight: "600",
-    textAlign: "center",
     marginTop: 2,
   },
   statSub: {
-    fontSize: 9,
+    fontSize: 10,
     color: TEXT_MUTED,
-    textAlign: "center",
   },
 
   // ── Table ──
@@ -1673,7 +1710,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 0,
   },
   infoCard: {
     flexBasis: "48%",

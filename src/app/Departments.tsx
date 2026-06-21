@@ -842,10 +842,7 @@ const DepartmentsScreen: React.FC = () => {
                     {!isWeb ? (
                         <>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                <View style={[s.pageTag, { marginBottom: 0 }]}>
-                                    <Feather name="grid" size={11} color={T.orange} />
-                                    <Text style={s.pageTagTxt}>Departments</Text>
-                                </View>
+
                                 <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => setAddOpen(true)} activeOpacity={0.85}>
                                     <Feather name="plus" size={14} color="#fff" />
                                     <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
@@ -859,10 +856,7 @@ const DepartmentsScreen: React.FC = () => {
                     ) : (
                         <>
                             <View style={s.pageHeadLeft}>
-                                <View style={s.pageTag}>
-                                    <Feather name="grid" size={11} color={T.orange} />
-                                    <Text style={s.pageTagTxt}>Departments</Text>
-                                </View>
+
                                 <Text style={s.pageTitle}>Manage Departments</Text>
                                 <Text style={s.pageSub}>Organize your workforce by department structure</Text>
                             </View>
@@ -1012,12 +1006,12 @@ const DepartmentsScreen: React.FC = () => {
                                             <Text style={[{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }, { color: dept.status === "Active" ? T.green : T.red }]}>{dept.status}</Text>
                                         </View>
                                         <View style={{ flexDirection: 'row', gap: 10 }}>
-                                             <TouchableOpacity onPress={() => setEditTarget(dept)} style={{ padding: 4 }}>
-                                                 <Feather name="edit-2" size={15} color={T.textM} />
-                                             </TouchableOpacity>
-                                             <TouchableOpacity onPress={() => setDeleteTarget(dept)} style={{ padding: 4 }}>
-                                                 <Feather name="trash-2" size={15} color={T.red} />
-                                             </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => setEditTarget(dept)} style={{ padding: 4 }}>
+                                                <Feather name="edit-2" size={15} color={T.textM} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => setDeleteTarget(dept)} style={{ padding: 4 }}>
+                                                <Feather name="trash-2" size={15} color={T.red} />
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
                                 </View>
@@ -1141,7 +1135,8 @@ const s = StyleSheet.create({
 
     // ── Scroll / content ──
     scroll: {
-        padding: 18,
+        paddingTop: 10,
+        paddingHorizontal: 16,
         paddingBottom: 48,
         gap: 14,
     },
@@ -1155,7 +1150,9 @@ const s = StyleSheet.create({
         backgroundColor: "#151D4F",
         padding: 24,
         paddingBottom: 48,
-        borderRadius: 16,
+        borderRadius: 22,
+        marginHorizontal: 2,
+        marginTop: 12,
     },
     pageHeadLeft: {
         flex: 1,
