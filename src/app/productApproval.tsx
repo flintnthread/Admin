@@ -937,6 +937,9 @@ export default function ProductApprovalScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
+          <PageHeader isWide={isWide} />
+
+          <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
 
           {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
@@ -1370,7 +1373,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: PALETTE.orangeLight,
+    backgroundColor: PALETTE.purpleLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1598,7 +1601,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: PALETTE.orangeLight,
+    backgroundColor: PALETTE.purpleLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
