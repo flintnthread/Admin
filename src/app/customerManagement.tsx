@@ -451,7 +451,7 @@ export default function CustomerManagementScreen() {
     revenue: 0,
   });
 
-  const PAGE_SIZE = 12;
+  const PAGE_SIZE = 20;
 
   const loadCustomers = useCallback(async () => {
     setLoading(true);
@@ -501,10 +501,10 @@ export default function CustomerManagementScreen() {
   // Formula: (100 - gap*(cols-1)/containerWidth*100) / cols  → not feasible without
   // container ref.  Simplest reliable approach: use fixed % that look right.
   const colPct =
-    gridCols === 1 ? "100%"   :
-    gridCols === 2 ? "49%"    :
-    gridCols === 3 ? "32.2%"  :
-    gridCols === 4 ? "23.8%"  : "19.2%";
+    gridCols === 1 ? "100%" :
+    gridCols === 2 ? "calc(50% - " + (GAP / 2) + "px)" :
+    gridCols === 3 ? "calc(33.333% - " + (GAP * 2 / 3) + "px)" :
+    gridCols === 4 ? "calc(25% - " + (GAP * 3 / 4) + "px)" : "calc(20% - " + (GAP * 4 / 5) + "px)";
 
   return (
     <AdminLayout>
@@ -623,10 +623,10 @@ export default function CustomerManagementScreen() {
                 ))}
               </View>
             ) : (
-              // Tablet / Laptop / Desktop → auto-fit multi-column grid
+              // Tablet / Laptop / Desktop - auto-fit multi-column grid
               <View style={[s.gridWrap, { gap: GAP }]}>
                 {paginated.map((c) => (
-                  <View key={c.id} style={{ width: colPct }}>
+                  <View key={c.id} style={{ width: colPct, marginBottom: GAP }}>
                     <GridCard c={c} onView={() => viewCustomer(c.id)} />
                   </View>
                 ))}
@@ -721,7 +721,7 @@ export default function CustomerManagementScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   scroll:        { flex: 1 },
-  scrollContent: { paddingTop: 18 },
+  scrollContent: { paddingTop: 18, paddingBottom: 40 },
 
   // Header
   header:      { backgroundColor: C.navy, paddingBottom: 14 },

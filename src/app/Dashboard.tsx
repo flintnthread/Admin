@@ -33,7 +33,8 @@ import Svg, {
   Text as SvgText,
   Defs,
   LinearGradient as SvgGradient,
-  Stop
+  Stop,
+  TSpan
 } from "react-native-svg";
 import AdminLayout from "@/components/admin-layout";
 import { useThemeContext } from "@/context/theme-context";
@@ -119,6 +120,26 @@ export default function DashboardScreen() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "inventory" | "users">("overview");
+
+  // State for chart hover / tooltip interaction
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    index: number;
+    x: number;
+    revenueY: number;
+    ordersY: number;
+    revenue: number;
+    orders: number;
+    label: string;
+  } | null>(null);
+
+  // State for bar chart hover / tooltip interaction
+  const [hoveredBar, setHoveredBar] = useState<{
+    index: number;
+    value: number;
+    x: number;
+    y: number;
+    label: string;
+  } | null>(null);
 
   // Dynamic header height measurement
   const [headerHeight, setHeaderHeight] = useState(130);
@@ -222,6 +243,7 @@ export default function DashboardScreen() {
   const [activeRevenueLegends, setActiveRevenueLegends] = useState({ revenue: true, orders: true });
   // Local loading state for revenue chart only
   const [chartLoading, setChartLoading] = useState(false);
+  const [chartWidth, setChartWidth] = useState(520);
 
   // Custom Date Picker States
   const [datePickerVisible, setDatePickerVisible] = useState(false);
@@ -621,18 +643,18 @@ export default function DashboardScreen() {
   // SECTION 1: Top Statistics KPI dataset with growth metrics
   const kpiStats = useMemo(() => {
     return {
-      totalRevenue: { value: rupee(Number(stats?.totalRevenue ?? stats?.allTimeRevenue ?? 0)), growth: "—", trend: "flat", label: "Total Revenue", icon: "cash-outline", color: C.active },
-      todayRevenue: { value: rupee(Number(stats?.todayRevenue ?? 0)), growth: "—", trend: "flat", label: "Today's Revenue", icon: "wallet-outline", color: C.primary },
-      totalOrders: { value: count(Number(stats?.totalOrders ?? stats?.allTimeOrders ?? 0)), growth: "—", trend: "flat", label: "Total Orders", icon: "cart-outline", color: C.processing },
-      pendingOrders: { value: count(Number(stats?.pendingOrders ?? 0)), growth: "—", trend: "flat", label: "Pending Orders", icon: "hourglass-outline", color: C.warning },
-      completedOrders: { value: count(Number(stats?.completedOrders ?? 0)), growth: "—", trend: "flat", label: "Completed Orders", icon: "checkmark-done-circle-outline", color: C.active },
-      cancelledOrders: { value: count(Number(stats?.cancelledOrders ?? 0)), growth: "—", trend: "flat", label: "Cancelled Orders", icon: "close-circle-outline", color: C.inactive },
-      totalCustomers: { value: count(Number(customerStats?.total ?? 0)), growth: "—", trend: "flat", label: "Total Customers", icon: "people-outline", color: "#0ea5e9" },
-      totalSellers: { value: count(Number(sellerStats?.total ?? sellerStats?.registered ?? 0)), growth: "—", trend: "flat", label: "Total Sellers", icon: "storefront-outline", color: C.purple },
-      totalProducts: { value: count(Number(productStats?.total ?? 0)), growth: "—", trend: "flat", label: "Total Products", icon: "cube-outline", color: C.violet },
-      outOfStock: { value: count(Number(productStats?.outOfStock ?? 0)), growth: "—", trend: "flat", label: "Out Of Stock", icon: "alert-circle-outline", color: C.inactive },
-      lowStock: { value: count(Number(productStats?.lowStock ?? 0)), growth: "—", trend: "flat", label: "Low Stock Products", icon: "warning-outline", color: C.warning },
-      totalCategories: { value: count(Number(stats?.totalCategories ?? 0)), growth: "—", trend: "flat", label: "Total Categories", icon: "grid-outline", color: "#ec4899" }
+      totalRevenue: { value: rupee(Number(stats?.totalRevenue ?? stats?.allTimeRevenue ?? 0)), growth: "—", trend: "flat", label: "Total Revenue", icon: "cash-outline", color: C.active, action: () => router.push("/orders" as any) },
+      todayRevenue: { value: rupee(Number(stats?.todayRevenue ?? 0)), growth: "—", trend: "flat", label: "Today's Revenue", icon: "wallet-outline", color: C.primary, action: () => router.push("/orders" as any) },
+      totalOrders: { value: count(Number(stats?.totalOrders ?? stats?.allTimeOrders ?? 0)), growth: "—", trend: "flat", label: "Total Orders", icon: "cart-outline", color: C.processing, action: () => router.push("/orders" as any) },
+      pendingOrders: { value: count(Number(stats?.pendingOrders ?? 0)), growth: "—", trend: "flat", label: "Pending Orders", icon: "hourglass-outline", color: C.warning, action: () => router.push({ pathname: "/orders" as any, params: { status: "Pending" } }) },
+      completedOrders: { value: count(Number(stats?.completedOrders ?? 0)), growth: "—", trend: "flat", label: "Completed Orders", icon: "checkmark-done-circle-outline", color: C.active, action: () => router.push({ pathname: "/orders" as any, params: { status: "Completed" } }) },
+      cancelledOrders: { value: count(Number(stats?.cancelledOrders ?? 0)), growth: "—", trend: "flat", label: "Cancelled Orders", icon: "close-circle-outline", color: C.inactive, action: () => router.push({ pathname: "/orders" as any, params: { status: "Cancelled" } }) },
+      totalCustomers: { value: count(Number(customerStats?.total ?? 0)), growth: "—", trend: "flat", label: "Total Customers", icon: "people-outline", color: "#0ea5e9", action: () => router.push("/customerManagement" as any) },
+      totalSellers: { value: count(Number(sellerStats?.total ?? sellerStats?.registered ?? 0)), growth: "—", trend: "flat", label: "Total Sellers", icon: "storefront-outline", color: C.purple, action: () => router.push("/sellers" as any) },
+      totalProducts: { value: count(Number(productStats?.total ?? 0)), growth: "—", trend: "flat", label: "Total Products", icon: "cube-outline", color: C.violet, action: () => router.push("/Products" as any) },
+      outOfStock: { value: count(Number(productStats?.outOfStock ?? 0)), growth: "—", trend: "flat", label: "Out Of Stock", icon: "alert-circle-outline", color: C.inactive, action: () => router.push({ pathname: "/Products" as any, params: { tab: "Out of Stock" } }) },
+      lowStock: { value: count(Number(productStats?.lowStock ?? 0)), growth: "—", trend: "flat", label: "Low Stock Products", icon: "warning-outline", color: C.warning, action: () => router.push({ pathname: "/Products" as any, params: { tab: "Low Stock" } }) },
+      totalCategories: { value: count(Number(stats?.totalCategories ?? 0)), growth: "—", trend: "flat", label: "Total Categories", icon: "grid-outline", color: "#ec4899", action: () => router.push("/mainCategories" as any) }
     };
   }, [stats, customerStats, sellerStats, productStats]);
 
@@ -778,87 +800,177 @@ export default function DashboardScreen() {
     setCouponDiscount("");
   };
 
-  // Pie chart calculation
-  const PieChart = ({ values, colors }: { values: number[]; colors: string[] }) => {
-    const total = values.reduce((a, b) => a + b, 0);
+  // Pie chart calculation using segment rotation and hover details
+  const PieChart = ({ values, colors, labels }: { values: number[]; colors: string[]; labels: string[] }) => {
+    const total = values.reduce((a, b) => a + b, 0) || 1;
     const R = 45;
     const C_Circum = 2 * Math.PI * R;
     let accumulated = 0;
 
+    const [hoveredSlice, setHoveredSlice] = useState<{
+      index: number;
+      label: string;
+      count: number;
+      color: string;
+    } | null>(null);
+
     return (
       <Svg width={140} height={140} viewBox="0 0 100 100">
-        <G transform="rotate(-90 50 50)">
-          {values.map((v, idx) => {
-            const length = (v / total) * C_Circum;
-            const offset = C_Circum - length + accumulated;
-            accumulated -= length;
-            return (
-              <Circle
-                key={idx}
-                cx={50}
-                cy={50}
-                r={R}
-                fill="none"
-                stroke={colors[idx % colors.length]}
-                strokeWidth={10}
-                strokeDasharray={`${length} ${C_Circum}`}
-                strokeDashoffset={offset}
-              />
-            );
-          })}
-        </G>
+        {values.map((v, idx) => {
+          const length = (v / total) * C_Circum;
+          const startAngle = (accumulated / total) * 360;
+          accumulated += v;
+          const isHovered = hoveredSlice?.index === idx;
+          return (
+            <Circle
+              key={idx}
+              cx={50}
+              cy={50}
+              r={R}
+              fill="none"
+              stroke={colors[idx % colors.length]}
+              strokeWidth={10}
+              strokeDasharray={`${length} ${C_Circum}`}
+              strokeDashoffset={0}
+              transform={`rotate(${startAngle - 90} 50 50)`}
+              onPress={() => {
+                setHoveredSlice({
+                  index: idx,
+                  label: labels[idx] ?? "Slice",
+                  count: v,
+                  color: colors[idx % colors.length]
+                });
+              }}
+              // @ts-ignore
+              onMouseEnter={() => {
+                setHoveredSlice({
+                  index: idx,
+                  label: labels[idx] ?? "Slice",
+                  count: v,
+                  color: colors[idx % colors.length]
+                });
+              }}
+              // @ts-ignore
+              onMouseLeave={() => {
+                setHoveredSlice(null);
+              }}
+            />
+          );
+        })}
+        {hoveredSlice && (
+          <G>
+            <Rect
+              x={15}
+              y={76}
+              width={70}
+              height={20}
+              rx={4}
+              ry={4}
+              fill="#1E293B"
+              stroke="#475569"
+              strokeWidth={0.5}
+              opacity={0.95}
+            />
+            <SvgText
+              x={50}
+              y={83}
+              textAnchor="middle"
+              fontSize={5}
+              fontWeight="bold"
+              fill="#FFF"
+            >
+              {hoveredSlice.label}: {hoveredSlice.count}
+            </SvgText>
+            <SvgText
+              x={50}
+              y={91}
+              textAnchor="middle"
+              fontSize={4.5}
+              fill="#94A3B8"
+            >
+              ({Math.round((hoveredSlice.count / total) * 100)}%)
+            </SvgText>
+          </G>
+        )}
       </Svg>
     );
   };
 
-  // Donut chart calculation
-  const DonutChart = ({ data, total, colors }: { data: number[]; total: number; colors: string[] }) => {
-    const sum = total || data.reduce((a, b) => a + b, 0);
+  // Donut chart calculation using segment rotation and hover details
+  const DonutChart = ({ data, total, colors, labels }: { data: number[]; total: number; colors: string[]; labels: string[] }) => {
+    const sum = total || data.reduce((a, b) => a + b, 0) || 1;
     const R = 40;
     const C_Circum = 2 * Math.PI * R;
     let accumulated = 0;
 
+    const [hoveredSlice, setHoveredSlice] = useState<{
+      index: number;
+      label: string;
+      count: number;
+      color: string;
+    } | null>(null);
+
     return (
       <Svg width={140} height={140} viewBox="0 0 100 100">
-        <G transform="rotate(-90 50 50)">
-          {data.map((v, idx) => {
-            const length = (v / sum) * C_Circum;
-            const offset = C_Circum - length + accumulated;
-            accumulated -= length;
-            return (
-              <Circle
-                key={idx}
-                cx={50}
-                cy={50}
-                r={R}
-                fill="none"
-                stroke={colors[idx % colors.length]}
-                strokeWidth={10}
-                strokeDasharray={`${length} ${C_Circum}`}
-                strokeDashoffset={offset}
-              />
-            );
-          })}
-        </G>
+        {data.map((v, idx) => {
+          const length = (v / sum) * C_Circum;
+          const startAngle = (accumulated / sum) * 360;
+          accumulated += v;
+          return (
+            <Circle
+              key={idx}
+              cx={50}
+              cy={50}
+              r={R}
+              fill="none"
+              stroke={colors[idx % colors.length]}
+              strokeWidth={10}
+              strokeDasharray={`${length} ${C_Circum}`}
+              strokeDashoffset={0}
+              transform={`rotate(${startAngle - 90} 50 50)`}
+              onPress={() => {
+                setHoveredSlice({
+                  index: idx,
+                  label: labels[idx] ?? "Slice",
+                  count: v,
+                  color: colors[idx % colors.length]
+                });
+              }}
+              // @ts-ignore
+              onMouseEnter={() => {
+                setHoveredSlice({
+                  index: idx,
+                  label: labels[idx] ?? "Slice",
+                  count: v,
+                  color: colors[idx % colors.length]
+                });
+              }}
+              // @ts-ignore
+              onMouseLeave={() => {
+                setHoveredSlice(null);
+              }}
+            />
+          );
+        })}
         <SvgText
           x={50}
-          y={48}
+          y={46}
           textAnchor="middle"
           fontSize={10}
           fontWeight="bold"
-          fill={C.text}
+          fill={hoveredSlice ? hoveredSlice.color : C.text}
         >
-          {sum}
+          {hoveredSlice ? hoveredSlice.count : sum}
         </SvgText>
         <SvgText
           x={50}
-          y={58}
+          y={56}
           textAnchor="middle"
-          fontSize={6}
-          fontWeight="500"
-          fill={C.sub}
+          fontSize={hoveredSlice ? 5 : 6}
+          fontWeight="700"
+          fill={hoveredSlice ? hoveredSlice.color : C.sub}
         >
-          Orders
+          {hoveredSlice ? hoveredSlice.label : "Orders"}
         </SvgText>
       </Svg>
     );
@@ -944,7 +1056,26 @@ export default function DashboardScreen() {
                   const hasKpiLoading = kpiLoading[key];
 
                   return (
-                    <View key={key} style={styles.kpiCard}>
+                    <Pressable
+                      key={key}
+                      onPress={card.action}
+                      style={({ hovered }) => [
+                        styles.kpiCard,
+                        {
+                          borderLeftWidth: 4,
+                          borderLeftColor: card.color,
+                        },
+                        Platform.OS === "web" && {
+                          transform: hovered ? [{ translateY: -4 }] : [{ translateY: 0 }],
+                          shadowOpacity: hovered ? 0.05 : 0.01,
+                          shadowRadius: hovered ? 12 : 6,
+                          borderColor: hovered ? card.color + "40" : C.border,
+                          // @ts-ignore – web hover animation
+                          transitionProperty: "all",
+                          transitionDuration: "0.2s",
+                        }
+                      ]}
+                    >
                       {hasKpiLoading || loading ? (
                         <View style={styles.kpiInnerContent}>
                           <ActivityIndicator size="small" color={C.primary} />
@@ -959,36 +1090,50 @@ export default function DashboardScreen() {
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <View style={styles.kpiCardInner}>
-                          <View style={styles.kpiCardHeader}>
-                            <Text style={styles.kpiCardLabel}>{card.label}</Text>
-                            <TouchableOpacity
-                              onPress={() => {
-                                // Simulate loading then error
-                                setKpiLoading(prev => ({ ...prev, [key]: true }));
-                                setTimeout(() => {
-                                  setKpiLoading(prev => ({ ...prev, [key]: false }));
-                                  setKpiErrors(prev => ({ ...prev, [key]: true }));
-                                }, 1000);
-                              }}
-                              style={styles.kpiTrigger}
-                            >
-                              <View style={[styles.kpiIconCircle, { backgroundColor: card.color + "15" }]}>
-                                <Ionicons name={card.icon} size={15} color={card.color} />
+                        <>
+                          <View style={styles.kpiCardInner}>
+                            <View style={styles.kpiCardHeader}>
+                              <Text style={styles.kpiCardLabel}>{card.label}</Text>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  // Simulate loading then error
+                                  setKpiLoading(prev => ({ ...prev, [key]: true }));
+                                  setTimeout(() => {
+                                    setKpiLoading(prev => ({ ...prev, [key]: false }));
+                                    setKpiErrors(prev => ({ ...prev, [key]: true }));
+                                  }, 1000);
+                                }}
+                                style={styles.kpiTrigger}
+                              >
+                                <View style={[styles.kpiIconCircle, { backgroundColor: card.color + "15" }]}>
+                                  <Ionicons name={card.icon} size={16} color={card.color} />
+                                </View>
+                              </TouchableOpacity>
+                            </View>
+                            <Text style={styles.kpiCardValue}>{card.value}</Text>
+                            <View style={styles.kpiFooter}>
+                              <View style={[
+                                styles.trendPill,
+                                {
+                                  backgroundColor: card.trend === "up" ? C.activeBg : card.trend === "down" ? C.inactiveBg : C.greyBg,
+                                }
+                              ]}>
+                                <Text style={[
+                                  styles.trendPillText,
+                                  {
+                                    color: card.trend === "up" ? C.active : card.trend === "down" ? C.inactive : C.sub,
+                                  }
+                                ]}>
+                                  {card.trend === "up" ? "▲ " : card.trend === "down" ? "▼ " : "● "}
+                                  {card.growth === "—" ? "Stable" : card.growth}
+                                </Text>
                               </View>
-                            </TouchableOpacity>
+                              <Text style={styles.kpiFooterSub}>vs last month</Text>
+                            </View>
                           </View>
-                          <Text style={styles.kpiCardValue}>{card.value}</Text>
-                          <View style={styles.kpiFooter}>
-                            <Text style={[styles.kpiFooterTrend, { color: card.trend === "down" ? C.inactive : C.active }]}>
-                              {card.trend === "up" ? "▲ " : card.trend === "down" ? "▼ " : "● "}
-                              {card.growth}
-                            </Text>
-                            <Text style={styles.kpiFooterSub}>vs last month</Text>
-                          </View>
-                        </View>
+                        </>
                       )}
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -1003,17 +1148,35 @@ export default function DashboardScreen() {
                     {[
                       { label: "Add Product", icon: "cube-outline", color: C.violet, action: () => router.push("/productApproval" as any) },
                       { label: "Add Category", icon: "grid-outline", color: C.primary, action: () => router.push("/categoryRequests" as any) },
-                      { label: "Add Seller", icon: "storefront-outline", color: C.active, action: () => router.push("/approveseller" as any) },
-                      { label: "Create Coupon", icon: "pricetag-outline", color: C.processing, action: () => setCouponModalVisible(true) },
-                      { label: "View Orders", icon: "receipt-outline", color: C.purple, action: () => router.push("/orders" as any) },
-                      { label: "Manage Inventory", icon: "stats-chart-outline", color: C.warning, action: () => handleTabPress("inventory") }
+                      { label: "Sellers", icon: "storefront-outline", color: C.active, action: () => router.push("/sellers" as any) },
+                      { label: "Customers", icon: "people-outline", color: C.processing, action: () => router.push("/customerManagement" as any) },
+                      { label: "Orders", icon: "receipt-outline", color: C.purple, action: () => router.push("/orders" as any) },
+                      { label: "Processing", icon: "sync-outline", color: C.processing, action: () => router.push({ pathname: "/orders" as any, params: { status: "Processing" } }) },
+                      { label: "Cancelled", icon: "close-circle-outline", color: C.inactive, action: () => router.push({ pathname: "/orders" as any, params: { status: "Cancelled" } }) },
+                      { label: "Returned", icon: "swap-horizontal-outline", color: C.primary, action: () => router.push({ pathname: "/orders" as any, params: { status: "Returned" } }) },
+                      { label: "Replacement", icon: "repeat-outline", color: C.warning, action: () => router.push({ pathname: "/orders" as any, params: { status: "Replacement" } }) }
                     ].map((act, idx) => (
-                      <TouchableOpacity key={idx} onPress={act.action} style={styles.quickActionItem} activeOpacity={0.8}>
-                        <View style={[styles.quickActionIconCircle, { backgroundColor: act.color + "15" }]}>
+                      <Pressable
+                        key={idx}
+                        onPress={act.action}
+                        style={({ hovered }) => [
+                          styles.quickActionItem,
+                          Platform.OS === "web" && {
+                            transform: hovered ? [{ translateY: -3 }] : [{ translateY: 0 }],
+                            shadowOpacity: hovered ? 0.05 : 0.01,
+                            shadowRadius: hovered ? 8 : 4,
+                            borderColor: hovered ? (isDark ? "#3A3F55" : "#CBD5E1") : C.border,
+                            // @ts-ignore – web hover animation
+                            transitionProperty: "all",
+                            transitionDuration: "0.2s",
+                          }
+                        ]}
+                      >
+                        <View style={[styles.quickActionIconCircle, { backgroundColor: act.color + "12" }]}>
                           <Ionicons name={act.icon as any} size={18} color={act.color} />
                         </View>
                         <Text style={styles.quickActionTextLabel}>{act.label}</Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </View>
                 </View>
@@ -1244,8 +1407,16 @@ export default function DashboardScreen() {
                 </View>
 
                 {/* Responsive SVG Chart */}
-                <View style={styles.chartContainer}>
-                  <Svg viewBox="0 0 520 200" width="100%" height={200}>
+                <View
+                  style={styles.chartContainer}
+                  onLayout={(e) => {
+                    const w = e.nativeEvent.layout.width;
+                    if (w > 0) {
+                      setChartWidth(w);
+                    }
+                  }}
+                >
+                  <Svg viewBox={`0 0 ${chartWidth} 200`} width="100%" height={200}>
                     <Defs>
                       <SvgGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                         <Stop offset="0%" stopColor={C.primary} stopOpacity="0.3" />
@@ -1262,7 +1433,7 @@ export default function DashboardScreen() {
                       const y = 20 + idx * 26;
                       return (
                         <G key={idx}>
-                          <Line x1={55} y1={y} x2={500} y2={y} stroke="#E2E8F0" strokeWidth={0.8} strokeDasharray="3 3" />
+                          <Line x1={55} y1={y} x2={chartWidth - 20} y2={y} stroke="#E2E8F0" strokeWidth={0.8} strokeDasharray="3 3" />
                           <SvgText x={45} y={y + 3} textAnchor="end" fontSize={9} fill={C.sub}>
                             {lbl}
                           </SvgText>
@@ -1272,7 +1443,7 @@ export default function DashboardScreen() {
 
                     {/* Paths rendering */}
                     {(() => {
-                      const stepX = 435 / (revenueChartData.labels.length - 1 || 1);
+                      const stepX = (chartWidth - 85) / (revenueChartData.labels.length - 1 || 1);
                       
                       // Revenue Points
                       const revPoints = revenueChartData.revenue.map((v, i) => ({
@@ -1320,13 +1491,154 @@ export default function DashboardScreen() {
                               ))}
                             </G>
                           )}
+
+                          {/* Hover Guide & Active Highlight circle */}
+                          {hoveredPoint && (
+                            <G>
+                              <Line
+                                x1={hoveredPoint.x}
+                                y1={20}
+                                x2={hoveredPoint.x}
+                                y2={150}
+                                stroke="#CBD5E1"
+                                strokeWidth={1}
+                                strokeDasharray="3 3"
+                              />
+                              {activeRevenueLegends.revenue && (
+                                <Circle
+                                  cx={hoveredPoint.x}
+                                  cy={hoveredPoint.revenueY}
+                                  r={6}
+                                  fill={C.primary}
+                                  stroke="#FFF"
+                                  strokeWidth={1.5}
+                                />
+                              )}
+                              {activeRevenueLegends.orders && (
+                                <Circle
+                                  cx={hoveredPoint.x}
+                                  cy={hoveredPoint.ordersY}
+                                  r={5.5}
+                                  fill={C.processing}
+                                  stroke="#FFF"
+                                  strokeWidth={1.5}
+                                />
+                              )}
+                            </G>
+                          )}
+
+                          {/* Transparent overlay bars for hover / touch response */}
+                          {revPoints.map((p, i) => {
+                            const hitSlopW = Math.max(stepX, 22);
+                            return (
+                              <Rect
+                                key={`rect-${i}`}
+                                x={p.x - hitSlopW / 2}
+                                y={15}
+                                width={hitSlopW}
+                                height={140}
+                                fill="transparent"
+                                onPress={() => {
+                                  setHoveredPoint({
+                                    index: i,
+                                    x: p.x,
+                                    revenueY: p.y,
+                                    ordersY: ordPoints[i].y,
+                                    revenue: revenueChartData.revenue[i],
+                                    orders: revenueChartData.orders[i],
+                                    label: revenueChartData.labels[i]
+                                  });
+                                }}
+                                // @ts-ignore – web hover events
+                                onMouseEnter={() => {
+                                  setHoveredPoint({
+                                    index: i,
+                                    x: p.x,
+                                    revenueY: p.y,
+                                    ordersY: ordPoints[i].y,
+                                    revenue: revenueChartData.revenue[i],
+                                    orders: revenueChartData.orders[i],
+                                    label: revenueChartData.labels[i]
+                                  });
+                                }}
+                                // @ts-ignore – web hover events
+                                onMouseLeave={() => {
+                                  setHoveredPoint(null);
+                                }}
+                              />
+                            );
+                          })}
+
+                          {/* Tooltip Box rendering */}
+                          {hoveredPoint && (() => {
+                            const tooltipWidth = 145;
+                            const tooltipHeight = 56;
+                            // Clamp tooltip X inside chart boundary
+                            let tooltipX = hoveredPoint.x - tooltipWidth / 2;
+                            if (tooltipX < 55) tooltipX = 55;
+                            if (tooltipX + tooltipWidth > chartWidth - 20) {
+                              tooltipX = chartWidth - 20 - tooltipWidth;
+                            }
+                            // Calculate tooltip Y above elements
+                            let tooltipY = Math.min(hoveredPoint.revenueY, hoveredPoint.ordersY) - 68;
+                            if (tooltipY < 10) {
+                              // Too high, flip below points
+                              tooltipY = Math.max(hoveredPoint.revenueY, hoveredPoint.ordersY) + 15;
+                            }
+
+                            return (
+                              <G>
+                                <Rect
+                                  x={tooltipX}
+                                  y={tooltipY}
+                                  width={tooltipWidth}
+                                  height={tooltipHeight}
+                                  rx={8}
+                                  ry={8}
+                                  fill="#1E293B" // Slate 800
+                                  stroke="#475569" // Slate 600
+                                  strokeWidth={1}
+                                  opacity={0.96}
+                                />
+                                <SvgText
+                                  x={tooltipX + 10}
+                                  y={tooltipY + 16}
+                                  fontSize={10}
+                                  fontWeight="bold"
+                                  fill="#FFF"
+                                >
+                                  {hoveredPoint.label}
+                                </SvgText>
+                                {activeRevenueLegends.revenue && (
+                                  <SvgText
+                                    x={tooltipX + 10}
+                                    y={tooltipY + 31}
+                                    fontSize={9.5}
+                                    fill="#94A3B8"
+                                  >
+                                    Revenue: <TSpan fill="#60A5FA" fontWeight="bold">₹{hoveredPoint.revenue.toLocaleString("en-IN")}</TSpan>
+                                  </SvgText>
+                                )}
+                                {activeRevenueLegends.orders && (
+                                  <SvgText
+                                    x={tooltipX + 10}
+                                    y={tooltipY + (activeRevenueLegends.revenue ? 46 : 31)}
+                                    fontSize={9.5}
+                                    fill="#94A3B8"
+                                  >
+                                    Orders: <TSpan fill="#34D399" fontWeight="bold">{hoveredPoint.orders.toLocaleString("en-IN")}</TSpan>
+                                  </SvgText>
+                                )}
+                              </G>
+                            );
+                          })()}
                         </G>
                       );
                     })()}
 
                     {/* X Axis Labels */}
                     {revenueChartData.labels.map((lbl, idx) => {
-                      const stepX = 435 / (revenueChartData.labels.length - 1 || 1);
+                      const stepX = (chartWidth - 85) / (revenueChartData.labels.length - 1 || 1);
                       const x = 55 + idx * stepX;
                       return (
                         <SvgText key={idx} x={x} y={168} textAnchor="middle" fontSize={8} fill={C.sub}>
@@ -1365,26 +1677,92 @@ export default function DashboardScreen() {
                   {/* Donut and Bar SVG Charts side by side */}
                   <View style={styles.doubleChartWrap}>
                     <View style={styles.doubleChartBox}>
-                      <DonutChart data={[35, 18, 3, 2, 1]} total={59} colors={[C.inactive, C.active, C.primary, C.purple, C.processing]} />
+                      <DonutChart
+                        data={[35, 18, 3, 2, 1]}
+                        labels={["Cancelled", "Delivered", "Processing", "Shipped", "Pending"]}
+                        colors={[C.inactive, C.active, C.primary, C.purple, C.processing]}
+                        total={59}
+                      />
                       <Text style={styles.chartSubtitleLabel}>Order Ratios</Text>
                     </View>
                     <View style={styles.doubleChartBox}>
                       {/* Responsive Vertical Bar Chart */}
                       <Svg width={140} height={110} viewBox="0 0 100 80">
-                        {[15, 30, 45, 60, 50, 75].map((val, idx) => {
-                          const barH = (val / 80) * 60;
+                        {(() => {
+                          const barLabels = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                          const barValues = [15, 30, 45, 60, 50, 75];
                           return (
-                            <Rect
-                              key={idx}
-                              x={10 + idx * 14}
-                              y={70 - barH}
-                              width={8}
-                              height={barH}
-                              fill={idx % 2 === 0 ? C.primary : C.processing}
-                              rx={2}
-                            />
+                            <G>
+                              {barValues.map((val, idx) => {
+                                const barH = (val / 80) * 60;
+                                const isHovered = hoveredBar?.index === idx;
+                                const barW = isHovered ? 10 : 8;
+                                const barX = 10 + idx * 14 - (isHovered ? 1 : 0);
+                                const barY = 70 - barH;
+                                return (
+                                  <Rect
+                                    key={idx}
+                                    x={barX}
+                                    y={barY}
+                                    width={barW}
+                                    height={barH}
+                                    fill={isHovered ? C.active : (idx % 2 === 0 ? C.primary : C.processing)}
+                                    rx={2}
+                                    onPress={() => {
+                                      setHoveredBar({
+                                        index: idx,
+                                        value: val,
+                                        x: barX + barW / 2,
+                                        y: barY,
+                                        label: barLabels[idx]
+                                      });
+                                    }}
+                                    // @ts-ignore
+                                    onMouseEnter={() => {
+                                      setHoveredBar({
+                                        index: idx,
+                                        value: val,
+                                        x: barX + barW / 2,
+                                        y: barY,
+                                        label: barLabels[idx]
+                                      });
+                                    }}
+                                    // @ts-ignore
+                                    onMouseLeave={() => {
+                                      setHoveredBar(null);
+                                    }}
+                                  />
+                                );
+                              })}
+                              {hoveredBar && (
+                                <G>
+                                  <Rect
+                                    x={Math.min(Math.max(2, hoveredBar.x - 24), 50)}
+                                    y={hoveredBar.y - 20}
+                                    width={48}
+                                    height={14}
+                                    rx={3}
+                                    ry={3}
+                                    fill="#1E293B"
+                                    stroke="#475569"
+                                    strokeWidth={0.5}
+                                    opacity={0.95}
+                                  />
+                                  <SvgText
+                                    x={Math.min(Math.max(2, hoveredBar.x - 24), 50) + 24}
+                                    y={hoveredBar.y - 11}
+                                    textAnchor="middle"
+                                    fontSize={5.5}
+                                    fontWeight="bold"
+                                    fill="#FFF"
+                                  >
+                                    {hoveredBar.label}: {hoveredBar.value}
+                                  </SvgText>
+                                </G>
+                              )}
+                            </G>
                           );
-                        })}
+                        })()}
                       </Svg>
                       <Text style={styles.chartSubtitleLabel}>Orders Volume</Text>
                     </View>
@@ -1416,7 +1794,11 @@ export default function DashboardScreen() {
 
                   {/* Payment Chart */}
                   <View style={styles.pieContainer}>
-                    <PieChart values={[39, 18]} colors={[C.active, C.primary]} />
+                    <PieChart
+                      values={[39, 18]}
+                      labels={["Online", "COD"]}
+                      colors={[C.active, C.primary]}
+                    />
                     <View style={styles.pieLegends}>
                       <View style={styles.legendRow}>
                         <View style={[styles.legendDot, { backgroundColor: C.active }]} />
@@ -1498,6 +1880,48 @@ export default function DashboardScreen() {
                         <Text style={[styles.orderCheckCount, { color: item.color }]}>{item.count} items</Text>
                       </View>
                     ))}
+                  </View>
+
+                  {/* Catalog Health Audit Section */}
+                  <View style={styles.healthAuditContainer}>
+                    <View style={styles.healthHeaderRow}>
+                      <Text style={styles.healthAuditTitle}>📋 Catalog Quality & Health Audit</Text>
+                      <View style={[styles.statusBadgeCell, { backgroundColor: C.activeBg, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 6 }]}>
+                        <Text style={[styles.statusBadgeText, { color: C.active, fontWeight: "800", fontSize: 10 }]}>94.2% Score</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.healthSubtitle}>A high score improves SEO ranking and increases customer conversion rate.</Text>
+                    
+                    <View style={styles.healthList}>
+                      {[
+                        { label: "Product Images Attached", val: "98%", score: 0.98, color: C.active },
+                        { label: "Rich Descriptions Filled", val: "92%", score: 0.92, color: C.purple },
+                        { label: "SEO Metadata & Tags", val: "88%", score: 0.88, color: C.processing },
+                        { label: "Category & Brand Mappings", val: "100%", score: 1.0, color: C.active }
+                      ].map((item, idx) => (
+                        <View key={idx} style={styles.healthItemRow}>
+                          <View style={styles.healthItemMeta}>
+                            <Text style={styles.healthItemLabel}>{item.label}</Text>
+                            <Text style={styles.healthItemValue}>{item.val}</Text>
+                          </View>
+                          {/* Progress bar */}
+                          <View style={styles.progressBarBg}>
+                            <View style={[styles.progressBarFill, { width: `${item.score * 100}%`, backgroundColor: item.color }]} />
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Quality Alerts */}
+                    <View style={styles.qualityAlertsBanner}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Ionicons name="alert-circle-outline" size={14} color={C.warning} />
+                        <Text style={styles.qualityAlertsText}>
+                          <Text style={{ fontWeight: "700" }}>Optimization Tips: </Text>
+                          13 products are missing meta descriptions. 5 products have low-resolution images.
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
@@ -2156,13 +2580,16 @@ const getStyles = (isDark: boolean) => {
     borderColor: C.border,
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.01,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
+    shadowOpacity: 0.02,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
     elevation: 2,
+    position: "relative",
+    overflow: "hidden",
   },
   kpiCardInner: {
     gap: 4,
+    zIndex: 1,
   },
   kpiCardHeader: {
     flexDirection: "row",
@@ -2180,9 +2607,9 @@ const getStyles = (isDark: boolean) => {
     padding: 2,
   },
   kpiIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2197,13 +2624,26 @@ const getStyles = (isDark: boolean) => {
     gap: 6,
     marginTop: 2,
   },
-  kpiFooterTrend: {
-    fontSize: 11,
-    fontWeight: "700",
+  trendPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  trendPillText: {
+    fontSize: 9,
+    fontWeight: "800",
   },
   kpiFooterSub: {
     fontSize: 10,
     color: C.sub,
+  },
+  kpiBgIconDecor: {
+    position: "absolute",
+    right: -12,
+    bottom: -16,
+    zIndex: 0,
   },
   kpiInnerContent: {
     alignItems: "center",
@@ -2266,28 +2706,48 @@ const getStyles = (isDark: boolean) => {
     gap: 12,
   },
   quickActionItem: {
-    flex: 1,
-    minWidth: 100,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "30%",
+    minWidth: 80,
+    backgroundColor: C.surface,
     alignItems: "center",
-    gap: 6,
-    padding: 10,
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 12,
+    position: "relative",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.01,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
     cursor: "pointer",
   },
   quickActionIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 1,
   },
   quickActionTextLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: "700",
     color: C.text,
     textAlign: "center",
+    zIndex: 1,
+  },
+  quickActionBgIconDecor: {
+    position: "absolute",
+    right: -10,
+    bottom: -12,
+    zIndex: 0,
   },
 
   // Live website activity & Promotion Tracker lists
@@ -2337,7 +2797,7 @@ const getStyles = (isDark: boolean) => {
     fontWeight: "700",
   },
   notifScroll: {
-    maxHeight: 220,
+    maxHeight: 300,
     // @ts-ignore – web-only scrollbar hiding
     scrollbarWidth: 'none',
     msOverflowStyle: 'none',
@@ -2713,7 +3173,8 @@ const getStyles = (isDark: boolean) => {
     color: C.text,
   },
   chartContainer: {
-    alignItems: "center",
+    width: "100%",
+    alignItems: "stretch",
     marginTop: 6,
   },
 
@@ -3294,6 +3755,73 @@ const getStyles = (isDark: boolean) => {
     backgroundColor: "#eff6ff",
     alignItems: "center",
     justifyContent: "center",
+  },
+  // Catalog Health Audit Styles
+  healthAuditContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    gap: 12,
+  },
+  healthHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  healthAuditTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.text,
+  },
+  healthSubtitle: {
+    fontSize: 11,
+    color: C.sub,
+    lineHeight: 15,
+  },
+  healthList: {
+    gap: 10,
+    marginTop: 4,
+  },
+  healthItemRow: {
+    gap: 4,
+  },
+  healthItemMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  healthItemLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.text,
+  },
+  healthItemValue: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.text,
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: C.greyBg,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  qualityAlertsBanner: {
+    backgroundColor: C.warningBg,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 4,
+  },
+  qualityAlertsText: {
+    fontSize: 10,
+    color: C.text,
+    flexShrink: 1,
+    lineHeight: 14,
   },
 
   // Footer
