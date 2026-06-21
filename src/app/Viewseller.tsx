@@ -1,8 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
-import { useAuth } from "@/context/auth-context";
 import SellerMediaImage from "@/components/SellerMediaImage";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { buildMediaUrlCandidates, isPdfMedia, resolveMediaUrl, resolveSellerProfileImage } from '@/lib/api/media';
+import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   fetchSellerAnalyticsChart,

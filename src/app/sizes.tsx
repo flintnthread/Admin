@@ -663,26 +663,17 @@ export default function SizesManagement() {
         <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
 
-        {/* ── BANNER ── */}
-        <LinearGradient
-          colors={["#1d324e", "#15253b"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={S.banner}
-        >
-
-          <View style={S.bannerIconBox}>
-            {/* Bootstrap: grid-3x3 */}
-            <BI name="grid-3x3" size={22} color="#fff" />
+        {/* ── WEB PAGE HEADER ── */}
+        <View style={S.webPageHeader}>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+            <View style={S.headerIconBox}>
+              <BI name="grid-3x3" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={S.webPageTitle}>Sizes Management</Text>
+              <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>
+            </View>
           </View>
-        </LinearGradient>
-
-        {/* ── TITLE CARD ── */}
-        <View style={[S.titleCard, { marginHorizontal: PADDING }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={S.pageTitle}>Sizes Management</Text>
-          </View>
-          {/* Bootstrap: plus-lg on Add button */}
           <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
             <BI name="plus-lg" size={15} color="#fff" />
             <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
@@ -830,31 +821,36 @@ export default function SizesManagement() {
 const S = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f5f6fa" },
 
-  // Banner
-  banner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 48 },
-  bannerIconBox: {
-    width: 48, height: 48, borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center", justifyContent: "center",
+  // Web Page Header Card
+  webPageHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 24, paddingVertical: 20,
+    backgroundColor: "#1d324e",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
-
-  // Title card
-  titleCard: {
-    backgroundColor: "#fff", borderRadius: 14,
-    padding: 16, marginTop: -28,
-    flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12,
-    shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  webPageTitle: { fontSize: 22, fontWeight: "800", color: "#fff" },
+  webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
+  headerIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#e07820",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  pageTitle: { fontSize: 20, fontWeight: "700", color: "#1a1a2e" },
-  breadcrumbLink: { fontSize: 12, color: "#d4691e", marginHorizontal: 2 },
-  breadcrumbCurrent: { fontSize: 12, color: "#999" },
   addBtn: {
-    backgroundColor: "#e07820", borderRadius: 8,
-    paddingHorizontal: 14, paddingVertical: 10,
-    flexDirection: "row", alignItems: "center",
-    shadowColor: "#d4691e", shadowOpacity: 0.4,
-    shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    backgroundColor: "#e07820",
+    borderWidth: 1.2,
+    borderColor: "#e07820",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 

@@ -30,7 +30,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
 const Icon = Ionicons;
 
@@ -381,10 +380,7 @@ function UserCard({ user, index, onEdit, onDelete }: { user: User; index: number
           <Text style={styles.userName}>{user.name}</Text>
           <Text style={styles.userSub}>{user.username}</Text>
           <Text style={styles.userSub}>{user.email}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-            <RoleBadge role={user.role} />
-            <StatusBadge status={user.status} />
-          </View>
+          <RoleBadge role={user.role} />
         </View>
 
         <View
@@ -394,6 +390,8 @@ function UserCard({ user, index, onEdit, onDelete }: { user: User; index: number
             gap: 6,
           }}
         >
+          <StatusBadge status={user.status} />
+
           <View style={styles.timeRow}>
             <Icon name="time-outline" size={12} color={C.subtext} />
             <Text style={styles.timeText}>{user.lastLogin}</Text>
@@ -461,10 +459,10 @@ function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: 
 }
 
 // ─── Web Grid Card ────────────────────────────────────────────────────────────
-function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void; cardWidth?: number }) {
+function GridCard({ user, index, onEdit, onDelete }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void }) {
   const bg = AVATAR_BG[index % AVATAR_BG.length];
   return (
-    <View style={[styles.gridCard, { width: cardWidth }]}>
+    <View style={styles.gridCard}>
       {/* Coloured top banner */}
       <View style={[styles.gridBanner, { backgroundColor: bg }]}>
         <View style={styles.gridAvatarCircle}>
@@ -486,7 +484,6 @@ function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; in
           <RoleBadge role={user.role} />
           <StatusBadge status={user.status} />
         </View>
-
         <View style={styles.gridTimeRow}>
           <Icon name="time-outline" size={12} color={C.subtext} />
           <Text style={styles.gridTimeText}>
@@ -509,59 +506,16 @@ function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; in
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
-function Pagination({
-  current,
-  total,
-  onChange,
-  totalItems,
-  pageSize,
-}: {
-  current: number;
-  total: number;
-  onChange: (p: number) => void;
-  totalItems: number;
-  pageSize: number;
-}) {
-  const pages: number[] = [];
-  for (let i = 1; i <= total; i++) {
-    pages.push(i);
-  }
-
+function Pagination({ total }: { total: number }) {
   return (
     <View style={styles.pagination}>
-      <Text style={styles.paginationText}>
-        Showing {totalItems === 0 ? 0 : (current - 1) * pageSize + 1}–
-        {Math.min(current * pageSize, totalItems)} of {totalItems} users
-      </Text>
+      <Text style={styles.paginationText}>Showing 1 – {total} of {total} users</Text>
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <TouchableOpacity
-          style={[styles.pageBtn, current === 1 && { opacity: 0.4 }]}
-          disabled={current === 1}
-          onPress={() => onChange(current - 1)}
-        >
+        <TouchableOpacity style={styles.pageBtn}>
           <Icon name="chevron-back" size={16} color={C.subtext} />
         </TouchableOpacity>
-
-        {pages.map((p) => {
-          const isActive = p === current;
-          return (
-            <TouchableOpacity
-              key={p}
-              style={isActive ? styles.pageActive : styles.pageBtn}
-              onPress={() => onChange(p)}
-            >
-              <Text style={isActive ? styles.pageActiveText : styles.pageBtnText}>
-                {p}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-
-        <TouchableOpacity
-          style={[styles.pageBtn, current === total && { opacity: 0.4 }]}
-          disabled={current === total}
-          onPress={() => onChange(current + 1)}
-        >
+        <View style={styles.pageActive}><Text style={styles.pageActiveText}>1</Text></View>
+        <TouchableOpacity style={styles.pageBtn}>
           <Icon name="chevron-forward" size={16} color={C.subtext} />
         </TouchableOpacity>
       </View>
@@ -580,10 +534,8 @@ export default function AdminUsersScreen() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
 
-  const { width } = useWindowDimensions();
-  const isWide = Platform.OS === "web" && width >= 768;
+  const isWide = IS_WEB_WIDE;
 
   const loadUsers = useCallback(async () => {
     try {
@@ -606,11 +558,6 @@ export default function AdminUsersScreen() {
     }
     return a.name.localeCompare(b.name);
   });
-
-  const PAGE_SIZE = 10;
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paginatedUsers = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   async function handleAdd(form: UserForm) {
     try {
@@ -720,19 +667,13 @@ export default function AdminUsersScreen() {
           </View> */}
 
           {/* User Cards */}
-          {paginatedUsers.map((u, i) => (
+          {sorted.map((u, i) => (
             <UserCard key={u.id} user={u} index={i}
               onEdit={u => setEditUser(u)}
               onDelete={u => setDeleteUser(u)} />
           ))}
 
-          <Pagination
-            current={safePage}
-            total={totalPages}
-            onChange={setPage}
-            totalItems={sorted.length}
-            pageSize={PAGE_SIZE}
-          />
+          <Pagination total={users.length} />
         </ScrollView>
       </View>
 
@@ -762,14 +703,14 @@ export default function AdminUsersScreen() {
 
       {/* ── Page Header ── */}
       <View style={styles.webPageHeader}>
-        <View>
-          <Text style={styles.webPageTitle}>Admin Panel Users</Text>
-          {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <Icon name="home-outline" size={13} color={C.subtext} />
-            <Text style={styles.breadcrumb}>Dashboard</Text>
-            <Text style={styles.breadcrumb}> › </Text>
-            <Text style={[styles.breadcrumb, { color: C.text }]}>Admin Users</Text>
-          </View> */}
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+          <View style={styles.headerIconBox}>
+            <Icon name="people" size={24} color={C.white} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.webPageTitle}>Admin Panel Users</Text>
+            <Text style={styles.webPageSubtitle}>Manage system administrators, roles, permissions, and account statuses</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
           <Icon name="add" size={18} color={C.white} />
@@ -823,7 +764,7 @@ export default function AdminUsersScreen() {
                   ]}>{h.label}</Text>
                 ))}
               </View>
-              {paginatedUsers.map((u, i) => (
+              {sorted.map((u, i) => (
                 <TableRow key={u.id} user={u} index={i}
                   selected={selectedUserId === u.id}
                   onPress={() => setSelectedUserId(selectedUserId === u.id ? null : u.id)}
@@ -837,7 +778,7 @@ export default function AdminUsersScreen() {
         {/* ── GRID VIEW ── */}
         {viewMode === "grid" && (
           <View style={styles.gridContainer}>
-            {paginatedUsers.map((u, i) => (
+            {sorted.map((u, i) => (
               <GridCard key={u.id} user={u} index={i}
                 onEdit={u => setEditUser(u)}
                 onDelete={u => setDeleteUser(u)} />
@@ -845,13 +786,7 @@ export default function AdminUsersScreen() {
           </View>
         )}
 
-        <Pagination
-          current={safePage}
-          total={totalPages}
-          onChange={setPage}
-          totalItems={sorted.length}
-          pageSize={PAGE_SIZE}
-        />
+        <Pagination total={users.length} />
 
         {/* Footer */}
         <View style={styles.webFooter}>
@@ -971,29 +906,11 @@ const styles = StyleSheet.create({
   deleteBtn: { backgroundColor: C.red, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
 
   // ── Pagination ──
-  pagination: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: C.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  paginationText: { color: C.subtext, fontSize: 13, fontWeight: "500" },
-  pageBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: C.white, borderWidth: 1, borderColor: C.border, justifyContent: "center", alignItems: "center" },
-  pageBtnText: { color: C.text, fontWeight: "600", fontSize: 13 },
-  pageActive: { width: 32, height: 32, borderRadius: 6, backgroundColor: C.navy, justifyContent: "center", alignItems: "center" },
-  pageActiveText: { color: C.white, fontWeight: "700", fontSize: 13 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+  paginationText: { color: C.subtext, fontSize: 13 },
+  pageBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: C.border, justifyContent: "center", alignItems: "center" },
+  pageActive: { width: 32, height: 32, borderRadius: 8, backgroundColor: C.orange, justifyContent: "center", alignItems: "center" },
+  pageActiveText: { color: C.white, fontWeight: "700", fontSize: 14 },
 
   // ── Bottom Nav (mobile) ──
   bottomNav: { flexDirection: "row", backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border, paddingBottom: Platform.OS === "ios" ? 20 : 6, paddingTop: 8, position: "absolute", bottom: 0, left: 0, right: 0 },
@@ -1046,13 +963,23 @@ const styles = StyleSheet.create({
   // ── Web Page Header ──
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 28, paddingVertical: 20,
-    backgroundColor: C.navy, borderBottomWidth: 1, borderBottomColor: C.border,
+    paddingHorizontal: 24, paddingVertical: 20,
+    backgroundColor: C.navy,
+    borderRadius: 12,
+    marginHorizontal: 24,
+    marginTop: 24,
   },
-  webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },  // ← C.white
-  breadcrumb: { fontSize: 12, color: "rgba(255,255,255,0.6)" },     // ← soft white
-  // webPageTitle: { fontSize: 22, fontWeight: "800", color: C.text },
-  // breadcrumb:   { fontSize: 12, color: C.subtext },
+  webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },
+  webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
+  headerIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: C.orange,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
 
   // ── Web Stats Row ──
   webStatsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
