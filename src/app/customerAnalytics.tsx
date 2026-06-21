@@ -1217,7 +1217,11 @@ const ChartTooltip = React.memo(function ChartTooltip({
   if (contributionStr) bubbleH += 18;
 
   const left = Math.min(Math.max(x - bubbleW / 2, 0), plotWidth - bubbleW);
-  const top = y - bubbleH - 12 >= 4 ? y - bubbleH - 12 : y + 16;
+  let top = y - bubbleH - 12;
+  if (top < 4) {
+    top = y + 16;
+  }
+  top = Math.min(Math.max(top, 4), plotHeight - bubbleH - 4);
 
   return (
     <View pointerEvents="none" style={[s.tooltipBubble, { left, top, width: bubbleW }]}>
@@ -1358,11 +1362,11 @@ function LineChartSvg({
   }, [activeIdx, data, timeframe]);
 
   return (
-    <View style={{ width, height: height + 24 }}>
+    <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
       {/* Chart Canvas Area */}
       <View
         {...pointerProps}
-        style={{ width, height, position: "relative" }}
+        style={{ width, height, position: "relative", zIndex: 10 }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           <Defs>
@@ -1531,10 +1535,10 @@ function BarChartSvg({
   };
 
   return (
-    <View style={{ width, height: height + 24 }}>
+    <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
       <View
         {...pointerProps}
-        style={{ width, height, position: "relative" }}
+        style={{ width, height, position: "relative", zIndex: 10 }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           {/* Horizontal lines */}
