@@ -374,7 +374,7 @@ function PagBtn({ iconName, onPress, disabled, active }: {
   return (
     <TouchableOpacity
       onPress={onPress} disabled={disabled}
-      style={[styles.pagBtn, active && { backgroundColor: ORANGE, borderColor: ORANGE }]}
+      style={[styles.pagBtn, active && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
     >
       <Ionicons name={iconName} size={12}
         color={disabled ? "#CBD5E1" : active ? "#fff" : "#374151"} />
@@ -1306,12 +1306,6 @@ export default function SellersDashboard() {
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.showingText}>
-                {totalSellers === 0
-                  ? "No results found"
-                  : `Showing ${(safePage - 1) * perPage + 1}–${Math.min(safePage * perPage, totalSellers)} of ${totalSellers} entries`}
-              </Text>
-
               {/* Table */}
               <View style={styles.tableContainer}>
                 {/* Table Header */}
@@ -1343,35 +1337,35 @@ export default function SellersDashboard() {
                   ))
                 )}
               </View>
-
-              {/* Pagination */}
-              {totalSellers > 0 && (
-                <View style={styles.paginationRow}>
-                  <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
-                  <View style={{ flexDirection: "row", gap: 4 }}>
-                    <PagBtn iconName="play-skip-back" onPress={() => setPage(1)} disabled={safePage === 1} />
-                    <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                    {pageNums.map((p, i) =>
-                      p === "..." ? (
-                        <View key={"e" + i} style={styles.pagBtn}>
-                          <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          key={`n${p}`}
-                          onPress={() => setPage(p as number)}
-                          style={[styles.pagBtn, safePage === p && { backgroundColor: ORANGE, borderColor: ORANGE }]}
-                        >
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                        </TouchableOpacity>
-                      )
-                    )}
-                    <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                    <PagBtn iconName="play-skip-forward" onPress={() => setPage(totalPages)} disabled={safePage === totalPages} />
-                  </View>
-                </View>
-              )}
             </View>
+
+            {/* Pagination */}
+            {totalSellers > 0 && (
+              <View style={styles.paginationRow}>
+                <Text style={styles.pageText}>
+                  Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
+                </Text>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
+                  {pageNums.map((p, i) =>
+                    p === "..." ? (
+                      <View key={"e" + i} style={styles.pagBtn}>
+                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        key={`n${p}`}
+                        onPress={() => setPage(p as number)}
+                        style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+                </View>
+              </View>
+            )}
 
             {/* ── Footer ── */}
             <Text style={styles.footer}>
@@ -1381,8 +1375,8 @@ export default function SellersDashboard() {
           </ScrollView>
 
           <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
-        </View>
-      </AdminLayout>
+        </View >
+      </AdminLayout >
     );
   }
 
@@ -1615,12 +1609,6 @@ export default function SellersDashboard() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.showingText}>
-              {totalSellers === 0
-                ? "No results found"
-                : `Showing ${(safePage - 1) * perPage + 1}–${Math.min(safePage * perPage, totalSellers)} of ${totalSellers} entries`}
-            </Text>
-
             {paginated.length === 0 ? (
               <View style={{ alignItems: "center", paddingVertical: 48 }}>
                 <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
@@ -1636,34 +1624,35 @@ export default function SellersDashboard() {
                 ))}
               </View>
             )}
-
-            {totalSellers > 0 && (
-              <View style={styles.paginationRow}>
-                <Text style={styles.pageText}>Page {safePage} of {totalPages}</Text>
-                <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                  <PagBtn iconName="play-skip-back" onPress={() => setPage(1)} disabled={safePage === 1} />
-                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                  {pageNums.map((p, i) =>
-                    p === "..." ? (
-                      <View key={"e" + i} style={styles.pagBtn}>
-                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        key={`n${p}`}
-                        onPress={() => setPage(p as number)}
-                        style={[styles.pagBtn, safePage === p && { backgroundColor: ORANGE, borderColor: ORANGE }]}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                  <PagBtn iconName="play-skip-forward" onPress={() => setPage(totalPages)} disabled={safePage === totalPages} />
-                </View>
-              </View>
-            )}
           </View>
+
+          {/* Pagination */}
+          {totalSellers > 0 && (
+            <View style={styles.paginationRow}>
+              <Text style={styles.pageText}>
+                Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
+              </Text>
+              <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
+                <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
+                {pageNums.map((p, i) =>
+                  p === "..." ? (
+                    <View key={"e" + i} style={styles.pagBtn}>
+                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      key={`n${p}`}
+                      onPress={() => setPage(p as number)}
+                      style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                    </TouchableOpacity>
+                  )
+                )}
+                <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+              </View>
+            </View>
+          )}
 
           {/* ── Footer ── */}
           <Text style={styles.footer}>
@@ -1673,8 +1662,8 @@ export default function SellersDashboard() {
         </ScrollView>
 
         <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
-      </View>
-    </AdminLayout>
+      </View >
+    </AdminLayout >
   );
 }
 
@@ -1843,9 +1832,17 @@ const styles = StyleSheet.create({
 
   /* Pagination */
   paginationRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: "#F1F5F9",
-    flexWrap: "wrap", gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    flexWrap: "wrap",
+    gap: 8,
   },
   pageText: { fontSize: 12, color: "#64748B" },
   pagBtn: {

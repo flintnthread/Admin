@@ -703,14 +703,14 @@ export default function AdminUsersScreen() {
 
       {/* ── Page Header ── */}
       <View style={styles.webPageHeader}>
-        <View>
-          <Text style={styles.webPageTitle}>Admin Panel Users</Text>
-          {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <Icon name="home-outline" size={13} color={C.subtext} />
-            <Text style={styles.breadcrumb}>Dashboard</Text>
-            <Text style={styles.breadcrumb}> › </Text>
-            <Text style={[styles.breadcrumb, { color: C.text }]}>Admin Users</Text>
-          </View> */}
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+          <View style={styles.headerIconBox}>
+            <Icon name="people" size={24} color={C.white} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.webPageTitle}>Admin Panel Users</Text>
+            <Text style={styles.webPageSubtitle}>Manage system administrators, roles, permissions, and account statuses</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
           <Icon name="add" size={18} color={C.white} />
@@ -838,7 +838,13 @@ const styles = StyleSheet.create({
   avatarText: { color: C.white, fontWeight: "700" },
 
   // ── Badges ──
-  roleBadge: { alignSelf: "flex-start", borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
+  roleBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   roleBadgeText: { fontSize: 11, fontWeight: "600" },
   statusBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" },
   statusText: { fontSize: 11, fontWeight: "600" },
@@ -900,11 +906,11 @@ const styles = StyleSheet.create({
   deleteBtn: { backgroundColor: C.red, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
 
   // ── Pagination ──
-  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16, padding: 16, backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2, flexWrap: 'wrap', gap: 12 },
-  paginationText: { color: C.subtext, fontSize: 13, fontWeight: "500" },
-  pageBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: '#FFF', borderWidth: 1, borderColor: C.border, justifyContent: "center", alignItems: "center" },
-  pageActive: { width: 32, height: 32, borderRadius: 6, backgroundColor: '#1d324e', borderColor: '#1d324e', borderWidth: 1, justifyContent: "center", alignItems: "center" },
-  pageActiveText: { color: C.white, fontWeight: "700", fontSize: 13 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+  paginationText: { color: C.subtext, fontSize: 13 },
+  pageBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: C.border, justifyContent: "center", alignItems: "center" },
+  pageActive: { width: 32, height: 32, borderRadius: 8, backgroundColor: C.orange, justifyContent: "center", alignItems: "center" },
+  pageActiveText: { color: C.white, fontWeight: "700", fontSize: 14 },
 
   // ── Bottom Nav (mobile) ──
   bottomNav: { flexDirection: "row", backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.border, paddingBottom: Platform.OS === "ios" ? 20 : 6, paddingTop: 8, position: "absolute", bottom: 0, left: 0, right: 0 },
@@ -957,13 +963,23 @@ const styles = StyleSheet.create({
   // ── Web Page Header ──
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 28, paddingVertical: 20,
-    backgroundColor: C.navy, borderBottomWidth: 1, borderBottomColor: C.border,
+    paddingHorizontal: 24, paddingVertical: 20,
+    backgroundColor: C.navy,
+    borderRadius: 12,
+    marginHorizontal: 24,
+    marginTop: 24,
   },
-  webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },  // ← C.white
-  breadcrumb: { fontSize: 12, color: "rgba(255,255,255,0.6)" },     // ← soft white
-  // webPageTitle: { fontSize: 22, fontWeight: "800", color: C.text },
-  // breadcrumb:   { fontSize: 12, color: C.subtext },
+  webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },
+  webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
+  headerIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: C.orange,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
 
   // ── Web Stats Row ──
   webStatsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
@@ -989,7 +1005,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 16,
     overflow: "hidden",
-    width: 270,
+    width: 340,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
@@ -1001,7 +1017,15 @@ const styles = StyleSheet.create({
   gridName: { fontSize: 16, fontWeight: "800", color: C.text, textAlign: "center", marginBottom: 10 },
   gridInfoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
   gridInfoText: { fontSize: 12, color: C.subtext, flex: 1 },
-  gridBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 8, marginBottom: 6 },
+  // gridBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 8, marginBottom: 6 },
+  gridBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "nowrap",
+    marginTop: 8,
+    marginBottom: 6,
+  },
   gridTimeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12 },
   gridTimeText: { fontSize: 11, color: C.subtext },
   gridActions: { flexDirection: "row", gap: 8 },

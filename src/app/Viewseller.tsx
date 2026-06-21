@@ -1,8 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
-import { useAuth } from "@/context/auth-context";
 import SellerMediaImage from "@/components/SellerMediaImage";
+import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { buildMediaUrlCandidates, isPdfMedia, resolveMediaUrl, resolveSellerProfileImage } from '@/lib/api/media';
+import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   fetchSellerAnalyticsChart,
@@ -147,7 +147,6 @@ interface SellerData {
     delivered: number;
     cancelled: number;
   };
-  totalOrders: number;
   verificationDocuments: {
     name: string;
     available: boolean;
@@ -619,25 +618,25 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
                 )}
               </View>
             ) : (
-            <ScrollView
-              contentContainerStyle={modalStyles.imgScrollContent}
-              maximumZoomScale={3}
-              minimumZoomScale={0.5}
-              bouncesZoom
-              centerContent
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-            >
-              <Animated.View style={{ transform: [{ scale }] }}>
-                <Image
-                  source={{ uri: imageUri }}
-                  style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
-                  onError={() => {
-                    if (imageIndex < candidates.length - 1) setImageIndex((i) => i + 1);
-                  }}
-                />
-              </Animated.View>
-            </ScrollView>
+              <ScrollView
+                contentContainerStyle={modalStyles.imgScrollContent}
+                maximumZoomScale={3}
+                minimumZoomScale={0.5}
+                bouncesZoom
+                centerContent
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+              >
+                <Animated.View style={{ transform: [{ scale }] }}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={{ width: modalW - 32, height: imgH - 16, resizeMode: 'contain' }}
+                    onError={() => {
+                      if (imageIndex < candidates.length - 1) setImageIndex((i) => i + 1);
+                    }}
+                  />
+                </Animated.View>
+              </ScrollView>
             )}
           </View>
 
@@ -737,9 +736,6 @@ const CsvExportModal: React.FC<{
           <ScrollView style={csvModalStyles.content}>
             <Text style={csvModalStyles.csvText}>{content}</Text>
           </ScrollView>
-          <TouchableOpacity style={csvModalStyles.closeBtnBottom} onPress={onClose}>
-            <Text style={csvModalStyles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -757,6 +753,7 @@ const csvModalStyles = StyleSheet.create({
   modal: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
+    overflow: 'hidden',
     width: '100%',
     maxWidth: 600,
     maxHeight: '80%',
@@ -922,15 +919,51 @@ function mapDetailToSellerData(
       delivered: Number(orderDist.delivered ?? 0),
       cancelled: Number(orderDist.cancelled ?? 0),
     },
-    verificationDocuments: docs.map((doc) => {
-      const rawPath = String(doc.path ?? doc.url ?? "");
-      return {
-        name: String(doc.name ?? "Document"),
-        available: doc.available !== false,
-        path: rawPath || undefined,
-        url: buildMediaUrlCandidates(rawPath, doc.url)[0] || undefined,
-      };
-    }),
+    verificationDocuments: (() => {
+      const defaultDocNames = [
+        'Aadhaar Front',
+        'Aadhaar Back',
+        'PAN Card',
+        'Cancelled Cheque',
+        'Business Proof',
+        'Bank Proof',
+      ];
+      const apiDocsByName = new Map<string, { url?: string; path?: string; available?: boolean }>();
+      docs.forEach((doc) => {
+        if (doc.name) {
+          apiDocsByName.set(doc.name, doc);
+        }
+      });
+      const finalDocs: { name: string; available: boolean; url?: string; path?: string }[] = [];
+      defaultDocNames.forEach((name) => {
+        if (apiDocsByName.has(name)) {
+          const apiDoc = apiDocsByName.get(name)!;
+          const rawPath = String(apiDoc.path ?? apiDoc.url ?? "");
+          finalDocs.push({
+            name,
+            available: apiDoc.available !== false,
+            path: rawPath || undefined,
+            url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+          });
+          apiDocsByName.delete(name);
+        } else {
+          finalDocs.push({
+            name,
+            available: false,
+          });
+        }
+      });
+      apiDocsByName.forEach((apiDoc, name) => {
+        const rawPath = String(apiDoc.path ?? apiDoc.url ?? "");
+        finalDocs.push({
+          name,
+          available: apiDoc.available !== false,
+          path: rawPath || undefined,
+          url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+        });
+      });
+      return finalDocs;
+    })(),
     analyticsData: {
       daily: monthlyProducts,
       weekly: monthlyProducts,
@@ -1032,22 +1065,12 @@ export default function ViewSeller() {
       <ScrollView style={styles.root} contentContainerStyle={styles.container}>
 
         {/* ── Page Header — dark blue container ──────────────────────────── */}
-        <View style={styles.pageHeaderContainer}>
+        <View style={[styles.pageHeaderContainer, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <View style={[styles.pageHeader, { paddingHorizontal: isMobile ? 16 : 24 }]}>
             <View style={styles.pageHeaderLeft}>
               <BootstrapIcon name="person-circle" size={32} color={COLORS.white} />
               <View style={{ marginLeft: 8 }}>
                 <Text style={styles.pageHeaderTitle}>Seller Details</Text>
-                <View style={styles.breadcrumb}>
-                  <BootstrapIcon name="house" size={11} color="rgba(255,255,255,0.7)" />
-                  <Text style={[styles.breadcrumbItem, { marginLeft: 3 }]}>Dashboard</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={styles.breadcrumbItem}>Ecommerce</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={styles.breadcrumbItem}>Sellers List</Text>
-                  <Text style={styles.breadcrumbSep}> › </Text>
-                  <Text style={[styles.breadcrumbItem, { color: 'rgba(255,255,255,0.5)' }]}>Seller Details</Text>
-                </View>
               </View>
             </View>
             <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
@@ -1213,10 +1236,10 @@ export default function ViewSeller() {
                 color={seller.status === 'Active' ? COLORS.success : seller.status === 'Pending' ? COLORS.warning : COLORS.danger}
               />
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <TouchableOpacity style={styles.actionBtn}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/sellerprofile')}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <BootstrapIcon name="arrow-down-circle" size={13} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Download</Text>
+                    <BootstrapIcon name="file-earmark-text" size={13} color={COLORS.white} />
+                    <Text style={styles.actionBtnText}>Export CSV</Text>
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F97316' }]} onPress={() => router.push('/sellers')}>
@@ -1365,14 +1388,14 @@ export default function ViewSeller() {
               isHalf
               width={width}
             />
+            <TouchableOpacity
+              style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1d324e' }]}
+              onPress={() => router.push('/Products')}
+            >
+              <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
+              <Text style={styles.actionBtnText}>View All Products</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.actionBtn, { alignSelf: 'flex-start', marginTop: 12, marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1E3A5F' }]}
-            onPress={() => router.push('/productApproval')}
-          >
-            <BootstrapIcon name="eye-fill" size={13} color={COLORS.white} />
-            <Text style={styles.actionBtnText}>View All Products</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Verification Documents ─────────────────────────────────────── */}
@@ -1447,16 +1470,17 @@ const styles = StyleSheet.create({
 
   // ── Page header container — dark blue background ──────────────────────────
   pageHeaderContainer: {
-    backgroundColor: COLORS.headerBg,   // #1E2A45 dark navy
+    backgroundColor: '#1d324e',
+    borderRadius: 12,
+    marginTop: 16,
     paddingTop: 20,
     paddingBottom: 20,
     marginBottom: 16,
-    // Subtle bottom shadow to lift it above content
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   pageHeader: {
     flexDirection: 'row',
@@ -1805,7 +1829,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   viewDocBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#1d324e',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 5,

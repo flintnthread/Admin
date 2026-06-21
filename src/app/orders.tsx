@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -61,7 +61,9 @@ type OrderStatus =
   | "Pending"
   | "Completed"
   | "Cancelled"
-  | "Shipped";
+  | "Shipped"
+  | "Returned"
+  | "Replacement";
 type GSTStatus = "Filed" | "Not Filed";
 type ViewMode = "grid" | "list";
 type SortOption = "newest" | "oldest" | "amount_high" | "amount_low";
@@ -108,6 +110,8 @@ const STATUS_CFG: Record<
   Completed: { bg: C.greenPale, text: C.green, dot: C.green },
   Cancelled: { bg: C.redPale, text: C.red, dot: C.red },
   Shipped: { bg: "#F5F3FF", text: "#7C3AED", dot: "#7C3AED" },
+  Returned: { bg: C.redPale, text: C.red, dot: C.red },
+  Replacement: { bg: C.bluePale, text: C.blue, dot: C.blue },
 };
 
 const STATUS_FILTERS = [
@@ -117,6 +121,8 @@ const STATUS_FILTERS = [
   "Completed",
   "Shipped",
   "Cancelled",
+  "Returned",
+  "Replacement",
 ];
 const PAYMENT_FILTERS = [
   "All Payments",
@@ -330,6 +336,9 @@ function toUiOrder(
     completed: "Completed",
     cancelled: "Cancelled",
     shipped: "Shipped",
+    returned: "Returned",
+    refunded: "Returned",
+    replacement: "Replacement",
   };
   const paymentMap: Record<string, PaymentType> = {
     cod: "Cash on Delivery",
@@ -2131,7 +2140,14 @@ export default function OrdersScreen() {
   const [totalPages, setTotalPages] = useState(0);
 
   const [search, setSearch] = useState("");
+  const params = useLocalSearchParams<{ status?: string }>();
   const [statusFilter, setStatusFilter] = useState("All");
+
+  useEffect(() => {
+    if (params.status) {
+      setStatusFilter(params.status);
+    }
+  }, [params.status]);
   const [paymentFilter, setPaymentFilter] = useState("All Payments");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");

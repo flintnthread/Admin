@@ -278,7 +278,7 @@ const ColorFormModal = ({ mode, initial, onSave, onClose }: ColorModalProps) => 
               </View>
             )}
             <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Color Code</Text>
-            <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
               <View style={[
                 styles.colorSwatchInput,
                 { backgroundColor: isValidHex(code) ? normalizeHex(code) : BRAND },
@@ -712,8 +712,14 @@ export default function ColorsScreen() {
   const HeaderSection = (
     <>
       <View style={styles.webPageHeader}>
-        <View>
-          <Text style={styles.webPageTitle}>Colors Management</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+          <View style={styles.headerIconBox}>
+            <Ionicons name={BI.palette as any} size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.webPageTitle}>Colors Management</Text>
+            <Text style={styles.webPageSubtitle}>Manage catalog color variants and status settings</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
           <Ionicons name={BI.plus as any} size={18} color="#fff" />
@@ -945,21 +951,40 @@ const styles = StyleSheet.create({
     marginRight: 12, flexShrink: 0,
   },
   headerContent: { flex: 1, minWidth: 0 },
-  pageTitle: { fontSize: 17, fontWeight: "800", color: "#1a1a2e" },
-  addBtn: {
-    backgroundColor: BRAND, paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 5,
-    flexShrink: 0, marginLeft: 12,
+  headerIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: BRAND,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  addBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  addBtn: {
+    backgroundColor: BRAND,
+    borderWidth: 1.2,
+    borderColor: BRAND,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+    marginLeft: 12,
+  },
+  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 28, paddingVertical: 20,
+    paddingHorizontal: 24, paddingVertical: 20,
     backgroundColor: "#1d324e",
-    borderBottomWidth: 1, borderBottomColor: "#e5e7eb",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
   webPageTitle: { fontSize: 22, fontWeight: "800", color: "#fff" },
+  webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
 
   // Toolbar
   toolbar: {
@@ -1043,10 +1068,10 @@ const styles = StyleSheet.create({
   // Column widths
   colId: { width: 95, flexShrink: 0 },
   colName: { flex: 1, minWidth: 80, paddingRight: 24 },
-  colPreview: { width: 140, flexShrink: 0, alignItems: "center" },
-  colCode: { width: 130, flexShrink: 0, paddingHorizontal: 4 },
-  colDate: { width: 145, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
-  colStatus: { width: 90, flexShrink: 0, paddingHorizontal: 4 },
+  colPreview: { width: 160, flexShrink: 0, alignItems: "center" },
+  colCode: { width: 160, flexShrink: 0, paddingLeft: 16, paddingRight: 12 },
+  colDate: { width: 175, flexShrink: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 },
+  colStatus: { width: 120, flexShrink: 0, paddingHorizontal: 12 },
   colAction: { width: 104, flexShrink: 0, flexDirection: "row", gap: 8, justifyContent: "flex-end" },
 
   // Cell content

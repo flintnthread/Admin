@@ -544,12 +544,15 @@ export default function CustomerManagementScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
+  // Measured width of the grid container (excludes sidebar + all padding).
+  // Initialised to 0; cards render only once a real measurement arrives.
+  const [gridContainerWidth, setGridContainerWidth] = useState(0);
   const [customerStats, setCustomerStats] = useState<{ total: number; revenue: number }>({
     total: 0,
     revenue: 0,
   });
 
-  const PAGE_SIZE = 12;
+  const PAGE_SIZE = 20;
 
   const loadCustomers = useCallback(async () => {
     setLoading(true);
@@ -594,19 +597,16 @@ export default function CustomerManagementScreen() {
   const rangeStart = total === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const rangeEnd    = Math.min(safePage * PAGE_SIZE, total);
 
-  // ── Card column width — auto-fit with gap ─────────────────────────────────
-  // Gap between cards is 14px. We derive the exact % so cards fill the row.
+  // ── Card column width — measured via onLayout, React Native compatible ──────
+  // We attach onLayout to the grid wrapper View so React Native tells us its
+  // exact rendered width after the sidebar, all padding, and scroll bars are
+  // accounted for. cardWidth is then pure arithmetic — no CSS calc() needed.
+  //   cardWidth = (measuredWidth - GAP × (cols - 1)) / cols
   const GAP = 14;
-  // For percentage widths we can't do real calc() in RN, but flexWrap + exact %
-  // leaves a small rounding error — to avoid orphan gaps we use pixel math instead
-  // by computing a % string that accounts for the gap.
-  // Formula: (100 - gap*(cols-1)/containerWidth*100) / cols  → not feasible without
-  // container ref.  Simplest reliable approach: use fixed % that look right.
-  const colPct =
-    gridCols === 1 ? "100%"   :
-    gridCols === 2 ? "49%"    :
-    gridCols === 3 ? "32.2%"  :
-    gridCols === 4 ? "23.8%"  : "19.2%";
+  const cardWidth =
+    gridContainerWidth > 0
+      ? (gridContainerWidth - GAP * (gridCols - 1)) / gridCols
+      : 0;
 
   return (
     <AdminLayout>
@@ -751,10 +751,13 @@ export default function CustomerManagementScreen() {
                 ))}
               </View>
             ) : (
-              // Tablet / Laptop / Desktop → auto-fit multi-column grid
-              <View style={[s.gridWrap, { gap: GAP }]}>
-                {paginated.map((c) => (
-                  <View key={c.id} style={{ width: colPct }}>
+              // Tablet / Laptop / Desktop - auto-fit multi-column grid
+              <View
+                style={[s.gridWrap, { gap: GAP }]}
+                onLayout={(e) => setGridContainerWidth(e.nativeEvent.layout.width)}
+              >
+                {cardWidth > 0 && paginated.map((c) => (
+                  <View key={c.id} style={{ width: cardWidth, marginBottom: GAP }}>
                     <GridCard c={c} onView={() => viewCustomer(c.id)} />
                   </View>
                 ))}
@@ -857,7 +860,7 @@ export default function CustomerManagementScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   scroll:        { flex: 1 },
-  scrollContent: { paddingTop: 0 },
+  scrollContent: { paddingTop: 10, paddingBottom: 40 },
 
   // Header — rounded on all four corners, top and bottom
   header:      { backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },

@@ -831,12 +831,12 @@ export default function BankVerifications() {
             </View>
 
             {/* ── Desktop Table ── */}
-            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ marginBottom: 14 }}>
+            <View style={{ marginBottom: 14, width: '100%' }}>
               <View style={{
                 backgroundColor: "#fff", borderRadius: 14,
                 borderWidth: 1, borderColor: BORDER,
                 overflow: "hidden",
-                minWidth: 1100,
+                width: '100%',
               }}>
                 {/* Table Header */}
                 <View style={{
@@ -847,12 +847,12 @@ export default function BankVerifications() {
                 }}>
                   <Text style={{ flex: 0.4, fontSize: 12, fontWeight: "600", color: "#fff" }}>ID</Text>
                   <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Seller</Text>
-                  <Text style={{ flex: 1.1, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
-                  <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
+                  <Text style={{ flex: 0.7, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
+                  <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
                   <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Attempts</Text>
                   <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Created</Text>
                   <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Verified</Text>
-                  <Text style={{ flex: 1.3, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
+                  <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
                 </View>
 
                 {/* Table Rows */}
@@ -870,11 +870,11 @@ export default function BankVerifications() {
                       <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.sellerName}</Text>
                       <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
                     </View>
-                    <View style={{ flex: 1.1 }}>
+                    <View style={{ flex: 0.7 }}>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
                       <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
                     </View>
-                    <View style={{ flex: 0.8 }}>
+                    <View style={{ flex: 0.6 }}>
                       <StatusBadge status={item.status} small />
                     </View>
                     <View style={{ flex: 0.6 }}>
@@ -882,7 +882,7 @@ export default function BankVerifications() {
                     </View>
                     <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.created}</Text>
                     <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
-                    <View style={{ flex: 1.3, flexDirection: "row", gap: 6 }}>
+                    <View style={{ flex: 1.2, flexDirection: "row", gap: 6 }}>
                       <TouchableOpacity
                         onPress={() => goToDetails(item.sellerId)}
                         style={{
@@ -968,7 +968,7 @@ export default function BankVerifications() {
                   </View>
                 </View>
               </View>
-            </ScrollView>
+            </View>
 
             {/* ── Footer ── */}
             <View style={{
