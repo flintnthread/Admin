@@ -894,13 +894,6 @@ const WebProductsScreen: React.FC = () => {
                 {/* Page header */}
                 <View style={wst.pageHeader}>
                     <View style={wst.titleContainer}>
-                        <View style={wst.breadcrumb}>
-                            <TouchableOpacity onPress={() => { /* TODO: navigate to dashboard */ }}>
-                                <Text style={wst.breadcrumbDim}>Dashboard</Text>
-                            </TouchableOpacity>
-                            <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.6)" />
-                            <Text style={wst.breadcrumbActive}>Product Management</Text>
-                        </View>
                         <Text style={wst.pageTitle}>Product Management</Text>
                     </View>
                     <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>

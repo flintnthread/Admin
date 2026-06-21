@@ -408,22 +408,8 @@ function PageHeader({ isWide }: { isWide: boolean }) {
         </View>
         <View>
           <Text style={styles.pageTitle}>Product Approvals</Text>
-          <Text style={styles.breadcrumb}>Dashboard {'>'} Product Approvals</Text>
         </View>
       </View>
-
-      {isWide && (
-        <View style={styles.pageHeaderActions}>
-          <Pressable
-            onPress={() => router.push('/productDetails')}
-            style={({ pressed }) => [styles.headerOutlineBtn, pressed && styles.pressed]}>
-            <Text style={styles.headerOutlineText}>View Details</Text>
-          </Pressable>
-          <Pressable style={({ pressed }) => [styles.headerPurpleBtn, pressed && styles.pressed]}>
-            <Text style={styles.headerPurpleText}>Activate</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 }
@@ -928,15 +914,15 @@ export default function ProductApprovalScreen() {
 
   return (
     <AdminLayout>
-      <View style={styles.screen}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}>
         <PageHeader isWide={isWide} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+        <View style={styles.scrollContent}>
 
           {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
@@ -987,8 +973,8 @@ export default function ProductApprovalScreen() {
               onPageChange={setCurrentPage}
             />
           )}
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </AdminLayout>
   );
 }
@@ -1176,10 +1162,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1d324e',
     paddingHorizontal: 32,
     paddingTop: 24,
-    paddingBottom: 68,
+    paddingBottom: 48,
     borderRadius: 22,
-    marginHorizontal: 2,
-    marginTop: 12,
+    marginHorizontal: 18,
+    marginTop: 22,
     gap: 12,
     shadowColor: '#1d324e',
     shadowOffset: { width: 0, height: 8 },
