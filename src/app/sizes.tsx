@@ -158,9 +158,9 @@ const INITIAL_SIZES: SizeItem[] = [
 const PAGE_SIZE = 12;
 
 const CARD_GRADIENTS: [string, string][] = [
-  ["#d4691e", "#8b3e0f"],
-  ["#c8611a", "#7a360a"],
-  ["#e07820", "#9a4a12"],
+  ["#1d324e", "#101d2e"],
+  ["#1d324e", "#14243a"],
+  ["#1d324e", "#192c46"],
 ];
 
 function todayStr(): string {
@@ -287,7 +287,7 @@ const ListRow: React.FC<{
   onDelete: (s: SizeItem) => void;
 }> = ({ item, idx, onEdit, onDelete }) => (
   <View style={[S.listRow, { backgroundColor: idx % 2 === 0 ? "#fff" : "#fdfaf8" }]}>
-    <Text style={[S.listCell, { width: 70, color: "#999", fontSize: 12 }]}>{item.id}</Text>
+    <Text style={[S.listCell, { width: 95, color: "#999", fontSize: 12 }]}>{item.id}</Text>
     <Text style={[S.listCell, { flex: 1.5, fontWeight: "700", color: "#111" }]} numberOfLines={1}>
       {item.name}
     </Text>
@@ -301,7 +301,7 @@ const ListRow: React.FC<{
         {item.createdDate}
       </Text>
     </View>
-    <View style={{ width: 72, alignItems: "flex-start" }}>
+    <View style={{ width: 150, alignItems: "flex-start" }}>
       <StatusBadge status={item.status} />
     </View>
     <View style={S.listActions}>
@@ -665,7 +665,7 @@ export default function SizesManagement() {
 
         {/* ── BANNER ── */}
         <LinearGradient
-          colors={["#0f2d6b", "#08275c"]}
+          colors={["#1d324e", "#15253b"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={S.banner}
@@ -681,14 +681,6 @@ export default function SizesManagement() {
         <View style={[S.titleCard, { marginHorizontal: PADDING }]}>
           <View style={{ flex: 1 }}>
             <Text style={S.pageTitle}>Sizes Management</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
-              <Text style={S.breadcrumbLink}>Dashboard</Text>
-              {/* Bootstrap: chevron-right */}
-              <BI name="chevron-right" size={10} color="#bbb" />
-              <Text style={S.breadcrumbLink}>Categories</Text>
-              <BI name="chevron-right" size={10} color="#bbb" />
-              <Text style={S.breadcrumbCurrent}>Sizes</Text>
-            </View>
           </View>
           {/* Bootstrap: plus-lg on Add button */}
           <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
@@ -778,11 +770,11 @@ export default function SizesManagement() {
                 ListHeaderComponent={
                   <View style={{ paddingHorizontal: PADDING }}>
                     <View style={S.listHeader}>
-                      <Text style={[S.listHeaderCell, { width: 70 }]}>ID</Text>
+                      <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                      <Text style={[S.listHeaderCell, { width: 72 }]}>Status</Text>
+                      <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
                       <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
                     </View>
                   </View>
@@ -879,7 +871,7 @@ const S = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 8,
     borderWidth: 1.5, borderColor: "#eee", gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#333", padding: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: "#333", padding: 0, outlineStyle: "none" } as any,
   viewToggle: { flexDirection: "row", gap: 6 },
   viewBtn: {
     width: 36, height: 36, borderRadius: 8,
@@ -946,24 +938,29 @@ const S = StyleSheet.create({
 
   // Pagination
   paginationRow: {
-    flexDirection: "row", gap: 4, flexWrap: "wrap", justifyContent: "center", marginTop: 8,
+    flexDirection: "row", gap: 4, flexWrap: "wrap", justifyContent: "center",
   },
   pageBtn: {
-    minWidth: 34, height: 34, borderRadius: 8,
-    borderWidth: 1.5, borderColor: "#e0e0e0", backgroundColor: "#fff",
+    minWidth: 32, height: 32, borderRadius: 6,
+    borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center", paddingHorizontal: 4,
   },
-  pageBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  pageBtnActive: { backgroundColor: "#1d324e", borderColor: "#1d324e" },
   pageBtnDisabled: { opacity: 0.35 },
-  pageBtnText: { fontSize: 14, color: "#333", fontWeight: "500" },
+  pageBtnText: { fontSize: 13, color: "#374151", fontWeight: "600" },
 
   // Footer
   footerRow: {
     marginTop: 16, flexDirection: "row", flexWrap: "wrap",
-    alignItems: "center", justifyContent: "space-between",
-    gap: 8, paddingBottom: 16,
+    alignItems: "center", justifyContent: "space-between", gap: 12,
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
   },
-  footerText: { fontSize: 13, color: "#888" },
+  footerText: { fontSize: 13, color: "#666" },
 
   // Empty
   emptyBox: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
@@ -997,7 +994,8 @@ const S = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === "ios" ? 12 : 9,
     fontSize: 14, color: "#333", backgroundColor: "#fafafa",
-  },
+    outlineStyle: "none",
+  } as any,
   statusToggleRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   statusToggleBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 8,

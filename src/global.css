@@ -7,3 +7,28 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/* Custom horizontal scrollbar styled in orange */
+.orange-scrollbar,
+.orange-scrollbar * {
+  scrollbar-width: thin !important;
+  scrollbar-color: #D4690A #E5EAF2 !important;
+}
+.orange-scrollbar::-webkit-scrollbar,
+.orange-scrollbar *::-webkit-scrollbar {
+  height: 8px !important;
+}
+.orange-scrollbar::-webkit-scrollbar-track,
+.orange-scrollbar *::-webkit-scrollbar-track {
+  background: #E5EAF2 !important;
+  border-radius: 4px !important;
+}
+.orange-scrollbar::-webkit-scrollbar-thumb,
+.orange-scrollbar *::-webkit-scrollbar-thumb {
+  background: #D4690A !important;
+  border-radius: 4px !important;
+}
+.orange-scrollbar::-webkit-scrollbar-thumb:hover,
+.orange-scrollbar *::-webkit-scrollbar-thumb:hover {
+  background: #B55508 !important;
+}

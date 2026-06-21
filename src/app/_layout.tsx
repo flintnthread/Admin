@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { patchComponents } from "@/lib/patch-components";
 import { useFonts } from "expo-font";
+import "@/global.css";
 
 // Safely execute component patching and capture errors to prevent white screen
 try {

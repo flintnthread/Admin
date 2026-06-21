@@ -99,13 +99,20 @@ export type PayoutSummary = {
   id: number;
   sellerId?: number;
   sellerName?: string;
+  sellerEmail?: string;
+  sellerPhone?: string;
   orderId?: number;
+  orderNumber?: string;
+  orderStatus?: string;
   requestedAmount?: number;
+  customerPaidAmount?: number;
   status?: string;
+  walletBalance?: number;
   sellerNote?: string;
   adminNote?: string;
   transactionRef?: string;
   requestedAt?: string;
+  deliveryDate?: string;
   paidAt?: string;
 };
 
@@ -188,6 +195,7 @@ export type DeliverySlab = {
   intraCityCharge?: number;
   metroMetroCharge?: number;
   active?: boolean;
+  custom?: boolean;
   sortOrder?: number;
 };
 
