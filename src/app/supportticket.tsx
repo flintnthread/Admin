@@ -33,66 +33,66 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import {
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-    useWindowDimensions,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
 } from "react-native";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
-const GREEN       = "#16a34a";  // Uploaded badge background
+const GREEN = "#16a34a";  // Uploaded badge background
 const GREEN_LIGHT = "#dcfce7";  // Section header tint bg
-const GREEN_DARK  = "#15803d";  // Uploaded badge text
-const HEADER_BG   = "#F7F9F7";  // Column header row background (very light warm grey)
-const BORDER      = "#E5E7EB";
-const ROW_EVEN    = "#ffffff";
-const ROW_ODD     = "#f9fafb";
+const GREEN_DARK = "#15803d";  // Uploaded badge text
+const HEADER_BG = "#F7F9F7";  // Column header row background (very light warm grey)
+const BORDER = "#E5E7EB";
+const ROW_EVEN = "#ffffff";
+const ROW_ODD = "#f9fafb";
 const TEXT_STRONG = "#111827";
-const TEXT_MID    = "#374151";
-const TEXT_LIGHT  = "#6B7280";
+const TEXT_MID = "#374151";
+const TEXT_LIGHT = "#6B7280";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // Match whatever shape your API/mapper already produces.
 // All fields are optional so the component degrades gracefully.
 export interface UploadedSeller {
-  id?:             string | number;
-  businessName?:   string;
-  contactPerson?:  string;
-  city?:           string;
-  state?:          string;
-  uploadedAt?:     string;   // Already-formatted string, e.g. "11 Jun, 2026 11:15 AM"
-  status?:         string;   // e.g. "Uploaded", "Pending", …
+  id?: string | number;
+  businessName?: string;
+  contactPerson?: string;
+  city?: string;
+  state?: string;
+  uploadedAt?: string;   // Already-formatted string, e.g. "11 Jun, 2026 11:15 AM"
+  status?: string;   // e.g. "Uploaded", "Pending", …
 }
 
 // ─── Column descriptor ───────────────────────────────────────────────────────
 interface ColDef {
-  key:        keyof UploadedSeller | "__status__";
-  label:      string;
-  flex?:      number;      // flex weight
-  minWidth?:  number;
-  maxWidth?:  number;
-  align?:     "left" | "center" | "right";
+  key: keyof UploadedSeller | "__status__";
+  label: string;
+  flex?: number;      // flex weight
+  minWidth?: number;
+  maxWidth?: number;
+  align?: "left" | "center" | "right";
   hideBelow?: number;      // hide column when screenWidth < this value
 }
 
 const COLUMNS: ColDef[] = [
-  { key: "businessName",  label: "Business Name",  flex: 2.2, minWidth: 120, align: "left"  },
-  { key: "contactPerson", label: "Contact Person", flex: 1.8, minWidth: 110, align: "left",  hideBelow: 600 },
-  { key: "city",          label: "City",           flex: 1.2, minWidth: 80,  align: "left",  hideBelow: 600 },
-  { key: "state",         label: "State",          flex: 1.2, minWidth: 90,  align: "left",  hideBelow: 900 },
-  { key: "uploadedAt",    label: "Uploaded At",    flex: 1.8, minWidth: 140, align: "left"  },
-  { key: "__status__",    label: "Status",         flex: 1,   minWidth: 90,  align: "center" },
+  { key: "businessName", label: "Business Name", flex: 2.2, minWidth: 120, align: "left" },
+  { key: "contactPerson", label: "Contact Person", flex: 1.8, minWidth: 110, align: "left", hideBelow: 600 },
+  { key: "city", label: "City", flex: 1.2, minWidth: 80, align: "left", hideBelow: 600 },
+  { key: "state", label: "State", flex: 1.2, minWidth: 90, align: "left", hideBelow: 900 },
+  { key: "uploadedAt", label: "Uploaded At", flex: 1.8, minWidth: 140, align: "left" },
+  { key: "__status__", label: "Status", flex: 1, minWidth: 90, align: "center" },
 ];
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function UploadedBadge({ status }: { status?: string }) {
-  const label  = status ?? "Uploaded";
+  const label = status ?? "Uploaded";
   const isGood = label.toLowerCase() === "uploaded";
 
   return (
@@ -157,7 +157,7 @@ export default function RecentlyUploadedSellersTable({ sellers }: Props) {
             styles.headerCell,
             { flex: col.flex ?? 1, minWidth: col.minWidth },
             col.align === "center" && { alignItems: "center" },
-            col.align === "right"  && { alignItems: "flex-end" },
+            col.align === "right" && { alignItems: "flex-end" },
           ]}
         >
           <Text style={styles.headerCellText}>{col.label}</Text>
@@ -197,14 +197,14 @@ export default function RecentlyUploadedSellersTable({ sellers }: Props) {
               styles.dataCell,
               { flex: col.flex ?? 1, minWidth: col.minWidth },
               col.align === "center" && { alignItems: "center" },
-              col.align === "right"  && { alignItems: "flex-end" },
+              col.align === "right" && { alignItems: "flex-end" },
             ]}
           >
             <Text
               style={[
                 styles.dataCellText,
                 col.key === "businessName" && styles.dataCellBold,
-                col.key === "uploadedAt"   && styles.dataCellMono,
+                col.key === "uploadedAt" && styles.dataCellMono,
                 (!value) && styles.dataCellEmpty,
               ]}
               numberOfLines={col.key === "businessName" ? 2 : 1}
@@ -230,31 +230,31 @@ export default function RecentlyUploadedSellersTable({ sellers }: Props) {
   return (
     <AdminLayout>
       <View style={styles.wrapper}>
-      <SectionHeader />
+        <SectionHeader />
 
-      {/* Horizontal scroll only kicks in when content is wider than screen */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1 }}
-        scrollEnabled={false}  // We rely on flex layout; enable if columns overflow
-      >
-        <View style={styles.tableContainer}>
-          <TableHeader />
+        {/* Horizontal scroll only kicks in when content is wider than screen */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+          scrollEnabled={false}  // We rely on flex layout; enable if columns overflow
+        >
+          <View style={styles.tableContainer}>
+            <TableHeader />
 
-          {safeSellers.length === 0 ? (
-            <EmptyState />
-          ) : (
-            safeSellers.map((seller, index) => (
-              <DataRow
-                key={seller.id ?? index}
-                seller={seller}
-                index={index}
-              />
-            ))
-          )}
-        </View>
-      </ScrollView>
+            {safeSellers.length === 0 ? (
+              <EmptyState />
+            ) : (
+              safeSellers.map((seller, index) => (
+                <DataRow
+                  key={seller.id ?? index}
+                  seller={seller}
+                  index={index}
+                />
+              ))
+            )}
+          </View>
+        </ScrollView>
       </View>
     </AdminLayout>
   );
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   rowEven: { backgroundColor: ROW_EVEN },
-  rowOdd:  { backgroundColor: ROW_ODD  },
+  rowOdd: { backgroundColor: ROW_ODD },
 
   dataCell: {
     justifyContent: "center",

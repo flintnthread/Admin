@@ -836,8 +836,10 @@ export default function SellersScreen() {
             </TouchableOpacity>
           ) : null}
           <View style={SS.pageHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <IconPerson size={24} color="#FFF" />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={SS.headerIconBox}>
+                <IconPerson size={16} color="#FFF" />
+              </View>
               <Text style={SS.pageTitle}>Active Sellers</Text>
             </View>
             <TouchableOpacity style={SS.exportBtn} onPress={() => router.push('/sellershiprocket')}>
@@ -1066,6 +1068,15 @@ const SS = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#ef7b1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   pageTitle: { fontSize: 22, fontWeight: '800', color: '#FFF' },
   exportBtn: { backgroundColor: C.green, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
