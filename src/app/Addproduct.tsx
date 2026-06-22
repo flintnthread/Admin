@@ -3034,7 +3034,7 @@ const ds = StyleSheet.create({
 
 const sc = StyleSheet.create({
     root: { flex: 1, backgroundColor: C.bg },
-    header: { backgroundColor: C.navyDeep, flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 10, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 10 : 10 },
+    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navyDeep, flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 10, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 10 : 10 },
     hBtn: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
     hCenter: { flex: 1, alignItems: "center" },
     hTitle: { fontFamily: fontFamilies.bold, fontSize: 17, color: C.white },

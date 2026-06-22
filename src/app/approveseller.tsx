@@ -16,6 +16,7 @@ import {
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import {
   fetchApprovedSellers,
@@ -229,6 +230,7 @@ export default function ApprovedSellersScreen() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [pendingCurrentPage, setPendingCurrentPage] = useState(1);
 
   // Filter sellers dynamically
   const filteredSellers = useMemo(() => {
@@ -896,10 +898,10 @@ export default function ApprovedSellersScreen() {
                   placeholder="Search pending sellers..."
                   placeholderTextColor="#9CA3AF"
                   value={pendingSearchQuery}
-                  onChangeText={setPendingSearchQuery}
+                  onChangeText={(text) => { setPendingSearchQuery(text); setPendingCurrentPage(1); }}
                 />
                 {pendingSearchQuery ? (
-                  <TouchableOpacity onPress={() => setPendingSearchQuery("")} style={styles.clearSearchBtn}>
+                  <TouchableOpacity onPress={() => { setPendingSearchQuery(""); setPendingCurrentPage(1); }} style={styles.clearSearchBtn}>
                     <Ionicons name="close-circle" size={18} color="#9CA3AF" />
                   </TouchableOpacity>
                 ) : null}
@@ -929,7 +931,7 @@ export default function ApprovedSellersScreen() {
                 <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Actions</Text>
               </View>
 
-              {filteredPendingSellers.map((seller) => (
+              {filteredPendingSellers.slice((pendingCurrentPage - 1) * itemsPerPage, pendingCurrentPage * itemsPerPage).map((seller) => (
                 <View key={seller.id} style={styles.tableRow}>
                   <View style={[styles.tableCell, { flex: 0.8 }]}>
                     <View style={styles.idBadge}>
@@ -961,25 +963,16 @@ export default function ApprovedSellersScreen() {
             )}
 
             {/* --- FOOTER PAGINATION --- */}
-            <View style={[styles.pagination, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              <Text style={styles.paginationText}>
-                Showing 1 - {filteredPendingSellers.length} of {filteredPendingSellers.length} pending sellers
-              </Text>
-
-              <View style={styles.pageSelectors}>
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
-                  <Ionicons name="chevron-back" size={16} color="#D1D5DB" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageNumber, styles.pageNumberActive]}>
-                  <Text style={[styles.pageNumberText, styles.pageNumberTextActive]}>1</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnDisabled]} disabled={true}>
-                  <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-                </TouchableOpacity>
-              </View>
-            </View>
+            {filteredPendingSellers.length > 0 && (
+              <Pagination
+                currentPage={pendingCurrentPage}
+                totalPages={Math.ceil(filteredPendingSellers.length / itemsPerPage)}
+                totalItems={filteredPendingSellers.length}
+                itemsPerPage={itemsPerPage}
+                itemName="pending sellers"
+                onPageChange={setPendingCurrentPage}
+              />
+            )}
           </>
         ) : (
           <>
@@ -1423,71 +1416,14 @@ export default function ApprovedSellersScreen() {
 
             {/* --- PAGINATION FOOTER --- */}
             {filteredSellers.length > 0 && (
-              <View style={[styles.pagination, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                <Text style={styles.paginationText}>
-                  Showing {(currentPage - 1) * itemsPerPage + 1} -{" "}
-                  {Math.min(currentPage * itemsPerPage, filteredSellers.length)} of{" "}
-                  {filteredSellers.length} sellers
-                </Text>
-
-                <View style={styles.pageSelectors}>
-                  <TouchableOpacity
-                    style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
-                    disabled={currentPage === 1}
-                    onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  >
-                    <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? "#D1D5DB" : "#374151"} />
-                  </TouchableOpacity>
-
-                  {Array.from({ length: totalPages }).map((_, idx) => {
-                    const pageNum = idx + 1;
-                    if (
-                      pageNum === 1 ||
-                      pageNum === totalPages ||
-                      Math.abs(currentPage - pageNum) <= 1
-                    ) {
-                      return (
-                        <TouchableOpacity
-                          key={pageNum}
-                          style={[styles.pageNumber, currentPage === pageNum && styles.pageNumberActive]}
-                          onPress={() => setCurrentPage(pageNum)}
-                        >
-                          <Text
-                            style={[
-                              styles.pageNumberText,
-                              currentPage === pageNum && styles.pageNumberTextActive,
-                            ]}
-                          >
-                            {pageNum}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    } else if (
-                      (pageNum === 2 && currentPage > 3) ||
-                      (pageNum === totalPages - 1 && currentPage < totalPages - 2)
-                    ) {
-                      return (
-                        <Text key={pageNum} style={styles.ellipses}>
-                          ...
-                        </Text>
-                      );
-                    }
-                    return null;
-                  })}
-
-                  <TouchableOpacity
-                    style={[styles.pageBtn, currentPage === totalPages && styles.pageBtnDisabled]}
-                    disabled={currentPage === totalPages}
-                    onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={currentPage === totalPages ? "#D1D5DB" : "#374151"}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredSellers.length / itemsPerPage)}
+                totalItems={filteredSellers.length}
+                itemsPerPage={itemsPerPage}
+                itemName="approved sellers"
+                onPageChange={setCurrentPage}
+              />
             )}
           </>
             ) : null}

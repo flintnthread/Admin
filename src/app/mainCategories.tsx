@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
@@ -241,20 +242,12 @@ const LayersIcon = ({ color = "#1d324e" }: { color?: string }) => (
 
 const HsnIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-    <Rect
-      x="2"
-      y="3"
-      width="20"
-      height="14"
-      rx="2"
-      stroke="#0EA5E9"
-      strokeWidth={1.8}
-    />
     <Path
-      d="M8 21h8M12 17v4"
-      stroke="#0EA5E9"
-      strokeWidth={1.8}
+      d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01"
+      stroke="#ef7b1a"
+      strokeWidth={2}
       strokeLinecap="round"
+      strokeLinejoin="round"
     />
   </Svg>
 );
@@ -263,12 +256,12 @@ const GstIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
     <Path
       d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"
-      stroke="#10B981"
+      stroke="#151D4F"
       strokeWidth={1.8}
     />
     <Path
       d="M15 9l-6 6M9 9h.01M15 15h.01"
-      stroke="#10B981"
+      stroke="#151D4F"
       strokeWidth={2}
       strokeLinecap="round"
     />
@@ -327,10 +320,10 @@ const WarningIcon = () => (
 
 const InfoIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-    <Circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth={1.6} />
+    <Circle cx="12" cy="12" r="10" stroke="#ef7b1a" strokeWidth={1.6} />
     <Path
       d="M12 8v4M12 16h.01"
-      stroke="#3B82F6"
+      stroke="#ef7b1a"
       strokeWidth={1.6}
       strokeLinecap="round"
     />
@@ -344,7 +337,7 @@ const C = {
   surface: "#FFFFFF",
   primary: "#ef7b1a",
   primaryLight: "#FFF0EA",
-  navy: "#1d324e",
+  navy: "#151D4F",
   navyLight: "#e8ecf2",
   text: "#1C2B4A",
   sub: "#6B7280",
@@ -353,12 +346,12 @@ const C = {
   activeLight: "#ECFDF5",
   inactive: "#EF4444",
   inactiveLight: "#FEF2F2",
-  hsnBg: "#EEF6FF",
-  hsnText: "#2563EB",
-  gstBg: "#ECFDF5",
-  gstText: "#059669",
+  hsnBg: "#FFF0EA",
+  hsnText: "#ef7b1a",
+  gstBg: "#e8ecf2",
+  gstText: "#151D4F",
   rowAlt: "#FDFAF7",
-  tableHead: "#1d324e",
+  tableHead: "#151D4F",
   tableHeadText: "#FFFFFF",
 };
 
@@ -1173,7 +1166,8 @@ const ListTable = ({
       <Text style={[styles.th, styles.colImage]}>Image</Text>
       <Text style={[styles.th, styles.colName]}>Category Name</Text>
       <Text style={[styles.th, styles.colType]}>Type</Text>
-      <Text style={[styles.th, styles.colHsn]}>HSN/GST Info</Text>
+      <Text style={[styles.th, styles.colHsn]}>HSN Code</Text>
+      <Text style={[styles.th, styles.colGst]}>GST</Text>
       <Text style={[styles.th, styles.colDate]}>Created Date</Text>
       <Text style={[styles.th, styles.colStatus]}>Status</Text>
       <Text style={[styles.th, styles.colAction, { textAlign: "center" }]}>
@@ -1234,15 +1228,18 @@ const ListTable = ({
             <Text style={styles.tdParent}>under: {cat.parent}</Text>
           )}
         </View>
-        {/* HSN/GST */}
-        <View style={[styles.cell, styles.colHsn, { gap: 4 }]}>
+        {/* HSN */}
+        <View style={[styles.cell, styles.colHsn]}>
           <View style={styles.hsnChip}>
             <HsnIcon />
-            <Text style={styles.hsnChipText}>HSN: {cat.hsn}</Text>
+            <Text style={styles.hsnChipText}>{cat.hsn}</Text>
           </View>
+        </View>
+        {/* GST */}
+        <View style={[styles.cell, styles.colGst]}>
           <View style={styles.gstChip}>
             <GstIcon />
-            <Text style={styles.gstChipText}>GST: {cat.gst}</Text>
+            <Text style={styles.gstChipText}>{cat.gst}</Text>
           </View>
         </View>
         {/* Created */}
@@ -1302,54 +1299,7 @@ const ListTable = ({
   </View>
 );
 
-// ─── Pagination ───────────────────────────────────────────────────────────────
 
-const Pagination = ({
-  page,
-  totalPages,
-  onPrev,
-  onNext,
-  onPage,
-}: {
-  page: number;
-  totalPages: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onPage: (p: number) => void;
-}) => {
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-  return (
-    <View style={styles.pagination}>
-      <TouchableOpacity
-        style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
-        onPress={onPrev}
-        disabled={page === 1}
-      >
-        <ChevronLeftIcon />
-      </TouchableOpacity>
-      {pages.map((p) => (
-        <TouchableOpacity
-          key={p}
-          style={[styles.pageBtn, p === page && styles.pageBtnActive]}
-          onPress={() => onPage(p)}
-        >
-          <Text
-            style={[styles.pageBtnText, p === page && styles.pageBtnTextActive]}
-          >
-            {p}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      <TouchableOpacity
-        style={[styles.pageBtn, page === totalPages && styles.pageBtnDisabled]}
-        onPress={onNext}
-        disabled={page === totalPages}
-      >
-        <ChevronRightIcon />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -1360,7 +1310,7 @@ export default function MainCategories() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [search, setSearch] = useState("");
   const [categories, setCategories] = useState<Category[]>(SAMPLE_CATEGORIES);
-  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [mainCatModalOpen, setMainCatModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
 
@@ -1370,8 +1320,8 @@ export default function MainCategories() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = filtered.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
   );
 
   const handleSave = (data: any) => {
@@ -1391,7 +1341,7 @@ export default function MainCategories() {
       image: data.image,
     };
     setCategories((prev) => [newCat, ...prev]);
-    setPage(1);
+    setCurrentPage(1);
   };
 
   const handleDelete = (cat: Category) => {
@@ -1445,7 +1395,7 @@ export default function MainCategories() {
               value={search}
               onChangeText={(t) => {
                 setSearch(t);
-                setPage(1);
+                setCurrentPage(1);
               }}
             />
           </View>
@@ -1489,7 +1439,7 @@ export default function MainCategories() {
               style={styles.addCatBtn}
               onPress={() => setCatModalOpen(true)}
             >
-              <PlusIcon color="#1E3A5F" />
+              <PlusIcon />
               <Text style={styles.addCatBtnText}>
                 {isWeb ? "Add Category" : "Category"}
               </Text>
@@ -1544,13 +1494,14 @@ export default function MainCategories() {
         )}
 
         {/* ── Pagination ── */}
-        {totalPages > 1 && (
+        {filtered.length > 0 && (
           <Pagination
-            page={page}
-            totalPages={totalPages}
-            onPrev={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-            onPage={setPage}
+            currentPage={currentPage}
+            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="categories"
+            onPageChange={setCurrentPage}
           />
         )}
       </ScrollView>
@@ -1671,14 +1622,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: C.primaryLight,
+    backgroundColor: C.primary,
     borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: C.primary,
     paddingHorizontal: 14,
     height: 42,
   },
-  addCatBtnText: { fontSize: 13, fontWeight: "700", color: C.primary },
+  addCatBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 
   // Count
   countRow: { marginBottom: 12 },
@@ -1795,6 +1744,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    alignSelf: "flex-start",
   },
   hsnChipText: { fontSize: 11, fontWeight: "600", color: C.hsnText },
   gstChip: {
@@ -1805,6 +1755,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    alignSelf: "flex-start",
   },
   gstChipText: { fontSize: 11, fontWeight: "600", color: C.gstText },
 
@@ -1883,14 +1834,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  colSno: { width: 56 },
-  colImage: { width: 76 },
-  colName: { flex: 1.4, minWidth: 120 },
-  colType: { flex: 1.6, minWidth: 130 },
-  colHsn: { flex: 1.8, minWidth: 150 },
-  colDate: { width: 128 },
-  colStatus: { width: 100 },
-  colAction: { width: 96 },
+  colSno: { width: 60 },
+  colImage: { width: 80 },
+  colName: { flex: 1, minWidth: 100 },
+  colType: { flex: 1, minWidth: 110 },
+  colHsn: { flex: 1, minWidth: 90 },
+  colGst: { flex: 1, minWidth: 80 },
+  colDate: { flex: 1, minWidth: 110 },
+  colStatus: { flex: 1, minWidth: 90 },
+  colAction: { width: 90 },
 
   tdSno: { fontSize: 14, fontWeight: "700", color: C.sub },
   tableThumb: { width: 50, height: 50, borderRadius: 10 },
@@ -1920,7 +1872,7 @@ const styles = StyleSheet.create({
   // ── Pagination ────────────────────────────────────────────────────────────
   pagination: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "flex-end",
     alignItems: "center",
     gap: 6,
     marginTop: 24,
@@ -1935,7 +1887,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  pageBtnActive: { backgroundColor: C.navy, borderColor: C.navy },
+  pageBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
   pageBtnDisabled: { opacity: 0.35 },
   pageBtnText: { fontSize: 13, fontWeight: "600", color: C.text },
   pageBtnTextActive: { color: "#FFFFFF" },
@@ -2048,12 +2000,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 6,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primaryLight,
     borderRadius: 8,
     padding: 10,
     marginTop: 8,
   },
-  infoText: { fontSize: 12, color: "#1D4ED8", flex: 1, lineHeight: 17 },
+  infoText: { fontSize: 12, color: C.primary, flex: 1, lineHeight: 17 },
   warnNote: {
     flexDirection: "row",
     alignItems: "flex-start",

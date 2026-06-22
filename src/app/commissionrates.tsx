@@ -178,13 +178,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
     marginBottom: 24,
     backgroundColor: "#151D4F",
     padding: 18,
     borderRadius: 12,
-    marginHorizontal: 2,
-    marginTop: 12,
     shadowColor: "#151D4F",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

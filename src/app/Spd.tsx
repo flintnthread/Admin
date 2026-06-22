@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 2,
     },
-    headerWeb: { paddingHorizontal: 28, paddingVertical: 20, borderRadius: 16 },
+    headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 28, paddingVertical: 20, },
     backBtn: {
         width: 40, height: 40, borderRadius: 12,
         borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",

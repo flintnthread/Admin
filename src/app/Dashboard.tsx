@@ -1076,7 +1076,7 @@ export default function DashboardScreen() {
                         }
                       ]}
                     >
-                      {hasKpiLoading || loading ? (
+                      {hasKpiLoading ? (
                         <View style={styles.kpiInnerContent}>
                           <ActivityIndicator size="small" color={C.primary} />
                           <Text style={styles.kpiLoadingText}>Syncing card...</Text>
@@ -2460,8 +2460,8 @@ const getStyles = (isDark: boolean) => {
     right: 0,
     zIndex: 1000,
     backgroundColor: C.bg,
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingHorizontal: 18,
+    paddingTop: 22,
     paddingBottom: 12,
   },
   sectionSpacing: {

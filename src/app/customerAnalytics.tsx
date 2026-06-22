@@ -3105,7 +3105,7 @@ const s = StyleSheet.create({
   body: { gap: 16, paddingTop: 16 },
 
   heroOuter: { width: "100%", alignSelf: "center", maxWidth: 1600, paddingHorizontal: 10 },
-  header: { paddingBottom: 20, borderRadius: 24, paddingHorizontal: 20 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  paddingBottom: 20, borderRadius: 24, paddingHorizontal: 20 },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",

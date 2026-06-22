@@ -22,6 +22,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 let Swal: any;
 if (Platform.OS === "web") {
@@ -236,23 +237,31 @@ const ListRow: React.FC<{
     const isActive = cat.status === "Active";
     return (
         <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
-            <View style={[lSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                <Feather name={safeIcon(cat.icon) as any} size={18} color={cat.color} />
+            <View style={{ flex: 1.5, flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <View style={[lSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
+                    <Feather name={safeIcon(cat.icon) as any} size={18} color={cat.color} />
+                </View>
+                <View style={lSt.info}>
+                    <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
+                    <Text style={lSt.desc} numberOfLines={1}>{cat.description}</Text>
+                </View>
             </View>
-            <View style={lSt.info}>
-                <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
-                <Text style={lSt.desc} numberOfLines={1}>{cat.description}</Text>
+            <View style={{ flex: 1, alignItems: "flex-start" }}>
+                <View style={lSt.countBox}>
+                    <Text style={lSt.countNum}>{cat.faqCount}</Text>
+                    <Text style={lSt.countLabel}>FAQs</Text>
+                </View>
             </View>
-            <View style={lSt.countBox}>
-                <Text style={lSt.countNum}>{cat.faqCount}</Text>
-                <Text style={lSt.countLabel}>FAQs</Text>
+            <View style={{ flex: 1, alignItems: "flex-start" }}>
+                <View style={[lSt.badge, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
+                    <View style={[lSt.dot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
+                    <Text style={[lSt.badgeText, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{cat.status}</Text>
+                </View>
             </View>
-            <View style={[lSt.badge, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
-                <View style={[lSt.dot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
-                <Text style={[lSt.badgeText, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{cat.status}</Text>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+                <Text style={lSt.date}>{cat.createdAt}</Text>
             </View>
-            <Text style={lSt.date}>{cat.createdAt}</Text>
-            <View style={lSt.actions}>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <TouchableOpacity style={lSt.btn} onPress={onEdit}>
                     <Feather name="edit-2" size={14} color={PRIMARY} />
                 </TouchableOpacity>
@@ -277,6 +286,8 @@ const FaqCategoriesScreen: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Inactive">("All");
     const [modalVisible, setModalVisible] = useState(false);
     const [editingCat, setEditingCat] = useState<FaqCategory | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     const loadCategories = useCallback(async () => {
         try {
@@ -299,6 +310,11 @@ const FaqCategoriesScreen: React.FC = () => {
         const mf = statusFilter === "All" || c.status === statusFilter;
         return ms && mf;
     });
+
+    const paginated = filtered.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const totalActive = categories.filter(c => c.status === "Active").length;
     const totalFaqs = categories.reduce((s, c) => s + c.faqCount, 0);
@@ -490,9 +506,15 @@ const FaqCategoriesScreen: React.FC = () => {
                                     placeholder="Search categories..."
                                     placeholderTextColor={TEXT_MUTED}
                                     value={search}
-                                    onChangeText={setSearch} />
+                                    onChangeText={(t) => {
+                                        setSearch(t);
+                                        setCurrentPage(1);
+                                    }} />
                                 {search.length > 0 && (
-                                    <TouchableOpacity onPress={() => setSearch("")}>
+                                    <TouchableOpacity onPress={() => {
+                                        setSearch("");
+                                        setCurrentPage(1);
+                                    }}>
                                         <Feather name="x-circle" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                 )}
@@ -503,7 +525,10 @@ const FaqCategoriesScreen: React.FC = () => {
                                 {(["All", "Active", "Inactive"] as const).map(f => (
                                     <TouchableOpacity key={f}
                                         style={[st.chip, statusFilter === f && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-                                        onPress={() => setStatusFilter(f)}>
+                                        onPress={() => {
+                                            setStatusFilter(f);
+                                            setCurrentPage(1);
+                                        }}>
                                         <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
                                     </TouchableOpacity>
                                 ))}
@@ -542,7 +567,7 @@ const FaqCategoriesScreen: React.FC = () => {
                             </View>
                         ) : viewMode === "grid" ? (
                             <View style={[st.grid, isWeb && st.gridWeb]}>
-                                {filtered.map(cat => (
+                                {paginated.map(cat => (
                                     <View key={cat.id} style={[st.gridItem, isWeb && st.gridItemWeb]}>
                                         <GridCard
                                             cat={cat}
@@ -556,16 +581,16 @@ const FaqCategoriesScreen: React.FC = () => {
                             </View>
                         ) : (
                             <View style={st.listWrap}>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    <View style={{ minWidth: 800 }}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
+                                    <View style={{ minWidth: 800, width: "100%" }}>
                                         <View style={lSt.headerRow}>
-                                            <Text style={[lSt.headerCell, { flex: 2 }]}>Category</Text>
-                                            <Text style={[lSt.headerCell, { width: 70 }]}>FAQs</Text>
-                                            <Text style={[lSt.headerCell, { width: 90 }]}>Status</Text>
-                                            <Text style={[lSt.headerCell, { width: 110 }]}>Created</Text>
-                                            <Text style={[lSt.headerCell, { width: 120 }]}>Actions</Text>
+                                            <Text style={[lSt.headerCell, { flex: 1.5 }]}>Category</Text>
+                                            <Text style={[lSt.headerCell, { flex: 1 }]}>FAQs</Text>
+                                            <Text style={[lSt.headerCell, { flex: 1 }]}>Status</Text>
+                                            <Text style={[lSt.headerCell, { flex: 1 }]}>Created</Text>
+                                            <Text style={[lSt.headerCell, { flex: 1 }]}>Actions</Text>
                                         </View>
-                                        {filtered.map(cat => (
+                                        {paginated.map(cat => (
                                             <ListRow key={cat.id} cat={cat}
                                                 onEdit={() => { setEditingCat(cat); setModalVisible(true); }}
                                                 onToggle={() => handleToggle(cat.id)}
@@ -575,6 +600,17 @@ const FaqCategoriesScreen: React.FC = () => {
                                     </View>
                                 </ScrollView>
                             </View>
+                        )}
+
+                        {filtered.length > 0 && (
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                totalItems={filtered.length}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                                itemName="categories"
+                                onPageChange={setCurrentPage}
+                            />
                         )}
                     </View>
                 </ScrollView>
@@ -600,7 +636,7 @@ const st = StyleSheet.create({
 
     // Header
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
-    headerWeb: { paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, marginHorizontal: 18, marginTop: 22, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },

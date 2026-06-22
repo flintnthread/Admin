@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type MessageStatus = "Replied" | "Not Replied";
@@ -778,7 +779,10 @@ const ContactMessagesScreen: React.FC = () => {
               placeholder="Search messages..."
               placeholderTextColor={TEXT_MUTED}
               value={search}
-              onChangeText={setSearch}
+              onChangeText={(t) => {
+                setSearch(t);
+                setCurrentPage(1);
+              }}
             />
           </View>
           <View style={styles.viewSwitcherMobile}>
@@ -865,7 +869,10 @@ const ContactMessagesScreen: React.FC = () => {
                 placeholder="Search by name, subject, or email..."
                 placeholderTextColor={TEXT_MUTED}
                 value={search}
-                onChangeText={setSearch}
+                onChangeText={(t) => {
+                  setSearch(t);
+                  setCurrentPage(1);
+                }}
               />
             </View>
             <View style={styles.filterPills}>
@@ -873,7 +880,7 @@ const ContactMessagesScreen: React.FC = () => {
                 <TouchableOpacity
                   key={f}
                   style={[styles.pill, filter === f && styles.pillActive]}
-                  onPress={() => setFilter(f)}
+                  onPress={() => { setFilter(f); setCurrentPage(1); }}
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>
@@ -897,7 +904,7 @@ const ContactMessagesScreen: React.FC = () => {
               <TouchableOpacity
                 key={f}
                 style={[styles.pill, filter === f && styles.pillActive]}
-                onPress={() => setFilter(f)}
+                onPress={() => { setFilter(f); setCurrentPage(1); }}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>
@@ -1027,24 +1034,15 @@ const ContactMessagesScreen: React.FC = () => {
         )}
 
         {/* Pagination Controls */}
-        {!loading && !loadError && totalPages > 1 && (
-          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24, marginBottom: 24, gap: 16 }}>
-            <TouchableOpacity 
-              disabled={currentPage === 1} 
-              onPress={() => setCurrentPage(p => p - 1)} 
-              style={{ padding: 8, opacity: currentPage === 1 ? 0.5 : 1, backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" }}
-            >
-              <Feather name="chevron-left" size={20} color="#1e293b" />
-            </TouchableOpacity>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: "#1e293b" }}>Page {currentPage} of {totalPages}</Text>
-            <TouchableOpacity 
-              disabled={currentPage === totalPages} 
-              onPress={() => setCurrentPage(p => p + 1)} 
-              style={{ padding: 8, opacity: currentPage === totalPages ? 0.5 : 1, backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" }}
-            >
-              <Feather name="chevron-right" size={20} color="#1e293b" />
-            </TouchableOpacity>
-          </View>
+        {!loading && !loadError && filtered.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              itemName="messages"
+              onPageChange={setCurrentPage}
+            />
         )}
         </>
         )}
@@ -1133,7 +1131,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Header ──
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1148,8 +1146,9 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingHorizontal: 24,
     paddingBottom: 50,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 22,
   },
   headerTextContainer: {
     flex: 1,
@@ -1510,11 +1509,13 @@ const styles = StyleSheet.create({
   // ── Stats ──
   statsRow: {
     flexDirection: "row",
+    justifyContent: "center",
     gap: 12,
     marginBottom: 0,
   },
   statsContainer: {
     flex: 1,
+    maxWidth: 240,
     flexDirection: "row",
     gap: 12,
     backgroundColor: "#FFFFFF",

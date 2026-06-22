@@ -165,9 +165,18 @@ const Dropdown = ({ label, value, options, onSelect }: DropdownProps) => {
       </TouchableOpacity>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
-        <TouchableOpacity style={styles.dropdownBackdrop} onPress={() => setOpen(false)}>
-          <View style={styles.dropdownMenu}>
-            <Text style={styles.dropdownMenuTitle}>{label}</Text>
+        <TouchableOpacity style={styles.dropdownBackdrop} activeOpacity={1} onPress={() => setOpen(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.dropdownMenu} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.dropdownMenuHeader}>
+              <Text style={styles.dropdownMenuTitle}>{label}</Text>
+              <TouchableOpacity
+                style={styles.dropdownDismissBtn}
+                onPress={() => setOpen(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <CloseIcon size={16} color={C.textSecondary} />
+              </TouchableOpacity>
+            </View>
             {options.map((opt) => (
               <TouchableOpacity
                 key={opt}
@@ -188,27 +197,95 @@ const Dropdown = ({ label, value, options, onSelect }: DropdownProps) => {
                 {value === opt && <Text style={styles.dropdownCheck}>✓</Text>}
               </TouchableOpacity>
             ))}
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
   );
 };
 
+// ─── Lightweight inline icons (no external icon lib dependency) ─────────────
+
+const SearchIcon = ({ size = 16, color = C.textMuted }: { size?: number; color?: string }) => {
+  const circleSize = size * 0.62;
+  const strokeWidth = Math.max(1.5, size * 0.11);
+  const handleLength = size * 0.4;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={{
+          width: circleSize,
+          height: circleSize,
+          borderRadius: circleSize / 2,
+          borderWidth: strokeWidth,
+          borderColor: color,
+          position: "absolute",
+          top: 0,
+          left: 0,
+        }}
+      />
+      <View
+        style={{
+          width: handleLength,
+          height: strokeWidth,
+          backgroundColor: color,
+          borderRadius: strokeWidth / 2,
+          position: "absolute",
+          top: circleSize - strokeWidth * 0.5,
+          left: circleSize - strokeWidth * 0.5,
+          transform: [{ rotate: "45deg" }, { translateX: handleLength / 2 }],
+        }}
+      />
+    </View>
+  );
+};
+
+const CloseIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <View style={{ width: size, height: size, justifyContent: "center", alignItems: "center" }}>
+    <View
+      style={{
+        width: size * 0.78,
+        height: 1.8,
+        backgroundColor: color,
+        borderRadius: 1,
+        position: "absolute",
+        transform: [{ rotate: "45deg" }],
+      }}
+    />
+    <View
+      style={{
+        width: size * 0.78,
+        height: 1.8,
+        backgroundColor: color,
+        borderRadius: 1,
+        position: "absolute",
+        transform: [{ rotate: "-45deg" }],
+      }}
+    />
+  </View>
+);
+
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   label: string;
+  sublabel: string;
   count: number;
   color: string;
   bgColor: string;
-  isWide: boolean;
+  icon: string;
 }
 
-const StatCard = ({ label, count, color, bgColor, isWide }: StatCardProps) => (
-  <View style={[styles.statCard, isWide && styles.statCardWide, { borderTopColor: color }]}>
-    <Text style={[styles.statCount, { color }]}>{count}</Text>
+const StatCard = ({ label, sublabel, count, color, bgColor, icon }: StatCardProps) => (
+  <View style={styles.statCard}>
+    <View style={styles.statCardTop}>
+      <View style={[styles.statIconChip, { backgroundColor: bgColor }]}>
+        <Text style={[styles.statIconText, { color }]}>{icon}</Text>
+      </View>
+      <Text style={[styles.statCount, { color }]}>{count}</Text>
+    </View>
     <Text style={styles.statLabel}>{label}</Text>
+    <Text style={styles.statSublabel}>{sublabel}</Text>
   </View>
 );
 
@@ -256,6 +333,7 @@ interface ChatPanelProps {
 const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
   const [replyText, setReplyText] = useState("");
   const isClosed = ticket.status === "Closed" || ticket.status === "Resolved";
+  const hasMessages = ticket.messages && ticket.messages.length > 0;
 
   const handleSend = () => {
     const t = replyText.trim();
@@ -283,9 +361,9 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
             <StatusBadge status={ticket.status} />
           </View>
           <View style={styles.chatHeaderContact}>
-            <Text style={styles.chatContactText}>✉ {ticket.email}</Text>
-            <Text style={styles.chatContactText}>  📱 {ticket.phone}</Text>
-            <Text style={styles.chatContactText}>  🗂 {ticket.department}</Text>
+            {!!ticket.email && <Text style={styles.chatContactText}>✉ {ticket.email}</Text>}
+            {!!ticket.phone && <Text style={styles.chatContactText}>  📱 {ticket.phone}</Text>}
+            {!!ticket.department && <Text style={styles.chatContactText}>  🗂 {ticket.department}</Text>}
           </View>
         </View>
         {isClosed && (
@@ -304,7 +382,14 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
         contentContainerStyle={styles.chatMessagesContent}
         showsVerticalScrollIndicator={false}
       >
-        {ticket.messages.map((msg) => (
+        {!hasMessages && (
+          <View style={styles.emptyMessages}>
+            <Text style={styles.emptyMessagesIcon}>💬</Text>
+            <Text style={styles.emptyMessagesText}>No messages yet</Text>
+          </View>
+        )}
+
+        {ticket.messages?.map((msg) => (
           <View
             key={msg.id}
             style={[
@@ -454,6 +539,9 @@ export default function SupportTicketManagement() {
   const handleSelectTicket = useCallback(
     (ticket: Ticket) => {
       setSelectedTicket(ticket);
+      // Refresh from the detail endpoint so messages/email/phone are fully populated,
+      // in case the list endpoint returns a lighter-weight shape than the detail endpoint.
+      void refreshTicket(ticket.id);
     },
     []
   );
@@ -494,63 +582,115 @@ export default function SupportTicketManagement() {
   }, [loadTickets, refreshTicket]);
 
   const statCards = [
-    { label: "Total Tickets", count: stats.total, color: C.brand, bgColor: C.brandFaint },
-    { label: "Open", count: stats.open, color: C.open.text, bgColor: C.open.bg },
-    { label: "In Progress", count: stats.inProgress, color: C.inProgress.text, bgColor: C.inProgress.bg },
-    { label: "Waiting", count: stats.waiting, color: C.waitingAdmin.text, bgColor: C.waitingAdmin.bg },
-    { label: "Resolved", count: stats.resolved, color: C.resolved.text, bgColor: C.resolved.bg },
-    { label: "Urgent", count: stats.urgent, color: C.urgent.text, bgColor: C.urgent.bg },
+    {
+      label: "Total Tickets",
+      sublabel: "All requests",
+      count: stats.total,
+      color: C.brand,
+      bgColor: C.brandFaint,
+      icon: "⊞",
+    },
+    {
+      label: "Open",
+      sublabel: "Needs response",
+      count: stats.open,
+      color: C.open.text,
+      bgColor: C.open.bg,
+      icon: "●",
+    },
+    {
+      label: "In Progress",
+      sublabel: "Being handled",
+      count: stats.inProgress,
+      color: C.inProgress.text,
+      bgColor: C.inProgress.bg,
+      icon: "◐",
+    },
+    {
+      label: "Waiting",
+      sublabel: "Pending reply",
+      count: stats.waiting,
+      color: C.waitingAdmin.text,
+      bgColor: C.waitingAdmin.bg,
+      icon: "◷",
+    },
+    {
+      label: "Resolved",
+      sublabel: "Completed",
+      count: stats.resolved,
+      color: C.resolved.text,
+      bgColor: C.resolved.bg,
+      icon: "✓",
+    },
+    {
+      label: "Urgent",
+      sublabel: "High priority",
+      count: stats.urgent,
+      color: C.urgent.text,
+      bgColor: C.urgent.bg,
+      icon: "!",
+    },
   ];
 
   return (
     <AdminLayout>
       <View style={{ flex: 1 }}>
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity style={styles.menuBtn}>
-              <View style={styles.menuLine} />
-              <View style={[styles.menuLine, { width: 16 }]} />
-              <View style={styles.menuLine} />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>Support Tickets</Text>
-              <Text style={styles.headerSubtitle}>Admin Panel · Manage all support requests</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>A</Text>
-          </TouchableOpacity>
-        </View>
-
         <ScrollView
           style={styles.body}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.bodyContent}
         >
+          {/* ── Header panel: rounded dark card with title row + overlapping stat cards ── */}
+          <View style={styles.headerOuter}>
+            <View style={styles.headerPanel}>
+              <View style={styles.headerTitleRow}>
+                <TouchableOpacity style={styles.menuBtn}>
+                  <View style={styles.menuLine} />
+                  <View style={[styles.menuLine, { width: 16 }]} />
+                  <View style={styles.menuLine} />
+                </TouchableOpacity>
+                <View style={styles.headerTitleTextWrap}>
+                  <Text style={styles.headerTitle}>Support Tickets</Text>
+                  <Text style={styles.headerSubtitle}>Admin Panel · Manage all support requests</Text>
+                </View>
+                <TouchableOpacity style={styles.headerAvatar}>
+                  <Text style={styles.headerAvatarText}>A</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Spacer so the panel has enough height for cards to overlap into */}
+              <View style={styles.headerCardSpacer} />
+            </View>
+
+            {/* Stat cards: horizontally scrollable, overlapping the bottom edge of the dark panel */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.statsScroll}
+              contentContainerStyle={styles.statsRow}
+            >
+              {statCards.map((card) => (
+                <StatCard
+                  key={card.label}
+                  label={card.label}
+                  sublabel={card.sublabel}
+                  count={card.count}
+                  color={card.color}
+                  bgColor={card.bgColor}
+                  icon={card.icon}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
           {loadError ? (
             <Text style={{ color: C.brand, marginBottom: 12, paddingHorizontal: 4 }}>{loadError}</Text>
           ) : null}
 
-          {/* ── Stats ── */}
-          <Text style={styles.sectionLabel}>Overview</Text>
-          <View style={styles.statsGrid}>
-            {statCards.map((card) => (
-              <StatCard
-                key={card.label}
-                label={card.label}
-                count={card.count}
-                color={card.color}
-                bgColor={card.bgColor}
-                isWide={isDesktop}
-              />
-            ))}
-          </View>
-
           {/* ── Filters ── */}
           <View style={styles.filtersRow}>
             <View style={styles.searchBox}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <SearchIcon size={16} color={C.textMuted} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search tickets..."
@@ -559,20 +699,18 @@ export default function SupportTicketManagement() {
                 onChangeText={setSearchText}
               />
             </View>
-            <View style={styles.dropdownsRow}>
-              <Dropdown
-                label="Status"
-                value={statusFilter}
-                options={statusOptions}
-                onSelect={setStatusFilter}
-              />
-              <Dropdown
-                label="Priority"
-                value={priorityFilter}
-                options={priorityOptions}
-                onSelect={setPriorityFilter}
-              />
-            </View>
+            <Dropdown
+              label="Status"
+              value={statusFilter}
+              options={statusOptions}
+              onSelect={setStatusFilter}
+            />
+            <Dropdown
+              label="Priority"
+              value={priorityFilter}
+              options={priorityOptions}
+              onSelect={setPriorityFilter}
+            />
           </View>
 
           {/* ── Main Content ── */}
@@ -683,18 +821,30 @@ const styles = StyleSheet.create({
   },
 
   // Header
-  header: {
-    backgroundColor: C.brandDark,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  headerOuter: {
+    marginHorizontal: -16,
+    marginTop: -8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    marginBottom: 8,
   },
-  headerLeft: {
+  headerPanel: {
+    backgroundColor: C.brandDark,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    overflow: "hidden",
+  },
+  headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  headerTitleTextWrap: {
+    flex: 1,
+  },
+  headerCardSpacer: {
+    height: 54,
   },
   menuBtn: {
     gap: 4,
@@ -738,6 +888,7 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: 16,
+    paddingTop: 8,
     paddingBottom: 32,
   },
 
@@ -750,47 +901,84 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // Stats
-  statsGrid: {
+  // Stats — overlap the bottom edge of the dark header panel
+  statsScroll: {
+    marginTop: -46,
+  },
+  statsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 20,
+    justifyContent: "center",
+    flexGrow: 1,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
   statCard: {
     backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 14,
-    minWidth: "30%",
-    flex: 1,
-    borderTopWidth: 3,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: 150,
+    borderWidth: 1,
+    borderColor: C.border,
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
   },
-  statCardWide: {
-    minWidth: "14%",
+  statCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  statIconChip: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statIconText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   statCount: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "800",
     letterSpacing: -0.5,
   },
   statLabel: {
+    fontSize: 13,
+    color: C.textPrimary,
+    fontWeight: "700",
+  },
+  statSublabel: {
     fontSize: 11,
-    color: C.textSecondary,
-    fontWeight: "500",
+    color: C.textMuted,
     marginTop: 2,
   },
 
   // Filters
   filtersRow: {
-    gap: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 3,
   },
   searchBox: {
+    flex: 2,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: C.surface,
@@ -799,10 +987,7 @@ const styles = StyleSheet.create({
     height: 42,
     borderWidth: 1,
     borderColor: C.border,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
@@ -846,17 +1031,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
-    paddingHorizontal: 20,
+    alignItems: "center",
+    paddingHorizontal: 24,
   },
   dropdownMenu: {
     backgroundColor: C.surface,
     borderRadius: 16,
     paddingVertical: 8,
+    width: "100%",
+    maxWidth: 340,
+    alignSelf: "center",
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 20,
     elevation: 12,
+  },
+  dropdownMenuHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    marginBottom: 4,
   },
   dropdownMenuTitle: {
     fontSize: 11,
@@ -864,11 +1063,14 @@ const styles = StyleSheet.create({
     color: C.textMuted,
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    marginBottom: 4,
+  },
+  dropdownDismissBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: C.bg,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dropdownItem: {
     flexDirection: "row",
@@ -1105,6 +1307,20 @@ const styles = StyleSheet.create({
   chatMessagesContent: {
     padding: 16,
     gap: 12,
+  },
+  emptyMessages: {
+    alignItems: "center",
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptyMessagesIcon: {
+    fontSize: 36,
+    opacity: 0.5,
+  },
+  emptyMessagesText: {
+    fontSize: 13,
+    color: C.textMuted,
+    fontWeight: "500",
   },
   messageBubbleWrapper: {
     alignItems: "flex-start",

@@ -1260,7 +1260,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 16, paddingBottom: 32 },
 
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
     backgroundColor: PALETTE.navy,
     paddingHorizontal: 16,
     paddingVertical: 14,
