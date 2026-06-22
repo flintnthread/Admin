@@ -1116,7 +1116,7 @@ export default function SellersDashboard() {
             {errorBanner}
 
             {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, marginHorizontal: 22 }}>
               {statCards.map(c => (
                 <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
                   <View style={{ flex: 1 }}>
@@ -1410,7 +1410,7 @@ export default function SellersDashboard() {
           {errorBanner}
 
           {/* ── Stat Cards (mobile: 2-col grid) ── */}
-          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }]}>
+          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, marginHorizontal: 22 }]}>
             {statCards.map(c => (
               <View key={c.label} style={[styles.statCard]}>
                 <View style={{ flex: 1 }}>
@@ -1679,9 +1679,11 @@ const styles = StyleSheet.create({
 
   headerContainer: {
     backgroundColor: "#1d324e",
+    marginHorizontal: 18,
+    marginTop: 22,
+    borderRadius: 22,
     padding: 16,
     paddingBottom: 48,
-    borderRadius: 16,
     marginBottom: 0,
   },
 

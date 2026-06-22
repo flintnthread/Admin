@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState } from "react";
 import {
@@ -1143,39 +1144,7 @@ const ListTable = ({
   </View>
 );
 
-// ─── Pagination ───────────────────────────────────────────────────────────────
-const Pagination = ({ page, total, onPrev, onNext, onPage }: any) => {
-  const pages = Array.from({ length: total }, (_, i) => i + 1);
-  return (
-    <View style={S.pagination}>
-      <TouchableOpacity
-        style={[S.pageBtn, page === 1 && S.pageBtnOff]}
-        onPress={onPrev}
-        disabled={page === 1}
-      >
-        <ChevronLeft />
-      </TouchableOpacity>
-      {pages.map((p) => (
-        <TouchableOpacity
-          key={p}
-          style={[S.pageBtn, p === page && S.pageBtnActive]}
-          onPress={() => onPage(p)}
-        >
-          <Text style={[S.pageBtnText, p === page && S.pageBtnTextActive]}>
-            {p}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      <TouchableOpacity
-        style={[S.pageBtn, page === total && S.pageBtnOff]}
-        onPress={onNext}
-        disabled={page === total}
-      >
-        <ChevronRight2 />
-      </TouchableOpacity>
-    </View>
-  );
-};
+
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function Subcategories() {
@@ -1186,7 +1155,7 @@ export default function Subcategories() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [mainCatFilter, setMainCatFilter] = useState("All");
-  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
 
   const filtered = items.filter((i) => {
@@ -1202,8 +1171,8 @@ export default function Subcategories() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = filtered.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
   );
 
   const handleSave = (data: any) => {
@@ -1224,7 +1193,7 @@ export default function Subcategories() {
       },
       ...prev,
     ]);
-    setPage(1);
+    setCurrentPage(1);
   };
 
   const handleDelete = (id: number) => {
@@ -1276,7 +1245,7 @@ export default function Subcategories() {
               value={search}
               onChangeText={(t) => {
                 setSearch(t);
-                setPage(1);
+                setCurrentPage(1);
               }}
             />
           </View>
@@ -1304,7 +1273,7 @@ export default function Subcategories() {
                 options={MAIN_CATS}
                 onChange={(v: string | undefined) => {
                   setMainCatFilter(v || "All");
-                  setPage(1);
+                  setCurrentPage(1);
                 }}
               />
             </View>
@@ -1352,13 +1321,14 @@ export default function Subcategories() {
         )}
 
         {/* ── Pagination ── */}
-        {totalPages > 1 && (
+        {filtered.length > 0 && (
           <Pagination
-            page={page}
-            total={totalPages}
-            onPrev={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-            onPage={setPage}
+            currentPage={currentPage}
+            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="subcategories"
+            onPageChange={setCurrentPage}
           />
         )}
       </ScrollView>

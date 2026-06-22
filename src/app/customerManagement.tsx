@@ -618,13 +618,13 @@ export default function CustomerManagementScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ══ HEADER (now scrolls away with content) ═══════════════════════ */}
-        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
+        <View style={{ paddingHorizontal: 16 }}>
           <View
             style={[
               s.header,
               {
                 paddingTop: Platform.OS === "ios" ? 50 : 16,
-                marginTop: isMobile ? 12 : 18,
+                marginTop: 12,
               },
             ]}
           >
@@ -863,7 +863,7 @@ const s = StyleSheet.create({
   scrollContent: { paddingTop: 10, paddingBottom: 40 },
 
   // Header — rounded on all four corners, top and bottom
-  header:      { backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
   headerInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hLeft:       { flexDirection: "row", alignItems: "center", gap: 11 },
   hIcon:       { width: 40, height: 40, borderRadius: 11, backgroundColor: C.primary, alignItems: "center", justifyContent: "center" },
@@ -871,8 +871,8 @@ const s = StyleSheet.create({
   hSub:        { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
 
   // Overlapping stat cards — desktop / tablet
-  statCardsWrap:   { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 10, marginTop: -32, marginBottom: 14 },
-  statCard:        { flex: 1, minWidth: 130, maxWidth: 230, backgroundColor: C.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 4 },
+  statCardsWrap:   { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: -32, marginBottom: 14 },
+  statCard:        { flex: 1, minWidth: 130, maxWidth: 240, backgroundColor: C.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 4 },
   statCardTop:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   statCardIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   statCardValue:   { fontSize: 17, fontWeight: "800" },

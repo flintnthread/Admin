@@ -25,6 +25,7 @@ import {
   StatusBar,
 } from 'react-native';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const C = {
@@ -231,6 +232,8 @@ export default function JobApplicationsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const handleStatusChange = useCallback(async (id: string, status: string) => {
     setUpdatingId(id);
@@ -288,6 +291,10 @@ export default function JobApplicationsScreen() {
     });
   }, [search, selectedJob, selectedStatus, applications]);
 
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
   const counts = useMemo(() => {
     const c: { [key: string]: number } = { total: applications.length };
     applications.forEach(a => { c[a.status] = (c[a.status] || 0) + 1; });
@@ -338,20 +345,20 @@ export default function JobApplicationsScreen() {
                 placeholder="Search applicants..."
                 placeholderTextColor={C.sub}
                 value={search}
-                onChangeText={setSearch}
+                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
               />
               {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')}>
+                <TouchableOpacity onPress={() => { setSearch(''); setCurrentPage(1); }}>
                   <Text style={{ color: C.sub, fontSize: 16, paddingHorizontal: 8 }}>✕</Text>
                 </TouchableOpacity>
               )}
             </View>
             <View style={[styles.filterDropdowns, isWeb && styles.filterDropdownsWeb]}>
-              <Dropdown value={selectedJob} options={jobOptions} onSelect={setSelectedJob} placeholder="All Jobs" />
-              <Dropdown value={selectedStatus} options={STATUSES} onSelect={setSelectedStatus} placeholder="All Status" />
+              <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
+              <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
               <TouchableOpacity
                 style={styles.resetBtn}
-                onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); }}
+                onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
                 activeOpacity={0.8}
               >
                 <Text style={styles.resetBtnText}>↺ Reset</Text>
@@ -388,7 +395,7 @@ export default function JobApplicationsScreen() {
           ) : isWeb ? (
             // Web: 2-column grid
             <View style={styles.webGrid}>
-              {filtered.map(item => (
+              {paginated.map(item => (
                 <View key={item.id} style={styles.webGridItem}>
                   <ApplicationCard
                     item={item}
@@ -401,7 +408,7 @@ export default function JobApplicationsScreen() {
             </View>
           ) : (
             // Mobile: single column list
-            filtered.map(item => (
+            paginated.map(item => (
               <ApplicationCard
                 key={item.id}
                 item={item}
@@ -410,6 +417,17 @@ export default function JobApplicationsScreen() {
                 updating={updatingId === item.id}
               />
             ))
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+              totalItems={filtered.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              itemName="applications"
+              onPageChange={setCurrentPage}
+            />
           )}
         </ScrollView>
       </SafeAreaView>
@@ -437,14 +455,11 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: 8,
   },
-  headerWeb: {
+  headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 24,
-    marginHorizontal: 18,
-    marginTop: 22,
-    borderRadius: 22,
     paddingBottom: 48,
   },
   breadcrumb: { fontSize: 12, color: '#D1D5DB', marginBottom: 4 },

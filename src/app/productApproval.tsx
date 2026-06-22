@@ -23,6 +23,7 @@ import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
 import { fetchProducts, fetchProductStats, type ProductListRow } from '@/services/productApi';
+import Pagination from '@/components/Pagination';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
 
@@ -735,84 +736,6 @@ function ProductTable({
 
 const PAGE_SIZE = 20;
 
-function buildPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages: (number | 'ellipsis')[] = [1];
-  if (current > 3) pages.push('ellipsis');
-  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p += 1) {
-    pages.push(p);
-  }
-  if (current < total - 2) pages.push('ellipsis');
-  if (total > 1) pages.push(total);
-  return pages;
-}
-
-function Pagination({
-  isMobile,
-  page,
-  totalPages,
-  totalElements,
-  onPageChange,
-}: {
-  isMobile: boolean;
-  page: number;
-  totalPages: number;
-  totalElements: number;
-  onPageChange: (page: number) => void;
-}) {
-  const start = totalElements === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const end = Math.min(page * PAGE_SIZE, totalElements);
-  const pageNumbers = buildPageNumbers(page, totalPages);
-
-  if (totalPages <= 1) {
-    return (
-      <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-        <Text style={styles.paginationInfo}>
-          Showing {start} to {end} of {totalElements} products
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-      <Text style={styles.paginationInfo}>
-        Showing {start} to {end} of {totalElements} products
-      </Text>
-      <View style={styles.paginationControls}>
-        <Pressable
-          style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-          disabled={page <= 1}
-          onPress={() => onPageChange(page - 1)}>
-          <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
-        </Pressable>
-        {pageNumbers.map((num, index) =>
-          num === 'ellipsis' ? (
-            <Text key={`e-${index}`} style={styles.pageEllipsis}>
-              ...
-            </Text>
-          ) : (
-            <Pressable
-              key={num}
-              style={[styles.pageNum, num === page && styles.pageNumActive]}
-              onPress={() => onPageChange(num)}>
-              <Text style={[styles.pageNumText, num === page && styles.pageNumTextActive]}>
-                {num}
-              </Text>
-            </Pressable>
-          ),
-        )}
-        <Pressable
-          style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-          disabled={page >= totalPages}
-          onPress={() => onPageChange(page + 1)}>
-          <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 function filterStatusForApi(filter: FilterKey): string | undefined {
   if (filter === 'all') return undefined;
   if (filter === 'approved') return 'active';
@@ -966,10 +889,11 @@ export default function ProductApprovalScreen() {
 
           {!loading && !error && (
             <Pagination
-              isMobile={isMobile}
-              page={currentPage}
+              currentPage={currentPage}
               totalPages={totalPages}
-              totalElements={totalProducts}
+              totalItems={totalProducts}
+              itemsPerPage={PAGE_SIZE}
+              itemName="products"
               onPageChange={setCurrentPage}
             />
           )}
@@ -1164,9 +1088,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 48,
     borderRadius: 22,
-    marginHorizontal: 18,
-    marginTop: 22,
-    gap: 12,
+        gap: 12,
     shadowColor: '#1d324e',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,

@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     borderRadius: 22,
   },
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',

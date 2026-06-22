@@ -6,6 +6,7 @@ import { fetchPayoutStats, fetchPayouts, markPayoutPaid } from "@/services/payou
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import { router } from "expo-router";
+import Pagination from "@/components/Pagination";
 import {
     ActivityIndicator,
     Alert,
@@ -687,30 +688,15 @@ const SellerPaymentsScreen: React.FC = () => {
                     </View>
                 )}
 
-                {!loading && !error && totalPages > 1 && (
-                    <View style={styles.paginationBar}>
-                        <Text style={styles.paginationInfo}>
-                            Showing {(currentPage - 1) * PAYMENTS_PAGE_SIZE + 1} to{" "}
-                            {Math.min(currentPage * PAYMENTS_PAGE_SIZE, totalElements)} of {totalElements}
-                        </Text>
-                        <View style={styles.paginationControls}>
-                            <TouchableOpacity
-                                style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}
-                                disabled={currentPage <= 1}
-                                onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                            >
-                                <Feather name="chevron-left" size={14} color={TEXT_BODY} />
-                            </TouchableOpacity>
-                            <Text style={styles.pageNumText}>{currentPage} / {totalPages}</Text>
-                            <TouchableOpacity
-                                style={[styles.pageBtn, currentPage >= totalPages && styles.pageBtnDisabled]}
-                                disabled={currentPage >= totalPages}
-                                onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                            >
-                                <Feather name="chevron-right" size={14} color={TEXT_BODY} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                {!loading && !error && filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalElements}
+                        itemsPerPage={PAYMENTS_PAGE_SIZE}
+                        itemName="payments"
+                        onPageChange={setCurrentPage}
+                    />
                 )}
                 </View>
             </View>
@@ -744,8 +730,8 @@ const styles = StyleSheet.create({
     mainWeb: { backgroundColor: BG_CARD, marginHorizontal: 24, marginBottom: 24, marginTop: 0, borderRadius: 20, overflow: "hidden", shadowColor: DARK, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5 },
 
     // Header
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, borderRadius: 22, marginHorizontal: 18, marginTop: 22, marginBottom: 0, zIndex: 1, shadowColor: "#151D4F", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
-    headerWeb: {},
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, borderRadius: 22, marginBottom: 0, zIndex: 1, shadowColor: "#151D4F", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,},
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },

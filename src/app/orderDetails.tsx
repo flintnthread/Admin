@@ -1257,7 +1257,7 @@ const s = StyleSheet.create({
   colStack: { flexDirection: "column" },
 
   // ── Header ─────────────────────────────────────────────────────────────────
-  header: { backgroundColor: C.navy, paddingBottom: 14 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navy, paddingBottom: 14 },
   headerInner: { flexDirection: "row", alignItems: "center" },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   backBtn: {

@@ -1100,7 +1100,7 @@ const s = StyleSheet.create({
   scroll:        { flex: 1, backgroundColor: "#FFFFFF" },
   scrollContent: { paddingTop: 0, backgroundColor: "#FFFFFF" },
   body:          { gap: 16 },
-  header:        { backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
   headerInner:   { flexDirection: "row", alignItems: "center" },
   headerLeft:    { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   backBtn:       { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
