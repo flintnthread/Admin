@@ -82,6 +82,22 @@ export type DashboardSellerInsights = {
   topPerformers: number;
 };
 
+export type DashboardTraffic = {
+  currentlyOnline: number;
+  visitorsToday: number;
+  visitorsWeek: number;
+  visitorsMonth: number;
+};
+
+export type DashboardCatalogQuality = {
+  overallScore: number;
+  productImagesAttached: number;
+  richDescriptionsFilled: number;
+  seoMetadataTags: number;
+  categoryBrandMappings: number;
+  optimizationTips: string;
+};
+
 export async function fetchDashboardPayments(): Promise<DashboardPaymentsSummary> {
   return adminApiRequest<DashboardPaymentsSummary>("/api/admin/dashboard/payments");
 }
@@ -92,6 +108,14 @@ export async function fetchDashboardCustomerInsights(): Promise<DashboardCustome
 
 export async function fetchDashboardSellerInsights(): Promise<DashboardSellerInsights> {
   return adminApiRequest<DashboardSellerInsights>("/api/admin/dashboard/seller-insights");
+}
+
+export async function fetchDashboardTraffic(): Promise<DashboardTraffic> {
+  return adminApiRequest<DashboardTraffic>("/api/admin/dashboard/traffic");
+}
+
+export async function fetchDashboardCatalogQuality(): Promise<DashboardCatalogQuality> {
+  return adminApiRequest<DashboardCatalogQuality>("/api/admin/dashboard/catalog-quality");
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {

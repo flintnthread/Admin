@@ -38,6 +38,7 @@ import Svg, {
 } from "react-native-svg";
 import AdminLayout from "@/components/admin-layout";
 import { useThemeContext } from "@/context/theme-context";
+import { useAuth } from "@/context/auth-context";
 
 // API Services
 import {
@@ -47,6 +48,8 @@ import {
   fetchDashboardTopSellers,
   fetchDashboardInventoryAlerts,
   fetchDashboardActivity,
+  fetchDashboardTraffic,
+  fetchDashboardCatalogQuality,
 } from "@/services/dashboardApi";
 import { formatDate } from "@/lib/format";
 import { fetchOrders } from "@/services/orderApi";
@@ -117,6 +120,8 @@ export default function DashboardScreen() {
   const isDark = theme === "dark";
   const C = useMemo(() => getPalette(isDark), [isDark]);
   const styles = useMemo(() => getStyles(isDark), [isDark]);
+
+  const { token, isLoading: authLoading } = useAuth();
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<"overview" | "sales" | "inventory" | "users">("overview");
@@ -229,6 +234,8 @@ export default function DashboardScreen() {
   const [topSellers, setTopSellers] = useState<any[]>([]);
   const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [traffic, setTraffic] = useState<any>(null);
+  const [catalogQuality, setCatalogQuality] = useState<any>(null);
 
   // UX Controls
   const [loading, setLoading] = useState(true);
@@ -562,6 +569,8 @@ export default function DashboardScreen() {
         topSellersRes,
         alertsRes,
         activityRes,
+        trafficRes,
+        catalogQualityRes,
       ] = await Promise.allSettled([
         fetchDashboardStats(),
         fetchOrders({ page: 0, size: 20 }),
@@ -574,6 +583,8 @@ export default function DashboardScreen() {
         fetchDashboardTopSellers(10),
         fetchDashboardInventoryAlerts(10),
         fetchDashboardActivity(10),
+        fetchDashboardTraffic(),
+        fetchDashboardCatalogQuality(),
       ]);
 
       if (statsRes.status === "fulfilled") setStats(statsRes.value);
@@ -600,6 +611,8 @@ export default function DashboardScreen() {
       if (topSellersRes.status === "fulfilled") setTopSellers(topSellersRes.value || []);
       if (alertsRes.status === "fulfilled") setInventoryAlerts(alertsRes.value || []);
       if (activityRes.status === "fulfilled") setNotifications(activityRes.value || []);
+      if (trafficRes.status === "fulfilled") setTraffic(trafficRes.value);
+      if (catalogQualityRes.status === "fulfilled") setCatalogQuality(catalogQualityRes.value);
     } catch (err) {
       console.error("Dashboard enhancement fetch error:", err);
       setError(getApiErrorMessage(err, "Failed to load dashboard data."));
@@ -623,18 +636,24 @@ export default function DashboardScreen() {
 
   // Initial load of chart with default timeframe
   useEffect(() => {
-    loadChartData(revenueTimeframe);
-  }, []);
+    if (!authLoading && token) {
+      loadChartData(revenueTimeframe);
+    }
+  }, [authLoading, token, loadChartData]);
 
   // Load chart whenever timeframe changes
   useEffect(() => {
-    loadChartData(revenueTimeframe);
-  }, [revenueTimeframe]);
+    if (!authLoading && token) {
+      loadChartData(revenueTimeframe);
+    }
+  }, [revenueTimeframe, authLoading, token, loadChartData]);
 
   // Run initial data load once on mount
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!authLoading && token) {
+      loadData();
+    }
+  }, [authLoading, token, loadData]);
 
   // Format helper
   const rupee = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -976,6 +995,29 @@ export default function DashboardScreen() {
     );
   };
 
+  if (authLoading) {
+    return (
+      <AdminLayout>
+        <View style={[styles.screenWrapper, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={[styles.headerSubtext, { marginTop: 16 }]}>Loading authentication...</Text>
+        </View>
+      </AdminLayout>
+    );
+  }
+
+  if (!token) {
+    return (
+      <AdminLayout>
+        <View style={[styles.screenWrapper, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="lock-closed-outline" size={48} color={C.sub} />
+          <Text style={[styles.headerTitle, { marginTop: 16 }]}>Authentication Required</Text>
+          <Text style={styles.headerSubtext}>Please sign in to access the dashboard</Text>
+        </View>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <View style={styles.screenWrapper}>
@@ -1244,10 +1286,10 @@ export default function DashboardScreen() {
                   <Text style={styles.cardColTitle}>📈 Live Website Traffic</Text>
                   <View style={styles.liveActivityList}>
                     {[
-                      { label: "Currently Online", val: "14", isOnline: true },
-                      { label: "Visitors Today", val: "1,204", isOnline: false },
-                      { label: "Visitors This Week", val: "8,924", isOnline: false },
-                      { label: "Visitors This Month", val: "32,940", isOnline: false }
+                      { label: "Currently Online", val: traffic?.currentlyOnline ? count(Number(traffic.currentlyOnline)) : "—", isOnline: true },
+                      { label: "Visitors Today", val: traffic?.visitorsToday ? count(Number(traffic.visitorsToday)) : "—", isOnline: false },
+                      { label: "Visitors This Week", val: traffic?.visitorsWeek ? count(Number(traffic.visitorsWeek)) : "—", isOnline: false },
+                      { label: "Visitors This Month", val: traffic?.visitorsMonth ? count(Number(traffic.visitorsMonth)) : "—", isOnline: false }
                     ].map((item, idx) => (
                       <View key={idx} style={styles.liveActivityRow}>
                         <View style={styles.liveActivityLeft}>
@@ -1870,17 +1912,19 @@ export default function DashboardScreen() {
                     <View style={styles.healthHeaderRow}>
                       <Text style={styles.healthAuditTitle}>📋 Catalog Quality & Health Audit</Text>
                       <View style={[styles.statusBadgeCell, { backgroundColor: C.activeBg, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 6 }]}>
-                        <Text style={[styles.statusBadgeText, { color: C.active, fontWeight: "800", fontSize: 10 }]}>94.2% Score</Text>
+                        <Text style={[styles.statusBadgeText, { color: C.active, fontWeight: "800", fontSize: 10 }]}>
+                          {catalogQuality?.overallScore ? `${catalogQuality.overallScore}% Score` : "—% Score"}
+                        </Text>
                       </View>
                     </View>
                     <Text style={styles.healthSubtitle}>A high score improves SEO ranking and increases customer conversion rate.</Text>
                     
                     <View style={styles.healthList}>
                       {[
-                        { label: "Product Images Attached", val: "98%", score: 0.98, color: C.active },
-                        { label: "Rich Descriptions Filled", val: "92%", score: 0.92, color: C.purple },
-                        { label: "SEO Metadata & Tags", val: "88%", score: 0.88, color: C.processing },
-                        { label: "Category & Brand Mappings", val: "100%", score: 1.0, color: C.active }
+                        { label: "Product Images Attached", val: catalogQuality?.productImagesAttached ? `${catalogQuality.productImagesAttached}%` : "—%", score: catalogQuality?.productImagesAttached ? catalogQuality.productImagesAttached / 100 : 0, color: C.active },
+                        { label: "Rich Descriptions Filled", val: catalogQuality?.richDescriptionsFilled ? `${catalogQuality.richDescriptionsFilled}%` : "—%", score: catalogQuality?.richDescriptionsFilled ? catalogQuality.richDescriptionsFilled / 100 : 0, color: C.purple },
+                        { label: "SEO Metadata & Tags", val: catalogQuality?.seoMetadataTags ? `${catalogQuality.seoMetadataTags}%` : "—%", score: catalogQuality?.seoMetadataTags ? catalogQuality.seoMetadataTags / 100 : 0, color: C.processing },
+                        { label: "Category & Brand Mappings", val: catalogQuality?.categoryBrandMappings ? `${catalogQuality.categoryBrandMappings}%` : "—%", score: catalogQuality?.categoryBrandMappings ? catalogQuality.categoryBrandMappings / 100 : 0, color: C.active }
                       ].map((item, idx) => (
                         <View key={idx} style={styles.healthItemRow}>
                           <View style={styles.healthItemMeta}>
@@ -1901,7 +1945,7 @@ export default function DashboardScreen() {
                         <Ionicons name="alert-circle-outline" size={14} color={C.warning} />
                         <Text style={styles.qualityAlertsText}>
                           <Text style={{ fontWeight: "700" }}>Optimization Tips: </Text>
-                          13 products are missing meta descriptions. 5 products have low-resolution images.
+                          {catalogQuality?.optimizationTips || "Loading..."}
                         </Text>
                       </View>
                     </View>
