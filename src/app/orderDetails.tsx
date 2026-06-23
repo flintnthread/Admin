@@ -8,8 +8,10 @@
 import { InvoiceModal } from "./orders";
 import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
+  ActivityIndicator,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -22,9 +24,16 @@ import {
   TouchableWithoutFeedback,
   useWindowDimensions,
   View,
+<<<<<<< HEAD
   Animated,
   Easing,
 } from "react-native"; 
+=======
+} from "react-native";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveMediaUrl } from "@/lib/api/media";
+import { fetchOrderDetail } from "@/services/orderApi";
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
 import Svg, { Circle, Path } from "react-native-svg";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,6 +46,7 @@ const C = {
   primary: "#F97316",
   primaryLight: "#FFF0EA",
   navy: "#1C2B4A",
+  white: "#FFFFFF",
   text: "#1C2B4A",
   sub: "#6B7280",
   border: "#E8E2D9",
@@ -78,20 +88,35 @@ type OrderStatus =
 
 type TrackingEvent = {
   date: string;
-  time: string;
-  location: string;
+  time?: string;
+  location?: string;
   description: string;
+};
+
+type ApiOrderItem = {
+  id: number;
+  productId?: number;
+  productName?: string;
+  sellerName?: string;
+  quantity?: number;
+  price?: number;
+  total?: number;
+  status?: string;
+  imageUrl?: string;
 };
 
 type OrderItem = {
   id: number;
+  productId?: number;
   product: string;
   sku: string;
   seller: string;
   variant: string;
   qty: number;
   price: number;
+  total: number;
   slug: string;
+  imageUrl?: string;
 };
 
 type StatusHistory = {
@@ -101,122 +126,258 @@ type StatusHistory = {
   comment: string;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SAMPLE DATA
-// ─────────────────────────────────────────────────────────────────────────────
-const ORDER = {
-  id: "FNT202605137181",
-  date: "13 May 2026, 11:46 AM",
-  status: "Processing" as OrderStatus,
-  paymentMethod: "Cash on Delivery",
+type Address = {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+};
+
+type Customer = {
+  id?: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+};
+
+type ShiprocketInfo = {
+  awb?: string;
+  courier?: string;
+  status?: string;
+  synced?: string;
+  url?: string;
+};
+
+type UIOrder = {
+  id: string;
+  date: string;
+  status: OrderStatus;
+  paymentMethod: string;
+  paymentStatus: string;
+  customer: Customer;
+  billing: Address;
+  shipping: Address;
+  shiprocket: ShiprocketInfo;
+  tracking: TrackingEvent[];
+  items: OrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  tax: number;
+  total: number;
+  history: StatusHistory[];
+  gstStatus?: string;
+  rawData?: Record<string, unknown>;
+};
+
+type OrderDetail = Record<string, unknown> & {
+  id: number;
+  userId?: number;
+  orderNumber?: string;
+  orderStatus?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  totalAmount?: number;
+  shippingAmount?: number;
+  taxAmount?: number;
+  discountAmount?: number;
+  walletDeduction?: number;
+  referralDiscountAmount?: number;
+  createdAt?: string;
+  shippingName?: string;
+  shippingEmail?: string;
+  shippingPhone?: string;
+  shippingAddress1?: string;
+  shippingAddress2?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingCountry?: string;
+  shippingPincode?: string;
+  billingName?: string;
+  billingEmail?: string;
+  billingPhone?: string;
+  billingAddress1?: string;
+  billingAddress2?: string;
+  billingCity?: string;
+  billingState?: string;
+  billingCountry?: string;
+  billingPincode?: string;
+  orderNotes?: string;
+  gstNumber?: string;
+  gstInfo?: string;
+  gstStatus?: string;
+  shiprocketStatus?: string;
+  shiprocketTrackingUrl?: string;
+  shiprocketAwbCode?: string;
+  shiprocketCourierName?: string;
+  shiprocketPushedAt?: string;
+  shiprocketSyncedAt?: string;
+  items?: ApiOrderItem[];
+  history?: StatusHistory[];
+};
+
+function normalizeStatus(status?: string): OrderStatus {
+  const value = (status ?? "").toLowerCase();
+  if (value === "processing") return "Processing";
+  if (value === "pending") return "Pending";
+  if (value === "completed") return "Completed";
+  if (value === "returned") return "Returned";
+  if (value === "replacement") return "Replacement";
+  if (value === "cancelled") return "Cancelled";
+  if (value === "shipped") return "Processing";
+  return "Pending";
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateTimeWithTime(value?: string) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })}, ${parsed.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+function mapApiItemToUi(item: ApiOrderItem): OrderItem {
+  const qty = Number(item.quantity ?? 0);
+  const price = Number(item.price ?? 0);
+  
+  // Try multiple possible field names for product name
+  const productName = 
+    (item as any).productName?.trim() ||
+    (item as any).name?.trim() ||
+    (item as any).title?.trim() ||
+    (item as any).product?.trim() ||
+    ((item as any).product as any)?.name?.trim() ||
+    "Product";
+  
+  return {
+    id: item.id,
+    productId: item.productId,
+    product: productName,
+    sku: String(item.productId ?? item.id ?? ""),
+    seller: item.sellerName ?? "Seller",
+    variant: item.status ?? "",
+    qty,
+    price,
+    total: Number(item.total ?? qty * price),
+    slug: productName
+      ? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+      : String(item.productId ?? item.id ?? ""),
+    imageUrl: resolveMediaUrl(item.imageUrl),
+  };
+}
+
+function mapApiOrderToUi(detail: OrderDetail): UIOrder {
+  const items = (detail.items ?? []).map(mapApiItemToUi);
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const shippingCost = Number(detail.shippingAmount ?? 0);
+  const tax = Number(detail.taxAmount ?? 0);
+  const total = Number(detail.totalAmount ?? subtotal + shippingCost + tax);
+  const awb = detail.shiprocketAwbCode
+    ? detail.shiprocketAwbCode
+    : detail.shiprocketTrackingUrl
+    ? detail.shiprocketTrackingUrl.split("/").pop() ?? detail.shiprocketTrackingUrl
+    : "";
+
+  const history: StatusHistory[] =
+    detail.history && detail.history.length > 0
+      ? detail.history
+      : [
+          {
+            status: normalizeStatus(detail.orderStatus),
+            date: formatDateTime(detail.createdAt),
+            by: "System",
+            comment: detail.orderStatus ?? "",
+          },
+        ];
+
+  return {
+    id: detail.orderNumber
+      ? detail.orderNumber.replace(/^#/, "")
+      : String(detail.id ?? ""),
+    date: formatDateTimeWithTime(detail.createdAt),
+    status: normalizeStatus(detail.orderStatus),
+    paymentMethod: detail.paymentMethod ?? "—",
+    paymentStatus: detail.paymentStatus ?? "—",
+    customer: {
+      id: detail.userId,
+      name: detail.shippingName ?? "—",
+      email: detail.shippingEmail ?? "",
+      phone: detail.shippingPhone ?? "",
+      notes: detail.orderNotes ?? "",
+    },
+    billing: {
+      line1: detail.billingAddress1 ?? detail.billingName ?? "",
+      line2: detail.billingAddress2 ?? "",
+      city: detail.billingCity ?? "",
+      state: detail.billingState ?? "",
+      pincode: detail.billingPincode ?? "",
+      country: detail.billingCountry ?? "India",
+    },
+    shipping: {
+      line1: detail.shippingAddress1 ?? detail.shippingName ?? "",
+      line2: detail.shippingAddress2 ?? "",
+      city: detail.shippingCity ?? "",
+      state: detail.shippingState ?? "",
+      pincode: detail.shippingPincode ?? "",
+      country: detail.shippingCountry ?? "India",
+    },
+    shiprocket: {
+      awb,
+      courier: detail.shiprocketCourierName ??
+        (detail.shiprocketTrackingUrl ? "ShipRocket" : "—"),
+      status: detail.shiprocketStatus ?? "—",
+      synced: formatDateTimeWithTime(detail.shiprocketSyncedAt),
+      url: detail.shiprocketTrackingUrl,
+    },
+    tracking: [],
+    items,
+    subtotal,
+    shippingCost,
+    tax,
+    total,
+    history: history,
+    gstStatus: detail.gstStatus ?? "Not Filed",
+    rawData: detail,
+  };
+}
+
+const INITIAL_ORDER: UIOrder = {
+  id: "",
+  date: "—",
+  status: "Pending",
+  paymentMethod: "—",
   paymentStatus: "Pending",
-  customer: {
-    id: 251,
-    name: "Sana shaikh",
-    email: "attusanshaikh@gmail.com",
-    phone: "8197481081",
-    notes: "Please call before delivery.",
-  },
-  billing: {
-    line1: "Plot 12, Banjara Hills",
-    line2: "Road No. 2",
-    city: "Hyderabad",
-    state: "Telangana",
-    pincode: "500034",
-    country: "India",
-  },
-  shipping: {
-    line1: "Plot 12, Banjara Hills",
-    line2: "Road No. 2",
-    city: "Hyderabad",
-    state: "Telangana",
-    pincode: "500034",
-    country: "India",
-  },
-  shiprocket: {
-    awb: "157489263041",
-    courier: "Delhivery",
-    status: "In Transit",
-    synced: "09 Jun, 11:53 AM",
-  },
-  tracking: [
-    {
-      date: "09 Jun 2026",
-      time: "11:53 AM",
-      location: "Hyderabad_Kukatpally_C (Telangana)",
-      description: "Shipment out for delivery",
-    },
-    {
-      date: "08 Jun 2026",
-      time: "09:10 AM",
-      location: "Hyderabad_Hub (Telangana)",
-      description: "Shipment arrived at hub",
-    },
-    {
-      date: "06 Jun 2026",
-      time: "06:45 PM",
-      location: "Mumbai_Gateway (Maharashtra)",
-      description: "Shipment in transit",
-    },
-    {
-      date: "04 Jun 2026",
-      time: "02:00 PM",
-      location: "Mumbai_Pickup (Maharashtra)",
-      description: "Shipment picked up",
-    },
-    {
-      date: "30 May 2026",
-      time: "08:34 PM",
-      location: "Hyderabad_Kukatpally_C (Telangana)",
-      description: "Order dispatched from warehouse",
-    },
-  ] as TrackingEvent[],
-  items: [
-    {
-      id: 1,
-      product: " Premium Cotton Shirt",
-      sku: "FNT-SHT-001",
-      seller: "Flint & Thread",
-      variant: "Blue / XL",
-      qty: 1,
-      price: 1499,
-      slug: "premium-cotton-shirt",
-    },
-    {
-      id: 2,
-      product: "Slim Fit Chinos",
-      sku: "FNT-CHN-002",
-      seller: "Flint & Thread",
-      variant: "Beige / 32",
-      qty: 1,
-      price: 819,
-      slug: "slim-fit-chinos",
-    },
-  ] as OrderItem[],
-  subtotal: 2318,
+  customer: { name: "—", email: "", phone: "", notes: "" },
+  billing: { line1: "", line2: "", city: "", state: "", pincode: "", country: "India" },
+  shipping: { line1: "", line2: "", city: "", state: "", pincode: "", country: "India" },
+  shiprocket: { awb: "", courier: "—", status: "—", synced: "—", url: "" },
+  tracking: [],
+  items: [],
+  subtotal: 0,
   shippingCost: 0,
   tax: 0,
-  total: 2318,
-  history: [
-    {
-      status: "Processing" as OrderStatus,
-      date: "09 Jun 2026, 11:46 AM",
-      by: "System",
-      comment: "No comment provided",
-    },
-    {
-      status: "Processing" as OrderStatus,
-      date: "27 May 2026, 11:45 PM",
-      by: "System",
-      comment: "No comment provided",
-    },
-    {
-      status: "Pending" as OrderStatus,
-      date: "26 May 2026, 12:52 PM",
-      by: "System",
-      comment: "Order placed with Cash on Delivery",
-    },
-  ] as StatusHistory[],
+  total: 0,
+  history: [],
+  rawData: undefined,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -635,7 +796,7 @@ function AddressBlock({
   addr,
 }: {
   title: string;
-  addr: typeof ORDER.billing;
+  addr: Address;
 }) {
   return (
     <View style={s.addrBlock}>
@@ -698,8 +859,8 @@ export default function OrderDetailScreen() {
   const { isMobile, isTablet, isDesktop, isWide } = useLayout(width);
   const router = useRouter();
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
-  const displayOrderId = orderId ?? ORDER.id;
 
+<<<<<<< HEAD
   const [status, setStatus] = useState<OrderStatus>(ORDER.status);
   const [invoiceVisible, setInvoiceVisible] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
@@ -777,6 +938,55 @@ export default function OrderDetailScreen() {
       }
     ]
   };
+=======
+  const [order, setOrder] = useState<UIOrder>(INITIAL_ORDER);
+  const [status, setStatus] = useState<OrderStatus>(INITIAL_ORDER.status);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const px = isMobile ? 14 : isTablet ? 20 : 28;
+
+  const displayOrderId = orderId ?? order.id;
+
+  const loadOrder = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    if (!orderId) {
+      setError("Order ID missing.");
+      setLoading(false);
+      return;
+    }
+
+    const id = Number(orderId);
+    if (Number.isNaN(id)) {
+      setError("Invalid order ID.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const raw = await fetchOrderDetail(id);
+      console.log("All backend fields:", Object.keys(raw));
+      console.log("Raw backend data:", raw);
+      console.log("Items from backend:", (raw as any).items);
+      if ((raw as any).items && (raw as any).items.length > 0) {
+        console.log("First item structure:", (raw as any).items[0]);
+        console.log("First item keys:", Object.keys((raw as any).items[0]));
+      }
+      const uiOrder = mapApiOrderToUi(raw as OrderDetail);
+      setOrder(uiOrder);
+      setStatus(uiOrder.status);
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
 
   return (
     <AdminLayout>
@@ -806,18 +1016,31 @@ export default function OrderDetailScreen() {
               <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>
                 Order Details
               </Text>
-              <Text style={s.hSub}>#{ORDER.id}</Text>
+              <Text style={s.hSub}>#{order.id}</Text>
             </View>
           </View>
         </View>
       </View>
 
       {/* ══ BODY ════════════════════════════════════════════════════════════ */}
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
-        showsVerticalScrollIndicator={false}
-      >
+      {loading ? (
+        <View style={s.loadingContainer}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={s.loadingText}>Loading order details…</Text>
+        </View>
+      ) : error ? (
+        <View style={s.errorContainer}>
+          <Text style={s.errorText}>{error}</Text>
+          <TouchableOpacity style={s.errorRetryBtn} onPress={loadOrder} activeOpacity={0.8}>
+            <Text style={s.errorRetryTxt}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
+          showsVerticalScrollIndicator={false}
+        >
         <View
           style={[
             s.body,
@@ -872,12 +1095,13 @@ export default function OrderDetailScreen() {
                   value={`#${displayOrderId}`}
                   valueStyle={{ color: C.primary, fontWeight: "700" }}
                 />
-                <InfoRow label="Order Date" value={ORDER.date} />
+                <InfoRow label="Order Date" value={order.date} />
                 <InfoRow
                   label="Order Status"
                   value={<StatusBadge status={status} />}
                 />
-                <InfoRow label="Payment Method" value={ORDER.paymentMethod} />
+                <InfoRow label="Payment Method" value={order.paymentMethod} />
+                <InfoRow label="GST Status" value={order.gstStatus ?? "Not Filed"} />
                 <InfoRow
                   label="Payment Status"
                   value={
@@ -886,7 +1110,7 @@ export default function OrderDetailScreen() {
                         s.badge,
                         {
                           backgroundColor:
-                            ORDER.paymentStatus === "Paid"
+                            order.paymentStatus === "Paid"
                               ? C.activeLight
                               : C.warningLight,
                         },
@@ -897,7 +1121,7 @@ export default function OrderDetailScreen() {
                           s.badgeDot,
                           {
                             backgroundColor:
-                              ORDER.paymentStatus === "Paid"
+                              order.paymentStatus === "Paid"
                                 ? C.active
                                 : C.warning,
                           },
@@ -908,13 +1132,13 @@ export default function OrderDetailScreen() {
                           s.badgeTxt,
                           {
                             color:
-                              ORDER.paymentStatus === "Paid"
+                              order.paymentStatus === "Paid"
                                 ? C.active
                                 : C.warning,
                           },
                         ]}
                       >
-                        {ORDER.paymentStatus}
+                        {order.paymentStatus}
                       </Text>
                     </View>
                   }
@@ -938,7 +1162,7 @@ export default function OrderDetailScreen() {
                       onPress={() =>
                         router.push({
                           pathname: "/customerDetails",
-                          params: { id: String(ORDER.customer.id) },
+                          params: { id: String(order.customer.id) },
                         })
                       }
                       activeOpacity={0.7}
@@ -949,7 +1173,7 @@ export default function OrderDetailScreen() {
                           { color: C.primary, fontWeight: "700" },
                         ]}
                       >
-                        {ORDER.customer.name}
+                        {order.customer.name}
                       </Text>
                       <LinkIcon size={13} color={C.primary} />
                     </TouchableOpacity>
@@ -959,21 +1183,26 @@ export default function OrderDetailScreen() {
                   <Text style={s.infoLabel}>Email Address</Text>
                   <View style={s.infoValRow}>
                     <Text style={s.infoValue} numberOfLines={1}>
-                      {ORDER.customer.email}
+                      {order.customer.email}
                     </Text>
                   </View>
                 </View>
                 <View style={s.infoRow}>
                   <Text style={s.infoLabel}>Phone Number</Text>
                   <View style={s.infoValRow}>
+<<<<<<< HEAD
                     <Text style={s.infoValue}>{ORDER.customer.phone}</Text>
+=======
+                    <PhoneIcon2 />
+                    <Text style={s.infoValue}>{order.customer.phone}</Text>
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                   </View>
                 </View>
                 <View style={s.infoRow}>
                   <Text style={s.infoLabel}>Order Notes</Text>
                   <View style={s.infoValRow}>
                     <Text style={[s.infoValue, { fontStyle: "italic" }]}>
-                      {ORDER.customer.notes}
+                      {order.customer.notes}
                     </Text>
                   </View>
                 </View>
@@ -989,12 +1218,12 @@ export default function OrderDetailScreen() {
             />
             <View style={[s.cardBody, isWide ? s.addrRow : s.colStack]}>
               <View style={{ flex: 1 }}>
-                <AddressBlock title="Billing Address" addr={ORDER.billing} />
+                <AddressBlock title="Billing Address" addr={order.billing} />
               </View>
               {isWide && <View style={s.addrVertDivider} />}
               {!isWide && <View style={s.addrHorizDivider} />}
               <View style={{ flex: 1 }}>
-                <AddressBlock title="Shipping Address" addr={ORDER.shipping} />
+                <AddressBlock title="Shipping Address" addr={order.shipping} />
               </View>
             </View>
           </Card>
@@ -1022,11 +1251,11 @@ export default function OrderDetailScreen() {
               <View style={s.cardBody}>
                 <InfoRow
                   label="AWB / Tracking #"
-                  value={ORDER.shiprocket.awb}
+                  value={order.shiprocket.awb}
                 />
                 <InfoRow
                   label="Courier Partner"
-                  value={ORDER.shiprocket.courier}
+                  value={order.shiprocket.courier}
                 />
                 <InfoRow
                   label="Shipment Status"
@@ -1034,13 +1263,25 @@ export default function OrderDetailScreen() {
                     <View style={[s.badge, { backgroundColor: C.blueLight }]}>
                       <View style={[s.badgeDot, { backgroundColor: C.blue }]} />
                       <Text style={[s.badgeTxt, { color: C.blue }]}>
-                        {ORDER.shiprocket.status}
+                        {order.shiprocket.status}
                       </Text>
                     </View>
                   }
                 />
-                <InfoRow label="Last Synced" value={ORDER.shiprocket.synced} />
-                <TouchableOpacity style={[s.trackBtn]} activeOpacity={0.8}>
+                <InfoRow label="Last Synced" value={order.shiprocket.synced} />
+                <TouchableOpacity
+                  style={[
+                    s.trackBtn,
+                    !order.shiprocket.url && s.trackBtnDisabled,
+                  ]}
+                  onPress={() => {
+                    if (order.shiprocket.url) {
+                      Linking.openURL(order.shiprocket.url);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  disabled={!order.shiprocket.url}
+                >
                   <TrackIcon size={14} />
                   <Text style={s.trackBtnTxt}>Track on ShipRocket</Text>
                 </TouchableOpacity>
@@ -1054,12 +1295,12 @@ export default function OrderDetailScreen() {
                 title="Tracking Timeline"
               />
               <View style={s.cardBody}>
-                {ORDER.tracking.map((ev, idx) => (
+                {order.tracking.map((ev, idx) => (
                   <View key={idx} style={s.tlItem}>
                     {/* Line */}
                     <View style={s.tlLeft}>
                       <View style={[s.tlDot, idx === 0 && s.tlDotActive]} />
-                      {idx < ORDER.tracking.length - 1 && (
+                      {idx < order.tracking.length - 1 && (
                         <View style={s.tlLine} />
                       )}
                     </View>
@@ -1108,7 +1349,7 @@ export default function OrderDetailScreen() {
                       </Text>
                     ))}
                   </View>
-                  {ORDER.items.map((item) => (
+                  {order.items.map((item) => (
                     <View key={item.id} style={s.tblRow}>
                       {/* Product with link */}
                       <View
@@ -1127,15 +1368,30 @@ export default function OrderDetailScreen() {
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
+<<<<<<< HEAD
                             router.push({
                               pathname: "/productDetails",
                               params: { id: String(item.id) },
                             });
+=======
+                            if (item.productId) {
+                              router.push({
+                                pathname: "/productDetails",
+                                params: { id: String(item.productId) },
+                              });
+                            }
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                           }}
                           activeOpacity={0.7}
+                          disabled={!item.productId}
                         >
+<<<<<<< HEAD
                           <View style={s.viewProductBtn}>
                             <BoxArrowUpRightIcon size={11} color={C.primary} />
+=======
+                          <View style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}>
+                            <LinkIcon size={11} color={C.primary} />
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                             <Text style={s.viewProductTxt}>View</Text>
                           </View>
                         </TouchableOpacity>
@@ -1175,19 +1431,29 @@ export default function OrderDetailScreen() {
               ) : (
                 // Mobile / Tablet: card format
                 <View style={{ padding: 14, gap: 12 }}>
-                  {ORDER.items.map((item) => (
+                  {order.items.map((item) => (
                     <View key={item.id} style={s.itemCard}>
                       <View style={s.itemCardTop}>
                         <Text style={s.itemCardName}>{item.product}</Text>
                         <TouchableOpacity
-                          style={s.viewProductBtn}
+                          style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}
                           onPress={() => {
+<<<<<<< HEAD
                             router.push({
                               pathname: "/productDetails",
                               params: { id: String(item.id) },
                             });
+=======
+                            if (item.productId) {
+                              router.push({
+                                pathname: "/productDetails",
+                                params: { id: String(item.productId) },
+                              });
+                            }
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                           }}
                           activeOpacity={0.7}
+                          disabled={!item.productId}
                         >
                           <BoxArrowUpRightIcon size={11} color={C.primary} />
                           <Text style={s.viewProductTxt}>View</Text>
@@ -1233,14 +1499,14 @@ export default function OrderDetailScreen() {
                   <WalletIcon size={14} color={C.sub} />
                   <View style={{ flex: 1, marginLeft: 8 }}>
                     <Text style={s.summaryLbl}>Payment Method</Text>
-                    <Text style={s.summaryVal}>{ORDER.paymentMethod}</Text>
+                    <Text style={s.summaryVal}>{order.paymentMethod}</Text>
                   </View>
                 </View>
                 <View style={s.summaryRow}>
                   <WalletIcon
                     size={14}
                     color={
-                      ORDER.paymentStatus === "Paid" ? C.active : C.warning
+                      order.paymentStatus === "Paid" ? C.active : C.warning
                     }
                   />
                   <View style={{ flex: 1, marginLeft: 8 }}>
@@ -1250,13 +1516,13 @@ export default function OrderDetailScreen() {
                         s.summaryVal,
                         {
                           color:
-                            ORDER.paymentStatus === "Paid"
+                            order.paymentStatus === "Paid"
                               ? C.active
                               : C.warning,
                         },
                       ]}
                     >
-                      {ORDER.paymentStatus}
+                      {order.paymentStatus}
                     </Text>
                   </View>
                 </View>
@@ -1269,15 +1535,15 @@ export default function OrderDetailScreen() {
               <View style={[s.summaryBox, { flex: 1 }]}>
                 <Text style={s.summaryTitle}>Order Summary</Text>
                 {[
-                  ["Subtotal", rupee(ORDER.subtotal), false],
+                  ["Subtotal", rupee(order.subtotal), false],
                   [
                     "Shipping",
-                    ORDER.shippingCost === 0
+                    order.shippingCost === 0
                       ? "Free"
-                      : rupee(ORDER.shippingCost),
+                      : rupee(order.shippingCost),
                     false,
                   ],
-                  ["Tax", ORDER.tax === 0 ? "₹0.00" : rupee(ORDER.tax), false],
+                  ["Tax", order.tax === 0 ? "₹0.00" : rupee(order.tax), false],
                 ].map(([lbl, val]) => (
                   <View key={String(lbl)} style={s.summaryLineRow}>
                     <Text style={s.summaryLineLbl}>{String(lbl)}</Text>
@@ -1286,7 +1552,7 @@ export default function OrderDetailScreen() {
                 ))}
                 <View style={s.summaryTotalRow}>
                   <Text style={s.summaryTotalLbl}>Total</Text>
-                  <Text style={s.summaryTotalVal}>{rupee(ORDER.total)}</Text>
+                  <Text style={s.summaryTotalVal}>{rupee(order.total)}</Text>
                 </View>
               </View>
             </View>
@@ -1309,14 +1575,22 @@ export default function OrderDetailScreen() {
               }
             />
             <View style={s.cardBody}>
+<<<<<<< HEAD
               {orderHistory.map((h, idx) => {
+=======
+              {order.history.map((h, idx) => {
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                 const cfg = STATUS_CFG[h.status];
                 return (
                   <View key={idx} style={s.histItem}>
                     {/* Left: colored dot + line */}
                     <View style={s.histLeft}>
                       <View style={[s.histDot, { backgroundColor: cfg.dot }]} />
+<<<<<<< HEAD
                       {idx < orderHistory.length - 1 && (
+=======
+                      {idx < order.history.length - 1 && (
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                         <View style={s.histLine} />
                       )}
                     </View>
@@ -1338,6 +1612,7 @@ export default function OrderDetailScreen() {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+<<<<<<< HEAD
 
       {/* Invoice Modal */}
       <InvoiceModal
@@ -1449,6 +1724,9 @@ export default function OrderDetailScreen() {
           </View>
         </View>
       </Modal>
+=======
+    )}
+>>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
     </AdminLayout>
   );
 }
@@ -1692,7 +1970,47 @@ const s = StyleSheet.create({
     paddingVertical: 11,
     marginTop: 4,
   },
+  trackBtnDisabled: {
+    opacity: 0.5,
+  },
   trackBtnTxt: { color: "#fff", fontSize: 13, fontWeight: "700" },
+
+  // ── Loading / error states ─────────────────────────────────────────────────
+  loadingContainer: {
+    flex: 1,
+    minHeight: 300,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: C.text,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    minHeight: 300,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  errorText: {
+    color: C.inactive,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 14,
+  },
+  errorRetryBtn: {
+    backgroundColor: C.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  errorRetryTxt: {
+    color: C.white,
+    fontWeight: "700",
+  },
 
   // ── Tracking timeline ──────────────────────────────────────────────────────
   tlItem: { flexDirection: "row", gap: 12, minHeight: 56 },
@@ -1744,6 +2062,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
+  },
+  viewProductBtnDisabled: {
+    opacity: 0.5,
   },
   viewProductTxt: { fontSize: 11, color: C.primary, fontWeight: "600" },
 

@@ -1,6 +1,7 @@
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -223,7 +224,9 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
           `${key}-${bySeller.get(key)!.products.length}`,
       ),
       name: item.productName ?? item.name ?? "",
-      image: item.productImage ?? item.image ?? item.thumbnail ?? "",
+      image:
+        resolveMediaUrl(item.imageUrl ?? item.productImage ?? item.image ?? item.thumbnail ?? "") ||
+        "",
       seller: sellerName,
       sellerEmail: "",
       price:
@@ -467,7 +470,7 @@ function toUiOrder(
   const orderNumber = row.orderId.startsWith("#")
     ? row.orderId
     : `#${row.orderId}`;
-  const sellerGroups = buildPlaceholderSellerGroups(orderNumber);
+  const sellerGroups = buildSellerGroups(raw);
 
   // Determine intra/inter-state by comparing buyer state to first seller's state.
   const buyerState = (raw as any).customerState ?? (raw as any).state;
