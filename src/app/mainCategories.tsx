@@ -2,6 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
+import Swal from "sweetalert2";
 import {
   Alert,
   Image,
@@ -635,17 +636,7 @@ const Dropdown = ({
 
 // ─── Add Main Category Modal ──────────────────────────────────────────────────
 
-const AddMainCategoryModal = ({
-  visible,
-  onClose,
-  onSave,
-  isWeb,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (data: any) => void;
-  isWeb: boolean;
-}) => {
+const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { visible: boolean; onClose: () => void; onSave: (data: any) => void; isWeb: boolean; editData?: Category | null; }) => {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [hsn, setHsn] = useState("");
@@ -660,6 +651,20 @@ const AddMainCategoryModal = ({
     setStatus("Active");
   };
 
+  React.useEffect(() => {
+    if (visible) {
+      if (editData) {
+        setName(editData.name);
+        setImage(editData.image || null);
+        setHsn(editData.hsn);
+        setGst(editData.gst);
+        setStatus(editData.status);
+      } else {
+        reset();
+      }
+    }
+  }, [visible, editData]);
+
   const handleSave = () => {
     if (!name.trim()) {
       Alert.alert("Required", "Please enter a category name.");
@@ -673,7 +678,7 @@ const AddMainCategoryModal = ({
       Alert.alert("Required", "Please select GST percentage.");
       return;
     }
-    onSave({ name, image, hsn, gst, status, type: "Main Category" });
+    onSave({ id: editData?.id, name, image, hsn, gst, status, type: "Main Category" });
     reset();
     onClose();
   };
@@ -700,7 +705,7 @@ const AddMainCategoryModal = ({
               <View style={styles.modalIconWrap}>
                 <LayersIcon color="#FFFFFF" />
               </View>
-              <Text style={styles.modalTitle}>Add Main Category</Text>
+              <Text style={styles.modalTitle}>{editData ? "Edit Main Category" : "Add Main Category"}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -814,7 +819,7 @@ const AddMainCategoryModal = ({
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>Save Category</Text>
+              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -830,11 +835,13 @@ const AddCategoryModal = ({
   onClose,
   onSave,
   isWeb,
+  editData,
 }: {
   visible: boolean;
   onClose: () => void;
   onSave: (data: any) => void;
   isWeb: boolean;
+  editData?: Category | null;
 }) => {
   const [mainCat, setMainCat] = useState("");
   const [name, setName] = useState("");
@@ -852,6 +859,21 @@ const AddCategoryModal = ({
     setStatus("Active");
   };
 
+  React.useEffect(() => {
+    if (visible) {
+      if (editData) {
+        setMainCat(editData.parent || "");
+        setName(editData.name);
+        setImage(editData.image || null);
+        setHsn(editData.hsn);
+        setGst(editData.gst);
+        setStatus(editData.status);
+      } else {
+        reset();
+      }
+    }
+  }, [visible, editData]);
+
   const handleSave = () => {
     if (!mainCat) {
       Alert.alert("Required", "Please select a main category.");
@@ -866,6 +888,7 @@ const AddCategoryModal = ({
       return;
     }
     onSave({
+      id: editData?.id,
       name,
       image,
       hsn,
@@ -905,7 +928,7 @@ const AddCategoryModal = ({
               >
                 <FolderIcon />
               </View>
-              <Text style={styles.modalTitle}>Add Category</Text>
+              <Text style={styles.modalTitle}>{editData ? "Edit Category" : "Add Category"}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -1034,7 +1057,7 @@ const AddCategoryModal = ({
               style={[styles.saveBtn, { backgroundColor: "#F97316" }]}
               onPress={handleSave}
             >
-              <Text style={styles.saveBtnText}>Save Category</Text>
+              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1313,6 +1336,7 @@ export default function MainCategories() {
   const [currentPage, setCurrentPage] = useState(1);
   const [mainCatModalOpen, setMainCatModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
+  const [editCat, setEditCat] = useState<Category | null>(null);
 
   const filtered = categories.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()),
@@ -1324,42 +1348,80 @@ export default function MainCategories() {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  const handleEdit = (cat: Category) => {
+    setEditCat(cat);
+    if (cat.type === "Main Category") {
+      setMainCatModalOpen(true);
+    } else {
+      setCatModalOpen(true);
+    }
+  };
+
   const handleSave = (data: any) => {
-    const newCat: Category = {
-      id: categories.length + 1,
-      name: data.name,
-      type: data.type,
-      parent: data.parent,
-      hsn: data.hsn || "—",
-      gst: data.gst.split("%")[0].trim() + "%",
-      created: new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      status: data.status,
-      image: data.image,
-    };
-    setCategories((prev) => [newCat, ...prev]);
-    setCurrentPage(1);
+    if (data.id) {
+      setCategories((prev) =>
+        prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+      );
+    } else {
+      const newCat: Category = {
+        id: categories.length + 1,
+        name: data.name,
+        type: data.type,
+        parent: data.parent,
+        hsn: data.hsn || "—",
+        gst: data.gst.split("%")[0].trim() + "%",
+        created: new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        status: data.status,
+        image: data.image,
+      };
+      setCategories((prev) => [newCat, ...prev]);
+      setCurrentPage(1);
+    }
+    setEditCat(null);
   };
 
   const handleDelete = (cat: Category) => {
-  if (Platform.OS === 'web') {
-    const confirmed = window.confirm(`Delete "${cat.name}"?`);
-    if (confirmed) {
+    const confirmDelete = () => {
       setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      if (Platform.OS === "web") {
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: `"${cat.name}" deleted successfully!`,
+          confirmButtonColor: "#151D4F",
+        });
+      }
+    };
+
+    if (Platform.OS === "web") {
+      Swal.fire({
+        title: "Are you sure?",
+        text: `You won't be able to revert this!`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#151D4F",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          confirmDelete();
+        }
+      });
+    } else {
+      Alert.alert(
+        "Confirm Delete",
+        `Are you sure you want to delete "${cat.name}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", style: "destructive", onPress: confirmDelete }
+        ]
+      );
     }
-  } else {
-    Alert.alert('Delete Category', `Delete "${cat.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: () => setCategories((prev) => prev.filter((c) => c.id !== cat.id)),
-      },
-    ]);
-  }
-};
+  };
 
   return (
     <AdminLayout>
@@ -1427,7 +1489,10 @@ export default function MainCategories() {
             {/* Add Buttons */}
             <TouchableOpacity
               style={styles.addMainBtn}
-              onPress={() => setMainCatModalOpen(true)}
+              onPress={() => {
+                setEditCat(null);
+                setMainCatModalOpen(true);
+              }}
             >
               <PlusIcon />
               <Text style={styles.addMainBtnText}>
@@ -1437,7 +1502,10 @@ export default function MainCategories() {
 
             <TouchableOpacity
               style={styles.addCatBtn}
-              onPress={() => setCatModalOpen(true)}
+              onPress={() => {
+                setEditCat(null);
+                setCatModalOpen(true);
+              }}
             >
               <PlusIcon />
               <Text style={styles.addCatBtnText}>
@@ -1469,7 +1537,7 @@ export default function MainCategories() {
               >
                 <GridCard
                   cat={cat}
-                  onEdit={() => {}}
+                  onEdit={() => handleEdit(cat)}
                   onDelete={() => handleDelete(cat)}
                 />
               </View>
@@ -1478,7 +1546,7 @@ export default function MainCategories() {
         ) : (
           <ListTable
             categories={paginated}
-            onEdit={() => {}}
+            onEdit={handleEdit}
             onDelete={handleDelete}
           />
         )}
@@ -1508,15 +1576,23 @@ export default function MainCategories() {
 
       <AddMainCategoryModal
         visible={mainCatModalOpen}
-        onClose={() => setMainCatModalOpen(false)}
+        onClose={() => {
+          setMainCatModalOpen(false);
+          setEditCat(null);
+        }}
         onSave={handleSave}
         isWeb={isWeb}
+        editData={editCat}
       />
       <AddCategoryModal
         visible={catModalOpen}
-        onClose={() => setCatModalOpen(false)}
+        onClose={() => {
+          setCatModalOpen(false);
+          setEditCat(null);
+        }}
         onSave={handleSave}
         isWeb={isWeb}
+        editData={editCat}
       />
     </AdminLayout>
   );
@@ -2094,3 +2170,4 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "600", color: C.text, marginTop: 8 },
   emptySubtitle: { fontSize: 13, color: C.sub },
 });
+

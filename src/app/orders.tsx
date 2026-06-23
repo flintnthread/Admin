@@ -2363,7 +2363,7 @@ export default function OrdersScreen() {
                 s.headerBlock,
                 {
                   paddingTop: Platform.OS === "ios" ? 50 : 20,
-                  marginTop: isMobile ? 12 : 12,
+                  
                 },
               ]}
             >
@@ -2703,10 +2703,17 @@ const s = StyleSheet.create({
   // ── Header — floating rounded card (all 4 corners) ──────────────────────────
   headerBlock: {
     backgroundColor: C.navyDeep,
-    paddingTop: 20,
-    paddingBottom: 44,
-    borderRadius: 24,
-    overflow: "hidden",
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    paddingBottom: 68,
+    borderRadius: 22,
+    marginHorizontal: 2,
+    marginTop: 12,
+    shadowColor: C.navyDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
   headerTop: {
     flexDirection: "row",
@@ -2746,7 +2753,7 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
-    marginTop: -32,
+    marginTop: -42,
     marginBottom: 4,
   },
   statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26 },
@@ -3901,3 +3908,5 @@ const s = StyleSheet.create({
   },
   retryText: { color: C.white, fontWeight: "700", fontSize: 13 },
 });
+
+

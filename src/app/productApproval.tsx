@@ -839,7 +839,7 @@ export default function ProductApprovalScreen() {
     <AdminLayout>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
         <PageHeader isWide={isWide} />
 
@@ -918,8 +918,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
     gap: 16,
   },
   pressed: {
@@ -1083,13 +1083,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    backgroundColor: '#1d324e',
+    backgroundColor: '#151D4F',
     paddingHorizontal: 32,
-    paddingTop: 24,
-    paddingBottom: 48,
+    paddingVertical: 28,
+    paddingBottom: 68,
     borderRadius: 22,
-        gap: 12,
-    shadowColor: '#1d324e',
+    marginHorizontal: 2,
+    marginTop: 12,
+    gap: 12,
+    shadowColor: '#151D4F',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 16,
