@@ -3,19 +3,21 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
 
 import { getApiErrorMessage } from "@/lib/api/client";
-import { formatDate, maskAccount } from "@/lib/format";
-import { approveSellerBank, fetchSellerBankDetails, rejectSellerBank } from "@/services/sellerApi";
+import { formatDate, formatDateTime, maskAccount } from "@/lib/format";
+import { approveSellerBank, fetchSellerBankDetails, fetchSellerDetail, rejectSellerBank } from "@/services/sellerApi";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 
 const BP = { mobile: 480, tablet: 768, laptop: 1024, desktop: 1280 };
@@ -47,6 +49,7 @@ type BankDetail = {
 function bankStatusLabel(data: BankDetail | null): string {
   if (!data) return "—";
   if (data.bankVerified) return "Approved";
+  if (data.adminRemarks && data.adminRemarks !== "—" && data.adminRemarks.trim() !== "") return "Rejected";
   if (data.bankName || data.accountNumber) return "Pending verification";
   return "Not requested";
 }
@@ -97,7 +100,7 @@ function TitleSection({
           <>
             <Text style={styles.userName}>{data?.fullName ?? "—"}</Text>
             <Text style={styles.userEmail}>{data?.email ?? "—"}</Text>
-            <View style={styles.statusBadge}>
+            <View style={[styles.statusBadge, { backgroundColor: statusLabel === "Approved" ? "#16A34A" : statusLabel === "Rejected" ? "#DC2626" : "#4A5568" }]}>
               <Text style={styles.statusText}>{statusLabel}</Text>
             </View>
           </>
@@ -173,11 +176,27 @@ function HistoryTimeline({
   data: BankDetail | null;
 }) {
   const events: { label: string; value: string }[] = [];
-  if (data?.createdAt) events.push({ label: "Seller registered", value: formatDate(data.createdAt) });
-  if (data?.bankName) events.push({ label: "Bank details submitted", value: formatDate(data.updatedAt ?? data.createdAt) });
-  if (data?.bankVerified && data.updatedAt) events.push({ label: "Bank approved", value: formatDate(data.updatedAt) });
-  else if (data?.adminRemarks && data.adminRemarks !== "—") {
-    events.push({ label: "Admin note", value: data.adminRemarks });
+  if (data?.createdAt) {
+    events.push({ label: "Seller registered", value: formatDate(data.createdAt) });
+  }
+
+  if (data?.bankName || data?.accountNumber) {
+    events.push({ label: "bank details submitted", value: formatDate(data.createdAt) });
+  }
+
+  const editCount = data?.updatedAt && data?.createdAt && data.updatedAt !== data.createdAt ? 1 : 0;
+  if (editCount > 0 && data) {
+    events.push({ label: `seller edit request (${editCount})`, value: formatDate(data.updatedAt) });
+  }
+
+  const isVerified = Boolean(data?.bankVerified);
+  if (isVerified && data?.updatedAt) {
+    events.push({ label: "Admin approval", value: formatDateTime(data.updatedAt) });
+  }
+
+  if (!isVerified && data?.adminRemarks && data.adminRemarks.trim() !== "" && data.adminRemarks !== "—" && data?.updatedAt) {
+    events.push({ label: "Admin rejected", value: formatDateTime(data.updatedAt) });
+    events.push({ label: "Rejection reason", value: data.adminRemarks });
   }
 
   return (
@@ -221,6 +240,11 @@ export default function BankApprovalHistory() {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Confirmation Modal States
+  const [approveModalVisible, setApproveModalVisible] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
   const loadDetails = useCallback(async () => {
     if (!sellerId || Number.isNaN(sellerId)) {
       setError("Invalid seller.");
@@ -230,8 +254,15 @@ export default function BankApprovalHistory() {
     setLoading(true);
     setError(null);
     try {
-      const detail = await fetchSellerBankDetails(sellerId);
-      setData(detail as BankDetail);
+      const [detail, seller] = await Promise.all([
+        fetchSellerBankDetails(sellerId),
+        fetchSellerDetail(sellerId),
+      ]);
+      const merged: BankDetail = {
+        ...detail,
+        adminRemarks: (seller.adminRemarks as string) || (detail.adminRemarks as string) || "",
+      };
+      setData(merged);
     } catch (e) {
       setError(getApiErrorMessage(e));
     } finally {
@@ -256,11 +287,11 @@ export default function BankApprovalHistory() {
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = async (reason: string) => {
     if (!sellerId) return;
     setActing(true);
     try {
-      await rejectSellerBank(sellerId, "Rejected by admin");
+      await rejectSellerBank(sellerId, reason);
       await loadDetails();
     } catch (e) {
       setError(getApiErrorMessage(e));
@@ -275,55 +306,148 @@ export default function BankApprovalHistory() {
   return (
     <AdminLayout>
       <View style={styles.root}>
-      {/* <StatusBar barStyle="light-content" backgroundColor="#C05E1A" /> */}
-      <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, !isMobile && { alignItems: "center" }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.outerContainer, { maxWidth: contentMaxWidth, width: "100%" }]}>
-          <View style={styles.topCard}>
-            <Header bp={bp} />
-            <TitleSection
-              bp={bp}
-              data={data}
-              loading={loading}
-              acting={acting}
-              onBack={() => router.push("/sellerbankapproval")}
-              onProof={() => router.push({ pathname: "/bankproof", params: { sellerId: String(sellerId) } })}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          </View>
+        {/* <StatusBar barStyle="light-content" backgroundColor="#C05E1A" /> */}
+        <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
-          {error ? (
-            <View style={styles.card}>
-              <Text style={{ color: "#DC2626" }}>{error}</Text>
-              <TouchableOpacity style={styles.proofBtn} onPress={loadDetails}>
-                <Text style={styles.proofBtnText}>Retry</Text>
-              </TouchableOpacity>
+        {/* Approval Modal */}
+        <Modal
+          visible={approveModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setApproveModalVisible(false)}
+        >
+          <View style={modalStyles.overlay}>
+            <View style={[modalStyles.box, { width: isMobile ? "90%" : 400 }]}>
+              <View style={modalStyles.header}>
+                <Text style={modalStyles.headerTitle}>Approve Bank Details</Text>
+                <TouchableOpacity onPress={() => setApproveModalVisible(false)}>
+                  <Icon name="close" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View style={modalStyles.body}>
+                <Icon name="check-circle-outline" size={48} color="#16A34A" style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <Text style={modalStyles.bodyText}>
+                  Are you sure you want to approve the bank details of {data?.fullName}?
+                </Text>
+              </View>
+              <View style={modalStyles.footer}>
+                <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setApproveModalVisible(false)}>
+                  <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={modalStyles.confirmApproveBtn}
+                  onPress={() => {
+                    setApproveModalVisible(false);
+                    handleApprove();
+                  }}
+                  disabled={acting}
+                >
+                  <Text style={modalStyles.confirmBtnText}>{acting ? "Approving..." : "Confirm Approve"}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          ) : null}
-
-          <View style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}>
-            {isDesktopWide ? (
-              <>
-                <View style={styles.leftCol}>
-                  <CurrentBankDetails data={data} />
-                </View>
-                <View style={styles.rightCol}>
-                  <HistoryTimeline compact={false} data={data} />
-                </View>
-              </>
-            ) : (
-              <>
-                <CurrentBankDetails data={data} />
-                <HistoryTimeline compact={isMobile} data={data} />
-              </>
-            )}
           </View>
-        </View>
-      </ScrollView>
+        </Modal>
+
+        {/* Rejection Modal */}
+        <Modal
+          visible={rejectModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setRejectModalVisible(false)}
+        >
+          <View style={modalStyles.overlay}>
+            <View style={[modalStyles.box, { width: isMobile ? "90%" : 400 }]}>
+              <View style={[modalStyles.header, { backgroundColor: '#DC2626' }]}>
+                <Text style={modalStyles.headerTitle}>Reject Bank Details</Text>
+                <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
+                  <Icon name="close" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View style={modalStyles.body}>
+                <Icon name="alert-circle-outline" size={48} color="#DC2626" style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <Text style={modalStyles.bodyText}>
+                  Enter a reason for rejecting {data?.fullName}'s bank details:
+                </Text>
+                <TextInput
+                  style={modalStyles.input}
+                  placeholder="Reason for rejection (e.g. Invalid document, incorrect IFSC)"
+                  value={rejectReason}
+                  onChangeText={setRejectReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+              <View style={modalStyles.footer}>
+                <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setRejectModalVisible(false)}>
+                  <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[modalStyles.confirmRejectBtn, !rejectReason.trim() && { backgroundColor: '#FFA1A1' }]}
+                  onPress={() => {
+                    if (!rejectReason.trim()) return;
+                    setRejectModalVisible(false);
+                    handleReject(rejectReason);
+                  }}
+                  disabled={acting || !rejectReason.trim()}
+                >
+                  <Text style={modalStyles.confirmBtnText}>{acting ? "Rejecting..." : "Confirm Reject"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, !isMobile && { alignItems: "center" }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.outerContainer, { maxWidth: contentMaxWidth, width: "100%" }]}>
+            <View style={styles.topCard}>
+              <Header bp={bp} />
+              <TitleSection
+                bp={bp}
+                data={data}
+                loading={loading}
+                acting={acting}
+                onBack={() => router.push("/sellerbankapproval")}
+                onProof={() => router.push({ pathname: "/bankproof", params: { sellerId: String(sellerId) } })}
+                onApprove={() => setApproveModalVisible(true)}
+                onReject={() => {
+                  setRejectReason("");
+                  setRejectModalVisible(true);
+                }}
+              />
+            </View>
+
+            {error ? (
+              <View style={styles.card}>
+                <Text style={{ color: "#DC2626" }}>{error}</Text>
+                <TouchableOpacity style={styles.proofBtn} onPress={loadDetails}>
+                  <Text style={styles.proofBtnText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            <View style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}>
+              {isDesktopWide ? (
+                <>
+                  <View style={styles.leftCol}>
+                    <CurrentBankDetails data={data} />
+                  </View>
+                  <View style={styles.rightCol}>
+                    <HistoryTimeline compact={false} data={data} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <CurrentBankDetails data={data} />
+                  <HistoryTimeline compact={isMobile} data={data} />
+                </>
+              )}
+            </View>
+          </View>
+        </ScrollView>
       </View>
     </AdminLayout>
   );
@@ -351,7 +475,7 @@ const shadowSm: any = Platform.select({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   scrollContent: { flexGrow: 1, paddingBottom: 32 },
-  outerContainer: { alignSelf: "center", paddingHorizontal: 0,  width: "100%",paddingTop: 12, gap: 16 },
+  outerContainer: { alignSelf: "center", paddingHorizontal: 0, width: "100%", paddingTop: 12, gap: 16 },
   topCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", ...shadow },
   headerBanner: {
     backgroundColor: HEADER_BG,
@@ -489,3 +613,93 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 15, fontWeight: "700", color: DARK },
   emptySubtitle: { fontSize: 13, color: GRAY, textAlign: "center", paddingHorizontal: 16 },
 } as any);
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  box: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  header: {
+    backgroundColor: "#16A34A",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  body: {
+    padding: 20,
+    gap: 12,
+  },
+  bodyText: {
+    fontSize: 14,
+    color: "#2C3E50",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    color: "#2D3748",
+    minHeight: 80,
+    textAlignVertical: "top",
+    marginTop: 8,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  cancelBtn: {
+    borderWidth: 1,
+    borderColor: "#CBD5E0",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  cancelBtnText: {
+    color: "#4A5568",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  confirmApproveBtn: {
+    backgroundColor: "#16A34A",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  confirmRejectBtn: {
+    backgroundColor: "#DC2626",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  confirmBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+});

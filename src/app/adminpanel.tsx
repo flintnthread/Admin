@@ -608,21 +608,7 @@ export default function AdminUsersScreen() {
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity>
-          <Icon name="menu" size={26} color={C.white} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Admin Users</Text>
-        <View style={styles.topBarIcons}>
-          <TouchableOpacity style={styles.topBarAdd} onPress={() => setAddVisible(true)}>
-            <Icon name="add" size={20} color={C.white} />
-          </TouchableOpacity>
-          <TouchableOpacity><Icon name="search-outline" size={22} color={C.white} /></TouchableOpacity>
-          <View style={{ position: "relative" }}>
-            <TouchableOpacity><Icon name="notifications-outline" size={22} color={C.white} /></TouchableOpacity>
-            <View style={styles.notifBadge}><Text style={styles.notifBadgeText}>2</Text></View>
-          </View>
-          <View style={styles.avatarSmall}><Text style={styles.avatarSmallText}>FL</Text></View>
-        </View>
+        <Text style={styles.topBarTitle}>Admin Panel Users</Text>
       </View>
 
       {/* Content */}

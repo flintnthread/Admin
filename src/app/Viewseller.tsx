@@ -11,7 +11,6 @@ import {
 } from '@/services/sellerApi';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import Svg, { Polygon, Polyline, Path } from 'react-native-svg';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +26,7 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
+import Svg, { Path, Polygon, Polyline } from 'react-native-svg';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
 let BootstrapIcon: React.FC<{ name: string; size: number; color: string }>;
@@ -769,7 +769,8 @@ const csvModalStyles = StyleSheet.create({
   modalMobile: {
     maxWidth: '100%',
   },
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
+  header: {
+    marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1304,43 +1305,51 @@ export default function ViewSeller() {
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.statsRow, isMobile && { flexDirection: 'column' }]}>
-            <View style={[styles.statCard, isMobile && { width: '100%', marginBottom: 12 }]}>
+          <View style={[styles.statsRow, width < 1024 && { flexDirection: 'column' }]}>
+            <View style={[styles.statCard, width < 1024 && { width: '100%', marginBottom: 12 }]}>
               <Text style={styles.statCardTitle}>Product Status Distribution</Text>
               <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
               <Text style={styles.statCardTotalLabel}>Total Products</Text>
-              <View style={styles.donutWrap}>
-                <DonutChart
-                  segments={productSegments}
-                  total={seller.totalProducts}
-                  size={isMobile ? 120 : 140}
-                />
-              </View>
-              {productSegments.map(s => (
-                <View key={s.label} style={styles.statLegendRow}>
-                  <Text style={styles.statLegendLabel}>{s.label}</Text>
-                  <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
+                <View style={styles.donutWrap}>
+                  <DonutChart
+                    segments={productSegments}
+                    total={seller.totalProducts}
+                    size={width < 600 ? 120 : 150}
+                  />
                 </View>
-              ))}
+                <View style={[styles.legendList, width >= 600 && { flex: 1, maxWidth: 220 }]}>
+                  {productSegments.map(s => (
+                    <View key={s.label} style={styles.statLegendRow}>
+                      <Text style={styles.statLegendLabel}>{s.label}</Text>
+                      <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
 
-            <View style={[styles.statCard, isMobile && { width: '100%' }]}>
+            <View style={[styles.statCard, width < 1024 && { width: '100%' }]}>
               <Text style={styles.statCardTitle}>Order Status Distribution</Text>
               <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
               <Text style={styles.statCardTotalLabel}>Total Orders</Text>
-              <View style={styles.donutWrap}>
-                <DonutChart
-                  segments={orderSegments}
-                  total={Math.max(seller.totalOrders, 1)}
-                  size={isMobile ? 120 : 140}
-                />
-              </View>
-              {orderSegments.map(s => (
-                <View key={s.label} style={styles.statLegendRow}>
-                  <Text style={styles.statLegendLabel}>{s.label}</Text>
-                  <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
+                <View style={styles.donutWrap}>
+                  <DonutChart
+                    segments={orderSegments}
+                    total={Math.max(seller.totalOrders, 1)}
+                    size={width < 600 ? 120 : 150}
+                  />
                 </View>
-              ))}
+                <View style={[styles.legendList, width >= 600 && { flex: 1, maxWidth: 220 }]}>
+                  {orderSegments.map(s => (
+                    <View key={s.label} style={styles.statLegendRow}>
+                      <Text style={styles.statLegendLabel}>{s.label}</Text>
+                      <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
           </View>
         </View>
@@ -1817,6 +1826,12 @@ const styles = StyleSheet.create({
   },
   donutWrap: {
     marginVertical: 8,
+  },
+  chartAndLegendContainer: {
+    marginTop: 12,
+  },
+  legendList: {
+    width: '100%',
   },
   statLegendRow: {
     flexDirection: 'row',
