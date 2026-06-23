@@ -13,11 +13,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   Modal,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -1023,6 +1025,135 @@ export default function ViewSeller() {
   const [productsExportModal, setProductsExportModal] = useState(false);
   const [ordersExportModal, setOrdersExportModal] = useState(false);
 
+  const exportSellerProfileToCsv = () => {
+    const headers = [
+      "ID",
+      "Seller ID",
+      "First Name",
+      "Last Name",
+      "Email",
+      "Mobile",
+      "Email Verified",
+      "Mobile Verified",
+      "Status",
+      "Registration Date",
+      "Last Login",
+      "Business Name",
+      "Business Type",
+      "GST Number",
+      "PAN Number",
+      "Address",
+      "City",
+      "State",
+      "Pincode",
+      "Country",
+      "GST Registered",
+      "Seller Category",
+      "Referral Code",
+      "Wallet Balance (INR)",
+      "Bank Name",
+      "Account Holder",
+      "Account Number",
+      "IFSC Code",
+      "Branch",
+      "Bank Verified",
+      "KYC Verified",
+      "Profile Completed",
+      "Total Revenue (INR)",
+      "Total Orders",
+      "Total Products",
+      "Products Listing Status",
+      "Warehouse Address",
+      "Warehouse Area",
+      "Warehouse City",
+      "Warehouse State",
+      "Warehouse Country",
+      "KYC Remarks",
+      "Admin Remarks"
+    ];
+
+    const values = [
+      seller.id,
+      seller.sellerId,
+      seller.firstName,
+      seller.lastName,
+      seller.email,
+      seller.mobile,
+      seller.emailVerified ? "Yes" : "No",
+      seller.mobileVerified ? "Yes" : "No",
+      seller.status,
+      seller.registrationDate,
+      seller.lastLogin,
+      seller.businessName,
+      seller.businessType,
+      seller.gstNumber,
+      seller.panNumber,
+      seller.address,
+      seller.city,
+      seller.state,
+      seller.pincode,
+      seller.country,
+      seller.hasGst ? "Yes" : "No",
+      seller.sellerCategory,
+      seller.referralCode,
+      seller.walletBalance.toFixed(2),
+      seller.bankName,
+      seller.accountHolder,
+      seller.accountNumber,
+      seller.ifscCode,
+      seller.branchName,
+      seller.bankVerified ? "Yes" : "No",
+      seller.kycVerified ? "Verified" : "Pending",
+      seller.profileCompleted ? "Yes" : "No",
+      seller.totalRevenue,
+      seller.totalOrders,
+      seller.totalProducts,
+      seller.productsListingStatus,
+      seller.warehouseAddress,
+      seller.warehouseArea,
+      seller.warehouseCity,
+      seller.warehouseState,
+      seller.warehouseCountry,
+      seller.kycRemarks,
+      seller.adminRemarks
+    ];
+
+    const formatCsvCell = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).trim();
+      const escaped = str.replace(/"/g, '""');
+      return `"${escaped}"`;
+    };
+
+    const csvContent = [
+      headers.map(formatCsvCell).join(','),
+      values.map(formatCsvCell).join(',')
+    ].join('\n');
+
+    const fileName = `seller_${seller.sellerId || seller.id}_profile.csv`;
+
+    try {
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        Share.share({
+          message: csvContent,
+          title: `Seller Profile Export`,
+        });
+      }
+    } catch (error) {
+      console.error("Export profile CSV error:", error);
+      Alert.alert("Export Error", "Failed to export seller profile.");
+    }
+  };
+
   const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
     setSelectedDocUrl(path || url || '');
@@ -1236,7 +1367,7 @@ export default function ViewSeller() {
                 color={seller.status === 'Active' ? COLORS.success : seller.status === 'Pending' ? COLORS.warning : COLORS.danger}
               />
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/sellerprofile')}>
+                <TouchableOpacity style={styles.actionBtn} onPress={exportSellerProfileToCsv}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                     <BootstrapIcon name="file-earmark-text" size={13} color={COLORS.white} />
                     <Text style={styles.actionBtnText}>Export CSV</Text>
