@@ -5,6 +5,7 @@
  * Bootstrap SVG icons only — no external icon libraries
  */
 
+import { InvoiceModal } from "./orders";
 import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState, useRef } from "react";
@@ -14,11 +15,15 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
   View,
+  Animated,
+  Easing,
 } from "react-native"; 
 import Svg, { Circle, Path } from "react-native-svg";
 
@@ -253,7 +258,7 @@ const STATUS_OPTIONS: {
 ];
 
 // Extra non-status option
-const EXTRA_OPTIONS = [{ label: "Sent to Seller", icon: <SentToSellerIcon /> }];
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SVG ICONS
@@ -404,11 +409,31 @@ const LinkIcon = ({ size = 13, color = C.primary }: IP) => (
     />
   </Svg>
 );
+const BoxArrowUpRightIcon = ({ size = 13, color = C.primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path
+      fill={color}
+      d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"
+    />
+    <Path
+      fill={color}
+      d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"
+    />
+  </Svg>
+);
 const MapPinIcon = ({ size = 13, color = C.primary }: IP) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
     <Path
       fill={color}
       d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"
+    />
+  </Svg>
+);
+const CloseIcon = ({ size = 16, color = C.text }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path
+      fill={color}
+      d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"
     />
   </Svg>
 );
@@ -452,22 +477,7 @@ const OrderIcon = ({ size = 20, color = "#fff" }: IP) => (
     />
   </Svg>
 );
-const EnvelopeIcon = ({ size = 13, color = C.sub }: IP) => (
-  <Svg width={size} height={size} viewBox="0 0 16 16">
-    <Path
-      fill={color}
-      d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-1.897L1 6.383z"
-    />
-  </Svg>
-);
-const PhoneIcon2 = ({ size = 13, color = C.sub }: IP) => (
-  <Svg width={size} height={size} viewBox="0 0 16 16">
-    <Path
-      fill={color}
-      d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.6 17.6 0 0 0 4.168 6.608 17.6 17.6 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.68.68 0 0 0-.58-.122l-2.19.547a1.75 1.75 0 0 1-1.657-.459L5.482 8.062a1.75 1.75 0 0 1-.46-1.657l.548-2.19a.68.68 0 0 0-.122-.58z"
-    />
-  </Svg>
-);
+
 const NoteIcon = ({ size = 13, color = C.sub }: IP) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
     <Path
@@ -691,7 +701,82 @@ export default function OrderDetailScreen() {
   const displayOrderId = orderId ?? ORDER.id;
 
   const [status, setStatus] = useState<OrderStatus>(ORDER.status);
+  const [invoiceVisible, setInvoiceVisible] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [newStatus, setNewStatus] = useState<OrderStatus>("Pending");
+  const [statusComment, setStatusComment] = useState("");
+  const [notifyCustomer, setNotifyCustomer] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<StatusHistory[]>(ORDER.history);
   const px = isMobile ? 14 : isTablet ? 20 : 28;
+
+  // Sync animation
+  const syncSpinAnim = useRef(new Animated.Value(0)).current;
+  const handleSync = () => {
+    Animated.loop(
+      Animated.timing(syncSpinAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    // simulate sync stop
+    setTimeout(() => {
+      syncSpinAnim.stopAnimation();
+      syncSpinAnim.setValue(0);
+    }, 2000);
+  };
+
+  const spin = syncSpinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  // Map the local mock ORDER to the shape expected by InvoiceModal
+  const mappedOrderForInvoice = {
+    id: String(ORDER.id),
+    orderNumber: displayOrderId,
+    date: ORDER.date.split(",")[0],
+    time: ORDER.date.split(", ")[1] || "",
+    customer: {
+      name: ORDER.customer.name,
+      email: ORDER.customer.email,
+      phone: ORDER.customer.phone,
+      address: `${ORDER.billing.line1} ${ORDER.billing.line2}`,
+      city: ORDER.billing.city,
+      state: ORDER.billing.state,
+      pincode: ORDER.billing.pincode,
+    },
+    amount: ORDER.total,
+    paymentType: ORDER.paymentMethod as any,
+    status: ORDER.status as any,
+    gstStatus: "Not Filed" as any,
+    isIntraState: true,
+    sellerGroups: [
+      {
+        seller: {
+          name: ORDER.items[0]?.seller || "Seller",
+          email: "support@seller.com",
+          address: {
+            line1: "Seller Line 1",
+            city: "Hyderabad",
+            state: "Telangana",
+            pincode: "500001",
+          }
+        },
+        hasInvoice: true,
+        hasShippingLabel: true,
+        products: ORDER.items.map(item => ({
+          id: String(item.id),
+          name: item.product,
+          price: item.price,
+          qty: item.qty,
+          taxPercent: 5,
+        }))
+      }
+    ]
+  };
 
   return (
     <AdminLayout>
@@ -703,7 +788,13 @@ export default function OrderDetailScreen() {
           <View style={s.headerLeft}>
             <TouchableOpacity
               style={s.backBtn}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.push("/orders");
+                }
+              }}
               activeOpacity={0.8}
             >
               <BackIcon size={18} />
@@ -756,17 +847,10 @@ export default function OrderDetailScreen() {
                 <TouchableOpacity
                   style={[s.actionBtn, { backgroundColor: C.navy }]}
                   activeOpacity={0.8}
+                  onPress={() => setInvoiceVisible(true)}
                 >
                   <InvoiceIcon />
                   <Text style={s.actionBtnTxt}>Invoice</Text>
-                </TouchableOpacity>
-                {/* Force Push */}
-                <TouchableOpacity
-                  style={[s.actionBtn, { backgroundColor: C.primary }]}
-                  activeOpacity={0.8}
-                >
-                  <ShiprocketIcon />
-                  <Text style={s.actionBtnTxt}>Force Push to Shiprocket</Text>
                 </TouchableOpacity>
                 {/* Update Status dropdown */}
                 <StatusDropdown current={status} onSelect={setStatus} />
@@ -874,7 +958,6 @@ export default function OrderDetailScreen() {
                 <View style={s.infoRow}>
                   <Text style={s.infoLabel}>Email Address</Text>
                   <View style={s.infoValRow}>
-                    <EnvelopeIcon />
                     <Text style={s.infoValue} numberOfLines={1}>
                       {ORDER.customer.email}
                     </Text>
@@ -883,14 +966,12 @@ export default function OrderDetailScreen() {
                 <View style={s.infoRow}>
                   <Text style={s.infoLabel}>Phone Number</Text>
                   <View style={s.infoValRow}>
-                    <PhoneIcon2 />
                     <Text style={s.infoValue}>{ORDER.customer.phone}</Text>
                   </View>
                 </View>
                 <View style={s.infoRow}>
                   <Text style={s.infoLabel}>Order Notes</Text>
                   <View style={s.infoValRow}>
-                    <NoteIcon />
                     <Text style={[s.infoValue, { fontStyle: "italic" }]}>
                       {ORDER.customer.notes}
                     </Text>
@@ -929,8 +1010,11 @@ export default function OrderDetailScreen() {
                   <TouchableOpacity
                     style={[s.smBtn, { backgroundColor: C.blue }]}
                     activeOpacity={0.8}
+                    onPress={handleSync}
                   >
-                    <SyncIcon size={13} />
+                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                      <SyncIcon size={13} />
+                    </Animated.View>
                     <Text style={s.smBtnTxt}>Sync Now</Text>
                   </TouchableOpacity>
                 }
@@ -1015,7 +1099,10 @@ export default function OrderDetailScreen() {
                     ].map((h) => (
                       <Text
                         key={h}
-                        style={[s.tblHdr, h === "Product" ? { flex: 2.5 } : {}]}
+                        style={[
+                          s.tblHdr, 
+                          h === "Product" ? { flex: 2 } : h === "Seller" ? { flex: 1.5 } : { flex: 1 }
+                        ]}
                       >
                         {h}
                       </Text>
@@ -1028,7 +1115,7 @@ export default function OrderDetailScreen() {
                         style={[
                           s.tblCell,
                           {
-                            flex: 2.5,
+                            flex: 2,
                             flexDirection: "row",
                             alignItems: "center",
                             gap: 6,
@@ -1040,12 +1127,15 @@ export default function OrderDetailScreen() {
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
-                            /* open flintnthread.in/product/slug */
+                            router.push({
+                              pathname: "/productDetails",
+                              params: { id: String(item.id) },
+                            });
                           }}
                           activeOpacity={0.7}
                         >
                           <View style={s.viewProductBtn}>
-                            <LinkIcon size={11} color={C.primary} />
+                            <BoxArrowUpRightIcon size={11} color={C.primary} />
                             <Text style={s.viewProductTxt}>View</Text>
                           </View>
                         </TouchableOpacity>
@@ -1053,8 +1143,10 @@ export default function OrderDetailScreen() {
                       <View style={s.tblCell}>
                         <Text style={s.tblCellSub}>{item.sku}</Text>
                       </View>
-                      <View style={s.tblCell}>
+                      <View style={[s.tblCell, { flex: 1.5 }]}>
                         <Text style={s.tblCellTxt}>{item.seller}</Text>
+                        <Text style={[s.tblCellSub, { fontSize: 11, marginTop: 2 }]}>support@flintnthread.in</Text>
+                        <Text style={[s.tblCellSub, { fontSize: 11 }]}>+91 9063499092</Text>
                       </View>
                       <View style={s.tblCell}>
                         <Text style={s.tblCellSub}>{item.variant}</Text>
@@ -1090,11 +1182,14 @@ export default function OrderDetailScreen() {
                         <TouchableOpacity
                           style={s.viewProductBtn}
                           onPress={() => {
-                            /* open product page */
+                            router.push({
+                              pathname: "/productDetails",
+                              params: { id: String(item.id) },
+                            });
                           }}
                           activeOpacity={0.7}
                         >
-                          <LinkIcon size={11} color={C.primary} />
+                          <BoxArrowUpRightIcon size={11} color={C.primary} />
                           <Text style={s.viewProductTxt}>View</Text>
                         </TouchableOpacity>
                       </View>
@@ -1206,6 +1301,7 @@ export default function OrderDetailScreen() {
                 <TouchableOpacity
                   style={[s.smBtn, { backgroundColor: C.navy }]}
                   activeOpacity={0.8}
+                  onPress={() => setUpdateModalVisible(true)}
                 >
                   <AddIcon size={13} />
                   <Text style={s.smBtnTxt}>Add Status Update</Text>
@@ -1213,14 +1309,14 @@ export default function OrderDetailScreen() {
               }
             />
             <View style={s.cardBody}>
-              {ORDER.history.map((h, idx) => {
+              {orderHistory.map((h, idx) => {
                 const cfg = STATUS_CFG[h.status];
                 return (
                   <View key={idx} style={s.histItem}>
                     {/* Left: colored dot + line */}
                     <View style={s.histLeft}>
                       <View style={[s.histDot, { backgroundColor: cfg.dot }]} />
-                      {idx < ORDER.history.length - 1 && (
+                      {idx < orderHistory.length - 1 && (
                         <View style={s.histLine} />
                       )}
                     </View>
@@ -1242,6 +1338,117 @@ export default function OrderDetailScreen() {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+
+      {/* Invoice Modal */}
+      <InvoiceModal
+        order={mappedOrderForInvoice as any}
+        visible={invoiceVisible}
+        onClose={() => setInvoiceVisible(false)}
+      />
+
+      {/* Add Status Update Modal */}
+      <Modal
+        visible={updateModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUpdateModalVisible(false)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { width: Math.min(480, width - 32) }]}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Add Status Update</Text>
+              <TouchableOpacity onPress={() => setUpdateModalVisible(false)}>
+                <CloseIcon color={C.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
+              <Text style={s.modalLabel}>Select Status</Text>
+              <View style={s.statusGrid}>
+                {STATUS_OPTIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      s.statusBtn,
+                      newStatus === opt.value && s.statusBtnActive
+                    ]}
+                    onPress={() => setNewStatus(opt.value)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={s.statusBtnIcon}>{opt.icon}</View>
+                    <Text style={[
+                      s.statusBtnTxt,
+                      newStatus === opt.value && s.statusBtnTxtActive
+                    ]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[s.modalLabel, { marginTop: 24 }]}>Comment</Text>
+              <TextInput
+                style={s.modalInput}
+                placeholder="Add a comment (Optional)..."
+                placeholderTextColor={C.sub}
+                value={statusComment}
+                onChangeText={setStatusComment}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <View style={s.notifyRow}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={s.notifyLabel}>Notify Customer</Text>
+                  <Text style={s.notifySub}>
+                    An email will be sent to the customer about this status update
+                  </Text>
+                </View>
+                <Switch
+                  value={notifyCustomer}
+                  onValueChange={setNotifyCustomer}
+                  trackColor={{ false: "#D1D5DB", true: C.primary }}
+                  thumbColor="#FFF"
+                />
+              </View>
+            </ScrollView>
+
+            <View style={s.modalFooter}>
+              <TouchableOpacity
+                style={s.modalCancelBtn}
+                onPress={() => setUpdateModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={s.modalCancelBtnTxt}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.modalSaveBtn}
+                onPress={() => {
+                  setUpdateModalVisible(false);
+                  
+                  const now = new Date();
+                  const dateStr = `${now.getDate().toString().padStart(2, '0')} ${now.toLocaleString('default', { month: 'short' })} ${now.getFullYear()}, ${now.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+                  
+                  const newEntry: StatusHistory = {
+                    status: newStatus,
+                    date: dateStr,
+                    by: "Admin",
+                    comment: statusComment.trim() || "No comment provided",
+                  };
+                  
+                  setOrderHistory([newEntry, ...orderHistory]);
+                  setStatusComment("");
+                  setNotifyCustomer(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={s.modalSaveBtnTxt}>Update Status</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AdminLayout>
   );
 }
@@ -1609,5 +1816,140 @@ const s = StyleSheet.create({
     color: C.text,
     marginTop: 4,
     fontStyle: "italic",
+  },
+  
+  // ── Modal Styles ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: C.bg,
+    borderRadius: 12,
+    maxHeight: "90%",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderColor: C.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: C.text,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.text,
+    marginBottom: 12,
+  },
+  statusGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  statusBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: "#F9FAFB",
+    minWidth: "48%",
+    gap: 8,
+  },
+  statusBtnActive: {
+    borderColor: C.primary,
+    backgroundColor: C.primaryLight,
+  },
+  statusBtnIcon: {
+    opacity: 0.8,
+  },
+  statusBtnTxt: {
+    fontSize: 13,
+    color: C.sub,
+    fontWeight: "500",
+  },
+  statusBtnTxtActive: {
+    color: C.primary,
+    fontWeight: "600",
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: C.text,
+    backgroundColor: "#F9FAFB",
+    minHeight: 80,
+  },
+  notifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderColor: C.border,
+  },
+  notifyLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.text,
+    marginBottom: 4,
+  },
+  notifySub: {
+    fontSize: 12,
+    color: C.sub,
+    lineHeight: 16,
+  },
+  modalFooter: {
+    flexDirection: "row",
+    padding: 20,
+    borderTopWidth: 1,
+    borderColor: C.border,
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  modalCancelBtnTxt: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.sub,
+  },
+  modalSaveBtn: {
+    backgroundColor: C.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalSaveBtnTxt: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFF",
   },
 });

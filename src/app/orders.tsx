@@ -76,10 +76,26 @@ interface Product {
   seller: string;
   sellerEmail: string;
   price?: number;
+  // ── Invoice-specific fields (optional — fall back gracefully if absent) ──
+  hsnCode?: string;
+  color?: string;
+  size?: string;
+  taxPercent?: number; // e.g. 5 for 5%
+  qty?: number;
+}
+
+interface SellerAddress {
+  line1?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  phone?: string;
+  email?: string;
+  gstin?: string;
 }
 
 interface SellerGroup {
-  seller: { name: string; email: string };
+  seller: { name: string; email: string; address?: SellerAddress };
   products: Product[];
   subOrderId?: string;
   trackingId?: string;
@@ -87,17 +103,31 @@ interface SellerGroup {
   hasShippingLabel: boolean;
 }
 
-interface Order {
+export interface Order {
   id: string;
   orderNumber: string;
   date: string;
   time: string;
-  customer: { name: string; email: string };
+  customer: {
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
   sellerGroups: SellerGroup[];
   amount: number;
   paymentType: PaymentType;
   status: OrderStatus;
   gstStatus: GSTStatus;
+  // True when buyer & seller are in the same state → CGST+SGST split.
+  // False (default) → inter-state → IGST.
+  isIntraState?: boolean;
+  // Shipping-label specific physical details (optional, falls back gracefully)
+  weightKg?: number;
+  dimensionsCm?: { l: number; w: number; h: number };
 }
 
 // ─── Status Config ────────────────────────────────────────────────────────────
@@ -141,7 +171,8 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 const ORDERS_PAGE_SIZE = 20;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmtCur = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+const fmtCur = (n: number) =>
+  `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const getInitials = (name: string) =>
   name
     .split(" ")
@@ -199,6 +230,12 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
         typeof item.price === "number"
           ? item.price
           : Number(item.price ?? NaN) || undefined,
+      hsnCode: item.hsnCode ?? item.hsn ?? undefined,
+      color: item.color ?? undefined,
+      size: item.size ?? undefined,
+      taxPercent:
+        typeof item.taxPercent === "number" ? item.taxPercent : undefined,
+      qty: typeof item.qty === "number" ? item.qty : item.quantity ?? 1,
     });
   }
 
@@ -212,6 +249,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop",
     price: 1499,
     seller: "Wugo Store",
+    hsnCode: "62046200",
+    color: "Beige",
+    size: "M",
+    taxPercent: 5,
   },
   {
     name: "Classic Crew Neck Tee",
@@ -219,6 +260,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop",
     price: 799,
     seller: "Ishna Fashions",
+    hsnCode: "61091000",
+    color: "Black",
+    size: "L",
+    taxPercent: 5,
   },
   {
     name: "Denim Slim Fit Jacket",
@@ -226,6 +271,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200&h=200&fit=crop",
     price: 2199,
     seller: "Wugo Store",
+    hsnCode: "62034200",
+    color: "Indigo",
+    size: "M",
+    taxPercent: 12,
   },
   {
     name: "Leather Strap Watch",
@@ -233,6 +282,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200&h=200&fit=crop",
     price: 3499,
     seller: "Ishna Fashions",
+    hsnCode: "91021900",
+    color: "Brown",
+    size: "Free Size",
+    taxPercent: 18,
   },
   {
     name: "Running Sneakers",
@@ -240,6 +293,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop",
     price: 2799,
     seller: "Wugo Store",
+    hsnCode: "64041100",
+    color: "White",
+    size: "9",
+    taxPercent: 12,
   },
   {
     name: "Wireless Earbuds",
@@ -247,6 +304,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200&h=200&fit=crop",
     price: 1999,
     seller: "Tech Bazaar",
+    hsnCode: "85183000",
+    color: "Black",
+    size: "Free Size",
+    taxPercent: 18,
   },
   {
     name: "Ceramic Coffee Mug Set",
@@ -254,6 +315,10 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop",
     price: 599,
     seller: "Home Essentials",
+    hsnCode: "69120090",
+    color: "White",
+    size: "Free Size",
+    taxPercent: 12,
   },
   {
     name: "Yoga Mat Premium",
@@ -261,8 +326,51 @@ const PLACEHOLDER_PRODUCTS = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop",
     price: 899,
     seller: "Tech Bazaar",
+    hsnCode: "95069190",
+    color: "Purple",
+    size: "Free Size",
+    taxPercent: 12,
   },
 ];
+
+const PLACEHOLDER_SELLER_ADDRESSES: Record<string, SellerAddress> = {
+  "Wugo Store": {
+    line1: "Plot No. 14, Industrial Estate, Phase II",
+    city: "Gurugram",
+    state: "Haryana",
+    pincode: "122015",
+    phone: "+919812345670",
+    email: "support@wugostore.in",
+    gstin: "06AABCW1234L1Z5",
+  },
+  "Ishna Fashions": {
+    line1: "HSC.NO. 6737, Kothacheruvu, 1st Ward, Dharmavaram Main Road",
+    city: "Puttaparthi, Sri Sathya Sai",
+    state: "Andhra Pradesh",
+    pincode: "515133",
+    phone: "+919966220474",
+    email: "support@ishnafashions.in",
+    gstin: "36AAGCF5402J1ZP",
+  },
+  "Tech Bazaar": {
+    line1: "4th Floor, Cyber Towers, Hitech City",
+    city: "Hyderabad",
+    state: "Telangana",
+    pincode: "500081",
+    phone: "+917788990011",
+    email: "support@techbazaar.in",
+    gstin: "36AACTB5678K1ZQ",
+  },
+  "Home Essentials": {
+    line1: "Warehouse 3, Logistics Park, Bhiwandi",
+    city: "Thane",
+    state: "Maharashtra",
+    pincode: "421302",
+    phone: "+919900112233",
+    email: "support@homeessentials.in",
+    gstin: "27AAHCH9012M1ZR",
+  },
+};
 
 function buildPlaceholderSellerGroups(orderId: string): SellerGroup[] {
   const digits = orderId.replace(/\D/g, "");
@@ -286,10 +394,19 @@ function buildPlaceholderSellerGroups(orderId: string): SellerGroup[] {
         seller: sellerName,
         sellerEmail: "",
         price: item.price,
+        hsnCode: item.hsnCode,
+        color: item.color,
+        size: item.size,
+        taxPercent: item.taxPercent,
+        qty: 1,
       });
     }
     return {
-      seller: { name: sellerName, email: "" },
+      seller: {
+        name: sellerName,
+        email: PLACEHOLDER_SELLER_ADDRESSES[sellerName]?.email ?? "",
+        address: PLACEHOLDER_SELLER_ADDRESSES[sellerName],
+      },
       products,
       hasInvoice: true,
       hasShippingLabel: true,
@@ -352,6 +469,27 @@ function toUiOrder(
     : `#${row.orderId}`;
   const sellerGroups = buildPlaceholderSellerGroups(orderNumber);
 
+  // Determine intra/inter-state by comparing buyer state to first seller's state.
+  const buyerState = (raw as any).customerState ?? (raw as any).state;
+  const sellerState = sellerGroups[0]?.seller.address?.state;
+  const isIntraState =
+    buyerState && sellerState
+      ? String(buyerState).toLowerCase() === String(sellerState).toLowerCase()
+      : false;
+
+  // Deterministic placeholder weight/dimensions (kept stable per order, falls
+  // back to real raw.weightKg / raw.dimensions when the API provides them).
+  const seedDigits = Number(orderNumber.replace(/\D/g, "").slice(-2)) || 0;
+  const weightKg =
+    (raw as any).weightKg ??
+    Math.round((0.3 + (seedDigits % 20) * 0.1) * 100) / 100;
+  const dimensionsCm =
+    (raw as any).dimensions ?? {
+      l: 20 + (seedDigits % 15),
+      w: 12 + (seedDigits % 10),
+      h: 5 + (seedDigits % 8),
+    };
+
   return {
     id: String(row.id),
     orderNumber,
@@ -368,7 +506,15 @@ function toUiOrder(
           minute: "2-digit",
         })
       : "",
-    customer: { name: row.customer, email: row.email },
+    customer: {
+      name: row.customer,
+      email: row.email,
+      phone: (raw as any).customerPhone,
+      address: (raw as any).shippingAddress ?? (raw as any).address,
+      city: (raw as any).customerCity,
+      state: buyerState,
+      pincode: (raw as any).customerPincode,
+    },
     sellerGroups,
     amount:
       typeof raw.totalAmount === "number"
@@ -380,6 +526,9 @@ function toUiOrder(
       ] ?? "Cash on Delivery",
     status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
     gstStatus: row.gstStatus?.toLowerCase() === "filed" ? "Filed" : "Not Filed",
+    isIntraState,
+    weightKg,
+    dimensionsCm,
   };
 }
 
@@ -861,6 +1010,42 @@ const OrderBoxIcon = ({
     />
   </Svg>
 );
+// Flint & Thread monogram mark — navy "F" + orange "T" interlocking badge,
+// replacing the plain navy-square "F&T" text placeholder.
+const FntLogoMark = ({ size = 34 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+    {/* Navy "F" stroke */}
+    <Path
+      d="M9 32V8h15"
+      stroke={C.navy}
+      strokeWidth={4.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M9 19h10"
+      stroke={C.navy}
+      strokeWidth={4.2}
+      strokeLinecap="round"
+    />
+    {/* Orange "T" stroke, overlapping to the right */}
+    <Path
+      d="M19 8h13"
+      stroke={C.orange}
+      strokeWidth={4.2}
+      strokeLinecap="round"
+    />
+    <Path
+      d="M25.5 8v24"
+      stroke={C.orange}
+      strokeWidth={4.2}
+      strokeLinecap="round"
+    />
+    {/* small accent dot where the two letterforms meet */}
+    <Circle cx="19" cy="19" r="2.1" fill={C.orange} />
+  </Svg>
+);
+
 const QrPlaceholderIcon = ({ size = 70 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect
@@ -1139,8 +1324,6 @@ const PaymentModal = ({
 };
 
 // ─── Action Menu (RE-THEMED: navy header + orange accents + close button) ────
-// Merged "Print Order" / "Export PDF" into the two Generate actions below,
-// since each document modal carries its own Print control.
 const ActionMenu = ({
   order,
   visible,
@@ -1285,7 +1468,12 @@ const ActionMenu = ({
 };
 
 // ─── Shipping Label Modal (native RN, replicates uploaded label PDF) ─────────
-// Footer: exactly 2 buttons — Print, Close.
+// ─── Shipping Label Modal (REDESIGNED to match the supplied label.pdf) ──────
+// Layout mirrors the reference exactly: brand header → "SHIPPING LABEL" caption
+// → Courier bar → AWB barcode + QR side-by-side → SHIP TO → meta grid (Order #,
+// Invoice, Date, Payment, Weight, Dimensions) → PRODUCT DETAILS table with
+// per-item HSN/Qty/Price/CGST/SGST/IGST/Total + TOTAL row → RETURN ADDRESS →
+// footer GST line → auto-generated note → Powered by.
 const ShippingLabelModal = ({
   order,
   visible,
@@ -1296,12 +1484,27 @@ const ShippingLabelModal = ({
   onClose: () => void;
 }) => {
   const { width } = useWindowDimensions();
-  const sheetWidth = Math.min(width - 32, 460);
+  const sheetWidth = Math.min(width - 32, 520);
+
+  // Deterministic bar pattern from order number — visual only, not scannable
+  // Must be declared before any conditional return (Rules of Hooks)
+  const bars = useMemo(() => {
+    if (!order) return [];
+    let seed = 0;
+    for (const ch of order.orderNumber)
+      seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
+    return Array.from({ length: 34 }, () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return 35 + (seed % 65);
+    });
+  }, [order]);
 
   if (!order) return null;
   const firstGroup = order.sellerGroups[0];
-  const trackingId = firstGroup?.trackingId ?? "1405571400";
+  const trackingId = firstGroup?.trackingId ?? "1345678625";
   const invoiceNum = `INV-${order.orderNumber.replace(/\D/g, "")}`;
+  const products = firstGroup?.products ?? [];
+  const isIntraState = !!order.isIntraState;
 
   const handlePrint = () => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -1311,16 +1514,45 @@ const ShippingLabelModal = ({
     }
   };
 
-  // Deterministic bar pattern from order number — visual only, not scannable
-  const bars = useMemo(() => {
-    let seed = 0;
-    for (const ch of order.orderNumber)
-      seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
-    return Array.from({ length: 26 }, () => {
-      seed = (seed * 1103515245 + 12345) % 2147483648;
-      return 30 + (seed % 70);
-    });
-  }, [order.orderNumber]);
+  // Per-item GST split — same logic as the invoice: IGST for inter-state,
+  // CGST+SGST for intra-state, derived from each product's own tax%.
+  const lineItems = products.map((p) => {
+    const unitPrice = p.price ?? 0;
+    const qty = p.qty ?? 1;
+    const taxPercent = p.taxPercent ?? 0;
+    const lineSubtotal = unitPrice * qty;
+    const taxAmount = (lineSubtotal * taxPercent) / 100;
+    const cgst = isIntraState ? taxAmount / 2 : 0;
+    const sgst = isIntraState ? taxAmount / 2 : 0;
+    const igst = isIntraState ? 0 : taxAmount;
+    const lineTotal = lineSubtotal + taxAmount;
+    return { ...p, qty, unitPrice, taxPercent, cgst, sgst, igst, lineTotal };
+  });
+
+  const totalCgst = lineItems.reduce((sum, li) => sum + li.cgst, 0);
+  const totalSgst = lineItems.reduce((sum, li) => sum + li.sgst, 0);
+  const totalIgst = lineItems.reduce((sum, li) => sum + li.igst, 0);
+  const grandTotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0);
+
+  const dims = order.dimensionsCm;
+  const dimensionsText = dims
+    ? `${dims.l.toFixed(1)}cm × ${dims.w.toFixed(1)}cm × ${dims.h.toFixed(1)}cm`
+    : "—";
+  const weightText =
+    typeof order.weightKg === "number" ? `${order.weightKg.toFixed(2)} kg` : "—";
+
+  const sellerAddr = firstGroup?.seller.address;
+  const sellerAddressLine = [
+    sellerAddr?.line1,
+    [sellerAddr?.city, sellerAddr?.state].filter(Boolean).join(", "),
+    sellerAddr?.pincode ? `${sellerAddr.pincode}.` : undefined,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const gstFooterLabel = isIntraState
+    ? `CGST+SGST: ${fmtCur(totalCgst + totalSgst)}`
+    : `IGST: ${fmtCur(totalIgst)}`;
 
   return (
     <Modal
@@ -1346,157 +1578,240 @@ const ShippingLabelModal = ({
           showsVerticalScrollIndicator={false}
         >
           <View style={[s.labelSheet, { width: sheetWidth }]}>
-            {/* Brand header */}
+            {/* Brand header + title */}
             <View style={s.labelBrandHeader}>
-              <View style={s.labelBrandRow}>
-                <View style={s.labelBrandMark}>
-                  <Text style={s.labelBrandMarkText}>F&T</Text>
-                </View>
-                <View>
-                  <Text style={s.labelBrandName}>
-                    <Text style={{ color: C.navy }}>FLINT</Text>
-                    <Text style={{ color: C.textDark }}> & </Text>
-                    <Text style={{ color: C.orange }}>THREAD</Text>
-                  </Text>
-                  <Text style={s.labelBrandTag}>The Infinity and Vanguard</Text>
-                </View>
-              </View>
+              <Image
+                source={require("../../assets/images/flint-thread-logo.png")}
+                style={s.labelBrandLogo}
+                resizeMode="contain"
+              />
               <Text style={s.labelTitleText}>SHIPPING LABEL</Text>
             </View>
 
-            {/* Courier / AWB block */}
-            <View style={s.labelCourierBlock}>
-              <View style={s.labelCourierTop}>
-                <Text style={s.labelCourierLabel}>Courier</Text>
-                <View style={s.labelGstChip}>
-                  <Text style={s.labelGstChipText}>GST: 36BASPA3241G1ZW</Text>
+            {/* Courier bar */}
+            <View style={s.labelCourierBar}>
+              <Text style={s.labelCourierBarText}>Courier</Text>
+            </View>
+
+            {/* AWB barcode + QR side-by-side */}
+            <View style={s.labelAwbArea}>
+              <View style={s.labelAwbLeft}>
+                <Text style={s.labelAwbCaption}>AWB NUMBER</Text>
+                <View style={s.barcodeRow}>
+                  {bars.map((h, i) => (
+                    <View key={i} style={[s.barcodeBar, { height: `${h}%` }]} />
+                  ))}
                 </View>
+                <Text style={s.labelAwbNumber}>{trackingId}</Text>
               </View>
-              <View style={s.labelAwbArea}>
-                <View style={s.labelAwbLeft}>
-                  <Text style={s.labelAwbCaption}>AWB NUMBER</Text>
-                  <View style={s.barcodeRow}>
-                    {bars.map((h, i) => (
-                      <View
-                        key={i}
-                        style={[s.barcodeBar, { height: `${h}%` }]}
-                      />
-                    ))}
-                  </View>
-                  <Text style={s.labelAwbNumber}>{trackingId}</Text>
-                </View>
-                <View style={s.labelQrBox}>
-                  <QrPlaceholderIcon size={56} />
-                </View>
+              <View style={s.labelQrBox}>
+                <QrPlaceholderIcon size={62} />
               </View>
             </View>
 
-            {/* Ship to */}
+            {/* Ship To */}
             <View style={s.labelSection}>
               <Text style={s.labelSectionLabel}>SHIP TO</Text>
               <Text style={s.labelShipName}>{order.customer.name}</Text>
+              {order.customer.address && (
+                <Text style={s.labelShipAddress}>{order.customer.address}</Text>
+              )}
               <Text style={s.labelShipAddress}>
-                Address on file · {order.customer.email}
+                {[order.customer.city, order.customer.state]
+                  .filter(Boolean)
+                  .join(", ")}
               </Text>
+              {order.customer.pincode && (
+                <Text style={s.labelShipAddress}>
+                  <Text style={{ fontWeight: "800" }}>PIN: </Text>
+                  {order.customer.pincode}
+                  {order.customer.phone
+                    ? `  |  Ph: ${order.customer.phone}`
+                    : ""}
+                </Text>
+              )}
             </View>
 
-            {/* Meta grid */}
-            <View style={s.labelMetaGrid}>
-              <View style={s.labelMetaItem}>
-                <Text style={s.labelMetaK}>Order #</Text>
-                <Text style={s.labelMetaV}>{order.orderNumber}</Text>
+            {/* Meta grid: Order #, Invoice, Date, Payment, Weight, Dimensions */}
+            <View style={s.labelMetaList}>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Order #:</Text>
+                <Text style={s.labelMetaVList}>{order.orderNumber}</Text>
               </View>
-              <View style={s.labelMetaItem}>
-                <Text style={s.labelMetaK}>Invoice</Text>
-                <Text style={s.labelMetaV}>{invoiceNum}</Text>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Invoice:</Text>
+                <Text style={s.labelMetaVList}>{invoiceNum}</Text>
               </View>
-              <View style={s.labelMetaItem}>
-                <Text style={s.labelMetaK}>Date</Text>
-                <Text style={s.labelMetaV}>{order.date}</Text>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Date:</Text>
+                <Text style={s.labelMetaVList}>{order.date}</Text>
               </View>
-              <View style={s.labelMetaItem}>
-                <Text style={s.labelMetaK}>Payment</Text>
-                <Text style={s.labelMetaV}>{order.paymentType}</Text>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Payment:</Text>
+                <Text style={s.labelMetaVList}>
+                  {order.paymentType === "Cash on Delivery" ? "COD" : "Prepaid"}{" "}
+                  {fmtCur(grandTotal)}
+                </Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Weight:</Text>
+                <Text style={s.labelMetaVList}>{weightText}</Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Dimensions:</Text>
+                <Text style={s.labelMetaVList}>{dimensionsText}</Text>
               </View>
             </View>
 
-            {/* Product table */}
+            {/* Product details table */}
+            <View style={s.labelSectionLabelBar}>
+              <Text style={s.labelSectionLabelBarText}>PRODUCT DETAILS</Text>
+            </View>
             <View>
               <View style={s.labelProductHead}>
-                <Text style={[s.labelProductHeadText, { flex: 2.2 }]}>
-                  Item
-                </Text>
+                <Text style={[s.labelProductHeadText, { flex: 2 }]}>Item</Text>
                 <Text
                   style={[
                     s.labelProductHeadText,
-                    { flex: 0.6, textAlign: "right" },
+                    s.labelProductHeadCenter,
+                    { flex: 0.8 },
                   ]}
                 >
-                  Qty
+                  HSN
                 </Text>
                 <Text
                   style={[
                     s.labelProductHeadText,
-                    { flex: 1, textAlign: "right" },
+                    s.labelProductHeadCenter,
+                    { flex: 0.4 },
                   ]}
+                >
+                  Q
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.8, textAlign: "right" }]}
+                >
+                  Price
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}
+                >
+                  CGST
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}
+                >
+                  SGST
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.75, textAlign: "right" }]}
+                >
+                  IGST
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.9, textAlign: "right" }]}
                 >
                   Total
                 </Text>
               </View>
-              {firstGroup?.products.map((p, i) => (
+              {lineItems.map((li, i) => (
                 <View
-                  key={p.id}
+                  key={li.id}
                   style={[
                     s.labelProductRow,
-                    i === firstGroup.products.length - 1 && {
-                      borderBottomWidth: 0,
-                    },
+                    i === lineItems.length - 1 && { borderBottomWidth: 0 },
                   ]}
                 >
                   <Text
-                    style={[s.labelProductName, { flex: 2.2 }]}
+                    style={[s.labelProductName, { flex: 2 }]}
                     numberOfLines={2}
                   >
-                    {p.name}
+                    {li.name}
                   </Text>
-                  <Text style={[s.labelProductNum, { flex: 0.6 }]}>1</Text>
-                  <Text style={[s.labelProductNum, { flex: 1 }]}>
-                    {fmtCur(p.price ?? 0)}
+                  <Text
+                    style={[
+                      s.labelProductNum,
+                      s.labelProductCenter,
+                      { flex: 0.8 },
+                    ]}
+                  >
+                    {li.hsnCode ?? "—"}
+                  </Text>
+                  <Text
+                    style={[
+                      s.labelProductNum,
+                      s.labelProductCenter,
+                      { flex: 0.4 },
+                    ]}
+                  >
+                    {li.qty}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.8 }]}>
+                    {fmtCur(li.unitPrice)}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.65 }]}>
+                    {li.cgst > 0 ? fmtCur(li.cgst) : "-"}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.65 }]}>
+                    {li.sgst > 0 ? fmtCur(li.sgst) : "-"}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.75 }]}>
+                    {li.igst > 0 ? (
+                      <>
+                        <Text>{li.taxPercent}%{"\n"}</Text>
+                        {fmtCur(li.igst)}
+                      </>
+                    ) : (
+                      "-"
+                    )}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.9, fontWeight: "800" }]}>
+                    {fmtCur(li.lineTotal)}
                   </Text>
                 </View>
               ))}
-              <View style={s.labelTotalsRow}>
-                <Text style={s.labelTotalsLabel}>TOTAL:</Text>
-                <Text style={s.labelTotalsValue}>{fmtCur(order.amount)}</Text>
+              <View style={s.labelTotalsRowFull}>
+                <Text style={[s.labelTotalsLabel, { flex: 3.2 }]}>TOTAL:</Text>
+                <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>
+                  {fmtCur(totalCgst)}
+                </Text>
+                <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>
+                  {fmtCur(totalSgst)}
+                </Text>
+                <Text style={[s.labelTotalsValueCell, { flex: 0.75 }]}>
+                  {fmtCur(totalIgst)}
+                </Text>
+                <Text
+                  style={[
+                    s.labelTotalsValueCell,
+                    { flex: 0.9, color: C.orange, fontWeight: "800" },
+                  ]}
+                >
+                  {fmtCur(grandTotal)}
+                </Text>
               </View>
             </View>
 
             {/* Return address */}
             <View style={s.labelSection}>
               <Text style={s.labelSectionLabel}>RETURN ADDRESS</Text>
-              <View style={s.labelReturnRow}>
-                <Text style={s.labelReturnName}>
-                  {firstGroup?.seller.name ?? "Seller"}
-                </Text>
-                <View style={s.labelReturnGstChip}>
-                  <Text style={s.labelReturnGstText}>GST: 36BASPA3241G1ZW</Text>
-                </View>
-              </View>
+              <Text style={s.labelReturnName}>
+                {firstGroup?.seller.name?.toUpperCase() ?? "SELLER"}
+              </Text>
               <Text style={s.labelReturnAddr}>
-                Registered seller address on file
+                {sellerAddressLine || "Registered seller address on file"}
+                {sellerAddr?.phone ? `  |  Ph: ${sellerAddr.phone}` : ""}
               </Text>
             </View>
 
-            {/* Footer note */}
+            {/* Footer */}
             <View style={s.labelFooterNote}>
-              <Text style={s.labelFooterGst}>
-                GST: CGST ₹1,274.71 + SGST ₹1,274.71 = ₹2,549.43
-              </Text>
+              <Text style={s.labelFooterGst}>GST: {gstFooterLabel}</Text>
               <Text style={s.labelFooterAuto}>
                 AUTO-GENERATED LABEL · NO SIGNATURE REQUIRED
               </Text>
               <Text style={s.labelFooterPowered}>
-                Powered by{" "}
+                Powered By{" "}
                 <Text style={{ color: C.navy, fontWeight: "800" }}>
                   Flint & Thread
                 </Text>
@@ -1529,10 +1844,12 @@ const ShippingLabelModal = ({
   );
 };
 
-// ─── Invoice Modal (native RN, replicates uploaded invoice PDF) ─────────────
-// Per spec: invoice has no Print/Close footer buttons — pure document view,
-// dismissible via the top-bar close icon only.
-const InvoiceModal = ({
+// ─── Invoice Modal (REDESIGNED to match the supplied PDF exactly) ───────────
+// Layout mirrors the reference: brand header + QR on the right, "Sold By"
+// block with full seller address, Bill/Ship two-column, item table with
+// HSN/Qty/Unit Price/Tax%/Tax Amt/Total, CGST/SGST/IGST breakdown panel,
+// payment info, and a single Print + Close footer.
+export const InvoiceModal = ({
   order,
   visible,
   onClose,
@@ -1543,12 +1860,52 @@ const InvoiceModal = ({
 }) => {
   const { width } = useWindowDimensions();
   const sheetWidth = Math.min(width - 32, 760);
+  const isNarrow = sheetWidth < 560;
 
   if (!order) return null;
+
   const firstGroup = order.sellerGroups[0];
   const invoiceNum = `INV-${order.orderNumber.replace(/\D/g, "")}`;
-  const subtotal = order.amount;
   const isPaid = order.status === "Completed";
+  const products = firstGroup?.products ?? [];
+
+  const handlePrint = () => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.print();
+    } else {
+      Alert.alert("Print", `Sending ${invoiceNum} to printer`);
+    }
+  };
+
+  // ── Per-item tax computation ──
+  // Unit price is treated as the pre-tax price; tax amount and line total
+  // are derived per item using each product's own tax%, matching the PDF's
+  // "Unit Price / Tax % / Tax Amount / Total" columns.
+  const lineItems = products.map((p) => {
+    const unitPrice = p.price ?? 0;
+    const qty = p.qty ?? 1;
+    const taxPercent = p.taxPercent ?? 0;
+    const lineSubtotal = unitPrice * qty;
+    const taxAmount = (lineSubtotal * taxPercent) / 100;
+    const lineTotal = lineSubtotal + taxAmount;
+    return { ...p, qty, unitPrice, taxPercent, lineSubtotal, taxAmount, lineTotal };
+  });
+
+  const subtotal = lineItems.reduce((sum, li) => sum + li.lineSubtotal, 0);
+  const totalTax = lineItems.reduce((sum, li) => sum + li.taxAmount, 0);
+  const grandTotal = subtotal + totalTax;
+
+  const isIntraState = !!order.isIntraState;
+  const cgst = isIntraState ? totalTax / 2 : 0;
+  const sgst = isIntraState ? totalTax / 2 : 0;
+  const igst = isIntraState ? 0 : totalTax;
+
+  const sellerAddr = firstGroup?.seller.address;
+  const sellerAddressLines = [
+    sellerAddr?.line1,
+    [sellerAddr?.city, sellerAddr?.state].filter(Boolean).join(", "),
+    sellerAddr?.pincode ? `PIN: ${sellerAddr.pincode}` : undefined,
+  ].filter(Boolean);
 
   return (
     <Modal
@@ -1574,106 +1931,212 @@ const InvoiceModal = ({
           showsVerticalScrollIndicator={false}
         >
           <View style={[s.invoiceSheet, { width: sheetWidth }]}>
-            {/* Top header */}
-            <View style={s.invTopHeader}>
-              <View style={s.invBrandRow}>
-                <View style={s.invBrandMark}>
-                  <Text style={s.invBrandMarkText}>F&T</Text>
-                </View>
-                <View>
-                  <Text style={s.invBrandName}>
-                    <Text style={{ color: C.navy }}>FLINT</Text>
-                    <Text style={{ color: C.textDark }}> & </Text>
-                    <Text style={{ color: C.orange }}>THREAD</Text>
+            {/* ── Top header: brand left, INVOICE meta + QR right ── */}
+            <View
+              style={[
+                s.invTopHeaderRow,
+                isNarrow && s.invTopHeaderRowNarrow,
+              ]}
+            >
+              <View style={s.invBrandCol}>
+                <Image
+                  source={require("../../assets/images/flint-thread-logo.png")}
+                  style={s.invBrandLogo}
+                  resizeMode="contain"
+                />
+
+                <View style={s.invSenderInfo}>
+                  <Text style={s.invSenderName}>
+                    Flint & Thread (India) Pvt. Ltd.
                   </Text>
-                  <Text style={s.invBrandTag}>The Infinity and Vanguard</Text>
+                  <Text style={s.invSenderLine}>India</Text>
+                  <Text style={s.invSenderLine}>Phone: +91 9063499092</Text>
+                  <Text style={s.invSenderLine}>
+                    Email: support@flintnthread.in
+                  </Text>
+                  <Text style={s.invSenderLine}>
+                    GSTIN: 36AAGCF5402J1ZP
+                  </Text>
                 </View>
               </View>
-              <View style={s.invMetaCol}>
+
+              <View
+                style={[
+                  s.invMetaColRight,
+                  isNarrow && s.invMetaColRightNarrow,
+                ]}
+              >
                 <Text style={s.invTitle}>INVOICE</Text>
                 <Text style={s.invMetaLine}>{invoiceNum}</Text>
                 <Text style={s.invMetaLineMuted}>
                   Order: {order.orderNumber}
                 </Text>
                 <Text style={s.invMetaLineMuted}>Date: {order.date}</Text>
+
+                <View style={s.invQrBox}>
+                  <QrPlaceholderIcon size={62} />
+                </View>
+                <Text style={s.invQrCaption}>Scan for order details</Text>
               </View>
             </View>
 
-            {/* Sender */}
-            <View style={s.invSenderBlock}>
-              <Text style={s.invSenderName}>
-                Flint & Thread (India) Pvt. Ltd.
-              </Text>
-              <Text style={s.invSenderLine}>
-                support@flintnthread.in · GSTIN 36AAGCF5402J1ZP
-              </Text>
-            </View>
-
-            {/* Sold by */}
+            {/* ── Sold By ── */}
             <View style={s.invSection}>
               <Text style={s.invSectionLabelNavy}>SOLD BY</Text>
               <Text style={s.invBoldName}>
-                {firstGroup?.seller.name ?? "Unknown Seller"}
+                {firstGroup?.seller.name?.toUpperCase() ?? "UNKNOWN SELLER"}
               </Text>
-              <Text style={s.invMutedLine}>Seller details on file</Text>
+              {sellerAddressLines.length > 0 ? (
+                sellerAddressLines.map((line, i) => (
+                  <Text key={i} style={s.invMutedLine}>
+                    {line}
+                  </Text>
+                ))
+              ) : (
+                <Text style={s.invMutedLine}>Seller details on file</Text>
+              )}
+              {sellerAddr?.phone && (
+                <Text style={s.invMutedLine}>Phone: {sellerAddr.phone}</Text>
+              )}
+              {sellerAddr?.email && (
+                <Text style={s.invMutedLine}>Email: {sellerAddr.email}</Text>
+              )}
             </View>
 
-            {/* Bill / Ship */}
+            {/* ── Bill / Ship ── */}
             <View style={s.invBsGrid}>
               <View style={s.invBsCol}>
                 <Text style={s.invSectionLabelOrange}>BILL TO</Text>
                 <Text style={s.invBoldName}>{order.customer.name}</Text>
-                <Text style={s.invMutedLine}>{order.customer.email}</Text>
+                {order.customer.address && (
+                  <Text style={s.invMutedLine}>{order.customer.address}</Text>
+                )}
+                {(order.customer.city || order.customer.state) && (
+                  <Text style={s.invMutedLine}>
+                    {[order.customer.city, order.customer.state]
+                      .filter(Boolean)
+                      .join(", ")}
+                    {order.customer.pincode
+                      ? ` - ${order.customer.pincode}`
+                      : ""}
+                  </Text>
+                )}
+                {order.customer.phone && (
+                  <Text style={s.invMutedLine}>
+                    Phone: {order.customer.phone}
+                  </Text>
+                )}
+                <Text style={s.invMutedLine}>
+                  Email: {order.customer.email}
+                </Text>
               </View>
               <View style={s.invBsCol}>
                 <Text style={s.invSectionLabelOrange}>SHIP TO</Text>
                 <Text style={s.invBoldName}>{order.customer.name}</Text>
-                <Text style={s.invMutedLine}>{order.customer.email}</Text>
+                {order.customer.address && (
+                  <Text style={s.invMutedLine}>{order.customer.address}</Text>
+                )}
+                {(order.customer.city || order.customer.state) && (
+                  <Text style={s.invMutedLine}>
+                    {[order.customer.city, order.customer.state]
+                      .filter(Boolean)
+                      .join(", ")}
+                    {order.customer.pincode
+                      ? ` - ${order.customer.pincode}`
+                      : ""}
+                  </Text>
+                )}
+                {order.customer.phone && (
+                  <Text style={s.invMutedLine}>
+                    Phone: {order.customer.phone}
+                  </Text>
+                )}
+                <Text style={s.invMutedLine}>
+                  Email: {order.customer.email}
+                </Text>
               </View>
             </View>
 
-            {/* Items table */}
+            {/* ── Items table: Item / HSN / Qty / Unit Price / Tax% / Tax Amt / Total ── */}
             <View style={s.invTable}>
               <View style={s.invTableHead}>
-                <Text style={[s.invTh, { flex: 2.4 }]}>Item</Text>
-                <Text style={[s.invTh, { flex: 0.6, textAlign: "right" }]}>
+                <Text style={[s.invTh, { flex: 2.2 }]}>Item Description</Text>
+                <Text style={[s.invTh, s.invThCenter, { flex: 1 }]}>
+                  HSN Code
+                </Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 0.6 }]}>
                   Qty
                 </Text>
-                <Text style={[s.invTh, { flex: 1, textAlign: "right" }]}>
-                  Price
+                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>
+                  Unit Price
                 </Text>
-                <Text style={[s.invTh, { flex: 1, textAlign: "right" }]}>
+                <Text style={[s.invTh, s.invThRight, { flex: 0.7 }]}>
+                  Tax %
+                </Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>
+                  Tax Amount
+                </Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>
                   Total
                 </Text>
               </View>
-              {firstGroup?.products.map((p, i) => (
+              {lineItems.map((li, i) => (
                 <View
-                  key={p.id}
+                  key={li.id}
                   style={[s.invTr, i % 2 === 1 && { backgroundColor: C.bg }]}
                 >
-                  <Text style={[s.invTdName, { flex: 2.4 }]} numberOfLines={2}>
-                    {p.name}
+                  <View style={{ flex: 2.2 }}>
+                    <Text style={s.invTdName} numberOfLines={2}>
+                      {li.name}
+                    </Text>
+                    {(li.color || li.size) && (
+                      <Text style={s.invTdVariant}>
+                        {[
+                          li.color ? `Color: ${li.color}` : null,
+                          li.size ? `Size: ${li.size}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join("  ")}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[s.invTdNum, s.invTdCenter, { flex: 1 }]}>
+                    {li.hsnCode ?? "—"}
                   </Text>
-                  <Text style={[s.invTdNum, { flex: 0.6 }]}>1</Text>
+                  <Text style={[s.invTdNum, { flex: 0.6 }]}>{li.qty}</Text>
                   <Text style={[s.invTdNum, { flex: 1 }]}>
-                    {fmtCur(p.price ?? 0)}
+                    {fmtCur(li.unitPrice)}
+                  </Text>
+                  <Text style={[s.invTdNum, { flex: 0.7 }]}>
+                    {li.taxPercent}%
+                  </Text>
+                  <Text style={[s.invTdNum, { flex: 1 }]}>
+                    {fmtCur(li.taxAmount)}
                   </Text>
                   <Text style={[s.invTdNum, { flex: 1, fontWeight: "800" }]}>
-                    {fmtCur(p.price ?? 0)}
+                    {fmtCur(li.lineTotal)}
                   </Text>
                 </View>
               ))}
             </View>
 
-            {/* Totals */}
+            {/* ── Totals ── */}
             <View style={s.invTotalsWrap}>
               <View style={s.invTotalsBox}>
                 <View style={s.invTotalsLine}>
-                  <Text style={s.invTotalsLabel}>Subtotal</Text>
+                  <Text style={s.invTotalsLabel}>Subtotal (Before Tax)</Text>
                   <Text style={s.invTotalsValue}>{fmtCur(subtotal)}</Text>
                 </View>
                 <View style={s.invTotalsLine}>
-                  <Text style={s.invTotalsLabel}>Shipping</Text>
+                  <Text style={s.invTotalsLabel}>
+                    {isIntraState ? "CGST + SGST" : "IGST"} @{" "}
+                    {subtotal > 0 ? ((totalTax / subtotal) * 100).toFixed(2) : "0.00"}
+                    %
+                  </Text>
+                  <Text style={s.invTotalsValue}>{fmtCur(totalTax)}</Text>
+                </View>
+                <View style={s.invTotalsLine}>
+                  <Text style={s.invTotalsLabel}>Shipping Charges</Text>
                   <Text
                     style={[
                       s.invTotalsValue,
@@ -1685,26 +2148,40 @@ const InvoiceModal = ({
                 </View>
                 <View style={s.invGrandLine}>
                   <Text style={s.invGrandLabel}>Grand Total</Text>
-                  <Text style={s.invGrandValue}>{fmtCur(subtotal)}</Text>
+                  <Text style={s.invGrandValue}>{fmtCur(grandTotal)}</Text>
                 </View>
               </View>
             </View>
 
-            {/* GST breakdown */}
+            {/* ── GST Breakdown Summary ── */}
             <View style={s.invGstBlock}>
               <Text style={s.invGstTitle}>GST Breakdown Summary</Text>
               <View style={s.invGstLine}>
-                <Text style={s.invGstK}>Total GST</Text>
-                <Text style={s.invGstV}>Included in price</Text>
+                <Text style={s.invGstK}>Total CGST:</Text>
+                <Text style={s.invGstV}>{fmtCur(cgst)}</Text>
+              </View>
+              <View style={s.invGstLine}>
+                <Text style={s.invGstK}>Total SGST:</Text>
+                <Text style={s.invGstV}>{fmtCur(sgst)}</Text>
+              </View>
+              <View style={s.invGstLine}>
+                <Text style={s.invGstK}>Total IGST:</Text>
+                <Text style={s.invGstV}>{fmtCur(igst)}</Text>
+              </View>
+              <View style={[s.invGstLine, s.invGstLineTotal]}>
+                <Text style={s.invGstKTotal}>Total GST:</Text>
+                <Text style={s.invGstVTotal}>{fmtCur(totalTax)}</Text>
               </View>
               <Text style={s.invGstNote}>
-                *GST details available on the seller invoice
+                {isIntraState
+                  ? "*Intra-state transaction - CGST + SGST applicable"
+                  : "*Inter-state transaction - IGST applicable"}
               </Text>
             </View>
 
-            {/* Payment info */}
+            {/* ── Payment Information ── */}
             <View style={s.invPaymentBlock}>
-              <Text style={s.invPaymentTitle}>Payment Information</Text>
+              <Text style={s.invPaymentTitle}>Payment Information:</Text>
               <Text style={s.invPaymentLine}>
                 Payment Method: {order.paymentType}
               </Text>
@@ -1728,12 +2205,42 @@ const InvoiceModal = ({
               </View>
             </View>
 
+            {/* ── Thank-you footer ── */}
+            <View style={s.invThankYouBlock}>
+              <Text style={s.invThankYouTitle}>Thank you for your business!</Text>
+              <Text style={s.invThankYouLine}>
+                If you have any questions about this invoice, please contact
+                us at
+              </Text>
+              <Text style={s.invThankYouContact}>support@flintnthread.in</Text>
+            </View>
+
             <Text style={s.invDocFooter}>
               This is a system-generated invoice and does not require a
               signature.
             </Text>
           </View>
         </ScrollView>
+
+        {/* Footer: Print, Close */}
+        <View style={s.docActionBar}>
+          <TouchableOpacity
+            style={s.docBtnPrint}
+            onPress={handlePrint}
+            activeOpacity={0.85}
+          >
+            <PrintIcon color={C.white} />
+            <Text style={s.docBtnPrintText}>Print</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.docBtnClose}
+            onPress={onClose}
+            activeOpacity={0.85}
+          >
+            <CloseIcon color={C.navy} size={15} />
+            <Text style={s.docBtnCloseText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -2351,11 +2858,7 @@ export default function OrdersScreen() {
           {/* ── Header — floats with side margins, rounded on all 4 corners ── */}
           <View
             style={{
-              
-              
-              
               paddingHorizontal: 16,
-              
             }}
           >
             <View
@@ -2363,7 +2866,6 @@ export default function OrdersScreen() {
                 s.headerBlock,
                 {
                   paddingTop: Platform.OS === "ios" ? 50 : 20,
-                  
                 },
               ]}
             >
@@ -3076,7 +3578,7 @@ const s = StyleSheet.create({
   actionDismissText: { fontSize: 15, fontWeight: "700", color: C.white },
 
   // ── Document screen shell (Invoice / Shipping Label modals) ────────────────
-  docScreen: { flex: 1, backgroundColor: C.bg },
+  docScreen: { flex: 1, backgroundColor: C.white },
   docTopBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -3099,7 +3601,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  docScroll: { padding: 16, paddingBottom: 100, alignItems: "center" },
+  docScroll: { padding: 16, paddingBottom: 100, alignItems: "center", backgroundColor: C.white },
   docActionBar: {
     position: "absolute",
     bottom: 0,
@@ -3156,17 +3658,7 @@ const s = StyleSheet.create({
     paddingBottom: 14,
     paddingHorizontal: 20,
   },
-  labelBrandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  labelBrandMark: {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
-    backgroundColor: C.navy,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  labelBrandMarkText: { color: C.white, fontWeight: "800", fontSize: 12 },
-  labelBrandName: { fontSize: 18, fontWeight: "800", letterSpacing: -0.2 },
+  labelBrandLogo: { width: 200, height: 52, marginBottom: 6 },
   labelBrandTag: { fontSize: 10, color: C.textLight, marginTop: 2 },
   labelTitleText: {
     marginTop: 12,
@@ -3176,28 +3668,28 @@ const s = StyleSheet.create({
     letterSpacing: 2,
   },
 
-  labelCourierBlock: {
+  labelCourierBar: {
+    backgroundColor: C.bg,
     borderTopWidth: 2,
     borderTopColor: C.navy,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    padding: 14,
-  },
-  labelCourierTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    paddingVertical: 8,
     alignItems: "center",
-    marginBottom: 10,
   },
-  labelCourierLabel: { fontSize: 12, fontWeight: "700", color: C.textMid },
-  labelGstChip: {
-    backgroundColor: C.orange,
-    borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
+  labelCourierBarText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.textMid,
   },
-  labelGstChipText: { color: C.white, fontSize: 10, fontWeight: "700" },
-  labelAwbArea: { flexDirection: "row", alignItems: "center", gap: 14 },
+  labelAwbArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
   labelAwbLeft: {
     flex: 1,
     alignItems: "center",
@@ -3259,95 +3751,98 @@ const s = StyleSheet.create({
   },
   labelShipAddress: { fontSize: 12.5, color: C.textMid, lineHeight: 19 },
 
-  labelMetaGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    padding: 14,
-    gap: 12,
+  labelMetaList: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 4,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     backgroundColor: C.bg,
   },
-  labelMetaItem: { width: "45%" },
-  labelMetaK: { fontSize: 11, color: C.textLight, fontWeight: "600" },
-  labelMetaV: {
-    fontSize: 12.5,
-    color: C.textDark,
+  labelMetaRow: { flexDirection: "row", gap: 6 },
+  labelMetaKList: { fontSize: 12, fontWeight: "800", color: C.textDark },
+  labelMetaVList: { fontSize: 12, color: C.textMid, flexShrink: 1 },
+
+  labelSectionLabelBar: {
+    backgroundColor: C.bg,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  labelSectionLabelBarText: {
+    fontSize: 10,
     fontWeight: "700",
-    marginTop: 2,
+    color: C.orange,
+    letterSpacing: 1.2,
   },
 
   labelProductHead: {
     flexDirection: "row",
     backgroundColor: C.navyDeep,
     paddingVertical: 9,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
   labelProductHeadText: {
     color: C.white,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
+  labelProductHeadCenter: { textAlign: "center" },
   labelProductRow: {
     flexDirection: "row",
     paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     alignItems: "center",
   },
-  labelProductName: { fontSize: 11.5, fontWeight: "700", color: C.textDark },
+  labelProductName: { fontSize: 11, fontWeight: "700", color: C.textDark },
   labelProductNum: {
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: "700",
     color: C.textDark,
     textAlign: "right",
   },
-  labelTotalsRow: {
+  labelProductCenter: { textAlign: "center" },
+  labelTotalsRowFull: {
     flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 14,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 8,
     backgroundColor: C.bg,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-  },
-  labelTotalsLabel: { fontSize: 12, fontWeight: "700", color: C.textMid },
-  labelTotalsValue: { fontSize: 14, fontWeight: "800", color: C.orange },
-
-  labelReturnRow: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
-    flexWrap: "wrap",
   },
-  labelReturnName: { fontWeight: "800", fontSize: 12.5, color: C.textDark },
-  labelReturnGstChip: {
-    backgroundColor: C.bluePale,
-    borderWidth: 1,
-    borderColor: C.navy,
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  labelReturnGstText: { fontSize: 9.5, fontWeight: "700", color: C.navy },
-  labelReturnAddr: { fontSize: 11.5, color: C.textMid },
-
-  labelFooterNote: { alignItems: "center", padding: 16 },
-  labelFooterGst: {
-    fontSize: 10,
-    fontWeight: "700",
+  labelTotalsLabel: {
+    fontSize: 11.5,
+    fontWeight: "800",
     color: C.textMid,
+    textAlign: "right",
+  },
+  labelTotalsValueCell: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: C.textDark,
+    textAlign: "right",
+  },
+
+  labelReturnName: {
+    fontWeight: "800",
+    fontSize: 12.5,
+    color: C.textDark,
     marginBottom: 4,
   },
+  labelReturnAddr: { fontSize: 11.5, color: C.textMid, lineHeight: 17 },
+
+  labelFooterNote: { alignItems: "center", padding: 16, gap: 4 },
+  labelFooterGst: { fontSize: 10.5, fontWeight: "700", color: C.textMid },
   labelFooterAuto: { fontSize: 9.5, color: C.textLight, letterSpacing: 0.4 },
   labelFooterPowered: { fontSize: 10, color: C.textLight, marginTop: 3 },
 
-  // ── Invoice sheet ─────────────────────────────────────────────────────────────
+  // ── Invoice sheet (REDESIGNED to match supplied PDF) ───────────────────────
   invoiceSheet: {
     backgroundColor: C.white,
     borderRadius: 8,
@@ -3355,31 +3850,40 @@ const s = StyleSheet.create({
     borderColor: C.border,
     padding: 24,
   },
-  invTopHeader: {
+
+  // Top header row: brand+sender info (left) vs INVOICE meta+QR (right)
+  invTopHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    gap: 12,
-    flexWrap: "wrap",
+    gap: 20,
   },
+  invTopHeaderRowNarrow: {
+    flexDirection: "column",
+    gap: 16,
+  },
+  invBrandCol: { flex: 1.3, minWidth: 200 },
   invBrandRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  invBrandMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: C.navy,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  invBrandMarkText: { color: C.white, fontWeight: "800", fontSize: 13 },
+  invBrandLogo: { width: 220, height: 56, marginBottom: 10 },
   invBrandName: { fontSize: 19, fontWeight: "800", letterSpacing: -0.2 },
   invBrandTag: { fontSize: 10.5, color: C.textLight, marginTop: 2 },
-  invMetaCol: { alignItems: "flex-end" },
+
+  invSenderInfo: { marginTop: 14, gap: 2 },
+  invSenderName: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: C.textDark,
+    marginBottom: 2,
+  },
+  invSenderLine: { fontSize: 12, color: C.textMid, lineHeight: 18 },
+
+  invMetaColRight: { alignItems: "flex-end", flexShrink: 0 },
+  invMetaColRightNarrow: { alignItems: "flex-start" },
   invTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     color: C.orange,
     letterSpacing: 1,
@@ -3388,22 +3892,30 @@ const s = StyleSheet.create({
     fontSize: 12.5,
     color: C.textDark,
     fontWeight: "700",
-    marginTop: 4,
+    marginTop: 6,
   },
   invMetaLineMuted: { fontSize: 11.5, color: C.textMid, marginTop: 2 },
+  invQrBox: {
+    marginTop: 14,
+    width: 84,
+    height: 84,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  invQrCaption: {
+    fontSize: 10,
+    color: C.textLight,
+    marginTop: 6,
+  },
 
   invSenderBlock: {
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  invSenderName: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: C.navyDeep,
-    marginBottom: 4,
-  },
-  invSenderLine: { fontSize: 12, color: C.textMid },
 
   invSection: {
     paddingVertical: 16,
@@ -3432,7 +3944,7 @@ const s = StyleSheet.create({
     color: C.textDark,
     marginBottom: 4,
   },
-  invMutedLine: { fontSize: 12, color: C.textMid },
+  invMutedLine: { fontSize: 12, color: C.textMid, lineHeight: 18 },
 
   invBsGrid: {
     flexDirection: "row",
@@ -3459,11 +3971,13 @@ const s = StyleSheet.create({
   },
   invTh: {
     color: C.white,
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
+  invThCenter: { textAlign: "center" },
+  invThRight: { textAlign: "right" },
   invTr: {
     flexDirection: "row",
     paddingVertical: 11,
@@ -3473,14 +3987,16 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   invTdName: { fontSize: 12.5, fontWeight: "700", color: C.textDark },
-  invTdNum: { fontSize: 12.5, color: C.textMid, textAlign: "right" },
+  invTdVariant: { fontSize: 10.5, color: C.textLight, marginTop: 2 },
+  invTdNum: { fontSize: 11.5, color: C.textMid, textAlign: "right" },
+  invTdCenter: { textAlign: "center" },
 
   invTotalsWrap: {
     flexDirection: "row",
     justifyContent: "flex-end",
     marginTop: 18,
   },
-  invTotalsBox: { width: "100%", maxWidth: 280 },
+  invTotalsBox: { width: "100%", maxWidth: 300 },
   invTotalsLine: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3518,8 +4034,16 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 3,
   },
+  invGstLineTotal: {
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: C.orangeBorder,
+  },
   invGstK: { fontSize: 12.5, color: C.textMid },
   invGstV: { fontSize: 12.5, fontWeight: "700", color: C.navyDeep },
+  invGstKTotal: { fontSize: 13, fontWeight: "800", color: C.textDark },
+  invGstVTotal: { fontSize: 14, fontWeight: "800", color: C.orange },
   invGstNote: {
     fontSize: 10.5,
     color: C.textLight,
@@ -3554,9 +4078,38 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
   },
 
+  invThankYouBlock: {
+    marginTop: 26,
+    alignItems: "center",
+    borderLeftWidth: 4,
+    borderLeftColor: C.orange,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: C.bg,
+    borderRadius: 6,
+  },
+  invThankYouTitle: {
+    fontSize: 14.5,
+    fontWeight: "800",
+    color: C.orange,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  invThankYouLine: {
+    fontSize: 11.5,
+    color: C.textMid,
+    textAlign: "center",
+  },
+  invThankYouContact: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: C.navyDeep,
+    marginTop: 4,
+  },
+
   invDocFooter: {
     textAlign: "center",
-    marginTop: 24,
+    marginTop: 20,
     fontSize: 10.5,
     color: C.textLight,
   },
@@ -3908,5 +4461,3 @@ const s = StyleSheet.create({
   },
   retryText: { color: C.white, fontWeight: "700", fontSize: 13 },
 });
-
-
