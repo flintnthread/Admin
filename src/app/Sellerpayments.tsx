@@ -708,7 +708,7 @@ const SellerPaymentsScreen: React.FC = () => {
             <View style={styles.webLayout}>
                 <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
                 <View style={styles.webColumn}>
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}>
                         {MainContent}
                     </ScrollView>
                 </View>
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
     webColumn: { flex: 1 },
 
     main: { flex: 1, backgroundColor: BG_PAGE },
-    mainWeb: { backgroundColor: BG_CARD, marginHorizontal: 24, marginBottom: 24, marginTop: 0, borderRadius: 20, overflow: "hidden", shadowColor: DARK, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5 },
+    mainWeb: { backgroundColor: BG_CARD, marginHorizontal: 0, marginBottom: 24, marginTop: 0, borderRadius: 20, overflow: "hidden", shadowColor: DARK, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 5 },
 
     // Header
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, borderRadius: 22, marginBottom: 0, zIndex: 1, shadowColor: "#151D4F", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
     scrollContent: { padding: 16, gap: 14 },
 
     // Stats Single Card
-    statsCardSingle: { flexDirection: "row", backgroundColor: BG_CARD, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, borderWidth: 1, borderColor: BORDER, shadowColor: DARK, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, marginBottom: 0, marginTop: -52, marginHorizontal: 32, zIndex: 10 },
+    statsCardSingle: { flexDirection: "row", backgroundColor: BG_CARD, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, borderWidth: 1, borderColor: BORDER, shadowColor: DARK, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, marginBottom: 0, marginTop: -42, marginHorizontal: 16, zIndex: 10 },
     statBlockSingle: { flexDirection: "row", alignItems: "center", gap: 12 },
     statIconWrapperSingle: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     statTextWrapperSingle: {},

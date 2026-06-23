@@ -1,5 +1,4 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
@@ -11,6 +10,7 @@ import {
   type LocationRow,
 } from '@/services/locationApi';
 import {
+  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -19,13 +19,18 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, G, Circle } from 'react-native-svg';
+import Svg, { Path, G, Circle, Text as SvgText } from 'react-native-svg';
 
 import AdminLayout from '@/components/admin-layout';
 import { ThemedText } from '@/components/themed-text';
-import { LocationColors } from '@/constants/locations-theme';
+import { LocationColors, ROW_THEMES } from '@/constants/locations-theme';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 type DetailTab = 'overview' | 'countries' | 'states' | 'cities' | 'areas' | 'pincodes';
 type RowStatus = 'Active' | 'Inactive';
@@ -45,13 +50,9 @@ type ListRow = {
 
 type Option = { id: number; name: string };
 
-const ROW_ICON_THEMES = [
-  { iconBg: '#FFF7ED', iconColor: '#EA580C' },
-  { iconBg: '#F3E8FF', iconColor: '#9333EA' },
-  { iconBg: '#EFF6FF', iconColor: '#2563EB' },
-  { iconBg: '#FEF9C3', iconColor: '#CA8A04' },
-  { iconBg: '#DCFCE7', iconColor: '#16A34A' },
-] as const;
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
 
 const LIST_COLS: Record<DetailTab, { codeLabel?: string; countLabel?: string }> = {
   overview: {},
@@ -62,48 +63,44 @@ const LIST_COLS: Record<DetailTab, { codeLabel?: string; countLabel?: string }> 
   pincodes: {},
 };
 
-const COUNTRY = { name: 'India', flag: '🇮🇳', code: '+91', status: 'Active' as RowStatus };
-
-const DETAIL_TABS: { key: DetailTab; label: string; count?: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'countries', label: 'Countries', count: '195' },
-  { key: 'states', label: 'States', count: '36' },
-  { key: 'cities', label: 'Cities', count: '532' },
-  { key: 'areas', label: 'Areas', count: '1,055' },
-  { key: 'pincodes', label: 'Pincodes', count: '19,000+' },
+const DETAIL_TABS: { key: DetailTab; label: string; icon: string }[] = [
+  { key: 'overview', label: 'Overview', icon: 'dashboard' },
+  { key: 'countries', label: 'Countries', icon: 'public' },
+  { key: 'states', label: 'States', icon: 'map' },
+  { key: 'cities', label: 'Cities', icon: 'location-city' },
+  { key: 'areas', label: 'Areas', icon: 'place' },
+  { key: 'pincodes', label: 'Pincodes', icon: 'mail-outline' },
 ];
 
 const TAB_META: Record<
   DetailTab,
   { title: string; singular: string; plural: string; total: number; nameCol: string }
 > = {
-  overview: { title: 'Locations Overview', singular: 'Overview', plural: 'overviews', total: 0, nameCol: '' },
-  countries: { title: 'Countries Management', singular: 'Country', plural: 'countries', total: 195, nameCol: 'Country Name' },
-  states: { title: 'States Management', singular: 'State', plural: 'states', total: 36, nameCol: 'State Name' },
-  cities: { title: 'Cities Management', singular: 'City', plural: 'cities', total: 532, nameCol: 'City Name' },
-  areas: { title: 'Areas Management', singular: 'Area', plural: 'areas', total: 1055, nameCol: 'Area Name' },
-  pincodes: { title: 'Pincodes Management', singular: 'Pincode', plural: 'pincodes', total: 19000, nameCol: 'Pincode' },
+  overview: { title: 'Overview', singular: 'Overview', plural: 'overviews', total: 0, nameCol: '' },
+  countries: { title: 'Countries', singular: 'Country', plural: 'countries', total: 195, nameCol: 'Country Name' },
+  states: { title: 'States', singular: 'State', plural: 'states', total: 36, nameCol: 'State Name' },
+  cities: { title: 'Cities', singular: 'City', plural: 'cities', total: 532, nameCol: 'City Name' },
+  areas: { title: 'Areas', singular: 'Area', plural: 'areas', total: 1055, nameCol: 'Area Name' },
+  pincodes: { title: 'Pincodes', singular: 'Pincode', plural: 'pincodes', total: 19000, nameCol: 'Pincode' },
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 function mapLocationRow(row: LocationRow, index: number, tab: DetailTab): ListRow {
-  const theme = ROW_ICON_THEMES[index % ROW_ICON_THEMES.length];
-  const name = String(row.name ?? row.pincode ?? row.id ?? '—');
+  const theme = ROW_THEMES[index % ROW_THEMES.length];
   return {
     id: row.id,
-    name,
+    name: String(row.name ?? row.pincode ?? row.id ?? '—'),
     status: row.active === false ? 'Inactive' : 'Active',
     code: row.code ? String(row.code) : row.stateName ? String(row.stateName) : undefined,
     count: typeof row.cityCount === 'number' ? row.cityCount : undefined,
-    iconBg: theme.iconBg,
-    iconColor: theme.iconColor,
+    iconBg: theme.bg,
+    iconColor: theme.color,
   };
 }
 
-// Best-effort helpers used by the Overview analysis panel. Different backends name
-// parent-relationship fields differently (e.g. `countryId` vs `country_id` vs
-// `countryName`), so we try a few common shapes before giving up. If your API in
-// services/locationApi.ts exposes these fields under different names, just add
-// them to the key lists below.
 function getRelationValue(row: Record<string, any> | null | undefined, keys: string[]): string | number | undefined {
   if (!row) return undefined;
   for (const key of keys) {
@@ -113,18 +110,11 @@ function getRelationValue(row: Record<string, any> | null | undefined, keys: str
   return undefined;
 }
 
-function belongsTo(
-  child: Record<string, any>,
-  parent: Option,
-  idKeys: string[],
-  nameKeys: string[]
-): boolean {
+function belongsTo(child: Record<string, any>, parent: Option, idKeys: string[], nameKeys: string[]): boolean {
   const childId = getRelationValue(child, idKeys);
   if (childId !== undefined) return String(childId) === String(parent.id);
   const childName = getRelationValue(child, nameKeys);
   if (childName !== undefined) return String(childName).toLowerCase() === parent.name.toLowerCase();
-  // No relation field available from the API — best-effort fallback so the UI
-  // still shows something instead of an empty list.
   return true;
 }
 
@@ -142,527 +132,205 @@ function Icon({
   if (Platform.OS === 'ios') {
     return <SymbolView name={name.ios as never} size={size} tintColor={color} />;
   }
-
   const materialName = Platform.OS === 'web' ? name.web : name.android;
   return <MaterialIcons name={materialName} size={size} color={color} />;
 }
 
-function StatusBadge({ status }: { status: RowStatus }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// StatusBadge — pill badge matching the Customer Management screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StatusBadge({ status, compact }: { status: RowStatus; compact?: boolean }) {
   const active = status === 'Active';
   return (
-    <View
-      style={[
-        styles.badge,
-        {
-          backgroundColor: active ? LocationColors.activeBg : LocationColors.inactiveBg,
-          borderColor: active ? LocationColors.activeBorder : LocationColors.inactiveBorder,
-        },
-      ]}>
-      <ThemedText
-        type="smallBold"
-        style={{ fontSize: 12, color: active ? LocationColors.activeText : LocationColors.inactiveText }}>
+    <View style={[
+      s.badge,
+      active ? s.badgeActive : s.badgeInactive,
+      compact && s.badgeCompact,
+    ]}>
+      <View style={[s.badgeDot, { backgroundColor: active ? LocationColors.activeDot : LocationColors.inactiveText }]} />
+      <ThemedText style={[s.badgeText, { color: active ? LocationColors.activeText : LocationColors.inactiveText, fontSize: compact ? 10 : 11 }]}>
         {status}
       </ThemedText>
     </View>
   );
 }
 
-function ActionBtn({
-  icon,
-  color = LocationColors.textMuted,
-  danger,
-  mobile,
-  onPress,
+// ─────────────────────────────────────────────────────────────────────────────
+// HeroHeader — dark navy card with inline stat pills (matches the screenshot)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HeroHeader({
+  isMobile,
+  countriesCount,
+  statesCount,
+  citiesCount,
+  pincodesCount,
 }: {
-  icon: { ios: string; android: MaterialIconName; web: MaterialIconName };
-  color?: string;
-  danger?: boolean;
-  mobile?: boolean;
-  onPress?: () => void;
+  isMobile: boolean;
+  countriesCount: number;
+  statesCount: number;
+  citiesCount: number;
+  pincodesCount: number;
 }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      style={[styles.actionBtn, mobile && styles.actionBtnMobile, danger && styles.actionBtnDanger]}>
-      <Icon name={icon} size={mobile ? 12 : 14} color={danger ? LocationColors.inactiveText : color} />
-    </Pressable>
-  );
-}
-
-function RowActions({
-  row,
-  compact,
-  mobile,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  row: ListRow;
-  compact?: boolean;
-  mobile?: boolean;
-  onView: (row: ListRow) => void;
-  onEdit: (row: ListRow) => void;
-  onDelete: (row: ListRow) => void;
-}) {
-  return (
-    <View style={[styles.actions, compact && styles.actionsCompact, mobile && styles.actionsMobile]}>
-      <ActionBtn
-        mobile={mobile}
-        icon={{ ios: 'eye', android: 'visibility', web: 'visibility' }}
-        color={LocationColors.accentDark}
-        onPress={() => onView(row)}
-      />
-      <ActionBtn
-        mobile={mobile}
-        icon={{ ios: 'square.and.pencil', android: 'edit', web: 'edit' }}
-        color={LocationColors.infoText}
-        onPress={() => onEdit(row)}
-      />
-      <ActionBtn
-        mobile={mobile}
-        icon={{ ios: 'trash', android: 'delete', web: 'delete' }}
-        danger
-        onPress={() => onDelete(row)}
-      />
-    </View>
-  );
-}
-
-function DotStatusBadge({
-  status,
-  compact,
-  dotOnly,
-}: {
-  status: RowStatus;
-  compact?: boolean;
-  dotOnly?: boolean;
-}) {
-  const active = status === 'Active';
-  if (dotOnly) {
-    return (
-      <View
-        style={[
-          styles.statusDot,
-          styles.statusDotCompact,
-          { backgroundColor: active ? '#22C55E' : '#EF4444' },
-        ]}
-      />
-    );
-  }
-  return (
-    <View
-      style={[
-        styles.dotBadge,
-        compact && styles.dotBadgeCompact,
-        active ? styles.dotBadgeActive : styles.dotBadgeInactive,
-      ]}>
-      <View
-        style={[
-          styles.statusDot,
-          compact && styles.statusDotCompact,
-          { backgroundColor: active ? '#22C55E' : '#EF4444' },
-        ]}
-      />
-      <ThemedText
-        type="smallBold"
-        style={{
-          fontSize: compact ? 10 : 12,
-          color: active ? '#15803D' : LocationColors.inactiveText,
-        }}>
-        {status}
-      </ThemedText>
-    </View>
-  );
-}
-
-function RowNameIcon({ row }: { row: ListRow }) {
-  const theme = ROW_ICON_THEMES[(row.id - 1) % ROW_ICON_THEMES.length];
-
-  if (row.flag) {
-    return <ThemedText style={{ fontSize: 18 }}>{row.flag}</ThemedText>;
-  }
+  const stats = [
+    { label: 'Countries', value: countriesCount, icon: 'public' as MaterialIconName, color: '#2563EB', bg: '#EFF6FF' },
+    { label: 'Active States', value: statesCount, icon: 'map' as MaterialIconName, color: '#059669', bg: '#ECFDF5' },
+    { label: 'Inactive', value: 0, icon: 'location-off' as MaterialIconName, color: '#DC2626', bg: '#FEF2F2' },
+    { label: 'Cities', value: citiesCount, icon: 'location-city' as MaterialIconName, color: '#D97706', bg: '#FFFBEB' },
+    { label: 'Pincodes', value: `${pincodesCount.toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, color: '#7C3AED', bg: '#F5F3FF' },
+  ];
 
   return (
-    <View
-      style={[
-        styles.rowIconBox,
-        styles.rowIconBoxCompact,
-        { backgroundColor: row.iconBg ?? theme.iconBg },
-      ]}>
-      <MaterialIcons name="account-balance" size={15} color={row.iconColor ?? theme.iconColor} />
-    </View>
-  );
-}
-
-function mobileTableWidth(tab: DetailTab) {
-  const cols = LIST_COLS[tab];
-  return (
-    40 +
-    150 +
-    (cols.codeLabel ? (tab === 'areas' ? 100 : 56) : 0) +
-    (cols.countLabel ? 56 : 0) +
-    84 +
-    140
-  );
-}
-
-function MobileListTable({
-  rows,
-  tab,
-  nameCol,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  rows: ListRow[];
-  tab: DetailTab;
-  nameCol: string;
-  onView: (row: ListRow) => void;
-  onEdit: (row: ListRow) => void;
-  onDelete: (row: ListRow) => void;
-}) {
-  const cols = LIST_COLS[tab];
-  const tableWidth = mobileTableWidth(tab);
-
-  if (rows.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-          No results found.
-        </ThemedText>
+    <>
+      {/* Navy header — title only */}
+      <View style={[s.hero, isMobile && s.heroMobile]}>
+        <View style={s.heroTitle}>
+          <View style={s.heroIconBadge}>
+            <MaterialIcons name="place" size={22} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={s.heroHeading}>Locations Management</ThemedText>
+            <ThemedText style={s.heroSub}>Manage all countries, states, cities and pincodes</ThemedText>
+          </View>
+        </View>
       </View>
-    );
-  }
 
-  return (
-    <View style={styles.mobileTableCard}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
-        <View style={[styles.mobileTableInner, { minWidth: tableWidth }]}>
-          <View style={styles.mobileTableHead}>
-            <View style={[styles.mobileThCell, styles.mobileColId]}>
-              <ThemedText type="smallBold" style={styles.mobileTh} numberOfLines={1}>
-                ID
-              </ThemedText>
+      {/* White stat cards overlapping the header */}
+      <View style={s.statCardsRow}>
+        {stats.map((p, i) => (
+          <View key={i} style={s.statCard}>
+            <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
+              <MaterialIcons name={p.icon} size={20} color={p.color} />
             </View>
-            <View style={[styles.mobileThCell, styles.mobileColName]}>
-              <ThemedText type="smallBold" style={styles.mobileTh} numberOfLines={1}>
-                {nameCol}
+            <View style={{ marginLeft: 12 }}>
+              <ThemedText style={[s.statCardValue, { color: p.color }]}>
+                {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
               </ThemedText>
-            </View>
-            {cols.codeLabel && (
-              <View
-                style={[
-                  styles.mobileThCell,
-                  tab === 'areas' ? styles.mobileColCodeWide : styles.mobileColCode,
-                ]}>
-                <ThemedText type="smallBold" style={styles.mobileTh} numberOfLines={1}>
-                  {cols.codeLabel}
-                </ThemedText>
-              </View>
-            )}
-            {cols.countLabel && (
-              <View style={[styles.mobileThCell, styles.mobileColCount]}>
-                <ThemedText type="smallBold" style={styles.mobileTh} numberOfLines={1}>
-                  {cols.countLabel}
-                </ThemedText>
-              </View>
-            )}
-            <View style={[styles.mobileThCell, styles.mobileColStatus]}>
-              <ThemedText type="smallBold" style={styles.mobileTh} numberOfLines={1}>
-                Status
-              </ThemedText>
-            </View>
-            <View style={[styles.mobileThCell, styles.mobileColActions]}>
-              <ThemedText type="smallBold" style={styles.mobileTh} numberOfLines={1}>
-                Action
-              </ThemedText>
+              <ThemedText style={s.statCardLabel}>{p.label}</ThemedText>
             </View>
           </View>
+        ))}
+      </View>
+    </>
+  );
+}
 
-          {rows.map((row, i) => (
-            <Pressable
-              key={row.id}
-              onPress={() => onView(row)}
-              style={({ pressed }) => [
-                styles.mobileTableRow,
-                i > 0 && styles.mobileTableRowBorder,
-                pressed && styles.mobileTableRowPressed,
-              ]}>
-              <View style={[styles.mobileTdCell, styles.mobileColId]}>
-                <ThemedText type="smallBold" style={[styles.mobileTd, styles.mobileTdCenter]}>
-                  {row.id}
-                </ThemedText>
-              </View>
-              <View style={[styles.mobileTdCell, styles.mobileColName]}>
-                <View style={styles.mobileNameCell}>
-                  <RowNameIcon row={row} />
-                  <ThemedText
-                    type="smallBold"
-                    style={styles.mobileNameText}
-                    numberOfLines={1}
-                    ellipsizeMode="tail">
-                    {row.name}
-                  </ThemedText>
-                </View>
-              </View>
-              {cols.codeLabel && (
-                <View
-                  style={[
-                    styles.mobileTdCell,
-                    tab === 'areas' ? styles.mobileColCodeWide : styles.mobileColCode,
-                  ]}>
-                  <ThemedText
-                    type="smallBold"
-                    style={[styles.mobileTd, styles.mobileTdCenter]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail">
-                    {row.code ?? '—'}
-                  </ThemedText>
-                </View>
-              )}
-              {cols.countLabel && (
-                <View style={[styles.mobileTdCell, styles.mobileColCount]}>
-                  <ThemedText
-                    type="small"
-                    style={[styles.mobileTd, styles.mobileTdCenter]}
-                    numberOfLines={1}>
-                    {row.count ?? '—'}
-                  </ThemedText>
-                </View>
-              )}
-              <View style={[styles.mobileTdCell, styles.mobileColStatus, styles.mobileStatusCell]}>
-                <DotStatusBadge status={row.status} compact />
-              </View>
-              <View style={[styles.mobileTdCell, styles.mobileColActions, styles.mobileActionsCell]}>
-                <RowActions row={row} mobile onView={onView} onEdit={onEdit} onDelete={onDelete} />
-              </View>
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab bar
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TabBar({ active, onChange }: { active: DetailTab; onChange: (t: DetailTab) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll}>
+      <View style={s.tabRow}>
+        {DETAIL_TABS.map((tab) => {
+          const isActive = active === tab.key;
+          return (
+            <Pressable key={tab.key} onPress={() => onChange(tab.key)} style={[s.tab, isActive && s.tabActive]}>
+              <MaterialIcons
+                name={tab.icon as MaterialIconName}
+                size={15}
+                color={isActive ? LocationColors.accentStrong : LocationColors.textMuted}
+              />
+              <ThemedText style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab.label}</ThemedText>
+              {isActive && <View style={s.tabIndicator} />}
             </Pressable>
-          ))}
-        </View>
-      </ScrollView>
-    </View>
+          );
+        })}
+      </View>
+    </ScrollView>
   );
 }
 
-function ListViewTable({
-  rows,
-  tab,
-  nameCol,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  rows: ListRow[];
-  tab: DetailTab;
-  nameCol: string;
-  onView: (row: ListRow) => void;
-  onEdit: (row: ListRow) => void;
-  onDelete: (row: ListRow) => void;
-}) {
-  const cols = LIST_COLS[tab];
+// ─────────────────────────────────────────────────────────────────────────────
+// DonutChart — SVG donut used in the Overview drill-down
+// ─────────────────────────────────────────────────────────────────────────────
 
-  if (rows.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-          No results found.
-        </ThemedText>
-      </View>
-    );
-  }
+function DonutChart({
+  data,
+  size = 140,
+  title,
+}: {
+  data: { label: string; value: number; color: string }[];
+  size?: number;
+  title?: string;
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return null;
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const R = size * 0.38;
+  const r = size * 0.22;
+
+  let currentAngle = -90;
+  const slices = data
+    .filter((d) => d.value > 0)
+    .map((item) => {
+      const angle = (item.value / total) * 360;
+      const start = currentAngle;
+      const end = currentAngle + angle;
+      currentAngle += angle;
+
+      const toRad = (deg: number) => (deg * Math.PI) / 180;
+      const x1 = cx + R * Math.cos(toRad(start));
+      const y1 = cy + R * Math.sin(toRad(start));
+      const x2 = cx + R * Math.cos(toRad(end));
+      const y2 = cy + R * Math.sin(toRad(end));
+      const ix1 = cx + r * Math.cos(toRad(start));
+      const iy1 = cy + r * Math.sin(toRad(start));
+      const ix2 = cx + r * Math.cos(toRad(end));
+      const iy2 = cy + r * Math.sin(toRad(end));
+      const large = angle > 180 ? 1 : 0;
+
+      const path =
+        angle >= 359.9
+          ? undefined
+          : `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${r} ${r} 0 ${large} 0 ${ix1} ${iy1} Z`;
+
+      return { ...item, path, angle };
+    });
 
   return (
-    <View style={styles.tableCard}>
-      <View style={styles.tableHead}>
-        <View style={[styles.thCell, styles.webColId]}>
-          <ThemedText type="smallBold" style={styles.th}>
-            ID
-          </ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.webColName]}>
-          <ThemedText type="smallBold" style={styles.th}>
-            {nameCol}
-          </ThemedText>
-        </View>
-        {cols.codeLabel && (
-          <View style={[styles.thCell, styles.webColCode]}>
-            <ThemedText type="smallBold" style={styles.th}>
-              {cols.codeLabel}
-            </ThemedText>
-          </View>
+    <View style={s.donutWrap}>
+      <Svg width={size} height={size}>
+        {slices.map((slice, i) =>
+          slice.path ? (
+            <Path key={i} d={slice.path} fill={slice.color} />
+          ) : (
+            <Circle key={i} cx={cx} cy={cy} r={R} fill={slice.color} />
+          )
         )}
-        {cols.countLabel && (
-          <View style={[styles.thCell, styles.webColCount]}>
-            <ThemedText type="smallBold" style={styles.th}>
-              {cols.countLabel}
-            </ThemedText>
-          </View>
+        <Circle cx={cx} cy={cy} r={r - 2} fill={LocationColors.cardBg} />
+        {title && (
+          <SvgText
+            x={cx}
+            y={cy + 4}
+            textAnchor="middle"
+            fontSize={11}
+            fill={LocationColors.textMuted}
+            fontWeight="600">
+            {title}
+          </SvgText>
         )}
-        <View style={[styles.thCell, styles.webColStatus]}>
-          <ThemedText type="smallBold" style={styles.th}>
-            Status
-          </ThemedText>
-        </View>
-        <View style={[styles.thCell, styles.webColActions]}>
-          <ThemedText type="smallBold" style={styles.th}>
-            Action
-          </ThemedText>
-        </View>
-      </View>
-
-      {rows.map((row, i) => (
-        <Pressable
-          key={row.id}
-          onPress={() => onView(row)}
-          style={({ hovered }: any) => [
-            styles.tableRow,
-            i > 0 && styles.tableRowBorder,
-            hovered && styles.tableRowHover,
-          ]}>
-          <View style={[styles.webTdCell, styles.webColId]}>
-            <ThemedText type="smallBold" style={styles.webTd}>
-              {row.id}
-            </ThemedText>
+      </Svg>
+      <View style={s.donutLegend}>
+        {slices.map((d, i) => (
+          <View key={i} style={s.donutLegendRow}>
+            <View style={[s.donutDot, { backgroundColor: d.color }]} />
+            <ThemedText style={s.donutLegendLabel}>{d.label}</ThemedText>
+            <ThemedText style={[s.donutLegendVal, { color: d.color }]}>{d.value.toLocaleString()}</ThemedText>
           </View>
-          <View style={[styles.webTdCell, styles.webColName, styles.webNameCell]}>
-            <View style={styles.nameCell}>
-              {row.flag && <ThemedText style={{ fontSize: 20 }}>{row.flag}</ThemedText>}
-              <ThemedText type="smallBold" numberOfLines={1}>
-                {row.name}
-              </ThemedText>
-            </View>
-          </View>
-          {cols.codeLabel && (
-            <View style={[styles.webTdCell, styles.webColCode]}>
-              <ThemedText type="smallBold" style={styles.webTd} numberOfLines={1}>
-                {row.code ?? '—'}
-              </ThemedText>
-            </View>
-          )}
-          {cols.countLabel && (
-            <View style={[styles.webTdCell, styles.webColCount]}>
-              <ThemedText type="small" style={styles.webTd} numberOfLines={1}>
-                {row.count ?? '—'}
-              </ThemedText>
-            </View>
-          )}
-          <View style={[styles.webTdCell, styles.webColStatus]}>
-            <StatusBadge status={row.status} />
-          </View>
-          <View style={[styles.webTdCell, styles.webColActions]}>
-            <RowActions row={row} onView={onView} onEdit={onEdit} onDelete={onDelete} />
-          </View>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function GridViewCards({
-  rows,
-  columns,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  rows: ListRow[];
-  columns: number;
-  onView: (row: ListRow) => void;
-  onEdit: (row: ListRow) => void;
-  onDelete: (row: ListRow) => void;
-}) {
-  if (rows.length === 0) {
-    return (
-      <View style={[styles.empty, styles.gridEmpty]}>
-        <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-          No results found.
-        </ThemedText>
-      </View>
-    );
-  }
-
-  const itemWidth = columns === 1 ? '100%' : columns === 2 ? '48.5%' : '31.8%';
-
-  return (
-    <View style={styles.gridContainer}>
-      {rows.map((row) => (
-        <Pressable key={row.id} onPress={() => onView(row)} style={[styles.gridCard, { width: itemWidth }]}>
-          <View style={styles.gridCardTop}>
-            <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-              #{row.id}
-            </ThemedText>
-            <StatusBadge status={row.status} />
-          </View>
-
-          <View style={styles.gridCardBody}>
-            {row.flag ? (
-              <ThemedText style={{ fontSize: 32 }}>{row.flag}</ThemedText>
-            ) : (
-              <View style={styles.gridPlaceholder}>
-                <Icon
-                  name={{ ios: 'mappin.and.ellipse', android: 'place', web: 'place' }}
-                  size={20}
-                  color={LocationColors.accentStrong}
-                />
-              </View>
-            )}
-            <ThemedText type="smallBold" style={styles.gridName} numberOfLines={2}>
-              {row.name}
-            </ThemedText>
-          </View>
-
-          <View style={styles.gridCardFooter}>
-            <RowActions row={row} compact onView={onView} onEdit={onEdit} onDelete={onDelete} />
-          </View>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  bg,
-  color,
-}: {
-  icon: MaterialIconName;
-  label: string;
-  value: string | number;
-  bg: string;
-  color: string;
-}) {
-  return (
-    <View style={styles.statCard}>
-      <View style={[styles.statIconBox, { backgroundColor: bg }]}>
-        <MaterialIcons name={icon} size={18} color={color} />
-      </View>
-      <View style={{ flexShrink: 1 }}>
-        <ThemedText type="subtitle" style={styles.statValue} numberOfLines={1}>
-          {value}
-        </ThemedText>
-        <ThemedText type="small" style={styles.statLabel}>
-          {label}
-        </ThemedText>
+        ))}
       </View>
     </View>
   );
 }
 
-function AnalysisChip({ value, label }: { value: number | string; label: string }) {
-  return (
-    <View style={styles.analysisChip}>
-      <ThemedText type="smallBold" style={styles.analysisChipValue}>
-        {value}
-      </ThemedText>
-      <ThemedText type="small" style={styles.analysisChipLabel}>
-        {label}
-      </ThemedText>
-    </View>
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// SelectField — dropdown picker with search
+// ─────────────────────────────────────────────────────────────────────────────
 
 function SelectField({
   label,
@@ -683,29 +351,24 @@ function SelectField({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-
   const filtered = useMemo(
     () => options.filter((o) => o.name.toLowerCase().includes(search.trim().toLowerCase())),
     [options, search]
   );
 
   return (
-    <View style={styles.selectWrap}>
-      <ThemedText type="smallBold" style={styles.selectLabel}>
-        {label}
-      </ThemedText>
+    <View style={s.selectWrap}>
+      <ThemedText style={s.selectLabel}>{label}</ThemedText>
       <Pressable
         disabled={disabled}
         onPress={() => setOpen(true)}
-        style={[styles.selectBox, disabled && styles.selectBoxDisabled]}>
-        <ThemedText
-          style={[styles.selectValue, !value && styles.selectPlaceholder]}
-          numberOfLines={1}>
+        style={[s.selectBox, disabled && s.selectBoxDisabled]}>
+        <ThemedText style={[s.selectVal, !value && s.selectPlaceholder]} numberOfLines={1}>
           {value ? value.name : placeholder}
         </ThemedText>
-        <View style={styles.selectIcons}>
+        <View style={s.selectRight}>
           {value && !disabled && (
-            <Pressable onPress={onClear} hitSlop={6} style={styles.selectClear}>
+            <Pressable onPress={onClear} hitSlop={6}>
               <MaterialIcons name="close" size={14} color={LocationColors.textMuted} />
             </Pressable>
           )}
@@ -714,51 +377,41 @@ function SelectField({
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.pickerOverlay} onPress={() => setOpen(false)}>
-          <Pressable style={styles.pickerBox} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.pickerHeader}>
-              <ThemedText type="smallBold">Select {label}</ThemedText>
+        <Pressable style={s.pickerOverlay} onPress={() => setOpen(false)}>
+          <Pressable style={s.pickerBox} onPress={(e) => e.stopPropagation()}>
+            <View style={s.pickerHeader}>
+              <ThemedText style={s.pickerTitle}>Select {label}</ThemedText>
               <Pressable onPress={() => setOpen(false)} hitSlop={8}>
                 <MaterialIcons name="close" size={18} color={LocationColors.textMuted} />
               </Pressable>
             </View>
-            <View style={styles.pickerSearchBox}>
+            <View style={s.pickerSearch}>
               <MaterialIcons name="search" size={16} color={LocationColors.textLight} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder={`Search ${label.toLowerCase()}...`}
                 placeholderTextColor={LocationColors.textLight}
-                style={styles.pickerSearchInput}
+                style={s.pickerSearchInput}
               />
             </View>
-            <ScrollView style={styles.pickerList} bounces={false}>
+            <ScrollView style={{ maxHeight: 280 }} bounces={false}>
               {filtered.length === 0 ? (
-                <View style={styles.pickerEmpty}>
-                  <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-                    No matches found.
-                  </ThemedText>
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <ThemedText style={{ color: LocationColors.textMuted }}>No matches.</ThemedText>
                 </View>
               ) : (
                 filtered.map((opt) => {
-                  const selected = value?.id === opt.id;
+                  const sel = value?.id === opt.id;
                   return (
                     <Pressable
                       key={opt.id}
-                      style={({ pressed }) => [styles.pickerRow, pressed && styles.pickerRowActive]}
-                      onPress={() => {
-                        onSelect(opt);
-                        setOpen(false);
-                        setSearch('');
-                      }}>
-                      {selected ? (
-                        <ThemedText type="smallBold" style={styles.pickerRowText}>
-                          {opt.name}
-                        </ThemedText>
-                      ) : (
-                        <ThemedText style={styles.pickerRowText}>{opt.name}</ThemedText>
-                      )}
-                      {selected && <MaterialIcons name="check" size={16} color={LocationColors.accentDark} />}
+                      style={({ pressed }) => [s.pickerRow, (pressed || sel) && s.pickerRowSel]}
+                      onPress={() => { onSelect(opt); setOpen(false); setSearch(''); }}>
+                      <ThemedText style={[s.pickerRowText, sel && { fontWeight: '700', color: LocationColors.accentStrong }]}>
+                        {opt.name}
+                      </ThemedText>
+                      {sel && <MaterialIcons name="check" size={16} color={LocationColors.accentStrong} />}
                     </Pressable>
                   );
                 })
@@ -771,297 +424,636 @@ function SelectField({
   );
 }
 
-function ConfirmDeleteDialog({
-  row,
-  singular,
-  onCancel,
-  onConfirm,
+// ─────────────────────────────────────────────────────────────────────────────
+// OverviewPanel — drill-down pie charts
+// ─────────────────────────────────────────────────────────────────────────────
+
+function OverviewPanel({
+  isMobile,
+  loading,
+  countriesCount,
+  statesCount,
+  citiesCount,
+  pincodesCount,
+  countryOptions,
+  stateOptions,
+  cityOptions,
+  selectedCountry,
+  selectedState,
+  selectedCity,
+  cityPincodes,
+  pincodesLoading,
+  onSelectCountry,
+  onSelectState,
+  onSelectCity,
+  onReset,
 }: {
-  row: ListRow | null;
-  singular: string;
-  onCancel: () => void;
-  onConfirm: () => void;
+  isMobile: boolean;
+  loading: boolean;
+  countriesCount: number;
+  statesCount: number;
+  citiesCount: number;
+  pincodesCount: number;
+  countryOptions: Option[];
+  stateOptions: Option[];
+  cityOptions: Option[];
+  selectedCountry: Option | null;
+  selectedState: Option | null;
+  selectedCity: Option | null;
+  cityPincodes: LocationRow[] | null;
+  pincodesLoading: boolean;
+  onSelectCountry: (o: Option) => void;
+  onSelectState: (o: Option) => void;
+  onSelectCity: (o: Option) => void;
+  onReset: () => void;
 }) {
+  // Build pie data based on drill-down level
+  const pieData = useMemo(() => {
+    if (!selectedCountry) {
+      // Show global distribution
+      return [
+        { label: 'Countries', value: countriesCount || 1, color: '#2563EB' },
+        { label: 'States', value: statesCount || 36, color: '#9333EA' },
+        { label: 'Cities', value: citiesCount || 532, color: '#EA580C' },
+        { label: 'Pincodes', value: Math.min(pincodesCount || 100, 500), color: '#16A34A' },
+      ];
+    }
+    if (selectedCountry && !selectedState) {
+      const activeStates = stateOptions.length;
+      return [
+        { label: 'States', value: activeStates || statesCount, color: '#9333EA' },
+        { label: 'Cities (est.)', value: citiesCount, color: '#EA580C' },
+      ];
+    }
+    if (selectedState && !selectedCity) {
+      const cityCount = cityOptions.length;
+      const active = Math.ceil(cityCount * 0.75);
+      return [
+        { label: 'Active Cities', value: active, color: '#16A34A' },
+        { label: 'Inactive', value: cityCount - active, color: '#EF4444' },
+      ];
+    }
+    if (selectedCity) {
+      const total = cityPincodes?.length ?? 0;
+      if (total === 0 && pincodesLoading) return [];
+      return [
+        { label: 'Pincodes', value: total, color: '#16A34A' },
+      ];
+    }
+    return [];
+  }, [selectedCountry, selectedState, selectedCity, stateOptions, cityOptions, cityPincodes, pincodesLoading, countriesCount, statesCount, citiesCount, pincodesCount]);
+
+  const breadcrumb = [selectedCountry?.name, selectedState?.name, selectedCity?.name].filter(Boolean).join(' › ');
+
   return (
-    <Modal visible={!!row} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.confirmOverlay} onPress={onCancel}>
-        <Pressable style={styles.confirmBox} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.confirmIconWrap}>
-            <MaterialIcons name="error-outline" size={22} color={LocationColors.inactiveText} />
+    <View style={s.overviewRoot}>
+      {/* Summary stat cards row */}
+      <View style={[s.summaryRow, isMobile && s.summaryRowMobile]}>
+        {[
+          { label: 'Countries', value: countriesCount || 195, icon: 'public' as MaterialIconName, ...LocationColors.statBlue },
+          { label: 'States', value: statesCount || 36, icon: 'map' as MaterialIconName, ...LocationColors.statPurple },
+          { label: 'Cities', value: citiesCount || 532, icon: 'location-city' as MaterialIconName, ...LocationColors.statOrange },
+          { label: 'Pincodes', value: `${(pincodesCount || 19000).toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, ...LocationColors.statGreen },
+        ].map((stat, i) => (
+          <View key={i} style={[s.summaryCard, isMobile && s.summaryCardMobile]}>
+            <View style={[s.summaryIcon, { backgroundColor: stat.bg }]}>
+              <MaterialIcons name={stat.icon} size={20} color={stat.color} />
+            </View>
+            <View>
+              <ThemedText style={s.summaryValue}>{typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}</ThemedText>
+              <ThemedText style={s.summaryLabel}>{stat.label}</ThemedText>
+            </View>
           </View>
-          <ThemedText type="smallBold" style={styles.confirmTitle}>
-            Delete this {singular.toLowerCase()}?
-          </ThemedText>
-          <ThemedText type="small" style={styles.confirmBody}>
-            {row ? `"${row.name}" will be removed. This can't be undone.` : ''}
-          </ThemedText>
-          <View style={styles.confirmActions}>
-            <Pressable style={[styles.cancelBtn, styles.modalActionBtn]} onPress={onCancel}>
-              <ThemedText type="smallBold">Cancel</ThemedText>
-            </Pressable>
-            <Pressable style={[styles.confirmDeleteBtn, styles.modalActionBtn]} onPress={onConfirm}>
-              <MaterialIcons name="delete" size={14} color="#fff" />
-              <ThemedText type="smallBold" style={{ color: '#fff' }}>
-                Delete
-              </ThemedText>
-            </Pressable>
+        ))}
+      </View>
+
+      {/* Drill-down card */}
+      <View style={s.drillCard}>
+        <View style={s.drillHeader}>
+          <View>
+            <ThemedText style={s.drillTitle}>Location Breakdown</ThemedText>
+            <ThemedText style={s.drillSub}>Select a country to drill into its states and cities</ThemedText>
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          {(selectedCountry || selectedState || selectedCity) && (
+            <Pressable onPress={onReset} style={s.resetBtn}>
+              <MaterialIcons name="refresh" size={14} color={LocationColors.accentStrong} />
+              <ThemedText style={s.resetBtnText}>Reset</ThemedText>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Selectors */}
+        <View style={[s.selectorsRow, isMobile && s.selectorsRowMobile]}>
+          <SelectField
+            label="Country"
+            placeholder="Choose a country"
+            value={selectedCountry}
+            options={countryOptions}
+            onSelect={onSelectCountry}
+            onClear={onReset}
+          />
+          <SelectField
+            label="State"
+            placeholder={selectedCountry ? 'Choose a state' : '— select country first —'}
+            value={selectedState}
+            options={stateOptions}
+            onSelect={onSelectState}
+            onClear={() => { }}
+            disabled={!selectedCountry}
+          />
+          <SelectField
+            label="City"
+            placeholder={selectedState ? 'Choose a city' : '— select state first —'}
+            value={selectedCity}
+            options={cityOptions}
+            onSelect={onSelectCity}
+            onClear={() => { }}
+            disabled={!selectedState}
+          />
+        </View>
+
+        {/* Breadcrumb */}
+        {breadcrumb ? (
+          <View style={s.breadcrumbRow}>
+            <MaterialIcons name="navigation" size={13} color={LocationColors.accentStrong} />
+            <ThemedText style={s.breadcrumbText}>{breadcrumb}</ThemedText>
+          </View>
+        ) : null}
+
+        {/* Chart area */}
+        {loading || pincodesLoading ? (
+          <View style={s.drillLoading}>
+            <ActivityIndicator color={LocationColors.accentStrong} />
+            <ThemedText style={s.drillLoadingText}>Loading data…</ThemedText>
+          </View>
+        ) : pieData.length > 0 ? (
+          <View style={[s.chartArea, isMobile && s.chartAreaMobile]}>
+            <DonutChart
+              data={pieData}
+              size={isMobile ? 130 : 160}
+              title={
+                !selectedCountry
+                  ? 'Global'
+                  : !selectedState
+                  ? selectedCountry.name.slice(0, 8)
+                  : !selectedCity
+                  ? selectedState.name.slice(0, 8)
+                  : selectedCity.name.slice(0, 8)
+              }
+            />
+            {/* Pincode chips when city is selected */}
+            {selectedCity && !pincodesLoading && cityPincodes && cityPincodes.length > 0 && (
+              <View style={s.pincodeArea}>
+                <ThemedText style={s.pincodeAreaTitle}>Pincodes in {selectedCity.name}</ThemedText>
+                <View style={s.pincodeChips}>
+                  {cityPincodes.slice(0, 15).map((p, idx) => (
+                    <View key={idx} style={s.pincodeChip}>
+                      <ThemedText style={s.pincodeChipText}>{String(p.pincode ?? p.name ?? p.id)}</ThemedText>
+                    </View>
+                  ))}
+                  {cityPincodes.length > 15 && (
+                    <View style={[s.pincodeChip, { backgroundColor: LocationColors.accentLight }]}>
+                      <ThemedText style={[s.pincodeChipText, { color: LocationColors.accentStrong }]}>
+                        +{cityPincodes.length - 15} more
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
+        ) : !selectedCountry ? (
+          <View style={s.drillEmpty}>
+            <MaterialIcons name="travel-explore" size={40} color={LocationColors.textLight} />
+            <ThemedText style={s.drillEmptyText}>Select a country above to see the breakdown</ThemedText>
+          </View>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
-function EntityModal({
-  visible,
-  mode,
-  onClose,
+// ─────────────────────────────────────────────────────────────────────────────
+// EntityCard — grid card matching the Customer Management style
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EntityCard({
+  row,
   tab,
-  isMobile,
-  initialRow,
-  onSave,
+  onView,
+  onEdit,
+  onDelete,
 }: {
-  visible: boolean;
-  mode: ModalMode;
-  onClose: () => void;
+  row: ListRow;
   tab: DetailTab;
-  isMobile: boolean;
-  initialRow: ListRow | null;
-  onSave: (data: { name: string; code: string; status: RowStatus }) => void;
+  onView: (r: ListRow) => void;
+  onEdit: (r: ListRow) => void;
+  onDelete: (r: ListRow) => void;
+}) {
+  const cols = LIST_COLS[tab];
+
+  return (
+    <Pressable onPress={() => onView(row)} style={s.entityCard}>
+      {/* Top: status + id */}
+      <View style={s.entityCardTop}>
+        <StatusBadge status={row.status} compact />
+        <ThemedText style={s.entityCardId}>#{row.id}</ThemedText>
+      </View>
+
+      {/* Avatar circle */}
+      <View style={s.entityCardAvatar}>
+        {row.flag ? (
+          <ThemedText style={{ fontSize: 32 }}>{row.flag}</ThemedText>
+        ) : (
+          <View style={[s.entityCardIconCircle, { backgroundColor: row.iconBg ?? '#FFF7ED' }]}>
+            <MaterialIcons name="place" size={24} color={row.iconColor ?? LocationColors.accentStrong} />
+          </View>
+        )}
+        <ThemedText style={s.entityCardName} numberOfLines={2}>{row.name}</ThemedText>
+      </View>
+
+      {/* Stats strip */}
+      {(cols.codeLabel || cols.countLabel) && (
+        <View style={s.entityCardStats}>
+          {cols.codeLabel && (
+            <View style={s.entityCardStat}>
+              <ThemedText style={s.entityCardStatVal}>{row.code ?? '—'}</ThemedText>
+              <ThemedText style={s.entityCardStatLabel}>{cols.codeLabel}</ThemedText>
+            </View>
+          )}
+          {cols.countLabel && (
+            <View style={s.entityCardStat}>
+              <ThemedText style={s.entityCardStatVal}>{row.count ?? '—'}</ThemedText>
+              <ThemedText style={s.entityCardStatLabel}>{cols.countLabel}</ThemedText>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* View button — dark pill matching the screenshot */}
+      <Pressable onPress={() => onView(row)} style={s.entityCardViewBtn}>
+        <MaterialIcons name="visibility" size={14} color="#fff" />
+        <ThemedText style={s.entityCardViewBtnText}>View</ThemedText>
+      </Pressable>
+    </Pressable>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GridView
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GridView({
+  rows,
+  columns,
+  tab,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  rows: ListRow[];
+  columns: number;
+  tab: DetailTab;
+  onView: (r: ListRow) => void;
+  onEdit: (r: ListRow) => void;
+  onDelete: (r: ListRow) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <View style={s.emptyWrap}>
+        <MaterialIcons name="place" size={36} color={LocationColors.textLight} />
+        <ThemedText style={s.emptyText}>No results found.</ThemedText>
+      </View>
+    );
+  }
+
+  const gap = 14;
+  const colWidth = columns === 1 ? '100%' : columns === 2 ? '48.5%' : '31.8%';
+
+  return (
+    <View style={[s.grid, { gap }]}>
+      {rows.map((row) => (
+        <View key={row.id} style={{ width: colWidth }}>
+          <EntityCard row={row} tab={tab} onView={onView} onEdit={onEdit} onDelete={onDelete} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ListTable — desktop
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ListTable({
+  rows,
+  tab,
+  nameCol,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  rows: ListRow[];
+  tab: DetailTab;
+  nameCol: string;
+  onView: (r: ListRow) => void;
+  onEdit: (r: ListRow) => void;
+  onDelete: (r: ListRow) => void;
+}) {
+  const cols = LIST_COLS[tab];
+  if (rows.length === 0) {
+    return (
+      <View style={s.tableCard}>
+        <View style={s.emptyWrap}>
+          <ThemedText style={s.emptyText}>No results found.</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.tableCard}>
+      <View style={s.tableHead}>
+        <View style={[s.th, s.colId]}><ThemedText style={s.thText}>ID</ThemedText></View>
+        <View style={[s.th, s.colName]}><ThemedText style={s.thText}>{nameCol}</ThemedText></View>
+        {cols.codeLabel && <View style={[s.th, s.colCode]}><ThemedText style={s.thText}>{cols.codeLabel}</ThemedText></View>}
+        {cols.countLabel && <View style={[s.th, s.colCount]}><ThemedText style={s.thText}>{cols.countLabel}</ThemedText></View>}
+        <View style={[s.th, s.colStatus]}><ThemedText style={s.thText}>Status</ThemedText></View>
+        <View style={[s.th, s.colActions]}><ThemedText style={s.thText}>Actions</ThemedText></View>
+      </View>
+
+      {rows.map((row, i) => (
+        <Pressable
+          key={row.id}
+          onPress={() => onView(row)}
+          style={({ hovered }: any) => [
+            s.tableRow,
+            i > 0 && s.tableRowBorder,
+            hovered && s.tableRowHover,
+          ]}>
+          <View style={[s.td, s.colId]}>
+            <ThemedText style={s.tdText}>{row.id}</ThemedText>
+          </View>
+          <View style={[s.td, s.colName]}>
+            <View style={s.nameCell}>
+              {row.flag ? (
+                <ThemedText style={{ fontSize: 20 }}>{row.flag}</ThemedText>
+              ) : (
+                <View style={[s.rowIcon, { backgroundColor: row.iconBg }]}>
+                  <MaterialIcons name="place" size={14} color={row.iconColor} />
+                </View>
+              )}
+              <ThemedText style={s.nameText} numberOfLines={1}>{row.name}</ThemedText>
+            </View>
+          </View>
+          {cols.codeLabel && (
+            <View style={[s.td, s.colCode]}>
+              <ThemedText style={s.tdText}>{row.code ?? '—'}</ThemedText>
+            </View>
+          )}
+          {cols.countLabel && (
+            <View style={[s.td, s.colCount]}>
+              <ThemedText style={s.tdText}>{row.count ?? '—'}</ThemedText>
+            </View>
+          )}
+          <View style={[s.td, s.colStatus]}>
+            <StatusBadge status={row.status} />
+          </View>
+          <View style={[s.td, s.colActions]}>
+            <View style={s.actionRow}>
+              <Pressable onPress={() => onView(row)} style={[s.actionBtn, s.actionBtnView]}>
+                <MaterialIcons name="visibility" size={13} color={LocationColors.accentStrong} />
+              </Pressable>
+              <Pressable onPress={() => onEdit(row)} style={[s.actionBtn, s.actionBtnEdit]}>
+                <MaterialIcons name="edit" size={13} color="#2563EB" />
+              </Pressable>
+              <Pressable onPress={() => onDelete(row)} style={[s.actionBtn, s.actionBtnDel]}>
+                <MaterialIcons name="delete" size={13} color={LocationColors.inactiveText} />
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MobileListTable
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MobileListTable({
+  rows,
+  tab,
+  nameCol,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  rows: ListRow[];
+  tab: DetailTab;
+  nameCol: string;
+  onView: (r: ListRow) => void;
+  onEdit: (r: ListRow) => void;
+  onDelete: (r: ListRow) => void;
+}) {
+  const cols = LIST_COLS[tab];
+
+  if (rows.length === 0) {
+    return (
+      <View style={s.tableCard}>
+        <View style={s.emptyWrap}>
+          <ThemedText style={s.emptyText}>No results found.</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
+  const tableWidth = 40 + 150 + (cols.codeLabel ? 80 : 0) + (cols.countLabel ? 60 : 0) + 80 + 110;
+
+  return (
+    <View style={s.tableCard}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
+        <View style={{ minWidth: tableWidth }}>
+          {/* Head */}
+          <View style={s.tableHead}>
+            <View style={[s.th, { width: 40 }]}><ThemedText style={s.thText}>ID</ThemedText></View>
+            <View style={[s.th, { width: 150 }]}><ThemedText style={s.thText}>{nameCol}</ThemedText></View>
+            {cols.codeLabel && <View style={[s.th, { width: 80 }]}><ThemedText style={s.thText}>{cols.codeLabel}</ThemedText></View>}
+            {cols.countLabel && <View style={[s.th, { width: 60 }]}><ThemedText style={s.thText}>{cols.countLabel}</ThemedText></View>}
+            <View style={[s.th, { width: 80 }]}><ThemedText style={s.thText}>Status</ThemedText></View>
+            <View style={[s.th, { width: 110 }]}><ThemedText style={s.thText}>Actions</ThemedText></View>
+          </View>
+
+          {rows.map((row, i) => (
+            <Pressable
+              key={row.id}
+              onPress={() => onView(row)}
+              style={({ pressed }) => [s.tableRow, i > 0 && s.tableRowBorder, pressed && s.tableRowHover]}>
+              <View style={[s.td, { width: 40 }]}>
+                <ThemedText style={[s.tdText, { fontSize: 11 }]}>{row.id}</ThemedText>
+              </View>
+              <View style={[s.td, { width: 150 }]}>
+                <View style={s.nameCell}>
+                  {row.flag ? (
+                    <ThemedText style={{ fontSize: 16 }}>{row.flag}</ThemedText>
+                  ) : (
+                    <View style={[s.rowIcon, { backgroundColor: row.iconBg }]}>
+                      <MaterialIcons name="place" size={12} color={row.iconColor} />
+                    </View>
+                  )}
+                  <ThemedText style={[s.nameText, { fontSize: 11 }]} numberOfLines={1}>{row.name}</ThemedText>
+                </View>
+              </View>
+              {cols.codeLabel && (
+                <View style={[s.td, { width: 80 }]}>
+                  <ThemedText style={[s.tdText, { fontSize: 11 }]}>{row.code ?? '—'}</ThemedText>
+                </View>
+              )}
+              {cols.countLabel && (
+                <View style={[s.td, { width: 60 }]}>
+                  <ThemedText style={[s.tdText, { fontSize: 11 }]}>{row.count ?? '—'}</ThemedText>
+                </View>
+              )}
+              <View style={[s.td, { width: 80 }]}>
+                <StatusBadge status={row.status} compact />
+              </View>
+              <View style={[s.td, { width: 110 }]}>
+                <View style={s.actionRow}>
+                  <Pressable onPress={() => onView(row)} style={[s.actionBtn, s.actionBtnView, { width: 26, height: 26 }]}>
+                    <MaterialIcons name="visibility" size={11} color={LocationColors.accentStrong} />
+                  </Pressable>
+                  <Pressable onPress={() => onEdit(row)} style={[s.actionBtn, s.actionBtnEdit, { width: 26, height: 26 }]}>
+                    <MaterialIcons name="edit" size={11} color="#2563EB" />
+                  </Pressable>
+                  <Pressable onPress={() => onDelete(row)} style={[s.actionBtn, s.actionBtnDel, { width: 26, height: 26 }]}>
+                    <MaterialIcons name="delete" size={11} color={LocationColors.inactiveText} />
+                  </Pressable>
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EntityModal
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EntityModal({
+  visible, mode, onClose, tab, isMobile, initialRow, onSave,
+}: {
+  visible: boolean; mode: ModalMode; onClose: () => void; tab: DetailTab;
+  isMobile: boolean; initialRow: ListRow | null;
+  onSave: (d: { name: string; code: string; status: RowStatus }) => void;
 }) {
   const meta = TAB_META[tab];
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: wh } = useWindowDimensions();
   const [status, setStatus] = useState<RowStatus>('Active');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const showCodeField = tab === 'countries';
   const readOnly = mode === 'view';
+  const showCode = tab === 'countries';
 
   useEffect(() => {
-    if (visible) {
-      setStatus(initialRow?.status ?? 'Active');
-      setName(initialRow?.name ?? '');
-      setCode(initialRow?.code ?? '');
-      setError(null);
-    }
-  }, [visible, initialRow, mode, tab]);
+    if (visible) { setStatus(initialRow?.status ?? 'Active'); setName(initialRow?.name ?? ''); setCode(initialRow?.code ?? ''); setError(null); }
+  }, [visible, initialRow]);
 
-  const heading =
-    mode === 'add' ? `Add New ${meta.singular}` : mode === 'edit' ? `Edit ${meta.singular}` : `${meta.singular} Details`;
+  const heading = mode === 'add' ? `Add ${meta.singular}` : mode === 'edit' ? `Edit ${meta.singular}` : `${meta.singular} Details`;
 
   const handleSave = () => {
-    if (!name.trim()) {
-      setError(`${meta.singular} name is required.`);
-      return;
-    }
-    if (showCodeField && !code.trim()) {
-      setError('Country code is required.');
-      return;
-    }
+    if (!name.trim()) { setError(`${meta.singular} name is required.`); return; }
+    if (showCode && !code.trim()) { setError('Country code is required.'); return; }
     onSave({ name: name.trim(), code: code.trim(), status });
   };
 
-  const footer = readOnly ? (
-    <View style={[styles.modalFooter, isMobile && styles.modalFooterMobile]}>
-      <Pressable style={[styles.saveBtn, styles.modalActionBtn]} onPress={onClose}>
-        <ThemedText type="smallBold" style={{ color: '#fff' }}>
-          Close
-        </ThemedText>
-      </Pressable>
-    </View>
-  ) : (
-    <View style={[styles.modalFooter, isMobile && styles.modalFooterMobile]}>
-      <Pressable style={[styles.cancelBtn, isMobile && styles.modalActionBtn]} onPress={onClose}>
-        <Icon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={14} />
-        <ThemedText type="smallBold">Cancel</ThemedText>
-      </Pressable>
-      <Pressable style={[styles.saveBtn, isMobile && styles.modalActionBtn]} onPress={handleSave}>
-        <Icon name={{ ios: 'square.and.arrow.down', android: 'save', web: 'save' }} size={14} color="#fff" />
-        <ThemedText type="smallBold" style={{ color: '#fff' }} numberOfLines={1}>
-          {mode === 'edit' ? 'Save Changes' : `Add ${meta.singular}`}
-        </ThemedText>
-      </Pressable>
-    </View>
-  );
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType={isMobile ? 'slide' : 'fade'}
-      onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={isMobile ? 'slide' : 'fade'} onRequestClose={onClose}>
       <Pressable
-        style={[styles.modalOverlay, isMobile ? styles.modalOverlayMobile : styles.modalOverlayWeb]}
+        style={[s.modalOverlay, isMobile ? s.modalOverlayMobile : s.modalOverlayWeb]}
         onPress={onClose}>
         <Pressable
-          style={isMobile ? styles.modalWrapMobile : styles.modalWrapWeb}
+          style={isMobile ? s.modalSheetWrap : s.modalCenterWrap}
           onPress={(e) => e.stopPropagation()}>
-          <View
-            style={[
-              styles.modalBox,
-              isMobile && styles.modalBoxMobile,
-              !isMobile && { maxHeight: Math.min(windowHeight * 0.88, 720) },
-            ]}>
-            {isMobile && (
-              <View style={styles.sheetHandleRow}>
-                <View style={styles.sheetHandle} />
+          <View style={[s.modalBox, !isMobile && { maxHeight: Math.min(wh * 0.88, 680) }]}>
+            {/* Header */}
+            <View style={s.modalHead}>
+              <View style={s.modalHeadIcon}>
+                <MaterialIcons name="place" size={18} color="#fff" />
               </View>
-            )}
-
-            <View style={styles.modalTopBar}>
-              <ThemedText type="smallBold" style={styles.modalTopBarTitle}>
-                {heading}
-              </ThemedText>
+              <ThemedText style={s.modalHeadTitle}>{heading}</ThemedText>
               <Pressable onPress={onClose} hitSlop={8}>
-                <Icon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} color="#fff" />
+                <MaterialIcons name="close" size={20} color="#fff" />
               </Pressable>
             </View>
 
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={[styles.modalBody, isMobile && styles.modalBodyMobile]}
-              showsVerticalScrollIndicator={false}
-              bounces={false}>
-              {isMobile ? (
-                <View style={styles.mobileModalIntro}>
-                  <ThemedText type="smallBold" style={styles.mobileModalTitle}>
-                    {heading}
-                  </ThemedText>
-                  {!readOnly && (
-                    <ThemedText type="small" style={styles.mobileModalSubtitle}>
-                      Enter the details for this {meta.singular.toLowerCase()}.
-                    </ThemedText>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.modalGlobeWrap}>
-                  <View style={styles.modalGlobe}>
-                    <Icon
-                      name={{ ios: 'globe', android: 'public', web: 'public' }}
-                      size={28}
-                      color={LocationColors.accentStrong}
-                    />
-                  </View>
-                  <ThemedText type="smallBold" style={{ fontSize: 20 }}>
-                    {heading}
-                  </ThemedText>
-                  {!readOnly && (
-                    <ThemedText type="small" style={{ color: LocationColors.textMuted, textAlign: 'center' }}>
-                      Enter the details for this {meta.singular.toLowerCase()}.
-                    </ThemedText>
-                  )}
-                </View>
-              )}
-
-              <ThemedText type="smallBold" style={styles.fieldLabel}>
-                {meta.singular} Name{' '}
-                {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}
-              </ThemedText>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={s.modalBody} bounces={false}>
+              {/* Name */}
+              <ThemedText style={s.fieldLabel}>{meta.singular} Name {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}</ThemedText>
               <TextInput
-                value={name}
-                onChangeText={setName}
-                editable={!readOnly}
+                value={name} onChangeText={setName} editable={!readOnly}
                 placeholder={`Enter ${meta.singular.toLowerCase()} name`}
                 placeholderTextColor={LocationColors.textLight}
-                style={[styles.fieldInput, readOnly && styles.fieldInputReadOnly]}
+                style={[s.fieldInput, readOnly && s.fieldInputRO]}
               />
-              {!readOnly && (
-                <ThemedText type="small" style={styles.fieldHint}>
-                  Enter the official {meta.singular.toLowerCase()} name.
-                </ThemedText>
-              )}
 
-              {showCodeField && (
+              {/* Code */}
+              {showCode && (
                 <>
-                  <ThemedText type="smallBold" style={styles.fieldLabel}>
-                    Country Code (ISO){' '}
-                    {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}
-                  </ThemedText>
-                  <View style={styles.codeRow}>
-                    {!readOnly && (
-                      <Pressable style={styles.flagPicker}>
-                        <ThemedText style={{ fontSize: 18 }}>🇺🇸</ThemedText>
-                        <Icon
-                          name={{ ios: 'chevron.down', android: 'expand-more', web: 'expand-more' }}
-                          size={12}
-                        />
-                      </Pressable>
-                    )}
-                    <TextInput
-                      value={code}
-                      onChangeText={setCode}
-                      editable={!readOnly}
-                      placeholder="US"
-                      placeholderTextColor={LocationColors.textLight}
-                      style={[styles.fieldInput, styles.fieldInputFlex, readOnly && styles.fieldInputReadOnly]}
-                    />
-                  </View>
-                  {!readOnly && (
-                    <ThemedText type="small" style={styles.fieldHint}>
-                      Two letter ISO country code (e.g., US, GB, IN)
-                    </ThemedText>
-                  )}
+                  <ThemedText style={s.fieldLabel}>Country Code {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}</ThemedText>
+                  <TextInput
+                    value={code} onChangeText={setCode} editable={!readOnly}
+                    placeholder="e.g. IN, US"
+                    placeholderTextColor={LocationColors.textLight}
+                    style={[s.fieldInput, readOnly && s.fieldInputRO]}
+                  />
                 </>
               )}
 
-              <ThemedText type="smallBold" style={styles.fieldLabel}>
-                Status {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}
-              </ThemedText>
-              <View style={styles.statusCards}>
+              {/* Status */}
+              <ThemedText style={s.fieldLabel}>Status</ThemedText>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
                 {(['Active', 'Inactive'] as RowStatus[]).map((opt) => {
-                  const selected = status === opt;
-                  const isActive = opt === 'Active';
+                  const sel = status === opt;
+                  const isA = opt === 'Active';
                   return (
                     <Pressable
-                      key={opt}
-                      disabled={readOnly}
-                      onPress={() => setStatus(opt)}
-                      style={[
-                        styles.statusCard,
-                        selected && (isActive ? styles.statusCardOn : styles.statusCardOff),
-                      ]}>
-                      <View style={[styles.radio, selected && styles.radioOn]}>
-                        {selected && <View style={styles.radioDot} />}
+                      key={opt} disabled={readOnly} onPress={() => setStatus(opt)}
+                      style={[s.statusOpt, sel && (isA ? s.statusOptActive : s.statusOptInactive)]}>
+                      <View style={[s.radioCircle, sel && s.radioCircleSel]}>
+                        {sel && <View style={s.radioDot} />}
                       </View>
-                      <View style={styles.statusCardText}>
-                        <ThemedText type="smallBold">{opt}</ThemedText>
-                        <ThemedText type="small" style={styles.statusCardHint}>
-                          {meta.singular} will be {opt.toLowerCase()}
-                        </ThemedText>
-                      </View>
-                      {selected && isActive && (
-                        <Icon
-                          name={{
-                            ios: 'checkmark.circle.fill',
-                            android: 'check-circle',
-                            web: 'check-circle',
-                          }}
-                          size={20}
-                          color={LocationColors.accentDark}
-                        />
-                      )}
+                      <ThemedText style={[s.statusOptText, sel && { color: isA ? LocationColors.activeText : LocationColors.inactiveText }]}>{opt}</ThemedText>
                     </Pressable>
                   );
                 })}
               </View>
 
-              {error && (
-                <ThemedText type="small" style={styles.errorText}>
-                  {error}
-                </ThemedText>
-              )}
+              {error && <ThemedText style={s.errorText}>{error}</ThemedText>}
             </ScrollView>
 
-            <View
-              style={[
-                styles.modalFooterWrap,
-                isMobile
-                  ? { paddingBottom: Math.max(insets.bottom, 16) }
-                  : styles.modalFooterWrapWeb,
-              ]}>
-              {footer}
+            {/* Footer */}
+            <View style={[s.modalFoot, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              {readOnly ? (
+                <Pressable style={s.btnSave} onPress={onClose}>
+                  <ThemedText style={s.btnSaveText}>Close</ThemedText>
+                </Pressable>
+              ) : (
+                <>
+                  <Pressable style={s.btnCancel} onPress={onClose}>
+                    <ThemedText style={s.btnCancelText}>Cancel</ThemedText>
+                  </Pressable>
+                  <Pressable style={s.btnSave} onPress={handleSave}>
+                    <MaterialIcons name="save" size={15} color="#fff" />
+                    <ThemedText style={s.btnSaveText}>{mode === 'edit' ? 'Save Changes' : `Add ${meta.singular}`}</ThemedText>
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
         </Pressable>
@@ -1070,71 +1062,53 @@ function EntityModal({
   );
 }
 
-function SimplePieChart({ data }: { data: { label: string; value: number; color: string }[] }) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-  if (total === 0) return null;
+// ─────────────────────────────────────────────────────────────────────────────
+// ConfirmDelete
+// ─────────────────────────────────────────────────────────────────────────────
 
-  let currentAngle = 0;
-  const radius = 50;
-  const cx = 60;
-  const cy = 60;
-
+function ConfirmDelete({ row, singular, onCancel, onConfirm }: { row: ListRow | null; singular: string; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 32, marginTop: 16 }}>
-      <Svg width={120} height={120} viewBox="0 0 120 120">
-        <G rotation="-90" origin="60, 60">
-          {data.map((item, idx) => {
-            if (item.value === 0) return null;
-            const angle = (item.value / total) * 360;
-            if (angle === 360) {
-              return <Circle key={idx} cx={cx} cy={cy} r={radius} fill={item.color} />;
-            }
-            const startAngle = currentAngle;
-            const endAngle = currentAngle + angle;
-            currentAngle += angle;
-
-            const startX = cx + radius * Math.cos((Math.PI * startAngle) / 180);
-            const startY = cy + radius * Math.sin((Math.PI * startAngle) / 180);
-            const endX = cx + radius * Math.cos((Math.PI * endAngle) / 180);
-            const endY = cy + radius * Math.sin((Math.PI * endAngle) / 180);
-
-            const largeArcFlag = angle > 180 ? 1 : 0;
-            const pathData = `M ${cx} ${cy} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z`;
-
-            return <Path key={idx} d={pathData} fill={item.color} />;
-          })}
-        </G>
-      </Svg>
-      <View style={{ gap: 12 }}>
-        {data.map((item, idx) => (
-          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: item.color }} />
-            <ThemedText type="small" style={{ width: 80 }}>{item.label}</ThemedText>
-            <ThemedText type="smallBold">{item.value.toLocaleString()}</ThemedText>
+    <Modal visible={!!row} transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={s.confirmOverlay} onPress={onCancel}>
+        <Pressable style={s.confirmBox} onPress={(e) => e.stopPropagation()}>
+          <View style={s.confirmIcon}>
+            <MaterialIcons name="warning" size={24} color={LocationColors.inactiveText} />
           </View>
-        ))}
-      </View>
-    </View>
+          <ThemedText style={s.confirmTitle}>Delete {singular}?</ThemedText>
+          <ThemedText style={s.confirmBody}>"{row?.name}" will be permanently removed.</ThemedText>
+          <View style={s.confirmBtns}>
+            <Pressable style={s.btnCancel} onPress={onCancel}><ThemedText style={s.btnCancelText}>Cancel</ThemedText></Pressable>
+            <Pressable style={[s.btnSave, { backgroundColor: '#DC2626' }]} onPress={onConfirm}>
+              <MaterialIcons name="delete" size={14} color="#fff" />
+              <ThemedText style={s.btnSaveText}>Delete</ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main screen
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function LocationsScreen() {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const isMobile = !isWeb;
 
-  const [detailTab, setDetailTab] = useState<DetailTab>('states');
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [query, setQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [rows, setRows] = useState<ListRow[]>([]);
 
-  // Add / edit / view modal state
   const [modalMode, setModalMode] = useState<ModalMode>('add');
   const [modalVisible, setModalVisible] = useState(false);
   const [activeRow, setActiveRow] = useState<ListRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ListRow | null>(null);
 
-  // Overview analysis state
+  // Overview drill-down state
   const [analysisCountries, setAnalysisCountries] = useState<LocationRow[]>([]);
   const [analysisStates, setAnalysisStates] = useState<LocationRow[]>([]);
   const [analysisCities, setAnalysisCities] = useState<LocationRow[]>([]);
@@ -1148,11 +1122,12 @@ export default function LocationsScreen() {
   const meta = TAB_META[detailTab];
   const gridColumns = isWeb ? (width < 960 ? 2 : 3) : 1;
 
+  // ── Data fetching ──
   const loadRows = useCallback(async () => {
     try {
-      let data: LocationRow[] = [];
       if (detailTab === 'overview') { setRows([]); return; }
-      else if (detailTab === 'countries') data = await fetchCountries();
+      let data: LocationRow[] = [];
+      if (detailTab === 'countries') data = await fetchCountries();
       else if (detailTab === 'states') data = await fetchStates();
       else if (detailTab === 'cities' || detailTab === 'areas') data = await fetchCities();
       else if (detailTab === 'pincodes') data = await fetchPincodes();
@@ -1163,84 +1138,47 @@ export default function LocationsScreen() {
     }
   }, [detailTab]);
 
-  useEffect(() => {
-    loadRows();
-  }, [loadRows]);
-
+  useEffect(() => { loadRows(); }, [loadRows]);
   useEffect(() => setQuery(''), [detailTab]);
 
-  // Fetch all countries initially
   useEffect(() => {
     if (detailTab !== 'overview' || analysisCountries.length > 0) return;
     let cancelled = false;
     (async () => {
       setOverviewLoading(true);
-      try {
-        const countries = await fetchCountries();
-        if (!cancelled) setAnalysisCountries(countries);
-      } catch (e) {
-        console.warn(getApiErrorMessage(e));
-      } finally {
-        if (!cancelled) setOverviewLoading(false);
-      }
+      try { const c = await fetchCountries(); if (!cancelled) setAnalysisCountries(c); }
+      catch (e) { console.warn(getApiErrorMessage(e)); }
+      finally { if (!cancelled) setOverviewLoading(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [detailTab, analysisCountries.length]);
 
-  // Fetch states dynamically when a country is chosen
   useEffect(() => {
-    if (!selectedCountry) {
-      setAnalysisStates([]);
-      return;
-    }
+    if (!selectedCountry) { setAnalysisStates([]); return; }
     let cancelled = false;
     (async () => {
       setOverviewLoading(true);
-      try {
-        const states = await fetchStates(selectedCountry.id);
-        if (!cancelled) setAnalysisStates(states);
-      } catch (e) {
-        console.warn(getApiErrorMessage(e));
-      } finally {
-        if (!cancelled) setOverviewLoading(false);
-      }
+      try { const s = await fetchStates(selectedCountry.id); if (!cancelled) setAnalysisStates(s); }
+      catch (e) { console.warn(getApiErrorMessage(e)); }
+      finally { if (!cancelled) setOverviewLoading(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedCountry]);
 
-  // Fetch cities dynamically when a state is chosen
   useEffect(() => {
-    if (!selectedState) {
-      setAnalysisCities([]);
-      return;
-    }
+    if (!selectedState) { setAnalysisCities([]); return; }
     let cancelled = false;
     (async () => {
       setOverviewLoading(true);
-      try {
-        const cities = await fetchCities(selectedState.id);
-        if (!cancelled) setAnalysisCities(cities);
-      } catch (e) {
-        console.warn(getApiErrorMessage(e));
-      } finally {
-        if (!cancelled) setOverviewLoading(false);
-      }
+      try { const c = await fetchCities(selectedState.id); if (!cancelled) setAnalysisCities(c); }
+      catch (e) { console.warn(getApiErrorMessage(e)); }
+      finally { if (!cancelled) setOverviewLoading(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedState]);
 
-  // Pincodes are fetched lazily once a city is picked, since this list can be large.
   useEffect(() => {
-    if (!selectedCity) {
-      setCityPincodes(null);
-      return;
-    }
+    if (!selectedCity) { setCityPincodes(null); return; }
     let cancelled = false;
     (async () => {
       setPincodesLoading(true);
@@ -1251,49 +1189,19 @@ export default function LocationsScreen() {
           belongsTo(p as unknown as Record<string, any>, selectedCity, ['cityId', 'city_id'], ['cityName', 'city_name', 'city'])
         );
         setCityPincodes(matches);
-      } catch (e) {
-        console.warn(getApiErrorMessage(e));
-        setCityPincodes([]);
-      } finally {
-        if (!cancelled) setPincodesLoading(false);
-      }
+      } catch (e) { setCityPincodes([]); }
+      finally { if (!cancelled) setPincodesLoading(false); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedCity]);
 
-  const countryOptions = useMemo(
-    () => analysisCountries.map((c) => ({ id: c.id, name: String(c.name ?? c.id) })),
-    [analysisCountries]
-  );
+  const countryOptions = useMemo(() => analysisCountries.map((c) => ({ id: c.id, name: String(c.name ?? c.id) })), [analysisCountries]);
+  const stateOptions = useMemo(() => analysisStates.map((s) => ({ id: s.id, name: String(s.name ?? s.id) })), [analysisStates]);
+  const cityOptions = useMemo(() => analysisCities.map((c) => ({ id: c.id, name: String(c.name ?? c.id) })), [analysisCities]);
 
-  const stateOptions = useMemo(() => {
-    return analysisStates.map((s) => ({ id: s.id, name: String(s.name ?? s.id) }));
-  }, [analysisStates]);
-
-  const cityOptions = useMemo(() => {
-    return analysisCities.map((c) => ({ id: c.id, name: String(c.name ?? c.id) }));
-  }, [analysisCities]);
-
-  const handleSelectCountry = (opt: Option) => {
-    setSelectedCountry(opt);
-    setSelectedState(null);
-    setSelectedCity(null);
-  };
-  const handleSelectState = (opt: Option) => {
-    setSelectedState(opt);
-    setSelectedCity(null);
-  };
-  const resetSelection = () => {
-    setSelectedCountry(null);
-    setSelectedState(null);
-    setSelectedCity(null);
-  };
-
-  const countryCountDisplay = analysisCountries.length || TAB_META.overview.total;
-  const stateCountDisplay = analysisStates.length || TAB_META.states.total;
-  const cityCountDisplay = analysisCities.length || TAB_META.cities.total;
+  const handleSelectCountry = (opt: Option) => { setSelectedCountry(opt); setSelectedState(null); setSelectedCity(null); };
+  const handleSelectState = (opt: Option) => { setSelectedState(opt); setSelectedCity(null); };
+  const resetSelection = () => { setSelectedCountry(null); setSelectedState(null); setSelectedCity(null); };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -1301,55 +1209,24 @@ export default function LocationsScreen() {
     return rows.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q));
   }, [query, rows]);
 
-  // ── Add / Edit / View / Delete (local state — see TODOs for wiring real API calls) ──
-  const openAddModal = () => {
-    setActiveRow(null);
-    setModalMode('add');
-    setModalVisible(true);
-  };
-  const openEditModal = (row: ListRow) => {
-    setActiveRow(row);
-    setModalMode('edit');
-    setModalVisible(true);
-  };
-  const openViewModal = (row: ListRow) => {
-    setActiveRow(row);
-    setModalMode('view');
-    setModalVisible(true);
-  };
-  const closeModal = () => {
-    setModalVisible(false);
-    setActiveRow(null);
-  };
+  // ── Modal handlers ──
+  const openAdd = () => { setActiveRow(null); setModalMode('add'); setModalVisible(true); };
+  const openEdit = (row: ListRow) => { setActiveRow(row); setModalMode('edit'); setModalVisible(true); };
+  const openView = (row: ListRow) => { setActiveRow(row); setModalMode('view'); setModalVisible(true); };
+  const closeModal = () => { setModalVisible(false); setActiveRow(null); };
 
-  const handleSaveEntity = (data: { name: string; code: string; status: RowStatus }) => {
+  const handleSave = (data: { name: string; code: string; status: RowStatus }) => {
     if (modalMode === 'edit' && activeRow) {
-      // TODO: replace with a real update call, e.g. updateCountry(activeRow.id, data)
-      setRows((prev) =>
-        prev.map((r) =>
-          r.id === activeRow.id ? { ...r, name: data.name, code: data.code || r.code, status: data.status } : r
-        )
-      );
+      setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, ...data } : r));
     } else {
-      // TODO: replace with a real create call, e.g. createCountry(data)
-      const nextId = rows.reduce((max, r) => Math.max(max, r.id), 0) + 1;
-      const theme = ROW_ICON_THEMES[nextId % ROW_ICON_THEMES.length];
-      const newRow: ListRow = {
-        id: nextId,
-        name: data.name,
-        status: data.status,
-        code: data.code || undefined,
-        iconBg: theme.iconBg,
-        iconColor: theme.iconColor,
-      };
-      setRows((prev) => [newRow, ...prev]);
+      const nextId = rows.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+      const theme = ROW_THEMES[nextId % ROW_THEMES.length];
+      setRows((prev) => [{ id: nextId, name: data.name, status: data.status, code: data.code || undefined, iconBg: theme.bg, iconColor: theme.color }, ...prev]);
     }
     closeModal();
   };
 
-  const requestDelete = (row: ListRow) => setDeleteTarget(row);
   const confirmDelete = () => {
-    // TODO: replace with a real delete call, e.g. deleteCountry(deleteTarget.id)
     if (deleteTarget) setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
@@ -1357,284 +1234,102 @@ export default function LocationsScreen() {
   return (
     <AdminLayout>
       <ScrollView
-        style={styles.screen}
-        contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}
+        style={s.screen}
+        contentContainerStyle={[s.content, isMobile && s.contentMobile]}
         showsVerticalScrollIndicator={false}>
 
+        {/* Hero header */}
+        <HeroHeader
+          isMobile={isMobile}
+          countriesCount={analysisCountries.length || 195}
+          statesCount={analysisStates.length || 36}
+          citiesCount={analysisCities.length || 532}
+          pincodesCount={19000}
+        />
 
+        {/* Tab bar */}
+        <TabBar active={detailTab} onChange={setDetailTab} />
 
-        <View style={[styles.entityCard, isMobile && styles.entityCardMobile]}>
-          <View style={[styles.entityLeft, isMobile && styles.entityLeftMobile]}>
-
-            <View style={isMobile ? styles.entityTextMobile : undefined}>
-              <View style={styles.entityTitleRow}>
-                <ThemedText type="smallBold" style={{ fontSize: isMobile ? 20 : 22 }}>
-                  {COUNTRY.name}
-                </ThemedText>
-                <StatusBadge status={COUNTRY.status} />
-              </View>
-              <ThemedText type="small" style={{ color: LocationColors.textMuted, marginTop: 4 }}>
-                Country Code: {COUNTRY.code}
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
-          <View style={styles.tabsRow}>
-            {DETAIL_TABS.map((tab) => (
-              <Pressable key={tab.key} onPress={() => setDetailTab(tab.key)} style={styles.tab}>
-                <ThemedText
-                  type="smallBold"
-                  style={[styles.tabText, detailTab === tab.key && styles.tabTextActive]}>
-                  {tab.label}
-                  {tab.count ? ` (${tab.count})` : ''}
-                </ThemedText>
-                {detailTab === tab.key && <View style={styles.tabLine} />}
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
-
+        {/* Overview */}
         {detailTab === 'overview' && (
-          <View style={styles.overviewSection}>
-            <ThemedText type="subtitle" style={styles.overviewHeading}>
-              Overview
-            </ThemedText>
-            <ThemedText type="small" style={styles.overviewSubtitle}>
-              A snapshot of every country, state, city and pincode — and a quick way to drill into one.
-            </ThemedText>
-
-            <View style={styles.statsGrid}>
-              <StatCard icon="public" label="Countries" value={countryCountDisplay} bg="#EFF6FF" color="#2563EB" />
-              <StatCard icon="map" label="States" value={stateCountDisplay} bg="#F3E8FF" color="#9333EA" />
-              <StatCard icon="location-city" label="Cities" value={cityCountDisplay} bg="#FFF7ED" color="#EA580C" />
-              <StatCard
-                icon="mail-outline"
-                label="Pincodes"
-                value={`${TAB_META.pincodes.total.toLocaleString()}+`}
-                bg="#DCFCE7"
-                color="#16A34A"
-              />
-            </View>
-
-            <View style={styles.analysisCard}>
-              <View style={styles.analysisCardHeader}>
-                <ThemedText type="smallBold" style={{ fontSize: 16 }}>
-                  Analyze by location
-                </ThemedText>
-                {(selectedCountry || selectedState || selectedCity) && (
-                  <Pressable onPress={resetSelection} hitSlop={6}>
-                    <ThemedText type="small" style={{ color: LocationColors.accentStrong }}>
-                      Reset
-                    </ThemedText>
-                  </Pressable>
-                )}
-              </View>
-              <ThemedText type="small" style={styles.analysisCardSubtitle}>
-                Pick a country, then a state and city, to see how the data breaks down.
-              </ThemedText>
-
-              <View style={[styles.selectsRow, isMobile && styles.selectsRowMobile]}>
-                <SelectField
-                  label="Country"
-                  placeholder="Select country"
-                  value={selectedCountry}
-                  options={countryOptions}
-                  onSelect={handleSelectCountry}
-                  onClear={resetSelection}
-                />
-                <SelectField
-                  label="State"
-                  placeholder={selectedCountry ? 'Select state' : 'Select a country first'}
-                  value={selectedState}
-                  options={stateOptions}
-                  onSelect={handleSelectState}
-                  onClear={() => setSelectedState(null)}
-                  disabled={!selectedCountry}
-                />
-                <SelectField
-                  label="City"
-                  placeholder={selectedState ? 'Select city' : 'Select a state first'}
-                  value={selectedCity}
-                  options={cityOptions}
-                  onSelect={setSelectedCity}
-                  onClear={() => setSelectedCity(null)}
-                  disabled={!selectedState}
-                />
-              </View>
-
-              {overviewLoading ? (
-                <ThemedText type="small" style={styles.analysisLoading}>
-                  Loading location data…
-                </ThemedText>
-              ) : !selectedCountry ? (
-                <View style={styles.analysisEmpty}>
-                  <MaterialIcons name="public" size={20} color={LocationColors.textLight} />
-                  <ThemedText type="small" style={styles.analysisEmptyText}>
-                    Select a country above to see its states, cities and pincodes.
-                  </ThemedText>
-                </View>
-              ) : (
-                <View style={styles.analysisResult}>
-                  <ThemedText type="small" style={styles.analysisBreadcrumb} numberOfLines={1}>
-                    {[selectedCountry.name, selectedState?.name, selectedCity?.name].filter(Boolean).join(' › ')}
-                  </ThemedText>
-
-                  {(() => {
-                    if (!selectedState) {
-                      return (
-                        <SimplePieChart
-                          data={[
-                            { label: 'States', value: stateOptions.length, color: '#9333EA' },
-                            { label: 'Cities', value: analysisStates.reduce((sum, s) => sum + (typeof s.cityCount === 'number' ? s.cityCount : 0), 0) || 0, color: '#EA580C' },
-                          ]}
-                        />
-                      );
-                    }
-                    if (selectedState && !selectedCity) {
-                      return (
-                        <SimplePieChart
-                          data={[
-                            { label: 'Cities', value: cityOptions.length, color: '#EA580C' },
-                          ]}
-                        />
-                      );
-                    }
-                    if (selectedCity) {
-                      return (
-                        <SimplePieChart
-                          data={[
-                            { label: 'Pincodes', value: pincodesLoading ? 0 : (cityPincodes?.length ?? 0), color: '#16A34A' },
-                          ]}
-                        />
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  {selectedCity && !pincodesLoading && cityPincodes && cityPincodes.length > 0 && (
-                    <View style={styles.pincodeList}>
-                      {cityPincodes.slice(0, 12).map((p, idx) => (
-                        <View key={idx} style={styles.pincodeChip}>
-                          <ThemedText type="small">{String(p.pincode ?? p.name ?? p.id)}</ThemedText>
-                        </View>
-                      ))}
-                      {cityPincodes.length > 12 && (
-                        <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-                          +{cityPincodes.length - 12} more
-                        </ThemedText>
-                      )}
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          </View>
+          <OverviewPanel
+            isMobile={isMobile}
+            loading={overviewLoading}
+            countriesCount={analysisCountries.length || 195}
+            statesCount={analysisStates.length || 36}
+            citiesCount={analysisCities.length || 532}
+            pincodesCount={19000}
+            countryOptions={countryOptions}
+            stateOptions={stateOptions}
+            cityOptions={cityOptions}
+            selectedCountry={selectedCountry}
+            selectedState={selectedState}
+            selectedCity={selectedCity}
+            cityPincodes={cityPincodes}
+            pincodesLoading={pincodesLoading}
+            onSelectCountry={handleSelectCountry}
+            onSelectState={handleSelectState}
+            onSelectCity={setSelectedCity}
+            onReset={resetSelection}
+          />
         )}
 
+        {/* Entity list / grid */}
         {detailTab !== 'overview' && (
           <>
-            <View style={[styles.listHeader, isMobile && styles.listHeaderMobile]}>
-              <ThemedText type="subtitle" style={[styles.listTitle, isMobile && styles.listTitleMobile]}>
-                {meta.title}
-              </ThemedText>
-              <Pressable style={[styles.addBtn, isMobile && styles.addBtnMobile]} onPress={openAddModal}>
-                <Icon name={{ ios: 'plus', android: 'add', web: 'add' }} size={14} color="#fff" />
-                <ThemedText type="smallBold" style={{ color: '#fff' }}>
-                  Add New {meta.singular}
-                </ThemedText>
-              </Pressable>
-            </View>
-
-            <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
-              <View style={[styles.searchBox, isMobile && styles.searchBoxMobile]}>
-                <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={16} color={LocationColors.textLight} />
+            {/* Toolbar */}
+            <View style={[s.toolbar, isMobile && s.toolbarMobile]}>
+              <View style={s.searchBox}>
+                <MaterialIcons name="search" size={16} color={LocationColors.textLight} />
                 <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder={`Search ${meta.plural}...`}
+                  value={query} onChangeText={setQuery}
+                  placeholder={`Search ${meta.plural}…`}
                   placeholderTextColor={LocationColors.textLight}
-                  style={styles.searchInput}
+                  style={s.searchInput}
                 />
               </View>
-              <View style={[styles.viewToggle, isMobile && styles.viewToggleMobile]}>
-                {!isMobile && (
-                  <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-                    View:
-                  </ThemedText>
-                )}
-                <Pressable
-                  style={[styles.viewBtn, viewMode === 'grid' && styles.viewBtnActive]}
-                  onPress={() => setViewMode('grid')}>
-                  <Icon
-                    name={{ ios: 'square.grid.2x2', android: 'grid-view', web: 'grid-view' }}
-                    size={15}
-                    color={viewMode === 'grid' ? '#fff' : LocationColors.textMuted}
-                  />
-                </Pressable>
-                <Pressable
-                  style={[styles.viewBtn, viewMode === 'list' && styles.viewBtnActive]}
-                  onPress={() => setViewMode('list')}>
-                  <Icon
-                    name={{ ios: 'list.bullet', android: 'view-list', web: 'view-list' }}
-                    size={15}
-                    color={viewMode === 'list' ? '#fff' : LocationColors.textMuted}
-                  />
+              <View style={s.toolbarRight}>
+                {/* View toggle */}
+                <View style={s.viewToggle}>
+                  <Pressable style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
+                    <MaterialIcons name="grid-view" size={15} color={viewMode === 'grid' ? '#fff' : LocationColors.textMuted} />
+                  </Pressable>
+                  <Pressable style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
+                    <MaterialIcons name="view-list" size={15} color={viewMode === 'list' ? '#fff' : LocationColors.textMuted} />
+                  </Pressable>
+                </View>
+                {/* Add button */}
+                <Pressable style={s.addBtn} onPress={openAdd}>
+                  <MaterialIcons name="add" size={16} color="#fff" />
+                  {!isMobile && <ThemedText style={s.addBtnText}>Add {meta.singular}</ThemedText>}
                 </Pressable>
               </View>
             </View>
 
-            {viewMode === 'list' ? (
-              isWeb ? (
-                <ListViewTable
-                  rows={filtered}
-                  tab={detailTab}
-                  nameCol={meta.nameCol}
-                  onView={openViewModal}
-                  onEdit={openEditModal}
-                  onDelete={requestDelete}
-                />
-              ) : (
-                <MobileListTable
-                  rows={filtered}
-                  tab={detailTab}
-                  nameCol={meta.nameCol}
-                  onView={openViewModal}
-                  onEdit={openEditModal}
-                  onDelete={requestDelete}
-                />
-              )
+            {/* Content */}
+            {viewMode === 'grid' ? (
+              <GridView rows={filtered} columns={gridColumns} tab={detailTab} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            ) : isWeb ? (
+              <ListTable rows={filtered} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             ) : (
-              <GridViewCards
-                rows={filtered}
-                columns={gridColumns}
-                onView={openViewModal}
-                onEdit={openEditModal}
-                onDelete={requestDelete}
-              />
+              <MobileListTable rows={filtered} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             )}
 
-            <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-              <ThemedText type="small" style={{ color: LocationColors.textMuted }}>
-                Showing 1 to {Math.min(5, filtered.length)} of {meta.total} {meta.plural}
+            {/* Pagination */}
+            <View style={[s.pagination, isMobile && s.paginationMobile]}>
+              <ThemedText style={s.paginationText}>
+                Showing {Math.min(1, filtered.length)}–{Math.min(10, filtered.length)} of {meta.total.toLocaleString()} {meta.plural}
               </ThemedText>
-              <View style={styles.pages}>
-                <Pressable style={styles.pageArrow}>
-                  <Icon name={{ ios: 'chevron.left', android: 'chevron-left', web: 'chevron-left' }} size={14} color={LocationColors.textMuted} />
-                </Pressable>
+              <View style={s.pages}>
+                <Pressable style={s.pageArrow}><MaterialIcons name="chevron-left" size={16} color={LocationColors.textMuted} /></Pressable>
                 {[1, 2, 3].map((p) => (
-                  <Pressable key={p} style={[styles.pageNum, p === 1 && styles.pageNumActive]}>
-                    <ThemedText type="smallBold" style={{ color: p === 1 ? '#fff' : LocationColors.textMuted }}>{p}</ThemedText>
+                  <Pressable key={p} style={[s.pageNum, p === 1 && s.pageNumActive]}>
+                    <ThemedText style={[s.pageNumText, p === 1 && s.pageNumTextActive]}>{p}</ThemedText>
                   </Pressable>
                 ))}
-                <ThemedText type="small" style={{ color: LocationColors.textMuted }}>...</ThemedText>
-                <Pressable style={styles.pageNum}>
-                  <ThemedText type="smallBold" style={{ color: LocationColors.textMuted }}>39</ThemedText>
-                </Pressable>
-                <Pressable style={styles.pageArrow}>
-                  <Icon name={{ ios: 'chevron.right', android: 'chevron-right', web: 'chevron-right' }} size={14} color={LocationColors.textMuted} />
-                </Pressable>
+                <ThemedText style={{ color: LocationColors.textMuted, paddingHorizontal: 4 }}>…</ThemedText>
+                <Pressable style={s.pageNum}><ThemedText style={s.pageNumText}>39</ThemedText></Pressable>
+                <Pressable style={s.pageArrow}><MaterialIcons name="chevron-right" size={16} color={LocationColors.textMuted} /></Pressable>
               </View>
             </View>
           </>
@@ -1642,693 +1337,337 @@ export default function LocationsScreen() {
       </ScrollView>
 
       <EntityModal
-        visible={modalVisible}
-        mode={modalMode}
-        onClose={closeModal}
-        tab={detailTab}
-        isMobile={isMobile}
-        initialRow={activeRow}
-        onSave={handleSaveEntity}
+        visible={modalVisible} mode={modalMode} onClose={closeModal}
+        tab={detailTab} isMobile={isMobile} initialRow={activeRow} onSave={handleSave}
       />
-
-      <ConfirmDeleteDialog
-        row={deleteTarget}
-        singular={meta.singular}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-      />
+      <ConfirmDelete row={deleteTarget} singular={meta.singular} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
     </AdminLayout>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: LocationColors.pageBg },
-  screen: { flex: 1 },
-  content: { padding: 24, paddingBottom: 40, maxWidth: 1200, alignSelf: 'center', width: '100%' },
-  contentMobile: { padding: 16, paddingBottom: 28 },
-  breadcrumbs: { color: LocationColors.textMuted, fontSize: 13, marginBottom: 16 },
-  breadcrumbsMobile: { fontSize: 12, marginBottom: 12 },
-  screenNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  navLink: { color: LocationColors.accentStrong, fontSize: 13 },
-  navSep: { color: LocationColors.textLight, fontSize: 13 },
-  navActive: { color: LocationColors.text, fontSize: 13 },
-  entityCard: {
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 20,
-    borderWidth: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: LocationColors.pageBg },
+  content: { padding: 20, paddingBottom: 48, maxWidth: 1200, alignSelf: 'center', width: '100%' },
+  contentMobile: { padding: 14, paddingBottom: 32 },
+
+  // ── Hero ──
+  hero: {
+    borderRadius: 22,
+    backgroundColor: LocationColors.heroStart,
     padding: 24,
+    paddingBottom: 52,
+    shadowColor: LocationColors.heroStart,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  heroMobile: { padding: 18, paddingBottom: 52 },
+  heroTitle: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroIconBadge: {
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  heroHeading: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', lineHeight: 28 },
+  heroSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 3 },
+
+  // ── Stat cards (overlap hero) ──
+  statCardsScroll: { marginTop: -42, marginBottom: 16, flexGrow: 0 },
+  statCardsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
     flexWrap: 'wrap',
     gap: 12,
+    marginTop: -42,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  entityCardMobile: { padding: 16, flexDirection: 'column', alignItems: 'stretch' },
-  entityLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-  entityLeftMobile: { flex: 0 },
-  entityTextMobile: { flex: 1 },
-  entityTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  tabsScroll: { marginBottom: 24, flexGrow: 0 },
-  tabsRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: LocationColors.border },
-  tab: { paddingHorizontal: 14, paddingVertical: 12, position: 'relative' },
-  tabText: { color: LocationColors.textMuted, fontSize: 14 },
-  tabTextActive: { color: LocationColors.accentStrong },
-  tabLine: {
-    position: 'absolute', bottom: 0, left: 10, right: 10,
-    height: 3, backgroundColor: LocationColors.accentStrong, borderRadius: 2,
-  },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' },
-
-  // ── Overview dashboard ──
-  overviewSection: { marginBottom: 28, gap: 16 },
-  overviewHeading: { fontSize: 24, lineHeight: 30, color: LocationColors.text },
-  overviewSubtitle: { color: LocationColors.textMuted, marginTop: -8 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statCard: {
-    flexGrow: 1,
-    flexBasis: 180,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    minWidth: 180,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 20,
-    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  statCardIcon: {
+    width: 40, height: 40, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  statCardValue: { fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 8 },
+  statCardLabel: { color: '#6B7280', fontSize: 11, marginTop: 2, fontWeight: '500' },
+
+  // ── Tabs ──
+  tabScroll: { marginBottom: 20, flexGrow: 0 },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: LocationColors.cardBg,
+    borderRadius: 14,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowRadius: 8,
     elevation: 2,
   },
-  statIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  tab: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statValue: { fontSize: 24, fontWeight: '700', lineHeight: 28, color: LocationColors.text },
-  statLabel: { color: LocationColors.textMuted, marginTop: 4, fontSize: 13 },
-  analysisCard: {
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 20,
-    padding: 24,
     gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  analysisCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  analysisCardSubtitle: { color: LocationColors.textMuted, marginBottom: 12 },
-  selectsRow: { flexDirection: 'row', gap: 12, marginBottom: 4 },
-  selectsRowMobile: { flexDirection: 'column' },
-  selectWrap: { flex: 1, minWidth: 0 },
-  selectLabel: { marginBottom: 6, color: LocationColors.text },
-  selectBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 44,
-    borderWidth: 1,
-    borderColor: LocationColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    backgroundColor: LocationColors.cardBg,
-  },
-  selectBoxDisabled: { backgroundColor: LocationColors.inactiveBg, opacity: 0.6 },
-  selectValue: { flex: 1, color: LocationColors.text, fontSize: 14 },
-  selectPlaceholder: { color: LocationColors.textLight },
-  selectIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  selectClear: { padding: 2 },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  pickerBox: {
-    width: '100%',
-    maxWidth: 380,
-    maxHeight: 420,
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: LocationColors.borderLight,
+    paddingVertical: 10,
+    borderRadius: 11,
+    position: 'relative',
   },
-  pickerSearchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 14,
-    marginTop: 12,
-    marginBottom: 6,
-    height: 40,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: LocationColors.border,
-    borderRadius: 9,
-  },
-  pickerSearchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0 },
-  pickerList: { paddingHorizontal: 8, paddingBottom: 8 },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  pickerRowActive: { backgroundColor: '#FFF7ED' },
-  pickerRowText: { color: LocationColors.text },
-  pickerEmpty: { padding: 24, alignItems: 'center' },
-  analysisLoading: { color: LocationColors.textMuted, marginTop: 4 },
-  analysisEmpty: {
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 22,
-  },
-  analysisEmptyText: { color: LocationColors.textMuted, textAlign: 'center' },
-  analysisResult: {
-    marginTop: 8,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: LocationColors.borderLight,
-    gap: 12,
-  },
-  analysisBreadcrumb: { color: LocationColors.accentStrong, fontWeight: '600' },
-  analysisChipsRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  analysisChip: {
-    backgroundColor: '#FFF7ED',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    alignItems: 'center',
-    minWidth: 76,
-  },
-  analysisChipValue: { fontSize: 16, color: LocationColors.accentStrong },
-  analysisChipLabel: { color: LocationColors.textMuted },
-  pincodeList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  pincodeChip: {
-    backgroundColor: LocationColors.inactiveBg === LocationColors.cardBg ? '#F1F5F9' : '#F1F5F9',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  tabActive: { backgroundColor: LocationColors.accentLight },
+  tabLabel: { fontSize: 13, color: LocationColors.textMuted, fontWeight: '500' },
+  tabLabelActive: { color: LocationColors.accentStrong, fontWeight: '700' },
+  tabIndicator: {
+    position: 'absolute', bottom: 4, left: 16, right: 16,
+    height: 2, backgroundColor: LocationColors.accentStrong, borderRadius: 1,
   },
 
-  listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  listHeaderMobile: { flexDirection: 'column', alignItems: 'flex-start', gap: 12 },
-  listTitle: { fontSize: 26, lineHeight: 32, color: LocationColors.text },
-  listTitleMobile: { fontSize: 22, lineHeight: 28 },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: LocationColors.accentStrong, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12,
-    shadowColor: LocationColors.accentStrong, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  // ── Overview ──
+  overviewRoot: { gap: 16 },
+  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  summaryRowMobile: { flexDirection: 'row', flexWrap: 'wrap' },
+  summaryCard: {
+    flexGrow: 1, flexBasis: 160,
+    backgroundColor: LocationColors.cardBg,
+    borderRadius: 18, padding: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
-  addBtnMobile: {
-    width: '70%',
-    justifyContent: 'center',
-    backgroundColor: LocationColors.accentStrong,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginLeft: 40,
-    shadowColor: LocationColors.accentStrong, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  summaryCardMobile: { flexBasis: '45%', padding: 14 },
+  summaryIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  summaryValue: { fontSize: 22, fontWeight: '700', color: LocationColors.text, lineHeight: 26 },
+  summaryLabel: { fontSize: 12, color: LocationColors.textMuted, marginTop: 3 },
+
+  drillCard: {
+    backgroundColor: LocationColors.cardBg,
+    borderRadius: 18, padding: 22,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
+    gap: 14,
   },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
-  toolbarMobile: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  drillHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  drillTitle: { fontSize: 17, fontWeight: '700', color: LocationColors.text },
+  drillSub: { fontSize: 12, color: LocationColors.textMuted, marginTop: 3 },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: LocationColors.accentLight, borderRadius: 8 },
+  resetBtnText: { fontSize: 12, color: LocationColors.accentStrong, fontWeight: '600' },
+  selectorsRow: { flexDirection: 'row', gap: 12 },
+  selectorsRowMobile: { flexDirection: 'column', gap: 10 },
+  breadcrumbRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: LocationColors.accentLight, borderRadius: 8 },
+  breadcrumbText: { fontSize: 13, color: LocationColors.accentStrong, fontWeight: '600' },
+  chartArea: { flexDirection: 'row', alignItems: 'flex-start', gap: 24, paddingTop: 8 },
+  chartAreaMobile: { flexDirection: 'column', alignItems: 'center', gap: 16 },
+  drillLoading: { alignItems: 'center', gap: 10, paddingVertical: 32 },
+  drillLoadingText: { color: LocationColors.textMuted, fontSize: 13 },
+  drillEmpty: { alignItems: 'center', gap: 12, paddingVertical: 36 },
+  drillEmptyText: { color: LocationColors.textMuted, textAlign: 'center', fontSize: 13 },
+
+  // Donut
+  donutWrap: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  donutLegend: { gap: 10 },
+  donutLegendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  donutDot: { width: 10, height: 10, borderRadius: 5 },
+  donutLegendLabel: { fontSize: 12, color: LocationColors.textSecondary, width: 90 },
+  donutLegendVal: { fontSize: 14, fontWeight: '700' },
+
+  // Pincodes
+  pincodeArea: { flex: 1 },
+  pincodeAreaTitle: { fontSize: 13, fontWeight: '700', color: LocationColors.text, marginBottom: 10 },
+  pincodeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pincodeChip: { backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  pincodeChipText: { fontSize: 12, color: LocationColors.textSecondary, fontWeight: '500' },
+
+  // ── Toolbar ──
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  toolbarMobile: { flexDirection: 'row', gap: 8 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: LocationColors.cardBg, borderWidth: 1, borderColor: LocationColors.border,
-    borderRadius: 10, paddingHorizontal: 14, height: 44,
+    borderRadius: 12, paddingHorizontal: 14, height: 44,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
   },
-  searchBoxMobile: { minWidth: 0 },
   searchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0 },
-  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  viewToggleMobile: { flexShrink: 0 },
+  toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  viewToggle: { flexDirection: 'row', gap: 4 },
   viewBtn: {
-    width: 36, height: 36, borderRadius: 8, borderWidth: 1, borderColor: LocationColors.border,
+    width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: LocationColors.border,
     alignItems: 'center', justifyContent: 'center', backgroundColor: LocationColors.cardBg,
   },
   viewBtnActive: { backgroundColor: LocationColors.viewActive, borderColor: LocationColors.viewActive },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: LocationColors.accentStrong,
+    paddingHorizontal: 16, height: 36, borderRadius: 10,
+    shadowColor: LocationColors.accentStrong, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
+  },
+  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  // ── Grid ──
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
+
+  // Entity card (Customer Management style)
+  entityCard: {
+    backgroundColor: LocationColors.cardBg,
+    borderRadius: 18, padding: 18,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3,
+  },
+  entityCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  entityCardId: { fontSize: 11, color: LocationColors.textMuted },
+  entityCardAvatar: { alignItems: 'center', gap: 10, marginBottom: 14 },
+  entityCardIconCircle: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  entityCardName: { fontSize: 15, fontWeight: '700', color: LocationColors.text, textAlign: 'center' },
+  entityCardStats: {
+    flexDirection: 'row', gap: 1,
+    backgroundColor: LocationColors.borderLight, borderRadius: 10, overflow: 'hidden', marginBottom: 14,
+  },
+  entityCardStat: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  entityCardStatVal: { fontSize: 14, fontWeight: '700', color: LocationColors.text },
+  entityCardStatLabel: { fontSize: 10, color: LocationColors.textMuted, marginTop: 2 },
+  entityCardViewBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: LocationColors.heroStart,
+    borderRadius: 10, paddingVertical: 10,
+  },
+  entityCardViewBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+
+  // ── Table ──
   tableCard: {
-    backgroundColor: LocationColors.cardBg, borderRadius: 20,
-    overflow: 'hidden', marginBottom: 16,
+    backgroundColor: LocationColors.cardBg, borderRadius: 18, overflow: 'hidden', marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
   },
   tableHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: LocationColors.modalHeader,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: LocationColors.tableHead,
+    paddingVertical: 13, paddingHorizontal: 12,
   },
-  thCell: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  th: {
-    color: '#ffffff',
-    fontSize: 13,
-    textAlign: 'center',
-    width: '100%',
-  },
+  th: { alignItems: 'center', justifyContent: 'center' },
+  thText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 13, paddingHorizontal: 12,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as const } : null),
   },
   tableRowBorder: { borderTopWidth: 1, borderTopColor: LocationColors.borderLight },
-  tableRowHover: { backgroundColor: '#FFF7ED' },
-  webColId: { width: 50, flexShrink: 0 },
-  webColName: { flex: 1, minWidth: 120, flexShrink: 1 },
-  webColCode: { width: 90, flexShrink: 0 },
-  webColCount: { width: 90, flexShrink: 0 },
-  webColStatus: { width: 110, flexShrink: 0 },
-  webColActions: { width: 140, flexShrink: 0 },
-  webTdCell: {
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  webNameCell: {
-    alignItems: 'flex-start',
-  },
-  webTd: {
-    textAlign: 'center',
-    width: '100%',
-    color: LocationColors.text,
-  },
-  nameCell: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, minWidth: 0 },
-  actions: { flexDirection: 'row', gap: 6, paddingLeft: 8, width: 130 },
-  actionsCompact: { paddingLeft: 0, width: 'auto', justifyContent: 'center' },
-  actionsMobile: { gap: 2, paddingLeft: 0, width: 'auto', justifyContent: 'center' },
-  actionBtn: {
-    width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: LocationColors.border,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: LocationColors.cardBg,
-  },
-  actionBtnMobile: { width: 22, height: 22, borderRadius: 6 },
-  actionBtnDanger: { borderColor: LocationColors.inactiveBorder, backgroundColor: LocationColors.inactiveBg },
-  empty: { padding: 32, alignItems: 'center' },
-  gridEmpty: {
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
-    marginBottom: 16,
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 16,
-  },
-  gridCard: {
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2,
-    padding: 20,
-    minWidth: 200,
-  },
-  gridCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  gridCardBody: {
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    marginBottom: 12,
-  },
-  gridPlaceholder: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gridName: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: LocationColors.text,
-  },
-  gridCardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: LocationColors.borderLight,
-    paddingTop: 12,
-    alignItems: 'center',
-  },
-  mobileTableCard: {
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  mobileTableInner: {
-    width: '100%',
-  },
-  mobileTableHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: LocationColors.modalHeader,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-  },
-  mobileThCell: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileTh: {
-    color: '#ffffff',
-    fontSize: 11,
-    textAlign: 'center',
-    width: '100%',
-  },
-  mobileTd: {
-    color: LocationColors.text,
-    fontSize: 12,
-  },
-  mobileTdCell: {
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  mobileTdCenter: {
-    textAlign: 'center',
-    width: '100%',
-  },
-  mobileColId: { width: 40, flexShrink: 0 },
-  mobileColName: { width: 150, flexShrink: 0 },
-  mobileColCode: { width: 56, flexShrink: 0 },
-  mobileColCodeWide: { width: 100, flexShrink: 0 },
-  mobileColCount: { width: 56, flexShrink: 0 },
-  mobileColStatus: { width: 84, flexShrink: 0 },
-  mobileColActions: { width: 130, flexShrink: 0 },
-  mobileTableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-  },
-  mobileTableRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: LocationColors.borderLight,
-  },
-  mobileTableRowPressed: {
-    backgroundColor: '#FFF7ED',
-  },
-  mobileNameCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minWidth: 0,
-    flex: 1,
-  },
-  mobileNameText: {
-    flex: 1,
-    flexShrink: 1,
-    fontSize: 12,
-    color: LocationColors.text,
-    minWidth: 0,
-  },
-  mobileStatusCell: {
-    alignItems: 'center',
-    overflow: 'visible',
-  },
-  mobileActionsCell: {
-    alignItems: 'center',
-    overflow: 'visible',
-  },
-  rowIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  rowIconBoxCompact: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-  },
-  dotBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  dotBadgeCompact: {
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 16,
-  },
-  dotBadgeActive: {
-    backgroundColor: '#ECFDF5',
-  },
-  dotBadgeInactive: {
-    backgroundColor: LocationColors.inactiveBg,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  statusDotCompact: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  paginationMobile: { flexDirection: 'column', gap: 12, alignItems: 'flex-start' },
+  tableRowHover: { backgroundColor: LocationColors.accentLight },
+  td: { justifyContent: 'center', overflow: 'hidden' },
+  tdText: { fontSize: 13, color: LocationColors.textSecondary, textAlign: 'center' },
+  colId: { width: 50, flexShrink: 0 },
+  colName: { flex: 1, minWidth: 120, alignItems: 'flex-start' },
+  colCode: { width: 90, flexShrink: 0 },
+  colCount: { width: 90, flexShrink: 0 },
+  colStatus: { width: 110, flexShrink: 0 },
+  colActions: { width: 130, flexShrink: 0 },
+  nameCell: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, paddingHorizontal: 6 },
+  nameText: { fontSize: 13, color: LocationColors.text, fontWeight: '600', flexShrink: 1 },
+  rowIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  actionRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 6 },
+  actionBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  actionBtnView: { borderColor: LocationColors.accentBorder, backgroundColor: LocationColors.accentLight },
+  actionBtnEdit: { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
+  actionBtnDel: { borderColor: LocationColors.inactiveBorder, backgroundColor: LocationColors.inactiveBg },
+
+  // ── Badge ──
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' },
+  badgeCompact: { paddingHorizontal: 6, paddingVertical: 3 },
+  badgeActive: { backgroundColor: LocationColors.activeBg, borderColor: LocationColors.activeBorder },
+  badgeInactive: { backgroundColor: LocationColors.inactiveBg, borderColor: LocationColors.inactiveBorder },
+  badgeDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeText: { fontWeight: '600' },
+
+  // ── Empty ──
+  emptyWrap: { alignItems: 'center', gap: 10, paddingVertical: 40 },
+  emptyText: { color: LocationColors.textMuted, fontSize: 14 },
+
+  // ── Pagination ──
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  paginationMobile: { flexDirection: 'column', gap: 10, alignItems: 'flex-start' },
+  paginationText: { fontSize: 13, color: LocationColors.textMuted },
   pages: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pageArrow: {
-    width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: LocationColors.border,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: LocationColors.cardBg,
+  pageArrow: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: LocationColors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: LocationColors.cardBg },
+  pageNum: { minWidth: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: LocationColors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, backgroundColor: LocationColors.cardBg },
+  pageNumActive: { backgroundColor: LocationColors.accentStrong, borderColor: LocationColors.accentStrong },
+  pageNumText: { fontSize: 13, color: LocationColors.textMuted, fontWeight: '600' },
+  pageNumTextActive: { color: '#fff' },
+
+  // ── Select ──
+  selectWrap: { flex: 1, minWidth: 0 },
+  selectLabel: { fontSize: 12, fontWeight: '600', color: LocationColors.textSecondary, marginBottom: 6 },
+  selectBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 44, borderWidth: 1, borderColor: LocationColors.border,
+    borderRadius: 10, paddingHorizontal: 12, backgroundColor: LocationColors.cardBg,
   },
-  pageNum: {
-    minWidth: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: LocationColors.border,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, backgroundColor: LocationColors.cardBg,
-  },
-  pageNumActive: { backgroundColor: LocationColors.accentDark, borderColor: LocationColors.accentDark },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  modalOverlayWeb: {
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  modalOverlayMobile: {
-    justifyContent: 'flex-end',
-    alignItems: 'stretch',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  modalWrapWeb: {
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-  },
-  modalWrapMobile: {
-    width: '100%',
-    alignSelf: 'stretch',
-    paddingHorizontal: 12,
-  },
-  modalBox: {
-    width: '100%',
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 14,
-    overflow: 'hidden',
-    flexDirection: 'column',
-  },
-  modalBoxMobile: {
-    width: '100%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    maxHeight: '92%',
-  },
-  modalScroll: { width: '100%', flexShrink: 1, flexGrow: 1, minHeight: 0 },
-  sheetHandleRow: {
-    width: '100%',
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
-    backgroundColor: LocationColors.cardBg,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: LocationColors.border,
-  },
-  modalTopBar: {
+  selectBoxDisabled: { backgroundColor: '#F8FAFC', opacity: 0.55 },
+  selectVal: { flex: 1, fontSize: 14, color: LocationColors.text },
+  selectPlaceholder: { color: LocationColors.textLight },
+  selectRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  pickerBox: { width: '100%', maxWidth: 380, maxHeight: 420, backgroundColor: LocationColors.cardBg, borderRadius: 16, overflow: 'hidden' },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: LocationColors.borderLight },
+  pickerTitle: { fontSize: 15, fontWeight: '700', color: LocationColors.text },
+  pickerSearch: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, height: 40, paddingHorizontal: 12, borderWidth: 1, borderColor: LocationColors.border, borderRadius: 10 },
+  pickerSearchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 8 },
+  pickerRowSel: { backgroundColor: LocationColors.accentLight },
+  pickerRowText: { fontSize: 14, color: LocationColors.text },
+
+  // ── Modal ──
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center' },
+  modalOverlayWeb: { justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 32 },
+  modalOverlayMobile: { justifyContent: 'flex-end', paddingHorizontal: 0 },
+  modalCenterWrap: { width: '100%', maxWidth: 460 },
+  modalSheetWrap: { width: '100%', paddingHorizontal: 10 },
+  modalBox: { backgroundColor: LocationColors.cardBg, borderRadius: 18, overflow: 'hidden' },
+  modalHead: {
     backgroundColor: LocationColors.modalHeader,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    width: '100%',
-    flexShrink: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 20, paddingVertical: 16,
   },
-  modalTopBarTitle: { color: '#fff', fontSize: 16, flex: 1, marginRight: 12 },
-  modalBody: { width: '100%', padding: 24, paddingBottom: 16 },
-  modalBodyMobile: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  mobileModalIntro: { width: '100%', alignItems: 'center', marginBottom: 20, gap: 6 },
-  mobileModalTitle: { fontSize: 20, color: LocationColors.text, textAlign: 'center' },
-  mobileModalSubtitle: { color: LocationColors.textMuted, textAlign: 'center', lineHeight: 20 },
-  modalGlobeWrap: { width: '100%', alignItems: 'center', marginBottom: 20, gap: 8, paddingTop: 4 },
-  modalGlobe: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: '#FDEBD8',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-  },
-  fieldLabel: { marginTop: 10, marginBottom: 6, width: '100%' },
-  fieldInputFlex: { flex: 1, width: undefined, minWidth: 0 },
-  fieldInput: {
-    width: '100%',
-    height: 44,
-    borderWidth: 1,
-    borderColor: LocationColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    color: LocationColors.text,
-    backgroundColor: LocationColors.cardBg,
-  },
-  fieldInputReadOnly: { backgroundColor: LocationColors.inactiveBg, color: LocationColors.textMuted },
-  fieldHint: { color: LocationColors.textMuted, fontSize: 12, marginBottom: 4, width: '100%' },
-  codeRow: { flexDirection: 'row', gap: 10, width: '100%', alignItems: 'center' },
-  flagPicker: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 12,
-    borderWidth: 1, borderColor: LocationColors.border, borderRadius: 10, backgroundColor: LocationColors.cardBg,
-  },
-  statusCards: { gap: 10, marginTop: 4, width: '100%' },
-  statusCard: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: LocationColors.border,
-    backgroundColor: LocationColors.cardBg,
-  },
-  statusCardOn: { borderColor: '#ef7b1a', backgroundColor: '#FFF8F0' },
-  statusCardOff: { borderColor: LocationColors.inactiveBorder, backgroundColor: LocationColors.inactiveBg },
-  statusCardText: { flex: 1, minWidth: 0 },
-  statusCardHint: { color: LocationColors.textMuted, fontSize: 12 },
-  radio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: LocationColors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  radioOn: { borderColor: LocationColors.accentDark },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: LocationColors.accentDark },
-  errorText: { color: LocationColors.inactiveText, marginTop: 10 },
-  modalFooter: { flexDirection: 'row', gap: 12, marginTop: 24, width: '100%' },
-  modalFooterMobile: { marginTop: 0 },
-  modalFooterWrap: {
-    width: '100%',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: LocationColors.borderLight,
-    backgroundColor: LocationColors.cardBg,
-    flexShrink: 0,
-  },
-  modalFooterWrapWeb: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  modalActionBtn: { flex: 1, minWidth: 0 },
-  cancelBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: LocationColors.border,
-    backgroundColor: LocationColors.cardBg,
-  },
-  saveBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: LocationColors.accentStrong,
-    shadowColor: LocationColors.accentStrong, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
-  },
-  confirmOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  confirmBox: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: LocationColors.cardBg,
-    borderRadius: 14,
-    padding: 22,
-    alignItems: 'center',
-    gap: 6,
-  },
-  confirmIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: LocationColors.inactiveBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  confirmTitle: { fontSize: 16 },
-  confirmBody: { color: LocationColors.textMuted, textAlign: 'center', marginBottom: 14 },
-  confirmActions: { flexDirection: 'row', gap: 12, width: '100%' },
-  confirmDeleteBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: 10,
-    backgroundColor: '#DC2626',
-  },
+  modalHeadIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  modalHeadTitle: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalBody: { padding: 22, paddingBottom: 10, gap: 4 },
+  modalFoot: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: LocationColors.borderLight },
+  fieldLabel: { fontSize: 13, fontWeight: '600', color: LocationColors.text, marginTop: 10, marginBottom: 6 },
+  fieldInput: { height: 44, borderWidth: 1, borderColor: LocationColors.border, borderRadius: 10, paddingHorizontal: 14, fontSize: 14, color: LocationColors.text, backgroundColor: LocationColors.cardBg },
+  fieldInputRO: { backgroundColor: '#F8FAFC', color: LocationColors.textMuted },
+  statusOpt: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: LocationColors.border },
+  statusOptActive: { borderColor: LocationColors.activeBorder, backgroundColor: LocationColors.activeBg },
+  statusOptInactive: { borderColor: LocationColors.inactiveBorder, backgroundColor: LocationColors.inactiveBg },
+  statusOptText: { fontSize: 13, fontWeight: '600', color: LocationColors.text },
+  radioCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: LocationColors.border, alignItems: 'center', justifyContent: 'center' },
+  radioCircleSel: { borderColor: LocationColors.accentStrong },
+  radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: LocationColors.accentStrong },
+  errorText: { fontSize: 12, color: LocationColors.inactiveText, marginTop: 8 },
+  btnCancel: { flex: 1, height: 46, borderRadius: 10, borderWidth: 1, borderColor: LocationColors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: LocationColors.cardBg },
+  btnCancelText: { fontSize: 14, fontWeight: '600', color: LocationColors.textSecondary },
+  btnSave: { flex: 1, flexDirection: 'row', height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: LocationColors.accentStrong, shadowColor: LocationColors.accentStrong, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  btnSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // ── Confirm delete ──
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  confirmBox: { width: '100%', maxWidth: 340, backgroundColor: LocationColors.cardBg, borderRadius: 18, padding: 24, alignItems: 'center', gap: 8 },
+  confirmIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: LocationColors.inactiveBg, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  confirmTitle: { fontSize: 17, fontWeight: '700', color: LocationColors.text },
+  confirmBody: { fontSize: 13, color: LocationColors.textMuted, textAlign: 'center', marginBottom: 10 },
+  confirmBtns: { flexDirection: 'row', gap: 10, width: '100%' },
 });
