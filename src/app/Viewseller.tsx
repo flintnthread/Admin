@@ -766,7 +766,7 @@ const csvModalStyles = StyleSheet.create({
   modalMobile: {
     maxWidth: '100%',
   },
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

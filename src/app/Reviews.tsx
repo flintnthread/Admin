@@ -620,7 +620,7 @@ const WebReviewsScreen: React.FC<ScreenProps> = ({
 // ─── Shared Styles ────────────────────────────────────────────
 const rs = StyleSheet.create({
     safeArea:             { flex: 1, backgroundColor: C.bg },
-    header:               { flexDirection: "row", alignItems: "center", backgroundColor: C.navy, paddingHorizontal: 16, paddingVertical: 14, gap: 12, marginTop: 35 },
+    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  flexDirection: "row", alignItems: "center", backgroundColor: C.navy, paddingHorizontal: 16, paddingVertical: 14, gap: 12, },
     backBtn:              { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
     headerCenter:         { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
     headerThumb:          { width: 36, height: 36, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.15)" },

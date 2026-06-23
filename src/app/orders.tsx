@@ -23,7 +23,6 @@ import {
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 import AdminLayout from "../components/admin-layout";
 
-
 // ─── Color Palette ────────────────────────────────────────────────────────────
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -632,8 +631,14 @@ const UserIcon = ({ color = C.textLight }: { color?: string }) => (
     <Circle cx="12" cy="7" r="4" stroke={color} strokeWidth={1.8} />
   </Svg>
 );
-const CalendarIcon = ({ color = C.textLight }: { color?: string }) => (
-  <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+const CalendarIcon = ({
+  color = C.textLight,
+  size = 16,
+}: {
+  color?: string;
+  size?: number;
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect
       x="3"
       y="4"
@@ -685,8 +690,14 @@ const CloseIcon = ({
     />
   </Svg>
 );
-const DownloadIcon = ({ color = C.green }: { color?: string }) => (
-  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+const DownloadIcon = ({
+  color = C.green,
+  size = 16,
+}: {
+  color?: string;
+  size?: number;
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
       stroke={color}
@@ -704,8 +715,14 @@ const DownloadIcon = ({ color = C.green }: { color?: string }) => (
     <Path d="M12 15V3" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
   </Svg>
 );
-const OrderBoxIcon = ({ color = C.white }: { color?: string }) => (
-  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+const OrderBoxIcon = ({
+  color = C.white,
+  size = 16,
+}: {
+  color?: string;
+  size?: number;
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
       stroke={color}
@@ -1680,7 +1697,9 @@ const GridOrderCard = ({
       <View style={s.gridCardHeader}>
         <View style={{ flex: 1 }}>
           <View style={s.orderIdRow}>
-            <Text style={s.gridOrderNum}>{order.orderNumber}</Text>
+            <Text style={s.gridOrderNum} numberOfLines={1}>
+              {order.orderNumber}
+            </Text>
             <TouchableOpacity
               onPress={() => copyToClipboard(order.orderNumber)}
               style={s.copyBtn}
@@ -1993,7 +2012,9 @@ function getColumnCount(width: number): number {
 export default function OrdersScreen() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
+  const isMobile = width < 480;
   const columnCount = getColumnCount(width);
+  const px = isMobile ? 14 : isWeb ? 28 : 20;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2171,6 +2192,38 @@ export default function OrdersScreen() {
     return `calc((100% - ${totalGutter}px) / ${columnCount})` as unknown as number;
   }, [columnCount]);
 
+  // ── Stat card data — now rendered as overlapping cards under the header ────
+  const statCards = [
+    {
+      label: "Total Orders",
+      value: String(totalElements),
+      icon: <OrderBoxIcon color={C.navy} />,
+      iconBg: "rgba(30,43,107,0.08)",
+      valueColor: C.navy,
+    },
+    {
+      label: "This Month",
+      value: String(thisMonth),
+      icon: <CalendarIcon color={C.teal} />,
+      iconBg: "#ECFEFF",
+      valueColor: C.teal,
+    },
+    {
+      label: "Monthly Revenue",
+      value: fmtCur(monthRevenue),
+      icon: <DownloadIcon color={C.green} />,
+      iconBg: C.greenPale,
+      valueColor: C.green,
+    },
+    {
+      label: "Pending Payment",
+      value: String(pendingPayment),
+      icon: <ChevronRightIcon color={C.orange} />,
+      iconBg: C.orangePale,
+      valueColor: C.orange,
+    },
+  ];
+
   return (
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
@@ -2179,115 +2232,139 @@ export default function OrdersScreen() {
           contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header ── */}
-          <View style={s.headerBlock}>
-            <View style={s.headerTop}>
-              <View style={s.headerLeft}>
-                <View style={s.headerIcon}>
-                  <OrderBoxIcon color={C.white} />
+          {/* ── Header — floats with side margins, rounded on all 4 corners ── */}
+          <View
+            style={{
+              
+              
+              
+              paddingHorizontal: 16,
+              
+            }}
+          >
+            <View
+              style={[
+                s.headerBlock,
+                {
+                  paddingTop: Platform.OS === "ios" ? 50 : 20,
+                  
+                },
+              ]}
+            >
+              <View
+                style={[s.headerTop, { paddingHorizontal: isMobile ? 16 : 22 }]}
+              >
+                <View style={s.headerLeft}>
+                  <View style={s.headerIcon}>
+                    <OrderBoxIcon color={C.white} />
+                  </View>
+                  <View>
+                    <Text
+                      style={[s.headerTitle, { fontSize: isMobile ? 16 : 20 }]}
+                    >
+                      Orders Management
+                    </Text>
+                    <Text style={s.headerSub}>
+                      Manage and track all customer orders
+                    </Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={s.headerTitle}>Orders Management</Text>
-                  <Text style={s.headerSub}>
-                    Manage and track all customer orders
-                  </Text>
+                <View style={s.headerActions}>
+                  <TouchableOpacity
+                    style={s.exportBtn}
+                    onPress={handleExportCSV}
+                    activeOpacity={0.85}
+                  >
+                    <ExportIcon />
+                    {!isMobile && (
+                      <Text style={s.exportBtnText}>Export CSV</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </View>
-              <View style={s.headerActions}>
-                <TouchableOpacity
-                  style={s.exportBtn}
-                  onPress={handleExportCSV}
-                  activeOpacity={0.85}
-                >
-                  <ExportIcon />
-                  <Text style={s.exportBtnText}>Export CSV</Text>
-                </TouchableOpacity>
               </View>
             </View>
 
-            <View style={s.filterPillsWrap}>
+            {/* ── Overlapping stat cards ── */}
+            <View
+              style={[
+                s.statCardsWrap,
+                { paddingHorizontal: 10 },
+                isMobile && s.statCardsWrapMobile,
+              ]}
+            >
+              {statCards.map((stat, i) => (
+                <View key={i} style={s.statCard}>
+                  <View
+                    style={[s.statIconBox, { backgroundColor: stat.iconBg }]}
+                  >
+                    {stat.icon}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text
+                      style={[s.statValue, { color: stat.valueColor }]}
+                      numberOfLines={1}
+                    >
+                      {stat.value}
+                    </Text>
+                    <Text style={s.statLabel} numberOfLines={1}>
+                      {stat.label}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* ── Filter pills (moved out of the header, into the toolbar area) ── */}
+          <View style={[s.filterPillsWrap, { paddingHorizontal: px }]}>
+            <View style={s.filterPillsCard}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={s.filterPillsRow}
               >
-                {STATUS_FILTERS.map((f) => (
-                  <TouchableOpacity
-                    key={f}
-                    style={[
-                      s.filterPill,
-                      statusFilter === f && s.filterPillActive,
-                    ]}
-                    onPress={() => {
-                      setStatusFilter(f);
-                      setCurrentPage(1);
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    {statusFilter === f && (
-                      <View
-                        style={[
-                          s.filterPillDot,
-                          {
-                            backgroundColor:
-                              f === "All"
-                                ? C.white
-                                : (STATUS_CFG[f as OrderStatus]?.dot ??
-                                  C.white),
-                          },
-                        ]}
-                      />
-                    )}
-                    <Text
+              {STATUS_FILTERS.map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[
+                    s.filterPill,
+                    statusFilter === f && s.filterPillActive,
+                  ]}
+                  onPress={() => {
+                    setStatusFilter(f);
+                    setCurrentPage(1);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  {statusFilter === f && (
+                    <View
                       style={[
-                        s.filterPillText,
-                        statusFilter === f && s.filterPillTextActive,
+                        s.filterPillDot,
+                        {
+                          backgroundColor:
+                            f === "All"
+                              ? C.white
+                              : (STATUS_CFG[f as OrderStatus]?.dot ?? C.white),
+                        },
                       ]}
-                    >
-                      {f}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+                    />
+                  )}
+                  <Text
+                    style={[
+                      s.filterPillText,
+                      statusFilter === f && s.filterPillTextActive,
+                    ]}
+                  >
+                    {f}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             </View>
           </View>
 
-          {/* ── Stats Cards ── */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.statsRow}
-          >
-            {[
-              {
-                label: "Total Orders",
-                value: String(totalElements),
-                accent: C.navy,
-              },
-              { label: "This Month", value: String(thisMonth), accent: C.teal },
-              {
-                label: "Monthly Revenue",
-                value: fmtCur(monthRevenue),
-                accent: C.green,
-              },
-              {
-                label: "Pending Payment",
-                value: String(pendingPayment),
-                accent: C.orange,
-              },
-            ].map((stat, i) => (
-              <View key={i} style={s.statCard}>
-                <View
-                  style={[s.statAccent, { backgroundColor: stat.accent }]}
-                />
-                <Text style={s.statValue}>{stat.value}</Text>
-                <Text style={s.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
-          </ScrollView>
-
           {/* ── Toolbar ── */}
-          <View style={s.toolbar}>
+          <View style={[s.toolbar, { paddingHorizontal: px }]}>
             <View style={s.searchBox}>
               <SearchIcon />
               <TextInput
@@ -2353,12 +2430,12 @@ export default function OrdersScreen() {
 
           {/* ── Content ── */}
           {loading ? (
-            <View style={s.stateBox}>
+            <View style={[s.stateBox, { marginHorizontal: px }]}>
               <ActivityIndicator size="large" color={C.navy} />
               <Text style={s.stateText}>Loading orders…</Text>
             </View>
           ) : error ? (
-            <View style={s.stateBox}>
+            <View style={[s.stateBox, { marginHorizontal: px }]}>
               <Text style={s.errorText}>{error}</Text>
               <TouchableOpacity
                 style={s.retryBtn}
@@ -2369,7 +2446,7 @@ export default function OrdersScreen() {
               </TouchableOpacity>
             </View>
           ) : filtered.length === 0 ? (
-            <View style={s.stateBox}>
+            <View style={[s.stateBox, { marginHorizontal: px }]}>
               <OrderBoxIcon color={C.textLight} />
               <Text style={s.stateText}>No orders found</Text>
               <Text style={s.stateSub}>
@@ -2377,7 +2454,7 @@ export default function OrdersScreen() {
               </Text>
             </View>
           ) : viewMode === "grid" ? (
-            <View style={s.gridWrap}>
+            <View style={[s.gridWrap, { paddingHorizontal: px }]}>
               {filtered.map((o) => (
                 <View
                   key={o.id}
@@ -2401,7 +2478,7 @@ export default function OrdersScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={true}
-              style={s.tableScroll}
+              style={[s.tableScroll, { paddingHorizontal: px }]}
             >
               <View style={s.tableWrap}>
                 <View style={s.tHead}>
@@ -2437,17 +2514,23 @@ export default function OrdersScreen() {
 
           {/* ── Pagination ── */}
           {!loading && !error && totalPages > 0 && (
-            <PaginationBar
-              page={currentPage}
-              total={totalPages}
-              rangeStart={rangeStart}
-              rangeEnd={rangeEnd}
-              totalElements={totalElements}
-              onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              onPage={setCurrentPage}
-            />
+            <View style={{ paddingHorizontal: px }}>
+              <PaginationBar
+                page={currentPage}
+                total={totalPages}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                totalElements={totalElements}
+                onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onNext={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                onPage={setCurrentPage}
+              />
+            </View>
           )}
+
+          <View style={{ height: 24 }} />
         </ScrollView>
       </View>
 
@@ -2501,22 +2584,25 @@ export default function OrdersScreen() {
 const s = StyleSheet.create({
   scrollContent: { paddingBottom: 60 },
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // ── Header — floating rounded card (all 4 corners) ──────────────────────────
   headerBlock: {
     backgroundColor: C.navyDeep,
-    paddingTop: 20,
-    paddingBottom: 0,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: 16,
-    overflow: "hidden",
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    paddingBottom: 68,
+    borderRadius: 22,
+    marginHorizontal: 2,
+    marginTop: 12,
+    shadowColor: C.navyDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginBottom: 20,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
   headerIcon: {
@@ -2528,7 +2614,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 20,
     fontWeight: "800",
     color: C.white,
     letterSpacing: -0.3,
@@ -2546,8 +2631,66 @@ const s = StyleSheet.create({
   },
   exportBtnText: { fontSize: 13, fontWeight: "700", color: C.white },
 
-  filterPillsWrap: { marginTop: 4, paddingBottom: 20 },
-  filterPillsRow: { paddingHorizontal: 20, gap: 8, flexDirection: "row" },
+  // ── Overlapping stat cards (sit on top of the header's bottom edge) ────────
+  statCardsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: -42,
+    marginBottom: 4,
+  },
+  statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26 },
+  statCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 130,
+    maxWidth: 240,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: C.navyDeep,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+    gap: 12,
+  },
+  statIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+  },
+  statLabel: {
+    fontSize: 11.5,
+    color: C.textLight,
+    fontWeight: "600",
+  },
+
+  filterPillsWrap: { marginTop: 4, marginBottom: 6 },
+  filterPillsCard: {
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: C.navyDeep,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  filterPillsRow: { gap: 8, flexDirection: "row" },
   filterPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -2555,61 +2698,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 30,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: C.border,
   },
-  filterPillActive: { backgroundColor: C.white, borderColor: C.white },
+  filterPillActive: { backgroundColor: C.navy, borderColor: C.navy },
   filterPillDot: { width: 6, height: 6, borderRadius: 3 },
   filterPillText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.75)",
+    color: C.textMid,
   },
-  filterPillTextActive: { color: C.navyDeep },
-
-  // ── Stats ────────────────────────────────────────────────────────────────────
-  statsRow: {
-    paddingHorizontal: 20,
-    gap: 12,
-    paddingBottom: 4,
-    flexDirection: "row",
-  },
-  statCard: {
-    backgroundColor: C.card,
-    borderRadius: 16,
-    padding: 16,
-    minWidth: 140,
-    borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: C.navyDeep,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    overflow: "hidden",
-  },
-  statAccent: { position: "absolute", top: 0, left: 0, right: 0, height: 4 },
-  statValue: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: C.textDark,
-    marginTop: 8,
-    letterSpacing: -0.5,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: C.textLight,
-    marginTop: 4,
-    fontWeight: "500",
-  },
+  filterPillTextActive: { color: C.white },
 
   // ── Toolbar ──────────────────────────────────────────────────────────────────
   toolbar: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingVertical: 14,
     flexWrap: "wrap",
   },
@@ -3343,8 +3449,8 @@ const s = StyleSheet.create({
   gridWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 20,
-    gap: GRID_GUTTER,
+    columnGap: GRID_GUTTER,
+    rowGap: 24,
     alignItems: "flex-start",
   },
   gridItem: {},
@@ -3514,7 +3620,7 @@ const s = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: "700" },
 
   // ── List / Table ─────────────────────────────────────────────────────────────
-  tableScroll: { paddingHorizontal: 20 },
+  tableScroll: {},
   tableWrap: {
     backgroundColor: C.card,
     borderRadius: 16,
@@ -3634,7 +3740,6 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
     marginTop: 16,
-    marginHorizontal: 20,
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: C.card,
@@ -3666,7 +3771,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 60,
     gap: 12,
-    marginHorizontal: 20,
     backgroundColor: C.card,
     borderRadius: 20,
     borderWidth: 1,
@@ -3688,3 +3792,5 @@ const s = StyleSheet.create({
   },
   retryText: { color: C.white, fontWeight: "700", fontSize: 13 },
 });
+
+

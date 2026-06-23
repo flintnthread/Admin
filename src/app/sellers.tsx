@@ -19,6 +19,7 @@ import { mapSellerListRow } from '@/lib/mappers';
 import { blockSeller, fetchSellerAnalyticsSummary, fetchSellers, normalizeSellerGraphSummary, unblockSeller } from '@/services/sellerApi';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import Pagination from '@/components/Pagination';
 import {
   ActivityIndicator,
   Image,
@@ -319,7 +320,7 @@ const ViewModal = ({ seller, onClose }: { seller: Seller | null; onClose: () => 
 const VM = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14 },
   htitle: { fontSize: 18, fontWeight: '800', color: C.text, flex: 1 },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   closeX: { fontSize: 14, color: C.sub, fontWeight: '700' },
@@ -663,46 +664,7 @@ const LV = StyleSheet.create({
   actBtn: { width: 30, height: 30, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
 });
 
-// ─────────────────────────── PAGINATION ──────────────────────────────────────
-const Pagination = ({
-  current, total, onChange,
-}: { current: number; total: number; onChange: (p: number) => void }) => {
-  const pages: (number | '...')[] = [];
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (current > 3) pages.push('...');
-    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
-    if (current < total - 2) pages.push('...');
-    pages.push(total);
-  }
-  return (
-    <View style={PG.wrap}>
-      <TouchableOpacity style={[PG.btn, current === 1 && PG.dis]} disabled={current === 1} onPress={() => onChange(current - 1)}>
-        <IconChevLeft size={13} color={current === 1 ? C.muted : C.sub} />
-      </TouchableOpacity>
-      {pages.map((p, i) => p === '...'
-        ? <Text key={`e${i}`} style={PG.ellipsis}>…</Text>
-        : <TouchableOpacity key={p} style={[PG.btn, p === current && PG.active]} onPress={() => onChange(p as number)}>
-          <Text style={[PG.btnTxt, p === current && PG.activeTxt]}>{p}</Text>
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity style={[PG.btn, current === total && PG.dis]} disabled={current === total} onPress={() => onChange(current + 1)}>
-        <IconChevRight size={13} color={current === total ? C.muted : C.sub} />
-      </TouchableOpacity>
-    </View>
-  );
-};
-const PG = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  btn: { minWidth: 32, height: 32, borderRadius: 6, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
-  active: { backgroundColor: '#1d324e', borderColor: '#1d324e' },
-  dis: { opacity: 0.4 },
-  btnTxt: { fontSize: 13, color: '#374151', fontWeight: '600' },
-  activeTxt: { color: '#FFF' },
-  ellipsis: { fontSize: 13, color: '#6B7280', paddingHorizontal: 4 },
-});
+
 
 // ─────────────────────────── MAIN SCREEN ─────────────────────────────────────
 export default function SellersScreen() {
@@ -973,12 +935,14 @@ export default function SellersScreen() {
 
           {/* Footer */}
           {!loading && totalElements > 0 && (
-            <View style={[SS.footer, isMobile && { flexDirection: 'column', alignItems: 'flex-start' }]}>
-              <Text style={SS.footTxt}>
-                Showing {(safePage - 1) * ipp + 1}–{Math.min(safePage * ipp, totalElements)} of {totalElements} sellers
-              </Text>
-              <Pagination current={safePage} total={totalPages} onChange={setPage} />
-            </View>
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalElements}
+              itemsPerPage={ipp}
+              itemName="sellers"
+              onPageChange={setPage}
+            />
           )}
         </ScrollView>
 
@@ -1008,11 +972,12 @@ const SS = StyleSheet.create({
   backButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600', marginLeft: 4 },
   headerContainer: {
     backgroundColor: "#1d324e",
+    marginHorizontal: 18,
+    marginTop: 22,
+    borderRadius: 22,
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 48,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
   },
   pageHeader: {
     flexDirection: 'row',
@@ -1025,6 +990,7 @@ const SS = StyleSheet.create({
     gap: 12,
     marginTop: -32,
     paddingHorizontal: 20,
+    marginHorizontal: 22,
     marginBottom: 16,
     zIndex: 10,
   },

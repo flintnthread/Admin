@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -383,7 +384,7 @@ const em = StyleSheet.create({
         borderRadius: 16,
         overflow: "hidden", // Prevents header from escaping border radius
     },
-    header: {
+    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -763,6 +764,8 @@ const DepartmentsScreen: React.FC = () => {
     const [editTarget, setEditTarget] = useState<Department | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
     const [addOpen, setAddOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type?: 'success' | 'error' }>({ visible: false, title: "", message: "", type: 'success' });
@@ -784,6 +787,8 @@ const DepartmentsScreen: React.FC = () => {
             return sortOrder === "asc" ? cmp : -cmp;
         });
     }
+
+    const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const totalJobs = departments.reduce((s, d) => s + d.jobs, 0);
     const activeCount = departments.filter(d => d.status === "Active").length;
@@ -842,10 +847,7 @@ const DepartmentsScreen: React.FC = () => {
                     {!isWeb ? (
                         <>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                <View style={[s.pageTag, { marginBottom: 0 }]}>
-                                    <Feather name="grid" size={11} color={T.orange} />
-                                    <Text style={s.pageTagTxt}>Departments</Text>
-                                </View>
+
                                 <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => setAddOpen(true)} activeOpacity={0.85}>
                                     <Feather name="plus" size={14} color="#fff" />
                                     <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
@@ -859,10 +861,7 @@ const DepartmentsScreen: React.FC = () => {
                     ) : (
                         <>
                             <View style={s.pageHeadLeft}>
-                                <View style={s.pageTag}>
-                                    <Feather name="grid" size={11} color={T.orange} />
-                                    <Text style={s.pageTagTxt}>Departments</Text>
-                                </View>
+
                                 <Text style={s.pageTitle}>Manage Departments</Text>
                                 <Text style={s.pageSub}>Organize your workforce by department structure</Text>
                             </View>
@@ -908,10 +907,10 @@ const DepartmentsScreen: React.FC = () => {
                             placeholder="Search departments…"
                             placeholderTextColor={T.textHint}
                             value={search}
-                            onChangeText={setSearch}
+                            onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
                         />
                         {search.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearch("")}>
+                            <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
                                 <Feather name="x-circle" size={15} color={T.textHint} />
                             </TouchableOpacity>
                         )}
@@ -923,11 +922,11 @@ const DepartmentsScreen: React.FC = () => {
                         <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
                             <Feather name="list" size={16} color={viewMode === 'list' ? T.orange : T.textHint} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All")}>
+                        <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
                             <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
                             <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc")}>
+                        <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => { setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc"); setCurrentPage(1); }}>
                             <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={13} color={sortOrder ? T.orange : T.textM} />
                             <Text style={[s.filterBtnTxt, sortOrder !== null && { color: T.orange }]}>{sortOrder === "asc" ? "Sort A-Z" : sortOrder === "desc" ? "Sort Z-A" : "Sort"}</Text>
                         </TouchableOpacity>
@@ -970,7 +969,7 @@ const DepartmentsScreen: React.FC = () => {
                                 <Text style={[s.th, { flex: 1, textAlign: 'center' }]}>Status</Text>
                                 <Text style={[s.th, { flex: 1, textAlign: 'right' }]}>Action</Text>
                             </View>
-                            {filtered.map((dept, idx) => (
+                            {paginated.map((dept, idx) => (
                                 <View key={dept.id} style={[s.tableRow, idx % 2 === 1 && s.tableRowAlt]}>
                                     <View style={{ flex: 2 }}>
                                         <Text style={[{ fontWeight: '700', color: T.textH }, s.td]}>{dept.name}</Text>
@@ -997,7 +996,7 @@ const DepartmentsScreen: React.FC = () => {
                         </View>
                     ) : (
                         <View style={{ gap: 10 }}>
-                            {filtered.map(dept => (
+                            {paginated.map(dept => (
                                 <View key={dept.id} style={{ backgroundColor: T.card, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: T.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                     <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: T.orangeLight, alignItems: 'center', justifyContent: 'center' }}>
                                         <Feather name="grid" size={18} color={T.orange} />
@@ -1012,12 +1011,12 @@ const DepartmentsScreen: React.FC = () => {
                                             <Text style={[{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }, { color: dept.status === "Active" ? T.green : T.red }]}>{dept.status}</Text>
                                         </View>
                                         <View style={{ flexDirection: 'row', gap: 10 }}>
-                                             <TouchableOpacity onPress={() => setEditTarget(dept)} style={{ padding: 4 }}>
-                                                 <Feather name="edit-2" size={15} color={T.textM} />
-                                             </TouchableOpacity>
-                                             <TouchableOpacity onPress={() => setDeleteTarget(dept)} style={{ padding: 4 }}>
-                                                 <Feather name="trash-2" size={15} color={T.red} />
-                                             </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => setEditTarget(dept)} style={{ padding: 4 }}>
+                                                <Feather name="edit-2" size={15} color={T.textM} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => setDeleteTarget(dept)} style={{ padding: 4 }}>
+                                                <Feather name="trash-2" size={15} color={T.red} />
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
                                 </View>
@@ -1029,7 +1028,7 @@ const DepartmentsScreen: React.FC = () => {
                         ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
                         : { gap: 12 }
                     }>
-                        {filtered.map(dept => (
+                        {paginated.map(dept => (
                             <View
                                 key={dept.id}
                                 style={isWeb ? { width: "calc(25% - 11px)" as any } : undefined}
@@ -1042,6 +1041,17 @@ const DepartmentsScreen: React.FC = () => {
                             </View>
                         ))}
                     </View>
+                )}
+
+                {filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        itemName="departments"
+                        onPageChange={setCurrentPage}
+                    />
                 )}
             </ScrollView>
 
@@ -1141,7 +1151,8 @@ const s = StyleSheet.create({
 
     // ── Scroll / content ──
     scroll: {
-        padding: 18,
+        paddingTop: 10,
+        paddingHorizontal: 16,
         paddingBottom: 48,
         gap: 14,
     },
@@ -1155,7 +1166,9 @@ const s = StyleSheet.create({
         backgroundColor: "#151D4F",
         padding: 24,
         paddingBottom: 48,
-        borderRadius: 16,
+        borderRadius: 22,
+        marginHorizontal: 2,
+        marginTop: 12,
     },
     pageHeadLeft: {
         flex: 1,

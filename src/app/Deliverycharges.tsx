@@ -25,6 +25,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import Swal from "sweetalert2";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -348,7 +349,7 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
       <View style={[sc.iconWrap, { backgroundColor: tint }]}>
         <Feather name={icon} size={16} color={txtColor} />
       </View>
-      <View>
+      <View style={{ flexDirection: "column" }}>
         <Text style={sc.value}>{value}</Text>
         <Text style={sc.label}>{label}</Text>
       </View>
@@ -359,12 +360,12 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
 const sc = StyleSheet.create({
   card: {
     flex: 1,
-    maxWidth: 320,
+    maxWidth: 240,
     backgroundColor: T.card,
     borderRadius: 14,
     padding: 14,
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
     gap: 12,
     borderWidth: 1,
     borderColor: T.border,
@@ -386,7 +387,7 @@ const sc = StyleSheet.create({
     fontSize: 9,
     fontWeight: "600",
     color: "#000",
-    marginTop: 3,
+    marginTop: 1,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -586,6 +587,9 @@ const DeliveryChargesScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
+
   const filteredSlabs = slabs.filter(s => filterStatus === "All" || s.status === filterStatus);
 
   const loadSlabs = useCallback(async () => {
@@ -678,17 +682,33 @@ const DeliveryChargesScreen: React.FC = () => {
       try {
         await deleteDeliverySlab(id);
         await loadSlabs();
-        if (Platform.OS === "web") window.alert("Delivery charge deleted successfully!");
-        else Alert.alert("Deleted", "Delivery charge deleted successfully!");
+        if (Platform.OS === "web") {
+          Swal.fire({
+            icon: "success",
+            title: "Deleted!",
+            text: "Delivery charge deleted successfully!",
+            confirmButtonColor: "#1E2B6B",
+          });
+        } else Alert.alert("Deleted", "Delivery charge deleted successfully!");
       } catch (e) {
         console.warn(getApiErrorMessage(e));
       }
     };
 
     if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this delivery charge?")) {
-        confirmDelete();
-      }
+      Swal.fire({
+        title: "Are you sure?",
+        text: "You won't be able to revert this!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#1E2B6B",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          confirmDelete();
+        }
+      });
     } else {
       Alert.alert(
         "Confirm Delete",
@@ -713,7 +733,7 @@ const DeliveryChargesScreen: React.FC = () => {
                 <Text style={[styles.pageTitle, { fontSize: 20 }]}>Delivery Charges</Text>
                 <Text style={styles.pageSub}>Manage weight slabs and charges</Text>
               </View>
-              <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+              <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}>
                 <Feather name="plus" size={14} color="#1E2B6B" />
                 <Text style={styles.addBtnWhiteTxt}>Add</Text>
               </TouchableOpacity>
@@ -722,14 +742,9 @@ const DeliveryChargesScreen: React.FC = () => {
         ) : (
           <>
             <View style={styles.pageHeadLeft}>
-              <View style={styles.breadcrumb}>
-                <Text style={styles.breadcrumbDim}>Dashboard</Text>
-                <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.breadcrumbActive}>Delivery Charges</Text>
-              </View>
               <Text style={styles.pageTitle}>Delivery Charges</Text>
             </View>
-            <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => setIsAddModalVisible(true)}>
+            <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}>
               <Feather name="plus" size={15} color="#1E2B6B" />
               <Text style={styles.addBtnWhiteTxt}>Add New Charge</Text>
             </TouchableOpacity>
@@ -738,10 +753,8 @@ const DeliveryChargesScreen: React.FC = () => {
       </View>
 
       <StatsFooter slabs={slabs} isWeb={isWeb} />
-      <ScrollView
-        style={styles.listContent}
-        contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }}
-        showsVerticalScrollIndicator={false}
+      <View
+        style={[styles.listContent, isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }]}
       >
 
         {/* ── Toolbar (Search + Filter) ── */}
@@ -754,7 +767,7 @@ const DeliveryChargesScreen: React.FC = () => {
               placeholderTextColor="#000"
             />
           </View>
-          
+
           <View style={{ flexDirection: "row", gap: 8, marginRight: 8 }}>
             {(["All", "Active", "Inactive"] as const).map(status => (
               <TouchableOpacity
@@ -763,7 +776,10 @@ const DeliveryChargesScreen: React.FC = () => {
                   styles.statusFilterBtn,
                   filterStatus === status && styles.statusFilterBtnActive,
                 ]}
-                onPress={() => setFilterStatus(status)}
+                onPress={() => {
+                  setFilterStatus(status);
+                  setCurrentPage(1);
+                }}
               >
                 <Text style={[
                   styles.statusFilterTxt,
@@ -807,7 +823,7 @@ const DeliveryChargesScreen: React.FC = () => {
             ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
             : { gap: 12 }
           }>
-            {filteredSlabs.map((item) => (
+            {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((item) => (
               <View
                 key={item.id}
                 style={isWeb ? { width: "calc(33.33% - 10px)" as any } : undefined}
@@ -822,8 +838,8 @@ const DeliveryChargesScreen: React.FC = () => {
             ))}
           </View>
         ) : (
-          <View style={styles.tableCard}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={[styles.tableCard, isWeb && { width: "75%" }]}>
+            <View style={[{ width: "100%", overflowX: "auto" } as any]}>
               <View style={{ minWidth: 880 }}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.th, { width: 140 }]}>Weight Slab</Text>
@@ -834,7 +850,7 @@ const DeliveryChargesScreen: React.FC = () => {
                   <Text style={[styles.th, { width: 90 }]}>Status</Text>
                   <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>Action</Text>
                 </View>
-                {filteredSlabs.map((slab, idx) => (
+                {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((slab, idx) => (
                   <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                     <Text style={[styles.td, { width: 140, fontWeight: '700', color: T.textH }]}>{slab.label}</Text>
                     <Text style={[styles.td, { width: 160 }]}>{slab.range}</Text>
@@ -857,10 +873,21 @@ const DeliveryChargesScreen: React.FC = () => {
                   </View>
                 ))}
               </View>
-            </ScrollView>
+            </View>
           </View>
         )}
-      </ScrollView>
+
+        {filteredSlabs.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filteredSlabs.length / ITEMS_PER_PAGE)}
+            totalItems={filteredSlabs.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="delivery charges"
+            onPageChange={setCurrentPage}
+          />
+        )}
+      </View>
     </View>
   );
 
@@ -868,7 +895,9 @@ const DeliveryChargesScreen: React.FC = () => {
     <AdminLayout>
       <View style={{ flex: 1 }}>
         <StatusBar barStyle="light-content" backgroundColor="#000080" />
-        {MainContent}
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {MainContent}
+        </ScrollView>
         <DeliveryChargeModal
           visible={editingSlabId !== null}
           onClose={() => setEditingSlabId(null)}
@@ -915,8 +944,8 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     paddingBottom: 68,
     borderRadius: 22,
-    marginHorizontal: 24,
-    marginTop: 24,
+    marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 0,
     zIndex: 1,
     shadowColor: "#151D4F",
@@ -1026,6 +1055,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginBottom: 16,
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   searchBox: {
     flex: 1,
@@ -1123,7 +1162,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Header (Old - might be used by other parts) ──
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

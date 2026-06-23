@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     padding: 0,
     // @ts-ignore – web-only: suppress default browser focus outline
-    outlineStyle: "none",
+    outlineStyle: "none" as any,
     outlineWidth: 0,
     borderWidth: 0,
   },

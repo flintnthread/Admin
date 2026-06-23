@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import Svg, { Path, Circle, G, Rect } from 'react-native-svg';
 
 // â”€â”€â”€ SVG Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -332,10 +333,10 @@ const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
       <Text style={[styles.th, { width: 60 }]}>ID</Text>
       <Text style={[styles.th, { flex: 2.5 }]}>Subject</Text>
       <Text style={[styles.th, { flex: 1.4 }]}>Customer</Text>
-      <Text style={[styles.th, { width: 120 }]}>Type</Text>
-      <Text style={[styles.th, { width: 130 }]}>Order</Text>
+      <Text style={[styles.th, { width: 100 }]}>Type</Text>
+      <Text style={[styles.th, { width: 160 }]}>Order</Text>
       <Text style={[styles.th, { width: 100 }]}>Status</Text>
-      <Text style={[styles.th, { width: 130 }]}>Created</Text>
+      <Text style={[styles.th, { width: 110 }]}>Created</Text>
       <Text style={[styles.th, { width: 90, textAlign: "center" }]}>
         Actions
       </Text>
@@ -362,16 +363,17 @@ const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
         <View
           style={[
             {
-              width: 120,
+              width: 100,
               paddingVertical: 13,
               paddingHorizontal: 12,
               justifyContent: "center",
+              alignItems: "flex-start",
             },
           ]}
         >
           <TypeBadge type={ticket.type} />
         </View>
-        <Text style={[styles.td, { width: 130 }, styles.orderLink]}>
+        <Text style={[styles.td, { width: 160 }, styles.orderLink]}>
           {ticket.order}
         </Text>
         <View
@@ -381,12 +383,13 @@ const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
               paddingVertical: 13,
               paddingHorizontal: 12,
               justifyContent: "center",
+              alignItems: "flex-start",
             },
           ]}
         >
           <StatusBadge status={ticket.status} />
         </View>
-        <Text style={[styles.td, { width: 130 }, styles.tdMuted]}>
+        <Text style={[styles.td, { width: 110 }, styles.tdMuted]}>
           {ticket.created}
         </Text>
         <View style={[styles.tdActions, { width: 90 }]}>
@@ -427,6 +430,11 @@ export default function CustomerSupportTickets() {
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const ITEMS_PER_PAGE = 15;
+
   const loadTickets = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -437,12 +445,14 @@ export default function CustomerSupportTickets() {
           status: selectedStatus || undefined,
           type: selectedType || undefined,
           search: searchQ || undefined,
-          page: 0,
-          size: 500,
+          page: currentPage - 1,
+          size: ITEMS_PER_PAGE,
         }),
         fetchCustomerSupportStats(),
       ]);
       setTickets((listRes.items ?? []).map(mapCustomerSupportTicket));
+      setTotalPages(listRes.totalPages ?? 1);
+      setTotalItems(listRes.totalElements ?? 0);
       setStats(statsRes);
     } catch (e) {
       setLoadError(getApiErrorMessage(e, 'Failed to load support tickets.'));
@@ -451,7 +461,7 @@ export default function CustomerSupportTickets() {
     } finally {
       setLoading(false);
     }
-  }, [token, selectedStatus, selectedType, searchQ]);
+  }, [token, selectedStatus, selectedType, searchQ, currentPage]);
 
   useEffect(() => {
     if (authLoading || !token) return;
@@ -463,6 +473,7 @@ export default function CustomerSupportTickets() {
   const handleSearch = useCallback((value: string) => {
     setSearch(value);
     setSearchQ(value);
+    setCurrentPage(1);
   }, []);
 
   const handleView = (ticket: (typeof tickets)[0]) => {
@@ -484,14 +495,17 @@ export default function CustomerSupportTickets() {
         contentContainerStyle={styles.rootContent}
         showsVerticalScrollIndicator={false}
       >
-        {loadError ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{loadError}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => void loadTickets()}>
-              <Text style={styles.retryBtnText}>Retry</Text>
-            </TouchableOpacity>
+        <View style={styles.pageHeader}>
+          <View style={styles.pageHeaderLeft}>
+            <TicketIcon />
+            <Text style={styles.pageTitle}>Support Tickets</Text>
           </View>
-        ) : null}
+          <View style={styles.ticketCount}>
+            <Text style={styles.ticketCountText}>
+              {filtered.length} tickets
+            </Text>
+          </View>
+        </View>
 
         {stats ? (
           <View style={styles.statsRow}>
@@ -513,17 +527,15 @@ export default function CustomerSupportTickets() {
             </View>
           </View>
         ) : null}
-        <View style={styles.pageHeader}>
-          <View style={styles.pageHeaderLeft}>
-            <TicketIcon />
-            <Text style={styles.pageTitle}>Support Tickets</Text>
+
+        {loadError ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{loadError}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => void loadTickets()}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.ticketCount}>
-            <Text style={styles.ticketCountText}>
-              {filtered.length} tickets
-            </Text>
-          </View>
-        </View>
+        ) : null}
 
         {/* â”€â”€ Search + Filters Row â”€â”€ */}
         <View style={styles.toolbarRow}>
@@ -606,6 +618,17 @@ export default function CustomerSupportTickets() {
           </View>
         )}
 
+        {!loading && filtered.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="tickets"
+            onPageChange={setCurrentPage}
+          />
+        )}
+
         {!loading && filtered.length === 0 && (
           <View style={styles.emptyState}>
             <TicketIcon />
@@ -623,7 +646,10 @@ export default function CustomerSupportTickets() {
         title="Filter by Status"
         options={STATUS_OPTIONS}
         selected={selectedStatus}
-        onSelect={setSelectedStatus}
+        onSelect={(val) => {
+          setSelectedStatus(val);
+          setCurrentPage(1);
+        }}
         onClose={() => setStatusModalOpen(false)}
         isWeb={isWeb}
       />
@@ -634,7 +660,10 @@ export default function CustomerSupportTickets() {
         title="Filter by Type"
         options={TYPE_OPTIONS}
         selected={selectedType}
-        onSelect={setSelectedType}
+        onSelect={(val) => {
+          setSelectedType(val);
+          setCurrentPage(1);
+        }}
         onClose={() => setTypeModalOpen(false)}
         isWeb={isWeb}
       />
@@ -659,10 +688,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
-    backgroundColor: "#1E3A5F",
-    padding: 15,
-    borderRadius: 10,
+    marginBottom: 0,
+    backgroundColor: "#151D4F",
+    padding: 20,
+    paddingTop: 24,
+    paddingBottom: 64,
+    borderRadius: 20,
   },
   pageHeaderLeft: {
     flexDirection: "row",
@@ -694,6 +725,17 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 20,
     alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
   },
   searchBox: {
     flex: 1,
@@ -1062,18 +1104,28 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 10,
     marginBottom: 16,
+    marginTop: -40,
+    zIndex: 10,
+    elevation: 5,
   },
   statCard: {
     flex: 1,
     minWidth: 120,
+    maxWidth: 240,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     padding: 14,
     alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   statValue: {
     fontSize: 22,

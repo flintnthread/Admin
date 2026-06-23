@@ -7,10 +7,11 @@
 
 import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   ActivityIndicator,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -33,7 +34,7 @@ const C = {
   bg: "#FFFFFF",
   surface: "#FFFFFF",
   cardBg: "#FFF8F4",
-  primary: "#E8571A",
+  primary: "#F97316",
   primaryLight: "#FFF0EA",
   navy: "#1C2B4A",
   white: "#FFFFFF",
@@ -69,6 +70,7 @@ function useLayout(w: number) {
 // ─────────────────────────────────────────────────────────────────────────────
 type OrderStatus =
   | "Pending"
+  | "Sent to Seller"
   | "Processing"
   | "Completed"
   | "Returned"
@@ -377,6 +379,7 @@ const STATUS_CFG: Record<
   { bg: string; color: string; dot: string }
 > = {
   Pending: { bg: C.warningLight, color: C.warning, dot: C.warning },
+  "Sent to Seller": { bg: C.blueLight, color: C.blue, dot: C.blue },
   Processing: { bg: C.blueLight, color: C.blue, dot: C.blue },
   Completed: { bg: C.activeLight, color: C.active, dot: C.active },
   Returned: { bg: "#FEF3C7", color: "#D97706", dot: "#D97706" },
@@ -695,69 +698,78 @@ function StatusDropdown({
   onSelect: (v: OrderStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const cfg = STATUS_CFG[current];
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 210 });
+  const btnRef = useRef<View>(null);
+
+  const openMenu = () => {
+    btnRef.current?.measureInWindow((x, y, width, height) => {
+      setMenuPos({ top: y + height + 6, left: x + width - 210, width: 210 });
+      setOpen(true);
+    });
+  };
 
   return (
-    <View style={{ position: "relative", zIndex: 100 }}>
+    <View ref={btnRef} collapsable={false}>
       <TouchableOpacity
-        style={[s.dropBtn, { borderColor: cfg.dot }]}
-        onPress={() => setOpen((o) => !o)}
+        style={[s.dropBtn, { borderColor: C.navy }]}
+        onPress={openMenu}
         activeOpacity={0.8}
       >
-        <View style={[s.dropDot, { backgroundColor: cfg.dot }]} />
-        <Text style={[s.dropBtnTxt, { color: cfg.color }]}>{current}</Text>
-        <ChevronIcon color={cfg.color} />
+        <Text style={[s.dropBtnTxt, { color: C.navy }]}>{current}</Text>
+        <ChevronIcon color={C.navy} />
       </TouchableOpacity>
 
-      {open && (
-        <>
-          {/* Invisible overlay to close on outside tap */}
-          <TouchableWithoutFeedback onPress={() => setOpen(false)}>
-            <View style={s.dropOverlay} />
-          </TouchableWithoutFeedback>
-
-          <View style={s.dropMenu}>
-            {/* Extra option: Sent to Seller */}
-            <TouchableOpacity
-              style={s.dropItem}
-              onPress={() => setOpen(false)}
-              activeOpacity={0.7}
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setOpen(false)}>
+          <View style={{ flex: 1 }}>
+            <View
+              style={[
+                s.dropMenu,
+                {
+                  position: "absolute",
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  width: menuPos.width,
+                },
+              ]}
             >
-              <View style={s.dropItemIcon}>
-                <SentToSellerIcon />
-              </View>
-              <Text style={s.dropItemTxt}>Sent to Seller</Text>
-            </TouchableOpacity>
-
-            <View style={s.dropDivider} />
-
-            {STATUS_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[s.dropItem, current === opt.value && s.dropItemActive]}
-                onPress={() => {
-                  onSelect(opt.value);
-                  setOpen(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={s.dropItemIcon}>{opt.icon}</View>
-                <Text
-                  style={[
-                    s.dropItemTxt,
-                    current === opt.value && {
-                      fontWeight: "700",
-                      color: C.navy,
-                    },
-                  ]}
+              {[
+                { value: "Pending" as OrderStatus, label: "Mark as Pending", icon: <PendingIcon /> },
+                { value: "Sent to Seller" as OrderStatus, label: "Sent to Seller", icon: <SentToSellerIcon /> },
+                { value: "Processing" as OrderStatus, label: "Mark as Processing", icon: <ProcessingIcon /> },
+                { value: "Completed" as OrderStatus, label: "Mark as Completed", icon: <CompletedIcon /> },
+                { value: "Returned" as OrderStatus, label: "Mark as Returned", icon: <ReturnedIcon /> },
+                { value: "Replacement" as OrderStatus, label: "Mark as Replacement", icon: <ReplacementIcon /> },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[s.dropItem, current === opt.value && s.dropItemActive]}
+                  onPress={() => {
+                    onSelect(opt.value);
+                    setOpen(false);
+                  }}
+                  activeOpacity={0.7}
                 >
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <View style={s.dropItemIcon}>{opt.icon}</View>
+                  <Text
+                    style={[
+                      s.dropItemTxt,
+                      current === opt.value && { fontWeight: "700", color: C.navy },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </>
-      )}
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -964,7 +976,7 @@ export default function OrderDetailScreen() {
                 </TouchableOpacity>
                 {/* Force Push */}
                 <TouchableOpacity
-                  style={[s.actionBtn, { backgroundColor: C.blue }]}
+                  style={[s.actionBtn, { backgroundColor: C.primary }]}
                   activeOpacity={0.8}
                 >
                   <ShiprocketIcon />
@@ -1485,7 +1497,7 @@ const s = StyleSheet.create({
   colStack: { flexDirection: "column" },
 
   // ── Header ─────────────────────────────────────────────────────────────────
-  header: { backgroundColor: C.navy, paddingBottom: 14 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navy, paddingBottom: 14 },
   headerInner: { flexDirection: "row", alignItems: "center" },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   backBtn: {
@@ -1603,8 +1615,6 @@ const s = StyleSheet.create({
   },
   dropMenu: {
     position: "absolute",
-    top: 44,
-    right: 0,
     backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1,

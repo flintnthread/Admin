@@ -25,6 +25,7 @@ import {
   StatusBar,
 } from 'react-native';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const C = {
@@ -51,9 +52,9 @@ function mapApplication(a: import('@/lib/api/types').JobApplication, index: numb
   const statusRaw = (a.status ?? 'pending').toLowerCase();
   const status =
     statusRaw === 'reviewed' ? 'Reviewed' :
-    statusRaw === 'shortlisted' ? 'Shortlisted' :
-    statusRaw === 'interviewed' ? 'Interviewed' :
-    statusRaw === 'rejected' ? 'Rejected' : 'Pending';
+      statusRaw === 'shortlisted' ? 'Shortlisted' :
+        statusRaw === 'interviewed' ? 'Interviewed' :
+          statusRaw === 'rejected' ? 'Rejected' : 'Pending';
   const jobTitle = a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : '—');
   return {
     id: String(a.id),
@@ -71,20 +72,20 @@ function mapApplication(a: import('@/lib/api/types').JobApplication, index: numb
 }
 
 const STATUS_CONFIG = {
-  Pending:     { color: C.pending,     bg: '#FFF7ED', icon: '⏳' },
-  Reviewed:    { color: C.reviewed,    bg: '#ECFEFF', icon: '👁️' },
+  Pending: { color: C.pending, bg: '#FFF7ED', icon: '⏳' },
+  Reviewed: { color: C.reviewed, bg: '#ECFEFF', icon: '👁️' },
   Shortlisted: { color: C.shortlisted, bg: '#ECFDF5', icon: '⭐' },
   Interviewed: { color: C.interviewed, bg: '#F5F3FF', icon: '🎤' },
-  Rejected:    { color: C.rejected,    bg: '#FEF2F2', icon: '✕' },
+  Rejected: { color: C.rejected, bg: '#FEF2F2', icon: '✕' },
 };
 
 const STAT_CARDS = [
-  { key: 'total',       label: 'Total',       color: C.total,       icon: '📋' },
-  { key: 'Pending',     label: 'Pending',     color: C.pending,     icon: '⏳' },
-  { key: 'Reviewed',    label: 'Reviewed',    color: C.reviewed,    icon: '👁️' },
+  { key: 'total', label: 'Total', color: C.total, icon: '📋' },
+  { key: 'Pending', label: 'Pending', color: C.pending, icon: '⏳' },
+  { key: 'Reviewed', label: 'Reviewed', color: C.reviewed, icon: '👁️' },
   { key: 'Shortlisted', label: 'Shortlisted', color: C.shortlisted, icon: '⭐' },
   { key: 'Interviewed', label: 'Interviewed', color: C.interviewed, icon: '🎤' },
-  { key: 'Rejected',    label: 'Rejected',    color: C.rejected,    icon: '✕' },
+  { key: 'Rejected', label: 'Rejected', color: C.rejected, icon: '✕' },
 ];
 
 const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'];
@@ -231,6 +232,8 @@ export default function JobApplicationsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const handleStatusChange = useCallback(async (id: string, status: string) => {
     setUpdatingId(id);
@@ -288,6 +291,10 @@ export default function JobApplicationsScreen() {
     });
   }, [search, selectedJob, selectedStatus, applications]);
 
+  const paginated = useMemo(() => {
+    return filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
   const counts = useMemo(() => {
     const c: { [key: string]: number } = { total: applications.length };
     applications.forEach(a => { c[a.status] = (c[a.status] || 0) + 1; });
@@ -302,117 +309,128 @@ export default function JobApplicationsScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
         <ScrollView style={styles.root} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
-        {/* ── Header ── */}
-        <View style={[styles.header, isWeb && styles.headerWeb]}>
-          <View>
+          {/* ── Header ── */}
+          <View style={[styles.header, isWeb && styles.headerWeb]}>
+            <View>
 
-            <Text style={styles.pageTitle}>Job Applications</Text>
+              <Text style={styles.pageTitle}>Job Applications</Text>
+            </View>
           </View>
-        </View>
 
-        {/* ── Stat Cards ── */}
-        <ScrollView
-          style={{ zIndex: 10, elevation: 10, marginTop: -42, overflow: 'visible' }}
-          horizontal={!isWeb}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.statRow, isWeb && styles.statRowWeb]}
-        >
-          {STAT_CARDS.map(s => (
-            <StatCard
-              key={s.key}
-              label={s.label}
-              count={counts[s.key] ?? 0}
-              color={s.color}
-              icon={s.icon}
-              isWeb={isWeb}
-            />
-          ))}
-        </ScrollView>
-
-        {/* ── Filters ── */}
-        <View style={[styles.filterRow, isWeb && styles.filterRowWeb]}>
-          <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={[styles.searchInput, { outlineStyle: "none" as any }]}
-              placeholder="Search applicants..."
-              placeholderTextColor={C.sub}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Text style={{ color: C.sub, fontSize: 16, paddingHorizontal: 8 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <View style={[styles.filterDropdowns, isWeb && styles.filterDropdownsWeb]}>
-            <Dropdown value={selectedJob} options={jobOptions} onSelect={setSelectedJob} placeholder="All Jobs" />
-            <Dropdown value={selectedStatus} options={STATUSES} onSelect={setSelectedStatus} placeholder="All Status" />
-            <TouchableOpacity
-              style={styles.resetBtn}
-              onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.resetBtnText}>↺ Reset</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ── Results info ── */}
-        <View style={styles.resultsRow}>
-          <Text style={styles.resultsText}>
-            Showing <Text style={{ color: C.primary, fontWeight: '700' }}>{filtered.length}</Text> of{' '}
-            <Text style={{ fontWeight: '700' }}>{applications.length}</Text> applications
-          </Text>
-        </View>
-
-        {/* ── Application List ── */}
-        {loading ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>Loading applications…</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>{error}</Text>
-            <TouchableOpacity style={styles.resetBtn} onPress={loadApplications}>
-              <Text style={styles.resetBtnText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyTitle}>No Applications Found</Text>
-            <Text style={styles.emptySub}>Try adjusting your filters to see more results.</Text>
-          </View>
-        ) : isWeb ? (
-          // Web: 2-column grid
-          <View style={styles.webGrid}>
-            {filtered.map(item => (
-              <View key={item.id} style={styles.webGridItem}>
-                <ApplicationCard
-                  item={item}
-                  isWeb={isWeb}
-                  onStatusChange={handleStatusChange}
-                  updating={updatingId === item.id}
-                />
-              </View>
+          {/* ── Stat Cards ── */}
+          <ScrollView
+            style={{ zIndex: 10, elevation: 10, marginTop: -42, overflow: 'visible' }}
+            horizontal={!isWeb}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.statRow, isWeb && styles.statRowWeb]}
+          >
+            {STAT_CARDS.map(s => (
+              <StatCard
+                key={s.key}
+                label={s.label}
+                count={counts[s.key] ?? 0}
+                color={s.color}
+                icon={s.icon}
+                isWeb={isWeb}
+              />
             ))}
+          </ScrollView>
+
+          {/* ── Filters ── */}
+          <View style={[styles.filterRow, isWeb && styles.filterRowWeb]}>
+            <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={[styles.searchInput, { outlineStyle: "none" as any }]}
+                placeholder="Search applicants..."
+                placeholderTextColor={C.sub}
+                value={search}
+                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearch(''); setCurrentPage(1); }}>
+                  <Text style={{ color: C.sub, fontSize: 16, paddingHorizontal: 8 }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.filterDropdowns, isWeb && styles.filterDropdownsWeb]}>
+              <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
+              <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
+              <TouchableOpacity
+                style={styles.resetBtn}
+                onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.resetBtnText}>↺ Reset</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : (
-          // Mobile: single column list
-          filtered.map(item => (
-            <ApplicationCard
-              key={item.id}
-              item={item}
-              isWeb={false}
-              onStatusChange={handleStatusChange}
-              updating={updatingId === item.id}
+
+          {/* ── Results info ── */}
+          <View style={styles.resultsRow}>
+            <Text style={styles.resultsText}>
+              Showing <Text style={{ color: C.primary, fontWeight: '700' }}>{filtered.length}</Text> of{' '}
+              <Text style={{ fontWeight: '700' }}>{applications.length}</Text> applications
+            </Text>
+          </View>
+
+          {/* ── Application List ── */}
+          {loading ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Loading applications…</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>{error}</Text>
+              <TouchableOpacity style={styles.resetBtn} onPress={loadApplications}>
+                <Text style={styles.resetBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyIcon}>📭</Text>
+              <Text style={styles.emptyTitle}>No Applications Found</Text>
+              <Text style={styles.emptySub}>Try adjusting your filters to see more results.</Text>
+            </View>
+          ) : isWeb ? (
+            // Web: 2-column grid
+            <View style={styles.webGrid}>
+              {paginated.map(item => (
+                <View key={item.id} style={styles.webGridItem}>
+                  <ApplicationCard
+                    item={item}
+                    isWeb={isWeb}
+                    onStatusChange={handleStatusChange}
+                    updating={updatingId === item.id}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : (
+            // Mobile: single column list
+            paginated.map(item => (
+              <ApplicationCard
+                key={item.id}
+                item={item}
+                isWeb={false}
+                onStatusChange={handleStatusChange}
+                updating={updatingId === item.id}
+              />
+            ))
+          )}
+
+          {filtered.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+              totalItems={filtered.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              itemName="applications"
+              onPageChange={setCurrentPage}
             />
-          ))
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          )}
+        </ScrollView>
+      </SafeAreaView>
     </AdminLayout>
   );
 }
@@ -437,14 +455,11 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: 8,
   },
-  headerWeb: {
+  headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 24,
-    marginHorizontal: 28,
-    marginTop: 24,
-    borderRadius: 16,
     paddingBottom: 48,
   },
   breadcrumb: { fontSize: 12, color: '#D1D5DB', marginBottom: 4 },

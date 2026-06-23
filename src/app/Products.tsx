@@ -212,7 +212,7 @@ const rs = StyleSheet.create({
     thumbInner:  { width: 8, height: 8, borderRadius: 4, backgroundColor: C.navy },
     labelRow:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18, gap: 8 },
     labelPill:   { flex: 1, backgroundColor: C.bg, borderRadius: 9, borderWidth: 1, borderColor: C.border, paddingVertical: 8, alignItems: "center" },
-    labelTxt:    { fontFamily: "Outfit_700Bold", fontSize: 13, color: C.navy },
+    labelTxt:    { fontSize: 13, color: C.navy },
     dash:        { width: 16, height: 1.5, backgroundColor: C.border, borderRadius: 1 },
 });
 
@@ -238,7 +238,7 @@ const WrapColorGroup = ({ selected, onSelect }: { selected: string; onSelect: (v
                     {col !== "All" && (
                         <View style={[fs.colorDot, { backgroundColor: DOT_COLORS[col] ?? "#ccc", borderWidth: col === "White" ? 1 : 0, borderColor: C.border }]} />
                     )}
-                    <Text style={[fs.chipText, isSelected && { color: C.navy, fontFamily: "Outfit_600SemiBold" }]}>{col}</Text>
+                    <Text style={[fs.chipText, isSelected && { color: C.navy, }]}>{col}</Text>
                 </TouchableOpacity>
             );
         })}
@@ -490,53 +490,53 @@ const dlp = StyleSheet.create({
     popupCard:               { width: 680, maxHeight: "85%" as any, backgroundColor: C.white, borderRadius: 20, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.25, shadowRadius: 40, elevation: 30, flexDirection: "column" },
     mobileFullScreen:        { flex: 1, backgroundColor: C.navyDeep },
     fullCard:                { flex: 1, flexDirection: "column" },
-    header:                  { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, backgroundColor: C.navyDeep },
+    header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, backgroundColor: C.navyDeep },
     backBtn:                 { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
     headerCenter:            { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
-    headerTitle:             { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.white },
-    headerSub:               { fontFamily: "Outfit_400Regular", fontSize: 10, color: "rgba(255,255,255,0.6)" },
+    headerTitle:             { fontSize: 14, color: C.white },
+    headerSub:               { fontSize: 10, color: "rgba(255,255,255,0.6)" },
     headerRight:             { flexDirection: "row", alignItems: "center", gap: 6 },
-    deliverAllLabel:         { fontFamily: "Outfit_500Medium", fontSize: 10, color: "rgba(255,255,255,0.8)" },
+    deliverAllLabel:         { fontSize: 10, color: "rgba(255,255,255,0.8)" },
     body:                    { flex: 1, backgroundColor: C.bg },
     infoBanner:              { flexDirection: "row", alignItems: "flex-start", gap: 8, margin: 12, backgroundColor: C.orangePale, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: C.orange + "30" },
-    infoText:                { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textMid, lineHeight: 17 },
-    infoBold:                { fontFamily: "Outfit_700Bold", color: C.textDark },
+    infoText:                { fontSize: 11, color: C.textMid, lineHeight: 17 },
+    infoBold:                { color: C.textDark },
     indiaWideBtn:            { backgroundColor: C.orange, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 5, alignSelf: "flex-start" },
-    indiaWideBtnTxt:         { fontFamily: "Outfit_600SemiBold", fontSize: 10, color: C.white },
+    indiaWideBtnTxt:         { fontSize: 10, color: C.white },
     dropdownsRow:            { flexDirection: "row", gap: 8, paddingHorizontal: 12, marginBottom: 10 },
     dropdownWrap:            { flex: 1, position: "relative" },
     inlineDropdownMenu:      { position: "absolute", top: 62, left: 0, right: 0, backgroundColor: C.white, borderRadius: 8, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, maxHeight: 180 },
     inlineDropdownItem:      { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.bg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     inlineDropdownItemActive:{ backgroundColor: C.bluePale },
-    inlineDropdownText:      { fontFamily: "Outfit_500Medium", fontSize: 13, color: C.textDark },
-    inlineDropdownTextActive:{ fontFamily: "Outfit_600SemiBold", color: C.navy },
-    dropdownLabel:           { fontFamily: "Outfit_600SemiBold", fontSize: 10, color: C.textLight, marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 },
+    inlineDropdownText:      { fontSize: 13, color: C.textDark },
+    inlineDropdownTextActive:{ color: C.navy },
+    dropdownLabel:           { fontSize: 10, color: C.textLight, marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 },
     dropdownInput:           { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.white, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, borderWidth: 1, borderColor: C.border },
-    dropdownText:            { fontFamily: "Outfit_500Medium", fontSize: 12, color: C.textDark, flex: 1 },
+    dropdownText:            { fontSize: 12, color: C.textDark, flex: 1 },
     searchRow:               { flexDirection: "row", alignItems: "center", marginHorizontal: 12, marginBottom: 10, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: C.border },
     searchIconBox:           { backgroundColor: C.orange, padding: 9 },
-    searchInput:             { flex: 1, fontFamily: "Outfit_400Regular", fontSize: 12, color: C.textDark, paddingHorizontal: 10, paddingVertical: 9, backgroundColor: C.white },
+    searchInput:             { flex: 1, fontSize: 12, color: C.textDark, paddingHorizontal: 10, paddingVertical: 9, backgroundColor: C.white },
     tableCard:               { backgroundColor: C.white, borderRadius: 12, marginHorizontal: 12, marginBottom: 10, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
     tableHeader:             { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 9, backgroundColor: C.navyDeep },
-    tableHeaderTxt:          { fontFamily: "Outfit_700Bold", fontSize: 10, color: C.white },
+    tableHeaderTxt:          { fontSize: 10, color: C.white },
     checkboxWrap:            { width: 32, alignItems: "center" },
     checkbox:                { width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.white, alignItems: "center", justifyContent: "center" },
     checkboxChecked:         { backgroundColor: C.orange, borderColor: C.orange },
     tableRow:                { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
     tableRowAlt:             { backgroundColor: "#FAFAFA" },
     tableRowChecked:         { backgroundColor: C.orangePale },
-    tableCellTxt:            { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textDark, paddingHorizontal: 4 },
-    tableCellHighlight:      { fontFamily: "Outfit_500Medium", fontSize: 11, color: C.orange, paddingHorizontal: 4 },
+    tableCellTxt:            { fontSize: 11, color: C.textDark, paddingHorizontal: 4 },
+    tableCellHighlight:      { fontSize: 11, color: C.orange, paddingHorizontal: 4 },
     emptyTable:              { alignItems: "center", paddingVertical: 28, gap: 8 },
-    emptyTableTitle:         { fontFamily: "Outfit_700Bold", fontSize: 13, color: C.textMid },
+    emptyTableTitle:         { fontSize: 13, color: C.textMid },
     selectionBanner:         { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.orangePale, borderTopWidth: 1, borderTopColor: C.orange + "30" },
-    selectionBannerTxt:      { flex: 1, fontFamily: "Outfit_600SemiBold", fontSize: 11, color: C.orange },
-    selectionClearTxt:       { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: C.red },
+    selectionBannerTxt:      { flex: 1, fontSize: 11, color: C.orange },
+    selectionClearTxt:       { fontSize: 11, color: C.red },
     footer:                  { flexDirection: "row", gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.white },
     cancelBtn:               { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 11, borderRadius: 10, borderWidth: 1.5, borderColor: C.border },
-    cancelBtnTxt:            { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textMid },
+    cancelBtnTxt:            { fontSize: 13, color: C.textMid },
     applyBtn:                { flex: 2, alignItems: "center", justifyContent: "center", paddingVertical: 11, borderRadius: 10, backgroundColor: C.orange },
-    applyBtnTxt:             { fontFamily: "Outfit_700Bold", fontSize: 13, color: C.white },
+    applyBtnTxt:             { fontSize: 13, color: C.white },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -622,16 +622,16 @@ const as = StyleSheet.create({
     drag:            { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: "center", marginTop: 14, marginBottom: 18 },
     productRow:      { flexDirection: "row", alignItems: "center", gap: 14, paddingBottom: 16 },
     productThumb:    { width: 56, height: 56, borderRadius: 12, backgroundColor: C.bg },
-    productName:     { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.textDark, marginBottom: 3 },
-    productSku:      { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight, marginBottom: 4 },
-    productPrice:    { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.navy },
+    productName:     { fontSize: 14, color: C.textDark, marginBottom: 3 },
+    productSku:      { fontSize: 11, color: C.textLight, marginBottom: 4 },
+    productPrice:    { fontSize: 14, color: C.navy },
     divider:         { height: 1, backgroundColor: C.border, marginBottom: 8 },
     actionItem:      { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 13, borderRadius: 12 },
     actionItemDanger:{ marginTop: 4 },
     actionIcon:      { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-    actionLabel:     { flex: 1, fontFamily: "Outfit_600SemiBold", fontSize: 14 },
+    actionLabel:     { flex: 1, fontSize: 14 },
     cancelBtn:       { marginTop: 10, borderWidth: 1.5, borderColor: C.border, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
-    cancelTxt:       { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: C.textMid },
+    cancelTxt:       { fontSize: 14, color: C.textMid },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -733,25 +733,25 @@ const wp = StyleSheet.create({
     popup:            { backgroundColor: C.white, borderRadius: 18, width: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.22, shadowRadius: 36, elevation: 30, overflow: "hidden" },
     popupHeader:      { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, paddingBottom: 12 },
     popupImg:         { width: 54, height: 54, borderRadius: 12, backgroundColor: C.bg },
-    popupName:        { fontFamily: "Outfit_700Bold", fontSize: 13.5, color: C.textDark, marginBottom: 3, lineHeight: 19 },
-    popupSku:         { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight, marginBottom: 6 },
+    popupName:        { fontSize: 13.5, color: C.textDark, marginBottom: 3, lineHeight: 19 },
+    popupSku:         { fontSize: 11, color: C.textLight, marginBottom: 6 },
     popupMeta:        { flexDirection: "row", alignItems: "center", gap: 8 },
-    popupPrice:       { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.navyDeep },
+    popupPrice:       { fontSize: 14, color: C.navyDeep },
     popupStatusBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-    popupStatusTxt:   { fontFamily: "Outfit_600SemiBold", fontSize: 10 },
+    popupStatusTxt:   { fontSize: 10 },
     popupCloseBtn:    { width: 28, height: 28, borderRadius: 8, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
     divider:          { height: 1, backgroundColor: "#F1F2F6", marginHorizontal: 16 },
     stockRow:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
-    stockTxt:         { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.textLight },
-    stockVal:         { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.textDark },
+    stockTxt:         { fontSize: 12, color: C.textLight },
+    stockVal:         { fontSize: 12, color: C.textDark },
     actionsContainer: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 4 },
     actionItem:       { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, paddingHorizontal: 6, borderRadius: 10 },
     actionItemDanger: { marginTop: 2 },
     actionItemBorder: { borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
     actionIconBox:    { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    actionLabel:      { flex: 1, fontFamily: "Outfit_600SemiBold", fontSize: 13.5 },
+    actionLabel:      { flex: 1, fontSize: 13.5 },
     cancelBtn:        { marginHorizontal: 16, marginTop: 4, marginBottom: 14, borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingVertical: 11, alignItems: "center", backgroundColor: C.bg },
-    cancelTxt:        { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textMid },
+    cancelTxt:        { fontSize: 13, color: C.textMid },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -884,9 +884,9 @@ const WebProductsScreen: React.FC = () => {
             <ScrollView style={wst.pageScroll} showsVerticalScrollIndicator={false} contentContainerStyle={wst.pageContent}>
                 {error ? (
                     <View style={{ marginBottom: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
-                        <Text style={{ fontFamily: "Outfit_500Medium", fontSize: 12, color: C.red }}>{error}</Text>
+                        <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
                         <TouchableOpacity onPress={reload} style={{ marginTop: 8, alignSelf: "flex-start" }}>
-                            <Text style={{ fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.navy }}>Retry</Text>
+                            <Text style={{ fontSize: 12, color: C.navy }}>Retry</Text>
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -894,13 +894,6 @@ const WebProductsScreen: React.FC = () => {
                 {/* Page header */}
                 <View style={wst.pageHeader}>
                     <View style={wst.titleContainer}>
-                        <View style={wst.breadcrumb}>
-                            <TouchableOpacity onPress={() => { /* TODO: navigate to dashboard */ }}>
-                                <Text style={wst.breadcrumbDim}>Dashboard</Text>
-                            </TouchableOpacity>
-                            <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.6)" />
-                            <Text style={wst.breadcrumbActive}>Product Management</Text>
-                        </View>
                         <Text style={wst.pageTitle}>Product Management</Text>
                     </View>
                     <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
@@ -977,7 +970,7 @@ const WebProductsScreen: React.FC = () => {
                                     return (
                                         <TouchableOpacity key={tab.label} style={[wst.filterTabItem, isActive && { backgroundColor: tab.bg }]} onPress={() => { setSelectedTab(tab.label); setVisibleCount(20); }} activeOpacity={0.75}>
                                             <View style={[wst.filterTabDot, { backgroundColor: tab.color }]} />
-                                            <Text style={[wst.filterTabLabel, isActive && { color: tab.color, fontFamily: "Outfit_600SemiBold" }]}>{tab.label}</Text>
+                                            <Text style={[wst.filterTabLabel, isActive && { color: tab.color, }]}>{tab.label}</Text>
                                             {tab.label === "Low Stock" && (
                                                 <View style={[wst.filterTabBadge, { backgroundColor: tab.color }]}>
                                                     <Text style={wst.filterTabBadgeTxt}>{lowStockCount}</Text>
@@ -1001,7 +994,7 @@ const WebProductsScreen: React.FC = () => {
                                                 <MaterialCommunityIcons name={opt.icon as any} size={13} color={isActive ? C.white : C.textMid} />
                                             </View>
                                             <View style={{ flex: 1 }}>
-                                                <Text style={[wst.sortSidebarLabel, isActive && { color: C.navy, fontFamily: "Outfit_600SemiBold" }]}>{opt.value}</Text>
+                                                <Text style={[wst.sortSidebarLabel, isActive && { color: C.navy, }]}>{opt.value}</Text>
                                                 <Text style={wst.sortSidebarDesc}>{opt.desc}</Text>
                                             </View>
                                             {isActive && <Ionicons name="checkmark-circle" size={15} color={C.navy} />}
@@ -1017,7 +1010,7 @@ const WebProductsScreen: React.FC = () => {
                                 <Text style={wst.filterSectionLabel}>Category</Text>
                                 <TouchableOpacity style={[wst.catMainItem, filterCategory === "All" && wst.catMainItemActive]} onPress={() => { setFilterCategory("All"); setFilterSubcategory("All"); setFilterSubSubcategory("All"); setExpandedCategory(null); setExpandedSubcat(null); }} activeOpacity={0.7}>
                                     <View style={[wst.catRadio, filterCategory === "All" && wst.catRadioFilled]}>{filterCategory === "All" && <View style={wst.catRadioInner} />}</View>
-                                    <Text style={[wst.catMainLabel, filterCategory === "All" && { color: C.navy, fontFamily: "Outfit_600SemiBold" }]}>All</Text>
+                                    <Text style={[wst.catMainLabel, filterCategory === "All" && { color: C.navy, }]}>All</Text>
                                 </TouchableOpacity>
                                 {CATEGORIES.filter(c => c !== "All").map(cat => {
                                     const isSelected = filterCategory === cat;
@@ -1030,7 +1023,7 @@ const WebProductsScreen: React.FC = () => {
                                                 else { setFilterCategory(cat); setFilterSubcategory("All"); setFilterSubSubcategory("All"); setExpandedCategory(cat); setExpandedSubcat(null); }
                                             }} activeOpacity={0.7}>
                                                 <View style={[wst.catRadio, isSelected && wst.catRadioFilled]}>{isSelected && <View style={wst.catRadioInner} />}</View>
-                                                <Text style={[wst.catMainLabel, isSelected && { color: C.navy, fontFamily: "Outfit_600SemiBold" }]}>{cat}</Text>
+                                                <Text style={[wst.catMainLabel, isSelected && { color: C.navy, }]}>{cat}</Text>
                                                 {subKeys.length > 0 && <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={12} color={isSelected ? C.navy : C.textLight} />}
                                             </TouchableOpacity>
                                             {isExpanded && subKeys.map(sub => {
@@ -1045,7 +1038,7 @@ const WebProductsScreen: React.FC = () => {
                                                         }} activeOpacity={0.7}>
                                                             <View style={wst.catSubIndent} />
                                                             <View style={[wst.catSubRadio, isSubSelected && wst.catSubRadioFilled]}>{isSubSelected && <View style={wst.catSubRadioInner} />}</View>
-                                                            <Text style={[wst.catSubLabel, isSubSelected && { color: C.purple, fontFamily: "Outfit_600SemiBold" }]}>{sub}</Text>
+                                                            <Text style={[wst.catSubLabel, isSubSelected && { color: C.purple, }]}>{sub}</Text>
                                                             {subSubList.length > 0 && <Ionicons name={isSubExpanded ? "chevron-up" : "chevron-down"} size={11} color={isSubSelected ? C.purple : C.textLight} />}
                                                         </TouchableOpacity>
                                                         {isSubExpanded && subSubList.map(subSub => {
@@ -1054,7 +1047,7 @@ const WebProductsScreen: React.FC = () => {
                                                                 <TouchableOpacity key={subSub} style={[wst.catSubSubItem, isActive && wst.catSubSubItemActive]} onPress={() => setFilterSubSubcategory(isActive ? "All" : subSub)} activeOpacity={0.75}>
                                                                     <View style={wst.catSubSubIndent} />
                                                                     <View style={[wst.catSubSubDot, isActive && wst.catSubSubDotActive]} />
-                                                                    <Text style={[wst.catSubSubLabel, isActive && { color: C.teal, fontFamily: "Outfit_600SemiBold" }]}>{subSub}</Text>
+                                                                    <Text style={[wst.catSubSubLabel, isActive && { color: C.teal, }]}>{subSub}</Text>
                                                                     {isActive && <Ionicons name="checkmark" size={11} color={C.teal} />}
                                                                 </TouchableOpacity>
                                                             );
@@ -1143,7 +1136,7 @@ const WebProductsScreen: React.FC = () => {
                         <View style={wst.tableToolbar}>
                             <View style={wst.tableToolbarLeft}>
                                 <Text style={wst.tableResultCount}>
-                                    <Text style={{ fontFamily: "Outfit_700Bold", color: C.navy }}>{processedProducts.length}</Text>{" "}products
+                                    <Text style={{ color: C.navy }}>{processedProducts.length}</Text>{" "}products
                                 </Text>
                                 {(searchQuery || activeFilterCount > 0) && (
                                     <TouchableOpacity style={wst.clearChip} onPress={() => { setSearchQuery(""); clearFilters(); }}>
@@ -1356,71 +1349,71 @@ const wst = StyleSheet.create({
     pageHeader:            { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.navyDeep, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, borderRadius: 22, marginHorizontal: 2, marginTop: 12, shadowColor: C.navyDeep, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     titleContainer:        { paddingLeft: 0, marginVertical: 0 },
     breadcrumb:            { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-    breadcrumbDim:         { fontFamily: "Outfit_500Medium", fontSize: 13, color: "rgba(255,255,255,0.75)" },
-    breadcrumbActive:      { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.white },
-    pageTitle:             { fontFamily: "Outfit_800ExtraBold", fontSize: 26, color: C.white, letterSpacing: -0.5 },
+    breadcrumbDim:         { fontSize: 13, color: "rgba(255,255,255,0.75)" },
+    breadcrumbActive:      { fontSize: 13, color: C.white },
+    pageTitle:             { fontSize: 26, color: C.white, letterSpacing: -0.5 },
     navAddBtn:             { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.white, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
-    navAddBtnTxt:          { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.navy },
+    navAddBtnTxt:          { fontSize: 14, color: C.navy },
     navBulkBtn:            { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
-    navBulkBtnTxt:         { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: C.white },
+    navBulkBtnTxt:         { fontSize: 14, color: C.white },
     statsRow:              { flexDirection: "row", gap: 12, marginBottom: 18, marginTop: -42, marginHorizontal: 6, zIndex: 10 },
     statCard:              { flex: 1, backgroundColor: C.white, borderRadius: 14, padding: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
     statCardTop:           { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
     statCardIcon:          { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    statCardVal:           { fontFamily: "Outfit_800ExtraBold", fontSize: 26 },
-    statCardLabel:         { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.textMid, marginBottom: 3 },
-    statCardTrend:         { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight },
+    statCardVal:           { fontSize: 26 },
+    statCardLabel:         { fontSize: 12, color: C.textMid, marginBottom: 3 },
+    statCardTrend:         { fontSize: 11, color: C.textLight },
     contentArea:           { flexDirection: "row", gap: 14, flex: 1, minHeight: 600 },
     // Search
     searchBarWrap:         { flexDirection: "row", alignItems: "center", backgroundColor: C.white, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: C.border },
-    searchBarInput:        { flex: 1, fontFamily: "Outfit_400Regular", fontSize: 13, color: C.textDark, ...(Platform.OS === "web" ? { outlineStyle: "none" } as any : {}) },
+    searchBarInput:        { flex: 1, fontSize: 13, color: C.textDark, ...(Platform.OS === "web" ? { outlineStyle: "none" } as any : {}) },
     // Filter panel
     filterPanel:           { width: 240, backgroundColor: C.white, borderRadius: 14, padding: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
     filterPanelHeader:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
     filterPanelHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-    filterPanelTitle:      { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.navyDeep },
+    filterPanelTitle:      { fontSize: 14, color: C.navyDeep },
     filterCountBadge:      { backgroundColor: C.navy, borderRadius: 8, minWidth: 18, height: 18, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
-    filterCountBadgeTxt:   { fontFamily: "Outfit_700Bold", fontSize: 10, color: C.white },
-    filterClearAll:        { fontFamily: "Outfit_600SemiBold", fontSize: 11.5, color: C.purple },
+    filterCountBadgeTxt:   { fontSize: 10, color: C.white },
+    filterClearAll:        { fontSize: 11.5, color: C.purple },
     filterSection:         { marginBottom: 12 },
-    filterSectionLabel:    { fontFamily: "Outfit_700Bold", fontSize: 10.5, color: C.textLight, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 8 },
+    filterSectionLabel:    { fontSize: 10.5, color: C.textLight, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 8 },
     filterDivider:         { height: 1, backgroundColor: C.border, marginBottom: 14 },
     filterTabItem:         { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 8, marginBottom: 2 },
     filterTabDot:          { width: 6, height: 6, borderRadius: 3 },
-    filterTabLabel:        { flex: 1, fontFamily: "Outfit_500Medium", fontSize: 12.5, color: C.textMid },
+    filterTabLabel:        { flex: 1, fontSize: 12.5, color: C.textMid },
     filterTabBadge:        { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7 },
-    filterTabBadgeTxt:     { fontFamily: "Outfit_700Bold", fontSize: 9.5, color: C.white },
+    filterTabBadgeTxt:     { fontSize: 9.5, color: C.white },
     // Sort sidebar
     sortSidebarItem:       { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 7, paddingHorizontal: 6, borderRadius: 8, marginBottom: 3 },
     sortSidebarItemActive: { backgroundColor: "#EEF1FF" },
     sortSidebarIconBox:    { width: 26, height: 26, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-    sortSidebarLabel:      { fontFamily: "Outfit_500Medium", fontSize: 12, color: C.textMid },
-    sortSidebarDesc:       { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.textLight },
+    sortSidebarLabel:      { fontSize: 12, color: C.textMid },
+    sortSidebarDesc:       { fontSize: 10, color: C.textLight },
     // Category tree
     catMainItem:           { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 7, marginBottom: 1 },
     catMainItemActive:     { backgroundColor: "#EEF1FF" },
     catRadio:              { width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, borderColor: C.border, alignItems: "center", justifyContent: "center" },
     catRadioFilled:        { borderColor: C.navy },
     catRadioInner:         { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.navy },
-    catMainLabel:          { flex: 1, fontFamily: "Outfit_500Medium", fontSize: 12.5, color: C.textMid },
+    catMainLabel:          { flex: 1, fontSize: 12.5, color: C.textMid },
     catSubItem:            { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 5, paddingHorizontal: 4, borderRadius: 6, marginBottom: 1 },
     catSubItemActive:      { backgroundColor: C.purplePale },
     catSubIndent:          { width: 14 },
     catSubRadio:           { width: 13, height: 13, borderRadius: 6.5, borderWidth: 1.5, borderColor: C.border, alignItems: "center", justifyContent: "center" },
     catSubRadioFilled:     { borderColor: C.purple },
     catSubRadioInner:      { width: 5, height: 5, borderRadius: 2.5, backgroundColor: C.purple },
-    catSubLabel:           { flex: 1, fontFamily: "Outfit_500Medium", fontSize: 11.5, color: C.textMid },
+    catSubLabel:           { flex: 1, fontSize: 11.5, color: C.textMid },
     catSubSubItem:         { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 4, paddingHorizontal: 4, borderRadius: 5, marginBottom: 1 },
     catSubSubItemActive:   { backgroundColor: "#F0FDF8" },
     catSubSubIndent:       { width: 26 },
     catSubSubDot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: C.border },
     catSubSubDotActive:    { backgroundColor: C.teal },
-    catSubSubLabel:        { flex: 1, fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight },
+    catSubSubLabel:        { flex: 1, fontSize: 11, color: C.textLight },
     // Price
     priceRangeInputs:      { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
     priceInput:            { flex: 1 },
-    priceInputLabel:       { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.textLight, marginBottom: 3 },
-    priceInputField:       { backgroundColor: C.bg, borderRadius: 7, borderWidth: 1, borderColor: C.border, paddingHorizontal: 8, paddingVertical: 6, fontFamily: "Outfit_500Medium", fontSize: 12.5, color: C.textDark, ...(Platform.OS === "web" ? { outlineStyle: "none" } as any : {}) },
+    priceInputLabel:       { fontSize: 10, color: C.textLight, marginBottom: 3 },
+    priceInputField:       { backgroundColor: C.bg, borderRadius: 7, borderWidth: 1, borderColor: C.border, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12.5, color: C.textDark, ...(Platform.OS === "web" ? { outlineStyle: "none" } as any : {}) },
     priceDash:             { width: 10, height: 1.5, backgroundColor: C.border, marginTop: 12 },
     priceSliderTrack:      { height: 3, backgroundColor: C.border, borderRadius: 2, position: "relative" },
     priceSliderFill:       { position: "absolute", height: 3, backgroundColor: C.navy, borderRadius: 2 },
@@ -1431,47 +1424,47 @@ const wst = StyleSheet.create({
     sizeGrid:              { flexDirection: "row", flexWrap: "wrap", gap: 5 },
     sizeChip:              { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, minWidth: 36, alignItems: "center" },
     sizeChipActive:        { backgroundColor: C.navy, borderColor: C.navy },
-    sizeChipTxt:           { fontFamily: "Outfit_500Medium", fontSize: 11, color: C.textMid },
-    sizeChipTxtActive:     { color: C.white, fontFamily: "Outfit_600SemiBold" },
+    sizeChipTxt:           { fontSize: 11, color: C.textMid },
+    sizeChipTxtActive:     { color: C.white, },
     applyFilterBtn:        { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: C.navy, borderRadius: 9, paddingVertical: 10, marginTop: 8 },
-    applyFilterBtnTxt:     { fontFamily: "Outfit_600SemiBold", fontSize: 12.5, color: C.white },
+    applyFilterBtnTxt:     { fontSize: 12.5, color: C.white },
     // Table
     tableArea:             { flex: 1, backgroundColor: C.white, borderRadius: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, overflow: "hidden", flexDirection: "column" },
     tableToolbar:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: "#FAFBFF" },
     tableToolbarLeft:      { flexDirection: "row", alignItems: "center", gap: 10 },
-    tableResultCount:      { fontFamily: "Outfit_500Medium", fontSize: 13, color: C.textMid },
+    tableResultCount:      { fontSize: 13, color: C.textMid },
     clearChip:             { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF1FF", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-    clearChipTxt:          { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: C.navy },
+    clearChipTxt:          { fontSize: 11, color: C.navy },
     activeSortIndicator:   { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.purplePale, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
-    activeSortTxt:         { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: C.purple },
+    activeSortTxt:         { fontSize: 11, color: C.purple },
     viewToggle:            { flexDirection: "row", backgroundColor: C.bg, borderRadius: 7, padding: 2, borderWidth: 1, borderColor: C.border },
     viewBtn:               { width: 28, height: 28, borderRadius: 5, alignItems: "center", justifyContent: "center" },
     viewBtnActive:         { backgroundColor: C.navy },
     tableScroll:           { flex: 1 },
     tableHead:             { flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 11, backgroundColor: "#F8F9FC", borderBottomWidth: 1.5, borderBottomColor: C.border, gap: 24 },
-    tableHeadCell:         { fontFamily: "Outfit_700Bold", fontSize: 11, color: C.textLight, textTransform: "uppercase", letterSpacing: 0.5 },
+    tableHeadCell:         { fontSize: 11, color: C.textLight, textTransform: "uppercase", letterSpacing: 0.5 },
     tableRow:              { flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", gap: 24 },
     tableRowAlt:           { backgroundColor: "#FAFBFF" },
     tableCell:             { flexDirection: "row", alignItems: "center", gap: 10 },
     tableProductImg:       { width: 44, height: 44, borderRadius: 9, backgroundColor: C.bg },
-    tableProductName:      { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textDark, marginBottom: 2 },
-    tableProductSub:       { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight, marginBottom: 1 },
-    tableProductUpdated:   { fontFamily: "Outfit_400Regular", fontSize: 10.5, color: C.textLight },
-    tableCellSku:          { fontFamily: "Outfit_500Medium", fontSize: 12, color: C.purple, backgroundColor: C.purplePale, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+    tableProductName:      { fontSize: 13, color: C.textDark, marginBottom: 2 },
+    tableProductSub:       { fontSize: 11, color: C.textLight, marginBottom: 1 },
+    tableProductUpdated:   { fontSize: 10.5, color: C.textLight },
+    tableCellSku:          { fontSize: 12, color: C.purple, backgroundColor: C.purplePale, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
     categoryTag:           { backgroundColor: "#EEF1FF", borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, alignSelf: "flex-start" },
-    categoryTagTxt:        { fontFamily: "Outfit_600SemiBold", fontSize: 10.5, color: C.navy },
-    subcategoryTxt:        { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.textLight },
+    categoryTagTxt:        { fontSize: 10.5, color: C.navy },
+    subcategoryTxt:        { fontSize: 10, color: C.textLight },
     subSubPill:            { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F0FDF8", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: "#CCFBEF", alignSelf: "flex-start" },
-    subSubPillTxt:         { fontFamily: "Outfit_600SemiBold", fontSize: 10.5, color: C.teal },
+    subSubPillTxt:         { fontSize: 10.5, color: C.teal },
     sizePill:              { backgroundColor: "#F3F4F6", borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: C.border, alignSelf: "flex-start" },
-    sizePillTxt:           { fontFamily: "Outfit_600SemiBold", fontSize: 10.5, color: C.textMid },
-    tablePriceVal:         { fontFamily: "Outfit_700Bold", fontSize: 13.5, color: C.navyDeep },
-    tableStockVal:         { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textDark },
-    lowStockHint:          { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.orange },
-    outStockHint:          { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.red },
+    sizePillTxt:           { fontSize: 10.5, color: C.textMid },
+    tablePriceVal:         { fontSize: 13.5, color: C.navyDeep },
+    tableStockVal:         { fontSize: 13, color: C.textDark },
+    lowStockHint:          { fontSize: 10, color: C.orange },
+    outStockHint:          { fontSize: 10, color: C.red },
     statusPill:            { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start" },
     statusDot:             { width: 5, height: 5, borderRadius: 2.5 },
-    statusPillTxt:         { fontFamily: "Outfit_600SemiBold", fontSize: 11 },
+    statusPillTxt:         { fontSize: 11 },
     actionBtn:             { width: 30, height: 30, borderRadius: 7, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
     // Grid
     webGridContainer:      { flexDirection: "row", flexWrap: "wrap", gap: 14, padding: 16 },
@@ -1479,25 +1472,25 @@ const wst = StyleSheet.create({
     webGridImgWrap:        { position: "relative" },
     webGridImg:            { width: "100%", height: 200, backgroundColor: C.bg },
     webGridStatusBadge:    { position: "absolute", top: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
-    webGridStatusTxt:      { fontFamily: "Outfit_600SemiBold", fontSize: 10 },
+    webGridStatusTxt:      { fontSize: 10 },
     webGridMoreBtn:        { position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: 7, backgroundColor: "rgba(255,255,255,0.93)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
     webGridInfo:           { padding: 12, gap: 4 },
-    webGridName:           { fontFamily: "Outfit_700Bold", fontSize: 12.5, color: C.textDark, lineHeight: 17 },
-    webGridSku:            { fontFamily: "Outfit_400Regular", fontSize: 10.5, color: C.textLight },
+    webGridName:           { fontSize: 12.5, color: C.textDark, lineHeight: 17 },
+    webGridSku:            { fontSize: 10.5, color: C.textLight },
     webGridMeta:           { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
-    webGridPrice:          { fontFamily: "Outfit_700Bold", fontSize: 13.5, color: C.navy },
-    webGridStock:          { fontFamily: "Outfit_500Medium", fontSize: 10.5, color: C.textLight },
+    webGridPrice:          { fontSize: 13.5, color: C.navy },
+    webGridStock:          { fontSize: 10.5, color: C.textLight },
     webGridCatRow:         { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 2 },
     webGridSizeRow:        { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
-    webGridSizeTxt:        { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.textLight },
+    webGridSizeTxt:        { fontSize: 10, color: C.textLight },
     loadMoreBtn:           { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginHorizontal: 18, marginVertical: 14, paddingVertical: 10, borderRadius: 9, borderWidth: 1.5, borderColor: C.navy, backgroundColor: "#EEF1FF" },
-    loadMoreTxt:           { fontFamily: "Outfit_600SemiBold", fontSize: 12.5, color: C.navy },
-    pageInfo:              { fontFamily: "Outfit_400Regular", fontSize: 11.5, color: C.textLight, textAlign: "center", paddingBottom: 14 },
+    loadMoreTxt:           { fontSize: 12.5, color: C.navy },
+    pageInfo:              { fontSize: 11.5, color: C.textLight, textAlign: "center", paddingBottom: 14 },
     emptyState:            { alignItems: "center", paddingVertical: 60 },
-    emptyTitle:            { fontFamily: "Outfit_700Bold", fontSize: 15, color: C.textMid, marginTop: 12 },
-    emptyDesc:             { fontFamily: "Outfit_400Regular", fontSize: 12.5, color: C.textLight, marginTop: 4 },
+    emptyTitle:            { fontSize: 15, color: C.textMid, marginTop: 12 },
+    emptyDesc:             { fontSize: 12.5, color: C.textLight, marginTop: 4 },
     emptyBtn:              { marginTop: 14, backgroundColor: C.navy, borderRadius: 9, paddingHorizontal: 22, paddingVertical: 9 },
-    emptyBtnTxt:           { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.white },
+    emptyBtnTxt:           { fontSize: 13, color: C.white },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1673,9 +1666,9 @@ const MobileProductsScreen: React.FC = () => {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {error ? (
                     <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
-                        <Text style={{ fontFamily: "Outfit_500Medium", fontSize: 12, color: C.red }}>{error}</Text>
+                        <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
                         <TouchableOpacity onPress={reload} style={{ marginTop: 8 }}>
-                            <Text style={{ fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.navy }}>Retry</Text>
+                            <Text style={{ fontSize: 12, color: C.navy }}>Retry</Text>
                         </TouchableOpacity>
                     </View>
                 ) : null}
@@ -1729,7 +1722,7 @@ const MobileProductsScreen: React.FC = () => {
                         return (
                             <TouchableOpacity key={tab.label} style={[s.tabBtn, isActive && { backgroundColor: tab.color, borderColor: tab.color }, !isActive && { borderColor: C.border }]} onPress={() => { setSelectedTab(tab.label); setVisibleCount(viewRange); }} activeOpacity={0.75}>
                                 <MaterialCommunityIcons name={tab.icon as any} size={14} color={isActive ? C.white : tab.color} />
-                                <Text style={[s.tabBtnText, { color: isActive ? C.white : C.textMid }, isActive && { fontFamily: "Outfit_700Bold" }]}>{tab.label}</Text>
+                                <Text style={[s.tabBtnText, { color: isActive ? C.white : C.textMid }, isActive && { }]}>{tab.label}</Text>
                                 {tab.label === "Low Stock" && (
                                     <View style={[s.tabBadgePill, { backgroundColor: isActive ? "rgba(255,255,255,0.3)" : C.orangePale }]}>
                                         <Text style={[s.tabBadgePillTxt, { color: isActive ? C.white : C.orange }]}>{lowStockCount}</Text>
@@ -1981,123 +1974,123 @@ const s = StyleSheet.create({
     searchBarRow:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
     backBtn:            { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
     headerContent:      { flex: 1 },
-    headerTitle:        { fontFamily: "Outfit_700Bold", fontSize: 19, color: C.white, marginBottom: 1 },
-    headerSub:          { fontFamily: "Outfit_400Regular", fontSize: 12, color: "rgba(255,255,255,0.65)" },
+    headerTitle:        { fontSize: 19, color: C.white, marginBottom: 1 },
+    headerSub:          { fontSize: 12, color: "rgba(255,255,255,0.65)" },
     headerIcon:         { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-    searchInput:        { flex: 1, fontFamily: "Outfit_400Regular", fontSize: 14, color: C.white, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.4)", paddingVertical: 4 },
+    searchInput:        { flex: 1, fontSize: 14, color: C.white, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.4)", paddingVertical: 4 },
     filterBadge:        { position: "absolute", top: -4, right: -4, backgroundColor: C.orange, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-    filterBadgeText:    { fontFamily: "Outfit_700Bold", fontSize: 9, color: C.white },
+    filterBadgeText:    { fontSize: 9, color: C.white },
     actionRow:          { flexDirection: "row", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6, gap: 12 },
     actionCard:         { flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 12, alignItems: "flex-start", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3, height: 130 },
     actionIconBox:      { width: 48, height: 48, borderRadius: 13, alignItems: "center", justifyContent: "center", marginBottom: 10 },
-    actionTitle:        { fontFamily: "Outfit_700Bold", fontSize: 13, color: C.navy, marginBottom: 3 },
-    actionDesc:         { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight, lineHeight: 15 },
+    actionTitle:        { fontSize: 13, color: C.navy, marginBottom: 3 },
+    actionDesc:         { fontSize: 11, color: C.textLight, lineHeight: 15 },
     statsCard:          { flexDirection: "row", alignItems: "center", backgroundColor: C.card, borderRadius: 16, marginHorizontal: 16, marginTop: 4, marginBottom: 10, paddingVertical: 16, paddingHorizontal: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },
     statItem:           { flex: 1, alignItems: "center", gap: 4 },
     statIconBox:        { width: 40, height: 40, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-    statValue:          { fontFamily: "Outfit_800ExtraBold", fontSize: 18 },
-    statLabel:          { fontFamily: "Outfit_400Regular", fontSize: 9.5, color: C.textLight, textAlign: "center" },
+    statValue:          { fontSize: 18 },
+    statLabel:          { fontSize: 9.5, color: C.textLight, textAlign: "center" },
     statDivider:        { width: 1, height: 52, backgroundColor: C.border, marginHorizontal: 2 },
     tabScrollWrapper:   { marginBottom: 8 },
     tabScrollContent:   { paddingHorizontal: 16, gap: 8, paddingVertical: 4 },
     tabBtn:             { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 22, borderWidth: 1.5, backgroundColor: C.card },
-    tabBtnText:         { fontFamily: "Outfit_600SemiBold", fontSize: 12 },
+    tabBtnText:         { fontSize: 12 },
     tabBadgePill:       { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 },
-    tabBadgePillTxt:    { fontFamily: "Outfit_700Bold", fontSize: 10 },
+    tabBadgePillTxt:    { fontSize: 10 },
     controlsRow:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 8, marginBottom: 0 },
     sortBtn:            { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.card, borderRadius: 12, paddingLeft: 6, paddingRight: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
     sortBtnLeft:        { flexDirection: "row", alignItems: "center", gap: 10 },
     sortIconWrap:       { width: 34, height: 34, borderRadius: 10, backgroundColor: C.navy, alignItems: "center", justifyContent: "center" },
-    sortBtnLabel:       { fontFamily: "Outfit_400Regular", fontSize: 10, color: C.textLight },
-    sortBtnValue:       { fontFamily: "Outfit_700Bold", fontSize: 12, color: C.navy, maxWidth: SW * 0.3 },
+    sortBtnLabel:       { fontSize: 10, color: C.textLight },
+    sortBtnValue:       { fontSize: 12, color: C.navy, maxWidth: SW * 0.3 },
     sortBtnRight:       { flexDirection: "row", alignItems: "center", gap: 6 },
     viewRangePill:      { backgroundColor: C.navyDeep + "12", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-    viewRangePillTxt:   { fontFamily: "Outfit_700Bold", fontSize: 11, color: C.navy },
+    viewRangePillTxt:   { fontSize: 11, color: C.navy },
     viewToggle:         { flexDirection: "row", backgroundColor: C.card, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: C.border },
     viewBtn:            { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center" },
     viewBtnActive:      { backgroundColor: C.navy },
     sortMenuWrapper:    { paddingHorizontal: 18, paddingTop: 4, marginBottom: 6, width: 320 },
     sortMenu:           { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: "hidden", elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 14 },
     sortMenuHeader:     { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
-    sortMenuTitle:      { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.navy },
+    sortMenuTitle:      { fontSize: 14, color: C.navy },
     sortRow:            { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
     sortRowActive:      { backgroundColor: "#F0F2FF" },
     sortRowBorder:      { borderBottomWidth: 1, borderBottomColor: C.border },
     sortRowIconWrap:    { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    sortRowLabel:       { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textDark, marginBottom: 1 },
-    sortRowLabelActive: { color: C.navy, fontFamily: "Outfit_700Bold" },
-    sortRowDesc:        { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight },
+    sortRowLabel:       { fontSize: 13, color: C.textDark, marginBottom: 1 },
+    sortRowLabelActive: { color: C.navy, },
+    sortRowDesc:        { fontSize: 11, color: C.textLight },
     sortRowDescActive:  { color: C.navyLight },
     sortMenuDivider:    { height: 1, backgroundColor: C.border, marginVertical: 4, marginHorizontal: 16 },
     viewRangeSection:   { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 6 },
     viewRangeLabelRow:  { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
     viewRangeIconWrap:  { width: 26, height: 26, borderRadius: 8, backgroundColor: "rgba(30,43,107,0.10)", alignItems: "center", justifyContent: "center" },
-    viewRangeLabel:     { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textMid },
+    viewRangeLabel:     { fontSize: 13, color: C.textMid },
     viewRangeChips:     { flexDirection: "row", gap: 8, flexWrap: "wrap" },
     viewRangeChip:      { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9, backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.border, minWidth: 48, alignItems: "center" },
     viewRangeChipActive:    { backgroundColor: C.navy, borderColor: C.navy },
-    viewRangeChipTxt:       { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.textMid },
+    viewRangeChipTxt:       { fontSize: 12, color: C.textMid },
     viewRangeChipTxtActive: { color: C.white },
     resultCountRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginTop: 8, marginBottom: 8 },
-    resultCountText:    { fontFamily: "Outfit_500Medium", fontSize: 12, color: C.textLight },
-    clearAllText:       { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.navy },
+    resultCountText:    { fontSize: 12, color: C.textLight },
+    clearAllText:       { fontSize: 12, color: C.navy },
     emptyState:         { alignItems: "center", paddingVertical: 48, paddingHorizontal: 32 },
-    emptyTitle:         { fontFamily: "Outfit_700Bold", fontSize: 16, color: C.textMid, marginTop: 12 },
-    emptyDesc:          { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.textLight, marginTop: 4, textAlign: "center" },
+    emptyTitle:         { fontSize: 16, color: C.textMid, marginTop: 12 },
+    emptyDesc:          { fontSize: 13, color: C.textLight, marginTop: 4, textAlign: "center" },
     clearBtn:           { marginTop: 16, backgroundColor: C.navy, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
-    clearBtnText:       { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.white },
+    clearBtnText:       { fontSize: 13, color: C.white },
     listContainer:      { paddingHorizontal: 16, gap: 12, marginBottom: 10 },
     productRow:         { flexDirection: "row", alignItems: "center", backgroundColor: C.card, borderRadius: 16, padding: 14, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     productImage:       { width: 90, height: 90, borderRadius: 12, backgroundColor: C.bg },
     productInfo:        { flex: 1 },
-    productName:        { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.textDark, marginBottom: 3 },
-    productSku:         { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight, marginBottom: 2 },
-    productCategory:    { fontFamily: "Outfit_500Medium", fontSize: 11, color: C.purple, marginBottom: 2 },
-    productUpdated:     { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.textLight, marginBottom: 6 },
-    productPrice:       { fontFamily: "Outfit_700Bold", fontSize: 15, color: C.navy },
+    productName:        { fontSize: 14, color: C.textDark, marginBottom: 3 },
+    productSku:         { fontSize: 11, color: C.textLight, marginBottom: 2 },
+    productCategory:    { fontSize: 11, color: C.purple, marginBottom: 2 },
+    productUpdated:     { fontSize: 11, color: C.textLight, marginBottom: 6 },
+    productPrice:       { fontSize: 15, color: C.navy },
     productRight:       { alignItems: "flex-end", gap: 6 },
     statusBadge:        { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 7 },
-    statusText:         { fontFamily: "Outfit_600SemiBold", fontSize: 10 },
-    stockText:          { fontFamily: "Outfit_600SemiBold", fontSize: 11, color: C.textMid },
+    statusText:         { fontSize: 10 },
+    stockText:          { fontSize: 11, color: C.textMid },
     moreBtn:            { width: 32, height: 32, borderRadius: 9, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
     gridContainer:      { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, gap: 10, marginBottom: 10 },
     gridCard:           { width: (SW - 52) / 2, backgroundColor: C.card, borderRadius: 14, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     gridImage:          { width: "100%", height: 130, backgroundColor: C.bg },
     statusBadgeSmall:   { position: "absolute", top: 8, right: 8, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5 },
-    statusTextSmall:    { fontFamily: "Outfit_600SemiBold", fontSize: 10 },
-    gridName:           { fontFamily: "Outfit_700Bold", fontSize: 12, color: C.textDark, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 2 },
-    gridPrice:          { fontFamily: "Outfit_700Bold", fontSize: 13, color: C.navy, paddingHorizontal: 10, marginBottom: 2 },
-    gridStock:          { fontFamily: "Outfit_500Medium", fontSize: 11, color: C.textLight, paddingHorizontal: 10, paddingBottom: 10 },
+    statusTextSmall:    { fontSize: 10 },
+    gridName:           { fontSize: 12, color: C.textDark, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 2 },
+    gridPrice:          { fontSize: 13, color: C.navy, paddingHorizontal: 10, marginBottom: 2 },
+    gridStock:          { fontSize: 11, color: C.textLight, paddingHorizontal: 10, paddingBottom: 10 },
     gridMoreBtn:        { position: "absolute", bottom: 8, right: 8, width: 28, height: 28, borderRadius: 8, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
     viewMoreBtn:        { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: 16, marginTop: 4, marginBottom: 4, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: C.navy, backgroundColor: C.card },
-    viewMoreTxt:        { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.navy },
-    pageInfo:           { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.textLight, textAlign: "center", paddingBottom: 8, marginTop: 4 },
+    viewMoreTxt:        { fontSize: 13, color: C.navy },
+    pageInfo:           { fontSize: 12, color: C.textLight, textAlign: "center", paddingBottom: 8, marginTop: 4 },
 
     modalOverlay:       { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
     filterSheet:        { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 32, maxHeight: "85%", position: "absolute", bottom: 0, left: 0, right: 0 },
     filterHeader:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 18 },
-    filterTitle:        { fontFamily: "Outfit_700Bold", fontSize: 18, color: C.textDark },
+    filterTitle:        { fontSize: 18, color: C.textDark },
     sliderWrap:         { paddingHorizontal: 4 },
     filterActions:      { flexDirection: "row", gap: 12, paddingTop: 8 },
     clearFilterBtn:     { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: C.navy, alignItems: "center" },
-    clearFilterText:    { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: C.navy },
+    clearFilterText:    { fontSize: 14, color: C.navy },
     applyFilterBtn:     { flex: 2, paddingVertical: 13, borderRadius: 12, backgroundColor: C.navy, alignItems: "center" },
-    applyFilterText:    { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: C.white },
+    applyFilterText:    { fontSize: 14, color: C.white },
 });
 
 const fs = StyleSheet.create({
-    sectionLabel:       { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.textMid, marginBottom: 10, marginTop: 14 },
+    sectionLabel:       { fontSize: 13, color: C.textMid, marginBottom: 10, marginTop: 14 },
     chip:               { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border },
     chipActive:         { backgroundColor: C.navy, borderColor: C.navy },
-    chipText:           { fontFamily: "Outfit_500Medium", fontSize: 12, color: C.textMid },
+    chipText:           { fontSize: 12, color: C.textMid },
     chipTextActive:     { color: C.white },
     colorChip:          { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border },
     colorDot:           { width: 14, height: 14, borderRadius: 7 },
     sizeGrid:           { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 },
     sizeChip:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, minWidth: 48, alignItems: "center" },
     sizeChipActive:     { backgroundColor: C.navy, borderColor: C.navy },
-    sizeChipTxt:        { fontFamily: "Outfit_500Medium", fontSize: 12, color: C.textMid },
-    sizeChipTxtActive:  { color: C.white, fontFamily: "Outfit_600SemiBold" },
+    sizeChipTxt:        { fontSize: 12, color: C.textMid },
+    sizeChipTxtActive:  { color: C.white, },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -18,31 +18,32 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
-    orange:      "#E8631A",
+    orange: "#E8631A",
     orangeLight: "#FEF0E6",
-    orangeMid:   "#FDDBB9",
-    orangeDark:  "#B84E14",
-    navy:        "#1F2937",
-    navyLight:   "#F3F4F6",
-    bg:          "#F9FAFB",
-    card:        "#FFFFFF",
-    border:      "#E5E7EB",
-    textH:       "#111827",
-    textB:       "#111827",
-    textM:       "#374151",
-    textHint:    "#6B7280",
-    red:         "#DC2626",
-    redBg:       "#FEF2F2",
-    green:       "#15803D",
-    greenBg:     "#F0FDF4",
-    blue:        "#1D4ED8",
-    blueBg:      "#EFF6FF",
-    purple:      "#7C3AED",
-    purpleBg:    "#F5F3FF",
-    white:       "#FFFFFF",
+    orangeMid: "#FDDBB9",
+    orangeDark: "#B84E14",
+    navy: "#1F2937",
+    navyLight: "#F3F4F6",
+    bg: "#F9FAFB",
+    card: "#FFFFFF",
+    border: "#E5E7EB",
+    textH: "#111827",
+    textB: "#111827",
+    textM: "#374151",
+    textHint: "#6B7280",
+    red: "#DC2626",
+    redBg: "#FEF2F2",
+    green: "#15803D",
+    greenBg: "#F0FDF4",
+    blue: "#1D4ED8",
+    blueBg: "#EFF6FF",
+    purple: "#7C3AED",
+    purpleBg: "#F5F3FF",
+    white: "#FFFFFF",
 };
 
 const WebStyles = Platform.OS === 'web' ? (
@@ -54,7 +55,7 @@ const WebStyles = Platform.OS === 'web' ? (
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type JobStatus = "Active" | "Paused" | "Closed";
-type JobType   = "Full Time" | "Part Time" | "Contract" | "Internship";
+type JobType = "Full Time" | "Part Time" | "Contract" | "Internship";
 
 interface Job {
     id: number;
@@ -80,8 +81,8 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
     const typeRaw = (j.employmentType ?? "full time").toLowerCase();
     const type: JobType =
         typeRaw.includes("part") ? "Part Time" :
-        typeRaw.includes("contract") ? "Contract" :
-        typeRaw.includes("intern") ? "Internship" : "Full Time";
+            typeRaw.includes("contract") ? "Contract" :
+                typeRaw.includes("intern") ? "Internship" : "Full Time";
     return {
         id: j.id,
         title: j.title ?? "Job",
@@ -106,13 +107,13 @@ const STATUSES: ("All Status" | JobStatus)[] = ["All Status", "Active", "Paused"
 type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
 const DEPT_ICONS: Record<string, FeatherName> = {
-    Marketing:         "trending-up",
-    Finance:           "dollar-sign",
-    Technology:        "cpu",
-    "Customer Support":"headphones",
+    Marketing: "trending-up",
+    Finance: "dollar-sign",
+    Technology: "cpu",
+    "Customer Support": "headphones",
     "Human Resources": "users",
-    Sales:             "briefcase",
-    Operations:        "settings",
+    Sales: "briefcase",
+    Operations: "settings",
 };
 const getDeptIcon = (d: string): FeatherName => DEPT_ICONS[d] || "folder";
 
@@ -123,10 +124,10 @@ const STATUS_COLOR: Record<JobStatus, { bg: string; fg: string }> = {
 };
 
 const TYPE_COLOR: Record<JobType, { bg: string; fg: string }> = {
-    "Full Time":  { bg: T.blueBg,   fg: T.blue },
-    "Part Time":  { bg: T.purpleBg, fg: T.purple },
-    Contract:     { bg: T.orangeLight, fg: T.orange },
-    Internship:   { bg: T.navyLight, fg: T.navy },
+    "Full Time": { bg: T.blueBg, fg: T.blue },
+    "Part Time": { bg: T.purpleBg, fg: T.purple },
+    Contract: { bg: T.orangeLight, fg: T.orange },
+    Internship: { bg: T.navyLight, fg: T.navy },
 };
 
 // ─── STAT PILL ────────────────────────────────────────────────────────────────
@@ -280,8 +281,8 @@ const JobCard: React.FC<{
     onDelete?: (job: Job) => void;
 }> = ({ job, onPress, onEdit, onDelete }) => {
     const statusStyle = STATUS_COLOR[job.status];
-    const typeStyle   = TYPE_COLOR[job.type];
-    const deptIcon    = getDeptIcon(job.department);
+    const typeStyle = TYPE_COLOR[job.type];
+    const deptIcon = getDeptIcon(job.department);
     const isWeb = Platform.OS === 'web';
 
     return (
@@ -691,8 +692,8 @@ const vt = StyleSheet.create({
 // ─── LIST ROW CARD (list view) ────────────────────────────────────────────────
 const JobRow: React.FC<{ job: Job }> = ({ job }) => {
     const statusStyle = STATUS_COLOR[job.status];
-    const typeStyle   = TYPE_COLOR[job.type];
-    const deptIcon    = getDeptIcon(job.department);
+    const typeStyle = TYPE_COLOR[job.type];
+    const deptIcon = getDeptIcon(job.department);
 
     return (
         <TouchableOpacity style={jr.row} activeOpacity={0.88}>
@@ -818,7 +819,7 @@ const EditJobModal: React.FC<{
             setEmpTypeOpen(false);
         }
     }, [visible, job, departments]);
-    
+
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={em.overlay}>
@@ -830,7 +831,7 @@ const EditJobModal: React.FC<{
                             <Feather name="x" size={18} color="#fff" />
                         </TouchableOpacity>
                     </View>
-                    
+
                     <ScrollView style={em.body} contentContainerStyle={em.bodyContent} showsVerticalScrollIndicator={false}>
                         <View style={[em.row, deptOpen && { zIndex: 70, elevation: 70 }]}>
                             <View style={[em.field, deptOpen && { zIndex: 1100, elevation: 1100 }]}>
@@ -864,7 +865,7 @@ const EditJobModal: React.FC<{
                                 </View>
                             </View>
                         </View>
- 
+
                         <View style={em.field}>
                             <Text style={em.label}>Description <Text style={{ color: T.red }}>*</Text></Text>
                             <View style={[em.inputWrap, { height: 80, alignItems: "flex-start", paddingTop: 10 }]}>
@@ -872,7 +873,7 @@ const EditJobModal: React.FC<{
                                 <Feather name="edit-2" size={12} color={T.textHint} style={{ position: "absolute", bottom: 8, right: 8 }} />
                             </View>
                         </View>
- 
+
                         <View style={em.field}>
                             <Text style={em.label}>Requirements</Text>
                             <View style={[em.inputWrap, { height: 60, alignItems: "flex-start", paddingTop: 10 }]}>
@@ -880,7 +881,7 @@ const EditJobModal: React.FC<{
                                 <Feather name="edit-2" size={12} color={T.textHint} style={{ position: "absolute", bottom: 8, right: 8 }} />
                             </View>
                         </View>
- 
+
                         <View style={[em.row, empTypeOpen && { zIndex: 40, elevation: 40 }]}>
                             <View style={em.field}>
                                 <Text style={em.label}>Location <Text style={{ color: T.red }}>*</Text></Text>
@@ -913,7 +914,7 @@ const EditJobModal: React.FC<{
                                 )}
                             </View>
                         </View>
- 
+
                         <View style={em.row3}>
                             <View style={em.field}>
                                 <Text style={em.label}>Experience</Text>
@@ -934,7 +935,7 @@ const EditJobModal: React.FC<{
                                 </View>
                             </View>
                         </View>
- 
+
                         <View style={[em.field, statusOpen && { zIndex: 20, elevation: 20 }]}>
                             <Text style={em.label}>Status <Text style={{ color: T.red }}>*</Text></Text>
                             <TouchableOpacity style={[em.inputWrap, statusOpen && { borderColor: T.orange, borderWidth: 1.5 }]} onPress={() => setStatusOpen(!statusOpen)} activeOpacity={0.8}>
@@ -951,7 +952,7 @@ const EditJobModal: React.FC<{
                                 </View>
                             )}
                         </View>
- 
+
                         <View style={em.footer}>
                             <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
                                 <Text style={em.cancelBtnTxt}>Cancel</Text>
@@ -1029,7 +1030,7 @@ const em = StyleSheet.create({
         shadowRadius: 20,
         elevation: 10,
     },
-    header: {
+    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1279,24 +1280,24 @@ const cm = StyleSheet.create({
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 const JobOpeningsScreen: React.FC = () => {
-    const [jobs, setJobs]                           = useState<Job[]>([]);
-    const [deptOptions, setDeptOptions]             = useState<string[]>(DEFAULT_DEPARTMENTS);
-    const [deptIdByName, setDeptIdByName]         = useState<Record<string, number>>({});
-    const [search, setSearch]                       = useState("");
-    const [deptFilter, setDeptFilter]               = useState("All Departments");
-    const [statusFilter, setStatusFilter]           = useState<"All Status" | JobStatus>("All Status");
-    const [viewMode, setViewMode]                   = useState<"grid" | "list">("grid");
-    const [deptDropdownOpen, setDeptDropdownOpen]   = useState(false);
+    const [jobs, setJobs] = useState<Job[]>([]);
+    const [deptOptions, setDeptOptions] = useState<string[]>(DEFAULT_DEPARTMENTS);
+    const [deptIdByName, setDeptIdByName] = useState<Record<string, number>>({});
+    const [search, setSearch] = useState("");
+    const [deptFilter, setDeptFilter] = useState("All Departments");
+    const [statusFilter, setStatusFilter] = useState<"All Status" | JobStatus>("All Status");
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-    const [page, setPage]                           = useState(1);
-    const cardsPerPage                              = 6;
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 6;
 
-    const [editModalVisible, setEditModalVisible]   = useState(false);
-    const [editingJob, setEditingJob]               = useState<Job | null>(null);
-    const [deleteTarget, setDeleteTarget]           = useState<Job | null>(null);
-    const [alertConfig, setAlertConfig]             = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: "", message: "" });
-    const [loading, setLoading]                     = useState(true);
-    const [error, setError]                         = useState<string | null>(null);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editingJob, setEditingJob] = useState<Job | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
+    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: "", message: "" });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const isWeb = Platform.OS === "web";
     const departmentNames = deptOptions.filter((d) => d !== "All Departments");
@@ -1306,7 +1307,7 @@ const JobOpeningsScreen: React.FC = () => {
             j.title.toLowerCase().includes(search.toLowerCase()) ||
             j.department.toLowerCase().includes(search.toLowerCase()) ||
             j.location.toLowerCase().includes(search.toLowerCase());
-        const matchDept   = deptFilter === "All Departments" || j.department === deptFilter;
+        const matchDept = deptFilter === "All Departments" || j.department === deptFilter;
         const matchStatus = statusFilter === "All Status" || j.status === statusFilter;
         return matchSearch && matchDept && matchStatus;
     });
@@ -1341,11 +1342,11 @@ const JobOpeningsScreen: React.FC = () => {
     }, [loadJobs]);
 
     useEffect(() => {
-        setPage(1);
+        setCurrentPage(1);
     }, [search, deptFilter, statusFilter]);
 
-    const paginated = isWeb ? filtered.slice((page - 1) * cardsPerPage, page * cardsPerPage) : filtered;
-    const totalPages = Math.ceil(filtered.length / cardsPerPage);
+    const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
 
     const handleEdit = (job: Job) => {
         setEditingJob(job);
@@ -1393,9 +1394,9 @@ const JobOpeningsScreen: React.FC = () => {
         }
     };
 
-    const totalJobs   = jobs.length;
+    const totalJobs = jobs.length;
     const activeCount = jobs.filter(j => j.status === "Active").length;
-    const totalApps   = jobs.reduce((s, j) => s + j.applications, 0);
+    const totalApps = jobs.reduce((s, j) => s + j.applications, 0);
     const urgentCount = jobs.filter(j => j.urgent).length;
 
     const Container = isWeb ? View : SafeAreaView;
@@ -1417,10 +1418,7 @@ const JobOpeningsScreen: React.FC = () => {
                     {!isWeb ? (
                         <>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                <View style={[s.pageTag, { marginBottom: 0 }]}>
-                                    <Feather name="briefcase" size={11} color={T.orange} />
-                                    <Text style={s.pageTagTxt}>Job Openings</Text>
-                                </View>
+
                                 <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => { setEditingJob(null); setEditModalVisible(true); }} activeOpacity={0.85}>
                                     <Feather name="plus" size={14} color="#fff" />
                                     <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
@@ -1434,10 +1432,7 @@ const JobOpeningsScreen: React.FC = () => {
                     ) : (
                         <>
                             <View style={s.pageHeadLeft}>
-                                <View style={s.pageTag}>
-                                    <Feather name="briefcase" size={11} color={T.orange} />
-                                    <Text style={s.pageTagTxt}>Job Openings</Text>
-                                </View>
+
                                 <Text style={s.pageTitle}>Open Positions</Text>
                                 <Text style={s.pageSub}>Manage and track all active job listings</Text>
                             </View>
@@ -1598,38 +1593,15 @@ const JobOpeningsScreen: React.FC = () => {
                 )}
 
                 {/* ── PAGINATION CONTROLS ── */}
-                {isWeb && totalPages > 1 && (
-                    <View style={s.paginationWrap}>
-                        <TouchableOpacity
-                            style={[s.pageBtn, page === 1 && { opacity: 0.5 }]}
-                            disabled={page === 1}
-                            onPress={() => setPage(p => Math.max(1, p - 1))}
-                        >
-                            <Feather name="chevron-left" size={14} color={T.textM} />
-                        </TouchableOpacity>
-
-                        <View style={s.pageNumbers}>
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <TouchableOpacity
-                                    key={i}
-                                    style={[s.pageNumBtn, page === i + 1 && s.pageNumBtnActive]}
-                                    onPress={() => setPage(i + 1)}
-                                >
-                                    <Text style={[s.pageNumTxt, page === i + 1 && s.pageNumTxtActive]}>
-                                        {i + 1}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        <TouchableOpacity
-                            style={[s.pageBtn, page === totalPages && { opacity: 0.5 }]}
-                            disabled={page === totalPages}
-                            onPress={() => setPage(p => Math.min(totalPages, p + 1))}
-                        >
-                            <Feather name="chevron-right" size={14} color={T.textM} />
-                        </TouchableOpacity>
-                    </View>
+                {filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        itemName="job openings"
+                        onPageChange={setCurrentPage}
+                    />
                 )}
             </ScrollView>
 
@@ -1742,7 +1714,8 @@ const s = StyleSheet.create({
 
     // Scroll
     scroll: {
-        padding: 18,
+        paddingTop: 10,
+        paddingHorizontal: 16,
         paddingBottom: 48,
         gap: 14,
     },
@@ -1756,7 +1729,9 @@ const s = StyleSheet.create({
         backgroundColor: "#151D4F", // deep navy
         padding: 24,
         paddingBottom: 48,
-        borderRadius: 16,
+        borderRadius: 22,
+        marginHorizontal: 2,
+        marginTop: 12,
     },
     pageHeadLeft: { flex: 1 },
     pageTag: {

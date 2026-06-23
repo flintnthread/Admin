@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDateTime, initialsFromName } from "@/lib/format";
 import {
@@ -40,6 +41,9 @@ export default function PendingSellersScreen() {
   const [rejectTarget, setRejectTarget] = useState<PendingProfileSeller | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [search, setSearch] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,7 +150,10 @@ export default function PendingSellersScreen() {
             placeholder="Search name, email, phone…"
             placeholderTextColor={MUTED}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={(val) => {
+              setSearch(val);
+              setCurrentPage(1);
+            }}
           />
         </View>
 
@@ -177,7 +184,7 @@ export default function PendingSellersScreen() {
               <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
               <Text style={[styles.th, { flex: 1 }]}>Actions</Text>
             </View>
-            {filtered.map((s) => (
+            {filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
               <View key={s.sellerId} style={styles.tableRow}>
                 <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <View style={styles.avatar}>
@@ -214,7 +221,7 @@ export default function PendingSellersScreen() {
             ))}
           </View>
         ) : (
-          filtered.map((s) => (
+          filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
             <View key={s.sellerId} style={styles.card}>
               <View style={styles.cardTop}>
                 <View style={styles.avatar}>
@@ -248,6 +255,17 @@ export default function PendingSellersScreen() {
               </View>
             </View>
           ))
+        )}
+
+        {filtered.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="pending sellers"
+            onPageChange={setCurrentPage}
+          />
         )}
       </ScrollView>
 
@@ -289,7 +307,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
   },
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

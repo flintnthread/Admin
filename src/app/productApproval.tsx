@@ -23,6 +23,7 @@ import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
 import { fetchProducts, fetchProductStats, type ProductListRow } from '@/services/productApi';
+import Pagination from '@/components/Pagination';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
 
@@ -408,22 +409,8 @@ function PageHeader({ isWide }: { isWide: boolean }) {
         </View>
         <View>
           <Text style={styles.pageTitle}>Product Approvals</Text>
-          <Text style={styles.breadcrumb}>Dashboard {'>'} Product Approvals</Text>
         </View>
       </View>
-
-      {isWide && (
-        <View style={styles.pageHeaderActions}>
-          <Pressable
-            onPress={() => router.push('/productDetails')}
-            style={({ pressed }) => [styles.headerOutlineBtn, pressed && styles.pressed]}>
-            <Text style={styles.headerOutlineText}>View Details</Text>
-          </Pressable>
-          <Pressable style={({ pressed }) => [styles.headerPurpleBtn, pressed && styles.pressed]}>
-            <Text style={styles.headerPurpleText}>Activate</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 }
@@ -749,84 +736,6 @@ function ProductTable({
 
 const PAGE_SIZE = 20;
 
-function buildPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages: (number | 'ellipsis')[] = [1];
-  if (current > 3) pages.push('ellipsis');
-  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p += 1) {
-    pages.push(p);
-  }
-  if (current < total - 2) pages.push('ellipsis');
-  if (total > 1) pages.push(total);
-  return pages;
-}
-
-function Pagination({
-  isMobile,
-  page,
-  totalPages,
-  totalElements,
-  onPageChange,
-}: {
-  isMobile: boolean;
-  page: number;
-  totalPages: number;
-  totalElements: number;
-  onPageChange: (page: number) => void;
-}) {
-  const start = totalElements === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const end = Math.min(page * PAGE_SIZE, totalElements);
-  const pageNumbers = buildPageNumbers(page, totalPages);
-
-  if (totalPages <= 1) {
-    return (
-      <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-        <Text style={styles.paginationInfo}>
-          Showing {start} to {end} of {totalElements} products
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.pagination, isMobile && styles.paginationMobile]}>
-      <Text style={styles.paginationInfo}>
-        Showing {start} to {end} of {totalElements} products
-      </Text>
-      <View style={styles.paginationControls}>
-        <Pressable
-          style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-          disabled={page <= 1}
-          onPress={() => onPageChange(page - 1)}>
-          <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
-        </Pressable>
-        {pageNumbers.map((num, index) =>
-          num === 'ellipsis' ? (
-            <Text key={`e-${index}`} style={styles.pageEllipsis}>
-              ...
-            </Text>
-          ) : (
-            <Pressable
-              key={num}
-              style={[styles.pageNum, num === page && styles.pageNumActive]}
-              onPress={() => onPageChange(num)}>
-              <Text style={[styles.pageNumText, num === page && styles.pageNumTextActive]}>
-                {num}
-              </Text>
-            </Pressable>
-          ),
-        )}
-        <Pressable
-          style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-          disabled={page >= totalPages}
-          onPress={() => onPageChange(page + 1)}>
-          <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 function filterStatusForApi(filter: FilterKey): string | undefined {
   if (filter === 'all') return undefined;
   if (filter === 'approved') return 'active';
@@ -928,15 +837,15 @@ export default function ProductApprovalScreen() {
 
   return (
     <AdminLayout>
-      <View style={styles.screen}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}>
         <PageHeader isWide={isWide} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+        <View style={styles.scrollContent}>
 
           {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
@@ -980,15 +889,16 @@ export default function ProductApprovalScreen() {
 
           {!loading && !error && (
             <Pagination
-              isMobile={isMobile}
-              page={currentPage}
+              currentPage={currentPage}
               totalPages={totalPages}
-              totalElements={totalProducts}
+              totalItems={totalProducts}
+              itemsPerPage={PAGE_SIZE}
+              itemName="products"
               onPageChange={setCurrentPage}
             />
           )}
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </AdminLayout>
   );
 }
@@ -1008,8 +918,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
     gap: 16,
   },
   pressed: {
@@ -1173,15 +1083,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    backgroundColor: '#1d324e',
+    backgroundColor: '#151D4F',
     paddingHorizontal: 32,
-    paddingTop: 24,
+    paddingVertical: 28,
     paddingBottom: 68,
     borderRadius: 22,
     marginHorizontal: 2,
     marginTop: 12,
     gap: 12,
-    shadowColor: '#1d324e',
+    shadowColor: '#151D4F',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 16,
@@ -1370,7 +1280,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: PALETTE.orangeLight,
+    backgroundColor: PALETTE.purpleLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1598,7 +1508,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: PALETTE.orangeLight,
+    backgroundColor: PALETTE.purpleLight,
     alignItems: 'center',
     justifyContent: 'center',
   },

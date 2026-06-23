@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapCategoryRequestRow } from '@/lib/mappers';
 import {
@@ -19,6 +19,7 @@ import {
   Platform,
 } from 'react-native';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import Svg, { Path, Circle, Rect, G, Polyline } from 'react-native-svg';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -309,6 +310,9 @@ export default function CategoryRequests() {
   const [filter, setFilter] = useState<'All' | Status>('All');
   const [selectedRequest, setSelectedRequest] = useState<CategoryRequest | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
@@ -335,6 +339,7 @@ export default function CategoryRequests() {
   }, [loadData]);
 
   const filtered = requests;
+  const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleUpdate = (id: string, status: 'Approved' | 'Rejected', reason: string) => {
     const row = requests.find((r) => r.id === id);
@@ -366,21 +371,24 @@ export default function CategoryRequests() {
           <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
         ) : null}
 
-        {/* Page Header */}
-        <View style={styles.pageHeader}>
-          <View style={styles.pageHeaderLeft}>
-            <View style={styles.pageIconWrap}>
-              <LayersIcon color="#1E3A5F" size={20} />
-            </View>
-            <View>
-              <Text style={styles.pageTitle}>Category Requests</Text>
-              <Text style={styles.pageSubtitle}>Review and manage seller category requests</Text>
+        {/* Page Header and Stats Overlap */}
+        <View style={styles.headerOuter}>
+          <View style={styles.pageHeader}>
+            <View style={styles.pageHeaderTop}>
+              <View style={styles.pageHeaderLeft}>
+                <View style={styles.pageIconWrap}>
+                  <LayersIcon color="#1E3A5F" size={20} />
+                </View>
+                <View>
+                  <Text style={styles.pageTitle}>Category Requests</Text>
+                  <Text style={styles.pageSubtitle}>Review and manage seller category requests</Text>
+                </View>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* â”€â”€ Stats Cards â”€â”€ */}
-        <View style={[styles.statsRow, isWeb && styles.statsRowWeb]}>
+          {/* â”€â”€ Stats Cards â”€â”€ */}
+          <View style={[styles.statsRow, isWeb && styles.statsRowWeb]}>
           <StatCard
             label="Total Requests"
             value={stats.total}
@@ -409,6 +417,7 @@ export default function CategoryRequests() {
             accent="#DC2626"
             bg="#FEE2E2"
           />
+          </View>
         </View>
 
         {/* â”€â”€ Filter Tabs â”€â”€ */}
@@ -421,7 +430,10 @@ export default function CategoryRequests() {
               <TouchableOpacity
                 key={f}
                 style={[styles.filterTab, filter === f && styles.filterTabActive]}
-                onPress={() => setFilter(f)}
+                onPress={() => {
+                  setFilter(f);
+                  setCurrentPage(1);
+                }}
               >
                 <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
                   {f}
@@ -452,7 +464,7 @@ export default function CategoryRequests() {
             </View>
 
             {/* Table Rows */}
-            {filtered.map((req, idx) => (
+            {paginated.map((req, idx) => (
               <View key={req.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                 <Text style={[styles.td, { width: 80 }, styles.tdId]}>{req.id}</Text>
                 <View style={{ width: 130, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
@@ -489,7 +501,7 @@ export default function CategoryRequests() {
         ) : (
           /* Mobile Cards */
           <View style={styles.cardList}>
-            {filtered.map((req) => (
+            {paginated.map((req) => (
               <View key={req.id} style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={styles.cardTopLeft}>
@@ -536,6 +548,17 @@ export default function CategoryRequests() {
             )}
           </View>
         )}
+
+        {filtered.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="category requests"
+            onPageChange={setCurrentPage}
+          />
+        )}
       </ScrollView>
 
       {/* â”€â”€ View Modal â”€â”€ */}
@@ -562,11 +585,19 @@ const styles = StyleSheet.create({
   },
 
   // Page Header
+  headerOuter: {
+    marginBottom: 8,
+  },
   pageHeader: {
+    backgroundColor: '#151D4F',
+    borderRadius: 14,
+    padding: 20,
+    paddingBottom: 64,
+  },
+  pageHeaderTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
   },
   pageHeaderLeft: {
     flexDirection: 'row',
@@ -584,7 +615,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
     letterSpacing: -0.3,
   },
   pageSubtitle: {
@@ -597,6 +628,9 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'column',
     gap: 12,
+    marginTop: -46,
+    paddingHorizontal: 16,
+    zIndex: 10,
     marginBottom: 20,
   },
   statsRowWeb: {
