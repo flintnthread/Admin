@@ -1392,12 +1392,12 @@ export default function SellersDashboard() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header Container (Dark Blue) ── */}
-          <View style={styles.headerContainer}>
+          <View style={[styles.headerContainer, { paddingHorizontal: 16 }]}>
             <View style={styles.pageHeader}>
-              <View>
+              <View style={{ flex: 1, marginRight: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="bar-chart" size={20} color={ORANGE} />
-                  <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
+                  <Text style={[styles.pageTitle, { flex: 1 }]} numberOfLines={2}>Sellers Graph / Analysis</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
