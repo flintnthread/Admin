@@ -11,6 +11,7 @@ import {
 } from '@/services/sellerApi';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+import Svg, { Polygon, Polyline, Path } from 'react-native-svg';
 import {
   ActivityIndicator,
   Alert,
@@ -365,18 +366,18 @@ const SparklineChart: React.FC<{
         />
       ))}
       <View style={{ position: 'absolute', top: 0, left: 0 }}>
-        <svg width={width} height={height} style={{ overflow: 'visible' }}>
-          <polygon
+        <Svg width={width} height={height} style={{ overflow: 'visible' }}>
+          <Polygon
             points={fillPoints.map(p => `${p.x},${p.y}`).join(' ')}
             fill={color + '22'}
           />
-          <polyline
+          <Polyline
             points={points.map(p => `${p.x},${p.y}`).join(' ')}
             fill="none"
             stroke={color}
             strokeWidth="2"
           />
-        </svg>
+        </Svg>
       </View>
       {data.map((d, i) => (
         <TouchableOpacity
@@ -498,9 +499,9 @@ const DonutChart: React.FC<{
 
   return (
     <View style={{ width: size, height: size }}>
-      <svg width={size} height={size}>
+      <Svg width={size} height={size}>
         {arcs.map((arc, i) => (
-          <path
+          <Path
             key={i}
             d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.angle)}
             fill="none"
@@ -509,7 +510,7 @@ const DonutChart: React.FC<{
             strokeLinecap="butt"
           />
         ))}
-      </svg>
+      </Svg>
     </View>
   );
 };
