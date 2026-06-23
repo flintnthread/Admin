@@ -341,13 +341,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: T.bg,
   },
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
     backgroundColor: T.navy,
     paddingHorizontal: 20,
     paddingTop: Platform.OS === "android" ? 16 : 10,
     paddingBottom: 24,
-    marginTop: 30,
-  },
+    },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

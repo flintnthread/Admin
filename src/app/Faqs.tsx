@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 // â”€â”€â”€ THEME â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PRIMARY = "#ef7b1a";
@@ -431,6 +432,8 @@ const FaqQuestionsScreen: React.FC = () => {
     const [addModal, setAddModal] = useState(false);
     const [deleteModal, setDeleteModal] = useState<FaqQuestion | null>(null);
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     const loadCategories = useCallback(async () => {
         try {
@@ -478,6 +481,11 @@ const FaqQuestionsScreen: React.FC = () => {
         const inStatus = statusFilter === "All" || q.status === statusFilter;
         return inCat && inSearch && inStatus;
     });
+
+    const paginated = filtered.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const toggleExpand = (id: number) => {
         setExpandedIds(prev => {
@@ -577,7 +585,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                             style={[st.catBtn,
                                             { borderColor: isSelected ? NAVY : PRIMARY },
                                             isSelected && { backgroundColor: NAVY }]}
-                                            onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); }}>
+                                            onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}>
                                             <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
                                                 <Feather name={cat.icon as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
                                             </View>
@@ -615,9 +623,15 @@ const FaqQuestionsScreen: React.FC = () => {
                                     placeholder="Search questions..."
                                     placeholderTextColor={TEXT_MUTED}
                                     value={search}
-                                    onChangeText={setSearch} />
+                                    onChangeText={(t) => {
+                                        setSearch(t);
+                                        setCurrentPage(1);
+                                    }} />
                                 {search.length > 0 && (
-                                    <TouchableOpacity onPress={() => setSearch("")}>
+                                    <TouchableOpacity onPress={() => {
+                                        setSearch("");
+                                        setCurrentPage(1);
+                                    }}>
                                         <Feather name="x-circle" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                 )}
@@ -627,7 +641,10 @@ const FaqQuestionsScreen: React.FC = () => {
                                     <TouchableOpacity key={f}
                                         style={[st.chip,
                                         statusFilter === f && { backgroundColor: selectedCat?.color ?? PRIMARY, borderColor: selectedCat?.color ?? PRIMARY }]}
-                                        onPress={() => setStatusFilter(f)}>
+                                        onPress={() => {
+                                            setStatusFilter(f);
+                                            setCurrentPage(1);
+                                        }}>
                                         <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
                                     </TouchableOpacity>
                                 ))}
@@ -677,7 +694,7 @@ const FaqQuestionsScreen: React.FC = () => {
                             </View>
                         ) : viewMode === "grid" ? (
                             <View style={st.gridContainer}>
-                                {filtered.map((q, idx) => (
+                                {paginated.map((q, idx) => (
                                     <View key={q.id} style={[st.gridItem, !isWeb && { width: "100%" as any }]}>
                                         <QuestionGridCard
                                             q={q}
@@ -705,7 +722,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                             <Text style={[qSt.headerCell, { width: 110 }]}>Created Date</Text>
                                             <Text style={[qSt.headerCell, { width: 110 }]}>Action</Text>
                                         </View>
-                                        {filtered.map((q, idx) => (
+                                        {paginated.map((q, idx) => (
                                             <QuestionRow
                                                 key={q.id}
                                                 q={q}
@@ -732,7 +749,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                                 <Text style={[qSt.headerCell, { width: 110 }]}>Created Date</Text>
                                                 <Text style={[qSt.headerCell, { width: 110 }]}>Action</Text>
                                             </View>
-                                            {filtered.map((q, idx) => (
+                                            {paginated.map((q, idx) => (
                                                 <QuestionRow
                                                     key={q.id}
                                                     q={q}
@@ -748,6 +765,17 @@ const FaqQuestionsScreen: React.FC = () => {
                                     </ScrollView>
                                 )}
                             </View>
+                        )}
+
+                        {filtered.length > 0 && (
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                totalItems={filtered.length}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                                itemName="questions"
+                                onPageChange={setCurrentPage}
+                            />
                         )}
                     </View>
                 </ScrollView>
@@ -788,7 +816,7 @@ const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: BG_CARD, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-    headerWeb: { paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, marginHorizontal: 18, marginTop: 22, borderRadius: 22, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT_HEAD, letterSpacing: -0.3 },

@@ -940,315 +940,315 @@ export default function ProductDetailsScreen() {
   return (
     <AdminLayout>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
-            <Text style={styles.backBtnText}>Back</Text>
-          </Pressable>
-          <View>
-            <Text style={styles.headerTitle} numberOfLines={2}>
-              {product.name}
-            </Text>
-            <Text style={styles.headerSub} numberOfLines={1}>
-              {product.category} · {product.seller} · Updated {product.lastUpdated}
-            </Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()}>
+              <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
+              <Text style={styles.backBtnText}>Back</Text>
+            </Pressable>
+            <View>
+              <Text style={styles.headerTitle} numberOfLines={2}>
+                {product.name}
+              </Text>
+              <Text style={styles.headerSub} numberOfLines={1}>
+                {product.category} · {product.seller} · Updated {product.lastUpdated}
+              </Text>
+            </View>
           </View>
+          {canReview && isWide ? (
+            <View style={styles.headerActions}>
+              <Pressable
+                style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
+                disabled={actionLoading}
+                onPress={() => void handleApprove()}
+              >
+                <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
+                <Text style={styles.approveActionText}>Approve</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.rejectActionBtn, actionLoading && { opacity: 0.6 }]}
+                disabled={actionLoading}
+                onPress={() => setShowRejectModal(true)}
+              >
+                <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
+                <Text style={styles.rejectActionText}>Reject</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
-        {canReview && isWide ? (
-          <View style={styles.headerActions}>
+
+        {canReview && !isWide ? (
+          <View style={styles.mobileHeaderActions}>
             <Pressable
-              style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
+              style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
               disabled={actionLoading}
               onPress={() => void handleApprove()}
             >
-              <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
               <Text style={styles.approveActionText}>Approve</Text>
             </Pressable>
             <Pressable
-              style={[styles.rejectActionBtn, actionLoading && { opacity: 0.6 }]}
+              style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
               disabled={actionLoading}
               onPress={() => setShowRejectModal(true)}
             >
-              <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
               <Text style={styles.rejectActionText}>Reject</Text>
             </Pressable>
           </View>
         ) : null}
-      </View>
 
-      {canReview && !isWide ? (
-        <View style={styles.mobileHeaderActions}>
-          <Pressable
-            style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-            disabled={actionLoading}
-            onPress={() => void handleApprove()}
-          >
-            <Text style={styles.approveActionText}>Approve</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-            disabled={actionLoading}
-            onPress={() => setShowRejectModal(true)}
-          >
-            <Text style={styles.rejectActionText}>Reject</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <Modal visible={showRejectModal} transparent animationType="fade">
-        <View style={styles.rejectModalBackdrop}>
-          <View style={styles.rejectModalCard}>
-            <Text style={styles.rejectModalTitle}>Reject product</Text>
-            <Text style={styles.rejectModalSub}>{product.name}</Text>
-            <TextInput
-              style={styles.rejectModalInput}
-              placeholder="Reason / admin note"
-              placeholderTextColor={PALETTE.textMuted}
-              value={rejectNote}
-              onChangeText={setRejectNote}
-              multiline
-            />
-            <View style={styles.headerActions}>
-              <Pressable style={styles.rejectActionBtn} onPress={() => setShowRejectModal(false)}>
-                <Text style={styles.rejectActionText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={styles.approveActionBtn}
-                disabled={actionLoading}
-                onPress={() => void handleReject()}
-              >
-                <Text style={styles.approveActionText}>Reject</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax, alignSelf: 'center', width: '100%' }]}
-        showsVerticalScrollIndicator={false}>
-        {/* Hero card */}
-        <View style={styles.heroCard}>
-          <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
-            {/* Gallery */}
-            <View style={styles.galleryCol}>
-              <View style={styles.mainImageWrap}>
-                <Image source={{ uri: product.gallery[activeImage] }} style={styles.mainImage} contentFit="cover" />
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{product.discount}% OFF</Text>
-                </View>
-                <View style={styles.stockBadge}>
-                  <MaterialCommunityIcons name="check-circle" size={12} color={PALETTE.green} />
-                  <Text style={styles.stockBadgeText}>{product.stock} units</Text>
-                </View>
-              </View>
-              <View style={styles.thumbRow}>
-                <Pressable style={styles.thumbNav}>
-                  <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
+        <Modal visible={showRejectModal} transparent animationType="fade">
+          <View style={styles.rejectModalBackdrop}>
+            <View style={styles.rejectModalCard}>
+              <Text style={styles.rejectModalTitle}>Reject product</Text>
+              <Text style={styles.rejectModalSub}>{product.name}</Text>
+              <TextInput
+                style={styles.rejectModalInput}
+                placeholder="Reason / admin note"
+                placeholderTextColor={PALETTE.textMuted}
+                value={rejectNote}
+                onChangeText={setRejectNote}
+                multiline
+              />
+              <View style={styles.headerActions}>
+                <Pressable style={styles.rejectActionBtn} onPress={() => setShowRejectModal(false)}>
+                  <Text style={styles.rejectActionText}>Cancel</Text>
                 </Pressable>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
-                  {product.gallery.map((uri, index) => (
-                    <Pressable key={uri + index} onPress={() => setActiveImage(index)}>
-                      <Image
-                        source={{ uri }}
-                        style={[styles.thumb, activeImage === index && styles.thumbActive]}
-                        contentFit="cover"
-                      />
-                    </Pressable>
-                  ))}
-                </ScrollView>
-                <Pressable style={styles.thumbNav}>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
+                <Pressable
+                  style={styles.approveActionBtn}
+                  disabled={actionLoading}
+                  onPress={() => void handleReject()}
+                >
+                  <Text style={styles.approveActionText}>Reject</Text>
                 </Pressable>
               </View>
             </View>
-
-            {/* Product info */}
-            <View style={styles.infoCol}>
-              <View style={styles.infoTopRow}>
-                <View style={styles.categoryPill}>
-                  <Text style={styles.categoryPillText}>
-                    {product.categoryLabel} · {product.subcategory}
-                  </Text>
-                </View>
-                <View style={styles.stockStatus}>
-                  <View style={styles.stockDot} />
-                  <Text style={styles.stockStatusText}>{product.stockStatus}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.productTitle}>{product.name}</Text>
-              <Text style={styles.productSku}>
-                {product.category} · SKU: {product.sku}
-              </Text>
-
-              <Text style={styles.price}>₹{product.price}</Text>
-              <Text style={styles.priceSub}>
-                MRP Excl. GST ₹{product.mrp} · Selling Incl. GST ({product.gst}%)
-              </Text>
-
-              <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>
-                <View style={styles.attrBox}>
-                  <Text style={styles.attrLabel}>Material</Text>
-                  <Text style={styles.attrValue}>{product.material}</Text>
-                </View>
-                <View style={styles.attrBox}>
-                  <Text style={styles.attrLabel}>Weight</Text>
-                  <Text style={styles.attrValue}>{product.weight}</Text>
-                </View>
-                <View style={styles.attrBox}>
-                  <Text style={styles.attrLabel}>HSN Code</Text>
-                  <Text style={styles.attrValue}>{product.hsnCode}</Text>
-                </View>
-                <View style={styles.attrBox}>
-                  <Text style={styles.attrLabel}>Warranty</Text>
-                  <Text style={styles.attrValue}>{product.warranty}</Text>
-                </View>
-              </View>
-
-              <View style={styles.returnBox}>
-                <Text style={styles.returnLabel}>Return Policy</Text>
-                <Text style={styles.returnText}>{product.returnPolicy}</Text>
-              </View>
-
-              <View style={styles.footerTags}>
-                <View style={styles.footerTag}>
-                  <Text style={styles.footerTagText}>Size: {product.size}</Text>
-                </View>
-                <View style={styles.footerTag}>
-                  <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
-                    Delivery: {product.delivery}
-                  </Text>
-                </View>
-                <View style={styles.footerTag}>
-                  <Text style={[styles.footerTagText, { color: PALETTE.navy }]}>
-                    Stock: {product.stock} units
-                  </Text>
-                </View>
-              </View>
-            </View>
           </View>
-        </View>
+        </Modal>
 
-        {/* Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {TABS.map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[styles.tab, active && styles.tabActive]}>
-                {tab.key === 'overview' && (
-                  <MaterialCommunityIcons
-                    name="information-outline"
-                    size={14}
-                    color={active ? '#FFF' : PALETTE.textSecondary}
-                  />
-                )}
-                {tab.key === 'variants' && (
-                  <MaterialCommunityIcons
-                    name="tune"
-                    size={14}
-                    color={active ? '#FFF' : PALETTE.textSecondary}
-                  />
-                )}
-                {tab.key === 'specifications' && (
-                  <MaterialCommunityIcons
-                    name="clipboard-list-outline"
-                    size={14}
-                    color={active ? '#FFF' : PALETTE.textSecondary}
-                  />
-                )}
-                {tab.key === 'delivery' && (
-                  <MaterialCommunityIcons
-                    name="truck-outline"
-                    size={14}
-                    color={active ? '#FFF' : PALETTE.textSecondary}
-                  />
-                )}
-                {tab.key === 'returns' && (
-                  <MaterialCommunityIcons
-                    name="backup-restore"
-                    size={14}
-                    color={active ? '#FFF' : PALETTE.textSecondary}
-                  />
-                )}
-                {tab.key === 'sizechart' && (
-                  <MaterialCommunityIcons
-                    name="ruler"
-                    size={14}
-                    color={active ? '#FFF' : PALETTE.textSecondary}
-                  />
-                )}
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
-                {tab.key === 'variants' && (
-                  <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
-                    <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>
-                      {variants.length}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax, alignSelf: 'center', width: '100%' }]}
+          showsVerticalScrollIndicator={false}>
+          {/* Hero card */}
+          <View style={styles.heroCard}>
+            <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
+              {/* Gallery */}
+              <View style={styles.galleryCol}>
+                <View style={styles.mainImageWrap}>
+                  <Image source={{ uri: product.gallery[activeImage] }} style={styles.mainImage} contentFit="cover" />
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountText}>{product.discount}% OFF</Text>
+                  </View>
+                  <View style={styles.stockBadge}>
+                    <MaterialCommunityIcons name="check-circle" size={12} color={PALETTE.green} />
+                    <Text style={styles.stockBadgeText}>{product.stock} units</Text>
+                  </View>
+                </View>
+                <View style={styles.thumbRow}>
+                  <Pressable style={styles.thumbNav}>
+                    <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
+                  </Pressable>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
+                    {product.gallery.map((uri, index) => (
+                      <Pressable key={uri + index} onPress={() => setActiveImage(index)}>
+                        <Image
+                          source={{ uri }}
+                          style={[styles.thumb, activeImage === index && styles.thumbActive]}
+                          contentFit="cover"
+                        />
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                  <Pressable style={styles.thumbNav}>
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Product info */}
+              <View style={styles.infoCol}>
+                <View style={styles.infoTopRow}>
+                  <View style={styles.categoryPill}>
+                    <Text style={styles.categoryPillText}>
+                      {product.categoryLabel} · {product.subcategory}
                     </Text>
                   </View>
-                )}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                  <View style={styles.stockStatus}>
+                    <View style={styles.stockDot} />
+                    <Text style={styles.stockStatusText}>{product.stockStatus}</Text>
+                  </View>
+                </View>
 
-        {/* Overview tab */}
-        {activeTab === 'overview' && (
-          <View style={styles.tabContent}>
-            <SectionCard title="Full Description" icon="file-document-outline">
-              <Text style={styles.descriptionText}>{product.fullDescription}</Text>
-            </SectionCard>
+                <Text style={styles.productTitle}>{product.name}</Text>
+                <Text style={styles.productSku}>
+                  {product.category} · SKU: {product.sku}
+                </Text>
 
-            <View style={[styles.twoCol, !isWide && styles.twoColMobile]}>
-              <SectionCard title="Classification" icon="tag-outline" flex={1}>
-                <InfoRow label="Category" value={product.categoryLabel} />
-                <InfoRow label="Subcategory" value={product.subcategory} />
-                <InfoRow label="Color" value={product.color} />
-                <InfoRow label="Size" value={product.size} />
-                <InfoRow label="HSN Code" value={product.hsnCode} />
-                <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
-                <InfoRow label="Material" value={product.material} />
-                <InfoRow label="Return" value={product.returnPolicy} />
-                <InfoRow label="Warranty" value={product.warranty} />
+                <Text style={styles.price}>₹{product.price}</Text>
+                <Text style={styles.priceSub}>
+                  MRP Excl. GST ₹{product.mrp} · Selling Incl. GST ({product.gst}%)
+                </Text>
+
+                <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>
+                  <View style={styles.attrBox}>
+                    <Text style={styles.attrLabel}>Material</Text>
+                    <Text style={styles.attrValue}>{product.material}</Text>
+                  </View>
+                  <View style={styles.attrBox}>
+                    <Text style={styles.attrLabel}>Weight</Text>
+                    <Text style={styles.attrValue}>{product.weight}</Text>
+                  </View>
+                  <View style={styles.attrBox}>
+                    <Text style={styles.attrLabel}>HSN Code</Text>
+                    <Text style={styles.attrValue}>{product.hsnCode}</Text>
+                  </View>
+                  <View style={styles.attrBox}>
+                    <Text style={styles.attrLabel}>Warranty</Text>
+                    <Text style={styles.attrValue}>{product.warranty}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.returnBox}>
+                  <Text style={styles.returnLabel}>Return Policy</Text>
+                  <Text style={styles.returnText}>{product.returnPolicy}</Text>
+                </View>
+
+                <View style={styles.footerTags}>
+                  <View style={styles.footerTag}>
+                    <Text style={styles.footerTagText}>Size: {product.size}</Text>
+                  </View>
+                  <View style={styles.footerTag}>
+                    <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
+                      Delivery: {product.delivery}
+                    </Text>
+                  </View>
+                  <View style={styles.footerTag}>
+                    <Text style={[styles.footerTagText, { color: PALETTE.navy }]}>
+                      Stock: {product.stock} units
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+            {TABS.map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[styles.tab, active && styles.tabActive]}>
+                  {tab.key === 'overview' && (
+                    <MaterialCommunityIcons
+                      name="information-outline"
+                      size={14}
+                      color={active ? '#FFF' : PALETTE.textSecondary}
+                    />
+                  )}
+                  {tab.key === 'variants' && (
+                    <MaterialCommunityIcons
+                      name="tune"
+                      size={14}
+                      color={active ? '#FFF' : PALETTE.textSecondary}
+                    />
+                  )}
+                  {tab.key === 'specifications' && (
+                    <MaterialCommunityIcons
+                      name="clipboard-list-outline"
+                      size={14}
+                      color={active ? '#FFF' : PALETTE.textSecondary}
+                    />
+                  )}
+                  {tab.key === 'delivery' && (
+                    <MaterialCommunityIcons
+                      name="truck-outline"
+                      size={14}
+                      color={active ? '#FFF' : PALETTE.textSecondary}
+                    />
+                  )}
+                  {tab.key === 'returns' && (
+                    <MaterialCommunityIcons
+                      name="backup-restore"
+                      size={14}
+                      color={active ? '#FFF' : PALETTE.textSecondary}
+                    />
+                  )}
+                  {tab.key === 'sizechart' && (
+                    <MaterialCommunityIcons
+                      name="ruler"
+                      size={14}
+                      color={active ? '#FFF' : PALETTE.textSecondary}
+                    />
+                  )}
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                  {tab.key === 'variants' && (
+                    <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                      <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>
+                        {variants.length}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Overview tab */}
+          {activeTab === 'overview' && (
+            <View style={styles.tabContent}>
+              <SectionCard title="Full Description" icon="file-document-outline">
+                <Text style={styles.descriptionText}>{product.fullDescription}</Text>
               </SectionCard>
 
-              <SectionCard title="Inventory" icon="warehouse" flex={1}>
-                <InfoRow label="Stock Quantity" value={`${product.stock} units`} valueColor={PALETTE.green} />
-                <InfoRow label="Status" value={product.stockStatus} valueColor={PALETTE.red} />
-                <InfoRow label="DB Status" value={product.dbStatus} />
-                <InfoRow label="Last Updated" value={product.lastUpdated} />
-                <InfoRow label="Created At" value={product.createdAt} />
-                <InfoRow label="Approved At" value={product.approvedAt} />
+              <View style={[styles.twoCol, !isWide && styles.twoColMobile]}>
+                <SectionCard title="Classification" icon="tag-outline" flex={1}>
+                  <InfoRow label="Category" value={product.categoryLabel} />
+                  <InfoRow label="Subcategory" value={product.subcategory} />
+                  <InfoRow label="Color" value={product.color} />
+                  <InfoRow label="Size" value={product.size} />
+                  <InfoRow label="HSN Code" value={product.hsnCode} />
+                  <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
+                  <InfoRow label="Material" value={product.material} />
+                  <InfoRow label="Return" value={product.returnPolicy} />
+                  <InfoRow label="Warranty" value={product.warranty} />
+                </SectionCard>
+
+                <SectionCard title="Inventory" icon="warehouse" flex={1}>
+                  <InfoRow label="Stock Quantity" value={`${product.stock} units`} valueColor={PALETTE.green} />
+                  <InfoRow label="Status" value={product.stockStatus} valueColor={PALETTE.red} />
+                  <InfoRow label="DB Status" value={product.dbStatus} />
+                  <InfoRow label="Last Updated" value={product.lastUpdated} />
+                  <InfoRow label="Created At" value={product.createdAt} />
+                  <InfoRow label="Approved At" value={product.approvedAt} />
+                </SectionCard>
+              </View>
+
+              <SectionCard title="Admin Notes" icon="bell-outline">
+                <View style={styles.adminNote}>
+                  <Text style={styles.adminNoteText}>{product.adminNote}</Text>
+                </View>
               </SectionCard>
             </View>
+          )}
 
-            <SectionCard title="Admin Notes" icon="bell-outline">
-              <View style={styles.adminNote}>
-                <Text style={styles.adminNoteText}>{product.adminNote}</Text>
-              </View>
-            </SectionCard>
-          </View>
-        )}
+          {activeTab === 'variants' && (
+            <VariantsTab isWide={isWide} variants={variants} />
+          )}
 
-        {activeTab === 'variants' && (
-          <VariantsTab isWide={isWide} variants={variants} />
-        )}
+          {activeTab === 'specifications' && extras && (
+            <SpecificationsTab isWide={isWide} extras={extras} />
+          )}
 
-        {activeTab === 'specifications' && extras && (
-          <SpecificationsTab isWide={isWide} extras={extras} />
-        )}
+          {activeTab === 'delivery' && extras && <DeliveryTab isWide={isWide} extras={extras} />}
 
-        {activeTab === 'delivery' && extras && <DeliveryTab isWide={isWide} extras={extras} />}
+          {activeTab === 'returns' && extras && <ReturnsTab isWide={isWide} extras={extras} />}
 
-        {activeTab === 'returns' && extras && <ReturnsTab isWide={isWide} extras={extras} />}
-
-        {activeTab === 'sizechart' && extras && <SizeChartTab isWide={isWide} extras={extras} />}
-      </ScrollView>
+          {activeTab === 'sizechart' && extras && <SizeChartTab isWide={isWide} extras={extras} />}
+        </ScrollView>
 
       </SafeAreaView>
     </AdminLayout>
@@ -1261,6 +1261,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, gap: 16, paddingBottom: 32 },
 
   header: {
+    marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     backgroundColor: PALETTE.navy,
     paddingHorizontal: 16,
     paddingVertical: 14,

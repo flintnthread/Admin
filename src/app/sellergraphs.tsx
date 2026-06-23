@@ -1094,7 +1094,7 @@ export default function SellersDashboard() {
         <View style={styles.root}>
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 32, paddingBottom: 40 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
           >
             {/* ── Header ── */}
@@ -1116,7 +1116,7 @@ export default function SellersDashboard() {
             {errorBanner}
 
             {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, marginHorizontal: 22 }}>
               {statCards.map(c => (
                 <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
                   <View style={{ flex: 1 }}>
@@ -1388,7 +1388,7 @@ export default function SellersDashboard() {
       <View style={styles.root}>
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: isTablet ? 24 : 14, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header Container (Dark Blue) ── */}
@@ -1410,7 +1410,7 @@ export default function SellersDashboard() {
           {errorBanner}
 
           {/* ── Stat Cards (mobile: 2-col grid) ── */}
-          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, paddingHorizontal: 16 }]}>
+          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, marginHorizontal: 22 }]}>
             {statCards.map(c => (
               <View key={c.label} style={[styles.statCard]}>
                 <View style={{ flex: 1 }}>
@@ -1678,11 +1678,18 @@ const styles = StyleSheet.create({
   },
 
   headerContainer: {
-    backgroundColor: "#1d324e",
-    padding: 16,
-    paddingBottom: 48,
-    borderRadius: 16,
-    marginBottom: 0,
+    backgroundColor: "#151D4F",
+    marginHorizontal: 2,
+    marginTop: 12,
+    borderRadius: 22,
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    paddingBottom: 68,
+    shadowColor: "#151D4F",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
 
   card: {
@@ -1873,7 +1880,7 @@ const styles = StyleSheet.create({
     margin: 10, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 8,
     borderWidth: 1, borderColor: BORDER, borderRadius: 8, backgroundColor: "#F8FAFC",
   },
-  sellerSearchInput: { flex: 1, fontSize: 13, color: "#374151", padding: 0 },
+  sellerSearchInput: { flex: 1, fontSize: 13, color: "#374151", padding: 0, outlineStyle: "none" } as any,
   sellerDropdownCount: {
     fontSize: 11, color: "#94A3B8", textAlign: "center",
     paddingVertical: 8, borderTopWidth: 1, borderTopColor: BORDER,

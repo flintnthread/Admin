@@ -1,6 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
+import Swal from "sweetalert2";
 import {
   Alert,
   Image,
@@ -709,11 +711,13 @@ const AddModal = ({
   onClose,
   onSave,
   isWeb,
+  editData,
 }: {
   visible: boolean;
   onClose: () => void;
   onSave: (d: any) => void;
   isWeb: boolean;
+  editData?: Subcategory | null;
 }) => {
   const [category, setCategory] = useState("");
   const [name, setName] = useState("");
@@ -728,6 +732,20 @@ const AddModal = ({
     setMaterials([]);
     setStatus("Active");
   };
+
+  useEffect(() => {
+    if (visible) {
+      if (editData) {
+        setCategory(editData.mainCat && editData.category ? `${editData.mainCat} > ${editData.category}` : "");
+        setName(editData.name);
+        setImage(editData.image || null);
+        setMaterials(editData.materials || []);
+        setStatus(editData.status);
+      } else {
+        reset();
+      }
+    }
+  }, [visible, editData]);
 
   const pickImage = async () => {
     if (Platform.OS === "web") {
@@ -773,6 +791,7 @@ const AddModal = ({
     }
     const parts = category.split(" > ");
     onSave({
+      id: editData?.id,
       mainCat: parts[0],
       category: parts[1] || parts[0],
       name,
@@ -802,7 +821,7 @@ const AddModal = ({
               <View style={S.modalIconWrap}>
                 <LayersIcon color="#FFF" />
               </View>
-              <Text style={S.modalTitle}>Add Subcategory</Text>
+              <Text style={S.modalTitle}>{editData ? "Edit Subcategory" : "Add Subcategory"}</Text>
             </View>
             <TouchableOpacity
               style={S.modalCloseBtn}
@@ -949,7 +968,7 @@ const AddModal = ({
               <Text style={S.cancelText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={S.saveBtn} onPress={handleSave}>
-              <Text style={S.saveText}>Save Subcategory</Text>
+              <Text style={S.saveText}>{editData ? "Update Subcategory" : "Save Subcategory"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -961,9 +980,11 @@ const AddModal = ({
 // ─── Grid Card ────────────────────────────────────────────────────────────────
 const GridCard = ({
   item,
+  onEdit,
   onDelete,
 }: {
   item: Subcategory;
+  onEdit: () => void;
   onDelete: () => void;
 }) => (
   <View style={S.card}>
@@ -1034,7 +1055,7 @@ const GridCard = ({
           <Text style={S.cardDate}>{item.created}</Text>
         </View>
         <View style={S.cardActions}>
-          <TouchableOpacity style={S.editBtn}>
+          <TouchableOpacity style={S.editBtn} onPress={onEdit}>
             <EditIcon />
           </TouchableOpacity>
           <TouchableOpacity style={S.deleteBtn} onPress={onDelete}>
@@ -1049,9 +1070,11 @@ const GridCard = ({
 // ─── List Table ───────────────────────────────────────────────────────────────
 const ListTable = ({
   items,
+  onEdit,
   onDelete,
 }: {
   items: Subcategory[];
+  onEdit: (cat: Subcategory) => void;
   onDelete: (id: number) => void;
 }) => (
   <View style={S.tableWrap}>
@@ -1128,7 +1151,7 @@ const ListTable = ({
             { flexDirection: "row", gap: 6, justifyContent: "center" },
           ]}
         >
-          <TouchableOpacity style={S.editBtn}>
+          <TouchableOpacity style={S.editBtn} onPress={() => onEdit(item)}>
             <EditIcon />
           </TouchableOpacity>
           <TouchableOpacity
@@ -1143,39 +1166,7 @@ const ListTable = ({
   </View>
 );
 
-// ─── Pagination ───────────────────────────────────────────────────────────────
-const Pagination = ({ page, total, onPrev, onNext, onPage }: any) => {
-  const pages = Array.from({ length: total }, (_, i) => i + 1);
-  return (
-    <View style={S.pagination}>
-      <TouchableOpacity
-        style={[S.pageBtn, page === 1 && S.pageBtnOff]}
-        onPress={onPrev}
-        disabled={page === 1}
-      >
-        <ChevronLeft />
-      </TouchableOpacity>
-      {pages.map((p) => (
-        <TouchableOpacity
-          key={p}
-          style={[S.pageBtn, p === page && S.pageBtnActive]}
-          onPress={() => onPage(p)}
-        >
-          <Text style={[S.pageBtnText, p === page && S.pageBtnTextActive]}>
-            {p}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      <TouchableOpacity
-        style={[S.pageBtn, page === total && S.pageBtnOff]}
-        onPress={onNext}
-        disabled={page === total}
-      >
-        <ChevronRight2 />
-      </TouchableOpacity>
-    </View>
-  );
-};
+
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function Subcategories() {
@@ -1186,7 +1177,7 @@ export default function Subcategories() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [mainCatFilter, setMainCatFilter] = useState("All");
-  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
 
   const filtered = items.filter((i) => {
@@ -1202,40 +1193,100 @@ export default function Subcategories() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = filtered.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
   );
 
+  const [editCat, setEditCat] = useState<Subcategory | null>(null);
+
+  const handleEdit = (cat: Subcategory) => {
+    setEditCat(cat);
+    setModalOpen(true);
+  };
+
   const handleSave = (data: any) => {
-    setItems((prev) => [
-      {
-        id: Math.max(...prev.map((x) => x.id)) + 1,
-        mainCat: data.mainCat,
-        category: data.category,
-        name: data.name,
-        materials: data.materials,
-        status: data.status,
-        image: data.image,
-        created: new Date().toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-      },
-      ...prev,
-    ]);
-    setPage(1);
+    let successMsg = "";
+    if (data.id) {
+      setItems((prev) =>
+        prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+      );
+      successMsg = "Subcategory updated successfully!";
+    } else {
+      setItems((prev) => [
+        {
+          id: Math.max(0, ...prev.map((x) => x.id)) + 1,
+          mainCat: data.mainCat,
+          category: data.category,
+          name: data.name,
+          materials: data.materials,
+          status: data.status,
+          image: data.image,
+          created: new Date().toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }),
+        },
+        ...prev,
+      ]);
+      setCurrentPage(1);
+      successMsg = "Subcategory added successfully!";
+    }
+    setEditCat(null);
+
+    if (Platform.OS === "web") {
+      setTimeout(() => {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "success",
+          title: successMsg,
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true,
+        });
+      }, 300);
+    } else {
+      Alert.alert("Success", successMsg);
+    }
   };
 
   const handleDelete = (id: number) => {
-    Alert.alert("Delete", "Delete this subcategory?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => setItems((prev) => prev.filter((i) => i.id !== id)),
-      },
-    ]);
+    const confirmDelete = () => {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      if (Platform.OS === "web") {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "success",
+          title: "Subcategory deleted successfully!",
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true,
+        });
+      }
+    };
+
+    if (Platform.OS === "web") {
+      Swal.fire({
+        title: "Are you sure?",
+        text: `You won't be able to revert this!`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#151D4F",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          confirmDelete();
+        }
+      });
+    } else {
+      Alert.alert("Delete", "Delete this subcategory?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: confirmDelete },
+      ]);
+    }
   };
 
   const handleExport = () => Alert.alert("Export", "CSV export triggered.");
@@ -1276,7 +1327,7 @@ export default function Subcategories() {
               value={search}
               onChangeText={(t) => {
                 setSearch(t);
-                setPage(1);
+                setCurrentPage(1);
               }}
             />
           </View>
@@ -1304,7 +1355,7 @@ export default function Subcategories() {
                 options={MAIN_CATS}
                 onChange={(v: string | undefined) => {
                   setMainCatFilter(v || "All");
-                  setPage(1);
+                  setCurrentPage(1);
                 }}
               />
             </View>
@@ -1333,12 +1384,13 @@ export default function Subcategories() {
               <GridCard
                 key={item.id}
                 item={item}
+                onEdit={() => handleEdit(item)}
                 onDelete={() => handleDelete(item.id)}
               />
             ))}
           </View>
         ) : (
-          <ListTable items={paginated} onDelete={handleDelete} />
+          <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
         )}
 
         {filtered.length === 0 && (
@@ -1352,22 +1404,27 @@ export default function Subcategories() {
         )}
 
         {/* ── Pagination ── */}
-        {totalPages > 1 && (
+        {filtered.length > 0 && (
           <Pagination
-            page={page}
-            total={totalPages}
-            onPrev={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-            onPage={setPage}
+            currentPage={currentPage}
+            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="subcategories"
+            onPageChange={setCurrentPage}
           />
         )}
       </ScrollView>
 
       <AddModal
         visible={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setEditCat(null);
+        }}
         onSave={handleSave}
         isWeb={isWeb}
+        editData={editCat}
       />
     </AdminLayout>
   );

@@ -1,6 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
+import Swal from "sweetalert2";
 import {
   Alert,
   Image,
@@ -241,20 +243,12 @@ const LayersIcon = ({ color = "#1d324e" }: { color?: string }) => (
 
 const HsnIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-    <Rect
-      x="2"
-      y="3"
-      width="20"
-      height="14"
-      rx="2"
-      stroke="#0EA5E9"
-      strokeWidth={1.8}
-    />
     <Path
-      d="M8 21h8M12 17v4"
-      stroke="#0EA5E9"
-      strokeWidth={1.8}
+      d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01"
+      stroke="#ef7b1a"
+      strokeWidth={2}
       strokeLinecap="round"
+      strokeLinejoin="round"
     />
   </Svg>
 );
@@ -263,12 +257,12 @@ const GstIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
     <Path
       d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"
-      stroke="#10B981"
+      stroke="#151D4F"
       strokeWidth={1.8}
     />
     <Path
       d="M15 9l-6 6M9 9h.01M15 15h.01"
-      stroke="#10B981"
+      stroke="#151D4F"
       strokeWidth={2}
       strokeLinecap="round"
     />
@@ -327,10 +321,10 @@ const WarningIcon = () => (
 
 const InfoIcon = () => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-    <Circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth={1.6} />
+    <Circle cx="12" cy="12" r="10" stroke="#ef7b1a" strokeWidth={1.6} />
     <Path
       d="M12 8v4M12 16h.01"
-      stroke="#3B82F6"
+      stroke="#ef7b1a"
       strokeWidth={1.6}
       strokeLinecap="round"
     />
@@ -344,7 +338,7 @@ const C = {
   surface: "#FFFFFF",
   primary: "#ef7b1a",
   primaryLight: "#FFF0EA",
-  navy: "#1d324e",
+  navy: "#151D4F",
   navyLight: "#e8ecf2",
   text: "#1C2B4A",
   sub: "#6B7280",
@@ -353,12 +347,12 @@ const C = {
   activeLight: "#ECFDF5",
   inactive: "#EF4444",
   inactiveLight: "#FEF2F2",
-  hsnBg: "#EEF6FF",
-  hsnText: "#2563EB",
-  gstBg: "#ECFDF5",
-  gstText: "#059669",
+  hsnBg: "#FFF0EA",
+  hsnText: "#ef7b1a",
+  gstBg: "#e8ecf2",
+  gstText: "#151D4F",
   rowAlt: "#FDFAF7",
-  tableHead: "#1d324e",
+  tableHead: "#151D4F",
   tableHeadText: "#FFFFFF",
 };
 
@@ -642,17 +636,7 @@ const Dropdown = ({
 
 // ─── Add Main Category Modal ──────────────────────────────────────────────────
 
-const AddMainCategoryModal = ({
-  visible,
-  onClose,
-  onSave,
-  isWeb,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (data: any) => void;
-  isWeb: boolean;
-}) => {
+const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { visible: boolean; onClose: () => void; onSave: (data: any) => void; isWeb: boolean; editData?: Category | null; }) => {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [hsn, setHsn] = useState("");
@@ -667,6 +651,20 @@ const AddMainCategoryModal = ({
     setStatus("Active");
   };
 
+  React.useEffect(() => {
+    if (visible) {
+      if (editData) {
+        setName(editData.name);
+        setImage(editData.image || null);
+        setHsn(editData.hsn);
+        setGst(editData.gst);
+        setStatus(editData.status);
+      } else {
+        reset();
+      }
+    }
+  }, [visible, editData]);
+
   const handleSave = () => {
     if (!name.trim()) {
       Alert.alert("Required", "Please enter a category name.");
@@ -680,7 +678,7 @@ const AddMainCategoryModal = ({
       Alert.alert("Required", "Please select GST percentage.");
       return;
     }
-    onSave({ name, image, hsn, gst, status, type: "Main Category" });
+    onSave({ id: editData?.id, name, image, hsn, gst, status, type: "Main Category" });
     reset();
     onClose();
   };
@@ -707,7 +705,7 @@ const AddMainCategoryModal = ({
               <View style={styles.modalIconWrap}>
                 <LayersIcon color="#FFFFFF" />
               </View>
-              <Text style={styles.modalTitle}>Add Main Category</Text>
+              <Text style={styles.modalTitle}>{editData ? "Edit Main Category" : "Add Main Category"}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -821,7 +819,7 @@ const AddMainCategoryModal = ({
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>Save Category</Text>
+              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -837,11 +835,13 @@ const AddCategoryModal = ({
   onClose,
   onSave,
   isWeb,
+  editData,
 }: {
   visible: boolean;
   onClose: () => void;
   onSave: (data: any) => void;
   isWeb: boolean;
+  editData?: Category | null;
 }) => {
   const [mainCat, setMainCat] = useState("");
   const [name, setName] = useState("");
@@ -859,6 +859,21 @@ const AddCategoryModal = ({
     setStatus("Active");
   };
 
+  React.useEffect(() => {
+    if (visible) {
+      if (editData) {
+        setMainCat(editData.parent || "");
+        setName(editData.name);
+        setImage(editData.image || null);
+        setHsn(editData.hsn);
+        setGst(editData.gst);
+        setStatus(editData.status);
+      } else {
+        reset();
+      }
+    }
+  }, [visible, editData]);
+
   const handleSave = () => {
     if (!mainCat) {
       Alert.alert("Required", "Please select a main category.");
@@ -873,6 +888,7 @@ const AddCategoryModal = ({
       return;
     }
     onSave({
+      id: editData?.id,
       name,
       image,
       hsn,
@@ -912,7 +928,7 @@ const AddCategoryModal = ({
               >
                 <FolderIcon />
               </View>
-              <Text style={styles.modalTitle}>Add Category</Text>
+              <Text style={styles.modalTitle}>{editData ? "Edit Category" : "Add Category"}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -1041,7 +1057,7 @@ const AddCategoryModal = ({
               style={[styles.saveBtn, { backgroundColor: "#F97316" }]}
               onPress={handleSave}
             >
-              <Text style={styles.saveBtnText}>Save Category</Text>
+              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1173,7 +1189,8 @@ const ListTable = ({
       <Text style={[styles.th, styles.colImage]}>Image</Text>
       <Text style={[styles.th, styles.colName]}>Category Name</Text>
       <Text style={[styles.th, styles.colType]}>Type</Text>
-      <Text style={[styles.th, styles.colHsn]}>HSN/GST Info</Text>
+      <Text style={[styles.th, styles.colHsn]}>HSN Code</Text>
+      <Text style={[styles.th, styles.colGst]}>GST</Text>
       <Text style={[styles.th, styles.colDate]}>Created Date</Text>
       <Text style={[styles.th, styles.colStatus]}>Status</Text>
       <Text style={[styles.th, styles.colAction, { textAlign: "center" }]}>
@@ -1234,15 +1251,18 @@ const ListTable = ({
             <Text style={styles.tdParent}>under: {cat.parent}</Text>
           )}
         </View>
-        {/* HSN/GST */}
-        <View style={[styles.cell, styles.colHsn, { gap: 4 }]}>
+        {/* HSN */}
+        <View style={[styles.cell, styles.colHsn]}>
           <View style={styles.hsnChip}>
             <HsnIcon />
-            <Text style={styles.hsnChipText}>HSN: {cat.hsn}</Text>
+            <Text style={styles.hsnChipText}>{cat.hsn}</Text>
           </View>
+        </View>
+        {/* GST */}
+        <View style={[styles.cell, styles.colGst]}>
           <View style={styles.gstChip}>
             <GstIcon />
-            <Text style={styles.gstChipText}>GST: {cat.gst}</Text>
+            <Text style={styles.gstChipText}>{cat.gst}</Text>
           </View>
         </View>
         {/* Created */}
@@ -1302,54 +1322,7 @@ const ListTable = ({
   </View>
 );
 
-// ─── Pagination ───────────────────────────────────────────────────────────────
 
-const Pagination = ({
-  page,
-  totalPages,
-  onPrev,
-  onNext,
-  onPage,
-}: {
-  page: number;
-  totalPages: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onPage: (p: number) => void;
-}) => {
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-  return (
-    <View style={styles.pagination}>
-      <TouchableOpacity
-        style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
-        onPress={onPrev}
-        disabled={page === 1}
-      >
-        <ChevronLeftIcon />
-      </TouchableOpacity>
-      {pages.map((p) => (
-        <TouchableOpacity
-          key={p}
-          style={[styles.pageBtn, p === page && styles.pageBtnActive]}
-          onPress={() => onPage(p)}
-        >
-          <Text
-            style={[styles.pageBtnText, p === page && styles.pageBtnTextActive]}
-          >
-            {p}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      <TouchableOpacity
-        style={[styles.pageBtn, page === totalPages && styles.pageBtnDisabled]}
-        onPress={onNext}
-        disabled={page === totalPages}
-      >
-        <ChevronRightIcon />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -1360,9 +1333,10 @@ export default function MainCategories() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [search, setSearch] = useState("");
   const [categories, setCategories] = useState<Category[]>(SAMPLE_CATEGORIES);
-  const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [mainCatModalOpen, setMainCatModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
+  const [editCat, setEditCat] = useState<Category | null>(null);
 
   const filtered = categories.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()),
@@ -1370,46 +1344,84 @@ export default function MainCategories() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = filtered.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
   );
 
+  const handleEdit = (cat: Category) => {
+    setEditCat(cat);
+    if (cat.type === "Main Category") {
+      setMainCatModalOpen(true);
+    } else {
+      setCatModalOpen(true);
+    }
+  };
+
   const handleSave = (data: any) => {
-    const newCat: Category = {
-      id: categories.length + 1,
-      name: data.name,
-      type: data.type,
-      parent: data.parent,
-      hsn: data.hsn || "—",
-      gst: data.gst.split("%")[0].trim() + "%",
-      created: new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      status: data.status,
-      image: data.image,
-    };
-    setCategories((prev) => [newCat, ...prev]);
-    setPage(1);
+    if (data.id) {
+      setCategories((prev) =>
+        prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+      );
+    } else {
+      const newCat: Category = {
+        id: categories.length + 1,
+        name: data.name,
+        type: data.type,
+        parent: data.parent,
+        hsn: data.hsn || "—",
+        gst: data.gst.split("%")[0].trim() + "%",
+        created: new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        status: data.status,
+        image: data.image,
+      };
+      setCategories((prev) => [newCat, ...prev]);
+      setCurrentPage(1);
+    }
+    setEditCat(null);
   };
 
   const handleDelete = (cat: Category) => {
-  if (Platform.OS === 'web') {
-    const confirmed = window.confirm(`Delete "${cat.name}"?`);
-    if (confirmed) {
+    const confirmDelete = () => {
       setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      if (Platform.OS === "web") {
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: `"${cat.name}" deleted successfully!`,
+          confirmButtonColor: "#151D4F",
+        });
+      }
+    };
+
+    if (Platform.OS === "web") {
+      Swal.fire({
+        title: "Are you sure?",
+        text: `You won't be able to revert this!`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#151D4F",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, delete it!"
+      }).then((result) => {
+        if (result.isConfirmed) {
+          confirmDelete();
+        }
+      });
+    } else {
+      Alert.alert(
+        "Confirm Delete",
+        `Are you sure you want to delete "${cat.name}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", style: "destructive", onPress: confirmDelete }
+        ]
+      );
     }
-  } else {
-    Alert.alert('Delete Category', `Delete "${cat.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: () => setCategories((prev) => prev.filter((c) => c.id !== cat.id)),
-      },
-    ]);
-  }
-};
+  };
 
   return (
     <AdminLayout>
@@ -1445,7 +1457,7 @@ export default function MainCategories() {
               value={search}
               onChangeText={(t) => {
                 setSearch(t);
-                setPage(1);
+                setCurrentPage(1);
               }}
             />
           </View>
@@ -1477,7 +1489,10 @@ export default function MainCategories() {
             {/* Add Buttons */}
             <TouchableOpacity
               style={styles.addMainBtn}
-              onPress={() => setMainCatModalOpen(true)}
+              onPress={() => {
+                setEditCat(null);
+                setMainCatModalOpen(true);
+              }}
             >
               <PlusIcon />
               <Text style={styles.addMainBtnText}>
@@ -1487,9 +1502,12 @@ export default function MainCategories() {
 
             <TouchableOpacity
               style={styles.addCatBtn}
-              onPress={() => setCatModalOpen(true)}
+              onPress={() => {
+                setEditCat(null);
+                setCatModalOpen(true);
+              }}
             >
-              <PlusIcon color="#1E3A5F" />
+              <PlusIcon />
               <Text style={styles.addCatBtnText}>
                 {isWeb ? "Add Category" : "Category"}
               </Text>
@@ -1519,7 +1537,7 @@ export default function MainCategories() {
               >
                 <GridCard
                   cat={cat}
-                  onEdit={() => {}}
+                  onEdit={() => handleEdit(cat)}
                   onDelete={() => handleDelete(cat)}
                 />
               </View>
@@ -1528,7 +1546,7 @@ export default function MainCategories() {
         ) : (
           <ListTable
             categories={paginated}
-            onEdit={() => {}}
+            onEdit={handleEdit}
             onDelete={handleDelete}
           />
         )}
@@ -1544,28 +1562,37 @@ export default function MainCategories() {
         )}
 
         {/* ── Pagination ── */}
-        {totalPages > 1 && (
+        {filtered.length > 0 && (
           <Pagination
-            page={page}
-            totalPages={totalPages}
-            onPrev={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-            onPage={setPage}
+            currentPage={currentPage}
+            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+            totalItems={filtered.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="categories"
+            onPageChange={setCurrentPage}
           />
         )}
       </ScrollView>
 
       <AddMainCategoryModal
         visible={mainCatModalOpen}
-        onClose={() => setMainCatModalOpen(false)}
+        onClose={() => {
+          setMainCatModalOpen(false);
+          setEditCat(null);
+        }}
         onSave={handleSave}
         isWeb={isWeb}
+        editData={editCat}
       />
       <AddCategoryModal
         visible={catModalOpen}
-        onClose={() => setCatModalOpen(false)}
+        onClose={() => {
+          setCatModalOpen(false);
+          setEditCat(null);
+        }}
         onSave={handleSave}
         isWeb={isWeb}
+        editData={editCat}
       />
     </AdminLayout>
   );
@@ -1671,14 +1698,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: C.primaryLight,
+    backgroundColor: C.primary,
     borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: C.primary,
     paddingHorizontal: 14,
     height: 42,
   },
-  addCatBtnText: { fontSize: 13, fontWeight: "700", color: C.primary },
+  addCatBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 
   // Count
   countRow: { marginBottom: 12 },
@@ -1795,6 +1820,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    alignSelf: "flex-start",
   },
   hsnChipText: { fontSize: 11, fontWeight: "600", color: C.hsnText },
   gstChip: {
@@ -1805,6 +1831,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    alignSelf: "flex-start",
   },
   gstChipText: { fontSize: 11, fontWeight: "600", color: C.gstText },
 
@@ -1883,14 +1910,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  colSno: { width: 56 },
-  colImage: { width: 76 },
-  colName: { flex: 1.4, minWidth: 120 },
-  colType: { flex: 1.6, minWidth: 130 },
-  colHsn: { flex: 1.8, minWidth: 150 },
-  colDate: { width: 128 },
-  colStatus: { width: 100 },
-  colAction: { width: 96 },
+  colSno: { width: 60 },
+  colImage: { width: 80 },
+  colName: { flex: 1, minWidth: 100 },
+  colType: { flex: 1, minWidth: 110 },
+  colHsn: { flex: 1, minWidth: 90 },
+  colGst: { flex: 1, minWidth: 80 },
+  colDate: { flex: 1, minWidth: 110 },
+  colStatus: { flex: 1, minWidth: 90 },
+  colAction: { width: 90 },
 
   tdSno: { fontSize: 14, fontWeight: "700", color: C.sub },
   tableThumb: { width: 50, height: 50, borderRadius: 10 },
@@ -1920,7 +1948,7 @@ const styles = StyleSheet.create({
   // ── Pagination ────────────────────────────────────────────────────────────
   pagination: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "flex-end",
     alignItems: "center",
     gap: 6,
     marginTop: 24,
@@ -1935,7 +1963,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  pageBtnActive: { backgroundColor: C.navy, borderColor: C.navy },
+  pageBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
   pageBtnDisabled: { opacity: 0.35 },
   pageBtnText: { fontSize: 13, fontWeight: "600", color: C.text },
   pageBtnTextActive: { color: "#FFFFFF" },
@@ -2048,12 +2076,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 6,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primaryLight,
     borderRadius: 8,
     padding: 10,
     marginTop: 8,
   },
-  infoText: { fontSize: 12, color: "#1D4ED8", flex: 1, lineHeight: 17 },
+  infoText: { fontSize: 12, color: C.primary, flex: 1, lineHeight: 17 },
   warnNote: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -2142,3 +2170,4 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "600", color: C.text, marginTop: 8 },
   emptySubtitle: { fontSize: 13, color: C.sub },
 });
+

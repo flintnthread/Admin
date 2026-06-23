@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -1029,7 +1030,7 @@ const em = StyleSheet.create({
         shadowRadius: 20,
         elevation: 10,
     },
-    header: {
+    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1288,8 +1289,8 @@ const JobOpeningsScreen: React.FC = () => {
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-    const [page, setPage] = useState(1);
-    const cardsPerPage = 6;
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 6;
 
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -1341,11 +1342,11 @@ const JobOpeningsScreen: React.FC = () => {
     }, [loadJobs]);
 
     useEffect(() => {
-        setPage(1);
+        setCurrentPage(1);
     }, [search, deptFilter, statusFilter]);
 
-    const paginated = isWeb ? filtered.slice((page - 1) * cardsPerPage, page * cardsPerPage) : filtered;
-    const totalPages = Math.ceil(filtered.length / cardsPerPage);
+    const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
 
     const handleEdit = (job: Job) => {
         setEditingJob(job);
@@ -1592,38 +1593,15 @@ const JobOpeningsScreen: React.FC = () => {
                 )}
 
                 {/* ── PAGINATION CONTROLS ── */}
-                {isWeb && totalPages > 1 && (
-                    <View style={s.paginationWrap}>
-                        <TouchableOpacity
-                            style={[s.pageBtn, page === 1 && { opacity: 0.5 }]}
-                            disabled={page === 1}
-                            onPress={() => setPage(p => Math.max(1, p - 1))}
-                        >
-                            <Feather name="chevron-left" size={14} color={T.textM} />
-                        </TouchableOpacity>
-
-                        <View style={s.pageNumbers}>
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <TouchableOpacity
-                                    key={i}
-                                    style={[s.pageNumBtn, page === i + 1 && s.pageNumBtnActive]}
-                                    onPress={() => setPage(i + 1)}
-                                >
-                                    <Text style={[s.pageNumTxt, page === i + 1 && s.pageNumTxtActive]}>
-                                        {i + 1}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        <TouchableOpacity
-                            style={[s.pageBtn, page === totalPages && { opacity: 0.5 }]}
-                            disabled={page === totalPages}
-                            onPress={() => setPage(p => Math.min(totalPages, p + 1))}
-                        >
-                            <Feather name="chevron-right" size={14} color={T.textM} />
-                        </TouchableOpacity>
-                    </View>
+                {filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        itemName="job openings"
+                        onPageChange={setCurrentPage}
+                    />
                 )}
             </ScrollView>
 

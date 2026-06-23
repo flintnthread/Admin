@@ -2351,10 +2351,11 @@ export default function OrdersScreen() {
           {/* ── Header — floats with side margins, rounded on all 4 corners ── */}
           <View
             style={{
-              alignSelf: "center",
-              width: "100%",
-              maxWidth: 1600,
-              paddingHorizontal: px,
+              
+              
+              
+              paddingHorizontal: 16,
+              
             }}
           >
             <View
@@ -2362,7 +2363,7 @@ export default function OrdersScreen() {
                 s.headerBlock,
                 {
                   paddingTop: Platform.OS === "ios" ? 50 : 20,
-                  marginTop: isMobile ? 12 : 18,
+                  
                 },
               ]}
             >
@@ -2414,30 +2415,30 @@ export default function OrdersScreen() {
                   >
                     {stat.icon}
                   </View>
-                  <Text
-                    style={[s.statValue, { color: stat.valueColor }]}
-                    numberOfLines={1}
-                  >
-                    {stat.value}
-                  </Text>
-                  <Text style={s.statLabel} numberOfLines={1}>
-                    {stat.label}
-                  </Text>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text
+                      style={[s.statValue, { color: stat.valueColor }]}
+                      numberOfLines={1}
+                    >
+                      {stat.value}
+                    </Text>
+                    <Text style={s.statLabel} numberOfLines={1}>
+                      {stat.label}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
           </View>
 
           {/* ── Filter pills (moved out of the header, into the toolbar area) ── */}
-          <View style={s.filterPillsWrap}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[
-                s.filterPillsRow,
-                { paddingHorizontal: px },
-              ]}
-            >
+          <View style={[s.filterPillsWrap, { paddingHorizontal: px }]}>
+            <View style={s.filterPillsCard}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.filterPillsRow}
+              >
               {STATUS_FILTERS.map((f) => (
                 <TouchableOpacity
                   key={f}
@@ -2475,6 +2476,7 @@ export default function OrdersScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            </View>
           </View>
 
           {/* ── Toolbar ── */}
@@ -2701,10 +2703,17 @@ const s = StyleSheet.create({
   // ── Header — floating rounded card (all 4 corners) ──────────────────────────
   headerBlock: {
     backgroundColor: C.navyDeep,
-    paddingTop: 20,
-    paddingBottom: 44,
-    borderRadius: 24,
-    overflow: "hidden",
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    paddingBottom: 68,
+    borderRadius: 22,
+    marginHorizontal: 2,
+    marginTop: 12,
+    shadowColor: C.navyDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
   headerTop: {
     flexDirection: "row",
@@ -2742,16 +2751,18 @@ const s = StyleSheet.create({
   statCardsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 10,
-    marginTop: -32,
+    justifyContent: "center",
+    gap: 8,
+    marginTop: -42,
     marginBottom: 4,
   },
   statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26 },
   statCard: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     minWidth: 130,
-    maxWidth: 230,
+    maxWidth: 240,
     backgroundColor: C.card,
     borderRadius: 14,
     padding: 14,
@@ -2762,15 +2773,14 @@ const s = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
-    gap: 4,
+    gap: 12,
   },
   statIconBox: {
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2,
   },
   statValue: {
     fontSize: 18,
@@ -2784,6 +2794,18 @@ const s = StyleSheet.create({
   },
 
   filterPillsWrap: { marginTop: 4, marginBottom: 6 },
+  filterPillsCard: {
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: C.navyDeep,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   filterPillsRow: { gap: 8, flexDirection: "row" },
   filterPill: {
     flexDirection: "row",
@@ -3543,7 +3565,8 @@ const s = StyleSheet.create({
   gridWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: GRID_GUTTER,
+    columnGap: GRID_GUTTER,
+    rowGap: 24,
     alignItems: "flex-start",
   },
   gridItem: {},
@@ -3885,3 +3908,5 @@ const s = StyleSheet.create({
   },
   retryText: { color: C.white, fontWeight: "700", fontSize: 13 },
 });
+
+

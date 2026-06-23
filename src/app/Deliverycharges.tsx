@@ -25,6 +25,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import Swal from "sweetalert2";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -348,8 +349,10 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
       <View style={[sc.iconWrap, { backgroundColor: tint }]}>
         <Feather name={icon} size={16} color={txtColor} />
       </View>
-      <Text style={sc.value}>{value}</Text>
-      <Text style={sc.label}>{label}</Text>
+      <View style={{ flexDirection: "column" }}>
+        <Text style={sc.value}>{value}</Text>
+        <Text style={sc.label}>{label}</Text>
+      </View>
     </View>
   );
 };
@@ -357,11 +360,13 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
 const sc = StyleSheet.create({
   card: {
     flex: 1,
-    maxWidth: 320,
+    maxWidth: 240,
     backgroundColor: T.card,
     borderRadius: 14,
     padding: 14,
     alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
     borderWidth: 1,
     borderColor: T.border,
   },
@@ -371,7 +376,6 @@ const sc = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
   },
   value: {
     fontSize: 20,
@@ -383,7 +387,7 @@ const sc = StyleSheet.create({
     fontSize: 9,
     fontWeight: "600",
     color: "#000",
-    marginTop: 3,
+    marginTop: 1,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -583,6 +587,9 @@ const DeliveryChargesScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
+
   const filteredSlabs = slabs.filter(s => filterStatus === "All" || s.status === filterStatus);
 
   const loadSlabs = useCallback(async () => {
@@ -769,7 +776,10 @@ const DeliveryChargesScreen: React.FC = () => {
                   styles.statusFilterBtn,
                   filterStatus === status && styles.statusFilterBtnActive,
                 ]}
-                onPress={() => setFilterStatus(status)}
+                onPress={() => {
+                  setFilterStatus(status);
+                  setCurrentPage(1);
+                }}
               >
                 <Text style={[
                   styles.statusFilterTxt,
@@ -813,7 +823,7 @@ const DeliveryChargesScreen: React.FC = () => {
             ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
             : { gap: 12 }
           }>
-            {filteredSlabs.map((item) => (
+            {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((item) => (
               <View
                 key={item.id}
                 style={isWeb ? { width: "calc(33.33% - 10px)" as any } : undefined}
@@ -840,7 +850,7 @@ const DeliveryChargesScreen: React.FC = () => {
                   <Text style={[styles.th, { width: 90 }]}>Status</Text>
                   <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>Action</Text>
                 </View>
-                {filteredSlabs.map((slab, idx) => (
+                {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((slab, idx) => (
                   <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                     <Text style={[styles.td, { width: 140, fontWeight: '700', color: T.textH }]}>{slab.label}</Text>
                     <Text style={[styles.td, { width: 160 }]}>{slab.range}</Text>
@@ -865,6 +875,17 @@ const DeliveryChargesScreen: React.FC = () => {
               </View>
             </View>
           </View>
+        )}
+
+        {filteredSlabs.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filteredSlabs.length / ITEMS_PER_PAGE)}
+            totalItems={filteredSlabs.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="delivery charges"
+            onPageChange={setCurrentPage}
+          />
         )}
       </View>
     </View>
@@ -923,8 +944,8 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     paddingBottom: 68,
     borderRadius: 22,
-    marginHorizontal: 18,
-    marginTop: 22,
+    marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 0,
     zIndex: 1,
     shadowColor: "#151D4F",
@@ -1034,6 +1055,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginBottom: 16,
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   searchBox: {
     flex: 1,
@@ -1131,7 +1162,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Header (Old - might be used by other parts) ──
-  header: {
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

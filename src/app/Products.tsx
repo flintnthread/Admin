@@ -490,7 +490,7 @@ const dlp = StyleSheet.create({
     popupCard:               { width: 680, maxHeight: "85%" as any, backgroundColor: C.white, borderRadius: 20, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.25, shadowRadius: 40, elevation: 30, flexDirection: "column" },
     mobileFullScreen:        { flex: 1, backgroundColor: C.navyDeep },
     fullCard:                { flex: 1, flexDirection: "column" },
-    header:                  { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, backgroundColor: C.navyDeep },
+    header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, backgroundColor: C.navyDeep },
     backBtn:                 { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
     headerCenter:            { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
     headerTitle:             { fontSize: 14, color: C.white },
