@@ -476,6 +476,7 @@ type ChartPoint = { label: string; value: number };
 type SlicePoint = { label: string; value: number; color: string };
 type RecentOrder = {
   id: string;
+  productName: string;
   date: string;
   amount: number;
   status: "Delivered" | "Processing" | "Cancelled" | "Returned" | "Replacement";
@@ -489,9 +490,7 @@ type SectionId =
   | "returns"
   | "orders"
   | "timeline"
-  | "profile"
-  | "insights"
-  | "actions";
+  | "profile";
 
 type TimeFrame = "7D" | "30D" | "90D" | "6M" | "1Y" | "All";
 
@@ -752,6 +751,14 @@ function buildMockAnalytics(customerId: string, name: string) {
     { length: Math.min(6, Math.max(totalOrders, 1)) },
     (_, i) => ({
       id: `FNT${20260500 + between(100, 999)}${i}`,
+      productName: pick([
+        "Wireless Noise-Cancelling Headphones",
+        "Ergonomic Mechanical Keyboard",
+        "Ultra-Wide Curved Monitor 34\"",
+        "Smart Fitness Watch v2",
+        "Portable USB-C SSD 1TB",
+        "Dual-Band Wi-Fi 6 Router",
+      ]),
       date: `${between(1, 28)} ${pick(["Jan", "Feb", "Mar", "Apr", "May", "Jun"])} 2026`,
       amount: between(500, Math.max(Math.round(avgOrderValue * 2), 600)),
       status: i === 0 ? "Delivered" : pick(statusPool),
@@ -827,7 +834,44 @@ function buildMockAnalytics(customerId: string, name: string) {
     status: rng() < 0.85 ? "Active" : "Inactive",
   };
 }
-type CustomerAnalytics = ReturnType<typeof buildMockAnalytics>;
+// Timeframe categorical filtering helper
+function getFilteredCategoricalData<T extends { label: string; value: number }>(
+  baseData: T[],
+  timeframe: TimeFrame,
+  seedValue: number
+): T[] {
+  if (timeframe === "All" || timeframe === "1Y") {
+    return baseData;
+  }
+
+  const rng = mulberry32(seedValue);
+  let scale = 1.0;
+  switch (timeframe) {
+    case "7D":
+      scale = 0.05;
+      break;
+    case "30D":
+      scale = 0.15;
+      break;
+    case "90D":
+      scale = 0.35;
+      break;
+    case "6M":
+      scale = 0.6;
+      break;
+    default:
+      scale = 1.0;
+  }
+
+  return baseData.map(item => {
+    const variation = 0.8 + rng() * 0.4;
+    const newVal = Math.max(1, Math.round(item.value * scale * variation));
+    return {
+      ...item,
+      value: newVal,
+    };
+  });
+}
 
 // Timeframe filtering helper
 function getFilteredData(
@@ -1008,11 +1052,13 @@ const StatPair = React.memo(function StatPair({
 
 const MiniStatTrio = React.memo(function MiniStatTrio({
   items,
+  style,
 }: {
   items: { label: string; value: string; color?: string }[];
+  style?: any;
 }) {
   return (
-    <View style={s.miniTrio}>
+    <View style={[s.miniTrio, style]}>
       {items.map((it, i) => (
         <React.Fragment key={it.label}>
           <View style={s.miniTrioItem}>
@@ -1217,7 +1263,11 @@ const ChartTooltip = React.memo(function ChartTooltip({
   if (contributionStr) bubbleH += 18;
 
   const left = Math.min(Math.max(x - bubbleW / 2, 0), plotWidth - bubbleW);
-  const top = y - bubbleH - 12 >= 4 ? y - bubbleH - 12 : y + 16;
+  let top = y - bubbleH - 12;
+  if (top < 4) {
+    top = y + 16;
+  }
+  top = Math.min(Math.max(top, 4), plotHeight - bubbleH - 4);
 
   return (
     <View pointerEvents="none" style={[s.tooltipBubble, { left, top, width: bubbleW }]}>
@@ -1358,11 +1408,11 @@ function LineChartSvg({
   }, [activeIdx, data, timeframe]);
 
   return (
-    <View style={{ width, height: height + 24 }}>
+    <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
       {/* Chart Canvas Area */}
       <View
         {...pointerProps}
-        style={{ width, height, position: "relative" }}
+        style={{ width, height, position: "relative", zIndex: 10 }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           <Defs>
@@ -1531,10 +1581,10 @@ function BarChartSvg({
   };
 
   return (
-    <View style={{ width, height: height + 24 }}>
+    <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
       <View
         {...pointerProps}
-        style={{ width, height, position: "relative" }}
+        style={{ width, height, position: "relative", zIndex: 10 }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           {/* Horizontal lines */}
@@ -2126,6 +2176,9 @@ export default function CustomerAnalyticsScreen() {
   const [ordersTF, setOrdersTF] = useState<TimeFrame>("All");
   const [freqTF, setFreqTF] = useState<TimeFrame>("All");
   const [distTF, setDistTF] = useState<TimeFrame>("All");
+  const [statusTF, setStatusTF] = useState<TimeFrame>("All");
+  const [paymentTF, setPaymentTF] = useState<TimeFrame>("All");
+  const [categoryTF, setCategoryTF] = useState<TimeFrame>("All");
 
   const spendData = useMemo(() => {
     return getFilteredData(data.monthlySpend, spendTF, "spend", seedFromString(customerId + "spend"));
@@ -2146,14 +2199,36 @@ export default function CustomerAnalyticsScreen() {
   // Legend toggle state
   const [hiddenStatusLabels, setHiddenStatusLabels] = useState<Set<string>>(new Set());
   const [hiddenPaymentLabels, setHiddenPaymentLabels] = useState<Set<string>>(new Set());
+  const [hiddenCategoryLabels, setHiddenCategoryLabels] = useState<Set<string>>(new Set());
+
+  const scaledOrderStatus = useMemo(() => {
+    return getFilteredCategoricalData(data.orderStatusBreakdown, statusTF, seedFromString(customerId + "status"));
+  }, [data.orderStatusBreakdown, statusTF, customerId]);
 
   const activeOrderStatus = useMemo(() => {
-    return data.orderStatusBreakdown.filter(item => !hiddenStatusLabels.has(item.label));
-  }, [data.orderStatusBreakdown, hiddenStatusLabels]);
+    return scaledOrderStatus.filter(item => !hiddenStatusLabels.has(item.label));
+  }, [scaledOrderStatus, hiddenStatusLabels]);
+
+  const scaledPaymentMethods = useMemo(() => {
+    return getFilteredCategoricalData(data.paymentMethods, paymentTF, seedFromString(customerId + "payment"));
+  }, [data.paymentMethods, paymentTF, customerId]);
 
   const activePaymentMethods = useMemo(() => {
-    return data.paymentMethods.filter(item => !hiddenPaymentLabels.has(item.label));
-  }, [data.paymentMethods, hiddenPaymentLabels]);
+    return scaledPaymentMethods.filter(item => !hiddenPaymentLabels.has(item.label));
+  }, [scaledPaymentMethods, hiddenPaymentLabels]);
+
+  const filteredCategories = useMemo(() => {
+    return getFilteredCategoricalData(data.categories, categoryTF, seedFromString(customerId + "category"));
+  }, [data.categories, categoryTF, customerId]);
+
+  const categorySlices = useMemo(() => {
+    const slices = filteredCategories.map((c, idx) => ({
+      label: c.label,
+      value: c.value,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+    return slices.filter(item => !hiddenCategoryLabels.has(item.label));
+  }, [filteredCategories, hiddenCategoryLabels]);
 
   // Live KPI scrubbing displays
   const [spendLiveKPI, setSpendLiveKPI] = useState<string | null>(null);
@@ -2171,9 +2246,9 @@ export default function CustomerAnalyticsScreen() {
   const [drilldownTitle, setDrilldownTitle] = useState<string>("");
 
   // Grid responsiveness basis
-  const kpiBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : 4);
-  const chartBasis = isMobile ? 100 : 48.5;
-  const behaviourBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : 4);
+  const kpiBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
+  const chartBasis = (isMobile || width < 1200) ? 100 : 48.5;
+  const behaviourBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
   const actionBasis = isMobile ? 50 : isTablet ? 31.5 : 23.5;
 
   // Sticky Section scroll logic
@@ -2191,8 +2266,6 @@ export default function CustomerAnalyticsScreen() {
       { id: "orders", label: "Orders", icon: <BagIcon size={13} /> },
       { id: "timeline", label: "Timeline", icon: <ActivityIcon size={13} /> },
       { id: "profile", label: "Profile", icon: <ShieldIcon size={13} /> },
-      { id: "insights", label: "Insights", icon: <SparkleIcon size={13} /> },
-      { id: "actions", label: "Actions", icon: <ArrowUpRightIcon size={13} color={primary} /> },
     ],
     [],
   );
@@ -2376,12 +2449,6 @@ export default function CustomerAnalyticsScreen() {
                     <Text style={s.headerName} numberOfLines={1}>
                       {customerName}
                     </Text>
-                    {data.isVip && (
-                      <View style={s.vipBadge}>
-                        <CrownIcon size={11} color={navyDeep} />
-                        <Text style={s.vipTxt}>VIP</Text>
-                      </View>
-                    )}
                   </View>
                   <Text style={s.headerSub}>
                     Customer ID #{customerId} &middot; Status: {data.status}
@@ -2724,10 +2791,13 @@ export default function CustomerAnalyticsScreen() {
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader icon={<PieChartIcon color={purple} size={16} />} title="Order Status Distribution" />
                   <View style={[s.cardBody, s.ringCardBody]}>
+                    <View style={{ width: "100%", marginBottom: 8 }}>
+                      {renderTimeFilters(statusTF, setStatusTF)}
+                    </View>
                     <RingChart data={activeOrderStatus} donut metricName="Order Status" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
-                        data={data.orderStatusBreakdown}
+                        data={scaledOrderStatus}
                         hiddenLabels={hiddenStatusLabels}
                         onToggleLabel={(lbl) => {
                           setHiddenStatusLabels((prev) => {
@@ -2746,10 +2816,13 @@ export default function CustomerAnalyticsScreen() {
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader icon={<CreditCardIcon color={navy} size={16} />} title="Preferred Payment Methods" />
                   <View style={[s.cardBody, s.ringCardBody]}>
+                    <View style={{ width: "100%", marginBottom: 8 }}>
+                      {renderTimeFilters(paymentTF, setPaymentTF)}
+                    </View>
                     <RingChart data={activePaymentMethods} donut metricName="Payment Method" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
-                        data={data.paymentMethods}
+                        data={scaledPaymentMethods}
                         hiddenLabels={hiddenPaymentLabels}
                         onToggleLabel={(lbl) => {
                           setHiddenPaymentLabels((prev) => {
@@ -2764,31 +2837,45 @@ export default function CustomerAnalyticsScreen() {
                   </View>
                 </Card>
 
-                {/* Purchase Categories List */}
+                {/* Purchase Categories Donut Chart */}
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
-                  <SectionHeader icon={<TagIcon color={teal} size={16} />} title="Purchase Categories" />
-                  <View style={[s.cardBody, { paddingVertical: 20 }]}>
-                    <BarList
-                      data={data.categories}
-                      onRowPress={(p) => {
-                        setDrilldownPoint(p);
-                        setDrilldownTitle("Category Purchases");
-                      }}
-                    />
+                  <SectionHeader icon={<PieChartIcon color={teal} size={16} />} title="Purchase Categories" />
+                  <View style={[s.cardBody, s.ringCardBody, { paddingVertical: 16 }]}>
+                    <View style={{ width: "100%", marginBottom: 8 }}>
+                      {renderTimeFilters(categoryTF, setCategoryTF)}
+                    </View>
+                    <RingChart data={categorySlices} donut metricName="Categories" unit="Orders" />
+                    <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
+                      <LegendList
+                        data={categorySlices}
+                        hiddenLabels={hiddenCategoryLabels}
+                        onToggleLabel={(lbl) => {
+                          setHiddenCategoryLabels((prev) => {
+                            const copy = new Set(prev);
+                            if (copy.has(lbl)) copy.delete(lbl);
+                            else copy.add(lbl);
+                            return copy;
+                          });
+                        }}
+                      />
+                    </View>
                   </View>
                 </Card>
 
-                {/* Favourite Brands List */}
+                {/* Most Purchased Categories List */}
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
-                  <SectionHeader icon={<HeartIcon color={pink} size={16} />} title="Favourite Brands" />
-                  <View style={[s.cardBody, { paddingVertical: 20 }]}>
-                    <BarList
-                      data={data.brands}
-                      onRowPress={(p) => {
-                        setDrilldownPoint(p);
-                        setDrilldownTitle("Brand Purchases");
-                      }}
-                    />
+                  <SectionHeader icon={<TagIcon color={pink} size={16} />} title="Most Purchased Categories" />
+                  <View style={[s.cardBody, { paddingVertical: 16 }]}>
+                    {renderTimeFilters(categoryTF, setCategoryTF)}
+                    <View style={{ marginTop: 12 }}>
+                      <BarList
+                        data={filteredCategories}
+                        onRowPress={(p) => {
+                          setDrilldownPoint(p);
+                          setDrilldownTitle("Category Purchases");
+                        }}
+                      />
+                    </View>
                   </View>
                 </Card>
               </View>
@@ -2822,34 +2909,44 @@ export default function CustomerAnalyticsScreen() {
           <PageSection id="payments" onMeasure={handleMeasure}>
             <Card>
               <SectionHeader icon={<CreditCardIcon size={16} />} title="Financial Transactions" />
-              <View style={s.cardBody}>
-                <MiniStatTrio
-                  items={[
-                    {
-                      label: "Success Rate",
-                      value: data.paymentsData.successRate + "%",
-                      color: green,
-                    },
-                    {
-                      label: "Preferred Method",
-                      value: data.paymentsData.preferredMethod,
-                    },
-                    {
-                      label: "Failed Payments",
-                      value: String(data.paymentsData.failedPayments),
-                      color: data.paymentsData.failedPayments > 0 ? red : green,
-                    },
-                  ]}
-                />
-                <Text style={s.subHeading}>Refund History</Text>
-                <View style={{ gap: 8 }}>
-                  {data.paymentsData.refundHistory.map((r, i) => (
-                    <View key={i} style={s.listRow}>
-                      <Text style={s.listRowMain} numberOfLines={1}>{r.reason}</Text>
-                      <Text style={s.listRowSub}>{r.date}</Text>
-                      <Text style={s.listRowAmt}>{rupee(r.amount)}</Text>
+              <View style={[s.cardBody, isWide && { flexDirection: "row", gap: 24 }]}>
+                <View style={isWide ? { flex: 1, height: 140 } : null}>
+                  <MiniStatTrio
+                    style={{ height: "100%", justifyContent: "space-around" }}
+                    items={[
+                      {
+                        label: "Success Rate",
+                        value: data.paymentsData.successRate + "%",
+                        color: green,
+                      },
+                      {
+                        label: "Preferred Method",
+                        value: data.paymentsData.preferredMethod,
+                      },
+                      {
+                        label: "Failed Payments",
+                        value: String(data.paymentsData.failedPayments),
+                        color: data.paymentsData.failedPayments > 0 ? red : green,
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={isWide ? { flex: 1.2, height: 140 } : { marginTop: 16 }}>
+                  <Text style={[s.subHeading, { marginTop: isWide ? 0 : 16, marginBottom: 6 }]}>Refund History</Text>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    style={isWide ? { flex: 1 } : { maxHeight: 100 }}
+                  >
+                    <View style={{ gap: 8 }}>
+                      {data.paymentsData.refundHistory.map((r, i) => (
+                        <View key={i} style={s.listRow}>
+                          <Text style={s.listRowMain} numberOfLines={1}>{r.reason}</Text>
+                          <Text style={s.listRowSub}>{r.date}</Text>
+                          <Text style={s.listRowAmt}>{rupee(r.amount)}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  </ScrollView>
                 </View>
               </View>
             </Card>
@@ -2896,9 +2993,10 @@ export default function CustomerAnalyticsScreen() {
                     style={{ width: "100%" }}
                     contentContainerStyle={{ flexGrow: 1 }}
                   >
-                    <View style={[s.orderTable, { minWidth: 720, width: "100%" }]}>
+                    <View style={[s.orderTable, { minWidth: 800, width: "100%" }]}>
                       <View style={[s.orderTableRow, s.orderTableHead]}>
                         <Text style={[s.orderTableHdr, { flex: 1.6 }]}>Order ID</Text>
+                        <Text style={[s.orderTableHdr, { flex: 2.2 }]}>Product Name</Text>
                         <Text style={s.orderTableHdr}>Date</Text>
                         <Text style={s.orderTableHdr}>Amount</Text>
                         <Text style={[s.orderTableHdr, { flex: 1.2 }]}>Status</Text>
@@ -2907,7 +3005,14 @@ export default function CustomerAnalyticsScreen() {
                       </View>
                       {data.recentOrders.map((o) => (
                         <View key={o.id} style={s.orderTableRow}>
-                          <Text style={[s.orderIdText, { flex: 1.6 }]} numberOfLines={1}>{o.id}</Text>
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            style={{ flex: 1.6 }}
+                            onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
+                          >
+                            <Text style={s.orderIdText} numberOfLines={1}>{o.id}</Text>
+                          </TouchableOpacity>
+                          <Text style={[s.orderTableCell, { flex: 2.2 }]} numberOfLines={1}>{o.productName}</Text>
                           <Text style={s.orderTableCell}>{o.date}</Text>
                           <Text style={[s.orderTableCell, { fontWeight: "700", color: text }]}>{rupee(o.amount)}</Text>
                           <View style={{ flex: 1.2 }}>
@@ -2918,10 +3023,7 @@ export default function CustomerAnalyticsScreen() {
                             <TouchableOpacity
                               style={s.eyeBtn}
                               activeOpacity={0.8}
-                              onPress={() => {
-                                setDrilldownPoint({ label: o.id, value: o.amount });
-                                setDrilldownTitle("Order Details");
-                              }}
+                              onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
                             >
                               <EyeIcon size={14} />
                             </TouchableOpacity>
@@ -2933,16 +3035,26 @@ export default function CustomerAnalyticsScreen() {
                 ) : (
                   <View style={{ padding: 14, gap: 10 }}>
                     {data.recentOrders.map((o) => (
-                      <View key={o.id} style={s.orderMobileCard}>
+                      <TouchableOpacity
+                        key={o.id}
+                        activeOpacity={0.8}
+                        style={s.orderMobileCard}
+                        onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
+                      >
                         <View style={s.omTop}>
                           <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
                           <OrderStatusChip status={o.status} />
                         </View>
                         <View style={s.omRow}>
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: text }} numberOfLines={1}>
+                            {o.productName}
+                          </Text>
+                        </View>
+                        <View style={s.omRow}>
                           <Text style={s.omSub}>{o.date} &middot; {o.payment}</Text>
                           <Text style={s.omAmt}>{rupee(o.amount)}</Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 )}
@@ -3018,46 +3130,7 @@ export default function CustomerAnalyticsScreen() {
             </Card>
           </PageSection>
 
-          {/* ══ AI INSIGHTS ═══════════════════════════════════════════════ */}
-          <PageSection id="insights" onMeasure={handleMeasure}>
-            <Card>
-              <SectionHeader icon={<SparkleIcon size={16} />} title="Predictive AI Insights" />
-              <View style={[s.cardBody, { gap: 10 }]}>
-                {data.aiInsights.map((txt, i) => (
-                  <View key={i} style={s.insightRow}>
-                    <View style={s.insightIconBox}>
-                      <SparkleIcon size={13} color={purple} />
-                    </View>
-                    <Text style={s.insightTxt}>{txt}</Text>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          </PageSection>
 
-          {/* ══ RECOMMENDED ACTIONS ═══════════════════════════════════════ */}
-          <PageSection id="actions" onMeasure={handleMeasure}>
-            <Card>
-              <SectionHeader
-                icon={<ArrowUpRightIcon size={16} color={primary} />}
-                title="Recommended Engagement Actions"
-              />
-              <View style={[s.cardBody, { flexDirection: "row", flexWrap: "wrap", gap: 10 }]}>
-                {data.recommendedActions.map((a) => (
-                  <TouchableOpacity
-                    key={a.label}
-                    style={[s.actionCard, { flexBasis: `${actionBasis}%` as const, minWidth: 110 }]}
-                    activeOpacity={0.85}
-                  >
-                    <View style={[s.actionIconBox, { backgroundColor: a.color }]}>
-                      {ACTION_ICON_CFG[a.icon]}
-                    </View>
-                    <Text style={s.actionLabel}>{a.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </Card>
-          </PageSection>
 
           <View style={{ height: 40 }} />
         </View>
@@ -3105,7 +3178,7 @@ const s = StyleSheet.create({
   body: { gap: 16, paddingTop: 16 },
 
   heroOuter: { width: "100%", alignSelf: "center", maxWidth: 1600, paddingHorizontal: 10 },
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  paddingBottom: 20, borderRadius: 24, paddingHorizontal: 20 },
+  header: { marginHorizontal: 2, marginTop: 12, paddingBottom: 20, borderRadius: 24, paddingHorizontal: 20 },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",

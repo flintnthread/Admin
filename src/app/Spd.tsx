@@ -15,7 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-// ─── THEME (matches SellerPaymentsScreen) ─────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
 const PRIMARY = "#ef7b1a";
 const DARK = "#79411c";
 const PRIMARY_LIGHT = "#fef3e9";
@@ -25,6 +25,8 @@ const TEXT_HEAD = "#1a0f08";
 const TEXT_BODY = "#504f56";
 const TEXT_MUTED = "#9b8b7e";
 const BORDER = "#ede5de";
+const GREEN = "#1a7a45";
+const GREEN_BG = "#e8f7ee";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type PaymentStatus = "Pending" | "Paid";
@@ -47,7 +49,7 @@ interface SellerOrder {
     reminderBucket: ReminderBucket;
     paymentStatus: PaymentStatus;
     walletBalance: string;
-    // ── Customer & shipping (new) ──────────────────────────────────────────
+    // Customer & shipping
     customerName: string;
     customerPhone: string;
     customerEmail?: string;
@@ -57,7 +59,7 @@ interface SellerOrder {
     shippingState: string;
     shippingPincode: string;
     cityType: CityType;
-    // ── Invoice-related fields (optional — fall back gracefully) ──────────
+    // Invoice fields
     sellerGstin?: string;
     sellerAddressLine1?: string;
     sellerAddressLine2?: string;
@@ -75,6 +77,18 @@ interface SellerOrder {
     basePrice?: number;
     totalAmount?: number;
     orderRef?: string;
+    // Price breakdown fields (from API / mapper)
+    mrpExclGst?: number;
+    discountPercent?: number;
+    discountAmount?: number;
+    sellingPriceExclGst?: number;
+    gstPercent?: number;
+    gstAmount?: number;
+    sellingPriceWithGst?: number;
+    commissionPercent?: number;
+    commissionAmount?: number;
+    sellingPlusCommission?: number;
+    mrpWithGst?: number;
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -92,7 +106,10 @@ const getPaymentColor = (status: PaymentStatus) =>
 const getInitials = (name?: string) =>
     (name || "N A").split(" ").map(w => w?.[0] || "").join("").toUpperCase().slice(0, 2);
 
-// ─── INVOICE: NUMBER TO WORDS (Indian numbering) ─────────────────────────────
+const fmtAmt = (n: number) =>
+    `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// ─── INVOICE: NUMBER TO WORDS ─────────────────────────────────────────────────
 const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
     "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
 const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -115,10 +132,9 @@ const amountInWords = (amount: number) => {
     return `${rupeeWords}${paiseWords} Only`;
 };
 
-// ─── INVOICE: COMPANY CONSTANTS (replace with real tenant data when available) ─
+// ─── COMPANY CONSTANTS ────────────────────────────────────────────────────────
 const COMPANY = {
-    name1: "FLINT",
-    name2: "& THREAD",
+    name1: "FLINT", name2: "& THREAD",
     tagline: "The Infinity and Beyond",
     addressLine: "Hyderabad, Telangana, India",
     phone: "+91 9063459092",
@@ -132,9 +148,7 @@ const COMPANY = {
 };
 
 // ─── SECTION HEADER ───────────────────────────────────────────────────────────
-const SectionHeader: React.FC<{ icon: string; title: string; accent?: string }> = ({
-    icon, title, accent = PRIMARY,
-}) => (
+const SectionHeader: React.FC<{ icon: string; title: string; accent?: string }> = ({ icon, title, accent = PRIMARY }) => (
     <View style={sectionStyles.row}>
         <View style={[sectionStyles.iconWrap, { backgroundColor: accent }]}>
             <Feather name={icon as any} size={14} color="#fff" />
@@ -143,7 +157,6 @@ const SectionHeader: React.FC<{ icon: string; title: string; accent?: string }> 
         <View style={sectionStyles.line} />
     </View>
 );
-
 const sectionStyles = StyleSheet.create({
     row: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14, marginTop: 4 },
     iconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
@@ -152,55 +165,34 @@ const sectionStyles = StyleSheet.create({
 });
 
 // ─── INFO ROW ─────────────────────────────────────────────────────────────────
-const InfoRow: React.FC<{ label: string; value: string; valueColor?: string; bold?: boolean }> = ({
-    label, value, valueColor = TEXT_HEAD, bold = false,
-}) => (
+const InfoRow: React.FC<{ label: string; value: string; valueColor?: string; bold?: boolean }> = ({ label, value, valueColor = TEXT_HEAD, bold = false }) => (
     <View style={infoStyles.row}>
         <Text style={infoStyles.label}>{label}</Text>
-        <Text style={[infoStyles.value, { color: valueColor, fontWeight: bold ? "800" : "600" }]}>
-            {value}
-        </Text>
+        <Text style={[infoStyles.value, { color: valueColor, fontWeight: bold ? "800" : "600" }]}>{value}</Text>
     </View>
 );
-
 const infoStyles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#f3ece6" },
     label: { fontSize: 12, color: TEXT_MUTED, fontWeight: "600", flex: 1 },
     value: { fontSize: 13, flex: 1, textAlign: "right" },
 });
 
-// ─── ADDRESS CHIP (new — used by Customer & Shipping card) ───────────────────
+// ─── ADDRESS CHIP ─────────────────────────────────────────────────────────────
 const AddressChip: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <View style={addressChipStyles.chip}>
         <Text style={addressChipStyles.label}>{label}</Text>
         <Text style={addressChipStyles.value} numberOfLines={1}>{value}</Text>
     </View>
 );
-
 const addressChipStyles = StyleSheet.create({
-    chip: {
-        flex: 1,
-        minWidth: 100,
-        backgroundColor: BG_PAGE,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: BORDER,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-    },
+    chip: { flex: 1, minWidth: 100, backgroundColor: BG_PAGE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 9 },
     label: { fontSize: 10, color: TEXT_MUTED, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 3 },
     value: { fontSize: 13, color: TEXT_HEAD, fontWeight: "700" },
 });
 
 // ─── ACTION BUTTON ────────────────────────────────────────────────────────────
-const ActionButton: React.FC<{
-    icon: string; label: string; color: string; onPress: () => void; flex?: boolean;
-}> = ({ icon, label, color, onPress, flex }) => (
-    <TouchableOpacity
-        style={[actionStyles.btn, { backgroundColor: color, flex: flex ? 1 : undefined }]}
-        onPress={onPress}
-        activeOpacity={0.8}
-    >
+const ActionButton: React.FC<{ icon: string; label: string; color: string; onPress: () => void; flex?: boolean }> = ({ icon, label, color, onPress, flex }) => (
+    <TouchableOpacity style={[actionStyles.btn, { backgroundColor: color, flex: flex ? 1 : undefined }]} onPress={onPress} activeOpacity={0.8}>
         {icon === "dollar-sign" ? (
             <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800", marginTop: -1 }}>₹</Text>
         ) : (
@@ -209,45 +201,202 @@ const ActionButton: React.FC<{
         <Text style={actionStyles.text}>{label}</Text>
     </TouchableOpacity>
 );
-
 const actionStyles = StyleSheet.create({
     btn: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 10, justifyContent: "center" },
     text: { color: "#fff", fontWeight: "700", fontSize: 13 },
 });
 
-// ─── COST BREAKDOWN ROW ───────────────────────────────────────────────────────
-const CostRow: React.FC<{ label: string; value: string; highlight?: boolean; dimmed?: boolean }> = ({
-    label, value, highlight, dimmed,
-}) => (
+// ─── COST ROW ─────────────────────────────────────────────────────────────────
+const CostRow: React.FC<{ label: string; value: string; highlight?: boolean; dimmed?: boolean }> = ({ label, value, highlight, dimmed }) => (
     <View style={costStyles.row}>
         <Text style={[costStyles.label, dimmed && { color: TEXT_MUTED }]}>{label}</Text>
-        <Text style={[costStyles.value, highlight && { color: PRIMARY, fontSize: 17, fontWeight: "800" }, dimmed && { color: TEXT_MUTED }]}>
-            {value}
-        </Text>
+        <Text style={[costStyles.value, highlight && { color: PRIMARY, fontSize: 17, fontWeight: "800" }, dimmed && { color: TEXT_MUTED }]}>{value}</Text>
     </View>
 );
-
 const costStyles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3ece6" },
     label: { fontSize: 13, color: TEXT_BODY, fontWeight: "600" },
     value: { fontSize: 14, color: TEXT_HEAD, fontWeight: "700" },
 });
 
-// ─── PROPS ────────────────────────────────────────────────────────────────────
-interface SellerPaymentDetailScreenProps {
-    /** The order object passed from the payments list screen */
-    order: SellerOrder;
-    /** Navigate back to list */
-    onBack: () => void;
-}
+// ─── PRICE BREAKDOWN ROW (matches reference image exactly) ───────────────────
+type PBRowVariant = "normal" | "negative" | "positive" | "subtotal-green" | "subtotal-bold" | "total-orange" | "divider";
 
-// ─── CUSTOMER & SHIPPING CARD (new — shared between web/mobile) ──────────────
+const PriceBreakdownRow: React.FC<{
+    label: string;
+    value?: string;
+    variant?: PBRowVariant;
+    isHeader?: boolean;
+}> = ({ label, value, variant = "normal", isHeader = false }) => {
+    if (variant === "divider") {
+        return <View style={pbStyles.divider} />;
+    }
+
+    const labelStyle: any[] = [pbStyles.label];
+    const valueStyle: any[] = [pbStyles.value];
+
+    if (isHeader) {
+        labelStyle.push(pbStyles.labelHeader);
+        valueStyle.push(pbStyles.labelHeader);
+    }
+
+    switch (variant) {
+        case "negative":
+            valueStyle.push({ color: "#e53e3e" });
+            break;
+        case "positive":
+            valueStyle.push({ color: PRIMARY });
+            break;
+        case "subtotal-green":
+            labelStyle.push({ color: GREEN, fontWeight: "800" as any, fontSize: 14 });
+            valueStyle.push({ color: GREEN, fontWeight: "800" as any, fontSize: 14 });
+            break;
+        case "subtotal-bold":
+            labelStyle.push({ fontWeight: "800" as any, color: TEXT_HEAD, fontSize: 13 });
+            valueStyle.push({ fontWeight: "800" as any, color: TEXT_HEAD, fontSize: 13 });
+            break;
+        case "total-orange":
+            labelStyle.push({ fontWeight: "800" as any, color: PRIMARY, fontSize: 14 });
+            valueStyle.push({ fontWeight: "800" as any, color: PRIMARY, fontSize: 14 });
+            break;
+    }
+
+    return (
+        <View style={[pbStyles.row, (variant === "subtotal-green" || variant === "subtotal-bold" || variant === "total-orange") && pbStyles.rowHighlight]}>
+            <Text style={labelStyle}>{label}</Text>
+            {value !== undefined && <Text style={valueStyle}>{value}</Text>}
+        </View>
+    );
+};
+
+const pbStyles = StyleSheet.create({
+    row: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 9,
+        paddingHorizontal: 16,
+    },
+    rowHighlight: {
+        backgroundColor: "#fafafa",
+        borderRadius: 6,
+        marginHorizontal: -4,
+        paddingHorizontal: 12,
+    },
+    label: { fontSize: 13, color: TEXT_BODY, fontWeight: "500", flex: 1 },
+    labelHeader: { fontSize: 13, fontWeight: "800", color: TEXT_HEAD },
+    value: { fontSize: 13, color: TEXT_HEAD, fontWeight: "600", textAlign: "right" },
+    divider: { height: 1, backgroundColor: BORDER, marginVertical: 6, marginHorizontal: 4 },
+});
+
+// ─── PRICE BREAKDOWN CARD ─────────────────────────────────────────────────────
+const PriceBreakdownCard: React.FC<{ order: SellerOrder }> = ({ order }) => {
+    // Derive values — use API fields if present, else calculate from customerPaid
+    const parseAmount = (str: string) => parseFloat(str.replace(/[^0-9.]/g, "")) || 0;
+    const customerPaidNum = parseAmount(order.customerPaid);
+
+    // If API provides breakdown fields use them, else derive sensible defaults
+    const gstPct = order.gstPercent ?? 5;
+    const commissionPct = order.commissionPercent ?? 15;
+    const discountPct = order.discountPercent ?? 0;
+
+    // Work backwards from customerPaid (which is sellingPriceWithGst)
+    const sellingWithGst = order.sellingPriceWithGst ?? customerPaidNum;
+    const gstAmt = order.gstAmount ?? +((sellingWithGst * gstPct) / (100 + gstPct)).toFixed(2);
+    const sellingExclGst = order.sellingPriceExclGst ?? +(sellingWithGst - gstAmt).toFixed(2);
+    const discountAmt = order.discountAmount ?? +(sellingExclGst * discountPct / 100).toFixed(2);
+    const mrpExclGst = order.mrpExclGst ?? +(sellingExclGst + discountAmt).toFixed(2);
+    const commissionAmt = order.commissionAmount ?? +((sellingWithGst * commissionPct) / 100).toFixed(2);
+    const sellingPlusCommission = order.sellingPlusCommission ?? +(sellingWithGst + commissionAmt).toFixed(2);
+    const mrpWithGst = order.mrpWithGst ?? +(mrpExclGst * (1 + gstPct / 100)).toFixed(2);
+
+    return (
+        <View style={styles.card}>
+            <SectionHeader icon="tag" title="Price Breakdown" accent="#1d4ed8" />
+
+            <View style={pbStyles2.container}>
+                {/* MRP (Excl. GST) */}
+                <PriceBreakdownRow
+                    label="MRP (Excl. GST)"
+                    value={fmtAmt(mrpExclGst)}
+                    variant="normal"
+                />
+
+                {/* Discount */}
+                <PriceBreakdownRow
+                    label={`Discount (${discountPct.toFixed(2)}%)`}
+                    value={discountAmt > 0 ? `- ${fmtAmt(discountAmt)}` : fmtAmt(0)}
+                    variant="negative"
+                />
+
+                {/* Selling Price Excl GST */}
+                <PriceBreakdownRow
+                    label="Selling Price (Excl. GST)"
+                    value={fmtAmt(sellingExclGst)}
+                    variant="normal"
+                />
+
+                {/* GST */}
+                <PriceBreakdownRow
+                    label={`GST (${gstPct.toFixed(2)}%)`}
+                    value={`+ ${fmtAmt(gstAmt)}`}
+                    variant="positive"
+                />
+
+                <PriceBreakdownRow label="" variant="divider" />
+
+                {/* Selling Price With GST — green subtotal */}
+                <PriceBreakdownRow
+                    label="Selling Price (With GST)"
+                    value={fmtAmt(sellingWithGst)}
+                    variant="subtotal-green"
+                />
+
+                {/* Commission */}
+                <PriceBreakdownRow
+                    label={`Commission (${commissionPct.toFixed(2)}% of SP w/ GST)`}
+                    value={`+ ${fmtAmt(commissionAmt)}`}
+                    variant="positive"
+                />
+
+                <PriceBreakdownRow label="" variant="divider" />
+
+                {/* Selling Price + Commission = Total — bold */}
+                <PriceBreakdownRow
+                    label="Selling Price (With GST) + Commission = Total"
+                    value={fmtAmt(sellingPlusCommission)}
+                    variant="subtotal-bold"
+                />
+
+                <PriceBreakdownRow label="" variant="divider" />
+
+                {/* MRP (With GST) — orange total */}
+                <PriceBreakdownRow
+                    label="MRP (With GST)"
+                    value={fmtAmt(mrpWithGst)}
+                    variant="total-orange"
+                />
+            </View>
+        </View>
+    );
+};
+
+const pbStyles2 = StyleSheet.create({
+    container: {
+        borderWidth: 1,
+        borderColor: BORDER,
+        borderRadius: 12,
+        overflow: "hidden",
+        backgroundColor: BG_CARD,
+    },
+});
+
+// ─── CUSTOMER & SHIPPING CARD ─────────────────────────────────────────────────
 const CustomerShippingCard: React.FC<{ order: SellerOrder }> = ({ order }) => {
     const customerInitials = getInitials(order.customerName);
     return (
         <View style={styles.card}>
             <SectionHeader icon="map-pin" title="Customer & Shipping" accent="#0f766e" />
-
             <View style={styles.avatarRow}>
                 <View style={[styles.avatar, { backgroundColor: "#0f766e" }]}>
                     <Text style={styles.avatarText}>{customerInitials}</Text>
@@ -263,7 +412,6 @@ const CustomerShippingCard: React.FC<{ order: SellerOrder }> = ({ order }) => {
                     </Text>
                 </View>
             </View>
-
             <View style={styles.addressBlock}>
                 <View style={styles.addressBlockHeader}>
                     <Feather name="home" size={12} color={TEXT_MUTED} />
@@ -273,7 +421,6 @@ const CustomerShippingCard: React.FC<{ order: SellerOrder }> = ({ order }) => {
                     {order.shippingAddressLine1 || "No Address Provided"}
                     {order.shippingAddressLine2 ? `, ${order.shippingAddressLine2}` : ""}
                 </Text>
-
                 <View style={styles.addressChipsRow}>
                     <AddressChip label="City" value={order.shippingCity || "—"} />
                     <AddressChip label="State" value={order.shippingState || "—"} />
@@ -284,7 +431,7 @@ const CustomerShippingCard: React.FC<{ order: SellerOrder }> = ({ order }) => {
     );
 };
 
-// ─── INVOICE: SMALL PIECES ────────────────────────────────────────────────────
+// ─── INVOICE MODAL PIECES ─────────────────────────────────────────────────────
 const InvoiceDetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <View style={invDr.row}>
         <Text style={invDr.label}>{label}</Text>
@@ -297,14 +444,10 @@ const invDr = StyleSheet.create({
     value: { fontSize: 11, color: TEXT_HEAD, fontWeight: "700", textAlign: "right", flexShrink: 1 },
 });
 
-const InvoiceSettlementRow: React.FC<{ label: string; value: string; negative?: boolean; bold?: boolean }> = ({
-    label, value, negative, bold,
-}) => (
+const InvoiceSettlementRow: React.FC<{ label: string; value: string; negative?: boolean; bold?: boolean }> = ({ label, value, negative, bold }) => (
     <View style={invSr.row}>
         <Text style={[invSr.label, bold && { fontWeight: "800", color: TEXT_HEAD }]}>{label}</Text>
-        <Text style={[invSr.value, negative && { color: "#b91c1c" }, bold && { fontWeight: "800" }]}>
-            {value}
-        </Text>
+        <Text style={[invSr.value, negative && { color: "#b91c1c" }, bold && { fontWeight: "800" }]}>{value}</Text>
     </View>
 );
 const invSr = StyleSheet.create({
@@ -313,7 +456,7 @@ const invSr = StyleSheet.create({
     value: { fontSize: 12, color: TEXT_HEAD, fontWeight: "700" },
 });
 
-// ─── INVOICE MODAL (inline — full-screen invoice view) ───────────────────────
+// ─── INVOICE MODAL ────────────────────────────────────────────────────────────
 interface InvoiceModalProps {
     visible: boolean;
     onClose: () => void;
@@ -337,32 +480,22 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
     onPrint, onRegenerate, regenLoading,
 }) => {
     const isWeb = Platform.OS === "web";
-    const fmtInv = (n: number) =>
-        `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtInv = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const itemTotal = order.totalAmount ?? customerPaidNum;
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
             <View style={invStyles.overlay}>
                 <View style={[invStyles.sheet, isWeb && invStyles.sheetWeb]}>
-
-                    {/* ── Top bar: timestamp / title / actions ───────────────── */}
                     <View style={invStyles.topBar}>
                         <Text style={invStyles.topBarTimestamp}>{generatedAt}</Text>
-                        <Text style={invStyles.topBarTitle} numberOfLines={1}>
-                            Seller Payment Invoice - {invoiceNo}
-                        </Text>
+                        <Text style={invStyles.topBarTitle} numberOfLines={1}>Seller Payment Invoice - {invoiceNo}</Text>
                         <View style={invStyles.topBarActions}>
                             <TouchableOpacity style={invStyles.iconBtn} onPress={onPrint} activeOpacity={0.75}>
                                 <Feather name="printer" size={13} color={TEXT_BODY} />
                                 <Text style={invStyles.iconBtnText}>Print</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={invStyles.iconBtn}
-                                onPress={onRegenerate}
-                                activeOpacity={0.75}
-                                disabled={regenLoading}
-                            >
+                            <TouchableOpacity style={invStyles.iconBtn} onPress={onRegenerate} activeOpacity={0.75} disabled={regenLoading}>
                                 <Feather name="rotate-ccw" size={13} color={TEXT_BODY} />
                                 <Text style={invStyles.iconBtnText}>{regenLoading ? "Regenerating…" : "Regenerate"}</Text>
                             </TouchableOpacity>
@@ -372,14 +505,8 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                         </View>
                     </View>
 
-                    <ScrollView
-                        style={invStyles.scroll}
-                        contentContainerStyle={invStyles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
+                    <ScrollView style={invStyles.scroll} contentContainerStyle={invStyles.scrollContent} showsVerticalScrollIndicator={false}>
                         <View style={invStyles.page} nativeID="invoice-print-area">
-
-                            {/* ── Brand header / invoice meta ─────────────────── */}
                             <View style={invStyles.brandRow}>
                                 <View style={invStyles.brandLeft}>
                                     <View style={invStyles.logoRow}>
@@ -392,7 +519,6 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                         </Text>
                                     </View>
                                     <Text style={invStyles.tagline}>{COMPANY.tagline}</Text>
-
                                     <View style={{ marginTop: 10, gap: 2 }}>
                                         <Text style={invStyles.companyLine}>{COMPANY.addressLine}</Text>
                                         <Text style={invStyles.companyLine}>{COMPANY.phone}</Text>
@@ -401,49 +527,32 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                         <Text style={invStyles.companyLine}>GSTIN: {COMPANY.gstin}</Text>
                                     </View>
                                 </View>
-
                                 <View style={invStyles.brandRight}>
                                     <Text style={invStyles.sellerPaymentTitle}>SELLER PAYMENT</Text>
                                     <View style={{ marginTop: 8, gap: 3 }}>
-                                        <Text style={invStyles.metaLine}>
-                                            <Text style={invStyles.metaLabel}>Invoice No: </Text>
-                                            <Text style={invStyles.metaValue}>{invoiceNo}</Text>
-                                        </Text>
-                                        <Text style={invStyles.metaLine}>
-                                            <Text style={invStyles.metaLabel}>Date: </Text>
-                                            <Text style={invStyles.metaValue}>{generatedAt.split(",")[0]}</Text>
-                                        </Text>
-                                        <Text style={invStyles.metaLine}>
-                                            <Text style={invStyles.metaLabel}>Order Ref: </Text>
-                                            <Text style={invStyles.metaValue}>{orderRef}</Text>
-                                        </Text>
+                                        <Text style={invStyles.metaLine}><Text style={invStyles.metaLabel}>Invoice No: </Text><Text style={invStyles.metaValue}>{invoiceNo}</Text></Text>
+                                        <Text style={invStyles.metaLine}><Text style={invStyles.metaLabel}>Date: </Text><Text style={invStyles.metaValue}>{generatedAt.split(",")[0]}</Text></Text>
+                                        <Text style={invStyles.metaLine}><Text style={invStyles.metaLabel}>Order Ref: </Text><Text style={invStyles.metaValue}>{orderRef}</Text></Text>
                                     </View>
                                 </View>
                             </View>
 
                             <View style={invStyles.divider} />
 
-                            {/* ── Beneficiary / Payout cards ──────────────────── */}
                             <View style={invStyles.twoColRow}>
                                 <View style={invStyles.infoCard}>
                                     <Text style={invStyles.infoCardTitle}>BENEFICIARY DETAILS</Text>
                                     <Text style={invStyles.beneficiaryName}>{order.sellerName}</Text>
                                     <Text style={invStyles.beneficiaryAddr}>
-                                        {[order.sellerAddressLine1, order.sellerAddressLine2, order.sellerCity, order.sellerState, order.sellerPincode]
-                                            .filter(Boolean)
-                                            .join(", ") || "Address not provided"}
+                                        {[order.sellerAddressLine1, order.sellerAddressLine2, order.sellerCity, order.sellerState, order.sellerPincode].filter(Boolean).join(", ") || "Address not provided"}
                                     </Text>
                                     <Text style={invStyles.beneficiaryAddr}>GSTIN: {order.sellerGstin || "—"}</Text>
                                     <Text style={invStyles.beneficiaryAddr}>Contact: {order.sellerPhone || "—"}</Text>
-
                                     <View style={invStyles.settledBadge}>
                                         <Feather name="check" size={11} color="#1a7a45" />
-                                        <Text style={invStyles.settledBadgeText}>
-                                            {order.paymentStatus === "Paid" ? "PAYMENT SETTLED" : "PAYMENT PENDING"}
-                                        </Text>
+                                        <Text style={invStyles.settledBadgeText}>{order.paymentStatus === "Paid" ? "PAYMENT SETTLED" : "PAYMENT PENDING"}</Text>
                                     </View>
                                 </View>
-
                                 <View style={invStyles.infoCard}>
                                     <Text style={invStyles.infoCardTitle}>PAYOUT DETAILS</Text>
                                     <InvoiceDetailRow label="Holder" value={order.bankAccountHolder || order.sellerName} />
@@ -453,7 +562,6 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                 </View>
                             </View>
 
-                            {/* ── Item table ───────────────────────────────────── */}
                             <View style={invStyles.table}>
                                 <View style={invStyles.tableHeaderRow}>
                                     <Text style={[invStyles.th, { flex: 3 }]}>Item Description</Text>
@@ -464,34 +572,27 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                     <Text style={[invStyles.th, invStyles.tRight]}>Total Amount</Text>
                                 </View>
                                 <View style={invStyles.tableRow}>
-                                    <Text style={[invStyles.td, { flex: 3, fontWeight: "700", color: TEXT_HEAD }]}>
-                                        {order.itemDescription || "Product"}
-                                    </Text>
+                                    <Text style={[invStyles.td, { flex: 3, fontWeight: "700", color: TEXT_HEAD }]}>{order.itemDescription || "Product"}</Text>
                                     <Text style={[invStyles.td, invStyles.tCenter]}>{order.hsn || "-"}</Text>
                                     <Text style={[invStyles.td, invStyles.tCenter]}>{order.sku || "-"}</Text>
                                     <Text style={[invStyles.td, invStyles.tCenter]}>{order.qty ?? 1}</Text>
                                     <Text style={[invStyles.td, invStyles.tRight]}>{fmtInv(order.basePrice ?? itemTotal)}</Text>
-                                    <Text style={[invStyles.td, invStyles.tRight, { fontWeight: "800", color: TEXT_HEAD }]}>
-                                        {fmtInv(itemTotal)}
-                                    </Text>
+                                    <Text style={[invStyles.td, invStyles.tRight, { fontWeight: "800", color: TEXT_HEAD }]}>{fmtInv(itemTotal)}</Text>
                                 </View>
                             </View>
 
-                            {/* ── Amount in words / Settlement breakdown ──────── */}
                             <View style={invStyles.twoColRow}>
                                 <View style={invStyles.wordsBlock}>
                                     <Text style={invStyles.wordsLabel}>Amount Payable (in words):</Text>
                                     <Text style={invStyles.wordsValue}>{amountInWords(sellerEarning)}</Text>
-
                                     <View style={{ marginTop: 18 }}>
                                         <Text style={invStyles.termsTitle}>Terms & Conditions</Text>
                                         <Text style={invStyles.termsItem}>1. This is a system generated settlement advice.</Text>
-                                        <Text style={invStyles.termsItem}>2. Deductions include GST, Shipping &amp; Commission fees.</Text>
+                                        <Text style={invStyles.termsItem}>2. Deductions include GST, Shipping & Commission fees.</Text>
                                         <Text style={invStyles.termsItem}>3. For discrepancies, contact support immediately.</Text>
                                         <Text style={invStyles.termsItem}>4. Payment has been processed and credited to seller wallet.</Text>
                                     </View>
                                 </View>
-
                                 <View style={invStyles.settlementBlock}>
                                     <InvoiceSettlementRow label="Total Order Value" value={fmtInv(customerPaidNum)} />
                                     <InvoiceSettlementRow label="Less GST" value={`- ${fmtInv(tax)}`} negative />
@@ -506,24 +607,12 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                             </View>
 
                             <View style={invStyles.footerDivider} />
-
-                            {/* ── Footer ───────────────────────────────────────── */}
                             <View style={invStyles.footer}>
-                                <Text style={invStyles.footerMuted}>
-                                    This is an automatically generated invoice and does not require a signature or stamp.
-                                </Text>
-                                <Text style={invStyles.footerBold}>
-                                    This invoice has been electronically generated by our system and is valid for all accounting and record-keeping purposes.
-                                </Text>
-                                <Text style={[invStyles.footerMuted, { marginTop: 10 }]}>
-                                    For any queries or assistance regarding this payment, please contact:
-                                </Text>
-                                <Text style={invStyles.footerContact}>
-                                    Email: {COMPANY.supportEmail}  |  Phone: {COMPANY.supportPhone}
-                                </Text>
-                                <Text style={[invStyles.footerMuted, { marginTop: 10 }]}>
-                                    © {COMPANY.year} {COMPANY.legalName}. All Rights Reserved.
-                                </Text>
+                                <Text style={invStyles.footerMuted}>This is an automatically generated invoice and does not require a signature or stamp.</Text>
+                                <Text style={invStyles.footerBold}>This invoice has been electronically generated by our system and is valid for all accounting and record-keeping purposes.</Text>
+                                <Text style={[invStyles.footerMuted, { marginTop: 10 }]}>For any queries or assistance regarding this payment, please contact:</Text>
+                                <Text style={invStyles.footerContact}>Email: {COMPANY.supportEmail}  |  Phone: {COMPANY.supportPhone}</Text>
+                                <Text style={[invStyles.footerMuted, { marginTop: 10 }]}>© {COMPANY.year} {COMPANY.legalName}. All Rights Reserved.</Text>
                             </View>
                         </View>
                     </ScrollView>
@@ -534,12 +623,15 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
 };
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
+interface SellerPaymentDetailScreenProps {
+    order: SellerOrder;
+    onBack: () => void;
+}
+
 const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps>> = ({ order: propOrder, onBack: propOnBack }) => {
     const isWeb = Platform.OS === "web";
     const [regenLoading, setRegenLoading] = useState(false);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
-
-    // ── Invoice modal state ────────────────────────────────────────────────
     const [invoiceVisible, setInvoiceVisible] = useState(false);
     const [invoiceNo, setInvoiceNo] = useState<string | null>(null);
     const [invoiceGeneratedAt, setInvoiceGeneratedAt] = useState<string>("");
@@ -550,17 +642,14 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
     const orderRaw = params.orderData ? JSON.parse(params.orderData as string) : null;
     const order = propOrder || orderRaw;
     const onBack = propOnBack || (() => {
-        if (router.canGoBack()) {
-            router.back();
-        } else {
-            router.replace("/Sellerpayments");
-        }
+        if (router.canGoBack()) router.back();
+        else router.replace("/Sellerpayments");
     });
 
     if (!order) {
         return (
             <AdminLayout>
-                <View style={[styles.root, isWeb && styles.rootWeb, { alignItems: 'center', justifyContent: 'center' }]}>
+                <View style={[styles.root, isWeb && styles.rootWeb, { alignItems: "center", justifyContent: "center" }]}>
                     <Text>Loading order details...</Text>
                 </View>
             </AdminLayout>
@@ -571,33 +660,18 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
     const payStyle = getPaymentColor(order.paymentStatus);
     const initials = getInitials(order.sellerName);
 
-    // ── Parse numeric amounts from formatted string like "₹1,200.00" ──────────
-    const parseAmount = (str: string) => {
-        const num = parseFloat(str.replace(/[^0-9.]/g, "")) || 0;
-        return num;
-    };
-
+    const parseAmount = (str: string) => parseFloat(str.replace(/[^0-9.]/g, "")) || 0;
     const customerPaidNum = parseAmount(order.customerPaid);
-    // Example breakdown — replace with real API fields when available
     const platformFee = +(customerPaidNum * 0.05).toFixed(2);
     const deliveryCharge = 40;
     const tax = +(customerPaidNum * 0.02).toFixed(2);
     const sellerEarning = +(customerPaidNum - platformFee - deliveryCharge - tax).toFixed(2);
 
-    const fmt = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-
-    // ── Build a fresh timestamp like "29/06/2026, 12:32" ───────────────────
     const buildTimestamp = () => {
         const now = new Date();
-        const dd = String(now.getDate()).padStart(2, "0");
-        const mm = String(now.getMonth() + 1).padStart(2, "0");
-        const yyyy = now.getFullYear();
-        const hh = String(now.getHours()).padStart(2, "0");
-        const min = String(now.getMinutes()).padStart(2, "0");
-        return `${dd}/${mm}/${yyyy}, ${hh}:${min}`;
+        return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}, ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     };
 
-    // ── Deterministic-ish invoice number for this order ────────────────────
     const buildInvoiceNo = () => {
         const year = new Date().getFullYear();
         const seed = (order.id ?? Math.floor(Math.random() * 999999)).toString().padStart(6, "0").slice(-6);
@@ -618,7 +692,6 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
         setRegenLoading(true);
         setTimeout(() => {
             setRegenLoading(false);
-            // Same invoice number, refreshed timestamp
             if (!invoiceNo) setInvoiceNo(buildInvoiceNo());
             setInvoiceGeneratedAt(buildTimestamp());
             setInvoiceVisible(true);
@@ -627,12 +700,7 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
 
     const handlePrint = () => {
         if (Platform.OS === "web") {
-            // Make sure the invoice is open before printing.
             if (!invoiceVisible) setInvoiceVisible(true);
-
-            // Inject a one-off print stylesheet that hides everything on the
-            // page except the invoice content, so the browser's print dialog
-            // only shows the invoice — not the dashboard behind it.
             const styleId = "invoice-print-style";
             let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
             if (!styleTag) {
@@ -644,300 +712,161 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
                 @media print {
                     body * { visibility: hidden !important; }
                     #invoice-print-area, #invoice-print-area * { visibility: visible !important; }
-                    #invoice-print-area {
-                        position: absolute !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        width: 100% !important;
-                        margin: 0 !important;
-                        box-shadow: none !important;
-                        border: none !important;
-                    }
+                    #invoice-print-area { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; margin: 0 !important; }
                 }
             `;
-
-            // Give the modal a moment to render before the print dialog opens.
-            setTimeout(() => {
-                window.print();
-            }, 50);
+            setTimeout(() => window.print(), 50);
         } else {
             Alert.alert("Print", "Sending invoice to printer…");
         }
     };
+
+    // ── Shared card content blocks ───────────────────────────────────────────
+
+    const OrderSummaryCard = (
+        <View style={styles.card}>
+            <SectionHeader icon="shopping-bag" title="Order Summary" />
+            <View style={styles.amountStrip}>
+                <View>
+                    <Text style={styles.amountLabel}>Customer Paid</Text>
+                    <Text style={styles.amountValue}>{order.customerPaid}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                    <Text style={styles.amountLabel}>Seller Earning</Text>
+                    <Text style={[styles.amountValue, { color: "#1a7a45" }]}>{fmtAmt(sellerEarning)}</Text>
+                </View>
+            </View>
+            <InfoRow label="Order ID" value={order.orderId} valueColor={PRIMARY} bold />
+            <InfoRow label="Order Date" value={order.orderDate} />
+            <InfoRow label="Order Status" value={order.orderStatus} valueColor={order.orderStatus === "Completed" ? "#1a7a45" : PRIMARY} />
+            <InfoRow label="Delivery Date" value={order.deliveryDate} />
+            <InfoRow label="Delivery Time" value={order.deliveryTime} />
+            <View style={{ marginTop: 10 }}>
+                <View style={[styles.reminderBadge, { backgroundColor: remStyle.bg }]}>
+                    <Feather name="clock" size={12} color={remStyle.dot} />
+                    <Text style={[styles.reminderText, { color: remStyle.color }]}>Reminder: {order.reminderLabel}</Text>
+                </View>
+            </View>
+        </View>
+    );
+
+    const SellerCard = (
+        <View style={styles.card}>
+            <SectionHeader icon="user" title="Seller Details" accent={DARK} />
+            <View style={styles.avatarRow}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.avatarName}>{order.sellerName}</Text>
+                    <Text style={styles.avatarSub}>{order.sellerEmail}</Text>
+                    <Text style={styles.avatarSub}>{order.sellerPhone}</Text>
+                </View>
+            </View>
+            <InfoRow label="Wallet Balance" value={order.walletBalance} valueColor="#1d4ed8" bold />
+        </View>
+    );
+
+    const CostBreakdownCard = (
+        <View style={styles.card}>
+            <SectionHeader icon="bar-chart-2" title="Cost Breakdown" accent="#7c3aed" />
+            <CostRow label="Customer Paid (Total)" value={fmtAmt(customerPaidNum)} />
+            <CostRow label="Platform Fee (5%)" value={`− ${fmtAmt(platformFee)}`} dimmed />
+            <CostRow label="Delivery Charge" value={`− ${fmtAmt(deliveryCharge)}`} dimmed />
+            <CostRow label="Tax (2%)" value={`− ${fmtAmt(tax)}`} dimmed />
+            <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Amount to Pay Seller</Text>
+                <Text style={styles.totalValue}>{fmtAmt(sellerEarning)}</Text>
+            </View>
+        </View>
+    );
+
+    const PaymentInfoCard = (
+        <View style={styles.card}>
+            <SectionHeader icon="credit-card" title="Payment Info" accent="#0891b2" />
+            <InfoRow label="Payment Status" value={order.paymentStatus} valueColor={payStyle.color} bold />
+            <InfoRow label="Wallet Balance" value={order.walletBalance} />
+            <InfoRow label="Reminder Days" value={`${order.reminderDays} day(s)`} valueColor={remStyle.color} />
+        </View>
+    );
+
+    const ActionsCard = (
+        <View style={styles.card}>
+            <SectionHeader icon="zap" title="Actions" accent="#d97706" />
+            <View style={styles.actionsGrid}>
+                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={handleInvoice} flex />
+                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={handleRegen} flex />
+                <ActionButton icon="printer" label="Print Invoice" color="#3b82f6" onPress={handlePrint} flex />
+                {order.paymentStatus === "Pending" && (
+                    <ActionButton icon="dollar-sign" label="Mark as Paid" color="#10b981" onPress={() => {
+                        const msg = `Mark order ${order.orderId} as paid?`;
+                        if (Platform.OS === "web") window.alert(msg);
+                        else Alert.alert("Pay", msg);
+                    }} flex />
+                )}
+            </View>
+        </View>
+    );
 
     return (
         <AdminLayout>
             <View style={[styles.root, isWeb && styles.rootWeb]}>
                 <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
-                <ScrollView
-                    style={styles.scroll}
-                    contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 60 }]}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* ── HEADER ─────────────────────────────────────────────── */}
+                <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, !isWeb && { paddingBottom: 60 }]} showsVerticalScrollIndicator={false}>
+
+                    {/* Header */}
                     <View style={[styles.header, isWeb && styles.headerWeb]}>
                         <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
                             <Feather name="arrow-left" size={18} color="#fff" />
                         </TouchableOpacity>
-
                         <View style={styles.headerMid}>
                             <Text style={styles.headerTitle}>Order Details</Text>
                             <Text style={styles.headerSub}>
-                                Dashboard › Seller Payments ›{" "}
-                                <Text style={{ color: PRIMARY }}>{order.orderId}</Text>
+                                Dashboard › Seller Payments › <Text style={{ color: PRIMARY }}>{order.orderId}</Text>
                             </Text>
                         </View>
-
                         <View style={styles.headerRight}>
-                            {/* Payment status pill */}
                             <View style={[styles.statusPill, { backgroundColor: payStyle.bg }]}>
                                 <View style={[styles.statusDot, { backgroundColor: payStyle.color }]} />
-                                <Text style={[styles.statusPillText, { color: payStyle.color }]}>
-                                    {order.paymentStatus}
-                                </Text>
+                                <Text style={[styles.statusPillText, { color: payStyle.color }]}>{order.paymentStatus}</Text>
                             </View>
                         </View>
                     </View>
 
-                    {/* ── BODY ───────────────────────────────────────────────── */}
                     {isWeb ? (
-                        // ── WEB: 2-column grid ─────────────────────────────
+                        // ── WEB: 2-column grid ──────────────────────────────
                         <View style={styles.grid}>
-
-                            {/* LEFT column */}
+                            {/* LEFT */}
                             <View style={styles.col}>
-
-                                {/* Order Summary card */}
-                                <View style={styles.card}>
-                                    <SectionHeader icon="shopping-bag" title="Order Summary" />
-
-                                    {/* Hero amount strip */}
-                                    <View style={styles.amountStrip}>
-                                        <View>
-                                            <Text style={styles.amountLabel}>Customer Paid</Text>
-                                            <Text style={styles.amountValue}>{order.customerPaid}</Text>
-                                        </View>
-                                        <View style={{ alignItems: "flex-end" }}>
-                                            <Text style={styles.amountLabel}>Seller Earning</Text>
-                                            <Text style={[styles.amountValue, { color: "#1a7a45" }]}>{fmt(sellerEarning)}</Text>
-                                        </View>
-                                    </View>
-
-                                    <InfoRow label="Order ID" value={order.orderId} valueColor={PRIMARY} bold />
-                                    <InfoRow label="Order Date" value={order.orderDate} />
-                                    <InfoRow label="Order Status" value={order.orderStatus} valueColor={order.orderStatus === "Completed" ? "#1a7a45" : PRIMARY} />
-                                    <InfoRow label="Delivery Date" value={order.deliveryDate} />
-                                    <InfoRow label="Delivery Time" value={order.deliveryTime} />
-                                    <View style={{ marginTop: 10 }}>
-                                        <View style={[styles.reminderBadge, { backgroundColor: remStyle.bg }]}>
-                                            <Feather name="clock" size={12} color={remStyle.dot} />
-                                            <Text style={[styles.reminderText, { color: remStyle.color }]}>
-                                                Reminder: {order.reminderLabel}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* Seller Info card */}
-                                <View style={styles.card}>
-                                    <SectionHeader icon="user" title="Seller Details" accent={DARK} />
-                                    <View style={styles.avatarRow}>
-                                        <View style={styles.avatar}>
-                                            <Text style={styles.avatarText}>{initials}</Text>
-                                        </View>
-                                        <View>
-                                            <Text style={styles.avatarName}>{order.sellerName}</Text>
-                                            <Text style={styles.avatarSub}>{order.sellerEmail}</Text>
-                                            <Text style={styles.avatarSub}>{order.sellerPhone}</Text>
-                                        </View>
-                                    </View>
-                                    <InfoRow label="Wallet Balance" value={order.walletBalance} valueColor="#1d4ed8" bold />
-                                </View>
-
-                                {/* Customer & Shipping card (new) */}
+                                {OrderSummaryCard}
+                                {SellerCard}
                                 <CustomerShippingCard order={order} />
                             </View>
-
-                            {/* RIGHT column */}
+                            {/* RIGHT */}
                             <View style={styles.col}>
-
-                                {/* Cost Breakdown card */}
-                                <View style={styles.card}>
-                                    <SectionHeader icon="bar-chart-2" title="Cost Breakdown" accent="#7c3aed" />
-                                    <CostRow label="Customer Paid (Total)" value={fmt(customerPaidNum)} />
-                                    <CostRow label="Platform Fee (5%)" value={`− ${fmt(platformFee)}`} dimmed />
-                                    <CostRow label="Delivery Charge" value={`− ${fmt(deliveryCharge)}`} dimmed />
-                                    <CostRow label="Tax (2%)" value={`− ${fmt(tax)}`} dimmed />
-                                    <View style={styles.totalRow}>
-                                        <Text style={styles.totalLabel}>Amount to Pay Seller</Text>
-                                        <Text style={styles.totalValue}>{fmt(sellerEarning)}</Text>
-                                    </View>
-                                </View>
-
-                                {/* Payment Info card */}
-                                <View style={styles.card}>
-                                    <SectionHeader icon="credit-card" title="Payment Info" accent="#0891b2" />
-                                    <InfoRow label="Payment Status" value={order.paymentStatus} valueColor={payStyle.color} bold />
-                                    <InfoRow label="Wallet Balance" value={order.walletBalance} />
-                                    <InfoRow label="Reminder Days" value={`${order.reminderDays} day(s)`} valueColor={remStyle.color} />
-                                </View>
-
-                                {/* Actions card */}
-                                <View style={styles.card}>
-                                    <SectionHeader icon="zap" title="Actions" accent="#d97706" />
-                                    <View style={styles.actionsGrid}>
-                                        <ActionButton
-                                            icon="file-text"
-                                            label={invoiceLoading ? "Generating…" : "Generate Invoice"}
-                                            color="#f59e0b"
-                                            onPress={handleInvoice}
-                                            flex
-                                        />
-                                        <ActionButton
-                                            icon="refresh-cw"
-                                            label={regenLoading ? "Regenerating…" : "Regenerate Invoice"}
-                                            color="#64748b"
-                                            onPress={handleRegen}
-                                            flex
-                                        />
-                                        <ActionButton
-                                            icon="printer"
-                                            label="Print Invoice"
-                                            color="#3b82f6"
-                                            onPress={handlePrint}
-                                            flex
-                                        />
-                                        {order.paymentStatus === "Pending" && (
-                                            <ActionButton
-                                                icon="dollar-sign"
-                                                label="Mark as Paid"
-                                                color="#10b981"
-                                                onPress={() => {
-                                                    const msg = `Mark order ${order.orderId} as paid?`;
-                                                    if (Platform.OS === "web") window.alert(msg);
-                                                    else Alert.alert("Pay", msg);
-                                                }}
-                                                flex
-                                            />
-                                        )}
-                                    </View>
-                                </View>
+                                {CostBreakdownCard}
+                                {/* ── PRICE BREAKDOWN (new) ── */}
+                                <PriceBreakdownCard order={order} />
+                                {PaymentInfoCard}
+                                {ActionsCard}
                             </View>
                         </View>
                     ) : (
-                        // ── MOBILE: single column ──────────────────────────
+                        // ── MOBILE: single column ───────────────────────────
                         <View style={{ gap: 14 }}>
-
-                            {/* Order summary */}
-                            <View style={styles.card}>
-                                <SectionHeader icon="shopping-bag" title="Order Summary" />
-                                <View style={styles.amountStrip}>
-                                    <View>
-                                        <Text style={styles.amountLabel}>Customer Paid</Text>
-                                        <Text style={styles.amountValue}>{order.customerPaid}</Text>
-                                    </View>
-                                    <View style={{ alignItems: "flex-end" }}>
-                                        <Text style={styles.amountLabel}>Seller Earning</Text>
-                                        <Text style={[styles.amountValue, { color: "#1a7a45" }]}>{fmt(sellerEarning)}</Text>
-                                    </View>
-                                </View>
-                                <InfoRow label="Order ID" value={order.orderId} valueColor={PRIMARY} bold />
-                                <InfoRow label="Order Date" value={order.orderDate} />
-                                <InfoRow label="Order Status" value={order.orderStatus} valueColor={order.orderStatus === "Completed" ? "#1a7a45" : PRIMARY} />
-                                <InfoRow label="Delivery Date" value={order.deliveryDate} />
-                                <InfoRow label="Delivery Time" value={order.deliveryTime} />
-                                <View style={{ marginTop: 10 }}>
-                                    <View style={[styles.reminderBadge, { backgroundColor: remStyle.bg }]}>
-                                        <Feather name="clock" size={12} color={remStyle.dot} />
-                                        <Text style={[styles.reminderText, { color: remStyle.color }]}>
-                                            Reminder: {order.reminderLabel}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            {/* Seller info */}
-                            <View style={styles.card}>
-                                <SectionHeader icon="user" title="Seller Details" accent={DARK} />
-                                <View style={styles.avatarRow}>
-                                    <View style={styles.avatar}>
-                                        <Text style={styles.avatarText}>{initials}</Text>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.avatarName}>{order.sellerName}</Text>
-                                        <Text style={styles.avatarSub}>{order.sellerEmail}</Text>
-                                        <Text style={styles.avatarSub}>{order.sellerPhone}</Text>
-                                    </View>
-                                </View>
-                                <InfoRow label="Wallet Balance" value={order.walletBalance} valueColor="#1d4ed8" bold />
-                            </View>
-
-                            {/* Customer & Shipping (new) */}
+                            {OrderSummaryCard}
+                            {SellerCard}
                             <CustomerShippingCard order={order} />
-
-                            {/* Cost breakdown */}
-                            <View style={styles.card}>
-                                <SectionHeader icon="bar-chart-2" title="Cost Breakdown" accent="#7c3aed" />
-                                <CostRow label="Customer Paid (Total)" value={fmt(customerPaidNum)} />
-                                <CostRow label="Platform Fee (5%)" value={`− ${fmt(platformFee)}`} dimmed />
-                                <CostRow label="Delivery Charge" value={`− ${fmt(deliveryCharge)}`} dimmed />
-                                <CostRow label="Tax (2%)" value={`− ${fmt(tax)}`} dimmed />
-                                <View style={styles.totalRow}>
-                                    <Text style={styles.totalLabel}>Amount to Pay Seller</Text>
-                                    <Text style={styles.totalValue}>{fmt(sellerEarning)}</Text>
-                                </View>
-                            </View>
-
-                            {/* Payment info */}
-                            <View style={styles.card}>
-                                <SectionHeader icon="credit-card" title="Payment Info" accent="#0891b2" />
-                                <InfoRow label="Payment Status" value={order.paymentStatus} valueColor={payStyle.color} bold />
-                                <InfoRow label="Wallet Balance" value={order.walletBalance} />
-                                <InfoRow label="Reminder Days" value={`${order.reminderDays} day(s)`} valueColor={remStyle.color} />
-                            </View>
-
-                            {/* Actions */}
-                            <View style={styles.card}>
-                                <SectionHeader icon="zap" title="Actions" accent="#d97706" />
-                                <View style={styles.actionsGrid}>
-                                    <ActionButton
-                                        icon="file-text"
-                                        label={invoiceLoading ? "Generating…" : "Invoice"}
-                                        color="#f59e0b"
-                                        onPress={handleInvoice}
-                                        flex
-                                    />
-                                    <ActionButton
-                                        icon="refresh-cw"
-                                        label={regenLoading ? "Regen…" : "Regenerate"}
-                                        color="#64748b"
-                                        onPress={handleRegen}
-                                        flex
-                                    />
-                                    <ActionButton
-                                        icon="printer"
-                                        label="Print"
-                                        color="#3b82f6"
-                                        onPress={handlePrint}
-                                        flex
-                                    />
-                                    {order.paymentStatus === "Pending" && (
-                                        <ActionButton
-                                            icon="dollar-sign"
-                                            label="Mark Paid"
-                                            color="#10b981"
-                                            onPress={() => Alert.alert("Pay", `Mark ${order.orderId} as paid?`)}
-                                            flex
-                                        />
-                                    )}
-                                </View>
-                            </View>
+                            {CostBreakdownCard}
+                            {/* ── PRICE BREAKDOWN (new) ── */}
+                            <PriceBreakdownCard order={order} />
+                            {PaymentInfoCard}
+                            {ActionsCard}
                         </View>
                     )}
                 </ScrollView>
 
-                {/* ── INVOICE MODAL ──────────────────────────────────────────── */}
                 {invoiceNo && (
                     <InvoiceModalView
                         visible={invoiceVisible}
@@ -968,278 +897,107 @@ const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: BG_PAGE },
     rootWeb: { backgroundColor: BG_PAGE },
 
-    // Header
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-        backgroundColor: "#151D4F",
-        paddingHorizontal: 18,
-        paddingVertical: 16,
-        borderRadius: 16,
-        shadowColor: DARK,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 2,
-    },
-    headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 28, paddingVertical: 20, },
-    backBtn: {
-        width: 40, height: 40, borderRadius: 12,
-        borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
-        alignItems: "center", justifyContent: "center",
-        backgroundColor: "rgba(255,255,255,0.1)",
-    },
+    header: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderRadius: 16, shadowColor: DARK, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
+    headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 28, paddingVertical: 20 },
+    backBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.1)" },
     headerMid: { flex: 1 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
     headerSub: { fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 2 },
     headerRight: { alignItems: "flex-end" },
-
-    statusPill: {
-        flexDirection: "row", alignItems: "center", gap: 6,
-        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    },
+    statusPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
     statusDot: { width: 7, height: 7, borderRadius: 99 },
     statusPillText: { fontSize: 12, fontWeight: "700" },
 
-    // Scroll
     scroll: { flex: 1 },
     scrollContent: { padding: 16, gap: 16 },
 
-    // Layout
     grid: { flexDirection: "row", gap: 16, alignItems: "flex-start" },
     col: { flex: 1, gap: 16 },
 
-    // Card
-    card: {
-        backgroundColor: BG_CARD,
-        borderRadius: 16,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: BORDER,
-        shadowColor: DARK,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 2,
-    },
+    card: { backgroundColor: BG_CARD, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: BORDER, shadowColor: DARK, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
 
-    // Amount strip inside card
-    amountStrip: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        backgroundColor: BG_PAGE,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: BORDER,
-    },
+    amountStrip: { flexDirection: "row", justifyContent: "space-between", backgroundColor: BG_PAGE, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 16, borderWidth: 1, borderColor: BORDER },
     amountLabel: { fontSize: 11, color: TEXT_MUTED, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 },
     amountValue: { fontSize: 22, fontWeight: "800", color: DARK },
 
-    // Reminder badge
-    reminderBadge: {
-        flexDirection: "row", alignItems: "center", gap: 7,
-        paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, alignSelf: "flex-start",
-    },
+    reminderBadge: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, alignSelf: "flex-start" },
     reminderText: { fontSize: 12, fontWeight: "700" },
 
-    // Avatar row
     avatarRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
-    avatar: {
-        width: 52, height: 52, borderRadius: 14,
-        backgroundColor: DARK, alignItems: "center", justifyContent: "center",
-    },
+    avatar: { width: 52, height: 52, borderRadius: 14, backgroundColor: DARK, alignItems: "center", justifyContent: "center" },
     avatarText: { color: "#fff", fontSize: 17, fontWeight: "800" },
     avatarName: { fontSize: 15, fontWeight: "800", color: TEXT_HEAD, marginBottom: 3 },
     avatarSub: { fontSize: 12, color: TEXT_MUTED, marginBottom: 1 },
 
-    // City type pill (new — Customer & Shipping card)
-    cityTypePill: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        alignSelf: "flex-start",
-    },
+    cityTypePill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: "flex-start" },
     cityTypeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
 
-    // Address block (new — Customer & Shipping card)
-    addressBlock: {
-        marginTop: 4,
-        paddingTop: 14,
-        borderTopWidth: 1,
-        borderTopColor: "#f3ece6",
-    },
+    addressBlock: { marginTop: 4, paddingTop: 14, borderTopWidth: 1, borderTopColor: "#f3ece6" },
     addressBlockHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
     addressBlockLabel: { fontSize: 11, color: TEXT_MUTED, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
     addressFreeText: { fontSize: 13, color: TEXT_BODY, fontWeight: "600", lineHeight: 19, marginBottom: 12 },
     addressChipsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
 
-    // Total row
-    totalRow: {
-        flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-        paddingTop: 14, marginTop: 4,
-    },
+    totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 14, marginTop: 4 },
     totalLabel: { fontSize: 14, fontWeight: "800", color: TEXT_HEAD },
     totalValue: { fontSize: 20, fontWeight: "800", color: PRIMARY },
 
-    // Actions grid
     actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
 });
 
-// ─── INVOICE MODAL STYLES ─────────────────────────────────────────────────────
-const GREEN = "#1a7a45";
-const GREEN_BG = "#e8f7ee";
-
+// ─── INVOICE STYLES ───────────────────────────────────────────────────────────
 const invStyles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: "rgba(20,12,6,0.55)",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-    },
-    sheet: {
-        width: "100%",
-        height: "100%",
-        backgroundColor: BG_PAGE,
-        borderRadius: 0,
-        overflow: "hidden",
-    },
-    sheetWeb: {
-        maxWidth: 720,
-        height: "92%",
-        borderRadius: 18,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.25,
-        shadowRadius: 30,
-    },
-
-    topBar: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: BG_CARD,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER,
-    },
+    overlay: { flex: 1, backgroundColor: "rgba(20,12,6,0.55)", alignItems: "center", justifyContent: "center", padding: 16 },
+    sheet: { width: "100%", height: "100%", backgroundColor: BG_PAGE, borderRadius: 0, overflow: "hidden" },
+    sheetWeb: { maxWidth: 720, height: "92%", borderRadius: 18, shadowColor: "#000", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.25, shadowRadius: 30 },
+    topBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: BG_CARD, borderBottomWidth: 1, borderBottomColor: BORDER },
     topBarTimestamp: { fontSize: 11, color: TEXT_MUTED, fontWeight: "600", width: 110 },
     topBarTitle: { flex: 1, fontSize: 12, fontWeight: "700", color: TEXT_HEAD, textAlign: "center" },
     topBarActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-    iconBtn: {
-        flexDirection: "row", alignItems: "center", gap: 6,
-        borderWidth: 1, borderColor: BORDER, borderRadius: 8,
-        paddingHorizontal: 10, paddingVertical: 7,
-        backgroundColor: BG_PAGE,
-    },
+    iconBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: BG_PAGE },
     iconBtnText: { fontSize: 11, fontWeight: "700", color: TEXT_BODY },
-    closeBtn: {
-        width: 30, height: 30, borderRadius: 8,
-        alignItems: "center", justifyContent: "center",
-        backgroundColor: BG_PAGE, borderWidth: 1, borderColor: BORDER,
-    },
-
+    closeBtn: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: BG_PAGE, borderWidth: 1, borderColor: BORDER },
     scroll: { flex: 1 },
     scrollContent: { padding: 18, paddingBottom: 40 },
-
-    page: {
-        backgroundColor: BG_CARD,
-        borderRadius: 14,
-        padding: 22,
-        borderWidth: 1,
-        borderColor: BORDER,
-    },
-
-    // Brand row
+    page: { backgroundColor: BG_CARD, borderRadius: 14, padding: 22, borderWidth: 1, borderColor: BORDER },
     brandRow: { flexDirection: "row", justifyContent: "space-between", gap: 16 },
     brandLeft: { flex: 1.4 },
     brandRight: { flex: 1, alignItems: "flex-end" },
-
     logoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    logoMark: {
-        width: 28, height: 28, borderRadius: 7,
-        backgroundColor: PRIMARY_LIGHT, borderWidth: 1, borderColor: PRIMARY,
-        alignItems: "center", justifyContent: "center",
-    },
+    logoMark: { width: 28, height: 28, borderRadius: 7, backgroundColor: PRIMARY_LIGHT, borderWidth: 1, borderColor: PRIMARY, alignItems: "center", justifyContent: "center" },
     logoMarkText: { fontSize: 11, fontWeight: "800", color: PRIMARY },
     logoText: { fontSize: 17, fontWeight: "800", letterSpacing: 0.2 },
     tagline: { fontSize: 10, color: TEXT_MUTED, fontStyle: "italic", marginTop: 2, marginLeft: 36 },
     companyLine: { fontSize: 11, color: TEXT_BODY, fontWeight: "600" },
-
     sellerPaymentTitle: { fontSize: 16, fontWeight: "800", color: PRIMARY, letterSpacing: 0.4 },
     metaLine: { fontSize: 11 },
     metaLabel: { color: TEXT_MUTED, fontWeight: "600" },
     metaValue: { color: TEXT_HEAD, fontWeight: "800" },
-
     divider: { height: 2, backgroundColor: PRIMARY, marginVertical: 16, opacity: 0.85 },
-
-    // Two-column generic row
     twoColRow: { flexDirection: "row", gap: 14, marginBottom: 18, alignItems: "flex-start" },
-
-    infoCard: {
-        flex: 1,
-        backgroundColor: BG_PAGE,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: BORDER,
-        padding: 14,
-    },
-    infoCardTitle: {
-        fontSize: 10.5, fontWeight: "800", color: PRIMARY,
-        textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8,
-    },
+    infoCard: { flex: 1, backgroundColor: BG_PAGE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 14 },
+    infoCardTitle: { fontSize: 10.5, fontWeight: "800", color: PRIMARY, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
     beneficiaryName: { fontSize: 13, fontWeight: "800", color: TEXT_HEAD, marginBottom: 4 },
     beneficiaryAddr: { fontSize: 11, color: TEXT_BODY, fontWeight: "600", marginBottom: 3, lineHeight: 15 },
-    settledBadge: {
-        flexDirection: "row", alignItems: "center", gap: 5,
-        backgroundColor: GREEN_BG, borderRadius: 6,
-        paddingHorizontal: 9, paddingVertical: 5,
-        alignSelf: "flex-start", marginTop: 8,
-    },
+    settledBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: GREEN_BG, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5, alignSelf: "flex-start", marginTop: 8 },
     settledBadgeText: { fontSize: 10, fontWeight: "800", color: GREEN, letterSpacing: 0.3 },
-
-    // Table
-    table: {
-        borderWidth: 1, borderColor: BORDER, borderRadius: 10,
-        overflow: "hidden", marginBottom: 18,
-    },
-    tableHeaderRow: {
-        flexDirection: "row", backgroundColor: BG_PAGE,
-        paddingHorizontal: 12, paddingVertical: 9,
-        borderBottomWidth: 1, borderBottomColor: BORDER,
-    },
+    table: { borderWidth: 1, borderColor: BORDER, borderRadius: 10, overflow: "hidden", marginBottom: 18 },
+    tableHeaderRow: { flexDirection: "row", backgroundColor: BG_PAGE, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: BORDER },
     tableRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 11 },
     th: { flex: 1, fontSize: 10, fontWeight: "800", color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 0.3 },
     td: { flex: 1, fontSize: 12, color: TEXT_BODY, fontWeight: "600" },
     tCenter: { textAlign: "center" },
     tRight: { textAlign: "right" },
-
-    // Words + settlement
     wordsBlock: { flex: 1.2 },
     wordsLabel: { fontSize: 11, color: TEXT_MUTED, fontWeight: "700", marginBottom: 4 },
     wordsValue: { fontSize: 13, color: "#1d4ed8", fontWeight: "800", lineHeight: 18 },
-
     termsTitle: { fontSize: 11, fontWeight: "800", color: TEXT_HEAD, marginBottom: 6 },
     termsItem: { fontSize: 10.5, color: TEXT_MUTED, fontWeight: "500", marginBottom: 3, lineHeight: 14 },
-
-    settlementBlock: {
-        flex: 1,
-        backgroundColor: BG_PAGE,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: BORDER,
-        padding: 14,
-    },
+    settlementBlock: { flex: 1, backgroundColor: BG_PAGE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, padding: 14 },
     settlementDivider: { height: 1, backgroundColor: BORDER, marginVertical: 6 },
     netRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 4 },
     netLabel: { fontSize: 12, fontWeight: "800", color: PRIMARY },
     netValue: { fontSize: 16, fontWeight: "800", color: PRIMARY },
-
     footerDivider: { height: 1, backgroundColor: BORDER, marginBottom: 14 },
     footer: { alignItems: "center" },
     footerMuted: { fontSize: 10, color: TEXT_MUTED, textAlign: "center", lineHeight: 14 },
