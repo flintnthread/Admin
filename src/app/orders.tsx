@@ -1,6 +1,7 @@
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -192,7 +193,9 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
           `${key}-${bySeller.get(key)!.products.length}`,
       ),
       name: item.productName ?? item.name ?? "",
-      image: item.productImage ?? item.image ?? item.thumbnail ?? "",
+      image:
+        resolveMediaUrl(item.imageUrl ?? item.productImage ?? item.image ?? item.thumbnail ?? "") ||
+        "",
       seller: sellerName,
       sellerEmail: "",
       price:
@@ -203,125 +206,6 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
   }
 
   return Array.from(bySeller.values());
-}
-
-const PLACEHOLDER_PRODUCTS = [
-  {
-    name: "Women's Cotton Pants Regular Fit",
-    image:
-      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop",
-    price: 1499,
-    seller: "Wugo Store",
-  },
-  {
-    name: "Classic Crew Neck Tee",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop",
-    price: 799,
-    seller: "Ishna Fashions",
-  },
-  {
-    name: "Denim Slim Fit Jacket",
-    image:
-      "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200&h=200&fit=crop",
-    price: 2199,
-    seller: "Wugo Store",
-  },
-  {
-    name: "Leather Strap Watch",
-    image:
-      "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200&h=200&fit=crop",
-    price: 3499,
-    seller: "Ishna Fashions",
-  },
-  {
-    name: "Running Sneakers",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop",
-    price: 2799,
-    seller: "Wugo Store",
-  },
-  {
-    name: "Wireless Earbuds",
-    image:
-      "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200&h=200&fit=crop",
-    price: 1999,
-    seller: "Tech Bazaar",
-  },
-  {
-    name: "Ceramic Coffee Mug Set",
-    image:
-      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop",
-    price: 599,
-    seller: "Home Essentials",
-  },
-  {
-    name: "Yoga Mat Premium",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop",
-    price: 899,
-    seller: "Tech Bazaar",
-  },
-];
-
-function buildPlaceholderSellerGroups(orderId: string): SellerGroup[] {
-  const digits = orderId.replace(/\D/g, "");
-  const seed = Number(digits.slice(-2)) || 0;
-
-  const isMultiSeller = seed % 100 < 35;
-
-  const makeGroup = (
-    sellerName: string,
-    items: typeof PLACEHOLDER_PRODUCTS,
-    count: number,
-    startIdx: number,
-  ): SellerGroup => {
-    const products: Product[] = [];
-    for (let i = 0; i < count; i++) {
-      const item = items[(startIdx + i) % items.length];
-      products.push({
-        id: `${orderId}-${sellerName}-p${i}`,
-        name: item.name,
-        image: item.image,
-        seller: sellerName,
-        sellerEmail: "",
-        price: item.price,
-      });
-    }
-    return {
-      seller: { name: sellerName, email: "" },
-      products,
-      hasInvoice: true,
-      hasShippingLabel: true,
-    };
-  };
-
-  if (!isMultiSeller) {
-    const sellers = Array.from(
-      new Set(PLACEHOLDER_PRODUCTS.map((p) => p.seller)),
-    );
-    const sellerName = sellers[seed % sellers.length];
-    const itemsForSeller = PLACEHOLDER_PRODUCTS.filter(
-      (p) => p.seller === sellerName,
-    );
-    const itemCount = (seed % 3) + 1;
-    return [makeGroup(sellerName, itemsForSeller, itemCount, seed)];
-  }
-
-  const sellers = Array.from(
-    new Set(PLACEHOLDER_PRODUCTS.map((p) => p.seller)),
-  );
-  const sellerCount = (seed % 2) + 2;
-  const groups: SellerGroup[] = [];
-  for (let s = 0; s < sellerCount; s++) {
-    const sellerName = sellers[(seed + s) % sellers.length];
-    const itemsForSeller = PLACEHOLDER_PRODUCTS.filter(
-      (p) => p.seller === sellerName,
-    );
-    const itemCount = ((seed + s) % 2) + 1;
-    groups.push(makeGroup(sellerName, itemsForSeller, itemCount, seed + s));
-  }
-  return groups;
 }
 
 function toUiOrder(
@@ -350,7 +234,7 @@ function toUiOrder(
   const orderNumber = row.orderId.startsWith("#")
     ? row.orderId
     : `#${row.orderId}`;
-  const sellerGroups = buildPlaceholderSellerGroups(orderNumber);
+  const sellerGroups = buildSellerGroups(raw);
 
   return {
     id: String(row.id),
