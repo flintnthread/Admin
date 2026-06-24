@@ -1503,7 +1503,7 @@ const s = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 14, height: 44,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
   },
-  searchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0, outlineStyle: "none" as any } as any,
   toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   viewToggle: { flexDirection: 'row', gap: 4 },
   viewBtn: {
@@ -1626,7 +1626,7 @@ const s = StyleSheet.create({
   pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: LocationColors.borderLight },
   pickerTitle: { fontSize: 15, fontWeight: '700', color: LocationColors.text },
   pickerSearch: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, height: 40, paddingHorizontal: 12, borderWidth: 1, borderColor: LocationColors.border, borderRadius: 10 },
-  pickerSearchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0 },
+  pickerSearchInput: { flex: 1, fontSize: 14, color: LocationColors.text, paddingVertical: 0, outlineStyle: "none" as any } as any,
   pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 8 },
   pickerRowSel: { backgroundColor: LocationColors.accentLight },
   pickerRowText: { fontSize: 14, color: LocationColors.text },
