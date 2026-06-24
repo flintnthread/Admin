@@ -7,6 +7,7 @@ module.exports = ({ config }) => ({
     plugins: [
       ...(config.expo?.plugins ?? []),
       "expo-font",
+      "@react-native-community/datetimepicker",
     ],
     android: {
       ...config.expo?.android,
