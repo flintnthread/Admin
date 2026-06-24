@@ -146,7 +146,7 @@ const OrderCard: React.FC<{
 };
 
 // ─── PAY MODAL ────────────────────────────────────────────────────────────────
-const PAYMENTS_PAGE_SIZE = 20;
+const PAYMENTS_PAGE_SIZE = 7;
 
 const PAYMENT_STATUS_OPTIONS: PaymentStatus[] = ["Pending", "Paid", "Cancelled"];
 
@@ -356,19 +356,20 @@ const PayModal: React.FC<{
 const ExportDropdown: React.FC<{
     onExport: (type: "all" | "pending" | "paid-cancelled") => void;
     isWeb: boolean;
-}> = ({ onExport, isWeb }) => {
-    const [open, setOpen] = useState(false);
+    isOpen: boolean;
+    onToggle: () => void;
+}> = ({ onExport, isWeb, isOpen, onToggle }) => {
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleMouseEnter = () => {
         if (isWeb) {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setOpen(true);
+            if (!isOpen) onToggle();
         }
     };
     const handleMouseLeave = () => {
         if (isWeb) {
-            timeoutRef.current = setTimeout(() => setOpen(false), 200);
+            timeoutRef.current = setTimeout(() => { if (isOpen) onToggle(); }, 200);
         }
     };
 
@@ -381,23 +382,23 @@ const ExportDropdown: React.FC<{
         >
             <TouchableOpacity
                 style={[styles.webExportBtn, { backgroundColor: "#1e293b", minWidth: 110 }]}
-                onPress={() => setOpen(!open)}
+                onPress={onToggle}
             >
                 <Feather name="download" size={14} color="#fff" />
                 <Text style={styles.webExportBtnText}>Export</Text>
                 <Feather name="chevron-down" size={12} color="rgba(255,255,255,0.7)" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
 
-            {open && (
+            {isOpen && (
                 <View
-                    style={styles.exportDropdownMenu}
+                    style={[styles.exportDropdownMenu, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}
                     // @ts-ignore
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                 >
                     <TouchableOpacity
                         style={styles.exportDropdownItem}
-                        onPress={() => { onExport("all"); setOpen(false); }}
+                        onPress={() => { onExport("all"); onToggle(); }}
                     >
                         <Feather name="download-cloud" size={13} color="#1e293b" />
                         <View>
@@ -408,7 +409,7 @@ const ExportDropdown: React.FC<{
                     <View style={{ height: 1, backgroundColor: BORDER, marginHorizontal: 12 }} />
                     <TouchableOpacity
                         style={styles.exportDropdownItem}
-                        onPress={() => { onExport("pending"); setOpen(false); }}
+                        onPress={() => { onExport("pending"); onToggle(); }}
                     >
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#f59e0b", marginTop: 3 }} />
                         <View>
@@ -419,7 +420,7 @@ const ExportDropdown: React.FC<{
                     <View style={{ height: 1, backgroundColor: BORDER, marginHorizontal: 12 }} />
                     <TouchableOpacity
                         style={styles.exportDropdownItem}
-                        onPress={() => { onExport("paid-cancelled"); setOpen(false); }}
+                        onPress={() => { onExport("paid-cancelled"); onToggle(); }}
                     >
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#22c55e", marginTop: 3 }} />
                         <View>
@@ -449,7 +450,7 @@ const SellerPaymentsScreen: React.FC = () => {
     const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Cancelled">("All");
     const [filterReminderBucket, setFilterReminderBucket] = useState<"All" | "green" | "orange" | "red">("All");
     const [sortPriority, setSortPriority] = useState<"Priority (Red first)" | "Date: Newest First" | "Date: Oldest First">("Priority (Red first)");
-    const [openDropdown, setOpenDropdown] = useState<"payment" | "reminder" | "priority" | null>(null);
+    const [openDropdown, setOpenDropdown] = useState<"payment" | "reminder" | "priority" | "export" | null>(null);
     const [payModalOrder, setPayModalOrder] = useState<SellerOrder | null>(null);
 
     const apiStatus =
@@ -610,7 +611,10 @@ const SellerPaymentsScreen: React.FC = () => {
                 !isWeb && { flexDirection: "column", gap: 16 },
                 isWeb && { justifyContent: "space-between" }
             ]}>
-                <View style={{ flexDirection: isWeb ? "row" : "column", gap: isWeb ? 24 : 16, alignItems: isWeb ? "center" : "stretch", flex: isWeb ? 1 : undefined }}>
+                <View style={[
+                    { gap: isWeb ? 24 : 16, flex: isWeb ? 1 : undefined },
+                    isWeb ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
+                ]}>
                     {[
                         { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
                         { icon: "clock", label: "Pending", value: String(stats.pending), color: "#f472b6" },
@@ -618,16 +622,16 @@ const SellerPaymentsScreen: React.FC = () => {
                         { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
                     ].map((s, i) => (
                         <React.Fragment key={i}>
-                            <View style={styles.statBlockSingle}>
+                            <View style={[styles.statBlockSingle, !isWeb && { width: "47%" }]}>
                                 <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
                                     <Feather name={s.icon as any} size={20} color="#ffffff" />
                                 </View>
-                                <View>
-                                    <Text style={styles.statValueSingle}>{s.value}</Text>
-                                    <Text style={styles.statLabelSingle}>{s.label}</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.statValueSingle} numberOfLines={1}>{s.value}</Text>
+                                    <Text style={styles.statLabelSingle} numberOfLines={1}>{s.label}</Text>
                                 </View>
                             </View>
-                            {i < 3 && <View style={[styles.statDividerSingle, !isWeb && { width: "100%", height: 1 }]} />}
+                            {i < 3 && isWeb && <View style={styles.statDividerSingle} />}
                         </React.Fragment>
                     ))}
                 </View>
@@ -655,7 +659,7 @@ const SellerPaymentsScreen: React.FC = () => {
             </View>
 
             <View style={[styles.main, isWeb && styles.mainWeb]}>
-                <View style={[styles.scrollArea, styles.scrollContent, !isWeb && { paddingBottom: 250 }]}>
+                <View style={[styles.scrollArea, styles.scrollContent, !isWeb && { paddingBottom: 20 }]}>
 
                     {(loading || authLoading) && <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 24 }} />}
                     {error && (
@@ -696,7 +700,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 !isWeb && { width: "100%" }
                             ]}>
                                 {/* Payment filter */}
-                                <View style={{ position: "relative", zIndex: 1000 }}>
+                                <View style={[{ position: "relative", zIndex: 1000 }, !isWeb && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "payment" ? null : "payment")}
@@ -705,7 +709,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "payment" && (
-                                        <View style={styles.webDropdownMenu}>
+                                        <View style={[styles.webDropdownMenu, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {(["All", "Pending", "Paid", "Cancelled"] as const).map(option => (
                                                 <TouchableOpacity
                                                     key={option}
@@ -722,7 +726,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Reminder filter */}
-                                <View style={{ position: "relative", zIndex: 999 }}>
+                                <View style={[{ position: "relative", zIndex: 999 }, !isWeb && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "reminder" ? null : "reminder")}
@@ -735,7 +739,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "reminder" && (
-                                        <View style={[styles.webDropdownMenu, { width: 180 }]}>
+                                        <View style={[styles.webDropdownMenu, { width: 180 }, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {[
                                                 { label: "All Buckets", value: "All" },
                                                 { label: "Green (0-2 days)", value: "green" },
@@ -757,7 +761,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Sort */}
-                                <View style={{ position: "relative", zIndex: 998 }}>
+                                <View style={[{ position: "relative", zIndex: 998 }, !isWeb && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "priority" ? null : "priority")}
@@ -766,7 +770,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "priority" && (
-                                        <View style={[styles.webDropdownMenu, { width: 170 }]}>
+                                        <View style={[styles.webDropdownMenu, { width: 170 }, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {["Priority (Red first)", "Date: Newest First", "Date: Oldest First"].map(option => (
                                                 <TouchableOpacity
                                                     key={option}
@@ -780,25 +784,30 @@ const SellerPaymentsScreen: React.FC = () => {
                                     )}
                                 </View>
 
-                                {/* Export All Dropdown */}
-                                <ExportDropdown onExport={handleExport} isWeb={isWeb} />
+                                {/* Export Buttons Container */}
+                                <View style={[{ flexDirection: "row", gap: 8 }, !isWeb && { width: "100%" }]}>
+                                    {/* Export All Dropdown */}
+                                    <View style={!isWeb ? { flex: 1 } : {}}>
+                                        <ExportDropdown onExport={handleExport} isWeb={isWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
+                                    </View>
 
-                                {/* Export >=4d button */}
-                                <TouchableOpacity
-                                    style={[styles.webExportBtn, { backgroundColor: "#ef4444" }]}
-                                    onPress={() => {
-                                        const overdueRows = filtered.filter(o => o.reminderDays >= 4);
-                                        if (overdueRows.length === 0) {
-                                            if (Platform.OS === "web") window.alert("No orders with 4+ reminder days found.");
-                                            else Alert.alert("Export", "No orders with 4+ reminder days found.");
-                                            return;
-                                        }
-                                        downloadCsv(buildCsv(overdueRows), "overdue_4d");
-                                    }}
-                                >
-                                    <Feather name="clock" size={14} color="#fff" />
-                                    <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
-                                </TouchableOpacity>
+                                    {/* Export >=4d button */}
+                                    <TouchableOpacity
+                                        style={[styles.webExportBtn, { backgroundColor: "#ef4444" }, !isWeb && { flex: 1, justifyContent: "center" }]}
+                                        onPress={() => {
+                                            const overdueRows = filtered.filter(o => o.reminderDays >= 4);
+                                            if (overdueRows.length === 0) {
+                                                if (Platform.OS === "web") window.alert("No orders with 4+ reminder days found.");
+                                                else Alert.alert("Export", "No orders with 4+ reminder days found.");
+                                                return;
+                                            }
+                                            downloadCsv(buildCsv(overdueRows), "overdue_4d");
+                                        }}
+                                    >
+                                        <Feather name="clock" size={14} color="#fff" />
+                                        <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
                     </View>

@@ -107,9 +107,10 @@ export default function Pagination({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -130,7 +131,9 @@ const styles = StyleSheet.create({
   },
   controls: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   pageBtn: {

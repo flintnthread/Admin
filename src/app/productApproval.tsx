@@ -400,17 +400,50 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide }: { isWide: boolean }) {
+function PageHeader({ isWide, stats, isMobile, onFilter }: { isWide: boolean; stats: ProductStats; isMobile: boolean; onFilter: (f: FilterKey) => void }) {
+  const statItems = [
+    { count: stats.pending, label: 'Pending', color: PALETTE.orange, bg: PALETTE.orangeLight, icon: 'clock-outline' as const, filter: 'pending' as FilterKey },
+    { count: stats.review, label: 'Under Review', color: PALETTE.blue, bg: PALETTE.blueLight, icon: 'magnify' as const, filter: 'review' as FilterKey },
+    { count: stats.approved, label: 'Approved', color: PALETTE.green, bg: PALETTE.greenLight, icon: 'check-circle-outline' as const, filter: 'approved' as FilterKey },
+    { count: stats.rejected, label: 'Rejected', color: PALETTE.red, bg: PALETTE.redLight, icon: 'close-circle-outline' as const, filter: 'rejected' as FilterKey },
+  ];
+
   return (
-    <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
-      <View style={styles.pageHeaderLeft}>
-        <View style={styles.pageIcon}>
-          <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
-        </View>
-        <View>
-          <Text style={styles.pageTitle}>Product Approvals</Text>
+    <View style={{ paddingHorizontal: 0 }}>
+      <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
+        <View style={styles.pageHeaderLeft}>
+          <View style={styles.pageIcon}>
+            <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
+          </View>
+          <View>
+            <Text style={styles.pageTitle}>Product Approvals</Text>
+          </View>
         </View>
       </View>
+
+      {/* Overlapping stat cards — mobile only */}
+      {isMobile && (
+        <View style={styles.mobileStatCardsWrap}>
+          {statItems.map((stat, i) => (
+            <Pressable
+              key={i}
+              onPress={() => onFilter(stat.filter)}
+              style={({ pressed }) => [
+                styles.mobileStatCard,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={[styles.mobileStatIcon, { backgroundColor: stat.bg }]}>
+                <MaterialCommunityIcons name={stat.icon} size={16} color={stat.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.mobileStatValue, { color: stat.color }]} numberOfLines={1}>{stat.count}</Text>
+                <Text style={styles.mobileStatLabel} numberOfLines={1}>{stat.label}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -841,13 +874,13 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} />
+        <PageHeader isWide={isWide} stats={stats} isMobile={isMobile} onFilter={handleFilterChange} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
         <View style={styles.scrollContent}>
 
-          {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
+          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}
@@ -1179,6 +1212,51 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     maxWidth: 900,
     alignSelf: 'center',
+  },
+
+  // Mobile overlapping stat cards
+  mobileStatCardsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: -28,
+    marginBottom: 4,
+    paddingHorizontal: 2,
+    zIndex: 10,
+    justifyContent: 'space-between',
+  },
+  mobileStatCard: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#151D4F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  mobileStatIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileStatValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  mobileStatLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
   },
   statCard: {
     flexDirection: 'row',

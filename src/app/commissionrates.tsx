@@ -72,7 +72,7 @@ const CommissionRatesScreen: React.FC = () => {
   const MainContent = (
     <ScrollView style={styles.mainContainer} contentContainerStyle={isWeb ? styles.webMainContent : styles.mobileMainContent}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, !isWeb && { marginBottom: 16 }]}>
         <Text style={styles.headerTitle}>Platform commission rates</Text>
         <View style={styles.breadcrumb}>
           <Text style={styles.breadcrumbLink}>Dashboard</Text>
