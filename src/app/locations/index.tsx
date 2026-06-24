@@ -137,7 +137,7 @@ function Icon({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StatusBadge — pill badge matching the Customer Management screen
+// StatusBadge
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status, compact }: { status: RowStatus; compact?: boolean }) {
@@ -157,7 +157,7 @@ function StatusBadge({ status, compact }: { status: RowStatus; compact?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HeroHeader — dark navy card with inline stat pills (matches the screenshot)
+// HeroHeader
 // ─────────────────────────────────────────────────────────────────────────────
 
 function HeroHeader({
@@ -183,7 +183,7 @@ function HeroHeader({
 
   return (
     <>
-      {/* Navy header — title only */}
+      {/* Navy header */}
       <View style={[s.hero, isMobile && s.heroMobile]}>
         <View style={s.heroTitle}>
           <View style={s.heroIconBadge}>
@@ -196,22 +196,54 @@ function HeroHeader({
         </View>
       </View>
 
-      {/* White stat cards overlapping the header */}
-      <View style={s.statCardsRow}>
-        {stats.map((p, i) => (
-          <View key={i} style={s.statCard}>
-            <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
-              <MaterialIcons name={p.icon} size={20} color={p.color} />
+      {/* Stat cards */}
+      {isMobile ? (
+        // ── Mobile: 2-column grid, Pincodes full width ──
+        <View style={s.statCardsMobileGrid}>
+          {stats.slice(0, 4).map((p, i) => (
+            <View key={i} style={s.statCardMobile}>
+              <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
+                <MaterialIcons name={p.icon} size={20} color={p.color} />
+              </View>
+              <View style={{ marginLeft: 12 }}>
+                <ThemedText style={[s.statCardValue, { color: p.color }]}>
+                  {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
+                </ThemedText>
+                <ThemedText style={s.statCardLabel}>{p.label}</ThemedText>
+              </View>
+            </View>
+          ))}
+          {/* Pincodes — full width */}
+          <View style={s.statCardMobileFull}>
+            <View style={[s.statCardIcon, { backgroundColor: stats[4].bg }]}>
+              <MaterialIcons name={stats[4].icon} size={20} color={stats[4].color} />
             </View>
             <View style={{ marginLeft: 12 }}>
-              <ThemedText style={[s.statCardValue, { color: p.color }]}>
-                {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
+              <ThemedText style={[s.statCardValue, { color: stats[4].color }]}>
+                {typeof stats[4].value === 'number' ? stats[4].value.toLocaleString() : stats[4].value}
               </ThemedText>
-              <ThemedText style={s.statCardLabel}>{p.label}</ThemedText>
+              <ThemedText style={s.statCardLabel}>{stats[4].label}</ThemedText>
             </View>
           </View>
-        ))}
-      </View>
+        </View>
+      ) : (
+        // ── Web: original horizontal row ──
+        <View style={s.statCardsRow}>
+          {stats.map((p, i) => (
+            <View key={i} style={s.statCard}>
+              <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
+                <MaterialIcons name={p.icon} size={20} color={p.color} />
+              </View>
+              <View style={{ marginLeft: 12 }}>
+                <ThemedText style={[s.statCardValue, { color: p.color }]}>
+                  {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
+                </ThemedText>
+                <ThemedText style={s.statCardLabel}>{p.label}</ThemedText>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
     </>
   );
 }
@@ -244,7 +276,7 @@ function TabBar({ active, onChange }: { active: DetailTab; onChange: (t: DetailT
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DonutChart — SVG donut used in the Overview drill-down
+// DonutChart
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DonutChart({
@@ -329,7 +361,7 @@ function DonutChart({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SelectField — dropdown picker with search
+// SelectField
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SelectField({
@@ -425,7 +457,7 @@ function SelectField({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OverviewPanel — drill-down pie charts
+// OverviewPanel
 // ─────────────────────────────────────────────────────────────────────────────
 
 function OverviewPanel({
@@ -467,10 +499,8 @@ function OverviewPanel({
   onSelectCity: (o: Option) => void;
   onReset: () => void;
 }) {
-  // Build pie data based on drill-down level
   const pieData = useMemo(() => {
     if (!selectedCountry) {
-      // Show global distribution
       return [
         { label: 'Countries', value: countriesCount || 1, color: '#2563EB' },
         { label: 'States', value: statesCount || 36, color: '#9333EA' },
@@ -507,25 +537,59 @@ function OverviewPanel({
 
   return (
     <View style={s.overviewRoot}>
-      {/* Summary stat cards row */}
-      <View style={[s.summaryRow, isMobile && s.summaryRowMobile]}>
-        {[
-          { label: 'Countries', value: countriesCount || 195, icon: 'public' as MaterialIconName, ...LocationColors.statBlue },
-          { label: 'States', value: statesCount || 36, icon: 'map' as MaterialIconName, ...LocationColors.statPurple },
-          { label: 'Cities', value: citiesCount || 532, icon: 'location-city' as MaterialIconName, ...LocationColors.statOrange },
-          { label: 'Pincodes', value: `${(pincodesCount || 19000).toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, ...LocationColors.statGreen },
-        ].map((stat, i) => (
-          <View key={i} style={[s.summaryCard, isMobile && s.summaryCardMobile]}>
-            <View style={[s.summaryIcon, { backgroundColor: stat.bg }]}>
-              <MaterialIcons name={stat.icon} size={20} color={stat.color} />
+      {/* Summary stat cards */}
+      {isMobile ? (
+        // ── Mobile: 3 cards in a row + Pincodes full width ──
+        <View style={s.summaryMobileGrid}>
+          {[
+            { label: 'Countries', value: countriesCount || 195, icon: 'public' as MaterialIconName, ...LocationColors.statBlue },
+            { label: 'States', value: statesCount || 36, icon: 'map' as MaterialIconName, ...LocationColors.statPurple },
+            { label: 'Cities', value: citiesCount || 532, icon: 'location-city' as MaterialIconName, ...LocationColors.statOrange },
+          ].map((stat, i) => (
+            <View key={i} style={s.summaryCardMobileThird}>
+              <View style={[s.summaryIcon, { backgroundColor: stat.bg }]}>
+                <MaterialIcons name={stat.icon} size={18} color={stat.color} />
+              </View>
+              <View>
+                <ThemedText style={[s.summaryValue, { fontSize: 16 }]}>
+                  {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+                </ThemedText>
+                <ThemedText style={s.summaryLabel}>{stat.label}</ThemedText>
+              </View>
+            </View>
+          ))}
+          {/* Pincodes full width */}
+          <View style={s.summaryCardMobileFull}>
+            <View style={[s.summaryIcon, { backgroundColor: LocationColors.statGreen.bg }]}>
+              <MaterialIcons name="mail-outline" size={20} color={LocationColors.statGreen.color} />
             </View>
             <View>
-              <ThemedText style={s.summaryValue}>{typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}</ThemedText>
-              <ThemedText style={s.summaryLabel}>{stat.label}</ThemedText>
+              <ThemedText style={s.summaryValue}>{`${(pincodesCount || 19000).toLocaleString()}+`}</ThemedText>
+              <ThemedText style={s.summaryLabel}>Pincodes</ThemedText>
             </View>
           </View>
-        ))}
-      </View>
+        </View>
+      ) : (
+        // ── Web: original layout ──
+        <View style={[s.summaryRow, s.summaryRowMobile]}>
+          {[
+            { label: 'Countries', value: countriesCount || 195, icon: 'public' as MaterialIconName, ...LocationColors.statBlue },
+            { label: 'States', value: statesCount || 36, icon: 'map' as MaterialIconName, ...LocationColors.statPurple },
+            { label: 'Cities', value: citiesCount || 532, icon: 'location-city' as MaterialIconName, ...LocationColors.statOrange },
+            { label: 'Pincodes', value: `${(pincodesCount || 19000).toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, ...LocationColors.statGreen },
+          ].map((stat, i) => (
+            <View key={i} style={[s.summaryCard, s.summaryCardMobile]}>
+              <View style={[s.summaryIcon, { backgroundColor: stat.bg }]}>
+                <MaterialIcons name={stat.icon} size={20} color={stat.color} />
+              </View>
+              <View>
+                <ThemedText style={s.summaryValue}>{typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}</ThemedText>
+                <ThemedText style={s.summaryLabel}>{stat.label}</ThemedText>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Drill-down card */}
       <View style={s.drillCard}>
@@ -601,7 +665,6 @@ function OverviewPanel({
                   : selectedCity.name.slice(0, 8)
               }
             />
-            {/* Pincode chips when city is selected */}
             {selectedCity && !pincodesLoading && cityPincodes && cityPincodes.length > 0 && (
               <View style={s.pincodeArea}>
                 <ThemedText style={s.pincodeAreaTitle}>Pincodes in {selectedCity.name}</ThemedText>
@@ -634,7 +697,7 @@ function OverviewPanel({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EntityCard — grid card matching the Customer Management style
+// EntityCard
 // ─────────────────────────────────────────────────────────────────────────────
 
 function EntityCard({
@@ -654,13 +717,11 @@ function EntityCard({
 
   return (
     <Pressable onPress={() => onView(row)} style={s.entityCard}>
-      {/* Top: status + id */}
       <View style={s.entityCardTop}>
         <StatusBadge status={row.status} compact />
         <ThemedText style={s.entityCardId}>#{row.id}</ThemedText>
       </View>
 
-      {/* Avatar circle */}
       <View style={s.entityCardAvatar}>
         {row.flag ? (
           <ThemedText style={{ fontSize: 32 }}>{row.flag}</ThemedText>
@@ -672,7 +733,6 @@ function EntityCard({
         <ThemedText style={s.entityCardName} numberOfLines={2}>{row.name}</ThemedText>
       </View>
 
-      {/* Stats strip */}
       {(cols.codeLabel || cols.countLabel) && (
         <View style={s.entityCardStats}>
           {cols.codeLabel && (
@@ -690,7 +750,6 @@ function EntityCard({
         </View>
       )}
 
-      {/* View button — dark pill matching the screenshot */}
       <Pressable onPress={() => onView(row)} style={s.entityCardViewBtn}>
         <MaterialIcons name="visibility" size={14} color="#fff" />
         <ThemedText style={s.entityCardViewBtnText}>View</ThemedText>
@@ -742,7 +801,7 @@ function GridView({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ListTable — desktop
+// ListTable
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ListTable({
@@ -875,7 +934,6 @@ function MobileListTable({
     <View style={s.tableCard}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
         <View style={{ minWidth: tableWidth }}>
-          {/* Head */}
           <View style={s.tableHead}>
             <View style={[s.th, { width: 40 }]}><ThemedText style={s.thText}>ID</ThemedText></View>
             <View style={[s.th, { width: 150 }]}><ThemedText style={s.thText}>{nameCol}</ThemedText></View>
@@ -981,7 +1039,6 @@ function EntityModal({
           style={isMobile ? s.modalSheetWrap : s.modalCenterWrap}
           onPress={(e) => e.stopPropagation()}>
           <View style={[s.modalBox, !isMobile && { maxHeight: Math.min(wh * 0.88, 680) }]}>
-            {/* Header */}
             <View style={s.modalHead}>
               <View style={s.modalHeadIcon}>
                 <MaterialIcons name="place" size={18} color="#fff" />
@@ -993,7 +1050,6 @@ function EntityModal({
             </View>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={s.modalBody} bounces={false}>
-              {/* Name */}
               <ThemedText style={s.fieldLabel}>{meta.singular} Name {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}</ThemedText>
               <TextInput
                 value={name} onChangeText={setName} editable={!readOnly}
@@ -1002,7 +1058,6 @@ function EntityModal({
                 style={[s.fieldInput, readOnly && s.fieldInputRO]}
               />
 
-              {/* Code */}
               {showCode && (
                 <>
                   <ThemedText style={s.fieldLabel}>Country Code {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}</ThemedText>
@@ -1015,7 +1070,6 @@ function EntityModal({
                 </>
               )}
 
-              {/* Status */}
               <ThemedText style={s.fieldLabel}>Status</ThemedText>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {(['Active', 'Inactive'] as RowStatus[]).map((opt) => {
@@ -1037,7 +1091,6 @@ function EntityModal({
               {error && <ThemedText style={s.errorText}>{error}</ThemedText>}
             </ScrollView>
 
-            {/* Footer */}
             <View style={[s.modalFoot, { paddingBottom: Math.max(insets.bottom, 16) }]}>
               {readOnly ? (
                 <Pressable style={s.btnSave} onPress={onClose}>
@@ -1108,7 +1161,6 @@ export default function LocationsScreen() {
   const [activeRow, setActiveRow] = useState<ListRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ListRow | null>(null);
 
-  // Overview drill-down state
   const [analysisCountries, setAnalysisCountries] = useState<LocationRow[]>([]);
   const [analysisStates, setAnalysisStates] = useState<LocationRow[]>([]);
   const [analysisCities, setAnalysisCities] = useState<LocationRow[]>([]);
@@ -1122,7 +1174,6 @@ export default function LocationsScreen() {
   const meta = TAB_META[detailTab];
   const gridColumns = isWeb ? (width < 960 ? 2 : 3) : 1;
 
-  // ── Data fetching ──
   const loadRows = useCallback(async () => {
     try {
       if (detailTab === 'overview') { setRows([]); return; }
@@ -1209,7 +1260,6 @@ export default function LocationsScreen() {
     return rows.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q));
   }, [query, rows]);
 
-  // ── Modal handlers ──
   const openAdd = () => { setActiveRow(null); setModalMode('add'); setModalVisible(true); };
   const openEdit = (row: ListRow) => { setActiveRow(row); setModalMode('edit'); setModalVisible(true); };
   const openView = (row: ListRow) => { setActiveRow(row); setModalMode('view'); setModalVisible(true); };
@@ -1238,7 +1288,6 @@ export default function LocationsScreen() {
         contentContainerStyle={[s.content, isMobile && s.contentMobile]}
         showsVerticalScrollIndicator={false}>
 
-        {/* Hero header */}
         <HeroHeader
           isMobile={isMobile}
           countriesCount={analysisCountries.length || 195}
@@ -1247,10 +1296,8 @@ export default function LocationsScreen() {
           pincodesCount={19000}
         />
 
-        {/* Tab bar */}
         <TabBar active={detailTab} onChange={setDetailTab} />
 
-        {/* Overview */}
         {detailTab === 'overview' && (
           <OverviewPanel
             isMobile={isMobile}
@@ -1274,10 +1321,8 @@ export default function LocationsScreen() {
           />
         )}
 
-        {/* Entity list / grid */}
         {detailTab !== 'overview' && (
           <>
-            {/* Toolbar */}
             <View style={[s.toolbar, isMobile && s.toolbarMobile]}>
               <View style={s.searchBox}>
                 <MaterialIcons name="search" size={16} color={LocationColors.textLight} />
@@ -1289,7 +1334,6 @@ export default function LocationsScreen() {
                 />
               </View>
               <View style={s.toolbarRight}>
-                {/* View toggle */}
                 <View style={s.viewToggle}>
                   <Pressable style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
                     <MaterialIcons name="grid-view" size={15} color={viewMode === 'grid' ? '#fff' : LocationColors.textMuted} />
@@ -1298,7 +1342,6 @@ export default function LocationsScreen() {
                     <MaterialIcons name="view-list" size={15} color={viewMode === 'list' ? '#fff' : LocationColors.textMuted} />
                   </Pressable>
                 </View>
-                {/* Add button */}
                 <Pressable style={s.addBtn} onPress={openAdd}>
                   <MaterialIcons name="add" size={16} color="#fff" />
                   {!isMobile && <ThemedText style={s.addBtnText}>Add {meta.singular}</ThemedText>}
@@ -1306,7 +1349,6 @@ export default function LocationsScreen() {
               </View>
             </View>
 
-            {/* Content */}
             {viewMode === 'grid' ? (
               <GridView rows={filtered} columns={gridColumns} tab={detailTab} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             ) : isWeb ? (
@@ -1315,7 +1357,6 @@ export default function LocationsScreen() {
               <MobileListTable rows={filtered} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             )}
 
-            {/* Pagination */}
             <View style={[s.pagination, isMobile && s.paginationMobile]}>
               <ThemedText style={s.paginationText}>
                 Showing {Math.min(1, filtered.length)}–{Math.min(10, filtered.length)} of {meta.total.toLocaleString()} {meta.plural}
@@ -1376,8 +1417,7 @@ const s = StyleSheet.create({
   heroHeading: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', lineHeight: 28 },
   heroSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 3 },
 
-  // ── Stat cards (overlap hero) ──
-  statCardsScroll: { marginTop: -42, marginBottom: 16, flexGrow: 0 },
+  // ── Web stat cards row ──
   statCardsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1411,6 +1451,50 @@ const s = StyleSheet.create({
   statCardValue: { fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 8 },
   statCardLabel: { color: '#6B7280', fontSize: 11, marginTop: 2, fontWeight: '500' },
 
+  // ── Mobile stat cards grid (2-col + full-width Pincodes) ──
+  statCardsMobileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: -42,
+    marginBottom: 16,
+    paddingHorizontal: 2,
+  },
+  statCardMobile: {
+    // ~48% width so 2 per row with gap
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  statCardMobileFull: {
+    // full width for Pincodes
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+
   // ── Tabs ──
   tabScroll: { marginBottom: 20, flexGrow: 0 },
   tabRow: {
@@ -1432,6 +1516,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 11,
     position: 'relative',
+    flexShrink: 0, // prevent tabs from shrinking on mobile
   },
   tabActive: { backgroundColor: LocationColors.accentLight },
   tabLabel: { fontSize: 13, color: LocationColors.textMuted, fontWeight: '500' },
@@ -1443,6 +1528,8 @@ const s = StyleSheet.create({
 
   // ── Overview ──
   overviewRoot: { gap: 16 },
+
+  // Web overview summary row
   summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   summaryRowMobile: { flexDirection: 'row', flexWrap: 'wrap' },
   summaryCard: {
@@ -1453,6 +1540,44 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
   summaryCardMobile: { flexBasis: '45%', padding: 14 },
+
+  // Mobile overview summary grid (3-col + full-width Pincodes)
+  summaryMobileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  summaryCardMobileThird: {
+    // ~31% so 3 per row
+    flexBasis: '30%',
+    flexGrow: 1,
+    backgroundColor: LocationColors.cardBg,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  summaryCardMobileFull: {
+    width: '100%',
+    backgroundColor: LocationColors.cardBg,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+
   summaryIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   summaryValue: { fontSize: 22, fontWeight: '700', color: LocationColors.text, lineHeight: 26 },
   summaryLabel: { fontSize: 12, color: LocationColors.textMuted, marginTop: 3 },
@@ -1522,7 +1647,7 @@ const s = StyleSheet.create({
   // ── Grid ──
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
 
-  // Entity card (Customer Management style)
+  // Entity card
   entityCard: {
     backgroundColor: LocationColors.cardBg,
     borderRadius: 18, padding: 18,

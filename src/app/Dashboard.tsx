@@ -2385,96 +2385,170 @@ export default function DashboardScreen() {
               {/* SECTION 9: RECENT ORDERS (Last 10 with actions) */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>📦 Recent Orders Logs (Last 10)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
-                  <View style={[styles.tableWrapper, { minWidth: 800, width: "100%" }]}>
-                    <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
-                    <Text style={[styles.tableHdrCell, { flex: 1.5 }]}>Order ID</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.8 }]}>Customer</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "right" }]}>Amount</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Status</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Payment</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 1.5, textAlign: "center" }]}>Date</Text>
-                    <Text style={[styles.tableHdrCell, { flex: 2, textAlign: "center" }]}>Update Status Action</Text>
-                  </View>
+                {!isMobile ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
+                    <View style={[styles.tableWrapper, { minWidth: 800, width: "100%" }]}>
+                      <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
+                      <Text style={[styles.tableHdrCell, { flex: 1.5 }]}>Order ID</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 1.8 }]}>Customer</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "right" }]}>Amount</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Status</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "center" }]}>Payment</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 1.5, textAlign: "center" }]}>Date</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 2, textAlign: "center" }]}>Update Status Action</Text>
+                    </View>
 
-                  {recentOrders.map(o => {
-                    let badgeBg = C.processingBg;
-                    let badgeColor = C.processing;
-                    if (o.status === "Completed" || o.status === "Delivered") {
-                      badgeBg = C.activeBg;
-                      badgeColor = C.active;
-                    } else if (o.status === "Cancelled") {
-                      badgeBg = C.inactiveBg;
-                      badgeColor = C.inactive;
-                    } else if (o.status === "Returned") {
-                      badgeBg = C.returnedBg;
-                      badgeColor = C.returned;
-                    } else if (o.status === "Shipped") {
-                      badgeBg = C.purpleBg;
-                      badgeColor = C.purple;
-                    }
+                    {recentOrders.map(o => {
+                      let badgeBg = C.processingBg;
+                      let badgeColor = C.processing;
+                      if (o.status === "Completed" || o.status === "Delivered") {
+                        badgeBg = C.activeBg;
+                        badgeColor = C.active;
+                      } else if (o.status === "Cancelled") {
+                        badgeBg = C.inactiveBg;
+                        badgeColor = C.inactive;
+                      } else if (o.status === "Returned") {
+                        badgeBg = C.returnedBg;
+                        badgeColor = C.returned;
+                      } else if (o.status === "Shipped") {
+                        badgeBg = C.purpleBg;
+                        badgeColor = C.purple;
+                      }
 
-                    return (
-                      <View key={o.id} style={styles.tableRowData}>
-                        <TouchableOpacity
-                          style={{ flex: 1.5 }}
-                          onPress={() => router.push({ pathname: "/orderDetails" as any, params: { orderId: String(o.rawId) } })}
-                        >
-                          <Text style={[styles.tableCellText, { fontWeight: "700", color: C.primary }]} numberOfLines={1}>
-                            {o.id}
+                      return (
+                        <View key={o.id} style={styles.tableRowData}>
+                          <TouchableOpacity
+                            style={{ flex: 1.5 }}
+                            onPress={() => router.push({ pathname: "/orderDetails" as any, params: { orderId: String(o.rawId) } })}
+                          >
+                            <Text style={[styles.tableCellText, { fontWeight: "700", color: C.primary }]} numberOfLines={1}>
+                              {o.id}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 1.8 }}
+                            onPress={() => {
+                              const match = customers.find(c => c.name === o.customer || c.email === o.customerEmail);
+                              if (match) {
+                                router.push({ pathname: "/customerDetails" as any, params: { id: String(match.id) } });
+                              } else {
+                                router.push({ pathname: "/customerManagement" as any, params: { search: o.customer } });
+                              }
+                            }}
+                          >
+                            <Text style={[styles.tableCellText, { fontWeight: "500", color: C.processing }]} numberOfLines={1}>
+                              {o.customer}
+                            </Text>
+                          </TouchableOpacity>
+                          <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "right", fontWeight: "700" }]}>
+                            {rupee(o.amount)}
                           </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{ flex: 1.8 }}
-                          onPress={() => {
-                            const match = customers.find(c => c.name === o.customer || c.email === o.customerEmail);
-                            if (match) {
-                              router.push({ pathname: "/customerDetails" as any, params: { id: String(match.id) } });
-                            } else {
-                              router.push({ pathname: "/customerManagement" as any, params: { search: o.customer } });
-                            }
-                          }}
-                        >
-                          <Text style={[styles.tableCellText, { fontWeight: "500", color: C.processing }]} numberOfLines={1}>
-                            {o.customer}
+                          <View style={[styles.tableCellText, { flex: 1.2, alignItems: "center" }]}>
+                            <View style={[styles.statusBadgeCell, { backgroundColor: badgeBg }]}>
+                              <Text style={[styles.statusBadgeText, { color: badgeColor }]}>{o.status}</Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>
+                            {o.payment}
                           </Text>
-                        </TouchableOpacity>
-                        <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "right", fontWeight: "700" }]}>
-                          {rupee(o.amount)}
-                        </Text>
-                        <View style={[styles.tableCellText, { flex: 1.2, alignItems: "center" }]}>
-                          <View style={[styles.statusBadgeCell, { backgroundColor: badgeBg }]}>
-                            <Text style={[styles.statusBadgeText, { color: badgeColor }]}>{o.status}</Text>
+                          <Text style={[styles.tableCellText, { flex: 1.5, textAlign: "center", color: C.sub }]}>
+                            {o.date}
+                          </Text>
+                          
+                          {/* Inline Actions dropdown simulation */}
+                          <View style={[styles.tableCellText, { flex: 2, flexDirection: "row", justifyContent: "center", gap: 6 }]}>
+                            {[
+                              { code: "Completed", label: "Complete", color: C.active },
+                              { code: "Shipped", label: "Ship", color: C.purple },
+                              { code: "Cancelled", label: "Cancel", color: C.inactive }
+                            ].map(act => (
+                              <TouchableOpacity
+                                key={act.code}
+                                onPress={() => updateOrderStatus(o.id, act.code)}
+                                style={[styles.smallInlineActionBtn, { borderColor: act.color }]}
+                              >
+                                <Text style={[styles.smallInlineActionBtnText, { color: act.color }]}>{act.label}</Text>
+                              </TouchableOpacity>
+                            ))}
                           </View>
                         </View>
-                        <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>
-                          {o.payment}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.5, textAlign: "center", color: C.sub }]}>
-                          {o.date}
-                        </Text>
-                        
-                        {/* Inline Actions dropdown simulation */}
-                        <View style={[styles.tableCellText, { flex: 2, flexDirection: "row", justifyContent: "center", gap: 6 }]}>
-                          {[
-                            { code: "Completed", label: "Complete", color: C.active },
-                            { code: "Shipped", label: "Ship", color: C.purple },
-                            { code: "Cancelled", label: "Cancel", color: C.inactive }
-                          ].map(act => (
+                      );
+                    })}
+                    </View>
+                  </ScrollView>
+                ) : (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
+                    {recentOrders.map(o => {
+                      let badgeBg = C.processingBg;
+                      let badgeColor = C.processing;
+                      if (o.status === "Completed" || o.status === "Delivered") {
+                        badgeBg = C.activeBg;
+                        badgeColor = C.active;
+                      } else if (o.status === "Cancelled") {
+                        badgeBg = C.inactiveBg;
+                        badgeColor = C.inactive;
+                      } else if (o.status === "Returned") {
+                        badgeBg = C.returnedBg;
+                        badgeColor = C.returned;
+                      } else if (o.status === "Shipped") {
+                        badgeBg = C.purpleBg;
+                        badgeColor = C.purple;
+                      }
+
+                      return (
+                        <View key={o.id} style={{ flexGrow: 1, width: "100%", backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, gap: 8 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 4 }}>
                             <TouchableOpacity
-                              key={act.code}
-                              onPress={() => updateOrderStatus(o.id, act.code)}
-                              style={[styles.smallInlineActionBtn, { borderColor: act.color }]}
+                              style={{ flex: 1 }}
+                              onPress={() => router.push({ pathname: "/orderDetails" as any, params: { orderId: String(o.rawId) } })}
                             >
-                              <Text style={[styles.smallInlineActionBtnText, { color: act.color }]}>{act.label}</Text>
+                              <Text style={{ fontWeight: "700", color: C.primary, fontSize: 12 }} numberOfLines={1}>{o.id}</Text>
                             </TouchableOpacity>
-                          ))}
+                            <View style={[styles.statusBadgeCell, { backgroundColor: badgeBg }]}>
+                              <Text style={[styles.statusBadgeText, { color: badgeColor, fontSize: 8 }]}>{o.status}</Text>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => {
+                              const match = customers.find(c => c.name === o.customer || c.email === o.customerEmail);
+                              if (match) {
+                                router.push({ pathname: "/customerDetails" as any, params: { id: String(match.id) } });
+                              } else {
+                                router.push({ pathname: "/customerManagement" as any, params: { search: o.customer } });
+                              }
+                            }}
+                          >
+                            <Text style={{ fontWeight: "500", color: C.processing, fontSize: 11 }} numberOfLines={1}>{o.customer}</Text>
+                          </TouchableOpacity>
+
+                          <Text style={{ fontWeight: "700", fontSize: 13, color: C.text }}>{rupee(o.amount)}</Text>
+                          
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <Text style={{ color: C.sub, fontSize: 10 }}>{o.date}</Text>
+                            <Text style={{ color: C.sub, fontSize: 10 }}>{o.payment}</Text>
+                          </View>
+                          
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                            {[
+                              { code: "Completed", label: "Complete", color: C.active },
+                              { code: "Shipped", label: "Ship", color: C.purple },
+                              { code: "Cancelled", label: "Cancel", color: C.inactive }
+                            ].map(act => (
+                              <TouchableOpacity
+                                key={act.code}
+                                onPress={() => updateOrderStatus(o.id, act.code)}
+                                style={[styles.smallInlineActionBtn, { borderColor: act.color, flex: 1, alignItems: "center" }]}
+                              >
+                                <Text style={[styles.smallInlineActionBtnText, { color: act.color }]}>{act.label}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
                   </View>
-                </ScrollView>
+                )}
               </View>
 
             
@@ -2606,8 +2680,8 @@ const getStyles = (isDark: boolean) => {
   headerCardMobile: {
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: "#2a4365",
     paddingTop: 48,
