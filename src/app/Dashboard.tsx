@@ -594,7 +594,9 @@ export default function DashboardScreen() {
         setRecentOrders(
           items.slice(0, 10).map((o) => ({
             id: o.orderNumber || `ORD-${o.id}`,
+            rawId: o.id,
             customer: o.shippingName || "Customer",
+            customerEmail: o.shippingEmail || "",
             amount: Number(o.totalAmount ?? 0),
             status: formatOrderStatus(o.orderStatus),
             payment: formatPaymentMethod(o.paymentMethod),
@@ -2289,9 +2291,14 @@ export default function DashboardScreen() {
 
                     {filteredSellers.map((s, idx) => (
                       <View key={idx} style={styles.tableRowData}>
-                        <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "600" }]} numberOfLines={1}>
-                          {s.name}
-                        </Text>
+                        <TouchableOpacity
+                          style={{ flex: 1.5 }}
+                          onPress={() => router.push({ pathname: "/Viewseller" as any, params: { sellerId: String(s.id) } })}
+                        >
+                          <Text style={[styles.tableCellText, { fontWeight: "600", color: C.primary }]} numberOfLines={1}>
+                            {s.name}
+                          </Text>
+                        </TouchableOpacity>
                         <Text style={[styles.tableCellText, { flex: 1.5, color: C.sub }]} numberOfLines={1}>
                           {s.business}
                         </Text>
@@ -2315,13 +2322,17 @@ export default function DashboardScreen() {
                 ) : (
                   <View style={styles.mobileCardListWrap}>
                     {filteredSellers.map(s => (
-                      <View key={s.id} style={styles.mobileProductCard}>
+                      <TouchableOpacity
+                        key={s.id}
+                        style={styles.mobileProductCard}
+                        onPress={() => router.push({ pathname: "/Viewseller" as any, params: { sellerId: String(s.id) } })}
+                      >
                         <View style={styles.mobileProductCardHeader}>
                           <View style={styles.avatarCircleSmall}>
                             <Text style={styles.avatarCircleText}>S</Text>
                           </View>
                           <View style={{ flex: 1, gap: 2 }}>
-                            <Text style={styles.mobileCardProdName}>{s.name}</Text>
+                            <Text style={[styles.mobileCardProdName, { color: C.primary }]}>{s.name}</Text>
                             <Text style={styles.mobileCardProdId}>{s.business}</Text>
                           </View>
                         </View>
@@ -2337,7 +2348,7 @@ export default function DashboardScreen() {
                             </View>
                           </View>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 )}
@@ -2376,12 +2387,29 @@ export default function DashboardScreen() {
 
                     return (
                       <View key={o.id} style={styles.tableRowData}>
-                        <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "700" }]} numberOfLines={1}>
-                          {o.id}
-                        </Text>
-                        <Text style={[styles.tableCellText, { flex: 1.8 }]} numberOfLines={1}>
-                          {o.customer}
-                        </Text>
+                        <TouchableOpacity
+                          style={{ flex: 1.5 }}
+                          onPress={() => router.push({ pathname: "/orderDetails" as any, params: { orderId: String(o.rawId) } })}
+                        >
+                          <Text style={[styles.tableCellText, { fontWeight: "700", color: C.primary }]} numberOfLines={1}>
+                            {o.id}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ flex: 1.8 }}
+                          onPress={() => {
+                            const match = customers.find(c => c.name === o.customer || c.email === o.customerEmail);
+                            if (match) {
+                              router.push({ pathname: "/customerDetails" as any, params: { id: String(match.id) } });
+                            } else {
+                              router.push({ pathname: "/customerManagement" as any, params: { search: o.customer } });
+                            }
+                          }}
+                        >
+                          <Text style={[styles.tableCellText, { fontWeight: "500", color: C.processing }]} numberOfLines={1}>
+                            {o.customer}
+                          </Text>
+                        </TouchableOpacity>
                         <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "right", fontWeight: "700" }]}>
                           {rupee(o.amount)}
                         </Text>
