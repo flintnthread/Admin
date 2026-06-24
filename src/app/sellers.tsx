@@ -913,25 +913,27 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0 }]}>
-              {!isMobile && <ListHeader isTablet={isTablet} />}
-              {paginated.length === 0 ? (
-                <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
-              ) : (
-                paginated.map((s, idx) => (
-                  <ListRow
-                    key={s.id}
-                    seller={s}
-                    even={idx % 2 === 0}
-                    isTablet={isTablet}
-                    isMobile={isMobile}
-                    onView={() => doView(s)}
-                    onToggleStatus={() => doToggle(s)}
-                    onDelete={() => doDelete(s)}
-                  />
-                ))
-              )}
-            </View>
+            <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={isMobile && { width: '100%' }}>
+              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0, minWidth: 1060 }]}>
+                {(!isMobile || isMobile) && <ListHeader isTablet={isMobile ? false : isTablet} />}
+                {paginated.length === 0 ? (
+                  <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
+                ) : (
+                  paginated.map((s, idx) => (
+                    <ListRow
+                      key={s.id}
+                      seller={s}
+                      even={idx % 2 === 0}
+                      isTablet={isMobile ? false : isTablet}
+                      isMobile={false}
+                      onView={() => doView(s)}
+                      onToggleStatus={() => doToggle(s)}
+                      onDelete={() => doDelete(s)}
+                    />
+                  ))
+                )}
+              </View>
+            </ScrollView>
           )}
 
           {/* Footer */}

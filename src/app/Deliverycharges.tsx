@@ -106,7 +106,6 @@ function mapSlabToUi(row: ReturnType<typeof mapDeliverySlabRow>, index: number):
 
 const BagIcon: React.FC<{ color: string; bg: string }> = ({ color, bg }) => (
   <View style={[styles.iconWrapper, { backgroundColor: bg }]}>
-    {/* Simplified bag shape using nested Views */}
     <View style={[styles.bagBottom, { borderColor: color }]}>
       <View style={[styles.bagHandle, { borderColor: color }]} />
     </View>
@@ -142,7 +141,7 @@ const FixedRateBadge: React.FC<{ custom?: boolean }> = ({ custom }) => (
   </View>
 );
 
-// ─── SLAB CARD ────────────────────────────────────────────────────────────────
+// ─── SLAB CARD (WEB GRID) ─────────────────────────────────────────────────────
 const dc = StyleSheet.create({
   card: {
     flex: 1,
@@ -336,8 +335,231 @@ const SlabCard: React.FC<{
   );
 };
 
+// ─── MOBILE SLAB CARD ─────────────────────────────────────────────────────────
+const MobileSlabCard: React.FC<{
+  slab: WeightSlab;
+  onEdit: (id: number) => void;
+  onDelete: (id: number) => void;
+}> = ({ slab, onEdit, onDelete }) => {
+  return (
+    <View style={msc.card}>
+      {/* Left color stripe */}
+      <View style={[msc.leftStripe, { backgroundColor: slab.iconColor }]} />
+
+      <View style={msc.body}>
+        {/* Top row: icon + title + actions */}
+        <View style={msc.topRow}>
+          <View style={[msc.iconWrap, { backgroundColor: slab.iconBg }]}>
+            <Feather name="truck" size={18} color={slab.iconColor} />
+          </View>
+          <View style={msc.titleBlock}>
+            <Text style={msc.title}>{slab.label}</Text>
+            <Text style={msc.subtitle}>{slab.range}</Text>
+          </View>
+          <View style={msc.actions}>
+            <TouchableOpacity
+              style={msc.actBtn}
+              onPress={() => onEdit(slab.id)}
+              activeOpacity={0.8}
+            >
+              <Feather name="edit-2" size={13} color={T.textM} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[msc.actBtn, { borderColor: "#FCA5A5" }]}
+              onPress={() => onDelete(slab.id)}
+              activeOpacity={0.8}
+            >
+              <Feather name="trash-2" size={13} color={T.red} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Price row */}
+        <View style={msc.priceRow}>
+          <View style={msc.priceBlock}>
+            <Text style={msc.priceLabel}>INTRA-CITY</Text>
+            <Text style={msc.priceValue}>{slab.intracity}</Text>
+          </View>
+          <View style={msc.priceDivider} />
+          <View style={msc.priceBlock}>
+            <Text style={msc.priceLabel}>METRO-METRO</Text>
+            <Text style={msc.priceValue}>{slab.metroMetro}</Text>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={msc.footer}>
+          <View style={msc.metaItem}>
+            <Feather
+              name={slab.isCustom ? "settings" : "check-circle"}
+              size={11}
+              color={T.textHint}
+            />
+            <Text style={msc.metaTxt}>
+              {slab.isCustom ? "Custom Pricing" : "Fixed Rate"}
+            </Text>
+          </View>
+          <View style={[
+            msc.statusBadge,
+            { backgroundColor: slab.status === "Active" ? T.greenBg : T.redBg }
+          ]}>
+            <View style={[
+              msc.statusDot,
+              { backgroundColor: slab.status === "Active" ? T.green : T.red }
+            ]} />
+            <Text style={[
+              msc.statusTxt,
+              { color: slab.status === "Active" ? T.green : T.red }
+            ]}>
+              {slab.status}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const msc = StyleSheet.create({
+  card: {
+    flexDirection: "row",
+    backgroundColor: T.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  leftStripe: {
+    width: 4,
+    alignSelf: "stretch",
+  },
+  body: {
+    flex: 1,
+    padding: 14,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 10,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  titleBlock: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: T.textH,
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: T.textM,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 6,
+    flexShrink: 0,
+  },
+  actBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F9FAFB",
+  },
+  priceRow: {
+    flexDirection: "row",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  priceBlock: {
+    flex: 1,
+  },
+  priceDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 12,
+  },
+  priceLabel: {
+    fontSize: 9,
+    color: T.textHint,
+    marginBottom: 3,
+    letterSpacing: 0.4,
+    fontWeight: "600",
+  },
+  priceValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: T.textB,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaTxt: {
+    fontSize: 11,
+    color: T.textM,
+    fontWeight: "500",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusTxt: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+});
+
 // ─── STATS FOOTER ─────────────────────────────────────────────────────────────
-const StatCard: React.FC<{ label: string; value: string | number; icon: any; colorKey: "orange" | "navy" | "green" | "red" }> = ({ label, value, icon, colorKey }) => {
+const StatCard: React.FC<{
+  label: string;
+  value: string | number;
+  icon: any;
+  colorKey: "orange" | "navy" | "green" | "red";
+}> = ({ label, value, icon, colorKey }) => {
   let tint, txtColor;
   if (colorKey === "orange") { tint = T.orangeLight; txtColor = T.orange; }
   else if (colorKey === "green") { tint = T.greenBg; txtColor = T.green; }
@@ -356,6 +578,71 @@ const StatCard: React.FC<{ label: string; value: string | number; icon: any; col
     </View>
   );
 };
+
+// Mobile stat card — compact version that fits 3 in a row
+const MobileStatCard: React.FC<{
+  label: string;
+  value: string | number;
+  icon: any;
+  colorKey: "orange" | "navy" | "green" | "red";
+}> = ({ label, value, icon, colorKey }) => {
+  let tint, txtColor;
+  if (colorKey === "orange") { tint = T.orangeLight; txtColor = T.orange; }
+  else if (colorKey === "green") { tint = T.greenBg; txtColor = T.green; }
+  else if (colorKey === "red") { tint = T.redBg; txtColor = T.red; }
+  else { tint = T.navyLight; txtColor = T.navy; }
+
+  return (
+    <View style={msc2.card}>
+      <View style={[msc2.iconWrap, { backgroundColor: tint }]}>
+        <Feather name={icon} size={14} color={txtColor} />
+      </View>
+      <Text style={msc2.value}>{value}</Text>
+      <Text style={msc2.label}>{label}</Text>
+    </View>
+  );
+};
+
+const msc2 = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: T.card,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  value: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: T.textH,
+    letterSpacing: -0.5,
+  },
+  label: {
+    fontSize: 8,
+    fontWeight: "600",
+    color: "#64748B",
+    marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    textAlign: "center",
+  },
+});
 
 const sc = StyleSheet.create({
   card: {
@@ -393,10 +680,20 @@ const sc = StyleSheet.create({
   },
 });
 
-const StatsFooter: React.FC<{ slabs: WeightSlab[], isWeb: boolean }> = ({ slabs, isWeb }) => {
+const StatsFooter: React.FC<{ slabs: WeightSlab[]; isWeb: boolean }> = ({ slabs, isWeb }) => {
   const total = slabs.length;
   const active = slabs.filter((s) => s.status === "Active").length;
   const inactive = slabs.filter((s) => s.status === "Inactive").length;
+
+  if (!isWeb) {
+    return (
+      <View style={styles.mobileStatsRow}>
+        <MobileStatCard label="Total Slabs" value={total} icon="layers" colorKey="navy" />
+        <MobileStatCard label="Active Slabs" value={active} icon="check-circle" colorKey="green" />
+        <MobileStatCard label="Inactive" value={inactive} icon="x-circle" colorKey="red" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.statsRow}>
@@ -586,11 +883,16 @@ const DeliveryChargesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
 
-  const filteredSlabs = slabs.filter(s => filterStatus === "All" || s.status === filterStatus);
+  const filteredSlabs = slabs.filter(s => {
+    const matchesStatus = filterStatus === "All" || s.status === filterStatus;
+    const matchesSearch = !searchQuery || s.label.toLowerCase().includes(searchQuery.toLowerCase()) || s.range.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
   const loadSlabs = useCallback(async () => {
     if (!token) return;
@@ -638,24 +940,14 @@ const DeliveryChargesScreen: React.FC = () => {
       await loadSlabs();
       const msg = editingSlabId != null ? "Delivery charge updated successfully!" : "Delivery charge added successfully!";
       if (Platform.OS === "web") {
-        Swal.fire({
-          icon: "success",
-          title: "Success!",
-          text: msg,
-          confirmButtonColor: "#1E2B6B",
-        });
+        Swal.fire({ icon: "success", title: "Success!", text: msg, confirmButtonColor: "#1E2B6B" });
       } else {
         Alert.alert("Success", msg);
       }
     } catch (e) {
       const msg = getApiErrorMessage(e);
       if (Platform.OS === "web") {
-        Swal.fire({
-          icon: "error",
-          title: "Error!",
-          text: msg,
-          confirmButtonColor: "#1E2B6B",
-        });
+        Swal.fire({ icon: "error", title: "Error!", text: msg, confirmButtonColor: "#1E2B6B" });
       } else {
         Alert.alert("Error", msg);
       }
@@ -683,12 +975,7 @@ const DeliveryChargesScreen: React.FC = () => {
         await deleteDeliverySlab(id);
         await loadSlabs();
         if (Platform.OS === "web") {
-          Swal.fire({
-            icon: "success",
-            title: "Deleted!",
-            text: "Delivery charge deleted successfully!",
-            confirmButtonColor: "#1E2B6B",
-          });
+          Swal.fire({ icon: "success", title: "Deleted!", text: "Delivery charge deleted successfully!", confirmButtonColor: "#1E2B6B" });
         } else Alert.alert("Deleted", "Delivery charge deleted successfully!");
       } catch (e) {
         console.warn(getApiErrorMessage(e));
@@ -705,9 +992,7 @@ const DeliveryChargesScreen: React.FC = () => {
         cancelButtonColor: "#d33",
         confirmButtonText: "Yes, delete it!"
       }).then((result) => {
-        if (result.isConfirmed) {
-          confirmDelete();
-        }
+        if (result.isConfirmed) confirmDelete();
       });
     } else {
       Alert.alert(
@@ -721,50 +1006,201 @@ const DeliveryChargesScreen: React.FC = () => {
     }
   };
 
+  // ── MOBILE LAYOUT ──
+  if (!isWeb) {
+    return (
+      <AdminLayout>
+      <View style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
+        <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
+
+        {/* Mobile Header */}
+        <View style={styles.mobileHeader}>
+          <View>
+            <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
+            <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.mobileAddBtn}
+            activeOpacity={0.85}
+            onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
+          >
+            <Feather name="plus" size={14} color="#1E2B6B" />
+            <Text style={styles.mobileAddBtnTxt}>Add New Charge</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Stats cards — overlap header */}
+        <StatsFooter slabs={slabs} isWeb={false} />
+
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        >
+          {/* Search + Filter toolbar */}
+          <View style={styles.mobileToolbar}>
+            {/* Search */}
+            <View style={styles.mobileSearchBox}>
+              <Feather name="search" size={15} color="#94A3B8" />
+              <TextInput
+                style={styles.mobileSearchInput}
+                placeholder="Search delivery charges..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={(text) => {
+                  setSearchQuery(text);
+                  setCurrentPage(1);
+                }}
+              />
+            </View>
+
+            {/* Filter pills + view toggle */}
+            <View style={styles.mobileFilterRow}>
+              <View style={styles.mobileFilterPills}>
+                {(["All", "Active", "Inactive"] as const).map(status => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.mobilePill,
+                      filterStatus === status && styles.mobilePillActive,
+                    ]}
+                    onPress={() => { setFilterStatus(status); setCurrentPage(1); }}
+                  >
+                    <Text style={[
+                      styles.mobilePillTxt,
+                      filterStatus === status && styles.mobilePillTxtActive,
+                    ]}>{status}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.mobileViewToggle}>
+                <TouchableOpacity
+                  style={[styles.mobileViewBtn, viewMode === "grid" && styles.mobileViewBtnActive]}
+                  onPress={() => setViewMode("grid")}
+                >
+                  <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : "#94A3B8"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mobileViewBtn, viewMode === "list" && styles.mobileViewBtnActive]}
+                  onPress={() => setViewMode("list")}
+                >
+                  <Feather name="list" size={15} color={viewMode === "list" ? T.orange : "#94A3B8"} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* Content */}
+          <View style={{ paddingHorizontal: 16 }}>
+            {loading || authLoading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>Loading delivery charges…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>{error}</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={loadSlabs}>
+                  <Text style={styles.retryBtnText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : viewMode === "grid" ? (
+              <View style={{ gap: 14 }}>
+                {filteredSlabs
+                  .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                  .map((item) => (
+                    <SlabCard
+                      key={item.id}
+                      slab={item}
+                      onActivate={handleActivate}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+              </View>
+            ) : (
+              <View style={{ gap: 12 }}>
+                {filteredSlabs
+                  .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                  .map((item) => (
+                    <MobileSlabCard
+                      key={item.id}
+                      slab={item}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+              </View>
+            )}
+
+            {filteredSlabs.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredSlabs.length / ITEMS_PER_PAGE)}
+                totalItems={filteredSlabs.length}
+                itemsPerPage={ITEMS_PER_PAGE}
+                itemName="delivery charges"
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </View>
+        </ScrollView>
+
+        <DeliveryChargeModal
+          visible={editingSlabId !== null}
+          onClose={() => setEditingSlabId(null)}
+          slab={slabs.find((s) => s.id === editingSlabId) || null}
+          isWeb={false}
+          onSave={saveSlab}
+        />
+        <DeliveryChargeModal
+          visible={isAddModalVisible}
+          onClose={() => setIsAddModalVisible(false)}
+          slab={null}
+          isWeb={false}
+          onSave={saveSlab}
+        />
+      </View>
+      </AdminLayout>
+    );
+  }
+
+  // ── WEB LAYOUT (UNCHANGED) ──
   const MainContent = (
     <View style={{ flex: 1 }}>
 
       {/* ── Page Header ── */}
-      <View style={[styles.pageHead, !isWeb && { flexDirection: "column", alignItems: "stretch", padding: 16, marginHorizontal: 0, marginTop: 0, borderRadius: 0, marginBottom: 12 }]}>
-        {!isWeb ? (
-          <>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <View>
-                <Text style={[styles.pageTitle, { fontSize: 20 }]}>Delivery Charges</Text>
-                <Text style={styles.pageSub}>Manage weight slabs and charges</Text>
-              </View>
-              <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}>
-                <Feather name="plus" size={14} color="#1E2B6B" />
-                <Text style={styles.addBtnWhiteTxt}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={styles.pageHeadLeft}>
-              <Text style={styles.pageTitle}>Delivery Charges</Text>
-            </View>
-            <TouchableOpacity style={styles.addBtnWhite} activeOpacity={0.85} onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}>
-              <Feather name="plus" size={15} color="#1E2B6B" />
-              <Text style={styles.addBtnWhiteTxt}>Add New Charge</Text>
-            </TouchableOpacity>
-          </>
-        )}
+      <View style={styles.pageHead}>
+        <View style={styles.pageHeadLeft}>
+          <Text style={styles.pageTitle}>Delivery Charges</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addBtnWhite}
+          activeOpacity={0.85}
+          onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
+        >
+          <Feather name="plus" size={15} color="#1E2B6B" />
+          <Text style={styles.addBtnWhiteTxt}>Add New Charge</Text>
+        </TouchableOpacity>
       </View>
 
-      <StatsFooter slabs={slabs} isWeb={isWeb} />
-      <View
-        style={[styles.listContent, isWeb ? styles.webListContent : { paddingBottom: 80, paddingHorizontal: 8, paddingTop: 12 }]}
-      >
+      <StatsFooter slabs={slabs} isWeb={true} />
+
+      <View style={[styles.listContent, styles.webListContent]}>
 
         {/* ── Toolbar (Search + Filter) ── */}
         <View style={styles.toolBar}>
-          <View style={[styles.searchBox, !isWeb && { paddingHorizontal: 9, paddingVertical: 7 }]}>
+          <View style={styles.searchBox}>
             <Feather name="search" size={16} color="#000" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search delivery charges..."
               placeholderTextColor="#000"
+              value={searchQuery}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+                setCurrentPage(1);
+              }}
             />
           </View>
 
@@ -776,10 +1212,7 @@ const DeliveryChargesScreen: React.FC = () => {
                   styles.statusFilterBtn,
                   filterStatus === status && styles.statusFilterBtnActive,
                 ]}
-                onPress={() => {
-                  setFilterStatus(status);
-                  setCurrentPage(1);
-                }}
+                onPress={() => { setFilterStatus(status); setCurrentPage(1); }}
               >
                 <Text style={[
                   styles.statusFilterTxt,
@@ -819,15 +1252,9 @@ const DeliveryChargesScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         ) : viewMode === "grid" ? (
-          <View style={isWeb
-            ? { flexDirection: "row", flexWrap: "wrap", gap: 14 }
-            : { gap: 12 }
-          }>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
             {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((item) => (
-              <View
-                key={item.id}
-                style={isWeb ? { width: "calc(33.33% - 10px)" as any } : undefined}
-              >
+              <View key={item.id} style={{ width: "calc(33.33% - 10px)" as any }}>
                 <SlabCard
                   slab={item}
                   onActivate={handleActivate}
@@ -838,7 +1265,7 @@ const DeliveryChargesScreen: React.FC = () => {
             ))}
           </View>
         ) : (
-          <View style={[styles.tableCard, isWeb && { width: "75%" }]}>
+          <View style={[styles.tableCard, { width: "75%" }]}>
             <View style={[{ width: "100%", overflowX: "auto" } as any]}>
               <View style={{ minWidth: 880 }}>
                 <View style={styles.tableHeader}>
@@ -848,21 +1275,21 @@ const DeliveryChargesScreen: React.FC = () => {
                   <Text style={[styles.th, { width: 120 }]}>Metro-Metro (₹)</Text>
                   <Text style={[styles.th, { width: 130 }]}>Type</Text>
                   <Text style={[styles.th, { width: 90 }]}>Status</Text>
-                  <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>Action</Text>
+                  <Text style={[styles.th, { width: 120, textAlign: "center" }]}>Action</Text>
                 </View>
                 {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((slab, idx) => (
                   <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
-                    <Text style={[styles.td, { width: 140, fontWeight: '700', color: T.textH }]}>{slab.label}</Text>
+                    <Text style={[styles.td, { width: 140, fontWeight: "700", color: T.textH }]}>{slab.label}</Text>
                     <Text style={[styles.td, { width: 160 }]}>{slab.range}</Text>
-                    <Text style={[styles.td, { width: 120, color: T.orange, fontWeight: '700' }]}>{slab.intracity}</Text>
-                    <Text style={[styles.td, { width: 120, color: T.navy, fontWeight: '700' }]}>{slab.metroMetro}</Text>
-                    <View style={[{ width: 130 }]}>
+                    <Text style={[styles.td, { width: 120, color: T.orange, fontWeight: "700" }]}>{slab.intracity}</Text>
+                    <Text style={[styles.td, { width: 120, color: T.navy, fontWeight: "700" }]}>{slab.metroMetro}</Text>
+                    <View style={{ width: 130 }}>
                       <FixedRateBadge custom={slab.isCustom} />
                     </View>
-                    <View style={[{ width: 90 }]}>
+                    <View style={{ width: 90 }}>
                       <StatusBadge status={slab.status} />
                     </View>
-                    <View style={[{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 6 }]}>
+                    <View style={{ width: 120, flexDirection: "row", justifyContent: "center", gap: 6 }}>
                       <TouchableOpacity style={dc.actBtn} onPress={() => handleEdit(slab.id)}>
                         <Feather name="edit-2" size={13} color={T.textM} />
                       </TouchableOpacity>
@@ -933,7 +1360,134 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
-  // ── PAGE HEADER (MATCHING PRODUCTS SCREEN) ──
+  // ── MOBILE HEADER ──────────────────────────────────────────────────────────
+  mobileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#151D4F",
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 16 : 52,
+    paddingBottom: 52,
+    marginBottom: 16,
+  },
+  mobileHeaderTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+  },
+  mobileHeaderSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 3,
+  },
+  mobileAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mobileAddBtnTxt: {
+    color: "#1E2B6B",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  // ── MOBILE STATS ROW ───────────────────────────────────────────────────────
+  mobileStatsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: -32,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    zIndex: 10,
+  },
+
+  // ── MOBILE TOOLBAR ─────────────────────────────────────────────────────────
+  mobileToolbar: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    gap: 10,
+  },
+  mobileSearchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  mobileSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1A1208",
+  },
+  mobileFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  mobileFilterPills: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  mobilePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  mobilePillActive: {
+    backgroundColor: "#151D4F",
+    borderColor: "#151D4F",
+  },
+  mobilePillTxt: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  mobilePillTxtActive: {
+    color: "#FFFFFF",
+  },
+  mobileViewToggle: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  mobileViewBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileViewBtnActive: {
+    borderColor: T.orange,
+    backgroundColor: T.orangeLight,
+  },
+
+  // ── PAGE HEADER (WEB) ──────────────────────────────────────────────────────
   pageHead: {
     flexDirection: "row",
     alignItems: "center",
@@ -1161,8 +1715,11 @@ const styles = StyleSheet.create({
     color: T.textM,
   },
 
-  // ── Header (Old - might be used by other parts) ──
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,
+  // ── Header (legacy) ──
+  header: {
+    marginHorizontal: 2,
+    marginTop: 12,
+    borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1178,21 +1735,9 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 25,
   },
-  headerTextContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: TEXT_PRIMARY,
-    letterSpacing: -0.3,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: TEXT_MUTED,
-    marginTop: 2,
-  },
+  headerTextContainer: { flex: 1, marginRight: 10 },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT_PRIMARY, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
   addButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1206,16 +1751,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  addButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  addButtonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  headerActions: { flexDirection: "row", alignItems: "center" },
   viewSwitcher: {
     flexDirection: "row",
     alignItems: "center",
@@ -1225,33 +1762,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginRight: 12,
   },
-  viewLabel: {
-    fontSize: 12,
-    color: TEXT_MUTED,
-    marginRight: 8,
-    fontWeight: "600",
-  },
-  viewButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 2,
-  },
-  viewButtonActive: {
-    backgroundColor: "#000080",
-  },
-  viewButtonText: {
-    fontSize: 12,
-    color: TEXT_MUTED,
-    fontWeight: "700",
-  },
-  viewButtonTextActive: {
-    color: "#FFFFFF",
-  },
+  viewLabel: { fontSize: 12, color: TEXT_MUTED, marginRight: 8, fontWeight: "600" },
+  viewButton: { width: 28, height: 28, borderRadius: 999, alignItems: "center", justifyContent: "center", marginHorizontal: 2 },
+  viewButtonActive: { backgroundColor: "#000080" },
+  viewButtonText: { fontSize: 12, color: TEXT_MUTED, fontWeight: "700" },
+  viewButtonTextActive: { color: "#FFFFFF" },
 
-  // ── Mobile Controls ──
   mobileControlsContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -1268,12 +1784,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  searchIcon: {
-    fontSize: 14,
-    color: TEXT_MUTED,
-    marginRight: 8,
-  },
-
+  searchIcon: { fontSize: 14, color: TEXT_MUTED, marginRight: 8 },
   viewSwitcherMobile: {
     flexDirection: "row",
     alignItems: "center",
@@ -1285,13 +1796,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  viewLabelMobile: {
-    fontSize: 13,
-    color: TEXT_PRIMARY,
-    fontWeight: "600",
-  },
+  viewLabelMobile: { fontSize: 13, color: TEXT_PRIMARY, fontWeight: "600" },
 
-  // ── List ──
   listContent: {
     flex: 1,
     paddingHorizontal: 8,
@@ -1311,24 +1817,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginHorizontal: -8,
   },
-  cardGridGrid: {
-    gap: 16,
-  },
-  cardGridList: {
-    gap: 0,
-  },
-  cardGridItem: {
-    flexBasis: "32%",
-    maxWidth: 360,
-    marginHorizontal: 8,
-    marginBottom: 16,
-  },
-  cardGridItemFull: {
-    width: "100%",
-    marginBottom: 16,
-  },
+  cardGridGrid: { gap: 16 },
+  cardGridList: { gap: 0 },
+  cardGridItem: { flexBasis: "32%", maxWidth: 360, marginHorizontal: 8, marginBottom: 16 },
+  cardGridItemFull: { width: "100%", marginBottom: 16 },
 
-  // ── Card ──
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
@@ -1342,576 +1835,140 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-  cardHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  iconWrapper: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  bagBottom: {
-    width: 20,
-    height: 16,
-    borderWidth: 2,
-    borderRadius: 4,
-    position: "relative",
-    alignItems: "center",
-  },
-  bagHandle: {
-    width: 10,
-    height: 6,
-    borderWidth: 2,
-    borderBottomWidth: 0,
-    borderRadius: 6,
-    position: "absolute",
-    top: -7,
-  },
-  cardTitleBlock: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: TEXT_PRIMARY,
-  },
-  cardRange: {
-    fontSize: 11,
-    color: TEXT_MUTED,
-    marginTop: 2,
-  },
+  cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+  cardHeaderLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  iconWrapper: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center", marginRight: 10 },
+  bagBottom: { width: 20, height: 16, borderWidth: 2, borderRadius: 4, position: "relative", alignItems: "center" },
+  bagHandle: { width: 10, height: 6, borderWidth: 2, borderBottomWidth: 0, borderRadius: 6, position: "absolute", top: -7 },
+  cardTitleBlock: { flex: 1 },
+  cardTitle: { fontSize: 14, fontWeight: "700", color: TEXT_PRIMARY },
+  cardRange: { fontSize: 11, color: TEXT_MUTED, marginTop: 2 },
 
-  // ── Status Badge ──
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusText: { fontSize: 11, fontWeight: "700" },
 
-  // ── Price ──
-  priceRow: {
-    flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-  },
-  priceBlock: {
-    flex: 1,
-    alignItems: "flex-start",
-  },
-  priceDivider: {
-    width: 1,
-    backgroundColor: BORDER,
-    marginHorizontal: 12,
-  },
-  priceLabel: {
-    fontSize: 11,
-    color: TEXT_MUTED,
-    marginBottom: 4,
-    fontWeight: "500",
-  },
-  priceValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: PURPLE,
-  },
+  priceRow: { flexDirection: "row", backgroundColor: "#F9FAFB", borderRadius: 12, padding: 12, marginBottom: 10 },
+  priceBlock: { flex: 1, alignItems: "flex-start" },
+  priceDivider: { width: 1, backgroundColor: BORDER, marginHorizontal: 12 },
+  priceLabel: { fontSize: 11, color: TEXT_MUTED, marginBottom: 4, fontWeight: "500" },
+  priceValue: { fontSize: 18, fontWeight: "800", color: PURPLE },
 
-  // ── Fixed Rate Badge ──
-  fixedRateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 12,
-  },
-  checkCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#D1FAE5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkMark: {
-    fontSize: 9,
-    color: "#059669",
-    fontWeight: "700",
-  },
-  fixedRateText: {
-    fontSize: 12,
-    color: "#059669",
-    fontWeight: "600",
-  },
+  fixedRateRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 12 },
+  checkCircle: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#D1FAE5", alignItems: "center", justifyContent: "center" },
+  checkMark: { fontSize: 9, color: "#059669", fontWeight: "700" },
+  fixedRateText: { fontSize: 12, color: "#059669", fontWeight: "600" },
 
-  // ── Card Divider ──
-  cardDivider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginBottom: 12,
-  },
+  cardDivider: { height: 1, backgroundColor: BORDER, marginBottom: 12 },
 
-  // ── Action Buttons ──
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
+  actionRow: { flexDirection: "row", gap: 10 },
   btnOutline: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: PURPLE_LIGHT,
-    borderWidth: 1,
-    borderColor: PURPLE_LIGHT,
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    paddingVertical: 10, borderRadius: 10, backgroundColor: PURPLE_LIGHT, borderWidth: 1, borderColor: PURPLE_LIGHT,
   },
-  btnOutlineIcon: {
-    fontSize: 13,
-  },
-  btnOutlineText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: PURPLE,
-  },
+  btnOutlineIcon: { fontSize: 13 },
+  btnOutlineText: { fontSize: 13, fontWeight: "600", color: PURPLE },
   btnActivate: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: PURPLE,
-    shadowColor: PURPLE,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
+    flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 10,
+    backgroundColor: PURPLE, shadowColor: PURPLE, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
   },
-  btnActivateText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  btnActivateText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
   btnEdit: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    paddingVertical: 10, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
   },
-  btnEditIcon: {
-    fontSize: 13,
-  },
-  btnEditText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: PURPLE,
-  },
+  btnEditIcon: { fontSize: 13 },
+  btnEditText: { fontSize: 13, fontWeight: "600", color: PURPLE },
 
-  // ── Stats Footer ──
   statsContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    marginTop: 4,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: "#FFFFFF", borderRadius: 18, marginTop: 4, marginBottom: 20,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    borderWidth: 1, borderColor: BORDER,
   },
-  statsScroll: {
-    paddingHorizontal: 8,
-    paddingVertical: 14,
-  },
-  statItem: {
-    alignItems: "center",
-    paddingHorizontal: 14,
-    minWidth: 88,
-    borderRightWidth: 1,
-    borderRightColor: BORDER,
-  },
-  statIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 5,
-  },
-  statIconText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  statValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  statLabel: {
-    fontSize: 10,
-    color: TEXT_PRIMARY,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 2,
-  },
-  statSub: {
-    fontSize: 9,
-    color: TEXT_MUTED,
-    textAlign: "center",
-  },
+  statsScroll: { paddingHorizontal: 8, paddingVertical: 14 },
+  statItem: { alignItems: "center", paddingHorizontal: 14, minWidth: 88, borderRightWidth: 1, borderRightColor: BORDER },
+  statIconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 5 },
+  statIconText: { fontSize: 14, fontWeight: "700" },
+  statValue: { fontSize: 13, fontWeight: "800", textAlign: "center" },
+  statLabel: { fontSize: 10, color: TEXT_PRIMARY, fontWeight: "600", textAlign: "center", marginTop: 2 },
+  statSub: { fontSize: 9, color: TEXT_MUTED, textAlign: "center" },
 
-  // ── Bottom Nav ──
   bottomNav: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    paddingVertical: 8,
-    paddingBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 10,
+    flexDirection: "row", backgroundColor: "#FFFFFF", borderTopWidth: 1, borderTopColor: BORDER,
+    paddingVertical: 8, paddingBottom: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 10,
   },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  navIcon: {
-    fontSize: 20,
-  },
-  navLabel: {
-    fontSize: 10,
-    color: TEXT_MUTED,
-    fontWeight: "500",
-  },
-  navLabelActive: {
-    color: PURPLE,
-    fontWeight: "700",
-  },
-  navActiveDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: PURPLE,
-    marginTop: 2,
-  },
+  navItem: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 },
+  navIcon: { fontSize: 20 },
+  navLabel: { fontSize: 10, color: TEXT_MUTED, fontWeight: "500" },
+  navLabelActive: { color: PURPLE, fontWeight: "700" },
+  navActiveDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: PURPLE, marginTop: 2 },
 
-  // ── Web Layout Additions ──
-  webLayout: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "#F4F2FB",
-    height: "100%",
-  },
-  sidebarGap: {
-    width: 260,
-    backgroundColor: "transparent",
-  },
-  headerGap: {
-    height: 64,
-    backgroundColor: "transparent",
-  },
-  webMainColumn: {
-    flex: 1,
-    flexDirection: "column",
-  },
-  mainContentContainer: {
-    flex: 1,
-    backgroundColor: "#F4F2FB",
-  },
+  webLayout: { flex: 1, flexDirection: "row", backgroundColor: "#F4F2FB", height: "100%" },
+  sidebarGap: { width: 260, backgroundColor: "transparent" },
+  headerGap: { height: 64, backgroundColor: "transparent" },
+  webMainColumn: { flex: 1, flexDirection: "column" },
+  mainContentContainer: { flex: 1, backgroundColor: "#F4F2FB" },
   webMainContentContainer: {
-    backgroundColor: "#FFFFFF",
-    margin: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
+    backgroundColor: "#FFFFFF", margin: 16, borderRadius: 16, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4,
   },
   webHeader: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    elevation: 0,
-    shadowOpacity: 0,
-    paddingTop: 24,
-    paddingHorizontal: 24,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
+    elevation: 0, shadowOpacity: 0, paddingTop: 24, paddingHorizontal: 24,
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
   },
 
   // ── Modal ──
-  modalOverlayWeb: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalOverlayMobile: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  modalContainer: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: "hidden",
-    maxHeight: "90%",
-  },
-  modalContainerWeb: {
-    width: "90%",
-    maxWidth: 600,
-    borderRadius: 16,
-  },
+  modalOverlayWeb: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  modalOverlayMobile: { flex: 1, justifyContent: "flex-end" },
+  modalContainer: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden", maxHeight: "90%" },
+  modalContainerWeb: { width: "90%", maxWidth: 600, borderRadius: 16 },
   modalHeader: {
-    backgroundColor: "#ef7b1a",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    backgroundColor: "#ef7b1a", flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16,
   },
-  modalHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  modalHeaderIcon: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    marginRight: 8,
-  },
-  modalTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  modalCloseText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  modalBody: {
-    padding: 20,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: TEXT_PRIMARY,
-    marginBottom: 6,
-  },
-  textAsterisk: {
-    color: "#ef7b1a",
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: TEXT_PRIMARY,
-  },
-  inputWithPrefix: {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  inputPrefix: {
-    backgroundColor: "#79411c",
-    paddingHorizontal: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  inputPrefixText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  textInputNoLeftBorder: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: TEXT_PRIMARY,
-  },
-  checkboxGroup: {
-    marginBottom: 16,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  checkboxOutline: {
-    width: 16,
-    height: 16,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  checkboxLabel: {
-    fontSize: 13,
-    color: TEXT_PRIMARY,
-    fontWeight: "600",
-  },
-  checkboxLabelActive: {
-    fontSize: 13,
-    color: "#059669",
-    fontWeight: "600",
-  },
-  checkboxHint: {
-    fontSize: 11,
-    color: TEXT_MUTED,
-    marginLeft: 24,
-  },
+  modalHeaderLeft: { flexDirection: "row", alignItems: "center" },
+  modalHeaderIcon: { color: "#FFFFFF", fontSize: 18, marginRight: 8 },
+  modalTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  modalCloseText: { color: "#FFFFFF", fontSize: 18, fontWeight: "600" },
+  modalBody: { padding: 20 },
+  row: { flexDirection: "row", justifyContent: "space-between" },
+  inputGroup: { marginBottom: 16 },
+  inputLabel: { fontSize: 12, fontWeight: "600", color: TEXT_PRIMARY, marginBottom: 6 },
+  textAsterisk: { color: "#ef7b1a" },
+  textInput: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: TEXT_PRIMARY },
+  inputWithPrefix: { flexDirection: "row", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 8, overflow: "hidden" },
+  inputPrefix: { backgroundColor: "#79411c", paddingHorizontal: 12, justifyContent: "center", alignItems: "center" },
+  inputPrefixText: { color: "#FFFFFF", fontWeight: "700" },
+  textInputNoLeftBorder: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: TEXT_PRIMARY },
+  checkboxGroup: { marginBottom: 16 },
+  checkboxContainer: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  checkboxOutline: { width: 16, height: 16, borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 4, marginRight: 8 },
+  checkboxLabel: { fontSize: 13, color: TEXT_PRIMARY, fontWeight: "600" },
+  checkboxLabelActive: { fontSize: 13, color: "#059669", fontWeight: "600" },
+  checkboxHint: { fontSize: 11, color: TEXT_MUTED, marginLeft: 24 },
   modalFooter: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    backgroundColor: "#F9FAFB",
-    gap: 12,
+    flexDirection: "row", justifyContent: "flex-end", padding: 16,
+    borderTopWidth: 1, borderTopColor: "#E5E7EB", backgroundColor: "#F9FAFB", gap: 12,
   },
-  btnCancel: {
-    backgroundColor: "#69798c",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  btnCancelText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  btnUpdate: {
-    backgroundColor: "#79411c",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  btnUpdateText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  checkboxOutlineActive: {
-    backgroundColor: "#ef7b1a",
-    borderColor: "#ef7b1a",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxCheck: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  btnCancel: { backgroundColor: "#69798c", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  btnCancelText: { color: "#FFFFFF", fontWeight: "600", fontSize: 13 },
+  btnUpdate: { backgroundColor: "#79411c", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  btnUpdateText: { color: "#FFFFFF", fontWeight: "600", fontSize: 13 },
+  checkboxOutlineActive: { backgroundColor: "#ef7b1a", borderColor: "#ef7b1a", justifyContent: "center", alignItems: "center" },
+  checkboxCheck: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
 
   // ── Web Table ──
-  tableContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  tableHeaderRow: {
-    flexDirection: "row",
-    backgroundColor: "#FFF3E0",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  tableHeaderCell: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: TEXT_PRIMARY,
-  },
+  tableContainer: { backgroundColor: "#FFFFFF", borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: BORDER },
+  tableHeaderRow: { flexDirection: "row", backgroundColor: "#FFF3E0", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
+  tableHeaderCell: { fontSize: 12, fontWeight: "700", color: TEXT_PRIMARY },
+  tableCell: { fontSize: 13, color: TEXT_PRIMARY },
+  tableBtnEdit: { backgroundColor: "#1d324e", width: 28, height: 28, borderRadius: 6, justifyContent: "center", alignItems: "center" },
+  tableBtnDelete: { backgroundColor: "#ef4444", width: 28, height: 28, borderRadius: 6, justifyContent: "center", alignItems: "center" },
+  tableBtnIcon: { fontSize: 12, color: "#FFFFFF" },
 
-  tableCell: {
-    fontSize: 13,
-    color: TEXT_PRIMARY,
-  },
-  tableBtnEdit: {
-    backgroundColor: "#1d324e",
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tableBtnDelete: {
-    backgroundColor: "#ef4444",
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tableBtnIcon: {
-    fontSize: 12,
-    color: "#FFFFFF",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 48,
-    gap: 12,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: T.textM,
-    textAlign: "center",
-  },
-  retryBtn: {
-    backgroundColor: T.orange,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 14,
-  },
+  emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 48, gap: 12 },
+  emptyStateText: { fontSize: 14, color: T.textM, textAlign: "center" },
+  retryBtn: { backgroundColor: T.orange, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  retryBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
 });
