@@ -673,6 +673,7 @@ export default function SellersScreen() {
   const screen = getScreen(width);
   const isMobile = screen === 'xs';
   const isTablet = screen === 'sm';
+  const isNarrow = width < 768;
   const ipp = getPerPage(width);
 
   // Native only — web uses getWebCols inside WebGridView
@@ -835,8 +836,8 @@ export default function SellersScreen() {
         </View>
 
         {/* Toolbar */}
-        <View style={[SS.toolbar, isMobile && { flexDirection: 'column', gap: 10 }]}>
-          <View style={[SS.searchBox, isMobile && { width: '100%', maxWidth: 99999 }]}>
+        <View style={[SS.toolbar, isNarrow && { flexDirection: 'column', gap: 12, alignItems: 'stretch' }]}>
+          <View style={[SS.searchBox, isNarrow ? { flex: 0, width: '100%', maxWidth: '100%' } : { flex: 1 }]}>
             <IconSearch size={16} color={C.muted} />
             <TextInput
               style={SS.searchInput}
@@ -852,7 +853,7 @@ export default function SellersScreen() {
             )}
           </View>
 
-          <View style={SS.viewToggle}>
+          <View style={[SS.viewToggle, isNarrow && { marginLeft: 0, marginTop: 4, justifyContent: 'flex-start' }]}>
             <Text style={SS.viewLabel}>View:</Text>
             <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
               <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />

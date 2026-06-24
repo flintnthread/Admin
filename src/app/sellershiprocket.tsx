@@ -27,6 +27,8 @@ interface Seller {
   state: string;
   status: 'Not Uploaded' | 'Uploaded';
   uploadedAt?: string;
+  email?: string;
+  warehouseAddress?: string;
 }
 
 interface Props {
@@ -43,6 +45,8 @@ function mapShiprocketRow(row: ShiprocketSellerRow, status: Seller['status']): S
     state: row.state ?? '—',
     status,
     uploadedAt: row.uploadedAt ? formatDate(row.uploadedAt) : undefined,
+    email: row.email,
+    warehouseAddress: row.warehouseAddress,
   };
 }
 
@@ -168,10 +172,106 @@ const SellerShiprocket: React.FC<Props> = () => {
   const handleExport = useCallback(async () => {
     setExporting(true);
 
-    const headers = ['Business Name', 'Contact Person', 'Phone', 'City', 'State', 'Status'];
-    const rows = pendingSellers.map((s) =>
-      [s.businessName, s.contactPerson, s.phone, s.city, s.state, s.status].join(',')
-    );
+    const escapeCsvCell = (val: any) => {
+      if (val === undefined || val === null) return '';
+      let str = String(val).trim();
+      if (str === '—') return '';
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const headers = [
+      'Pickup Location Nickname',
+      'Contact Person Name',
+      'Phone Number',
+      'Alternate Phone Number',
+      'Email',
+      'Address Line 1',
+      'Address Line 2',
+      'City',
+      'State',
+      'Country',
+      'Pincode',
+      'Address Type',
+      'Vendor GSTIN',
+      'Vendor Name',
+      'RTO Location Nickname',
+      'RTO Address Line 1',
+      'RTO Address Line 2',
+      'RTO City',
+      'RTO State',
+      'RTO Country',
+      'RTO Pincode',
+      'RTO Email',
+      'RTO Phone',
+      'RTO Name',
+      'RTO Same as Pickup',
+      'Verify Via WhatsApp',
+      'Verify Via SMS'
+    ];
+
+    const rows = pendingSellers.map((s, idx) => {
+      const pickupNickname = s.businessName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10) || `SR${s.id}`;
+      const contactPerson = s.contactPerson !== '—' ? s.contactPerson : '';
+      const phone = s.phone !== '—' ? s.phone : '';
+      const email = s.email || `${s.businessName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'seller'}@example.com`;
+
+      let address1 = s.warehouseAddress || `${s.businessName} Warehouse`;
+      let address2 = '';
+      if (s.warehouseAddress && s.warehouseAddress !== '—' && s.warehouseAddress.length > 30) {
+        const mid = s.warehouseAddress.indexOf(',', 20);
+        if (mid !== -1) {
+          address1 = s.warehouseAddress.substring(0, mid).trim();
+          address2 = s.warehouseAddress.substring(mid + 1).trim();
+        }
+      }
+
+      const city = s.city !== '—' ? s.city : 'Delhi';
+      const state = s.state !== '—' ? s.state : 'Delhi';
+      const country = 'India';
+      const pincode = '110030';
+      const addressType = 'vendor';
+      const vendorGst = '';
+      const vendorName = contactPerson;
+
+      const rtoNickname = `RTOADR${idx + 1}`;
+      const rtoSameAsPickup = 'N';
+      const verifyWhatsApp = idx % 2 === 0 ? '1' : '';
+      const verifySms = idx % 2 !== 0 ? '1' : '';
+
+      return [
+        escapeCsvCell(pickupNickname),
+        escapeCsvCell(contactPerson),
+        escapeCsvCell(phone),
+        escapeCsvCell(''), // Alternate Phone
+        escapeCsvCell(email),
+        escapeCsvCell(address1),
+        escapeCsvCell(address2),
+        escapeCsvCell(city),
+        escapeCsvCell(state),
+        escapeCsvCell(country),
+        escapeCsvCell(pincode),
+        escapeCsvCell(addressType),
+        escapeCsvCell(vendorGst),
+        escapeCsvCell(vendorName),
+        escapeCsvCell(rtoNickname),
+        escapeCsvCell(''), // RTO Address 1
+        escapeCsvCell(''), // RTO Address 2
+        escapeCsvCell(''), // RTO City
+        escapeCsvCell(''), // RTO State
+        escapeCsvCell(''), // RTO Country
+        escapeCsvCell(''), // RTO Pincode
+        escapeCsvCell(''), // RTO Email
+        escapeCsvCell(''), // RTO Phone
+        escapeCsvCell(''), // RTO Name
+        escapeCsvCell(rtoSameAsPickup),
+        escapeCsvCell(verifyWhatsApp),
+        escapeCsvCell(verifySms)
+      ].join(',');
+    });
+
     const csv = [headers.join(','), ...rows].join('\n');
 
     if (Platform.OS === 'web') {
@@ -259,7 +359,7 @@ const SellerShiprocket: React.FC<Props> = () => {
     <View
       style={[
         styles.statsRow,
-        { paddingHorizontal: contentPadding, marginTop: -42, zIndex: 10, elevation: 10 },
+        { paddingHorizontal: contentPadding, marginTop: isMobile ? 12 : -42, zIndex: 10, elevation: 10 },
         isMobile && styles.statsRowMobile,
       ]}
     >
@@ -610,7 +710,7 @@ const SellerShiprocket: React.FC<Props> = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Page header */}
-          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: 68 }]}>
+          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: isMobile ? 20 : 68 }]}>
             {renderHeader()}
           </View>
 
