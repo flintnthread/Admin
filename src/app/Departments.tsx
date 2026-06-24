@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { Department as ApiDepartment } from "@/lib/api/types";
 import {
@@ -7,21 +8,20 @@ import {
     fetchDepartments,
     updateDepartment,
 } from "@/services/hrApi";
+import { Feather } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    SafeAreaView,
-    StatusBar,
-    TextInput,
     Modal,
     Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import AdminLayout from "@/components/admin-layout";
-import Pagination from "@/components/Pagination";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -384,7 +384,8 @@ const em = StyleSheet.create({
         borderRadius: 16,
         overflow: "hidden", // Prevents header from escaping border radius
     },
-    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
+    header: {
+        marginHorizontal: 2, marginTop: 12, borderRadius: 22,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1253,7 +1254,11 @@ const s = StyleSheet.create({
         flex: 1,
         fontSize: 13,
         color: T.textH,
-    },
+        borderWidth: 0,
+        outline: "none" as any,
+        outlineStyle: "none" as any,
+        outlineWidth: 0 as any,
+    } as any,
     filterGroup: {
         flexDirection: "row",
         gap: 8,
