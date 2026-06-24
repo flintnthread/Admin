@@ -359,7 +359,7 @@ const SellerShiprocket: React.FC<Props> = () => {
     <View
       style={[
         styles.statsRow,
-        { paddingHorizontal: contentPadding, marginTop: -42, zIndex: 10, elevation: 10 },
+        { paddingHorizontal: contentPadding, marginTop: isMobile ? 12 : -42, zIndex: 10, elevation: 10 },
         isMobile && styles.statsRowMobile,
       ]}
     >
@@ -710,7 +710,7 @@ const SellerShiprocket: React.FC<Props> = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Page header */}
-          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: 68 }]}>
+          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: isMobile ? 20 : 68 }]}>
             {renderHeader()}
           </View>
 

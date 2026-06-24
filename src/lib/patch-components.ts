@@ -105,10 +105,26 @@ const mapStyle = (style: any, isDark: boolean): any => {
   return mapped;
 };
 
+function copyStaticProperties(target: any, source: any) {
+  if (!source || !target) return;
+  Object.getOwnPropertyNames(source).forEach((key) => {
+    if (key !== "displayName" && key !== "render" && key !== "prototype") {
+      try {
+        const desc = Object.getOwnPropertyDescriptor(source, key);
+        if (desc) {
+          Object.defineProperty(target, key, desc);
+        }
+      } catch {
+        // Ignore read-only write errors
+      }
+    }
+  });
+}
+
 function safePatch(obj: any, key: string, value: any) {
   try {
     obj[key] = value;
-  } catch (e) {
+  } catch {
     try {
       Object.defineProperty(obj, key, {
         value: value,
@@ -152,6 +168,7 @@ export function patchComponents() {
     return React.createElement(OriginalText, { ...props, ref, style: newStyle });
   });
   PatchedText.displayName = "Text";
+  copyStaticProperties(PatchedText, OriginalText);
   safePatch(RN, "Text", PatchedText);
   safePatch(RN.Text, "__patched", true);
 
@@ -167,6 +184,7 @@ export function patchComponents() {
       return React.createElement(OriginalView, { ...props, ref, style: newStyle });
     });
     PatchedView.displayName = "View";
+    copyStaticProperties(PatchedView, OriginalView);
     safePatch(RN, "View", PatchedView);
     safePatch(RN.View, "__patched", true);
   }
@@ -190,6 +208,7 @@ export function patchComponents() {
       });
     });
     PatchedScrollView.displayName = "ScrollView";
+    copyStaticProperties(PatchedScrollView, OriginalScrollView);
     safePatch(RN, "ScrollView", PatchedScrollView);
     safePatch(RN.ScrollView, "__patched", true);
   }
@@ -221,6 +240,7 @@ export function patchComponents() {
       });
     });
     PatchedTextInput.displayName = "TextInput";
+    copyStaticProperties(PatchedTextInput, OriginalTextInput);
     safePatch(RN, "TextInput", PatchedTextInput);
     safePatch(RN.TextInput, "__patched", true);
   }
