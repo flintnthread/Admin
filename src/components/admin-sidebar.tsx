@@ -10,6 +10,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from "react-native";
 
 type Props = {
@@ -354,7 +355,7 @@ export default function AdminSidebar({
       {/* Scrollable nav items */}
       <ScrollView
         style={styles.navScroll}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 20 : 60 }}
         showsVerticalScrollIndicator={false}
       >
         {/* GENERAL */}
@@ -704,7 +705,7 @@ export default function AdminSidebar({
         </View>
 
         {/* CUSTOM */}
-        <View style={styles.section}>
+        <View style={[styles.section, { marginBottom: 0 }]}>
           {!collapsed && <Text style={styles.sectionTitle}>CUSTOM</Text>}
           {NAV_ITEMS.CUSTOM.map((item) => {
             const hasChildren = "children" in item;
