@@ -7,25 +7,24 @@
  *   All other imports are from react-native core.
  */
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate, initialsFromName } from '@/lib/format';
 import { fetchJobApplications, fetchJobs, updateJobApplicationStatus } from '@/services/hrApi';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  ScrollView,
   useWindowDimensions,
-  SafeAreaView,
-  Platform,
-  StatusBar,
+  View
 } from 'react-native';
-import AdminLayout from '@/components/admin-layout';
-import Pagination from '@/components/Pagination';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const C = {
@@ -45,6 +44,41 @@ const C = {
   tagText: '#4338CA',
   white: '#FFFFFF',
 };
+
+// ─── Bootstrap Icons via 'bootstrap-icons' Font Family ────────
+const BI_MAP: Record<string, string> = {
+  "file-earmark-text": "\uF339",
+  "hourglass-split": "\uF41C",
+  "eye": "\uF332",
+  "star-fill": "\uF586",
+  "mic-fill": "\uF4AD",
+  "x-circle-fill": "\uF659",
+  "x-lg": "\uF659",
+  "search": "\uF52A",
+  "arrow-counterclockwise": "\uF117",
+  "chevron-down": "\uF282",
+  "chevron-up": "\uF286",
+  "building": "\uF1D7",
+  "geo-alt-fill": "\uF390",
+  "envelope-fill": "\uF32F",
+  "inbox": "\uF42D",
+};
+
+type BIName = keyof typeof BI_MAP | string;
+
+const BI: React.FC<{ name: BIName; size?: number; color?: string; style?: object }> = ({
+  name,
+  size = 15,
+  color = C.sub,
+  style,
+}) => (
+  <Text
+    style={[{ fontFamily: "bootstrap-icons", fontSize: size, color, lineHeight: size + 4 }, style]}
+    accessible={false}
+  >
+    {BI_MAP[name] ?? "•"}
+  </Text>
+);
 
 const AVATAR_COLORS = ['#5B4EFF', '#8B5CF6', '#06B6D4', '#F97316', '#EF4444', '#10B981', '#F59E0B', '#EC4899'];
 
@@ -72,20 +106,20 @@ function mapApplication(a: import('@/lib/api/types').JobApplication, index: numb
 }
 
 const STATUS_CONFIG = {
-  Pending: { color: C.pending, bg: '#FFF7ED', icon: '⏳' },
-  Reviewed: { color: C.reviewed, bg: '#ECFEFF', icon: '👁️' },
-  Shortlisted: { color: C.shortlisted, bg: '#ECFDF5', icon: '⭐' },
-  Interviewed: { color: C.interviewed, bg: '#F5F3FF', icon: '🎤' },
-  Rejected: { color: C.rejected, bg: '#FEF2F2', icon: '✕' },
+  Pending: { color: C.pending, bg: '#FFF7ED', icon: 'hourglass-split' },
+  Reviewed: { color: C.reviewed, bg: '#ECFEFF', icon: 'eye' },
+  Shortlisted: { color: C.shortlisted, bg: '#ECFDF5', icon: 'star-fill' },
+  Interviewed: { color: C.interviewed, bg: '#F5F3FF', icon: 'mic-fill' },
+  Rejected: { color: C.rejected, bg: '#FEF2F2', icon: 'x-circle-fill' },
 };
 
 const STAT_CARDS = [
-  { key: 'total', label: 'Total', color: C.total, icon: '📋' },
-  { key: 'Pending', label: 'Pending', color: C.pending, icon: '⏳' },
-  { key: 'Reviewed', label: 'Reviewed', color: C.reviewed, icon: '👁️' },
-  { key: 'Shortlisted', label: 'Shortlisted', color: C.shortlisted, icon: '⭐' },
-  { key: 'Interviewed', label: 'Interviewed', color: C.interviewed, icon: '🎤' },
-  { key: 'Rejected', label: 'Rejected', color: C.rejected, icon: '✕' },
+  { key: 'total', label: 'Total', color: C.total, icon: 'file-earmark-text' },
+  { key: 'Pending', label: 'Pending', color: C.pending, icon: 'hourglass-split' },
+  { key: 'Reviewed', label: 'Reviewed', color: C.reviewed, icon: 'eye' },
+  { key: 'Shortlisted', label: 'Shortlisted', color: C.shortlisted, icon: 'star-fill' },
+  { key: 'Interviewed', label: 'Interviewed', color: C.interviewed, icon: 'mic-fill' },
+  { key: 'Rejected', label: 'Rejected', color: C.rejected, icon: 'x-circle-fill' },
 ];
 
 const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'];
@@ -95,10 +129,16 @@ const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewe
 
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: C.sub, bg: C.bg, icon: '•' };
+  const isBI = cfg.icon !== '•';
   return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+    <View style={[styles.badge, { backgroundColor: cfg.bg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+      {isBI ? (
+        <BI name={cfg.icon} size={11} color={cfg.color} />
+      ) : (
+        <Text style={{ color: cfg.color }}>•</Text>
+      )}
       <Text style={[styles.badgeText, { color: cfg.color }]}>
-        {cfg.icon}  {status}
+        {status}
       </Text>
     </View>
   );
@@ -115,8 +155,8 @@ function Avatar({ initials, color, size = 44 }: { initials: string, color: strin
 function StatCard({ label, count, color, icon, isWeb }: { label: string, count: number | string, color: string, icon: string, isWeb: boolean }) {
   return (
     <View style={[styles.statCard, isWeb && styles.statCardWeb, { borderTopColor: color }]}>
-      <View style={[styles.statIcon, { backgroundColor: color + '18' }]}>
-        <Text style={{ fontSize: 18 }}>{icon}</Text>
+      <View style={[styles.statIcon, { backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center' }]}>
+        <BI name={icon} size={16} color={color} />
       </View>
       <View>
         <Text style={[styles.statCount, { color }]}>{count}</Text>
@@ -147,9 +187,18 @@ function ApplicationCard({
         <Text style={styles.appName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.appRole} numberOfLines={1}>{item.role}</Text>
         <View style={styles.appMeta}>
-          <Text style={styles.metaChip}>🏢 {item.department}</Text>
-          <Text style={styles.metaChip}>📍 {item.location}</Text>
-          <Text style={styles.metaChip}>✉️ {item.experience}</Text>
+          <View style={styles.metaChip}>
+            <BI name="building" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.department}</Text>
+          </View>
+          <View style={styles.metaChip}>
+            <BI name="geo-alt-fill" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.location}</Text>
+          </View>
+          <View style={styles.metaChip}>
+            <BI name="envelope-fill" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.experience}</Text>
+          </View>
         </View>
       </View>
 
@@ -199,7 +248,7 @@ function Dropdown({ value, options, onSelect, placeholder }: { value: string, op
     <View style={styles.dropdownWrap}>
       <TouchableOpacity style={styles.dropdownBtn} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <Text style={styles.dropdownText} numberOfLines={1}>{value || placeholder}</Text>
-        <Text style={styles.dropdownArrow}>{open ? '▲' : '▼'}</Text>
+        <BI name={open ? 'chevron-up' : 'chevron-down'} size={10} color={C.sub} />
       </TouchableOpacity>
       {open && (
         <View style={styles.dropdownMenu}>
@@ -339,7 +388,7 @@ export default function JobApplicationsScreen() {
           {/* ── Filters ── */}
           <View style={[styles.filterRow, isWeb && styles.filterRowWeb]}>
             <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <BI name="search" size={14} color={C.sub} style={{ marginRight: 8 }} />
               <TextInput
                 style={[styles.searchInput, { outlineStyle: "none" as any }]}
                 placeholder="Search applicants..."
@@ -349,7 +398,7 @@ export default function JobApplicationsScreen() {
               />
               {search.length > 0 && (
                 <TouchableOpacity onPress={() => { setSearch(''); setCurrentPage(1); }}>
-                  <Text style={{ color: C.sub, fontSize: 16, paddingHorizontal: 8 }}>✕</Text>
+                  <BI name="x-lg" size={13} color={C.sub} style={{ paddingHorizontal: 8 }} />
                 </TouchableOpacity>
               )}
             </View>
@@ -357,11 +406,12 @@ export default function JobApplicationsScreen() {
               <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
               <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
               <TouchableOpacity
-                style={styles.resetBtn}
+                style={[styles.resetBtn, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}
                 onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.resetBtnText}>↺ Reset</Text>
+                <BI name="arrow-counterclockwise" size={13} color={C.primary} />
+                <Text style={styles.resetBtnText}>Reset</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -388,7 +438,7 @@ export default function JobApplicationsScreen() {
             </View>
           ) : filtered.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyIcon}>📭</Text>
+              <BI name="inbox" size={48} color={C.sub} style={{ marginBottom: 16 }} />
               <Text style={styles.emptyTitle}>No Applications Found</Text>
               <Text style={styles.emptySub}>Try adjusting your filters to see more results.</Text>
             </View>
@@ -455,7 +505,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: 8,
   },
-  headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22,
+  headerWeb: {
+    marginHorizontal: 16, marginTop: 16, borderRadius: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -663,8 +714,20 @@ const styles = StyleSheet.create({
   appInfo: { flex: 1, gap: 3 },
   appName: { fontSize: 15, fontWeight: '800', color: C.text },
   appRole: { fontSize: 12, color: C.sub, fontWeight: '500' },
-  appMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  metaChip: { fontSize: 11, color: C.sub, backgroundColor: C.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  appMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: C.bg,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  metaChipText: {
+    fontSize: 11,
+    color: C.sub,
+  },
   appRight: { alignItems: 'flex-end', gap: 6 },
   appDate: { fontSize: 11, color: C.sub },
   statusPickerWrap: { position: 'relative' },

@@ -518,12 +518,21 @@ function VariantsTab({
             </View>
           </ScrollView>
         </View>
-      ) : (
-        <View style={viewMode === 'grid' && isWide ? styles.variantGrid : styles.variantCardList}>
+      ) : isWide ? (
+        <View style={viewMode === 'grid' ? styles.variantGrid : styles.variantCardList}>
           {variants.map((v) => (
-            <VariantCard key={v.id} variant={v} compact={!isWide} />
+            <VariantCard key={v.id} variant={v} compact={false} />
           ))}
         </View>
+      ) : (
+        // Mobile: horizontal scrollable cards
+        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginHorizontal: -4 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 4, paddingBottom: 8 }}>
+          {variants.map((v) => (
+            <View key={v.id} style={{ width: 260 }}>
+              <VariantCard variant={v} compact={true} />
+            </View>
+          ))}
+        </ScrollView>
       )}
     </View>
   );
@@ -1039,7 +1048,7 @@ export default function ProductDetailsScreen() {
     <AdminLayout>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, !isWide && styles.headerMobile]}>
           <View style={styles.headerLeft}>
             <Pressable style={styles.backBtn} onPress={() => router.back()}>
               <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
@@ -1047,11 +1056,13 @@ export default function ProductDetailsScreen() {
             </Pressable>
             <View>
               <Text style={styles.headerTitle} numberOfLines={2}>
-                {product.name}
+                {isWide ? product.name : "Product Detail"}
               </Text>
-              <Text style={styles.headerSub} numberOfLines={1}>
-                {product.category} · {product.seller} · Updated {product.lastUpdated}
-              </Text>
+              {isWide && (
+                <Text style={styles.headerSub} numberOfLines={1}>
+                  {product.category} · {product.seller} · Updated {product.lastUpdated}
+                </Text>
+              )}
             </View>
           </View>
           {canReview && isWide ? (
@@ -1132,11 +1143,11 @@ export default function ProductDetailsScreen() {
           <View style={styles.heroCard}>
             <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
               {/* Gallery */}
-              <View style={styles.galleryCol}>
-                <View style={styles.mainImageWrap}>
+              <View style={[styles.galleryCol, !isWide && styles.galleryColMobile]}>
+                <View style={[styles.mainImageWrap, !isWide && { borderRadius: 0 }]}>
                   <Image
                     source={{ uri: product.gallery[activeImage] || product.image }}
-                    style={styles.mainImage}
+                    style={[styles.mainImage, !isWide && styles.mainImageMobile]}
                     contentFit="cover"
                   />
                   {product.discount > 0 ? (
@@ -1149,8 +1160,11 @@ export default function ProductDetailsScreen() {
                     <Text style={styles.stockBadgeText}>{product.stock} units</Text>
                   </View>
                 </View>
-                <View style={styles.thumbRow}>
-                  <Pressable style={styles.thumbNav}>
+                <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 10 }]}>
+                  <Pressable 
+                    style={styles.thumbNav}
+                    onPress={() => setActiveImage(prev => Math.max(0, prev - 1))}
+                  >
                     <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
                   </Pressable>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
@@ -1160,18 +1174,22 @@ export default function ProductDetailsScreen() {
                           source={{ uri }}
                           style={[styles.thumb, activeImage === index && styles.thumbActive]}
                           contentFit="cover"
+                          pointerEvents="none"
                         />
                       </Pressable>
                     ))}
                   </ScrollView>
-                  <Pressable style={styles.thumbNav}>
+                  <Pressable 
+                    style={styles.thumbNav}
+                    onPress={() => setActiveImage(prev => Math.min(product.gallery.length - 1, prev + 1))}
+                  >
                     <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
                   </Pressable>
                 </View>
               </View>
 
               {/* Product info */}
-              <View style={styles.infoCol}>
+              <View style={[styles.infoCol, !isWide && styles.infoColMobile]}>
                 <View style={styles.infoTopRow}>
                   <View style={styles.categoryPill}>
                     <Text style={styles.categoryPillText}>
@@ -1238,68 +1256,57 @@ export default function ProductDetailsScreen() {
           </View>
 
           {/* Tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            {TABS.map((tab) => {
-              const active = activeTab === tab.key;
-              return (
-                <Pressable
-                  key={tab.key}
-                  onPress={() => setActiveTab(tab.key)}
-                  style={[styles.tab, active && styles.tabActive]}>
-                  {tab.key === 'overview' && (
-                    <MaterialCommunityIcons
-                      name="information-outline"
-                      size={14}
-                      color={active ? '#FFF' : PALETTE.textSecondary}
-                    />
-                  )}
-                  {tab.key === 'variants' && (
-                    <MaterialCommunityIcons
-                      name="tune"
-                      size={14}
-                      color={active ? '#FFF' : PALETTE.textSecondary}
-                    />
-                  )}
-                  {tab.key === 'specifications' && (
-                    <MaterialCommunityIcons
-                      name="clipboard-list-outline"
-                      size={14}
-                      color={active ? '#FFF' : PALETTE.textSecondary}
-                    />
-                  )}
-                  {tab.key === 'delivery' && (
-                    <MaterialCommunityIcons
-                      name="truck-outline"
-                      size={14}
-                      color={active ? '#FFF' : PALETTE.textSecondary}
-                    />
-                  )}
-                  {tab.key === 'returns' && (
-                    <MaterialCommunityIcons
-                      name="backup-restore"
-                      size={14}
-                      color={active ? '#FFF' : PALETTE.textSecondary}
-                    />
-                  )}
-                  {tab.key === 'sizechart' && (
-                    <MaterialCommunityIcons
-                      name="ruler"
-                      size={14}
-                      color={active ? '#FFF' : PALETTE.textSecondary}
-                    />
-                  )}
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
-                  {tab.key === 'variants' && (
-                    <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
-                      <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>
-                        {variants.length}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          {isWide ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+              {TABS.map((tab) => {
+                const active = activeTab === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => setActiveTab(tab.key)}
+                    style={[styles.tab, active && styles.tabActive]}>
+                    {tab.key === 'overview' && <MaterialCommunityIcons name="information-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'variants' && <MaterialCommunityIcons name="tune" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'specifications' && <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'delivery' && <MaterialCommunityIcons name="truck-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'returns' && <MaterialCommunityIcons name="backup-restore" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'sizechart' && <MaterialCommunityIcons name="ruler" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                    {tab.key === 'variants' && (
+                      <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                        <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{variants.length}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={styles.tabsGrid}>
+              {TABS.map((tab) => {
+                const active = activeTab === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => setActiveTab(tab.key)}
+                    style={[styles.tab, styles.tabMobile, active && styles.tabActive]}>
+                    {tab.key === 'overview' && <MaterialCommunityIcons name="information-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'variants' && <MaterialCommunityIcons name="tune" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'specifications' && <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'delivery' && <MaterialCommunityIcons name="truck-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'returns' && <MaterialCommunityIcons name="backup-restore" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    {tab.key === 'sizechart' && <MaterialCommunityIcons name="ruler" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                    {tab.key === 'variants' && (
+                      <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                        <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{variants.length}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
 
           {/* Overview tab */}
           {activeTab === 'overview' && (
@@ -1376,6 +1383,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  headerMobile: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    borderRadius: 0,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   backBtn: {
@@ -1477,18 +1489,21 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: PALETTE.cardBg,
     borderRadius: 14,
-    padding: 16,
     borderWidth: 1,
     borderColor: PALETTE.border,
+    overflow: 'hidden',
     ...(Platform.OS === 'web' ? { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' } : {}),
   },
-  heroLayout: { flexDirection: 'row', gap: 24 },
-  heroLayoutMobile: { flexDirection: 'column' },
+  heroLayout: { flexDirection: 'row', gap: 24, padding: 16 },
+  heroLayoutMobile: { flexDirection: 'column', padding: 0 },
   galleryCol: { flex: 1, minWidth: 0 },
+  galleryColMobile: { width: '100%' },
   infoCol: { flex: 1, minWidth: 0, gap: 10 },
+  infoColMobile: { padding: 14, gap: 10 },
 
-  mainImageWrap: { position: 'relative', borderRadius: 12, overflow: 'hidden' },
+  mainImageWrap: { position: 'relative', overflow: 'hidden' },
   mainImage: { width: '100%', height: 280, backgroundColor: PALETTE.pageBg },
+  mainImageMobile: { height: 240, borderRadius: 0 },
   discountBadge: {
     position: 'absolute',
     top: 12,
@@ -1568,6 +1583,7 @@ const styles = StyleSheet.create({
   footerTagText: { fontSize: 11, fontWeight: '600', color: PALETTE.textSecondary },
 
   tabs: { gap: 8, paddingVertical: 4 },
+  tabsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 4 },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1579,6 +1595,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.border,
   },
+  tabMobile: { width: '48%' as any },
   tabActive: { backgroundColor: PALETTE.tabActive, borderColor: PALETTE.tabActive },
   tabText: { fontSize: 13, fontWeight: '600', color: PALETTE.textSecondary },
   tabTextActive: { color: '#FFF' },

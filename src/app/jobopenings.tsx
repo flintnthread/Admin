@@ -1814,7 +1814,11 @@ const s = StyleSheet.create({
         flex: 1,
         fontSize: 13,
         color: T.textH,
-    },
+        borderWidth: 0,
+        outline: "none" as any,
+        outlineStyle: "none" as any,
+        outlineWidth: 0 as any,
+    } as any,
     filterRow: {
         flexDirection: "row",
         alignItems: "center",

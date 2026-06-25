@@ -3279,7 +3279,7 @@ export default function OrdersScreen() {
               ]}
             >
               {statCards.map((stat, i) => (
-                <View key={i} style={s.statCard}>
+                <View key={i} style={[s.statCard, isMobile && { width: '48%', flex: undefined, minWidth: undefined, maxWidth: undefined }]}>
                   <View
                     style={[s.statIconBox, { backgroundColor: stat.iconBg }]}
                   >
@@ -3629,7 +3629,7 @@ const s = StyleSheet.create({
     marginTop: -42,
     marginBottom: 4,
   },
-  statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26 },
+  statCardsWrapMobile: { flexWrap: "wrap", gap: 8, marginTop: -26, justifyContent: "space-between" },
   statCard: {
     flex: 1,
     flexDirection: "row",

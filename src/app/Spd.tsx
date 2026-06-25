@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Modal,
     Platform,
     ScrollView,
@@ -546,13 +547,10 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                             <View style={invStyles.brandRow}>
                                 <View style={invStyles.brandLeft}>
                                     <View style={invStyles.logoRow}>
-                                        <View style={invStyles.logoMark}>
-                                            <Text style={invStyles.logoMarkText}>FT</Text>
-                                        </View>
-                                        <Text style={invStyles.logoText}>
-                                            <Text style={{ color: TEXT_HEAD }}>{COMPANY.name1} </Text>
-                                            <Text style={{ color: PRIMARY }}>{COMPANY.name2}</Text>
-                                        </Text>
+                                        <Image
+                                            source={require("../../assets/images/flint-thread-logo.png")}
+                                            style={{ height: 40, width: 150, resizeMode: "contain" }}
+                                        />
                                     </View>
                                     <Text style={invStyles.tagline}>{COMPANY.tagline}</Text>
                                     <View style={{ marginTop: 10, gap: 2 }}>

@@ -5,6 +5,7 @@
 // Uses @expo/vector-icons (Ionicons) – swap with react-native-vector-icons if not using Expo
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
@@ -506,22 +507,7 @@ function GridCard({ user, index, onEdit, onDelete }: { user: User; index: number
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
-function Pagination({ total }: { total: number }) {
-  return (
-    <View style={styles.pagination}>
-      <Text style={styles.paginationText}>Showing 1 – {total} of {total} users</Text>
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <TouchableOpacity style={styles.pageBtn}>
-          <Icon name="chevron-back" size={16} color={C.subtext} />
-        </TouchableOpacity>
-        <View style={styles.pageActive}><Text style={styles.pageActiveText}>1</Text></View>
-        <TouchableOpacity style={styles.pageBtn}>
-          <Icon name="chevron-forward" size={16} color={C.subtext} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+// (Using reusable component from @/components/Pagination)
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function AdminUsersScreen() {
@@ -533,6 +519,8 @@ export default function AdminUsersScreen() {
   const [addVisible, setAddVisible] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   const isWide = IS_WEB_WIDE;
@@ -558,6 +546,20 @@ export default function AdminUsersScreen() {
     }
     return a.name.localeCompare(b.name);
   });
+
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedUsers = sorted.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   async function handleAdd(form: UserForm) {
     try {
@@ -608,21 +610,7 @@ export default function AdminUsersScreen() {
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity>
-          <Icon name="menu" size={26} color={C.white} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Admin Users</Text>
-        <View style={styles.topBarIcons}>
-          <TouchableOpacity style={styles.topBarAdd} onPress={() => setAddVisible(true)}>
-            <Icon name="add" size={20} color={C.white} />
-          </TouchableOpacity>
-          <TouchableOpacity><Icon name="search-outline" size={22} color={C.white} /></TouchableOpacity>
-          <View style={{ position: "relative" }}>
-            <TouchableOpacity><Icon name="notifications-outline" size={22} color={C.white} /></TouchableOpacity>
-            <View style={styles.notifBadge}><Text style={styles.notifBadgeText}>2</Text></View>
-          </View>
-          <View style={styles.avatarSmall}><Text style={styles.avatarSmallText}>FL</Text></View>
-        </View>
+        <Text style={styles.topBarTitle}>Admin Panel Users</Text>
       </View>
 
       {/* Content */}
@@ -667,13 +655,20 @@ export default function AdminUsersScreen() {
           </View> */}
 
           {/* User Cards */}
-          {sorted.map((u, i) => (
+          {paginatedUsers.map((u, i) => (
             <UserCard key={u.id} user={u} index={i}
               onEdit={u => setEditUser(u)}
               onDelete={u => setDeleteUser(u)} />
           ))}
 
-          <Pagination total={users.length} />
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={ITEMS_PER_PAGE}
+            itemName="users"
+            onPageChange={setCurrentPage}
+          />
         </ScrollView>
       </View>
 
@@ -764,7 +759,7 @@ export default function AdminUsersScreen() {
                   ]}>{h.label}</Text>
                 ))}
               </View>
-              {sorted.map((u, i) => (
+              {paginatedUsers.map((u, i) => (
                 <TableRow key={u.id} user={u} index={i}
                   selected={selectedUserId === u.id}
                   onPress={() => setSelectedUserId(selectedUserId === u.id ? null : u.id)}
@@ -778,7 +773,7 @@ export default function AdminUsersScreen() {
         {/* ── GRID VIEW ── */}
         {viewMode === "grid" && (
           <View style={styles.gridContainer}>
-            {sorted.map((u, i) => (
+            {paginatedUsers.map((u, i) => (
               <GridCard key={u.id} user={u} index={i}
                 onEdit={u => setEditUser(u)}
                 onDelete={u => setDeleteUser(u)} />
@@ -786,7 +781,14 @@ export default function AdminUsersScreen() {
           </View>
         )}
 
-        <Pagination total={users.length} />
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={ITEMS_PER_PAGE}
+          itemName="users"
+          onPageChange={setCurrentPage}
+        />
 
         {/* Footer */}
         <View style={styles.webFooter}>
