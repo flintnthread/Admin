@@ -84,20 +84,28 @@ export function mapProductToApprovalRow(p: ProductSummary) {
 export function mapProductListToApprovalRow(
   p: ProductSummary & {
     sellerName?: string;
+    sellerEmail?: string;
     categoryName?: string;
+    mainCategoryName?: string;
+    subcategoryName?: string;
     imageUrl?: string;
     price?: number;
   },
 ) {
+  const categoryLabel = [p.mainCategoryName, p.categoryName, p.subcategoryName]
+    .filter(Boolean)
+    .join(" › ") || p.categoryName || "—";
+
   return {
     id: String(p.id),
     name: p.name ?? "Product",
     sku: p.sku ?? "—",
     seller: p.sellerName ?? `Seller #${p.sellerId ?? "—"}`,
+    sellerEmail: p.sellerEmail ?? "",
     status: mapProductStatus(p.status),
     submittedAt: formatDate(p.createdAt),
     image: resolveMediaUrl(p.imageUrl),
-    category: p.categoryName ?? "—",
+    category: categoryLabel,
     price: p.price != null ? formatRupee(p.price) : "—",
   };
 }
@@ -170,6 +178,9 @@ export function mapPayoutToPaymentRow(p: PayoutSummary) {
     ? deliveryAt.split("T")[1]?.slice(0, 5) ?? ""
     : "";
 
+  const breakdown = p.amountBreakdown;
+  const finalPayable = breakdown?.finalPayableAmount ?? p.requestedAmount;
+
   return {
     id: p.id,
     orderId: p.orderNumber ?? (p.orderId ? `FNT${p.orderId}` : `ORDER-${p.id}`),
@@ -178,6 +189,8 @@ export function mapPayoutToPaymentRow(p: PayoutSummary) {
     sellerName: p.sellerName ?? `Seller #${p.sellerId ?? ""}`,
     sellerEmail: p.sellerEmail ?? "",
     sellerPhone: p.sellerPhone ?? "",
+    customerName: p.customerName ?? "",
+    customerEmail: p.customerEmail ?? "",
     customerPaid: formatRupee(p.customerPaidAmount ?? p.requestedAmount),
     deliveryDate: formatDate(deliveryAt ?? p.requestedAt),
     deliveryTime,
@@ -188,7 +201,98 @@ export function mapPayoutToPaymentRow(p: PayoutSummary) {
     walletBalance: formatRupee(p.walletBalance ?? 0),
     transactionRef: p.transactionRef ?? "",
     adminNote: p.adminNote ?? "",
-    sellerNote: p.sellerNote ?? "",
+    sellerRequestNote: p.sellerNote ?? "",
+    bankName: p.bankName,
+    branchName: p.branchName,
+    accountNumber: p.accountNumber,
+    ifscCode: p.ifscCode,
+    accountHolderName: p.accountHolderName,
+    orderAmount: breakdown?.orderAmount != null ? formatRupee(breakdown.orderAmount) : formatRupee(p.customerPaidAmount),
+    gstAmount: breakdown?.gstAmount != null ? `-${formatRupee(breakdown.gstAmount)}` : "-₹0.00",
+    deliveryCharge: breakdown?.deliveryCharge != null ? `-${formatRupee(breakdown.deliveryCharge)}` : "-₹0.00",
+    deliveryType: breakdown?.deliveryType ?? "Intra-City",
+    commissionRate: breakdown?.commissionRate != null ? String(breakdown.commissionRate) : "15.00",
+    commissionAmount: breakdown?.commissionAmount != null ? `-${formatRupee(breakdown.commissionAmount)}` : "-₹0.00",
+    finalPayableAmount: formatRupee(finalPayable),
+  };
+}
+
+function toNum(value: unknown): number {
+  if (value == null || value === "") return 0;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Full payout detail for Spd (view) screen — includes shipping, items, numeric breakdown. */
+export function mapPayoutDetailToSpdOrder(raw: Record<string, unknown>) {
+  const base = mapPayoutToPaymentRow(raw as PayoutSummary);
+  const breakdown = (raw.amountBreakdown ?? {}) as PayoutSummary["amountBreakdown"];
+  const items = Array.isArray(raw.items) ? (raw.items as PayoutSummary["items"]) : [];
+  const first = items?.[0];
+
+  const customerPaidNum = toNum(raw.customerPaidAmount ?? breakdown?.orderAmount);
+  const orderAmountNum = toNum(breakdown?.orderAmount ?? customerPaidNum);
+  const gstAmountNum = toNum(breakdown?.gstAmount);
+  const deliveryChargeNum = toNum(breakdown?.deliveryCharge);
+  const commissionRateNum = toNum(breakdown?.commissionRate ?? 15);
+  const commissionAmountNum = toNum(breakdown?.commissionAmount);
+  const finalPayableNum = toNum(breakdown?.finalPayableAmount ?? raw.requestedAmount);
+
+  const deliveryType = breakdown?.deliveryType ?? "Intra-City";
+  const cityType = deliveryType.toLowerCase().includes("metro") ? "Metro-Metro" : "Intra-City";
+
+  const sellingWithGst = customerPaidNum;
+  const gstPct = sellingWithGst > 0 ? +((gstAmountNum / sellingWithGst) * 100).toFixed(2) : 0;
+  const sellingExclGst = +(sellingWithGst - gstAmountNum).toFixed(2);
+
+  return {
+    ...base,
+    customerPhone: String(raw.shippingPhone ?? ""),
+    shippingAddressLine1: String(raw.shippingAddress1 ?? ""),
+    shippingAddressLine2: String(raw.shippingAddress2 ?? ""),
+    shippingCity: String(raw.shippingCity ?? ""),
+    shippingState: String(raw.shippingState ?? ""),
+    shippingPincode: String(raw.shippingPincode ?? ""),
+    cityType,
+    sellerGstin: String(raw.sellerGstin ?? ""),
+    sellerAddressLine1: String(raw.sellerAddress ?? ""),
+    sellerAddressLine2: "",
+    sellerCity: String(raw.sellerCity ?? ""),
+    sellerState: String(raw.sellerState ?? ""),
+    sellerPincode: String(raw.sellerPincode ?? ""),
+    bankAccountHolder: base.accountHolderName ?? String(raw.accountHolderName ?? ""),
+    bankAccountNumber: base.accountNumber ?? String(raw.accountNumber ?? ""),
+    bankIfsc: base.ifscCode ?? String(raw.ifscCode ?? ""),
+    itemDescription: first?.productName ?? "",
+    hsn: first?.hsnCode ?? "",
+    sku: first?.sku ?? "",
+    qty: first?.quantity ?? 1,
+    basePrice: toNum(first?.price),
+    totalAmount: toNum(first?.total) || orderAmountNum,
+    items: (items ?? []).map((item) => ({
+      productName: item.productName ?? "",
+      hsn: item.hsnCode ?? "",
+      sku: item.sku ?? "",
+      qty: item.quantity ?? 1,
+      basePrice: toNum(item.price),
+      total: toNum(item.total),
+    })),
+    orderRef: base.orderId,
+    customerPaidNum,
+    orderAmountNum,
+    gstAmountNum,
+    deliveryChargeNum,
+    commissionAmountNum,
+    commissionRateNum,
+    finalPayableNum,
+    sellingPriceWithGst: sellingWithGst,
+    sellingPriceExclGst: sellingExclGst,
+    gstAmount: gstAmountNum,
+    gstPercent: gstPct,
+    commissionPercent: commissionRateNum,
+    commissionAmount: commissionAmountNum,
+    sellingPlusCommission: +(sellingWithGst + commissionAmountNum).toFixed(2),
+    invoiceNumber: String(raw.invoiceNumber ?? ""),
   };
 }
 

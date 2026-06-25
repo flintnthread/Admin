@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -18,6 +19,8 @@ export default function ProfileScreen() {
   const { user } = useAuth();
   const colors = useTheme();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -50,23 +53,25 @@ export default function ProfileScreen() {
     <AdminLayout>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: isMobile ? 0 : 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Breadcrumb */}
-        <View style={styles.breadcrumb}>
-          <TouchableOpacity onPress={() => router.replace("/Dashboard")}>
-            <Text style={{ color: "#e8731a", fontSize: 13, fontWeight: "600" }}>🏠 Dashboard</Text>
-          </TouchableOpacity>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}> › </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>My Profile</Text>
+        <View style={[styles.pageHeaderWrapper, isMobile && { marginHorizontal: 12, marginTop: 12, borderRadius: 16, padding: 16 }]}>
+          {/* Header Breadcrumb */}
+          <View style={styles.breadcrumb}>
+            <TouchableOpacity onPress={() => router.replace("/Dashboard")}>
+              <Text style={{ color: "#cbd5e1", fontSize: 13, fontWeight: "600" }}>🏠 Dashboard</Text>
+            </TouchableOpacity>
+            <Text style={{ color: "#94a3b8", fontSize: 13 }}> › </Text>
+            <Text style={{ color: "#f1f5f9", fontSize: 13 }}>My Profile</Text>
+          </View>
+
+          <Text style={[styles.title, { color: "#ffffff", marginBottom: 0 }]}>Admin Profile</Text>
         </View>
 
-        <Text style={[styles.title, { color: colors.text }]}>Admin Profile</Text>
-
-        <View style={styles.contentContainer}>
+        <View style={[styles.contentContainer, isMobile && { flexDirection: "column", paddingHorizontal: 12, marginTop: 0 }]}>
           {/* Left Column: Avatar & Role */}
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, !isMobile && { flex: 1 }, isMobile && { width: "100%" }]}>
             <View style={styles.avatarSection}>
               <View style={[styles.avatar, { backgroundColor: "#e8731a" }]}>
                 <Text style={styles.avatarText}>{initials}</Text>
@@ -86,7 +91,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Right Column: Account Details & Password Update */}
-          <View style={{ flex: 2, gap: 20 }}>
+          <View style={[{ gap: 20 }, !isMobile ? { flex: 2 } : { width: "100%" }]}>
             {/* Account Details Card */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Account Details</Text>
@@ -118,7 +123,7 @@ export default function ProfileScreen() {
             {/* Password Update Card */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Change Password</Text>
-              
+
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Current Password</Text>
                 <TextInput
@@ -194,7 +199,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 20,
     minWidth: 280,
-    flex: 1,
   },
   avatarSection: {
     alignItems: "center",
@@ -270,15 +274,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   btn: {
-    height: 40,
-    borderRadius: 6,
+    height: 48,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   btnText: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 13,
+    fontSize: 15,
+  },
+  pageHeaderWrapper: {
+    backgroundColor: '#151D4F',
+    padding: 24,
+    borderRadius: 22,
+    marginBottom: 24,
   },
 });

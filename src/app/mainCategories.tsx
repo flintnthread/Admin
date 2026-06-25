@@ -1,8 +1,19 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
+import {
+  fetchMainCategories,
+  fetchSubcategories,
+  fetchCategoryCounts,
+  createMainCategory,
+  createSubcategory,
+  updateCategory,
+  deleteCategory,
+  type CategoryRow,
+  type CategoryCounts,
+} from "@/services/categoryApi";
 import {
   Alert,
   Image,
@@ -369,28 +380,17 @@ const GST_RATES = [
   "28% (Luxury rate)",
 ];
 
-const MAIN_CATEGORIES = [
-  "Accessories",
-  "Beauty & Personal Care",
-  "Footwear",
-  "Homely Hub",
-  "Indoor Play",
-  "Kids",
-  "Men",
-  "Sportswear",
-  "Sweets",
-  "Women",
-];
 
 const ITEMS_PER_PAGE = 8;
 
-// ─── Sample Data ──────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────
 
 interface Category {
   id: number;
   name: string;
   type: "Main Category" | "Category";
   parent?: string;
+  parentId?: number | null;
   hsn: string;
   gst: string;
   created: string;
@@ -636,7 +636,7 @@ const Dropdown = ({
 
 // ─── Add Main Category Modal ──────────────────────────────────────────────────
 
-const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { visible: boolean; onClose: () => void; onSave: (data: any) => void; isWeb: boolean; editData?: Category | null; }) => {
+const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { visible: boolean; onClose: () => void; onSave: (data: any) => Promise<void>; isWeb: boolean; editData?: Category | null; }) => {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [hsn, setHsn] = useState("");
@@ -836,12 +836,14 @@ const AddCategoryModal = ({
   onSave,
   isWeb,
   editData,
+  mainCategories,
 }: {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   isWeb: boolean;
   editData?: Category | null;
+  mainCategories: Category[];
 }) => {
   const [mainCat, setMainCat] = useState("");
   const [name, setName] = useState("");
@@ -887,8 +889,10 @@ const AddCategoryModal = ({
       Alert.alert("Required", "Please select GST percentage.");
       return;
     }
+    const selectedMain = mainCategories.find(c => c.name === mainCat);
     onSave({
       id: editData?.id,
+      parentId: selectedMain?.id,
       name,
       image,
       hsn,
@@ -955,7 +959,7 @@ const AddCategoryModal = ({
               <Dropdown
                 value={mainCat}
                 placeholder="-- Select Main Category --"
-                options={MAIN_CATEGORIES}
+                options={mainCategories.map(c => c.name)}
                 onChange={setMainCat}
               />
             </View>
@@ -1332,11 +1336,78 @@ export default function MainCategories() {
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [search, setSearch] = useState("");
-  const [categories, setCategories] = useState<Category[]>(SAMPLE_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [mainCatModalOpen, setMainCatModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [editCat, setEditCat] = useState<Category | null>(null);
+
+  // Fetch all categories (main + subcategories) from backend
+  const loadCategories = useCallback(async () => {
+    try {
+      setLoading(true);
+      const mainCats = await fetchMainCategories();
+      const allCats: Category[] = mainCats.map((row: CategoryRow) => ({
+        id: row.id,
+        name: row.categoryName,
+        type: "Main Category" as const,
+        parentId: row.parentId,
+        hsn: row.hsnCode || "—",
+        gst: row.gstPercentage != null ? `${row.gstPercentage}%` : "—",
+        created: row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }) : new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        status: row.status ? "Active" : "Inactive",
+        image: row.categoryImage || row.mobileImage || row.bannerImage,
+      }));
+
+      // Fetch subcategories for each main category
+      for (const mainCat of mainCats) {
+        const subCats = await fetchSubcategories(mainCat.id);
+        subCats.forEach((row: CategoryRow) => {
+          allCats.push({
+            id: row.id,
+            name: row.categoryName,
+            type: "Category" as const,
+            parentId: row.parentId,
+            parent: mainCat.categoryName,
+            hsn: row.hsnCode || "—",
+            gst: row.gstPercentage != null ? `${row.gstPercentage}%` : "—",
+            created: row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }) : new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            status: row.status ? "Active" : "Inactive",
+            image: row.categoryImage || row.mobileImage || row.bannerImage,
+          });
+        });
+      }
+
+      setCategories(allCats);
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  const mainCategories = categories.filter(c => c.type === "Main Category");
 
   const filtered = categories.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()),
@@ -1357,43 +1428,81 @@ export default function MainCategories() {
     }
   };
 
-  const handleSave = (data: any) => {
-    if (data.id) {
-      setCategories((prev) =>
-        prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
-      );
-    } else {
-      const newCat: Category = {
-        id: categories.length + 1,
-        name: data.name,
-        type: data.type,
-        parent: data.parent,
-        hsn: data.hsn || "—",
-        gst: data.gst.split("%")[0].trim() + "%",
-        created: new Date().toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-        status: data.status,
-        image: data.image,
-      };
-      setCategories((prev) => [newCat, ...prev]);
-      setCurrentPage(1);
+  const handleSave = async (data: any) => {
+    try {
+      // Convert GST percentage string to number
+      const gstValue = data.gst ? parseFloat(data.gst.replace('%', '')) : undefined;
+      const statusValue = data.status === "Active" ? true : false;
+
+      if (data.id) {
+        // Update existing category
+        await updateCategory(
+          data.id,
+          data.name,
+          data.hsn,
+          gstValue,
+          data.image,
+          data.mobileImage,
+          data.bannerImage,
+          statusValue
+        );
+        setCategories((prev) =>
+          prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+        );
+      } else {
+        // Create new category
+        let newRow: CategoryRow;
+        if (data.type === "Main Category") {
+          newRow = await createMainCategory(data.name, data.hsn, gstValue, data.image, data.mobileImage, data.bannerImage, statusValue);
+        } else {
+          newRow = await createSubcategory(data.parentId, data.name, data.hsn, gstValue, data.image, data.mobileImage, data.bannerImage, statusValue);
+        }
+        const newCat: Category = {
+          id: newRow.id,
+          name: newRow.categoryName,
+          type: data.type,
+          parentId: newRow.parentId,
+          parent: data.parent,
+          hsn: newRow.hsnCode || "—",
+          gst: newRow.gstPercentage != null ? `${newRow.gstPercentage}%` : "—",
+          created: newRow.createdAt ? new Date(newRow.createdAt).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }) : new Date().toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }),
+          status: newRow.status ? "Active" : "Inactive",
+          image: data.image || data.mobileImage || data.bannerImage || newRow.categoryImage,
+        };
+        setCategories((prev) => [newCat, ...prev]);
+        setCurrentPage(1);
+      }
+      setEditCat(null);
+    } catch (error) {
+      console.error("Failed to save category:", error);
+      Alert.alert("Error", "Failed to save category. Please try again.");
     }
-    setEditCat(null);
   };
 
-  const handleDelete = (cat: Category) => {
-    const confirmDelete = () => {
-      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
-      if (Platform.OS === "web") {
-        Swal.fire({
-          icon: "success",
-          title: "Deleted!",
-          text: `"${cat.name}" deleted successfully!`,
-          confirmButtonColor: "#151D4F",
-        });
+  const handleDelete = async (cat: Category) => {
+    const confirmDelete = async () => {
+      try {
+        await deleteCategory(cat.id);
+        setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+        if (Platform.OS === "web") {
+          Swal.fire({
+            icon: "success",
+            title: "Deleted!",
+            text: `"${cat.name}" deleted successfully!`,
+            confirmButtonColor: "#151D4F",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to delete category:", error);
+        Alert.alert("Error", "Failed to delete category. Please try again.");
       }
     };
 
@@ -1605,6 +1714,7 @@ export default function MainCategories() {
         onSave={handleSave}
         isWeb={isWeb}
         editData={editCat}
+        mainCategories={mainCategories}
       />
     </AdminLayout>
   );
