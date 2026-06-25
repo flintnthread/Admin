@@ -22,9 +22,8 @@ import {
 import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
-import { fetchProducts, fetchProductStats, fetchSellers, type ProductListRow } from '@/services/productApi';
-import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from '@/services/categoryApi';
-import { fetchSubcategories as fetchProductSubcategories } from '@/services/subcategoryApi';
+import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow } from '@/services/productApi';
+import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
 import Pagination from '@/components/Pagination';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
@@ -93,7 +92,7 @@ function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>):
     description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
     image: resolveMediaUrl(row.image) || PLACEHOLDER_IMAGE,
     seller: row.seller,
-    email: row.sellerEmail ?? '',
+    email: '',
     category: row.category,
     status: row.status as ProductStatus,
     submittedOn: row.submittedAt,
@@ -368,50 +367,17 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide, stats, isMobile, onFilter }: { isWide: boolean; stats: ProductStats; isMobile: boolean; onFilter: (f: FilterKey) => void }) {
-  const statItems = [
-    { count: stats.pending, label: 'Pending', color: PALETTE.orange, bg: PALETTE.orangeLight, icon: 'clock-outline' as const, filter: 'pending' as FilterKey },
-    { count: stats.review, label: 'Under Review', color: PALETTE.blue, bg: PALETTE.blueLight, icon: 'magnify' as const, filter: 'review' as FilterKey },
-    { count: stats.approved, label: 'Approved', color: PALETTE.green, bg: PALETTE.greenLight, icon: 'check-circle-outline' as const, filter: 'approved' as FilterKey },
-    { count: stats.rejected, label: 'Rejected', color: PALETTE.red, bg: PALETTE.redLight, icon: 'close-circle-outline' as const, filter: 'rejected' as FilterKey },
-  ];
-
+function PageHeader({ isWide }: { isWide: boolean }) {
   return (
-    <View style={{ paddingHorizontal: 0 }}>
-      <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
-        <View style={styles.pageHeaderLeft}>
-          <View style={styles.pageIcon}>
-            <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
-          </View>
-          <View>
-            <Text style={styles.pageTitle}>Product Approvals</Text>
-          </View>
+    <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
+      <View style={styles.pageHeaderLeft}>
+        <View style={styles.pageIcon}>
+          <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
+        </View>
+        <View>
+          <Text style={styles.pageTitle}>Product Approvals</Text>
         </View>
       </View>
-
-      {/* Overlapping stat cards — mobile only */}
-      {isMobile && (
-        <View style={styles.mobileStatCardsWrap}>
-          {statItems.map((stat, i) => (
-            <Pressable
-              key={i}
-              onPress={() => onFilter(stat.filter)}
-              style={({ pressed }) => [
-                styles.mobileStatCard,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={[styles.mobileStatIcon, { backgroundColor: stat.bg }]}>
-                <MaterialCommunityIcons name={stat.icon} size={16} color={stat.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.mobileStatValue, { color: stat.color }]} numberOfLines={1}>{stat.count}</Text>
-                <Text style={styles.mobileStatLabel} numberOfLines={1}>{stat.label}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      )}
     </View>
   );
 }
@@ -548,14 +514,9 @@ function FilterSection({
   mainCategoryOptions,
   categoryOptions,
   subcategoryOptions,
-  seller,
-  mainCat,
-  category,
-  subcategory,
-  onSellerChange,
+  mainCategories,
   onMainCategoryChange,
   onCategoryChange,
-  onSubcategoryChange,
 }: {
   stats: ProductStats;
   search: string;
@@ -569,20 +530,25 @@ function FilterSection({
   mainCategoryOptions: string[];
   categoryOptions: string[];
   subcategoryOptions: string[];
-  seller: string;
-  mainCat: string;
-  category: string;
-  subcategory: string;
-  onSellerChange: (value: string) => void;
+  mainCategories: CategoryRow[];
   onMainCategoryChange: (selectedMainCat: string) => void;
   onCategoryChange: (selectedCategory: string) => void;
-  onSubcategoryChange: (value: string) => void;
 }) {
+  const [seller, setSeller] = useState("All Sellers");
+  const [mainCat, setMainCat] = useState("All Main Categories");
+  const [category, setCategory] = useState("All Categories");
+  const [subcategory, setSubcategory] = useState("All Subcategories");
+
   const handleMainCategorySelect = (value: string) => {
+    setMainCat(value);
+    setCategory("All Categories");
+    setSubcategory("All Subcategories");
     onMainCategoryChange(value);
   };
 
   const handleCategorySelect = (value: string) => {
+    setCategory(value);
+    setSubcategory("All Subcategories");
     onCategoryChange(value);
   };
 
@@ -603,10 +569,10 @@ function FilterSection({
           isWide && styles.filtersGridWide,
           { zIndex: 10, elevation: 10 }
         ]}>
-        <FilterDropdown label="Seller" value={seller} onSelect={onSellerChange} options={sellerOptions} wide={isWide} />
+        <FilterDropdown label="Seller" value={seller} onSelect={setSeller} options={sellerOptions} wide={isWide} />
         <FilterDropdown label="Main Category" value={mainCat} onSelect={handleMainCategorySelect} options={mainCategoryOptions} wide={isWide} />
         <FilterDropdown label="Category" value={category} onSelect={handleCategorySelect} options={categoryOptions} wide={isWide} />
-        <FilterDropdown label="Subcategory" value={subcategory} onSelect={onSubcategoryChange} options={subcategoryOptions} wide={isWide} />
+        <FilterDropdown label="Subcategory" value={subcategory} onSelect={setSubcategory} options={subcategoryOptions} wide={isWide} />
       </View>
 
       <View style={[styles.searchRow, isMobile && styles.searchRowMobile]}>
@@ -729,7 +695,11 @@ function ProductTable({
               </Pressable>
 
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
-                <Image source={{ uri: product.image }} style={styles.tableThumb} contentFit="cover" />
+             <Image
+  source={{ uri: product.image }}
+  style={styles.tableThumb}
+  contentFit="cover"
+/>
                 <View style={styles.tableProductInfo}>
                   <View style={styles.productNameRow}>
                     <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
@@ -791,19 +761,11 @@ export default function ProductApprovalScreen() {
   const [error, setError] = useState<string | null>(null);
   
   // Filter options from backend
-  const [sellerFilter, setSellerFilter] = useState('All Sellers');
-  const [mainCatFilter, setMainCatFilter] = useState('All Main Categories');
-  const [categoryFilter, setCategoryFilter] = useState('All Categories');
-  const [subcategoryFilter, setSubcategoryFilter] = useState('All Subcategories');
-
   const [sellerOptions, setSellerOptions] = useState<string[]>(["All Sellers"]);
   const [mainCategoryOptions, setMainCategoryOptions] = useState<string[]>(["All Main Categories"]);
   const [categoryOptions, setCategoryOptions] = useState<string[]>(["All Categories"]);
   const [subcategoryOptions, setSubcategoryOptions] = useState<string[]>(["All Subcategories"]);
   const [mainCategories, setMainCategories] = useState<CategoryRow[]>([]);
-  const [childCategories, setChildCategories] = useState<CategoryRow[]>([]);
-  const [productSubcategories, setProductSubcategories] = useState<{ id: number; name: string; categoryId: number }[]>([]);
-  const [sellers, setSellers] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
@@ -812,52 +774,33 @@ export default function ProductApprovalScreen() {
 
   const loadFilterData = useCallback(async () => {
     try {
+      // Fetch main categories (parentId is NULL)
       const mainCats = await fetchMainCategories();
       setMainCategories(mainCats);
       setMainCategoryOptions(["All Main Categories", ...mainCats.map(cat => cat.categoryName)]);
-
+      
+      // Fetch sellers from backend
       const sellersPage = await fetchSellers();
-      const sellerRows = sellersPage.items.map(seller => ({
-        id: seller.id,
-        name: seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown',
-      }));
-      setSellers(sellerRows);
-      setSellerOptions(["All Sellers", ...sellerRows.map(s => s.name)]);
+      const sellerNames = sellersPage.items.map(seller => 
+        seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown'
+      );
+      setSellerOptions(["All Sellers", ...sellerNames]);
+      
+      // Categories (parentId is NOT NULL) and subcategories will be updated based on main category selection
     } catch (err) {
       console.error("Failed to load filter data:", err);
     }
   }, []);
-
-  const resolveFilterIds = useCallback(() => {
-    const sellerId = sellerFilter === 'All Sellers'
-      ? undefined
-      : sellers.find((s) => s.name === sellerFilter)?.id;
-    const mainCategoryId = mainCatFilter === 'All Main Categories'
-      ? undefined
-      : mainCategories.find((cat) => cat.categoryName === mainCatFilter)?.id;
-    const categoryId = categoryFilter === 'All Categories'
-      ? undefined
-      : childCategories.find((cat) => cat.categoryName === categoryFilter)?.id;
-    const subcategoryId = subcategoryFilter === 'All Subcategories'
-      ? undefined
-      : productSubcategories.find((sub) => sub.name === subcategoryFilter)?.id;
-    return { sellerId, mainCategoryId, categoryId, subcategoryId };
-  }, [sellerFilter, mainCatFilter, categoryFilter, subcategoryFilter, sellers, mainCategories, childCategories, productSubcategories]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const apiStatus = filterStatusForApi(activeFilter);
-      const { sellerId, mainCategoryId, categoryId, subcategoryId } = resolveFilterIds();
       const [page, apiStats] = await Promise.all([
         fetchProducts({
           status: apiStatus,
           search: debouncedSearch.trim() || undefined,
-          sellerId,
-          mainCategoryId,
-          categoryId,
-          subcategoryId,
           page: currentPage - 1,
           size: PAGE_SIZE,
         }),
@@ -879,12 +822,20 @@ export default function ProductApprovalScreen() {
         rejected: Number(apiStats.rejected ?? 0),
         all: Number(apiStats.total ?? 0),
       });
+      
+      // Extract unique categories from products
+      const uniqueCategories = new Set<string>(["All Categories"]);
+      mappedProducts.forEach(p => {
+        if (p.category) uniqueCategories.add(p.category);
+      });
+      setCategoryOptions(Array.from(uniqueCategories));
+      
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to load products.'));
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, currentPage, debouncedSearch, resolveFilterIds]);
+  }, [activeFilter, currentPage, debouncedSearch]);
 
   useEffect(() => {
     loadData();
@@ -907,69 +858,31 @@ export default function ProductApprovalScreen() {
   }, []);
 
   const handleMainCategoryChange = useCallback(async (selectedMainCat: string) => {
-    setMainCatFilter(selectedMainCat);
-    setCategoryFilter('All Categories');
-    setSubcategoryFilter('All Subcategories');
-    setCurrentPage(1);
-
-    if (selectedMainCat === 'All Main Categories') {
-      setChildCategories([]);
-      setCategoryOptions(['All Categories']);
-      setProductSubcategories([]);
-      setSubcategoryOptions(['All Subcategories']);
+    if (selectedMainCat === "All Main Categories") {
+      setCategoryOptions(["All Categories"]);
+      setSubcategoryOptions(["All Subcategories"]);
       return;
     }
-
+    
     try {
       const selectedMainCategory = mainCategories.find(cat => cat.categoryName === selectedMainCat);
       if (selectedMainCategory) {
-        const categories = await fetchChildCategories(selectedMainCategory.id);
-        setChildCategories(categories);
-        setCategoryOptions(['All Categories', ...categories.map(cat => cat.categoryName)]);
-        setProductSubcategories([]);
-        setSubcategoryOptions(['All Subcategories']);
+        // Fetch categories (parentId is NOT NULL - these are children of main category)
+        const categories = await fetchSubcategories(selectedMainCategory.id);
+        setCategoryOptions(["All Categories", ...categories.map(cat => cat.categoryName)]);
+        
+        // Reset subcategories until a category is selected
+        setSubcategoryOptions(["All Subcategories"]);
       }
     } catch (err) {
-      console.error('Failed to load categories:', err);
+      console.error("Failed to load categories:", err);
     }
   }, [mainCategories]);
 
   const handleCategoryChange = useCallback(async (selectedCategory: string) => {
-    setCategoryFilter(selectedCategory);
-    setSubcategoryFilter('All Subcategories');
-    setCurrentPage(1);
-
-    if (selectedCategory === 'All Categories') {
-      setProductSubcategories([]);
-      setSubcategoryOptions(['All Subcategories']);
-      return;
-    }
-
-    try {
-      const selected = childCategories.find((cat) => cat.categoryName === selectedCategory);
-      if (selected) {
-        const subs = await fetchProductSubcategories(selected.id);
-        const mapped = subs.map((sub) => ({
-          id: sub.id,
-          name: sub.subcategoryName,
-          categoryId: sub.categoryId,
-        }));
-        setProductSubcategories(mapped);
-        setSubcategoryOptions(['All Subcategories', ...mapped.map((sub) => sub.name)]);
-      }
-    } catch (err) {
-      console.error('Failed to load subcategories:', err);
-    }
-  }, [childCategories]);
-
-  const handleSellerChange = useCallback((value: string) => {
-    setSellerFilter(value);
-    setCurrentPage(1);
-  }, []);
-
-  const handleSubcategoryChange = useCallback((value: string) => {
-    setSubcategoryFilter(value);
-    setCurrentPage(1);
+    // For now, subcategories will be extracted from products
+    // TODO: Add dedicated subcategory API endpoint when available
+    setSubcategoryOptions(["All Subcategories"]);
   }, []);
 
   const toggleSelect = (id: string) => {
@@ -995,13 +908,13 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} stats={stats} isMobile={isMobile} onFilter={handleFilterChange} />
+        <PageHeader isWide={isWide} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
         <View style={styles.scrollContent}>
 
-          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
+          {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}
@@ -1016,14 +929,9 @@ export default function ProductApprovalScreen() {
             mainCategoryOptions={mainCategoryOptions}
             categoryOptions={categoryOptions}
             subcategoryOptions={subcategoryOptions}
-            seller={sellerFilter}
-            mainCat={mainCatFilter}
-            category={categoryFilter}
-            subcategory={subcategoryFilter}
-            onSellerChange={handleSellerChange}
+            mainCategories={mainCategories}
             onMainCategoryChange={handleMainCategoryChange}
             onCategoryChange={handleCategoryChange}
-            onSubcategoryChange={handleSubcategoryChange}
           />
 
           {loading ? (
@@ -1345,51 +1253,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     maxWidth: 900,
     alignSelf: 'center',
-  },
-
-  // Mobile overlapping stat cards
-  mobileStatCardsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: -28,
-    marginBottom: 4,
-    paddingHorizontal: 2,
-    zIndex: 10,
-    justifyContent: 'space-between',
-  },
-  mobileStatCard: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#151D4F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  mobileStatIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileStatValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  mobileStatLabel: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    fontWeight: '600',
   },
   statCard: {
     flexDirection: 'row',
