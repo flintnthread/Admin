@@ -1,18 +1,17 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-} from "react-native";
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "@/hooks/use-theme";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function ProfileScreen() {
   const { user } = useAuth();
@@ -53,16 +52,13 @@ export default function ProfileScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Breadcrumb */}
-        <View style={styles.breadcrumb}>
-          <TouchableOpacity onPress={() => router.replace("/Dashboard")}>
-            <Text style={{ color: "#e8731a", fontSize: 13, fontWeight: "600" }}>🏠 Dashboard</Text>
-          </TouchableOpacity>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}> › </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>My Profile</Text>
+        {/* Page Header Banner */}
+        <View style={styles.pageHeader}>
+          <View style={styles.pageHeaderLeft}>
+            <Text style={{ fontFamily: "bootstrap-icons", color: "#FFFFFF", fontSize: 20 }}>{"\uF425"}</Text>
+            <Text style={styles.pageTitle}>Admin Profile</Text>
+          </View>
         </View>
-
-        <Text style={[styles.title, { color: colors.text }]}>Admin Profile</Text>
 
         <View style={styles.contentContainer}>
           {/* Left Column: Avatar & Role */}
@@ -118,7 +114,7 @@ export default function ProfileScreen() {
             {/* Password Update Card */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Change Password</Text>
-              
+
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Current Password</Text>
                 <TextInput
@@ -179,6 +175,28 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 16,
   },
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 0,
+    backgroundColor: "#1d324e",
+    padding: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+    borderRadius: 20,
+  },
+  pageHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+  },
   title: {
     fontSize: 24,
     fontWeight: "700",
@@ -188,6 +206,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 20,
+    marginTop: 20,
   },
   card: {
     borderRadius: 8,

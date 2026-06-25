@@ -18,7 +18,89 @@ import {
   useWindowDimensions
 } from "react-native";
 
-type BankRow = ReturnType<typeof mapBankPendingRow>;
+type BankRow = Omit<ReturnType<typeof mapBankPendingRow>, "status" | "statusLabel"> & {
+  status: "pending" | "approved" | "not_requested";
+  statusLabel: string;
+};
+
+const MOCK_EXTRA_SELLERS: BankRow[] = [
+  {
+    id: "#S991",
+    sellerId: 991,
+    initials: "JD",
+    color: "#2196F3",
+    name: "John Doe",
+    email: "john.doe@example.com",
+    phone: "+91 9876543210",
+    business: "Doe Enterprises",
+    bank: "HDFC Bank",
+    branch: "Mumbai Main",
+    account: "••••••••5678",
+    ifsc: "HDFC0000123",
+    status: "approved",
+    statusLabel: "Approved",
+    requested: "10 Jun, 2026",
+    sellerConfirm: "10 Jun, 2026",
+    adminApprove: "11 Jun, 2026",
+  },
+  {
+    id: "#S992",
+    sellerId: 992,
+    initials: "AS",
+    color: "#4CAF50",
+    name: "Alice Smith",
+    email: "alice.smith@example.com",
+    phone: "+91 9998887776",
+    business: "Smith Garments",
+    bank: "ICICI Bank",
+    branch: "Delhi West",
+    account: "••••••••4321",
+    ifsc: "ICIC0000456",
+    status: "approved",
+    statusLabel: "Approved",
+    requested: "12 Jun, 2026",
+    sellerConfirm: "12 Jun, 2026",
+    adminApprove: "13 Jun, 2026",
+  },
+  {
+    id: "#S993",
+    sellerId: 993,
+    initials: "RB",
+    color: "#9C27B0",
+    name: "Robert Brown",
+    email: "robert.b@example.com",
+    phone: "+91 9123456789",
+    business: "Brown Trading Co.",
+    bank: "State Bank of India",
+    branch: "Bangalore Rural",
+    account: "••••••••9876",
+    ifsc: "SBIN0000789",
+    status: "not_requested",
+    statusLabel: "Not Requested",
+    requested: "—",
+    sellerConfirm: "—",
+    adminApprove: "—",
+  },
+  {
+    id: "#S994",
+    sellerId: 994,
+    initials: "EM",
+    color: "#E91E63",
+    name: "Emma Miller",
+    email: "emma.miller@example.com",
+    phone: "+91 8887776665",
+    business: "Emma Couture",
+    bank: "Axis Bank",
+    branch: "Chennai North",
+    account: "••••••••2468",
+    ifsc: "UTIB0000234",
+    status: "not_requested",
+    statusLabel: "Not Requested",
+    requested: "—",
+    sellerConfirm: "—",
+    adminApprove: "—",
+  }
+];
 
 const STAT_DEFS = [
   { icon: "people", label: "Total Sellers", key: "total", sub: "Bank submissions", color: "#FF6B35", bg: "#FFF3EE" },
@@ -211,11 +293,11 @@ export default function BankApproval() {
         fetchPendingBankSellers(0, 200),
         fetchBankStats(),
       ]);
-      setSellers((pendingRes?.items ?? []).map(mapBankPendingRow));
+      setSellers([...(pendingRes?.items ?? []).map(mapBankPendingRow), ...MOCK_EXTRA_SELLERS]);
       setBankStats(statsRes ?? {});
     } catch (e) {
       setLoadError(getApiErrorMessage(e));
-      setSellers([]);
+      setSellers([...MOCK_EXTRA_SELLERS]);
       setBankStats({});
     }
   }, []);
@@ -239,8 +321,8 @@ export default function BankApproval() {
     return matchStatus && matchSearch;
   });
 
-  const pending = bankStats.pending ?? 0;
-  const verified = bankStats.verified ?? 0;
+  const pending = sellers.filter((s) => s.status === "pending").length;
+  const verified = sellers.filter((s) => s.status === "approved").length;
   const total = pending + verified;
   const rate = total > 0 ? `${Math.round((verified / total) * 1000) / 10}%` : "—";
   const stats = STAT_DEFS.map((s) => {
