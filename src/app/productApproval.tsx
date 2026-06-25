@@ -22,7 +22,8 @@ import {
 import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
-import { fetchProducts, fetchProductStats, type ProductListRow } from '@/services/productApi';
+import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow } from '@/services/productApi';
+import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
 import Pagination from '@/components/Pagination';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
@@ -109,40 +110,6 @@ const STATUS_CONFIG: Record<
 };
 
 type FilterKey = 'all' | ProductStatus;
-
-const SELLER_OPTIONS = [
-  "All Sellers",
-  "Af Enterprises",
-  "Ahmad Expoters",
-  "Aman Rajbhar",
-  "Ambedkar Seelam",
-  "Anantha Lakshmi Mattupalli",
-  "Arhaan Collection",
-  "Arpitha Ravirekhala",
-  "Arumulla Mahima",
-  "Begari Jagadamba",
-  "Charanyan",
-  "Dominic Rathnam",
-  "Eage Sainath Kumar",
-  "Eega Mani",
-  "Finn Brooks",
-  "G Naga Malleswara Rao",
-  "Gone Mahender",
-  "Gopi Tayi"
-];
-
-const MAIN_CATEGORY_OPTIONS = [
-  "All Main Categories",
-  "Accessories (163)",
-  "Footwear (45)",
-  "Homely Hub (32)",
-  "Indoor Play (16)",
-  "Kids (0)",
-  "Men (112)",
-  "Sportswear (21)",
-  "Sweets (9)",
-  "Women (341)"
-];
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────────
 
@@ -400,50 +367,17 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide, stats, isMobile, onFilter }: { isWide: boolean; stats: ProductStats; isMobile: boolean; onFilter: (f: FilterKey) => void }) {
-  const statItems = [
-    { count: stats.pending, label: 'Pending', color: PALETTE.orange, bg: PALETTE.orangeLight, icon: 'clock-outline' as const, filter: 'pending' as FilterKey },
-    { count: stats.review, label: 'Under Review', color: PALETTE.blue, bg: PALETTE.blueLight, icon: 'magnify' as const, filter: 'review' as FilterKey },
-    { count: stats.approved, label: 'Approved', color: PALETTE.green, bg: PALETTE.greenLight, icon: 'check-circle-outline' as const, filter: 'approved' as FilterKey },
-    { count: stats.rejected, label: 'Rejected', color: PALETTE.red, bg: PALETTE.redLight, icon: 'close-circle-outline' as const, filter: 'rejected' as FilterKey },
-  ];
-
+function PageHeader({ isWide }: { isWide: boolean }) {
   return (
-    <View style={{ paddingHorizontal: 0 }}>
-      <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
-        <View style={styles.pageHeaderLeft}>
-          <View style={styles.pageIcon}>
-            <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
-          </View>
-          <View>
-            <Text style={styles.pageTitle}>Product Approvals</Text>
-          </View>
+    <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
+      <View style={styles.pageHeaderLeft}>
+        <View style={styles.pageIcon}>
+          <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
+        </View>
+        <View>
+          <Text style={styles.pageTitle}>Product Approvals</Text>
         </View>
       </View>
-
-      {/* Overlapping stat cards — mobile only */}
-      {isMobile && (
-        <View style={styles.mobileStatCardsWrap}>
-          {statItems.map((stat, i) => (
-            <Pressable
-              key={i}
-              onPress={() => onFilter(stat.filter)}
-              style={({ pressed }) => [
-                styles.mobileStatCard,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={[styles.mobileStatIcon, { backgroundColor: stat.bg }]}>
-                <MaterialCommunityIcons name={stat.icon} size={16} color={stat.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.mobileStatValue, { color: stat.color }]} numberOfLines={1}>{stat.count}</Text>
-                <Text style={styles.mobileStatLabel} numberOfLines={1}>{stat.label}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      )}
     </View>
   );
 }
@@ -576,6 +510,13 @@ function FilterSection({
   isMobile,
   isTablet,
   isWide,
+  sellerOptions,
+  mainCategoryOptions,
+  categoryOptions,
+  subcategoryOptions,
+  mainCategories,
+  onMainCategoryChange,
+  onCategoryChange,
 }: {
   stats: ProductStats;
   search: string;
@@ -585,9 +526,31 @@ function FilterSection({
   isMobile: boolean;
   isTablet: boolean;
   isWide: boolean;
+  sellerOptions: string[];
+  mainCategoryOptions: string[];
+  categoryOptions: string[];
+  subcategoryOptions: string[];
+  mainCategories: CategoryRow[];
+  onMainCategoryChange: (selectedMainCat: string) => void;
+  onCategoryChange: (selectedCategory: string) => void;
 }) {
   const [seller, setSeller] = useState("All Sellers");
   const [mainCat, setMainCat] = useState("All Main Categories");
+  const [category, setCategory] = useState("All Categories");
+  const [subcategory, setSubcategory] = useState("All Subcategories");
+
+  const handleMainCategorySelect = (value: string) => {
+    setMainCat(value);
+    setCategory("All Categories");
+    setSubcategory("All Subcategories");
+    onMainCategoryChange(value);
+  };
+
+  const handleCategorySelect = (value: string) => {
+    setCategory(value);
+    setSubcategory("All Subcategories");
+    onCategoryChange(value);
+  };
 
   return (
     <View style={[styles.queueCard, { zIndex: 10, elevation: 10 }]}>
@@ -606,10 +569,10 @@ function FilterSection({
           isWide && styles.filtersGridWide,
           { zIndex: 10, elevation: 10 }
         ]}>
-        <FilterDropdown label="Seller" value={seller} onSelect={setSeller} options={SELLER_OPTIONS} wide={isWide} />
-        <FilterDropdown label="Main Category" value={mainCat} onSelect={setMainCat} options={MAIN_CATEGORY_OPTIONS} wide={isWide} />
-        <FilterDropdown label="Category" value="All Categories" wide={isWide} />
-        <FilterDropdown label="Subcategory" value="All Subcategories" wide={isWide} />
+        <FilterDropdown label="Seller" value={seller} onSelect={setSeller} options={sellerOptions} wide={isWide} />
+        <FilterDropdown label="Main Category" value={mainCat} onSelect={handleMainCategorySelect} options={mainCategoryOptions} wide={isWide} />
+        <FilterDropdown label="Category" value={category} onSelect={handleCategorySelect} options={categoryOptions} wide={isWide} />
+        <FilterDropdown label="Subcategory" value={subcategory} onSelect={setSubcategory} options={subcategoryOptions} wide={isWide} />
       </View>
 
       <View style={[styles.searchRow, isMobile && styles.searchRowMobile]}>
@@ -732,6 +695,11 @@ function ProductTable({
               </Pressable>
 
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
+             <Image
+  source={{ uri: product.image }}
+  style={styles.tableThumb}
+  contentFit="cover"
+/>
                 <View style={styles.tableProductInfo}>
                   <View style={styles.productNameRow}>
                     <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
@@ -791,11 +759,38 @@ export default function ProductApprovalScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter options from backend
+  const [sellerOptions, setSellerOptions] = useState<string[]>(["All Sellers"]);
+  const [mainCategoryOptions, setMainCategoryOptions] = useState<string[]>(["All Main Categories"]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(["All Categories"]);
+  const [subcategoryOptions, setSubcategoryOptions] = useState<string[]>(["All Subcategories"]);
+  const [mainCategories, setMainCategories] = useState<CategoryRow[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
+
+  const loadFilterData = useCallback(async () => {
+    try {
+      // Fetch main categories (parentId is NULL)
+      const mainCats = await fetchMainCategories();
+      setMainCategories(mainCats);
+      setMainCategoryOptions(["All Main Categories", ...mainCats.map(cat => cat.categoryName)]);
+      
+      // Fetch sellers from backend
+      const sellersPage = await fetchSellers();
+      const sellerNames = sellersPage.items.map(seller => 
+        seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown'
+      );
+      setSellerOptions(["All Sellers", ...sellerNames]);
+      
+      // Categories (parentId is NOT NULL) and subcategories will be updated based on main category selection
+    } catch (err) {
+      console.error("Failed to load filter data:", err);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -811,11 +806,10 @@ export default function ProductApprovalScreen() {
         }),
         fetchProductStats(),
       ]);
-      setProducts(
-        page.items.map((p: ProductListRow) =>
-          toApprovalProduct(mapProductListToApprovalRow(p)),
-        ),
+      const mappedProducts = page.items.map((p: ProductListRow) =>
+        toApprovalProduct(mapProductListToApprovalRow(p)),
       );
+      setProducts(mappedProducts);
       setTotalProducts(page.totalElements);
       setTotalPages(page.totalPages);
       if (currentPage > page.totalPages && page.totalPages > 0) {
@@ -828,6 +822,14 @@ export default function ProductApprovalScreen() {
         rejected: Number(apiStats.rejected ?? 0),
         all: Number(apiStats.total ?? 0),
       });
+      
+      // Extract unique categories from products
+      const uniqueCategories = new Set<string>(["All Categories"]);
+      mappedProducts.forEach(p => {
+        if (p.category) uniqueCategories.add(p.category);
+      });
+      setCategoryOptions(Array.from(uniqueCategories));
+      
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to load products.'));
     } finally {
@@ -839,6 +841,10 @@ export default function ProductApprovalScreen() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    loadFilterData();
+  }, [loadFilterData]);
+
   const handleFilterChange = useCallback((filter: FilterKey) => {
     setActiveFilter(filter);
     setCurrentPage(1);
@@ -849,6 +855,34 @@ export default function ProductApprovalScreen() {
     setSearch(value);
     setCurrentPage(1);
     setSelected(new Set());
+  }, []);
+
+  const handleMainCategoryChange = useCallback(async (selectedMainCat: string) => {
+    if (selectedMainCat === "All Main Categories") {
+      setCategoryOptions(["All Categories"]);
+      setSubcategoryOptions(["All Subcategories"]);
+      return;
+    }
+    
+    try {
+      const selectedMainCategory = mainCategories.find(cat => cat.categoryName === selectedMainCat);
+      if (selectedMainCategory) {
+        // Fetch categories (parentId is NOT NULL - these are children of main category)
+        const categories = await fetchSubcategories(selectedMainCategory.id);
+        setCategoryOptions(["All Categories", ...categories.map(cat => cat.categoryName)]);
+        
+        // Reset subcategories until a category is selected
+        setSubcategoryOptions(["All Subcategories"]);
+      }
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  }, [mainCategories]);
+
+  const handleCategoryChange = useCallback(async (selectedCategory: string) => {
+    // For now, subcategories will be extracted from products
+    // TODO: Add dedicated subcategory API endpoint when available
+    setSubcategoryOptions(["All Subcategories"]);
   }, []);
 
   const toggleSelect = (id: string) => {
@@ -874,13 +908,13 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} stats={stats} isMobile={isMobile} onFilter={handleFilterChange} />
+        <PageHeader isWide={isWide} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
         <View style={styles.scrollContent}>
 
-          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
+          {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}
@@ -891,6 +925,13 @@ export default function ProductApprovalScreen() {
             isMobile={isMobile}
             isTablet={isTablet}
             isWide={isWide}
+            sellerOptions={sellerOptions}
+            mainCategoryOptions={mainCategoryOptions}
+            categoryOptions={categoryOptions}
+            subcategoryOptions={subcategoryOptions}
+            mainCategories={mainCategories}
+            onMainCategoryChange={handleMainCategoryChange}
+            onCategoryChange={handleCategoryChange}
           />
 
           {loading ? (
@@ -1212,51 +1253,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     maxWidth: 900,
     alignSelf: 'center',
-  },
-
-  // Mobile overlapping stat cards
-  mobileStatCardsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: -28,
-    marginBottom: 4,
-    paddingHorizontal: 2,
-    zIndex: 10,
-    justifyContent: 'space-between',
-  },
-  mobileStatCard: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#151D4F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  mobileStatIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileStatValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  mobileStatLabel: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    fontWeight: '600',
   },
   statCard: {
     flexDirection: 'row',

@@ -31,15 +31,33 @@ import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/pr
 
 const PLACEHOLDER_IMAGE = '';
 
-type ApiImage = { url?: string };
+type ApiImage = { url?: string; variantId?: number };
+type ApiSizeChartRow = { size?: string; chest?: string; waist?: string; hip?: string; length?: string };
 type ApiVariant = {
   id?: number;
   color?: string;
+  colorHex?: string;
+  imageUrl?: string;
   size?: string;
   sku?: string;
   stock?: number;
+  basePrice?: number;
+  mrpExclGst?: number;
+  mrpInclGst?: number;
+  mrpPrice?: number;
+  discountPercentage?: number;
+  discountAmount?: number;
   sellingPrice?: number;
+  taxPercentage?: number;
+  taxAmount?: number;
   finalPrice?: number;
+  commissionPercentage?: number;
+  commissionAmount?: number;
+  intraCityDeliveryCharge?: number;
+  metroMetroDeliveryCharge?: number;
+  totalPriceIntraCity?: number;
+  totalPriceMetroMetro?: number;
+  weight?: number;
 };
 
 type SpecItem = { label: string; value: string };
@@ -76,6 +94,7 @@ export type ProductDetailExtras = {
   sizeChart: {
     unit: string;
     footerNote: string;
+    imageUrl?: string;
     rows: { size: string; chest: string; waist: string; hip: string; length: string }[];
   };
 };
@@ -124,6 +143,61 @@ function parseSpecItems(raw: unknown): SpecItem[] {
     .map((line, index) => ({ label: `Item ${index + 1}`, value: line }));
 }
 
+function toNum(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parseKeyFeatures(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw.trim()) return '—';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((item) => String(item)).join(' · ');
+      }
+    } catch {
+      // plain text fallback
+    }
+  }
+  return trimmed;
+}
+
+function parseSizeChartRows(
+  raw: unknown,
+  variants: ProductVariant[],
+  chartImage?: string,
+): ProductDetailExtras['sizeChart'] {
+  const apiRows = Array.isArray(raw) ? (raw as ApiSizeChartRow[]) : [];
+  if (apiRows.length > 0) {
+    return {
+      unit: 'Measurements from linked size chart',
+      footerNote: 'Size chart loaded from seller catalog',
+      imageUrl: chartImage || undefined,
+      rows: apiRows.map((row) => ({
+        size: dash(row.size),
+        chest: dash(row.chest),
+        waist: dash(row.waist),
+        hip: dash(row.hip),
+        length: dash(row.length),
+      })),
+    };
+  }
+  const uniqueSizes = [...new Set(variants.map((v) => v.size).filter((s) => s && s !== '—'))];
+  return {
+    unit: 'Variant sizes from listing',
+    footerNote: uniqueSizes.length > 0 ? 'Detailed measurements not linked for this product' : 'No size chart linked',
+    rows: uniqueSizes.map((size) => ({
+      size,
+      chest: '—',
+      waist: '—',
+      hip: '—',
+      length: '—',
+    })),
+  };
+}
+
 function buildExtras(data: Record<string, unknown>, variants: ProductVariant[]): ProductDetailExtras {
   const minDays = data.deliveryTimeMin;
   const maxDays = data.deliveryTimeMax;
@@ -142,11 +216,13 @@ function buildExtras(data: Record<string, unknown>, variants: ProductVariant[]):
   const deliveryInfo = dash(data.deliveryInfo);
   const acceptCod = data.acceptCod === true;
   const deliverAll = data.deliverAllLocations !== false;
-  const uniqueSizes = [...new Set(variants.map((v) => v.size).filter((s) => s && s !== '—'))];
+  const careLines = careInstructions !== '—'
+    ? careInstructions.split(/\n|;/).map((line) => line.trim()).filter(Boolean)
+    : [];
 
   return {
     specItems: parseSpecItems(data.specifications),
-    keyFeatures: dash(data.features),
+    keyFeatures: parseKeyFeatures(data.features),
     package: {
       boxDimensions: formatDims(data.lengthCm, data.widthCm, data.heightCm),
       grossWeight: dash(data.productWeight) !== '—' ? `${dash(data.productWeight)} kg` : '—',
@@ -169,29 +245,18 @@ function buildExtras(data: Record<string, unknown>, variants: ProductVariant[]):
     },
     returns: {
       policyHighlight: returnPolicy !== '—' ? returnPolicy : 'Return policy not specified',
-      policySubtext: careInstructions !== '—' ? careInstructions : 'See seller return terms',
+      policySubtext: deliveryInfo !== '—' ? deliveryInfo : 'See seller return terms',
       returnWindow: returnPolicy !== '—' ? returnPolicy : '—',
       refundMode: 'As per marketplace policy',
       warranty: warrantyInfo,
-      conditions: careInstructions !== '—' ? [careInstructions] : ['Product must be unused and in original packaging'],
+      conditions: careLines.length > 0 ? careLines : returnPolicy !== '—' ? [returnPolicy] : ['Product must be unused and in original packaging'],
       processSteps: ['Request Return', 'Pickup Scheduled', 'Quality Check', 'Refund Processed'],
     },
-    sizeChart: {
-      unit: 'Measurements in inches (variant sizes from listing)',
-      footerNote:
-        data.sizeChartId != null
-          ? `Linked size chart #${data.sizeChartId}`
-          : uniqueSizes.length > 0
-            ? 'Sizes available in variants tab'
-            : 'No size chart linked for this product',
-      rows: uniqueSizes.map((size) => ({
-        size,
-        chest: '—',
-        waist: '—',
-        hip: '—',
-        length: '—',
-      })),
-    },
+    sizeChart: parseSizeChartRows(
+      data.sizeChartRows,
+      variants,
+      data.sizeChartImage ? resolveMediaUrl(String(data.sizeChartImage)) : undefined,
+    ),
   };
 }
 
@@ -206,7 +271,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     .filter(Boolean);
   const primaryImage = gallery[0] ?? PLACEHOLDER_IMAGE;
   const variantsRaw = (data.variants as ApiVariant[] | undefined) ?? [];
-  const gst = Number(data.gstPercentage ?? 18);
+  const gst = toNum(data.gstPercentage, 18);
   const statusRaw = String(data.status ?? 'pending').toLowerCase();
   const status: ProductStatus =
     statusRaw === 'approved' || statusRaw === 'active'
@@ -218,50 +283,65 @@ function mapApiProductDetail(data: Record<string, unknown>): {
           : 'pending';
 
   const variants: ProductVariant[] = variantsRaw.map((v) => {
-    const sellingWith = Number(v.finalPrice ?? v.sellingPrice ?? 0);
-    const sellingExcl = gst > 0 ? sellingWith / (1 + gst / 100) : sellingWith;
-    const gstAmount = sellingWith - sellingExcl;
+    const sellingWith = toNum(v.finalPrice ?? v.mrpPrice ?? v.sellingPrice);
+    const sellingExcl = toNum(v.sellingPrice, gst > 0 ? sellingWith / (1 + gst / 100) : sellingWith);
+    const taxPct = toNum(v.taxPercentage, gst);
+    const taxAmt = toNum(v.taxAmount, Math.max(0, sellingWith - sellingExcl));
+    const mrpExcl = toNum(v.mrpExclGst ?? v.basePrice, sellingExcl);
+    const discountPct = toNum(v.discountPercentage);
+    const variantImage = resolveMediaUrl(String(v.imageUrl ?? '')) || primaryImage;
     return {
       id: String(v.id ?? ''),
       colorName: String(v.color ?? '—'),
-      colorHex: '#6B7280',
-      image: primaryImage,
+      colorHex: String(v.colorHex ?? '#9CA3AF'),
+      image: variantImage,
       size: String(v.size ?? '—'),
       sku: String(v.sku ?? '—'),
-      stock: Number(v.stock ?? 0),
-      mrp: sellingWith,
-      discountPercent: 0,
+      stock: toNum(v.stock),
+      mrp: mrpExcl,
+      discountPercent: discountPct,
       sellingPriceExclGst: sellingExcl,
-      gstPercent: gst,
-      gstAmount,
+      gstPercent: taxPct,
+      gstAmount: taxAmt,
       sellingPriceWithGst: sellingWith,
-      commissionPercent: 0,
-      commissionAmount: 0,
-      intraCityDelivery: 0,
-      metroDelivery: 0,
+      commissionPercent: toNum(v.commissionPercentage),
+      commissionAmount: toNum(v.commissionAmount),
+      intraCityDelivery: toNum(v.intraCityDeliveryCharge),
+      metroDelivery: toNum(v.metroMetroDeliveryCharge),
     };
   });
 
   const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
   const firstVariant = variants[0];
+  const mainCategory = String(data.mainCategoryName ?? '');
+  const categoryName = String(data.categoryName ?? `Category #${data.categoryId ?? '—'}`);
+  const categoryLabel = mainCategory && mainCategory !== categoryName
+    ? `${mainCategory} > ${categoryName}`
+    : categoryName;
+  const sellerLabel = data.addedByAdmin === true
+    ? 'Admin Catalog'
+    : String(data.sellerName ?? `Seller #${data.sellerId ?? '—'}`);
+  const discount = firstVariant?.discountPercent ?? 0;
+  const displayPrice = firstVariant?.sellingPriceWithGst ?? 0;
+  const displayMrp = firstVariant?.mrp ?? displayPrice;
 
   const product: ProductDetail = {
     id: String(data.id ?? ''),
     name: String(data.name ?? 'Product'),
     description: String(data.shortDescription ?? data.description ?? ''),
     image: primaryImage,
-    seller: String(data.sellerName ?? `Seller #${data.sellerId ?? '—'}`),
-    email: '',
-    category: String(data.categoryName ?? `Category #${data.categoryId ?? '—'}`),
+    seller: sellerLabel,
+    email: String(data.sellerEmail ?? ''),
+    category: categoryLabel,
     status,
     submittedOn: formatDateTime(String(data.createdAt ?? '')),
     sku: String(data.sku ?? '—'),
     lastUpdated: formatDate(String(data.updatedAt ?? data.createdAt ?? '')),
-    categoryLabel: String(data.categoryName ?? `Category #${data.categoryId ?? '—'}`),
+    categoryLabel,
     subcategory: String(data.subcategoryName ?? `Subcategory #${data.subcategoryId ?? '—'}`),
     fullTitle: String(data.name ?? 'Product'),
-    price: firstVariant?.sellingPriceWithGst ?? 0,
-    mrp: firstVariant?.mrp ?? 0,
+    price: displayPrice,
+    mrp: displayMrp,
     gst,
     material: dash(data.productMaterialType),
     weight: dash(data.productWeight) !== '—' ? `${dash(data.productWeight)} kg` : '—',
@@ -272,20 +352,32 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     delivery:
       data.deliveryTimeMin != null && data.deliveryTimeMax != null
         ? `${data.deliveryTimeMin}-${data.deliveryTimeMax} days`
-        : '—',
+        : dash(data.deliveryInfo) !== '—'
+          ? String(data.deliveryInfo)
+          : '—',
     stock: totalStock,
     stockStatus: totalStock > 0 ? 'In Stock' : 'Out of Stock',
-    discount: 0,
+    discount,
     color: firstVariant?.colorName ?? '—',
     dbStatus: statusRaw,
     createdAt: formatDate(String(data.createdAt ?? '')),
     approvedAt: data.reviewedAt ? formatDateTime(String(data.reviewedAt)) : '—',
     adminNote: String(data.adminNotes ?? '—'),
     fullDescription: String(data.description ?? data.shortDescription ?? ''),
-    gallery: gallery.length > 0 ? gallery : [primaryImage],
+    gallery: gallery.length > 0 ? gallery : primaryImage ? [primaryImage] : [],
   };
 
-  return { product, variants, extras: buildExtras(data, variants) };
+  const extras = buildExtras(data, variants);
+  if (data.sizeChartName) {
+    extras.sizeChart.unit = String(data.sizeChartName);
+  }
+
+  return {
+    product,
+    variants,
+    extras,
+    sellerPhone: String(data.sellerPhone ?? ''),
+  };
 }
 
 const PALETTE = {
@@ -783,6 +875,10 @@ function SizeChartTab({ isWide, extras }: { isWide: boolean; extras: ProductDeta
           </View>
         </View>
 
+        {chart.imageUrl ? (
+          <Image source={{ uri: chart.imageUrl }} style={styles.sizeChartImage} contentFit="contain" />
+        ) : null}
+
         {isWide ? table : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {table}
@@ -828,6 +924,7 @@ export default function ProductDetailsScreen() {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [extras, setExtras] = useState<ProductDetailExtras | null>(null);
+  const [sellerPhone, setSellerPhone] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -850,6 +947,7 @@ export default function ProductDetailsScreen() {
       setProduct(mapped.product);
       setVariants(mapped.variants);
       setExtras(mapped.extras);
+      setSellerPhone(mapped.sellerPhone);
       setActiveImage(0);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to load product.'));
@@ -1047,10 +1145,16 @@ export default function ProductDetailsScreen() {
               {/* Gallery */}
               <View style={[styles.galleryCol, !isWide && styles.galleryColMobile]}>
                 <View style={[styles.mainImageWrap, !isWide && { borderRadius: 0 }]}>
-                  <Image source={{ uri: product.gallery[activeImage] }} style={[styles.mainImage, !isWide && styles.mainImageMobile]} contentFit="cover" />
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>{product.discount}% OFF</Text>
-                  </View>
+                  <Image
+                    source={{ uri: product.gallery[activeImage] || product.image }}
+                    style={[styles.mainImage, !isWide && styles.mainImageMobile]}
+                    contentFit="cover"
+                  />
+                  {product.discount > 0 ? (
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>{product.discount.toFixed(0)}% OFF</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.stockBadge}>
                     <MaterialCommunityIcons name="check-circle" size={12} color={PALETTE.green} />
                     <Text style={styles.stockBadgeText}>{product.stock} units</Text>
@@ -1103,9 +1207,9 @@ export default function ProductDetailsScreen() {
                   {product.category} · SKU: {product.sku}
                 </Text>
 
-                <Text style={styles.price}>₹{product.price}</Text>
+                <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
                 <Text style={styles.priceSub}>
-                  MRP Excl. GST ₹{product.mrp} · Selling Incl. GST ({product.gst}%)
+                  MRP Excl. GST ₹{product.mrp.toLocaleString('en-IN')} · GST {product.gst}%
                 </Text>
 
                 <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>
@@ -1215,6 +1319,9 @@ export default function ProductDetailsScreen() {
                 <SectionCard title="Classification" icon="tag-outline" flex={1}>
                   <InfoRow label="Category" value={product.categoryLabel} />
                   <InfoRow label="Subcategory" value={product.subcategory} />
+                  <InfoRow label="Seller" value={product.seller} />
+                  {product.email ? <InfoRow label="Seller Email" value={product.email} /> : null}
+                  {sellerPhone ? <InfoRow label="Seller Phone" value={sellerPhone} /> : null}
                   <InfoRow label="Color" value={product.color} />
                   <InfoRow label="Size" value={product.size} />
                   <InfoRow label="HSN Code" value={product.hsnCode} />
@@ -1911,6 +2018,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
     borderRadius: 10,
     padding: 14,
+  },
+  sizeChartImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 10,
+    marginBottom: 14,
+    backgroundColor: PALETTE.pageBg,
   },
   sizeChartFooterText: { fontSize: 13, color: PALETTE.blue, fontWeight: '600', flex: 1 },
 

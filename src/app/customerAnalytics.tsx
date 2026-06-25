@@ -1,14 +1,20 @@
 /**
  * customerAnalytics.tsx
- * 360° single-customer analytics dashboard (mock data only, no backend)
+ * 360° single-customer analytics dashboard — data from GET /api/admin/customers/{id}/analytics
  * React Native + Expo + TypeScript
  * Fully interactive hand-rolled SVG charts with hover crosshairs, tooltips, drill-downs,
- * date-range filtering, legend toggles.
+ * time-filtering (7D, 30D, 90D, 6M, 1Y, All), fullscreen mode, legend toggles,
+ * and PDF/CSV export features.
  *
  * Enterprise dashboard layout inspired by Shopify/Stripe/HubSpot.
  */
 
 import AdminLayout from "@/components/admin-layout";
+import {
+  fetchCustomerAnalytics,
+  mapApiAnalyticsToUi,
+  type CustomerAnalyticsUi,
+} from "@/services/customerApi";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -18,6 +24,7 @@ import React, {
   useEffect,
 } from "react";
 import {
+  ActivityIndicator,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -31,6 +38,7 @@ import {
   useWindowDimensions,
   View,
   Modal,
+  Share,
   Animated,
   Linking,
 } from "react-native";
@@ -45,8 +53,9 @@ import Svg, {
   G,
   Text as SvgText,
 } from "react-native-svg";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { LinearGradient } from "expo-linear-gradient";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PALETTE
@@ -418,6 +427,12 @@ const MapPinIcon = ({ size = 14, color = primary }: IP) => (
     />
   </Svg>
 );
+const CrownIcon = ({ size = 14, color = "#F59E0B" }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path fill={color} d="M1.5 12.5h13l.7-7-3.7 2.5L8 3 4.5 8l-3.7-2.5z" />
+    <Path fill={color} d="M1.5 13.5h13a.5.5 0 0 1 0 1h-13a.5.5 0 0 1 0-1" />
+  </Svg>
+);
 const EyeIcon = ({ size = 14, color = "#fff" }: IP) => (
   <Svg width={size} height={size} viewBox="0 0 16 16">
     <Path
@@ -438,6 +453,26 @@ const ActivityIcon = ({ size = 14, color = primary }: IP) => (
     />
   </Svg>
 );
+const MaximizeIcon = ({ size = 14, color = primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path
+      fill={color}
+      d="M1.5 1c-.276 0-.5.224-.5.5v4a.5.5 0 0 0 1 0V2.707l3.146 3.147a.5.5 0 1 0 .708-.708L2.707 2H5.5a.5.5 0 0 0 0-1H1.5zm9.5 0a.5.5 0 0 0 0 1h2.793l-3.147 3.146a.5.5 0 1 0 .708.708L14 2.707V5.5a.5.5 0 0 0 1 0v-4c0-.276-.224-.5-.5-.5H11zM1.5 10a.5.5 0 0 0-.5.5v4c0 .276.224.5.5.5h4a.5.5 0 0 0 0-1H2.707l3.146-3.146a.5.5 0 1 0-.708-.708L2 13.293V10.5a.5.5 0 0 0-.5-.5zm13 0a.5.5 0 0 0-.5.5v2.793l-3.146-3.147a.5.5 0 0 0-.708.708L13.293 15H10.5a.5.5 0 0 0 0 1h4c.276 0 .5-.224.5-.5v-4a.5.5 0 0 0-.5-.5z"
+    />
+  </Svg>
+);
+const DownloadIcon = ({ size = 14, color = primary }: IP) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path
+      fill={color}
+      d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"
+    />
+    <Path
+      fill={color}
+      d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"
+    />
+  </Svg>
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -447,6 +482,7 @@ type ChartPoint = { label: string; value: number };
 type SlicePoint = { label: string; value: number; color: string };
 type RecentOrder = {
   id: string;
+  orderNumber: string;
   productName: string;
   date: string;
   amount: number;
@@ -463,49 +499,7 @@ type SectionId =
   | "timeline"
   | "profile";
 
-type DateRange = { from: Date; to: Date };
 type TimeFrame = "7D" | "30D" | "90D" | "6M" | "1Y" | "All";
-
-// Converts a preset timeframe into a concrete From/To date range, anchored to today.
-function rangeForTimeFrame(tf: TimeFrame, allRangeStart: Date): DateRange {
-  const to = new Date();
-  const from = new Date();
-  switch (tf) {
-    case "7D":
-      from.setDate(from.getDate() - 6);
-      break;
-    case "30D":
-      from.setDate(from.getDate() - 29);
-      break;
-    case "90D":
-      from.setDate(from.getDate() - 89);
-      break;
-    case "6M":
-      from.setMonth(from.getMonth() - 6);
-      break;
-    case "1Y":
-      from.setFullYear(from.getFullYear() - 1);
-      break;
-    case "All":
-    default:
-      return { from: allRangeStart, to };
-  }
-  return { from, to };
-}
-
-// Detects whether a given range exactly matches one of the presets, so the
-// chip row can highlight the active preset (or none, if the user picked a
-// custom date manually).
-function matchTimeFrame(range: DateRange, allRangeStart: Date): TimeFrame | null {
-  const presets: TimeFrame[] = ["7D", "30D", "90D", "6M", "1Y", "All"];
-  for (const tf of presets) {
-    const candidate = rangeForTimeFrame(tf, allRangeStart);
-    const sameTo = Math.abs(candidate.to.getTime() - range.to.getTime()) < 1000 * 60 * 60 * 24;
-    const sameFrom = Math.abs(candidate.from.getTime() - range.from.getTime()) < 1000 * 60 * 60 * 24;
-    if (sameTo && sameFrom) return tf;
-  }
-  return null;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK DATA BUILDER
@@ -691,6 +685,15 @@ function buildMockAnalytics(customerId: string, name: string) {
         : "No tickets raised",
   };
 
+  const loyaltyData = {
+    tier: pick(["Bronze", "Silver", "Gold", "Platinum"]),
+    points: between(50, 5000),
+    progressPct: between(20, 95),
+    nextTier: pick(["Silver", "Gold", "Platinum"]),
+    couponsUsed: between(0, 12),
+    lifetimeSavings: between(200, 15000),
+  };
+
   const riskBadges: { label: string; color: string; bg: string }[] = [];
   if (lifetimeSpend > 80000)
     riskBadges.push({
@@ -700,6 +703,8 @@ function buildMockAnalytics(customerId: string, name: string) {
     });
   if (totalOrders > 15)
     riskBadges.push({ label: "Repeat Buyer", color: blue, bg: blueLight });
+  if (loyaltyData.tier === "Gold" || loyaltyData.tier === "Platinum")
+    riskBadges.push({ label: "VIP Customer", color: "#F59E0B", bg: "#FEF9C3" });
   if (returnsData.returnRate < 8)
     riskBadges.push({
       label: "Low Return Rate",
@@ -735,6 +740,7 @@ function buildMockAnalytics(customerId: string, name: string) {
 
   const recommendedActions: { label: string; icon: string; color: string }[] = [
     { label: "Send Coupon", icon: "gift", color: pink },
+    { label: "Upgrade Loyalty Tier", icon: "crown", color: "#F59E0B" },
     { label: "Offer Free Shipping", icon: "truck", color: blue },
     { label: "Notify About Sale", icon: "send", color: purple },
     { label: "Contact Customer", icon: "phone", color: green },
@@ -788,7 +794,7 @@ function buildMockAnalytics(customerId: string, name: string) {
       title: "Submitted a " + reviewsData.avgRating + "★ review",
       date: "1 week ago",
     },
-    { type: "coupon", title: "Applied a discount coupon", date: "2 weeks ago" },
+    { type: "coupon", title: "Used a loyalty coupon", date: "2 weeks ago" },
     {
       type: "replacement",
       title: "Requested a replacement",
@@ -822,6 +828,7 @@ function buildMockAnalytics(customerId: string, name: string) {
     addressData,
     reviewsData,
     supportData,
+    loyaltyData,
     riskBadges,
     aiInsights,
     recommendedActions,
@@ -830,116 +837,85 @@ function buildMockAnalytics(customerId: string, name: string) {
     customerSince: `${between(1, 28)} ${pick(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"])} ${pick([2023, 2024, 2025])}`,
     lastPurchase: `${between(1, 28)} ${pick(["Apr", "May", "Jun"])} 2026`,
     healthScore: between(55, 98),
+    isVip: loyaltyData.tier === "Gold" || loyaltyData.tier === "Platinum",
     status: rng() < 0.85 ? "Active" : "Inactive",
   };
 }
-
-// Number of whole days spanned by a date range (minimum 1)
-function daysBetween(from: Date, to: Date): number {
-  const ms = Math.abs(to.getTime() - from.getTime());
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
+// Timeframe categorical filtering — lifetime aggregates from backend
+function getFilteredCategoricalData<T extends { label: string; value: number }>(
+  baseData: T[],
+  _timeframe: TimeFrame,
+): T[] {
+  return baseData;
 }
 
-// Maps a date range's span to a scale factor + bucket count/labels, then
-// regenerates deterministic mock values for that bucketing — this replaces
-// the old fixed-preset (7D/30D/90D/6M/1Y/All) filtering with a continuous
-// date-driven equivalent.
-function getFilteredDataByRange(
+function sliceMonthlyData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[] {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  let monthsToInclude = 12;
+  switch (timeframe) {
+    case "7D":
+    case "30D":
+      monthsToInclude = 1;
+      break;
+    case "90D":
+      monthsToInclude = 3;
+      break;
+    case "6M":
+      monthsToInclude = 6;
+      break;
+    default:
+      return data;
+  }
+  const indices: number[] = [];
+  for (let i = monthsToInclude - 1; i >= 0; i--) {
+    indices.push((currentMonth - i + 12) % 12);
+  }
+  return indices.map((m) => data[m] ?? { label: "", value: 0 }).filter((p) => p.label);
+}
+
+function sliceTailData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[] {
+  if (timeframe === "All" || timeframe === "1Y") return data;
+  let count = data.length;
+  switch (timeframe) {
+    case "7D":
+      count = 1;
+      break;
+    case "30D":
+      count = Math.min(4, data.length);
+      break;
+    case "90D":
+      count = Math.min(6, data.length);
+      break;
+    case "6M":
+      count = Math.min(6, data.length);
+      break;
+  }
+  return data.slice(-count);
+}
+
+// Timeframe filtering — slice real monthly / weekly series from backend
+function getFilteredData(
   baseData: ChartPoint[],
-  range: DateRange,
+  timeframe: TimeFrame,
   metricType: "spend" | "orders" | "freq" | "time",
-  seedValue: number,
 ): ChartPoint[] {
-  const spanDays = daysBetween(range.from, range.to);
-
-  // Long ranges (~11 months or more) just show the underlying monthly/base data.
-  if (spanDays >= 330) {
+  if (timeframe === "All" || timeframe === "1Y") {
     return baseData;
   }
-
-  const rng = mulberry32(seedValue + spanDays);
-  const between = (min: number, max: number) =>
-    Math.round(min + rng() * (max - min));
-
-  let count: number;
-  let labelFormat: (i: number) => string;
-
-  if (spanDays <= 9) {
-    // Day-by-day across the range
-    count = spanDays + 1;
-    const start = range.from < range.to ? range.from : range.to;
-    labelFormat = (i) => {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-    };
-  } else if (spanDays <= 45) {
-    // Weekly buckets
-    count = Math.min(7, Math.ceil(spanDays / 7));
-    labelFormat = (i) => `Week ${i + 1}`;
-  } else {
-    // Monthly buckets
-    count = Math.min(11, Math.max(2, Math.ceil(spanDays / 30)));
-    const start = range.from < range.to ? range.from : range.to;
-    labelFormat = (i) => {
-      const d = new Date(start);
-      d.setMonth(d.getMonth() + i);
-      return d.toLocaleDateString("en-IN", { month: "short" });
-    };
+  if (metricType === "spend" || metricType === "orders") {
+    return sliceMonthlyData(baseData, timeframe);
   }
-
-  let minVal = 0;
-  let maxVal = 100;
-  if (metricType === "spend") {
-    minVal = 500;
-    maxVal = 20000;
-  } else if (metricType === "orders") {
-    minVal = 0;
-    maxVal = 5;
-  } else if (metricType === "freq") {
-    minVal = 0;
-    maxVal = 3;
-  } else {
-    minVal = 5;
-    maxVal = 45;
+  if (metricType === "freq") {
+    return sliceTailData(baseData, timeframe);
   }
-
-  return Array.from({ length: count }, (_, i) => ({
-    label: labelFormat(i),
-    value: between(minVal, maxVal),
-  }));
+  return baseData;
 }
 
-// Scales categorical (donut/bar-list) data to a date range using the same
-// span-based scale factor approach as the old timeframe presets.
-function getFilteredCategoricalDataByRange<
-  T extends { label: string; value: number },
->(baseData: T[], range: DateRange, seedValue: number): T[] {
-  const spanDays = daysBetween(range.from, range.to);
-  if (spanDays >= 330) {
-    return baseData;
-  }
-
-  const rng = mulberry32(seedValue + spanDays);
-  // Scale relative to a 365-day year so shorter ranges show proportionally smaller totals.
-  const scale = Math.max(0.05, Math.min(1, spanDays / 365));
-
-  return baseData.map((item) => {
-    const variation = 0.8 + rng() * 0.4;
-    const newVal = Math.max(1, Math.round(item.value * scale * variation));
-    return {
-      ...item,
-      value: newVal,
-    };
-  });
-}
-
-function formatDateShort(d: Date): string {
-  return d.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+function parseTrendValue(val: string): Trend {
+  const num = parseFloat(val.replace("%", "").replace("+", ""));
+  if (!val || val === "0%" || Number.isNaN(num) || num === 0) return "flat";
+  return num > 0 ? "up" : "down";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1137,475 +1113,71 @@ const Badge = React.memo(function Badge({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATE RANGE PICKER
+// EXPORTING HELPERS (CSV / PDF)
 // ─────────────────────────────────────────────────────────────────────────────
-const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-const MONTH_LABELS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-// Pure-React calendar grid, used on web where @react-native-community/datetimepicker
-// has no functional UI. Renders a month grid with prev/next navigation, plus
-// tappable month/year selectors for fast jumps across years.
-function WebCalendar({
-  value,
-  maximumDate,
-  onSelect,
-}: {
-  value: Date;
-  maximumDate?: Date;
-  onSelect: (d: Date) => void;
-}) {
-  const [viewMonth, setViewMonth] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
-  const [pickerOpen, setPickerOpen] = useState<"month" | "year" | null>(null);
-
-  const weeks = useMemo(() => {
-    const firstOfMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
-    const startOffset = firstOfMonth.getDay();
-    const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate();
-
-    const cells: (Date | null)[] = [];
-    for (let i = 0; i < startOffset; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) {
-      cells.push(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d));
-    }
-    while (cells.length % 7 !== 0) cells.push(null);
-
-    const rows: (Date | null)[][] = [];
-    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
-    return rows;
-  }, [viewMonth]);
-
-  const goPrevMonth = useCallback(() => {
-    setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
-  }, []);
-  const goNextMonth = useCallback(() => {
-    setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1));
-  }, []);
-
-  const todayCutoff = maximumDate ?? new Date();
-  const maxYear = todayCutoff.getFullYear();
-  // 15-year lookback gives fast access to most relevant history without an
-  // unbounded list; older dates remain reachable via repeated prev-month taps.
-  const yearOptions = useMemo(() => {
-    const years: number[] = [];
-    for (let y = maxYear; y >= maxYear - 15; y--) years.push(y);
-    return years;
-  }, [maxYear]);
-
-  const togglePicker = useCallback((which: "month" | "year") => {
-    setPickerOpen((prev) => (prev === which ? null : which));
-  }, []);
-
-  const selectMonth = useCallback((monthIdx: number) => {
-    setViewMonth((m) => new Date(m.getFullYear(), monthIdx, 1));
-    setPickerOpen(null);
-  }, []);
-
-  const selectYear = useCallback((year: number) => {
-    setViewMonth((m) => new Date(year, m.getMonth(), 1));
-    setPickerOpen(null);
-  }, []);
-
-  return (
-    <View style={s.webCalendar}>
-      <View style={s.webCalHeader}>
-        <TouchableOpacity onPress={goPrevMonth} style={s.webCalNavBtn}>
-          <Text style={s.webCalNavTxt}>‹</Text>
-        </TouchableOpacity>
-
-        <View style={s.webCalTitleRow}>
-          <TouchableOpacity
-            onPress={() => togglePicker("month")}
-            style={[s.webCalTitleBtn, pickerOpen === "month" && s.webCalTitleBtnActive]}
-          >
-            <Text style={s.webCalTitle}>{MONTH_LABELS[viewMonth.getMonth()]}</Text>
-            <Text style={s.webCalTitleCaret}>▾</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => togglePicker("year")}
-            style={[s.webCalTitleBtn, pickerOpen === "year" && s.webCalTitleBtnActive]}
-          >
-            <Text style={s.webCalTitle}>{viewMonth.getFullYear()}</Text>
-            <Text style={s.webCalTitleCaret}>▾</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity onPress={goNextMonth} style={s.webCalNavBtn}>
-          <Text style={s.webCalNavTxt}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {pickerOpen === "month" && (
-        <View style={s.webCalFastGrid}>
-          {MONTH_LABELS.map((m, idx) => {
-            const isFuture = viewMonth.getFullYear() === maxYear && idx > todayCutoff.getMonth();
-            const isCurrent = idx === viewMonth.getMonth();
-            return (
-              <TouchableOpacity
-                key={m}
-                disabled={isFuture}
-                onPress={() => selectMonth(idx)}
-                style={[
-                  s.webCalFastItem,
-                  isCurrent && s.webCalFastItemActive,
-                  isFuture && s.webCalFastItemDisabled,
-                ]}
-              >
-                <Text
-                  style={[
-                    s.webCalFastItemTxt,
-                    isCurrent && s.webCalFastItemTxtActive,
-                    isFuture && s.webCalFastItemTxtDisabled,
-                  ]}
-                >
-                  {m.slice(0, 3)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      {pickerOpen === "year" && (
-        <View style={s.webCalFastGrid}>
-          {yearOptions.map((y) => {
-            const isCurrent = y === viewMonth.getFullYear();
-            return (
-              <TouchableOpacity
-                key={y}
-                onPress={() => selectYear(y)}
-                style={[s.webCalFastItem, isCurrent && s.webCalFastItemActive]}
-              >
-                <Text style={[s.webCalFastItemTxt, isCurrent && s.webCalFastItemTxtActive]}>
-                  {y}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      {!pickerOpen && (
-        <>
-          <View style={s.webCalWeekRow}>
-            {WEEKDAY_LABELS.map((wd, i) => (
-              <Text key={i} style={s.webCalWeekLbl}>{wd}</Text>
-            ))}
-          </View>
-
-          {weeks.map((week, ri) => (
-            <View key={ri} style={s.webCalWeekRow}>
-              {week.map((day, ci) => {
-                if (!day) return <View key={ci} style={s.webCalCell} />;
-                const disabled = day > todayCutoff;
-                const selected = isSameDay(day, value);
-                return (
-                  <TouchableOpacity
-                    key={ci}
-                    disabled={disabled}
-                    onPress={() => onSelect(day)}
-                    style={[
-                      s.webCalCell,
-                      s.webCalDayBtn,
-                      selected && s.webCalDayBtnSelected,
-                      disabled && s.webCalDayBtnDisabled,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        s.webCalDayTxt,
-                        selected && s.webCalDayTxtSelected,
-                        disabled && s.webCalDayTxtDisabled,
-                      ]}
-                    >
-                      {day.getDate()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ))}
-        </>
-      )}
-    </View>
-  );
-}
-
-function DateField({
-  label,
-  value,
-  onPress,
-}: {
-  label: string;
-  value: Date;
-  onPress: () => void;
-}) {
-  return (
-    <View style={s.modalDateFieldGroup}>
-      <Text style={s.modalDateFieldLbl}>{label}</Text>
-      <TouchableOpacity
-        style={s.modalDateFieldBtn}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <CalendarIcon size={13} color={sub} />
-        <Text style={s.modalDateFieldTxt}>{formatDateShort(value)}</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// Compact trigger button shown in the dashboard header: a single pill
-// summarizing the active range, opening the full picker modal on press.
-function DateRangeTriggerButton({
-  range,
-  onPress,
-}: {
-  range: DateRange;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={s.dateRangeTrigger}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <CalendarIcon size={13} color={sub} />
-      <Text style={s.dateRangeTriggerTxt} numberOfLines={1}>
-        {formatDateShort(range.from)} - {formatDateShort(range.to)}
-      </Text>
-      <Text style={s.dateRangeTriggerChevron}>▾</Text>
-    </TouchableOpacity>
-  );
-}
-
-const DateRangePicker = React.memo(function DateRangePicker({
-  range,
-  onChange,
-  allRangeStart,
-}: {
-  range: DateRange;
-  onChange: (range: DateRange) => void;
-  allRangeStart: Date;
-}) {
-  const [openField, setOpenField] = useState<"from" | "to" | null>(null);
-  const [draftDate, setDraftDate] = useState<Date | null>(null);
-
-  // Modal visibility + the in-progress range being edited inside it.
-  // Mirrors `range` while open; only pushed out via onChange on Apply.
-  const [modalVisible, setModalVisible] = useState(false);
-  const [pendingRange, setPendingRange] = useState<DateRange>(range);
-
-  const activePreset = useMemo(
-    () => matchTimeFrame(range, allRangeStart),
-    [range, allRangeStart],
-  );
-
-  const handlePresetPress = useCallback(
-    (tf: TimeFrame) => {
-      onChange(rangeForTimeFrame(tf, allRangeStart));
-    },
-    [onChange, allRangeStart],
-  );
-
-  const openModal = useCallback(() => {
-    setPendingRange(range);
-    setModalVisible(true);
-  }, [range]);
-
-  const closeModal = useCallback(() => {
-    setOpenField(null);
-    setDraftDate(null);
-    setModalVisible(false);
-  }, []);
-
-  const applyModal = useCallback(() => {
-    onChange(pendingRange);
-    setOpenField(null);
-    setDraftDate(null);
-    setModalVisible(false);
-  }, [pendingRange, onChange]);
-
-  const openPicker = useCallback(
-    (field: "from" | "to") => {
-      setDraftDate(field === "from" ? pendingRange.from : pendingRange.to);
-      setOpenField(field);
-    },
-    [pendingRange],
-  );
-
-  // Identical clamping logic to before — only now it writes into the modal's
-  // pendingRange instead of calling onChange directly. The existing apply
-  // logic (onChange(pendingRange)) fires once, when Apply is pressed.
-  const commit = useCallback(
-    (field: "from" | "to", selectedDate: Date) => {
-      setPendingRange((prev) => {
-        if (field === "from") {
-          const newFrom = selectedDate > prev.to ? prev.to : selectedDate;
-          return { from: newFrom, to: prev.to };
-        } else {
-          const newTo = selectedDate < prev.from ? prev.from : selectedDate;
-          return { from: prev.from, to: newTo };
-        }
+const shareData = async (title: string, data: ChartPoint[]) => {
+  const csvString = "Label,Value\n" + data.map(d => `"${d.label}",${d.value}`).join("\n");
+  try {
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${title.replace(/\s+/g, '_')}_data.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      await Share.share({
+        message: csvString,
+        title: `${title} CSV Export`,
       });
-    },
-    [],
-  );
+    }
+  } catch (error) {
+    console.error("Export error:", error);
+  }
+};
 
-  // Android native dialog has its own OK/Cancel, applies immediately on pick.
-  const handleAndroidChange = useCallback(
-    (event: any, selectedDate?: Date) => {
-      const field = openField;
-      setOpenField(null);
-      if (!selectedDate || !field || event?.type === "dismissed") return;
-      commit(field, selectedDate);
-    },
-    [openField, commit],
-  );
+const printDataPDF = async (title: string, data: ChartPoint[], customerId: string) => {
+  const rows = data.map(d => `
+    <tr>
+      <td style="padding: 8px; border-bottom: 1px solid #E5E7EB; font-family: system-ui;">${d.label}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #E5E7EB; text-align: right; font-weight: bold; font-family: system-ui;">${d.value.toLocaleString()}</td>
+    </tr>
+  `).join("");
 
-  // iOS inline calendar fires onChange on every scroll/tap, so we just
-  // track the draft and only commit when the user taps "Done".
-  const handleIOSChange = useCallback((event: any, selectedDate?: Date) => {
-    if (selectedDate) setDraftDate(selectedDate);
-  }, []);
+  const html = `
+    <html>
+      <body style="font-family: system-ui, sans-serif; padding: 24px; color: #111827;">
+        <h1 style="color: #1E2B6B; font-size: 24px; margin-bottom: 4px;">Customer Analytics Export</h1>
+        <h2 style="color: #F97316; font-size: 14px; margin-top: 0; margin-bottom: 24px;">Report: ${title} &middot; Customer #${customerId}</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #F3F4F6;">
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #E5E7EB;">Metric label</th>
+              <th style="padding: 10px; text-align: right; border-bottom: 2px solid #E5E7EB;">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+        <p style="margin-top: 40px; text-align: center; font-size: 11px; color: #9CA3AF;">Generated dynamically via Admin Panel Dashboard.</p>
+      </body>
+    </html>
+  `;
 
-  // Web calendar: each day tap is a deliberate, final selection.
-  const handleWebSelect = useCallback(
-    (selectedDate: Date) => {
-      if (openField) commit(openField, selectedDate);
-      setOpenField(null);
-      setDraftDate(null);
-    },
-    [openField, commit],
-  );
-
-  const confirmIOS = useCallback(() => {
-    if (openField && draftDate) commit(openField, draftDate);
-    setOpenField(null);
-    setDraftDate(null);
-  }, [openField, draftDate, commit]);
-
-  const closeSheet = useCallback(() => {
-    setOpenField(null);
-    setDraftDate(null);
-  }, []);
-
-  return (
-    <View style={s.dateRangeWrap}>
-      {/* Preset timeframe chips — unchanged behavior, still apply instantly */}
-      <View style={s.tfChipRow}>
-        {(["7D", "30D", "90D", "6M", "1Y", "All"] as TimeFrame[]).map((tf) => (
-          <TouchableOpacity
-            key={tf}
-            onPress={() => handlePresetPress(tf)}
-            style={[s.tfBtn, activePreset === tf && s.tfBtnActive]}
-          >
-            <Text style={[s.tfBtnTxt, activePreset === tf && s.tfBtnTxtActive]}>{tf}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={s.tfDivider} />
-
-      {/* Compact trigger — opens the full Select Date Range modal */}
-      <DateRangeTriggerButton range={range} onPress={openModal} />
-
-      {/* ── Select Date Range modal ──────────────────────────────────── */}
-      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
-        <Pressable style={s.centerModalOverlay} onPress={closeModal}>
-          <Pressable style={s.rangeModalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={s.rangeModalTitle}>Select Date Range</Text>
-
-            <View style={s.rangeModalFields}>
-              <DateField label="From" value={pendingRange.from} onPress={() => openPicker("from")} />
-              <DateField label="To" value={pendingRange.to} onPress={() => openPicker("to")} />
-            </View>
-
-            <View style={s.rangeModalFooter}>
-              <TouchableOpacity style={s.rangeModalCancelBtn} onPress={closeModal} activeOpacity={0.7}>
-                <Text style={s.rangeModalCancelTxt}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.rangeModalApplyBtn} onPress={applyModal} activeOpacity={0.85}>
-                <Text style={s.rangeModalApplyTxt}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ── Platform-specific day pickers, nested above the modal ───────
-          Logic untouched: Android native dialog, iOS inline + Done/Cancel
-          sheet, Web calendar grid. Only the source range (pendingRange
-          instead of range) changed, since edits here are drafts until
-          Apply is pressed. */}
-      {openField && Platform.OS === "web" && (
-        <Modal visible transparent animationType="fade" onRequestClose={closeSheet}>
-          <Pressable style={s.centerModalOverlay} onPress={closeSheet}>
-            <Pressable style={s.webCalSheet} onPress={(e) => e.stopPropagation()}>
-              <View style={s.datePickerSheetHeader}>
-                <TouchableOpacity onPress={closeSheet}>
-                  <Text style={s.datePickerCancelTxt}>Close</Text>
-                </TouchableOpacity>
-                <Text style={s.datePickerSheetTitle}>
-                  {openField === "from" ? "From Date" : "To Date"}
-                </Text>
-                <View style={{ width: 44 }} />
-              </View>
-              <WebCalendar
-                value={openField === "from" ? pendingRange.from : pendingRange.to}
-                maximumDate={new Date()}
-                onSelect={handleWebSelect}
-              />
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
-
-      {openField && Platform.OS === "ios" && (
-        <Modal visible transparent animationType="fade">
-          <View style={s.modalOverlay}>
-            <View style={s.datePickerSheet}>
-              <View style={s.datePickerSheetHeader}>
-                <TouchableOpacity onPress={closeSheet}>
-                  <Text style={s.datePickerCancelTxt}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={s.datePickerSheetTitle}>
-                  {openField === "from" ? "From Date" : "To Date"}
-                </Text>
-                <TouchableOpacity onPress={confirmIOS}>
-                  <Text style={s.datePickerDoneTxt}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={draftDate ?? new Date()}
-                mode="date"
-                display="inline"
-                maximumDate={new Date()}
-                onChange={handleIOSChange}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {openField && Platform.OS === "android" && (
-        <DateTimePicker
-          value={openField === "from" ? pendingRange.from : pendingRange.to}
-          mode="date"
-          display="default"
-          maximumDate={new Date()}
-          onChange={handleAndroidChange}
-        />
-      )}
-    </View>
-  );
-});
+  try {
+    if (Platform.OS === 'web') {
+      await Print.printAsync({ html });
+    } else {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri);
+    }
+  } catch (error) {
+    console.error("PDF Print error:", error);
+  }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESPONSIVE INTERACTIVE CHARTS
@@ -1627,6 +1199,16 @@ function MeasuredChart({ plotHeight = 140, render }: MeasuredChartProps) {
       {w > 0 ? render(w, effectivePlotHeight) : <View style={{ height: effectivePlotHeight }} />}
     </View>
   );
+}
+
+// Helper to format month abbreviations to full Month Year (e.g. "Jan" to "Jan 2026")
+function formatPeriodLabel(label: string) {
+  const monthMap: Record<string, string> = {
+    Jan: "Jan 2026", Feb: "Feb 2026", Mar: "Mar 2026", Apr: "Apr 2026",
+    May: "May 2026", Jun: "Jun 2026", Jul: "Jul 2026", Aug: "Aug 2026",
+    Sep: "Sep 2026", Oct: "Oct 2026", Nov: "Nov 2026", Dec: "Dec 2026"
+  };
+  return monthMap[label] ?? label;
 }
 
 interface ChartTooltipProps {
@@ -1674,7 +1256,7 @@ const ChartTooltip = React.memo(function ChartTooltip({
   return (
     <View pointerEvents="none" style={[s.tooltipBubble, { left, top, width: bubbleW }]}>
       <Text style={s.tooltipMetricName} numberOfLines={1}>{metricName}</Text>
-      <Text style={s.tooltipLabel} numberOfLines={1}>{label}</Text>
+      <Text style={s.tooltipLabel} numberOfLines={1}>{formatPeriodLabel(label)}</Text>
       <Text style={[s.tooltipValue, { color }]} numberOfLines={1}>{value}</Text>
       {pctChange ? (
         <Text style={[s.tooltipPctChange, { color: pctChange.startsWith("-") ? C.red : C.green }]} numberOfLines={1}>
@@ -1701,6 +1283,7 @@ interface SvgChartProps {
   onPointPress?: (p: ChartPoint) => void;
   onHoverValueChange?: (val: string | null) => void;
   metricName: string;
+  timeframe?: TimeFrame;
 }
 function LineChartSvg({
   data,
@@ -1711,6 +1294,7 @@ function LineChartSvg({
   onPointPress,
   onHoverValueChange,
   metricName,
+  timeframe,
 }: SvgChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const padX = Math.max(12, width * 0.04);
@@ -1803,8 +1387,9 @@ function LineChartSvg({
     }
     const pct = ((curr - prev) / prev) * 100;
     const sign = pct >= 0 ? "+" : "";
-    return `${sign}${pct.toFixed(1)}% from previous period`;
-  }, [activeIdx, data]);
+    const period = timeframe === "7D" ? "day" : (timeframe === "30D" || timeframe === "90D" ? "week" : "month");
+    return `${sign}${pct.toFixed(1)}% from previous ${period}`;
+  }, [activeIdx, data, timeframe]);
 
   return (
     <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
@@ -1913,6 +1498,7 @@ function BarChartSvg({
   onPointPress,
   onHoverValueChange,
   metricName,
+  timeframe,
 }: SvgChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const padX = Math.max(12, width * 0.03);
@@ -2124,29 +1710,18 @@ const RingChart = React.memo(function RingChart({
   if (donut) {
     if (activeIdx !== null && data[activeIdx]) {
       const pct = ((data[activeIdx].value / total) * 100).toFixed(1) + "%";
-      const activeLabel = data[activeIdx].label.toUpperCase();
-      // Inner-circle diameter sets a hard ceiling on how much label text can
-      // fit on one line; shrink the font further for longer words so labels
-      // like "REPLACEMENT" stay inside the ring instead of overflowing it.
-      const innerDiameter = rInner * 2;
-      const usableWidth = innerDiameter * 0.78;
-      const boldCharWidthFactor = 0.72;
-      const labelFontSize = Math.max(
-        5.5,
-        Math.min(9, usableWidth / Math.max(activeLabel.length, 1) / boldCharWidthFactor),
-      );
       centerTextElement = (
         <G pointerEvents="none">
           <SvgText
             x={cx}
             y={cy - 14}
-            fontSize={labelFontSize}
+            fontSize={9}
             fontWeight="700"
             fill={C.textLight}
             textAnchor="middle"
             alignmentBaseline="middle"
           >
-            {activeLabel}
+            {data[activeIdx].label.toUpperCase()}
           </SvgText>
           <SvgText
             x={cx}
@@ -2234,19 +1809,14 @@ const RingChart = React.memo(function RingChart({
         </Svg>
       </View>
       
-      {/* Simple un-intrusive text label below the chart — fixed-width
-          container so the text re-centers in place rather than shifting
-          the whole label sideways as its content length changes on hover. */}
-      <View style={{ width: size, height: 20, marginTop: 4, justifyContent: "center", alignItems: "center", paddingHorizontal: 6 }}>
+      {/* Simple un-intrusive text label below the chart */}
+      <View style={{ height: 20, marginTop: 4, justifyContent: "center", alignItems: "center" }}>
         {activeSlice ? (
-          <Text
-            style={{ fontSize: 11, fontWeight: "700", color: activeSlice.color, textAlign: "center" }}
-            numberOfLines={1}
-          >
+          <Text style={{ fontSize: 11, fontWeight: "700", color: activeSlice.color }}>
             {activeSlice.label}: {activeSlice.value.toLocaleString()} {unit} ({activePct})
           </Text>
         ) : (
-          <Text style={{ fontSize: 10, color: C.textLight, fontStyle: "italic", textAlign: "center" }}>
+          <Text style={{ fontSize: 10, color: C.textLight, fontStyle: "italic" }}>
             Hover slices for details
           </Text>
         )}
@@ -2336,6 +1906,7 @@ const TIMELINE_ICON_CFG: Record<string, { icon: React.ReactNode; bg: string }> =
 
 const ACTION_ICON_CFG: Record<string, React.ReactNode> = {
   gift: <GiftIcon size={16} color="#fff" />,
+  crown: <CrownIcon size={16} color="#fff" />,
   truck: <TruckIcon size={16} color="#fff" />,
   send: <SendIcon size={16} color="#fff" />,
   phone: <PhoneIcon size={16} color="#fff" />,
@@ -2399,7 +1970,7 @@ const SectionNav = React.memo(function SectionNav({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DRILL-DOWN MODAL
+// DRILL-DOWN & FULLSCREEN MODALS
 // ─────────────────────────────────────────────────────────────────────────────
 interface DrillDownModalProps {
   visible: boolean;
@@ -2477,6 +2048,67 @@ const DrillDownModal = React.memo(function DrillDownModal({
   );
 });
 
+interface FullscreenChartModalProps {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  data: ChartPoint[];
+  exportCSV: () => void;
+  exportPDF: () => void;
+}
+const FullscreenChartModal = React.memo(function FullscreenChartModal({
+  visible,
+  onClose,
+  title,
+  children,
+  data,
+  exportCSV,
+  exportPDF,
+}: FullscreenChartModalProps) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent>
+      <View style={s.modalOverlay}>
+        <View style={[s.modalContent, { height: "70%", maxHeight: 600 }]}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Fullscreen: {title}</Text>
+            <TouchableOpacity onPress={onClose} style={s.closeBtn}>
+              <Text style={s.closeBtnTxt}>Exit</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={s.modalBody} contentContainerStyle={{ gap: 20 }}>
+            <View style={s.fullscreenChartContainer}>{children}</View>
+
+            <View style={s.fullscreenActions}>
+              <TouchableOpacity onPress={exportCSV} style={s.actionOutline}>
+                <DownloadIcon size={12} color={primary} />
+                <Text style={s.actionOutlineTxt}>CSV Export</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={exportPDF} style={s.actionOutline}>
+                <DownloadIcon size={12} color={blue} />
+                <Text style={s.actionOutlineTxt}>PDF Export</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={s.modalSubheading}>Dataset</Text>
+            <View style={s.datasetTable}>
+              {data.map((d) => (
+                <View key={d.label} style={s.datasetRow}>
+                  <Text style={s.datasetCellLabel}>{d.label}</Text>
+                  <Text style={s.datasetCellValue}>
+                    {d.value > 100 ? rupee(d.value) : d.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN SCREEN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2493,19 +2125,49 @@ export default function CustomerAnalyticsScreen() {
   const px = isMobile ? 12 : isTablet ? 18 : 24;
 
   const customerId = id ?? "0";
-  const customerName = name ?? "Customer";
+  const [analytics, setAnalytics] = useState<CustomerAnalyticsUi | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadAnalytics = useCallback(async () => {
+    const numericId = Number(customerId);
+    if (!numericId || Number.isNaN(numericId)) {
+      setLoadError("Invalid customer id");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const raw = await fetchCustomerAnalytics(numericId);
+      setAnalytics(mapApiAnalyticsToUi(raw));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load analytics");
+      setAnalytics(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [customerId]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
+
+  const customerName = analytics?.customer.name || name || "Customer";
 
   const customerEmail = useMemo(() => {
+    const fromApi = analytics?.customer.email;
+    if (fromApi && fromApi !== "—") return fromApi;
     if (email && email !== "—" && email !== "") return email;
-    return `${customerName.toLowerCase().replace(/\s+/g, "")}@flintandthread.com`;
-  }, [email, customerName]);
+    return "—";
+  }, [analytics?.customer.email, email]);
 
   const customerPhone = useMemo(() => {
+    const fromApi = analytics?.customer.phone;
+    if (fromApi && fromApi !== "—") return fromApi;
     if (phone && phone !== "—" && phone !== "") return phone;
-    const rng = mulberry32(seedFromString(customerId + "contact"));
-    const num = Math.floor(7000000000 + rng() * 2000000000);
-    return `+91 ${num.toString().replace(/(\d{5})(\d{5})/, "$1 $2")}`;
-  }, [phone, customerId]);
+    return "—";
+  }, [analytics?.customer.phone, phone]);
 
   const handleEmailPress = useCallback(() => {
     if (Platform.OS === 'web' && typeof window !== "undefined") {
@@ -2517,52 +2179,36 @@ export default function CustomerAnalyticsScreen() {
     }
   }, [customerEmail]);
 
-  // Build raw mock analytics
-  const data = useMemo(
-    () => buildMockAnalytics(customerId, customerName),
-    [customerId, customerName],
-  );
+  const data = analytics;
 
-  // Default range shown when a chart first loads: the last 7 days, ending today.
-  const defaultRange = useMemo<DateRange>(() => {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(from.getDate() - 6);
-    return { from, to };
-  }, []);
-
-  // Anchor used by the "All" preset chip — independent of defaultRange,
-  // spans the last 12 months regardless of what the initial view shows.
-  const allRangeStart = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 11);
-    return d;
-  }, []);
-
-  // Date-range states for charts
-  const [spendRange, setSpendRange] = useState<DateRange>(defaultRange);
-  const [ordersRange, setOrdersRange] = useState<DateRange>(defaultRange);
-  const [freqRange, setFreqRange] = useState<DateRange>(defaultRange);
-  const [distRange, setDistRange] = useState<DateRange>(defaultRange);
-  const [statusRange, setStatusRange] = useState<DateRange>(defaultRange);
-  const [paymentRange, setPaymentRange] = useState<DateRange>(defaultRange);
-  const [categoryRange, setCategoryRange] = useState<DateRange>(defaultRange);
+  // Timeframe states for charts
+  const [spendTF, setSpendTF] = useState<TimeFrame>("All");
+  const [ordersTF, setOrdersTF] = useState<TimeFrame>("All");
+  const [freqTF, setFreqTF] = useState<TimeFrame>("All");
+  const [distTF, setDistTF] = useState<TimeFrame>("All");
+  const [statusTF, setStatusTF] = useState<TimeFrame>("All");
+  const [paymentTF, setPaymentTF] = useState<TimeFrame>("All");
+  const [categoryTF, setCategoryTF] = useState<TimeFrame>("All");
 
   const spendData = useMemo(() => {
-    return getFilteredDataByRange(data.monthlySpend, spendRange, "spend", seedFromString(customerId + "spend"));
-  }, [data.monthlySpend, spendRange, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.monthlySpend, spendTF, "spend");
+  }, [data, spendTF]);
 
   const ordersData = useMemo(() => {
-    return getFilteredDataByRange(data.monthlyOrders, ordersRange, "orders", seedFromString(customerId + "orders"));
-  }, [data.monthlyOrders, ordersRange, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.monthlyOrders, ordersTF, "orders");
+  }, [data, ordersTF]);
 
   const freqData = useMemo(() => {
-    return getFilteredDataByRange(data.orderFrequency, freqRange, "freq", seedFromString(customerId + "freq"));
-  }, [data.orderFrequency, freqRange, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.orderFrequency, freqTF, "freq");
+  }, [data, freqTF]);
 
   const distData = useMemo(() => {
-    return getFilteredDataByRange(data.purchaseTime, distRange, "time", seedFromString(customerId + "time"));
-  }, [data.purchaseTime, distRange, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.purchaseTime, distTF, "time");
+  }, [data, distTF]);
 
   // Legend toggle state
   const [hiddenStatusLabels, setHiddenStatusLabels] = useState<Set<string>>(new Set());
@@ -2570,24 +2216,27 @@ export default function CustomerAnalyticsScreen() {
   const [hiddenCategoryLabels, setHiddenCategoryLabels] = useState<Set<string>>(new Set());
 
   const scaledOrderStatus = useMemo(() => {
-    return getFilteredCategoricalDataByRange(data.orderStatusBreakdown, statusRange, seedFromString(customerId + "status"));
-  }, [data.orderStatusBreakdown, statusRange, customerId]);
+    if (!data) return [];
+    return getFilteredCategoricalData(data.orderStatusBreakdown, statusTF);
+  }, [data, statusTF]);
 
   const activeOrderStatus = useMemo(() => {
     return scaledOrderStatus.filter(item => !hiddenStatusLabels.has(item.label));
   }, [scaledOrderStatus, hiddenStatusLabels]);
 
   const scaledPaymentMethods = useMemo(() => {
-    return getFilteredCategoricalDataByRange(data.paymentMethods, paymentRange, seedFromString(customerId + "payment"));
-  }, [data.paymentMethods, paymentRange, customerId]);
+    if (!data) return [];
+    return getFilteredCategoricalData(data.paymentMethods, paymentTF);
+  }, [data, paymentTF]);
 
   const activePaymentMethods = useMemo(() => {
     return scaledPaymentMethods.filter(item => !hiddenPaymentLabels.has(item.label));
   }, [scaledPaymentMethods, hiddenPaymentLabels]);
 
   const filteredCategories = useMemo(() => {
-    return getFilteredCategoricalDataByRange(data.categories, categoryRange, seedFromString(customerId + "category"));
-  }, [data.categories, categoryRange, customerId]);
+    if (!data) return [];
+    return getFilteredCategoricalData(data.categories, categoryTF);
+  }, [data, categoryTF]);
 
   const categorySlices = useMemo(() => {
     const slices = filteredCategories.map((c, idx) => ({
@@ -2603,6 +2252,11 @@ export default function CustomerAnalyticsScreen() {
   const [ordersLiveKPI, setOrdersLiveKPI] = useState<string | null>(null);
   const [freqLiveKPI, setFreqLiveKPI] = useState<string | null>(null);
   const [distLiveKPI, setDistLiveKPI] = useState<string | null>(null);
+
+  // Fullscreen modals states
+  const [fullscreenChartTitle, setFullscreenChartTitle] = useState<string | null>(null);
+  const [fullscreenData, setFullscreenData] = useState<ChartPoint[]>([]);
+  const [fullscreenRender, setFullscreenRender] = useState<((w: number, h: number) => React.ReactNode) | null>(null);
 
   // Drill-down Modal state
   const [drilldownPoint, setDrilldownPoint] = useState<ChartPoint | null>(null);
@@ -2662,15 +2316,19 @@ export default function CustomerAnalyticsScreen() {
 
   // Dynamic status-based KPI definitions
   const kpis = useMemo(
-    () => [
+    () => {
+      if (!data) return [];
+      const spendTrend = parseTrendValue(data.trends.spendTrend);
+      const ordersTrend = parseTrendValue(data.trends.ordersTrend);
+      return [
       {
         icon: <WalletIcon color={primary} size={18} />,
         iconBg: primaryLight,
         title: "Lifetime Spend",
         value: spendLiveKPI ? spendLiveKPI : rupee(data.lifetimeSpend),
         sub: spendLiveKPI ? "Live Hover Value" : "All-time total",
-        trend: "up" as Trend,
-        trendVal: "+12%",
+        trend: spendTrend,
+        trendVal: data.trends.spendTrend,
       },
       {
         icon: <BagIcon color={navy} size={18} />,
@@ -2678,8 +2336,8 @@ export default function CustomerAnalyticsScreen() {
         title: "Total Orders",
         value: ordersLiveKPI ? ordersLiveKPI : String(data.totalOrders),
         sub: ordersLiveKPI ? "Live Hover Value" : "All-time orders",
-        trend: "up" as Trend,
-        trendVal: "+4",
+        trend: ordersTrend,
+        trendVal: data.trends.ordersTrend,
       },
       {
         icon: <CartIcon color={blue} size={18} />,
@@ -2735,7 +2393,8 @@ export default function CustomerAnalyticsScreen() {
         trend: "down" as Trend,
         trendVal: "-3%",
       },
-    ],
+    ];
+    },
     [data, spendLiveKPI, ordersLiveKPI],
   );
 
@@ -2749,6 +2408,45 @@ export default function CustomerAnalyticsScreen() {
         .toUpperCase(),
     [customerName],
   );
+
+  // Time filter rendering
+  const renderTimeFilters = (current: TimeFrame, setFilter: (tf: TimeFrame) => void) => (
+    <View style={s.tfRow}>
+      {(["7D", "30D", "90D", "6M", "1Y", "All"] as TimeFrame[]).map((tf) => (
+        <TouchableOpacity
+          key={tf}
+          onPress={() => setFilter(tf)}
+          style={[s.tfBtn, current === tf && s.tfBtnActive]}
+        >
+          <Text style={[s.tfBtnTxt, current === tf && s.tfBtnTxtActive]}>{tf}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
+          <ActivityIndicator size="large" color={primary} />
+          <Text style={{ marginTop: 12, color: sub }}>Loading customer analytics…</Text>
+        </View>
+      </AdminLayout>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <AdminLayout>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
+          <Text style={{ color: red, fontWeight: "700" }}>{loadError ?? "No analytics data"}</Text>
+          <TouchableOpacity onPress={loadAnalytics} style={[s.tfBtn, s.tfBtnActive]}>
+            <Text style={[s.tfBtnTxt, s.tfBtnTxtActive]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -2810,7 +2508,7 @@ export default function CustomerAnalyticsScreen() {
                       <EnvelopeIcon size={11} color="rgba(255,255,255,0.7)" />
                       <Text style={s.headerMetaTxt} numberOfLines={1}>{customerEmail}</Text>
                     </TouchableOpacity>
-                    {Platform.OS !== 'web' && (
+                    {Platform.OS !== "web" && customerPhone !== "—" && (
                       <View style={s.headerMetaItem}>
                         <PhoneIcon size={11} color="rgba(255,255,255,0.7)" />
                         <Text style={s.headerMetaTxt}>{customerPhone}</Text>
@@ -2915,9 +2613,36 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader
                     icon={<GraphUpIcon color={primary} size={16} />}
                     title="Spending Trend"
+                    right={
+                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setFullscreenChartTitle("Monthly Spending Trend");
+                            setFullscreenData(spendData);
+                            setFullscreenRender(() => (w: number, h: number) => (
+                              <LineChartSvg
+                                data={spendData}
+                                color={primary}
+                                width={w}
+                                height={h}
+                                formatValue={rupee}
+                                metricName="Revenue"
+                                timeframe={spendTF}
+                                onPointPress={(p) => {
+                                  setDrilldownPoint(p);
+                                  setDrilldownTitle("Monthly Spending");
+                                }}
+                              />
+                            ));
+                          }}
+                        >
+                          <MaximizeIcon size={14} color={C.textLight} />
+                        </TouchableOpacity>
+                      </View>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <DateRangePicker range={spendRange} onChange={setSpendRange} allRangeStart={allRangeStart} />
+                    {renderTimeFilters(spendTF, setSpendTF)}
                     <MeasuredChart
                       plotHeight={150}
                       render={(w, h) => (
@@ -2929,6 +2654,7 @@ export default function CustomerAnalyticsScreen() {
                           formatValue={rupee}
                           onHoverValueChange={setSpendLiveKPI}
                           metricName="Revenue"
+                          timeframe={spendTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Monthly Spending");
@@ -2944,9 +2670,34 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader
                     icon={<BarChartFillIcon color={blue} size={16} />}
                     title="Orders Placed"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFullscreenChartTitle("Orders Count");
+                          setFullscreenData(ordersData);
+                          setFullscreenRender(() => (w: number, h: number) => (
+                            <BarChartSvg
+                              data={ordersData}
+                              color={blue}
+                              width={w}
+                              height={h}
+                              formatValue={(v) => `${v.toLocaleString()} Orders`}
+                              metricName="Orders"
+                              timeframe={ordersTF}
+                              onPointPress={(p) => {
+                                setDrilldownPoint(p);
+                                setDrilldownTitle("Orders Placed");
+                              }}
+                            />
+                          ));
+                        }}
+                      >
+                        <MaximizeIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <DateRangePicker range={ordersRange} onChange={setOrdersRange} allRangeStart={allRangeStart} />
+                    {renderTimeFilters(ordersTF, setOrdersTF)}
                     <MeasuredChart
                       plotHeight={150}
                       render={(w, h) => (
@@ -2958,6 +2709,7 @@ export default function CustomerAnalyticsScreen() {
                           formatValue={(v) => `${v.toLocaleString()} Orders`}
                           onHoverValueChange={setOrdersLiveKPI}
                           metricName="Orders"
+                          timeframe={ordersTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Orders Placed");
@@ -2973,9 +2725,34 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader
                     icon={<GraphUpIcon color={green} size={16} />}
                     title="Order Frequency"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFullscreenChartTitle("Order Frequency");
+                          setFullscreenData(freqData);
+                          setFullscreenRender(() => (w: number, h: number) => (
+                            <LineChartSvg
+                              data={freqData}
+                              color={green}
+                              width={w}
+                              height={h}
+                              formatValue={(v) => `${v.toFixed(1)} orders/wk`}
+                              metricName="Order Frequency"
+                              timeframe={freqTF}
+                              onPointPress={(p) => {
+                                setDrilldownPoint(p);
+                                setDrilldownTitle("Order Frequency");
+                              }}
+                            />
+                          ));
+                        }}
+                      >
+                        <MaximizeIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <DateRangePicker range={freqRange} onChange={setFreqRange} allRangeStart={allRangeStart} />
+                    {renderTimeFilters(freqTF, setFreqTF)}
                     <MeasuredChart
                       plotHeight={150}
                       render={(w, h) => (
@@ -2987,6 +2764,7 @@ export default function CustomerAnalyticsScreen() {
                           formatValue={(v) => `${v.toFixed(1)} orders/wk`}
                           onHoverValueChange={setFreqLiveKPI}
                           metricName="Order Frequency"
+                          timeframe={freqTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Order Frequency");
@@ -3002,9 +2780,34 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader
                     icon={<ClockIcon color={yellow} size={16} />}
                     title="Purchase Time Breakdown"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFullscreenChartTitle("Purchase Time");
+                          setFullscreenData(distData);
+                          setFullscreenRender(() => (w: number, h: number) => (
+                            <BarChartSvg
+                              data={distData}
+                              color={yellow}
+                              width={w}
+                              height={h}
+                              formatValue={(v) => `${v.toFixed(1)}% of orders`}
+                              metricName="Purchase Time Breakdown"
+                              timeframe={distTF}
+                              onPointPress={(p) => {
+                                setDrilldownPoint(p);
+                                setDrilldownTitle("Purchase Time Distribution");
+                              }}
+                            />
+                          ));
+                        }}
+                      >
+                        <MaximizeIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={s.cardBody}>
-                    <DateRangePicker range={distRange} onChange={setDistRange} allRangeStart={allRangeStart} />
+                    {renderTimeFilters(distTF, setDistTF)}
                     <MeasuredChart
                       plotHeight={150}
                       render={(w, h) => (
@@ -3016,6 +2819,7 @@ export default function CustomerAnalyticsScreen() {
                           formatValue={(v) => `${v.toFixed(1)}% of orders`}
                           onHoverValueChange={setDistLiveKPI}
                           metricName="Purchase Time Breakdown"
+                          timeframe={distTF}
                           onPointPress={(p) => {
                             setDrilldownPoint(p);
                             setDrilldownTitle("Purchase Time Distribution");
@@ -3034,7 +2838,7 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader icon={<PieChartIcon color={purple} size={16} />} title="Order Status Distribution" />
                   <View style={[s.cardBody, s.ringCardBody]}>
                     <View style={{ width: "100%", marginBottom: 8 }}>
-                      <DateRangePicker range={statusRange} onChange={setStatusRange} allRangeStart={allRangeStart} />
+                      {renderTimeFilters(statusTF, setStatusTF)}
                     </View>
                     <RingChart data={activeOrderStatus} donut metricName="Order Status" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
@@ -3059,7 +2863,7 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader icon={<CreditCardIcon color={navy} size={16} />} title="Preferred Payment Methods" />
                   <View style={[s.cardBody, s.ringCardBody]}>
                     <View style={{ width: "100%", marginBottom: 8 }}>
-                      <DateRangePicker range={paymentRange} onChange={setPaymentRange} allRangeStart={allRangeStart} />
+                      {renderTimeFilters(paymentTF, setPaymentTF)}
                     </View>
                     <RingChart data={activePaymentMethods} donut metricName="Payment Method" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
@@ -3084,7 +2888,7 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader icon={<PieChartIcon color={teal} size={16} />} title="Purchase Categories" />
                   <View style={[s.cardBody, s.ringCardBody, { paddingVertical: 16 }]}>
                     <View style={{ width: "100%", marginBottom: 8 }}>
-                      <DateRangePicker range={categoryRange} onChange={setCategoryRange} allRangeStart={allRangeStart} />
+                      {renderTimeFilters(categoryTF, setCategoryTF)}
                     </View>
                     <RingChart data={categorySlices} donut metricName="Categories" unit="Orders" />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
@@ -3108,7 +2912,7 @@ export default function CustomerAnalyticsScreen() {
                 <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
                   <SectionHeader icon={<TagIcon color={pink} size={16} />} title="Most Purchased Categories" />
                   <View style={[s.cardBody, { paddingVertical: 16 }]}>
-                    <DateRangePicker range={categoryRange} onChange={setCategoryRange} allRangeStart={allRangeStart} />
+                    {renderTimeFilters(categoryTF, setCategoryTF)}
                     <View style={{ marginTop: 12 }}>
                       <BarList
                         data={filteredCategories}
@@ -3252,7 +3056,7 @@ export default function CustomerAnalyticsScreen() {
                             style={{ flex: 1.6 }}
                             onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
                           >
-                            <Text style={s.orderIdText} numberOfLines={1}>{o.id}</Text>
+                            <Text style={s.orderIdText} numberOfLines={1}>{o.orderNumber}</Text>
                           </TouchableOpacity>
                           <Text style={[s.orderTableCell, { flex: 2.2 }]} numberOfLines={1}>{o.productName}</Text>
                           <Text style={s.orderTableCell}>{o.date}</Text>
@@ -3284,7 +3088,7 @@ export default function CustomerAnalyticsScreen() {
                         onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
                       >
                         <View style={s.omTop}>
-                          <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
+                          <Text style={s.omId} numberOfLines={1}>{o.orderNumber}</Text>
                           <OrderStatusChip status={o.status} />
                         </View>
                         <View style={s.omRow}>
@@ -3341,6 +3145,12 @@ export default function CustomerAnalyticsScreen() {
                   <View style={{ flex: 1, minWidth: 140 }}>
                     <StatPair label="Most Delivered City" value={data.addressData.mostDelivered} />
                   </View>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <StatPair label="Loyalty Tier" value={data.loyaltyData.tier} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 140 }}>
+                    <StatPair label="Loyalty Points" value={String(data.loyaltyData.points)} />
+                  </View>
                 </View>
 
                 {/* Risk Badges */}
@@ -3357,6 +3167,9 @@ export default function CustomerAnalyticsScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 130 }}>
                     <StatPair label="Pending Support Tickets" value={String(data.supportData.pending)} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 130 }}>
+                    <StatPair label="Loyalty Savings" value={rupee(data.loyaltyData.lifetimeSavings)} />
                   </View>
                 </View>
               </View>
@@ -3378,6 +3191,26 @@ export default function CustomerAnalyticsScreen() {
         customerId={customerId}
         customerName={customerName}
       />
+
+      {/* Chart Fullscreen Viewer Modal */}
+      <FullscreenChartModal
+        visible={!!fullscreenChartTitle}
+        onClose={() => {
+          setFullscreenChartTitle(null);
+          setFullscreenRender(null);
+        }}
+        title={fullscreenChartTitle ?? ""}
+        data={fullscreenData}
+        exportCSV={() => shareData(fullscreenChartTitle ?? "Chart", fullscreenData)}
+        exportPDF={() => printDataPDF(fullscreenChartTitle ?? "Chart", fullscreenData, customerId)}
+      >
+        {fullscreenChartTitle && fullscreenRender && (
+          <MeasuredChart
+            plotHeight={280}
+            render={(w, h) => fullscreenRender(w, h)}
+          />
+        )}
+      </FullscreenChartModal>
     </AdminLayout>
   );
 }
@@ -3443,6 +3276,16 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
   },
   headerName: { color: "#fff", fontSize: 21, fontWeight: "800", flexShrink: 1 },
+  vipBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  vipTxt: { color: navyDeep, fontSize: 10, fontWeight: "800" },
   headerSub: { color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 },
   headerMetaRow: {
     flexDirection: "row",
@@ -3624,208 +3467,11 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  dateRangeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 14,
-  },
-  tfChipRow: { flexDirection: "row", gap: 5, flexWrap: "wrap" },
-  tfBtn: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, backgroundColor: cardBg },
+  tfRow: { flexDirection: "row", gap: 6, marginBottom: 12, flexWrap: "wrap" },
+  tfBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: cardBg },
   tfBtnActive: { backgroundColor: primary },
   tfBtnTxt: { fontSize: 11, fontWeight: "700", color: sub },
   tfBtnTxtActive: { color: "#fff" },
-
-  tfDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: border,
-  },
-
-  // Compact "Date Range" trigger button — opens the full picker modal.
-  dateRangeTrigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: cardBg,
-    borderWidth: 1,
-    borderColor: border,
-    ...(Platform.OS === "web"
-      ? ({ cursor: "pointer", transitionDuration: "120ms" } as any)
-      : null),
-  },
-  dateRangeTriggerTxt: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: text,
-    maxWidth: 200,
-  },
-  dateRangeTriggerChevron: {
-    fontSize: 10,
-    color: C.textLight,
-    marginLeft: 1,
-  },
-
-  // "Select Date Range" modal card
-  rangeModalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    width: "100%",
-    maxWidth: 360,
-    gap: 18,
-    shadowColor: navyDeep,
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  rangeModalTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: navyDeep,
-    textAlign: "center",
-  },
-  rangeModalFields: { gap: 14 },
-  modalDateFieldGroup: { gap: 6 },
-  modalDateFieldLbl: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: sub,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  modalDateFieldBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderRadius: 10,
-    backgroundColor: cardBg,
-    borderWidth: 1,
-    borderColor: border,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-  },
-  modalDateFieldTxt: { fontSize: 13, fontWeight: "700", color: text },
-  rangeModalFooter: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 10,
-  },
-  rangeModalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 9,
-    backgroundColor: cardBg,
-    borderWidth: 1,
-    borderColor: border,
-  },
-  rangeModalCancelTxt: { fontSize: 13, fontWeight: "700", color: sub },
-  rangeModalApplyBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 9,
-    backgroundColor: primary,
-  },
-  rangeModalApplyTxt: { fontSize: 13, fontWeight: "700", color: "#fff" },
-
-  // Web calendar grid (used inside the From/To sub-picker on web)
-  webCalSheet: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    width: "100%",
-    maxWidth: 340,
-    gap: 4,
-    shadowColor: navyDeep,
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  webCalendar: { gap: 4, paddingTop: 8 },
-  webCalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-  webCalNavBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: cardBg,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-  },
-  webCalNavTxt: { fontSize: 15, fontWeight: "700", color: text },
-  webCalTitleRow: { flexDirection: "row", gap: 6 },
-  webCalTitleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 7,
-    backgroundColor: "transparent",
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-  },
-  webCalTitleBtnActive: { backgroundColor: primaryLight },
-  webCalTitle: { fontSize: 13, fontWeight: "800", color: navyDeep },
-  webCalTitleCaret: { fontSize: 9, color: C.textLight, marginTop: 1 },
-
-  // Fast month/year jump grid — replaces the day grid while open, so
-  // switching years/months takes one tap instead of many chevron clicks.
-  webCalFastGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    paddingVertical: 8,
-    maxHeight: 220,
-    overflow: Platform.OS === "web" ? ("auto" as any) : undefined,
-  },
-  webCalFastItem: {
-    flexBasis: "30%",
-    flexGrow: 1,
-    paddingVertical: 9,
-    borderRadius: 8,
-    alignItems: "center",
-    backgroundColor: cardBg,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-  },
-  webCalFastItemActive: { backgroundColor: primary },
-  webCalFastItemDisabled: { opacity: 0.35 },
-  webCalFastItemTxt: { fontSize: 12.5, fontWeight: "700", color: text },
-  webCalFastItemTxtActive: { color: "#fff" },
-  webCalFastItemTxtDisabled: { color: C.textLight },
-
-  webCalWeekRow: { flexDirection: "row" },
-  webCalWeekLbl: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: "700",
-    color: C.textLight,
-    paddingVertical: 6,
-  },
-  webCalCell: { flex: 1, aspectRatio: 1, alignItems: "center", justifyContent: "center" },
-  webCalDayBtn: {
-    borderRadius: 999,
-    margin: 2,
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-  },
-  webCalDayBtnSelected: { backgroundColor: primary },
-  webCalDayBtnDisabled: { opacity: 0.3 },
-  webCalDayTxt: { fontSize: 12, fontWeight: "600", color: text },
-  webCalDayTxtSelected: { color: "#fff", fontWeight: "800" },
-  webCalDayTxtDisabled: { color: C.textLight },
 
   statPair: { gap: 3 },
   statPairLbl: { fontSize: 11, color: sub },
@@ -4078,15 +3724,6 @@ const s = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
   },
-  // Used by modals that should appear centered on screen (Select Date Range,
-  // web calendar sheet) rather than as a bottom sheet.
-  centerModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
   modalContent: {
     backgroundColor: "#fff",
     width: "100%",
@@ -4095,26 +3732,6 @@ const s = StyleSheet.create({
     borderTopRightRadius: 24,
     overflow: "hidden",
   },
-  datePickerSheet: {
-    backgroundColor: "#fff",
-    width: "100%",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: "hidden",
-    paddingBottom: 12,
-  },
-  datePickerSheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: border,
-    backgroundColor: cardBg,
-  },
-  datePickerSheetTitle: { fontSize: 14, fontWeight: "800", color: navyDeep },
-  datePickerCancelTxt: { fontSize: 14, fontWeight: "600", color: sub },
-  datePickerDoneTxt: { fontSize: 14, fontWeight: "700", color: primary },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -4156,4 +3773,48 @@ const s = StyleSheet.create({
   breakoutRowId: { fontSize: 13, fontWeight: "700", color: primary },
   breakoutRowSub: { fontSize: 11, color: sub, marginTop: 2 },
   breakoutRowAmt: { fontSize: 13, fontWeight: "800", color: text, marginBottom: 4 },
+
+  fullscreenChartContainer: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: border,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullscreenActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  actionOutline: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    backgroundColor: cardBg,
+  },
+  actionOutlineTxt: { fontSize: 12, fontWeight: "700", color: text },
+
+  datasetTable: {
+    borderWidth: 1,
+    borderColor: border,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  datasetRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: border,
+  },
+  datasetCellLabel: { fontSize: 12, color: text },
+  datasetCellValue: { fontSize: 12, fontWeight: "800", color: navyDeep },
 });
