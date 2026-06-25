@@ -50,7 +50,10 @@ export function normalizeMediaPath(value: string): string {
 
   }
 
-  const bare = p.startsWith("/") && !p.startsWith("/uploads/") ? p.slice(1) : p;
+  let bare = p.startsWith("/") && !p.startsWith("/uploads/") ? p.slice(1) : p;
+
+  // Legacy/corrupted DB paths (e.g. ads/products → uploads/products)
+  bare = bare.replace(/^(ads|pads)\/products\//i, "uploads/products/");
 
   if (bare.startsWith("/uploads/sellers/")) {
 

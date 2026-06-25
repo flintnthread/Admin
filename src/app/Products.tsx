@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapProductListRow } from "@/lib/mappers";
-import { fetchProducts } from "@/services/productApi";
+import { fetchAdminCatalogProducts } from "@/services/productApi";
 import AdminLayout from "@/components/admin-layout";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -765,7 +765,7 @@ const WebProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchProducts({ size: 500 });
+            const res = await fetchAdminCatalogProducts({ size: 500 });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1175,11 +1175,23 @@ const WebProductsScreen: React.FC = () => {
                                 {visibleProducts.length === 0 ? (
                                     <View style={wst.emptyState}>
                                         <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
-                                        <Text style={wst.emptyTitle}>No products found</Text>
-                                        <Text style={wst.emptyDesc}>Try adjusting your search or filters</Text>
+                                        <Text style={wst.emptyTitle}>
+                                            {products.length === 0 ? "No admin products yet" : "No products found"}
+                                        </Text>
+                                        <Text style={wst.emptyDesc}>
+                                            {products.length === 0
+                                                ? "Products you add via Add Product appear here (not seller listings)."
+                                                : "Try adjusting your search or filters"}
+                                        </Text>
+                                        {products.length === 0 ? (
+                                            <TouchableOpacity style={wst.emptyBtn} onPress={() => router.push('/Addproduct')}>
+                                                <Text style={wst.emptyBtnTxt}>Add Product</Text>
+                                            </TouchableOpacity>
+                                        ) : (
                                         <TouchableOpacity style={wst.emptyBtn} onPress={() => { setSearchQuery(""); clearFilters(); }}>
                                             <Text style={wst.emptyBtnTxt}>Clear Filters</Text>
                                         </TouchableOpacity>
+                                        )}
                                     </View>
                                 ) : (
                                     visibleProducts.map((product, idx) => {
@@ -1265,10 +1277,23 @@ const WebProductsScreen: React.FC = () => {
                                 {visibleProducts.length === 0 ? (
                                     <View style={wst.emptyState}>
                                         <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
-                                        <Text style={wst.emptyTitle}>No products found</Text>
+                                        <Text style={wst.emptyTitle}>
+                                            {products.length === 0 ? "No admin products yet" : "No products found"}
+                                        </Text>
+                                        <Text style={wst.emptyDesc}>
+                                            {products.length === 0
+                                                ? "Products you add via Add Product appear here (not seller listings)."
+                                                : "Try adjusting your search or filters"}
+                                        </Text>
+                                        {products.length === 0 ? (
+                                            <TouchableOpacity style={wst.emptyBtn} onPress={() => router.push('/Addproduct')}>
+                                                <Text style={wst.emptyBtnTxt}>Add Product</Text>
+                                            </TouchableOpacity>
+                                        ) : (
                                         <TouchableOpacity style={wst.emptyBtn} onPress={() => { setSearchQuery(""); clearFilters(); }}>
                                             <Text style={wst.emptyBtnTxt}>Clear Filters</Text>
                                         </TouchableOpacity>
+                                        )}
                                     </View>
                                 ) : (
                                     <View style={wst.webGridContainer}>
@@ -1504,7 +1529,7 @@ const MobileProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchProducts({ size: 500 });
+            const res = await fetchAdminCatalogProducts({ size: 500 });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1818,11 +1843,23 @@ const MobileProductsScreen: React.FC = () => {
                 {visibleProducts.length === 0 && (
                     <View style={s.emptyState}>
                         <MaterialCommunityIcons name="package-variant-closed" size={52} color={C.textLight} />
-                        <Text style={s.emptyTitle}>No products found</Text>
-                        <Text style={s.emptyDesc}>Try adjusting your search or filters</Text>
+                        <Text style={s.emptyTitle}>
+                            {products.length === 0 ? "No admin products yet" : "No products found"}
+                        </Text>
+                        <Text style={s.emptyDesc}>
+                            {products.length === 0
+                                ? "Products you add via Add Product appear here (not seller listings)."
+                                : "Try adjusting your search or filters"}
+                        </Text>
+                        {products.length === 0 ? (
+                            <TouchableOpacity style={s.clearBtn} onPress={() => router.push('/Addproduct')}>
+                                <Text style={s.clearBtnText}>Add Product</Text>
+                            </TouchableOpacity>
+                        ) : (
                         <TouchableOpacity style={s.clearBtn} onPress={() => { setSearchQuery(""); clearFilters(); }}>
                             <Text style={s.clearBtnText}>Clear All</Text>
                         </TouchableOpacity>
+                        )}
                     </View>
                 )}
 

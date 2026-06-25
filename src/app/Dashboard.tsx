@@ -50,14 +50,15 @@ import {
   fetchDashboardActivity,
   fetchDashboardTraffic,
   fetchDashboardCatalogQuality,
+  type DashboardTopProduct,
 } from "@/services/dashboardApi";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { formatDate } from "@/lib/format";
 import { fetchOrders } from "@/services/orderApi";
 import { fetchSellers, fetchSellerAnalyticsSummary } from "@/services/sellerApi";
 import { fetchProductStats } from "@/services/productApi";
 import { fetchCustomers, fetchCustomerStats } from "@/services/customerApi";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { resolvePublicMediaBaseUrl } from "@/lib/api/config";
 
 // Palette
 const getPalette = (isDark: boolean) => ({
@@ -109,6 +110,47 @@ function chartYLabels(maxVal: number) {
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+type TopProductRow = {
+  id: string;
+  name: string;
+  sales: number;
+  revenue: number;
+  stock: string;
+  stockCount: number;
+  imageUrl: string;
+};
+
+function TopProductThumb({ uri, size = 40 }: { uri: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(uri) && !failed;
+  const thumbStyle = {
+    width: size,
+    height: size,
+    borderRadius: 8,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    overflow: "hidden" as const,
+  };
+
+  if (!showImage) {
+    return (
+      <View style={thumbStyle}>
+        <Ionicons name="cube-outline" size={size * 0.45} color="#94a3b8" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={thumbStyle}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -167,7 +209,12 @@ export default function DashboardScreen() {
     setIsManualScrolling(true);
     setActiveTab(key);
 
-    const targetY = Math.max(0, (sectionOffsets[key] || 0) - 10);
+    const paddingTopVal = headerHeight + 10;
+    const absolutePosition = (sectionOffsets[key] || 0) + paddingTopVal;
+    
+    // Position the section heading directly below the fixed header (scroll offset equal to header height)
+    const targetY = Math.max(0, absolutePosition - headerHeight);
+
     scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
 
     if (manualScrollTimeoutRef.current) {
@@ -176,19 +223,25 @@ export default function DashboardScreen() {
     manualScrollTimeoutRef.current = setTimeout(() => {
       setIsManualScrolling(false);
     }, 1000);
-  }, [sectionOffsets]);
+  }, [sectionOffsets, headerHeight]);
 
   const handleScroll = useCallback((event: any) => {
     if (isManualScrolling) return;
     const y = event.nativeEvent.contentOffset.y;
 
-    const threshold = 100; // Trigger when section is 100px from top of scrollview viewport
+    const paddingTopVal = headerHeight + 10;
+    const getAbsoluteY = (k: string) => {
+      return (sectionOffsets[k] || 0) + paddingTopVal;
+    };
+
+    // A section is active when its heading reaches the bottom of the fixed header (with a 20px tolerance)
+    const threshold = headerHeight + 20;
 
     const sorted = [
-      { key: "overview", y: sectionOffsets["overview"] || 0 },
-      { key: "sales", y: sectionOffsets["sales"] || 0 },
-      { key: "inventory", y: sectionOffsets["inventory"] || 0 },
-      { key: "users", y: sectionOffsets["users"] || 0 },
+      { key: "overview", y: getAbsoluteY("overview") },
+      { key: "sales", y: getAbsoluteY("sales") },
+      { key: "inventory", y: getAbsoluteY("inventory") },
+      { key: "users", y: getAbsoluteY("users") },
     ].sort((a, b) => b.y - a.y);
 
     for (const section of sorted) {
@@ -197,7 +250,7 @@ export default function DashboardScreen() {
         break;
       }
     }
-  }, [sectionOffsets, isManualScrolling]);
+  }, [sectionOffsets, isManualScrolling, headerHeight]);
 
   useEffect(() => {
     return () => {
@@ -220,7 +273,7 @@ export default function DashboardScreen() {
   const [customerStats, setCustomerStats] = useState<any>(null);
   const [sellers, setSellers] = useState<any[]>([]);
   const [revenueChart, setRevenueChart] = useState<any>(null);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<DashboardTopProduct[]>([]);
   const [topSellers, setTopSellers] = useState<any[]>([]);
   const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -584,9 +637,7 @@ export default function DashboardScreen() {
         setRecentOrders(
           items.slice(0, 10).map((o) => ({
             id: o.orderNumber || `ORD-${o.id}`,
-            rawId: o.id,
             customer: o.shippingName || "Customer",
-            customerEmail: o.shippingEmail || "",
             amount: Number(o.totalAmount ?? 0),
             status: formatOrderStatus(o.orderStatus),
             payment: formatPaymentMethod(o.paymentMethod),
@@ -704,16 +755,16 @@ export default function DashboardScreen() {
     };
   }, [revenueChart]);
 
-  // SECTION 7: Top Selling Products dataset
-  const topProductsRaw = useMemo(() => {
+  // SECTION 7: Top Selling Products dataset (from GET /api/admin/dashboard/top-products)
+  const topProductsRaw = useMemo<TopProductRow[]>(() => {
     return topProducts.map((p) => ({
-      id: p.id,
-      name: p.name,
+      id: String(p.id ?? p.productId ?? ""),
+      name: String(p.name ?? "Product").trim() || "Product",
       sales: Number(p.sales ?? 0),
       revenue: Number(p.revenue ?? 0),
       stock: p.stock ?? "In Stock",
       stockCount: Number(p.stockCount ?? 0),
-      image: p.image || "📦",
+      imageUrl: resolveMediaUrl(p.image),
     }));
   }, [topProducts]);
 
@@ -1013,99 +1064,62 @@ export default function DashboardScreen() {
   return (
     <AdminLayout>
       <View style={styles.screenWrapper}>
+        <View
+          style={styles.headerContainer}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            setHeaderHeight(h);
+          }}
+        >
+          {/* HEADER ROW */}
+          <View style={styles.headerCard}>
+            <View>
+              <Text style={styles.headerTitle}>Flint & Thread Dashboard</Text>
+              <Text style={styles.headerSubtext}>SaaS Enterprise Administrative Overview</Text>
+            </View>
+            <View style={styles.tabButtons}>
+              {[
+                { key: "overview", label: "Overview", icon: "grid-outline", color: C.active, bg: C.activeBg },
+                { key: "sales", label: "Sales & Payments", icon: "bar-chart-outline", color: C.primary, bg: C.primaryLight },
+                { key: "inventory", label: "Catalog & Stock", icon: "cube-outline", color: C.violet, bg: C.violetBg },
+                { key: "users", label: "Users & Sellers", icon: "people-outline", color: C.purple, bg: C.purpleBg }
+              ].map(tab => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    onPress={() => handleTabPress(tab.key as any)}
+                    style={[
+                      styles.tabButton,
+                      isActive && { backgroundColor: tab.bg }
+                    ]}
+                  >
+                    <Ionicons name={tab.icon as any} size={14} color={tab.color} />
+                    <Text
+                      style={[
+                        styles.tabButtonText,
+                        isActive && { color: tab.color, fontWeight: "700" }
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
         <ScrollView
           ref={scrollViewRef}
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, isMobile && { paddingHorizontal: 16 }]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-          <View
-            style={[styles.headerContainer, isMobile && { paddingHorizontal: 0, paddingTop: 0, zIndex: 10 }]}
-            onLayout={(e) => {
-              const h = e.nativeEvent.layout.height;
-              setHeaderHeight(h);
-            }}
-          >
-            {/* HEADER ROW */}
-            <View style={[styles.headerCard, isMobile && styles.headerCardMobile]}>
-              <View style={[isMobile && { width: '100%' }]}>
-                <Text style={styles.headerTitle}>Flint & Thread Dashboard</Text>
-                <Text style={styles.headerSubtext}>SaaS Enterprise Administrative Overview</Text>
-              </View>
-              {!isMobile && (
-                <View style={styles.tabButtons}>
-                  {[
-                    { key: "overview", label: "Overview", icon: "grid-outline", color: C.active, bg: C.activeBg },
-                    { key: "sales", label: "Sales & Payments", icon: "bar-chart-outline", color: C.primary, bg: C.primaryLight },
-                    { key: "inventory", label: "Catalog & Stock", icon: "cube-outline", color: C.violet, bg: C.violetBg },
-                    { key: "users", label: "Users & Sellers", icon: "people-outline", color: C.purple, bg: C.purpleBg }
-                  ].map(tab => {
-                    const isActive = activeTab === tab.key;
-                    return (
-                      <TouchableOpacity
-                        key={tab.key}
-                        onPress={() => handleTabPress(tab.key as any)}
-                        style={[
-                          styles.tabButton,
-                          isActive && { backgroundColor: tab.bg }
-                        ]}
-                      >
-                        <Ionicons name={tab.icon as any} size={14} color={tab.color} />
-                        <Text
-                          style={[
-                            styles.tabButtonText,
-                            isActive && { color: tab.color, fontWeight: "700" }
-                          ]}
-                        >
-                          {tab.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-            
-            {isMobile && (
-              <View style={styles.mobileNavCard}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={[styles.tabButtons, { flexWrap: 'nowrap', backgroundColor: 'transparent', padding: 0 }]}>
-                    {[
-                      { key: "overview", label: "Overview", icon: "grid-outline", color: C.active, bg: C.activeBg },
-                      { key: "sales", label: "Sales & Payments", icon: "bar-chart-outline", color: C.primary, bg: C.primaryLight },
-                      { key: "inventory", label: "Catalog & Stock", icon: "cube-outline", color: C.violet, bg: C.violetBg },
-                      { key: "users", label: "Users & Sellers", icon: "people-outline", color: C.purple, bg: C.purpleBg }
-                    ].map(tab => {
-                      const isActive = activeTab === tab.key;
-                      return (
-                        <TouchableOpacity
-                          key={tab.key}
-                          onPress={() => handleTabPress(tab.key as any)}
-                          style={[
-                            styles.tabButton,
-                            isActive && { backgroundColor: tab.bg }
-                          ]}
-                        >
-                          <Ionicons name={tab.icon as any} size={14} color={tab.color} />
-                          <Text
-                            style={[
-                              styles.tabButtonText,
-                              isActive && { color: tab.color, fontWeight: "700" }
-                            ]}
-                          >
-                            {tab.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
+          {/* Spacer to push content below the fixed header */}
+          <View style={{ height: headerHeight + 10 }} />
           <View style={styles.container}>
 
             {/* SECTION 1: OVERVIEW */}
@@ -1120,7 +1134,7 @@ export default function DashboardScreen() {
 
 
               {/* SECTION 1: 12 TOP STATISTICS CARDS */}
-              <View style={[styles.statsCardGrid, isMobile && { marginTop: -20 }]}>
+              <View style={styles.statsCardGrid}>
                 {Object.keys(kpiStats).map((key) => {
                   const card = kpiStats[key as keyof typeof kpiStats];
                   const hasKpiError = kpiErrors[key];
@@ -1132,7 +1146,6 @@ export default function DashboardScreen() {
                       onPress={card.action}
                       style={({ hovered }) => [
                         styles.kpiCard,
-                        isMobile && { minWidth: "100%" as any, flex: undefined },
                         {
                           borderLeftWidth: 4,
                           borderLeftColor: card.color,
@@ -2084,28 +2097,36 @@ export default function DashboardScreen() {
                 {!isMobile ? (
                   <View style={styles.tableWrapper}>
                     <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Img</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1 }]}>Product Name</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Units Sold</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "right" }]}>Revenue</Text>
-                      <Text style={[styles.tableHdrCell, { flex: 1, textAlign: "center" }]}>Stock Status</Text>
+                      <Text style={[styles.tableHdrCell, { width: 50, textAlign: "center" }]}>Img</Text>
+                      <Text style={[styles.tableHdrCell, { flex: 2 }]}>Product Name</Text>
+                      <Text style={[styles.tableHdrCell, { width: 100, textAlign: "center" }]}>Units Sold</Text>
+                      <Text style={[styles.tableHdrCell, { width: 120, textAlign: "right" }]}>Revenue</Text>
+                      <Text style={[styles.tableHdrCell, { width: 120, textAlign: "center" }]}>Stock Status</Text>
                     </View>
 
-                    {paginatedProducts.map((p, idx) => (
+                    {paginatedProducts.length === 0 ? (
+                      <View style={styles.tableEmptyRow}>
+                        <Text style={styles.tableEmptyText}>
+                          {topProductsRaw.length === 0
+                            ? "No sales data yet. Top products appear after orders are placed."
+                            : "No products match your search."}
+                        </Text>
+                      </View>
+                    ) : paginatedProducts.map((p) => (
                       <View key={p.id} style={styles.tableRowData}>
-                        <View style={{ flex: 1, alignItems: "center" }}>
-                          <Image source={{ uri: `https://picsum.photos/seed/${p.id}/100/100` }} style={{ width: 40, height: 40, borderRadius: 4 }} resizeMode="cover" />
+                        <View style={{ width: 50, alignItems: "center" }}>
+                          <TopProductThumb uri={p.imageUrl} size={40} />
                         </View>
-                        <Text style={[styles.tableCellText, { flex: 1, fontWeight: "600" }]} numberOfLines={1}>
+                        <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
                           {p.name}
                         </Text>
-                        <Text style={[styles.tableCellText, { flex: 1, textAlign: "center", fontWeight: "700" }]}>
+                        <Text style={[styles.tableCellText, { width: 100, textAlign: "center", fontWeight: "700" }]}>
                           {p.sales} units
                         </Text>
-                        <Text style={[styles.tableCellText, { flex: 1, textAlign: "right", color: C.active, fontWeight: "700" }]}>
+                        <Text style={[styles.tableCellText, { width: 120, textAlign: "right", color: C.active, fontWeight: "700" }]}>
                           {rupee(p.revenue)}
                         </Text>
-                        <View style={{ flex: 1, alignItems: "center" }}>
+                        <View style={{ width: 120, alignItems: "center" }}>
                           <View style={[
                             styles.statusBadgeCell,
                             { backgroundColor: p.stock === "In Stock" ? C.activeBg : p.stock === "Low Stock" ? C.warningBg : C.inactiveBg }
@@ -2148,10 +2169,18 @@ export default function DashboardScreen() {
                 ) : (
                   // Mobile View Card List with simulated infinite scroll load-more button
                   <View style={styles.mobileCardListWrap}>
-                    {filteredProducts.slice(0, mobileProdCount).map(p => (
+                    {filteredProducts.length === 0 ? (
+                      <View style={styles.tableEmptyRow}>
+                        <Text style={styles.tableEmptyText}>
+                          {topProductsRaw.length === 0
+                            ? "No sales data yet."
+                            : "No products match your search."}
+                        </Text>
+                      </View>
+                    ) : filteredProducts.slice(0, mobileProdCount).map(p => (
                       <View key={p.id} style={styles.mobileProductCard}>
                         <View style={styles.mobileProductCardHeader}>
-                          <Text style={{ fontSize: 24 }}>{p.image}</Text>
+                          <TopProductThumb uri={p.imageUrl} size={48} />
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={styles.mobileCardProdName} numberOfLines={1}>{p.name}</Text>
                             <Text style={styles.mobileCardProdId}>ID: {p.id}</Text>
@@ -2319,14 +2348,9 @@ export default function DashboardScreen() {
 
                     {filteredSellers.map((s, idx) => (
                       <View key={idx} style={styles.tableRowData}>
-                        <TouchableOpacity
-                          style={{ flex: 1.5 }}
-                          onPress={() => router.push({ pathname: "/Viewseller" as any, params: { sellerId: String(s.id) } })}
-                        >
-                          <Text style={[styles.tableCellText, { fontWeight: "600", color: C.primary }]} numberOfLines={1}>
-                            {s.name}
-                          </Text>
-                        </TouchableOpacity>
+                        <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "600" }]} numberOfLines={1}>
+                          {s.name}
+                        </Text>
                         <Text style={[styles.tableCellText, { flex: 1.5, color: C.sub }]} numberOfLines={1}>
                           {s.business}
                         </Text>
@@ -2350,17 +2374,13 @@ export default function DashboardScreen() {
                 ) : (
                   <View style={styles.mobileCardListWrap}>
                     {filteredSellers.map(s => (
-                      <TouchableOpacity
-                        key={s.id}
-                        style={styles.mobileProductCard}
-                        onPress={() => router.push({ pathname: "/Viewseller" as any, params: { sellerId: String(s.id) } })}
-                      >
+                      <View key={s.id} style={styles.mobileProductCard}>
                         <View style={styles.mobileProductCardHeader}>
                           <View style={styles.avatarCircleSmall}>
                             <Text style={styles.avatarCircleText}>S</Text>
                           </View>
                           <View style={{ flex: 1, gap: 2 }}>
-                            <Text style={[styles.mobileCardProdName, { color: C.primary }]}>{s.name}</Text>
+                            <Text style={styles.mobileCardProdName}>{s.name}</Text>
                             <Text style={styles.mobileCardProdId}>{s.business}</Text>
                           </View>
                         </View>
@@ -2376,7 +2396,7 @@ export default function DashboardScreen() {
                             </View>
                           </View>
                         </View>
-                      </TouchableOpacity>
+                      </View>
                     ))}
                   </View>
                 )}
@@ -2385,9 +2405,8 @@ export default function DashboardScreen() {
               {/* SECTION 9: RECENT ORDERS (Last 10 with actions) */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>📦 Recent Orders Logs (Last 10)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
-                  <View style={[styles.tableWrapper, { minWidth: 800, width: "100%" }]}>
-                    <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
+                <View style={styles.tableWrapper}>
+                  <View style={[styles.tableHdrRow, { backgroundColor: C.greyBg }]}>
                     <Text style={[styles.tableHdrCell, { flex: 1.5 }]}>Order ID</Text>
                     <Text style={[styles.tableHdrCell, { flex: 1.8 }]}>Customer</Text>
                     <Text style={[styles.tableHdrCell, { flex: 1.2, textAlign: "right" }]}>Amount</Text>
@@ -2416,29 +2435,12 @@ export default function DashboardScreen() {
 
                     return (
                       <View key={o.id} style={styles.tableRowData}>
-                        <TouchableOpacity
-                          style={{ flex: 1.5 }}
-                          onPress={() => router.push({ pathname: "/orderDetails" as any, params: { orderId: String(o.rawId) } })}
-                        >
-                          <Text style={[styles.tableCellText, { fontWeight: "700", color: C.primary }]} numberOfLines={1}>
-                            {o.id}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{ flex: 1.8 }}
-                          onPress={() => {
-                            const match = customers.find(c => c.name === o.customer || c.email === o.customerEmail);
-                            if (match) {
-                              router.push({ pathname: "/customerDetails" as any, params: { id: String(match.id) } });
-                            } else {
-                              router.push({ pathname: "/customerManagement" as any, params: { search: o.customer } });
-                            }
-                          }}
-                        >
-                          <Text style={[styles.tableCellText, { fontWeight: "500", color: C.processing }]} numberOfLines={1}>
-                            {o.customer}
-                          </Text>
-                        </TouchableOpacity>
+                        <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "700" }]} numberOfLines={1}>
+                          {o.id}
+                        </Text>
+                        <Text style={[styles.tableCellText, { flex: 1.8 }]} numberOfLines={1}>
+                          {o.customer}
+                        </Text>
                         <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "right", fontWeight: "700" }]}>
                           {rupee(o.amount)}
                         </Text>
@@ -2473,8 +2475,7 @@ export default function DashboardScreen() {
                       </View>
                     );
                   })}
-                  </View>
-                </ScrollView>
+                </View>
               </View>
 
             
@@ -2556,13 +2557,15 @@ const getStyles = (isDark: boolean) => {
     position: "relative",
   },
   headerContainer: {
-    position: "relative",
-    zIndex: 1,
-    backgroundColor: "transparent",
-    paddingHorizontal: 0,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: C.bg,
+    paddingHorizontal: 18,
     paddingTop: 22,
     paddingBottom: 12,
-    width: "100%",
   },
   sectionSpacing: {
     marginTop: 30,
@@ -2602,31 +2605,6 @@ const getStyles = (isDark: boolean) => {
     alignSelf: "center",
     width: "100%",
     maxWidth: 1600,
-  },
-  headerCardMobile: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    borderWidth: 1,
-    borderColor: "#2a4365",
-    paddingTop: 48,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-  },
-  mobileNavCard: {
-    backgroundColor: C.surface,
-    marginHorizontal: 16,
-    marginTop: -20,
-    borderRadius: 12,
-    padding: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: C.border,
   },
   headerTitle: {
     fontSize: 22,
@@ -3536,6 +3514,19 @@ const getStyles = (isDark: boolean) => {
     borderTopWidth: 1,
     borderTopColor: C.border,
     backgroundColor: C.surface,
+  },
+  tableEmptyRow: {
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  tableEmptyText: {
+    fontSize: 13,
+    color: C.sub,
+    textAlign: "center",
   },
   tableCellText: {
     fontSize: 12,

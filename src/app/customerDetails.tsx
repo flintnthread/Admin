@@ -46,7 +46,16 @@ export type Customer = {
 };
 
 type Address = { line1: string; line2?: string; city: string; state: string; pincode: string; country?: string };
-type Order   = { id: string; date: string; items: number; amount: number; payment: string; status: "Ordered" | "Processing" | "Delivered" | "Cancelled" | "Returned" /*| "Replacement"*/ };
+type Order = {
+  orderId: number;
+  orderNumber: string;
+  date: string;
+  items: number;
+  amount: number;
+  payment: string;
+  paymentStatus?: string;
+  status: "Ordered" | "Processing" | "Delivered" | "Cancelled" | "Returned" /*| "Replacement"*/;
+};
 type MonthlyData = { month: string; amount: number };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,11 +124,13 @@ function mapApiCustomerDetail(data: Record<string, unknown>): Customer {
 
   const orderHistory: Order[] = Array.isArray(data.orders)
     ? (data.orders as Record<string, unknown>[]).map((o) => ({
-        id: String(o.orderNumber ?? o.id ?? "—"),
+        orderId: Number(o.id ?? 0),
+        orderNumber: String(o.orderNumber ?? o.id ?? "—"),
         date: formatDate(String(o.createdAt ?? "")),
         items: Number(o.itemCount ?? 0),
         amount: Number(o.totalAmount ?? 0),
         payment: formatPaymentLabel(String(o.paymentMethod ?? "")),
+        paymentStatus: o.paymentStatus ? String(o.paymentStatus) : undefined,
         status: mapOrderStatus(String(o.orderStatus ?? "")),
       }))
     : [];
@@ -161,11 +172,15 @@ function mapOrderStatus(status: string): Order["status"] {
   if (normalized.includes("deliver"))  return "Delivered";
   if (normalized.includes("cancel"))   return "Cancelled";
   if (normalized.includes("return"))   return "Returned";
-  // if (normalized.includes("replace"))  return "Replacement";
   if (normalized.includes("process") || normalized.includes("ship") || normalized.includes("pending")) {
     return "Processing";
   }
   return "Ordered";
+}
+
+function openOrderDetails(router: ReturnType<typeof useRouter>, orderId: number) {
+  if (!orderId) return;
+  router.push({ pathname: "/orderDetails", params: { orderId: String(orderId) } });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -708,6 +723,11 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
     setCurrentPage(1);
   }, [id]);
 
+  const handleViewOrder = useCallback(
+    (orderId: number) => openOrderDetails(router, orderId),
+    [router]
+  );
+
   const px  = isMobile ? 14 : isTablet ? 20 : 28;
 
   if (loading) {
@@ -999,10 +1019,10 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                 <>
                   {isMobile ? (
                     paginatedOrders.map((o) => (
-                      <View key={o.id} style={s.orderMobileCard}>
+                      <View key={o.orderId} style={s.orderMobileCard}>
                         <View style={s.omHeader}>
                           <View style={s.omHeaderLeft}>
-                            <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
+                            <Text style={s.omId} numberOfLines={1}>{o.orderNumber}</Text>
                           </View>
                           <OrderStatusPill status={o.status} />
                         </View>
@@ -1028,7 +1048,11 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                             </View>
                           </View>
                         </View>
-                        <TouchableOpacity style={s.orderViewBtn} activeOpacity={0.8}>
+                        <TouchableOpacity
+                          style={s.orderViewBtn}
+                          activeOpacity={0.8}
+                          onPress={() => handleViewOrder(o.orderId)}
+                        >
                           <EyeIcon size={14} />
                           <Text style={s.orderViewTxt}>View Order Details</Text>
                         </TouchableOpacity>
@@ -1046,8 +1070,8 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                         <Text style={[s.orderTableHdr, { flex: 0.7, textAlign: "center" }]}>Action</Text>
                       </View>
                       {paginatedOrders.map((o) => (
-                        <View key={o.id} style={s.orderTableRow}>
-                          <Text style={[s.orderIdText, { flex: 2.5 }]}>{o.id}</Text>
+                        <View key={o.orderId} style={s.orderTableRow}>
+                          <Text style={[s.orderIdText, { flex: 2.5 }]}>{o.orderNumber}</Text>
                           <Text style={s.orderTableCell}>{o.date}</Text>
                           <View style={{ flex: 1 }}>
                             <View style={s.itemsBadge}><CartIcon size={12} color={C.primary} /><Text style={s.itemsBadgeTxt}>{o.items} item{o.items !== 1 ? "s" : ""}</Text></View>
@@ -1058,7 +1082,14 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                           </View>
                           <View style={{ flex: 1.3 }}><OrderStatusPill status={o.status} /></View>
                           <View style={{ flex: 0.7, alignItems: "center" }}>
-                            <TouchableOpacity style={s.eyeBtn} activeOpacity={0.8}><EyeIcon size={15} /></TouchableOpacity>
+                            <TouchableOpacity
+                              style={s.eyeBtn}
+                              activeOpacity={0.8}
+                              accessibilityLabel="View order"
+                              onPress={() => handleViewOrder(o.orderId)}
+                            >
+                              <EyeIcon size={15} />
+                            </TouchableOpacity>
                           </View>
                         </View>
                       ))}
