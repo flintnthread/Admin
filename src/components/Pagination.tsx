@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface PaginationProps {
   currentPage: number; // 1-indexed for UI, but usually 0-indexed for API. We'll assume 1-indexed here.
@@ -63,11 +64,11 @@ export default function Pagination({
 
       <View style={styles.controls}>
         <TouchableOpacity
-          style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
+          style={[styles.pageBtn, currentPage === 1 && styles.navBtnDisabled]}
           disabled={currentPage === 1}
           onPress={() => onPageChange(currentPage - 1)}
         >
-          <Text style={[styles.arrowText, currentPage === 1 && styles.arrowTextDisabled]}>&lt;</Text>
+          <ChevronLeft size={18} color={currentPage === 1 ? '#D1D5DB' : '#6B7280'} />
         </TouchableOpacity>
 
         {getPageNumbers().map((page, index) => {
@@ -94,11 +95,11 @@ export default function Pagination({
         })}
 
         <TouchableOpacity
-          style={[styles.pageBtn, currentPage === totalPages && styles.pageBtnDisabled]}
+          style={[styles.pageBtn, currentPage === totalPages && styles.navBtnDisabled]}
           disabled={currentPage === totalPages}
           onPress={() => onPageChange(currentPage + 1)}
         >
-          <Text style={[styles.arrowText, currentPage === totalPages && styles.arrowTextDisabled]}>&gt;</Text>
+          <ChevronRight size={18} color={currentPage === totalPages ? '#D1D5DB' : '#6B7280'} />
         </TouchableOpacity>
       </View>
     </View>
@@ -107,22 +108,18 @@ export default function Pagination({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'column',
-    gap: 12,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginTop: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   infoText: {
     fontSize: 13,
@@ -133,7 +130,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     gap: 6,
   },
   pageBtn: {
@@ -150,8 +147,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#151D4F',
     borderColor: '#151D4F',
   },
-  pageBtnDisabled: {
-    opacity: 0.5,
+  navBtnDisabled: {
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
   },
   pageBtnText: {
     fontSize: 13,
@@ -161,14 +159,6 @@ const styles = StyleSheet.create({
   pageBtnTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
-  },
-  arrowText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-  arrowTextDisabled: {
-    color: '#D1D5DB',
   },
   ellipsisContainer: {
     width: 34,
