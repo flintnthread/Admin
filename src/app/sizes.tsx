@@ -600,6 +600,7 @@ type ModalState =
 
 export default function SizesManagement() {
   const { width } = useWindowDimensions();
+  const isMobile = width < 600;
   const isTablet = width >= 600;
   const isDesktop = width >= 960;
 
@@ -662,21 +663,21 @@ export default function SizesManagement() {
       <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
         <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
-
-        {/* ── WEB PAGE HEADER ── */}
-        <View style={S.webPageHeader}>
-          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-            <View style={S.headerIconBox}>
-              <BI name="grid-3x3" size={18} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={S.webPageTitle}>Sizes Management</Text>
-              <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>
-            </View>
+        {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}
+        <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
+          <View style={S.headerIconBox}>
+            <BI name="grid-3x3" size={18} color="#fff" />
           </View>
-          <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
+          <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
+            <Text style={S.webPageTitle}>{isMobile ? "Sizes" : "Sizes Management"}</Text>
+            {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+          </View>
+          <TouchableOpacity 
+            style={[S.addBtn, isMobile && S.addBtnMobile]} 
+            onPress={() => setModal({ type: "add" })}
+          >
             <BI name="plus-lg" size={15} color="#fff" />
-            <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
+            {!isMobile && <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>}
           </TouchableOpacity>
         </View>
 
@@ -830,6 +831,11 @@ const S = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
   },
+  webPageHeaderMobile: {
+    paddingHorizontal: 12, paddingVertical: 14,
+    marginHorizontal: 8, marginTop: 12,
+    borderRadius: 16,
+  },
   webPageTitle: { fontSize: 22, fontWeight: "800", color: "#fff" },
   webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
   headerIconBox: {
@@ -851,6 +857,11 @@ const S = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  addBtnMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 8,
   },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 

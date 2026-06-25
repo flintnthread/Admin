@@ -127,7 +127,7 @@ function basisForColumns(cols: number): number {
     case 1:
       return 100;
     case 2:
-      return 48.5; // Leave room for flex gaps on Web
+      return 47; // Leave room for flex gaps on Web and Mobile
     case 3:
       return 31.5; // Leave room for flex gaps on Web
     case 4:
@@ -2609,7 +2609,7 @@ export default function CustomerAnalyticsScreen() {
   const [drilldownTitle, setDrilldownTitle] = useState<string>("");
 
   // Grid responsiveness basis
-  const kpiBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
+  const kpiBasis = basisForColumns(isMobile ? 2 : isTablet ? 2 : (width < 1200 ? 2 : 4));
   const chartBasis = (isMobile || width < 1200) ? 100 : 48.5;
   const behaviourBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
   const actionBasis = isMobile ? 50 : isTablet ? 31.5 : 23.5;
@@ -2758,7 +2758,7 @@ export default function CustomerAnalyticsScreen() {
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
+        stickyHeaderIndices={isMobile ? [] : [1]}
         onScroll={handleScroll}
         scrollEventThrottle={32}
       >
@@ -2820,8 +2820,8 @@ export default function CustomerAnalyticsScreen() {
                 </View>
               </View>
 
-              <View style={[s.headerRight, !isWide && { width: "100%", marginTop: 14, alignItems: "flex-start" }]}>
-                <View style={s.healthBox}>
+              <View style={[s.headerRight, !isWide && { width: "100%", marginTop: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
+                <View style={[s.healthBox, !isWide && { alignItems: "flex-start" }]}>
                   <Text style={s.healthLabel}>Account Health</Text>
                   <Text
                     style={[
@@ -3154,7 +3154,7 @@ export default function CustomerAnalyticsScreen() {
               <View style={[s.cardBody, isWide && { flexDirection: "row", gap: 24 }]}>
                 <View style={isWide ? { flex: 1, height: 140 } : null}>
                   <MiniStatTrio
-                    style={{ height: "100%", justifyContent: "space-around" }}
+                    style={isWide ? { height: "100%", justifyContent: "space-around" } : null}
                     items={[
                       {
                         label: "Success Rate",
@@ -3547,7 +3547,7 @@ const s = StyleSheet.create({
     borderColor: border,
     padding: 16,
     gap: 6,
-    minWidth: 140,
+    minWidth: 130,
     shadowColor: navyDeep,
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 4 },

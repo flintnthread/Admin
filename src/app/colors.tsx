@@ -833,6 +833,8 @@ export default function ColorsScreen() {
     );
   }
 
+  const isMobile = width < 768;
+
   // ── DEFAULT: FlatList for list view (all platforms) and native grid ────────
   const listContent = (
     <FlatList
@@ -846,7 +848,7 @@ export default function ColorsScreen() {
 
       ListHeaderComponent={
         <View>
-          {HeaderSection}
+          {!isMobile && HeaderSection}
           {/* List table header row */}
           {viewMode === "list" && (
             <View style={{ paddingHorizontal: PADDING }}>
@@ -886,7 +888,7 @@ export default function ColorsScreen() {
       <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
         <StatusBar barStyle="light-content" backgroundColor={BRAND} />
 
-
+        {isMobile && HeaderSection}
 
         {viewMode === "list" ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -979,7 +981,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
     backgroundColor: "#1d324e",
-    borderRadius: 12,
+    borderRadius: 22,
     marginHorizontal: 16,
     marginTop: 16,
   },

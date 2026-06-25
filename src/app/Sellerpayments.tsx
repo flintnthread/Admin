@@ -999,6 +999,8 @@ const styles = StyleSheet.create({
         paddingVertical: 24,
         paddingBottom: 64,
         borderRadius: 22,
+        marginHorizontal: 2,
+        marginTop: 12,
         marginBottom: 0,
         zIndex: 1,
         shadowColor: "#151D4F",
