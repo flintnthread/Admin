@@ -3,10 +3,28 @@ import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import {
+  fetchAreas,
   fetchCities,
   fetchCountries,
+  fetchLocationCounts,
   fetchPincodes,
   fetchStates,
+  createCountry,
+  createState,
+  createCity,
+  createArea,
+  createPincode,
+  updateCountry,
+  updateState,
+  updateCity,
+  updateArea,
+  updatePincode,
+  deleteCountry,
+  deleteState,
+  deleteCity,
+  deleteArea,
+  deletePincode,
+  type LocationCounts,
   type LocationRow,
 } from '@/services/locationApi';
 import {
@@ -1118,6 +1136,7 @@ export default function LocationsScreen() {
   const [selectedCity, setSelectedCity] = useState<Option | null>(null);
   const [cityPincodes, setCityPincodes] = useState<LocationRow[] | null>(null);
   const [pincodesLoading, setPincodesLoading] = useState(false);
+  const [locationCounts, setLocationCounts] = useState<LocationCounts | null>(null);
 
   const meta = TAB_META[detailTab];
   const gridColumns = isWeb ? (width < 960 ? 2 : 3) : 1;
@@ -1129,7 +1148,8 @@ export default function LocationsScreen() {
       let data: LocationRow[] = [];
       if (detailTab === 'countries') data = await fetchCountries();
       else if (detailTab === 'states') data = await fetchStates();
-      else if (detailTab === 'cities' || detailTab === 'areas') data = await fetchCities();
+      else if (detailTab === 'cities') data = await fetchCities();
+      else if (detailTab === 'areas') data = await fetchAreas();
       else if (detailTab === 'pincodes') data = await fetchPincodes();
       setRows(data.map((r, i) => mapLocationRow(r, i, detailTab)));
     } catch (e) {
@@ -1146,7 +1166,13 @@ export default function LocationsScreen() {
     let cancelled = false;
     (async () => {
       setOverviewLoading(true);
-      try { const c = await fetchCountries(); if (!cancelled) setAnalysisCountries(c); }
+      try {
+        const [c, counts] = await Promise.all([fetchCountries(), fetchLocationCounts()]);
+        if (!cancelled) {
+          setAnalysisCountries(c);
+          setLocationCounts(counts);
+        }
+      }
       catch (e) { console.warn(getApiErrorMessage(e)); }
       finally { if (!cancelled) setOverviewLoading(false); }
     })();
@@ -1215,19 +1241,43 @@ export default function LocationsScreen() {
   const openView = (row: ListRow) => { setActiveRow(row); setModalMode('view'); setModalVisible(true); };
   const closeModal = () => { setModalVisible(false); setActiveRow(null); };
 
-  const handleSave = (data: { name: string; code: string; status: RowStatus }) => {
-    if (modalMode === 'edit' && activeRow) {
-      setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, ...data } : r));
-    } else {
-      const nextId = rows.reduce((m, r) => Math.max(m, r.id), 0) + 1;
-      const theme = ROW_THEMES[nextId % ROW_THEMES.length];
-      setRows((prev) => [{ id: nextId, name: data.name, status: data.status, code: data.code || undefined, iconBg: theme.bg, iconColor: theme.color }, ...prev]);
+  const handleSave = async (data: { name: string; code: string; status: RowStatus }) => {
+    try {
+      if (modalMode === 'edit' && activeRow) {
+        if (detailTab === 'countries') await updateCountry(activeRow.id, data.name);
+        else if (detailTab === 'states') await updateState(activeRow.id, data.name);
+        else if (detailTab === 'cities') await updateCity(activeRow.id, data.name);
+        else if (detailTab === 'areas') await updateArea(activeRow.id, data.name);
+        else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name);
+        setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, ...data } : r));
+      } else {
+        let newRow: LocationRow;
+        if (detailTab === 'countries') newRow = await createCountry(data.name);
+        else if (detailTab === 'states') newRow = await createState(0, data.name);
+        else if (detailTab === 'cities') newRow = await createCity(0, data.name);
+        else if (detailTab === 'areas') newRow = await createArea(0, data.name);
+        else return;
+        const theme = ROW_THEMES[newRow.id % ROW_THEMES.length];
+        setRows((prev) => [{ ...mapLocationRow(newRow, 0, detailTab), status: data.status, iconBg: theme.bg, iconColor: theme.color }, ...prev]);
+      }
+      closeModal();
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
     }
-    closeModal();
   };
 
-  const confirmDelete = () => {
-    if (deleteTarget) setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      if (detailTab === 'countries') await deleteCountry(deleteTarget.id);
+      else if (detailTab === 'states') await deleteState(deleteTarget.id);
+      else if (detailTab === 'cities') await deleteCity(deleteTarget.id);
+      else if (detailTab === 'areas') await deleteArea(deleteTarget.id);
+      else if (detailTab === 'pincodes') await deletePincode(deleteTarget.id);
+      setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+    } catch (e) {
+      console.warn(getApiErrorMessage(e));
+    }
     setDeleteTarget(null);
   };
 
@@ -1241,10 +1291,10 @@ export default function LocationsScreen() {
         {/* Hero header */}
         <HeroHeader
           isMobile={isMobile}
-          countriesCount={analysisCountries.length || 195}
-          statesCount={analysisStates.length || 36}
-          citiesCount={analysisCities.length || 532}
-          pincodesCount={19000}
+          countriesCount={locationCounts?.countries ?? analysisCountries.length ?? 195}
+          statesCount={locationCounts?.states ?? analysisStates.length ?? 36}
+          citiesCount={locationCounts?.cities ?? analysisCities.length ?? 532}
+          pincodesCount={locationCounts?.pincodes ?? 19000}
         />
 
         {/* Tab bar */}
@@ -1255,10 +1305,10 @@ export default function LocationsScreen() {
           <OverviewPanel
             isMobile={isMobile}
             loading={overviewLoading}
-            countriesCount={analysisCountries.length || 195}
-            statesCount={analysisStates.length || 36}
-            citiesCount={analysisCities.length || 532}
-            pincodesCount={19000}
+            countriesCount={locationCounts?.countries ?? analysisCountries.length ?? 195}
+            statesCount={locationCounts?.states ?? analysisStates.length ?? 36}
+            citiesCount={locationCounts?.cities ?? analysisCities.length ?? 532}
+            pincodesCount={locationCounts?.pincodes ?? 19000}
             countryOptions={countryOptions}
             stateOptions={stateOptions}
             cityOptions={cityOptions}

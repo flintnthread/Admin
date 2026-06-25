@@ -309,3 +309,51 @@ export async function rejectSellerProfile(id: number, reason: string): Promise<v
     body: JSON.stringify({ reason }),
   });
 }
+
+export async function exportSellerProductsCsv(sellerId: number): Promise<string> {
+  // Fetch products for this seller using the product API
+  const q = new URLSearchParams();
+  q.set('page', '0');
+  q.set('size', '1000');
+  q.set('sellerId', String(sellerId));
+  const response = await adminApiRequest<{ items: unknown[] }>(
+    `/api/admin/products?${q}`
+  );
+  const products = response.items || [];
+
+  // Generate CSV
+  const headers = ['ID', 'Name', 'Status', 'Price', 'Stock', 'Created At'];
+  const rows = products.map((p: any) => [
+    p.id || '',
+    `"${(p.name || '').replace(/"/g, '""')}"`,
+    p.status || '',
+    p.price || 0,
+    p.stock || 0,
+    p.createdAt || '',
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  return csv;
+}
+
+export async function exportSellerOrdersCsv(sellerId: number): Promise<string> {
+  // Fetch orders for this seller using the order API
+  const q = new URLSearchParams();
+  q.set('page', '0');
+  q.set('size', '1000');
+  q.set('sellerId', String(sellerId));
+  const response = await adminApiRequest<{ items: unknown[] }>(
+    `/api/admin/orders?${q}`
+  );
+  const orders = response.items || [];
+
+  // Generate CSV
+  const headers = ['Order ID', 'Status', 'Total Amount', 'Created At'];
+  const rows = orders.map((o: any) => [
+    o.id || '',
+    o.status || '',
+    o.totalAmount || 0,
+    o.createdAt || '',
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  return csv;
+}

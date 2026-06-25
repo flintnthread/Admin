@@ -63,23 +63,63 @@ export type OrderSummary = {
   shippingPhone?: string;
   shippingCity?: string;
   shippingState?: string;
+  shippingAddress1?: string;
+  shippingAddress2?: string;
+  shippingPincode?: string;
   gstStatus?: string;
   createdAt?: string;
+  shiprocketAwbCode?: string;
+  shiprocketCourierName?: string;
+  shiprocketTrackingUrl?: string;
+  trackingId?: string;
+  weightKg?: number;
+  dimensionsCm?: { l?: number; w?: number; h?: number };
   products?: OrderProductPreview[];
   sellers?: OrderSellerPreview[];
+  sellerGroups?: OrderSellerGroupPreview[];
 };
 
 export type OrderProductPreview = {
   id?: number;
+  productId?: number;
   name?: string;
+  productName?: string;
   imageUrl?: string;
   sellerName?: string;
+  sellerId?: number;
+  price?: number;
+  quantity?: number;
+  qty?: number;
+  hsnCode?: string;
+  color?: string;
+  size?: string;
+  sku?: string;
+  taxPercent?: number;
 };
 
 export type OrderSellerPreview = {
   id?: number;
   name?: string;
   email?: string;
+};
+
+export type OrderSellerGroupPreview = {
+  seller?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    gstin?: string;
+    address?: {
+      line1?: string;
+      city?: string;
+      state?: string;
+      pincode?: string;
+      phone?: string;
+      email?: string;
+      gstin?: string;
+    };
+  };
+  products?: OrderProductPreview[];
 };
 
 export type CustomerSummary = {
@@ -95,6 +135,15 @@ export type CustomerSummary = {
   lastOrderAt?: string;
 };
 
+export type PayoutItem = {
+  productName?: string;
+  sku?: string;
+  hsnCode?: string;
+  quantity?: number;
+  price?: number;
+  total?: number;
+};
+
 export type PayoutSummary = {
   id: number;
   sellerId?: number;
@@ -106,6 +155,8 @@ export type PayoutSummary = {
   orderStatus?: string;
   requestedAmount?: number;
   customerPaidAmount?: number;
+  customerName?: string;
+  customerEmail?: string;
   status?: string;
   walletBalance?: number;
   sellerNote?: string;
@@ -114,6 +165,34 @@ export type PayoutSummary = {
   requestedAt?: string;
   deliveryDate?: string;
   paidAt?: string;
+  bankName?: string;
+  branchName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  accountHolderName?: string;
+  shippingAddress1?: string;
+  shippingAddress2?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingPincode?: string;
+  shippingPhone?: string;
+  sellerGstin?: string;
+  sellerAddress?: string;
+  sellerCity?: string;
+  sellerState?: string;
+  sellerPincode?: string;
+  items?: PayoutItem[];
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  amountBreakdown?: {
+    orderAmount?: number;
+    gstAmount?: number;
+    deliveryCharge?: number;
+    deliveryType?: string;
+    commissionRate?: number;
+    commissionAmount?: number;
+    finalPayableAmount?: number;
+  };
 };
 
 export type SupportTicketSummary = {

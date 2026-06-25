@@ -5,9 +5,7 @@ import { getApiErrorMessage } from '@/lib/api/client';
 import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
-  fetchSellerAnalyticsChart,
-  fetchSellerDetail,
-  normalizeSellerGraphChart,
+  exportSellerOrdersCsv, exportSellerProductsCsv, fetchSellerAnalyticsChart, fetchSellerDetail, normalizeSellerGraphChart,
 } from '@/services/sellerApi';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -1006,6 +1004,12 @@ export default function ViewSeller() {
           monthly: monthlyChart,
           yearly: yearlyChart,
         }));
+        setChartData({
+          daily: null,
+          weekly: null,
+          monthly: monthlyChart,
+          yearly: yearlyChart,
+        });
       } catch (e) {
         setLoadError(getApiErrorMessage(e));
       } finally {
@@ -1020,8 +1024,27 @@ export default function ViewSeller() {
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string>('');
   const [selectedDocUrl, setSelectedDocUrl] = useState<string>('');
-  const [productsExportModal, setProductsExportModal] = useState(false);
-  const [ordersExportModal, setOrdersExportModal] = useState(false);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [chartData, setChartData] = useState<Record<'daily' | 'weekly' | 'monthly' | 'yearly', unknown>>({
+    daily: null,
+    weekly: null,
+    monthly: null,
+    yearly: null,
+  });
+
+  // Fetch chart data when period changes
+  useEffect(() => {
+    const sellerId = Number(params.sellerId);
+    if (!sellerId || Number.isNaN(sellerId) || !token) return;
+    void (async () => {
+      try {
+        const data = await fetchSellerAnalyticsChart({ sellerId, filterType: periodTab });
+        setChartData(prev => ({ ...prev, [periodTab]: data }));
+      } catch (e) {
+        console.error('Failed to fetch chart data:', e);
+      }
+    })();
+  }, [periodTab, params.sellerId, token]);
 
   const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
@@ -1029,14 +1052,62 @@ export default function ViewSeller() {
     setDocModalVisible(true);
   };
 
+  const handleExportProductsCsv = async () => {
+    const sellerId = Number(params.sellerId);
+    if (!sellerId || Number.isNaN(sellerId)) return;
+    try {
+      setCsvLoading(true);
+      const csv = await exportSellerProductsCsv(sellerId);
+      downloadCsv(csv, `products_seller_${sellerId}.csv`);
+    } catch (e) {
+      alert(getApiErrorMessage(e));
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
+  const handleExportOrdersCsv = async () => {
+    const sellerId = Number(params.sellerId);
+    if (!sellerId || Number.isNaN(sellerId)) return;
+    try {
+      setCsvLoading(true);
+      const csv = await exportSellerOrdersCsv(sellerId);
+      downloadCsv(csv, `orders_seller_${sellerId}.csv`);
+    } catch (e) {
+      alert(getApiErrorMessage(e));
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
+  const downloadCsv = (csvContent: string, filename: string) => {
+    // Create a Blob with the CSV content
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Create a download link
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    
+    // Append to document, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    URL.revokeObjectURL(url);
+  };
+
   const isMobile = width < 600;
   const isTablet = width >= 600 && width < 1024;
   const chartWidth = width - (isMobile ? 32 : isTablet ? 48 : 64);
 
-  const currentData =
-    analyticsTab === 'products'
-      ? seller.analyticsData[periodTab]
-      : seller.ordersAnalyticsData[periodTab];
+  const currentChart = chartData[periodTab];
+  const currentData = currentChart
+    ? chartToSeries(currentChart, analyticsTab === 'products' ? 'productsAdded' : 'registered')
+    : (analyticsTab === 'products' ? seller.analyticsData[periodTab] : seller.ordersAnalyticsData[periodTab]);
 
   const productSegments = [
     { value: seller.productStatusDistribution.active, color: COLORS.success, label: 'Active' },
@@ -1158,13 +1229,13 @@ export default function ViewSeller() {
                 <Text style={styles.exportBtnText}>View List</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.exportBtn} onPress={() => setProductsExportModal(true)}>
+            <TouchableOpacity style={styles.exportBtn} onPress={handleExportProductsCsv} disabled={csvLoading}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <BootstrapIcon name="download" size={13} color={COLORS.white} />
                 <Text style={styles.exportBtnText}>Export Products CSV</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.exportBtn} onPress={() => setOrdersExportModal(true)}>
+            <TouchableOpacity style={styles.exportBtn} onPress={handleExportOrdersCsv} disabled={csvLoading}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <BootstrapIcon name="download" size={13} color={COLORS.white} />
                 <Text style={styles.exportBtnText}>Export Orders CSV</Text>
@@ -1428,22 +1499,6 @@ export default function ViewSeller() {
           docName={selectedDoc}
           docUrl={selectedDocUrl}
           onClose={() => setDocModalVisible(false)}
-        />
-
-        {/* Products Export Modal */}
-        <CsvExportModal
-          visible={productsExportModal}
-          onClose={() => setProductsExportModal(false)}
-          title="Export Products CSV"
-          content='263,"Red Banarasi Style Cotton Silk Saree with Silver Zari Border",Active,"2026-05-25 13:41:05"'
-        />
-
-        {/* Orders Export Modal */}
-        <CsvExportModal
-          visible={ordersExportModal}
-          onClose={() => setOrdersExportModal(false)}
-          title="Export Orders CSV"
-          content='"Order Status","Total Amount","Created At"'
         />
 
         <View style={{ height: 32 }} />

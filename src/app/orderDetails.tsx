@@ -11,6 +11,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -24,16 +27,11 @@ import {
   TouchableWithoutFeedback,
   useWindowDimensions,
   View,
-<<<<<<< HEAD
-  Animated,
-  Easing,
-} from "react-native"; 
-=======
 } from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrderDetail } from "@/services/orderApi";
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
+import { fetchOrderDetail, updateOrderStatus } from "@/services/orderApi";
+
 import Svg, { Circle, Path } from "react-native-svg";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,6 +96,9 @@ type ApiOrderItem = {
   productId?: number;
   productName?: string;
   sellerName?: string;
+  sku?: string;
+  color?: string;
+  size?: string;
   quantity?: number;
   price?: number;
   total?: number;
@@ -166,9 +167,13 @@ type UIOrder = {
   subtotal: number;
   shippingCost: number;
   tax: number;
+  discount: number;
+  walletDeduction: number;
+  referralDiscount: number;
   total: number;
   history: StatusHistory[];
   gstStatus?: string;
+  gstNumber?: string;
   rawData?: Record<string, unknown>;
 };
 
@@ -215,19 +220,51 @@ type OrderDetail = Record<string, unknown> & {
   shiprocketPushedAt?: string;
   shiprocketSyncedAt?: string;
   items?: ApiOrderItem[];
-  history?: StatusHistory[];
+  statusHistory?: Array<{
+    id?: number;
+    status?: string;
+    comment?: string;
+    createdBy?: number;
+    createdAt?: string;
+  }>;
+  customerId?: number;
 };
 
 function normalizeStatus(status?: string): OrderStatus {
-  const value = (status ?? "").toLowerCase();
-  if (value === "processing") return "Processing";
-  if (value === "pending") return "Pending";
-  if (value === "completed") return "Completed";
-  if (value === "returned") return "Returned";
-  if (value === "replacement") return "Replacement";
-  if (value === "cancelled") return "Cancelled";
-  if (value === "shipped") return "Processing";
+  const value = (status ?? "").toLowerCase().replace(/_/g, " ");
+  if (value.includes("sent") && value.includes("seller")) return "Sent to Seller";
+  if (value.includes("process") || value.includes("ship") || value.includes("transit") || value.includes("packed")) {
+    return "Processing";
+  }
+  if (value.includes("deliver") || value.includes("complete")) return "Completed";
+  if (value.includes("return") || value.includes("refund") || value.includes("rto")) return "Returned";
+  if (value.includes("replace")) return "Replacement";
+  if (value.includes("cancel") || value.includes("reject")) return "Cancelled";
+  if (value.includes("pending") || value.includes("confirm") || value.includes("placed") || value.includes("new")) {
+    return "Pending";
+  }
   return "Pending";
+}
+
+function formatPaymentStatus(status?: string) {
+  if (!status) return "—";
+  const normalized = status.trim();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function isPaymentPaid(status?: string) {
+  const value = (status ?? "").toLowerCase();
+  return value.includes("paid") || value.includes("success") || value.includes("captured");
+}
+
+function buildVariantLabel(item: ApiOrderItem) {
+  const parts = [item.color, item.size].filter(Boolean);
+  if (parts.length > 0) return parts.join(" / ");
+  return item.status ?? "—";
+}
+
+function uiStatusToBackend(status: OrderStatus): string {
+  return status;
 }
 
 function formatDateTime(value?: string) {
@@ -255,34 +292,115 @@ function formatDateTimeWithTime(value?: string) {
   })}`;
 }
 
+function resolveItemImageUrl(item: ApiOrderItem): string {
+  const raw = item as Record<string, unknown>;
+  const path =
+    item.imageUrl ??
+    raw.image_url ??
+    raw.productImagePath ??
+    raw.product_image_path ??
+    raw.productImage ??
+    raw.product_image;
+  return resolveMediaUrl(typeof path === "string" ? path : "");
+}
+
+function resolveItemProductName(item: ApiOrderItem): string {
+  const raw = item as Record<string, unknown>;
+  const nestedProduct = raw.product;
+  const fromNested =
+    nestedProduct &&
+    typeof nestedProduct === "object" &&
+    nestedProduct !== null &&
+    "name" in nestedProduct
+      ? String((nestedProduct as { name?: string }).name ?? "").trim()
+      : "";
+
+  return (
+    item.productName?.trim() ||
+    String(raw.product_name ?? "").trim() ||
+    String(raw.name ?? "").trim() ||
+    String(raw.title ?? "").trim() ||
+    (typeof raw.product === "string" ? raw.product.trim() : "") ||
+    fromNested ||
+    (item.productId ? `Product #${item.productId}` : "Product")
+  );
+}
+
 function mapApiItemToUi(item: ApiOrderItem): OrderItem {
   const qty = Number(item.quantity ?? 0);
   const price = Number(item.price ?? 0);
-  
-  // Try multiple possible field names for product name
-  const productName = 
-    (item as any).productName?.trim() ||
-    (item as any).name?.trim() ||
-    (item as any).title?.trim() ||
-    (item as any).product?.trim() ||
-    ((item as any).product as any)?.name?.trim() ||
-    "Product";
-  
+  const productName = resolveItemProductName(item);
+  const imageUrl = resolveItemImageUrl(item);
+
   return {
     id: item.id,
     productId: item.productId,
     product: productName,
-    sku: String(item.productId ?? item.id ?? ""),
+    sku: String(item.sku ?? item.productId ?? item.id ?? "—"),
     seller: item.sellerName ?? "Seller",
-    variant: item.status ?? "",
+    variant: buildVariantLabel(item),
     qty,
     price,
     total: Number(item.total ?? qty * price),
     slug: productName
       ? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
       : String(item.productId ?? item.id ?? ""),
-    imageUrl: resolveMediaUrl(item.imageUrl),
+    imageUrl,
   };
+}
+
+function ProductThumb({ uri, size = 44 }: { uri?: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(uri) && !failed;
+  const thumbStyle = {
+    width: size,
+    height: size,
+    borderRadius: 8,
+    backgroundColor: C.cardBg,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: "hidden" as const,
+  };
+
+  if (!showImage) {
+    return (
+      <View style={[thumbStyle, { alignItems: "center", justifyContent: "center" }]}>
+        <Text style={{ fontSize: size * 0.28, fontWeight: "700", color: C.sub }}>P</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={thumbStyle}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function mapStatusHistoryEntry(entry: NonNullable<OrderDetail["statusHistory"]>[number]): StatusHistory {
+  return {
+    status: normalizeStatus(entry.status),
+    date: formatDateTimeWithTime(entry.createdAt),
+    by: entry.createdBy ? `Admin #${entry.createdBy}` : "System",
+    comment: entry.comment?.trim() || entry.status || "",
+  };
+}
+
+function buildTrackingTimeline(history: StatusHistory[]): TrackingEvent[] {
+  return [...history].reverse().map((entry) => {
+    const [datePart, timePart] = entry.date.includes(",")
+      ? entry.date.split(",").map((part) => part.trim())
+      : [entry.date, ""];
+    return {
+      date: datePart,
+      time: timePart,
+      location: entry.by,
+      description: entry.comment || entry.status,
+    };
+  });
 }
 
 function mapApiOrderToUi(detail: OrderDetail): UIOrder {
@@ -290,24 +408,26 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const shippingCost = Number(detail.shippingAmount ?? 0);
   const tax = Number(detail.taxAmount ?? 0);
-  const total = Number(detail.totalAmount ?? subtotal + shippingCost + tax);
-  const awb = detail.shiprocketAwbCode
-    ? detail.shiprocketAwbCode
-    : detail.shiprocketTrackingUrl
-    ? detail.shiprocketTrackingUrl.split("/").pop() ?? detail.shiprocketTrackingUrl
-    : "";
+  const discount = Number(detail.discountAmount ?? 0);
+  const walletDeduction = Number(detail.walletDeduction ?? 0);
+  const referralDiscount = Number(detail.referralDiscountAmount ?? 0);
+  const total = Number(detail.totalAmount ?? subtotal + shippingCost + tax - discount - walletDeduction - referralDiscount);
+  const awb = detail.shiprocketAwbCode?.trim()
+    || (detail.shiprocketTrackingUrl ? detail.shiprocketTrackingUrl.split("/").pop() ?? "" : "");
 
   const history: StatusHistory[] =
-    detail.history && detail.history.length > 0
-      ? detail.history
+    detail.statusHistory && detail.statusHistory.length > 0
+      ? detail.statusHistory.map(mapStatusHistoryEntry)
       : [
           {
             status: normalizeStatus(detail.orderStatus),
-            date: formatDateTime(detail.createdAt),
+            date: formatDateTimeWithTime(detail.createdAt),
             by: "System",
-            comment: detail.orderStatus ?? "",
+            comment: detail.orderStatus ?? "Order placed",
           },
         ];
+
+  const paymentStatus = formatPaymentStatus(detail.paymentStatus);
 
   return {
     id: detail.orderNumber
@@ -316,13 +436,13 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
     date: formatDateTimeWithTime(detail.createdAt),
     status: normalizeStatus(detail.orderStatus),
     paymentMethod: detail.paymentMethod ?? "—",
-    paymentStatus: detail.paymentStatus ?? "—",
+    paymentStatus,
     customer: {
-      id: detail.userId,
+      id: detail.customerId ?? detail.userId,
       name: detail.shippingName ?? "—",
       email: detail.shippingEmail ?? "",
       phone: detail.shippingPhone ?? "",
-      notes: detail.orderNotes ?? "",
+      notes: detail.orderNotes?.trim() || "—",
     },
     billing: {
       line1: detail.billingAddress1 ?? detail.billingName ?? "",
@@ -341,21 +461,24 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
       country: detail.shippingCountry ?? "India",
     },
     shiprocket: {
-      awb,
-      courier: detail.shiprocketCourierName ??
-        (detail.shiprocketTrackingUrl ? "ShipRocket" : "—"),
-      status: detail.shiprocketStatus ?? "—",
-      synced: formatDateTimeWithTime(detail.shiprocketSyncedAt),
+      awb: awb || "—",
+      courier: detail.shiprocketCourierName?.trim() || (detail.shiprocketTrackingUrl ? "ShipRocket" : "—"),
+      status: detail.shiprocketStatus?.trim() || "—",
+      synced: formatDateTimeWithTime(detail.shiprocketSyncedAt ?? detail.shiprocketPushedAt),
       url: detail.shiprocketTrackingUrl,
     },
-    tracking: [],
+    tracking: buildTrackingTimeline(history),
     items,
     subtotal,
     shippingCost,
     tax,
+    discount,
+    walletDeduction,
+    referralDiscount,
     total,
-    history: history,
+    history,
     gstStatus: detail.gstStatus ?? "Not Filed",
+    gstNumber: detail.gstNumber ?? "",
     rawData: detail,
   };
 }
@@ -375,6 +498,9 @@ const INITIAL_ORDER: UIOrder = {
   subtotal: 0,
   shippingCost: 0,
   tax: 0,
+  discount: 0,
+  walletDeduction: 0,
+  referralDiscount: 0,
   total: 0,
   history: [],
   rawData: undefined,
@@ -402,21 +528,21 @@ const STATUS_OPTIONS: {
   value: OrderStatus;
   icon: React.ReactNode;
 }[] = [
-  { value: "Pending", label: "Mark as Pending", icon: <PendingIcon /> },
-  {
-    value: "Processing",
-    label: "Mark as Processing",
-    icon: <ProcessingIcon />,
-  },
-  { value: "Completed", label: "Mark as Completed", icon: <CompletedIcon /> },
-  { value: "Returned", label: "Mark as Returned", icon: <ReturnedIcon /> },
-  {
-    value: "Replacement",
-    label: "Mark as Replacement",
-    icon: <ReplacementIcon />,
-  },
-  { value: "Cancelled", label: "Mark as Cancelled", icon: <CancelledIcon /> },
-];
+    { value: "Pending", label: "Mark as Pending", icon: <PendingIcon /> },
+    {
+      value: "Processing",
+      label: "Mark as Processing",
+      icon: <ProcessingIcon />,
+    },
+    { value: "Completed", label: "Mark as Completed", icon: <CompletedIcon /> },
+    { value: "Returned", label: "Mark as Returned", icon: <ReturnedIcon /> },
+    {
+      value: "Replacement",
+      label: "Mark as Replacement",
+      icon: <ReplacementIcon />,
+    },
+    { value: "Cancelled", label: "Mark as Cancelled", icon: <CancelledIcon /> },
+  ];
 
 // Extra non-status option
 
@@ -707,9 +833,11 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 function StatusDropdown({
   current,
   onSelect,
+  disabled = false,
 }: {
   current: OrderStatus;
   onSelect: (v: OrderStatus) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 210 });
@@ -725,9 +853,10 @@ function StatusDropdown({
   return (
     <View ref={btnRef} collapsable={false}>
       <TouchableOpacity
-        style={[s.dropBtn, { borderColor: C.navy }]}
+        style={[s.dropBtn, { borderColor: C.navy }, disabled && { opacity: 0.6 }]}
         onPress={openMenu}
         activeOpacity={0.8}
+        disabled={disabled}
       >
         <Text style={[s.dropBtnTxt, { color: C.navy }]}>{current}</Text>
         <ChevronIcon color={C.navy} />
@@ -860,89 +989,18 @@ export default function OrderDetailScreen() {
   const router = useRouter();
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
 
-<<<<<<< HEAD
-  const [status, setStatus] = useState<OrderStatus>(ORDER.status);
+  const [order, setOrder] = useState<UIOrder>(INITIAL_ORDER);
+  const [status, setStatus] = useState<OrderStatus>(INITIAL_ORDER.status);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [invoiceVisible, setInvoiceVisible] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [newStatus, setNewStatus] = useState<OrderStatus>("Pending");
   const [statusComment, setStatusComment] = useState("");
   const [notifyCustomer, setNotifyCustomer] = useState(false);
-  const [orderHistory, setOrderHistory] = useState<StatusHistory[]>(ORDER.history);
-  const px = isMobile ? 14 : isTablet ? 20 : 28;
-
-  // Sync animation
-  const syncSpinAnim = useRef(new Animated.Value(0)).current;
-  const handleSync = () => {
-    Animated.loop(
-      Animated.timing(syncSpinAnim, {
-        toValue: 1,
-        duration: 1000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // simulate sync stop
-    setTimeout(() => {
-      syncSpinAnim.stopAnimation();
-      syncSpinAnim.setValue(0);
-    }, 2000);
-  };
-
-  const spin = syncSpinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  // Map the local mock ORDER to the shape expected by InvoiceModal
-  const mappedOrderForInvoice = {
-    id: String(ORDER.id),
-    orderNumber: displayOrderId,
-    date: ORDER.date.split(",")[0],
-    time: ORDER.date.split(", ")[1] || "",
-    customer: {
-      name: ORDER.customer.name,
-      email: ORDER.customer.email,
-      phone: ORDER.customer.phone,
-      address: `${ORDER.billing.line1} ${ORDER.billing.line2}`,
-      city: ORDER.billing.city,
-      state: ORDER.billing.state,
-      pincode: ORDER.billing.pincode,
-    },
-    amount: ORDER.total,
-    paymentType: ORDER.paymentMethod as any,
-    status: ORDER.status as any,
-    gstStatus: "Not Filed" as any,
-    isIntraState: true,
-    sellerGroups: [
-      {
-        seller: {
-          name: ORDER.items[0]?.seller || "Seller",
-          email: "support@seller.com",
-          address: {
-            line1: "Seller Line 1",
-            city: "Hyderabad",
-            state: "Telangana",
-            pincode: "500001",
-          }
-        },
-        hasInvoice: true,
-        hasShippingLabel: true,
-        products: ORDER.items.map(item => ({
-          id: String(item.id),
-          name: item.product,
-          price: item.price,
-          qty: item.qty,
-          taxPercent: 5,
-        }))
-      }
-    ]
-  };
-=======
-  const [order, setOrder] = useState<UIOrder>(INITIAL_ORDER);
-  const [status, setStatus] = useState<OrderStatus>(INITIAL_ORDER.status);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const px = isMobile ? 14 : isTablet ? 20 : 28;
 
   const displayOrderId = orderId ?? order.id;
@@ -966,13 +1024,6 @@ export default function OrderDetailScreen() {
 
     try {
       const raw = await fetchOrderDetail(id);
-      console.log("All backend fields:", Object.keys(raw));
-      console.log("Raw backend data:", raw);
-      console.log("Items from backend:", (raw as any).items);
-      if ((raw as any).items && (raw as any).items.length > 0) {
-        console.log("First item structure:", (raw as any).items[0]);
-        console.log("First item keys:", Object.keys((raw as any).items[0]));
-      }
       const uiOrder = mapApiOrderToUi(raw as OrderDetail);
       setOrder(uiOrder);
       setStatus(uiOrder.status);
@@ -986,7 +1037,63 @@ export default function OrderDetailScreen() {
   useEffect(() => {
     loadOrder();
   }, [loadOrder]);
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
+
+  // Sync animation
+  const syncSpinAnim = useRef(new Animated.Value(0)).current;
+  const applyStatusUpdate = useCallback(
+    async (nextStatus: OrderStatus, comment?: string) => {
+      if (!orderId) return;
+      const id = Number(orderId);
+      if (Number.isNaN(id)) return;
+
+      setStatusSaving(true);
+      try {
+        const updated = await updateOrderStatus(id, uiStatusToBackend(nextStatus), comment);
+        const uiOrder = mapApiOrderToUi(updated as OrderDetail);
+        setOrder(uiOrder);
+        setStatus(uiOrder.status);
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      } finally {
+        setStatusSaving(false);
+      }
+    },
+    [orderId]
+  );
+
+  const handleStatusSelect = useCallback(
+    async (nextStatus: OrderStatus) => {
+      if (nextStatus === status || statusSaving) return;
+      await applyStatusUpdate(nextStatus);
+    },
+    [applyStatusUpdate, status, statusSaving]
+  );
+
+  const handleSync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    Animated.loop(
+      Animated.timing(syncSpinAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    try {
+      await loadOrder();
+    } finally {
+      syncSpinAnim.stopAnimation();
+      syncSpinAnim.setValue(0);
+      setSyncing(false);
+    }
+  }, [loadOrder, syncing, syncSpinAnim]);
+
+  const spin = syncSpinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
     <AdminLayout>
@@ -1036,561 +1143,553 @@ export default function OrderDetailScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
-          style={s.scroll}
+        <>
+          <ScrollView
+            style={s.scroll}
           contentContainerStyle={[s.scrollContent, { paddingHorizontal: px }]}
           showsVerticalScrollIndicator={false}
         >
-        <View
-          style={[
-            s.body,
-            { maxWidth: 1600, alignSelf: "center", width: "100%" },
-          ]}
-        >
-          {/* ── CARD 1: Actions ─────────────────────────────────────────── */}
-          <Card>
-            <View
-              style={[
-                s.actionBar,
-                isMobile && {
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                },
-              ]}
-            >
-              {/* Order ID */}
-              <View style={s.actionOrderId}>
-                <Text style={s.actionOrderLbl}>Order</Text>
-                <Text style={s.actionOrderNum}>#{displayOrderId}</Text>
-              </View>
+          <View
+            style={[
+              s.body,
+              { maxWidth: 1600, alignSelf: "center", width: "100%" },
+            ]}
+          >
+            {/* ── CARD 1: Actions ─────────────────────────────────────────── */}
+            <Card>
+              <View
+                style={[
+                  s.actionBar,
+                  isMobile && {
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                  },
+                ]}
+              >
+                {/* Order ID */}
+                <View style={s.actionOrderId}>
+                  <Text style={s.actionOrderLbl}>Order</Text>
+                  <Text style={s.actionOrderNum}>#{displayOrderId}</Text>
+                </View>
 
-              {/* Buttons */}
-              <View style={[s.actionBtns, isMobile && { flexWrap: "wrap" }]}>
-                {/* Invoice */}
-                <TouchableOpacity
-                  style={[s.actionBtn, { backgroundColor: C.navy }]}
-                  activeOpacity={0.8}
-                  onPress={() => setInvoiceVisible(true)}
-                >
-                  <InvoiceIcon />
-                  <Text style={s.actionBtnTxt}>Invoice</Text>
-                </TouchableOpacity>
-                {/* Update Status dropdown */}
-                <StatusDropdown current={status} onSelect={setStatus} />
+                {/* Buttons */}
+                <View style={[s.actionBtns, isMobile && { flexWrap: "wrap" }]}>
+                  {/* Invoice */}
+                  <TouchableOpacity
+                    style={[s.actionBtn, { backgroundColor: C.navy }]}
+                    activeOpacity={0.8}
+                    onPress={() => setInvoiceVisible(true)}
+                  >
+                    <InvoiceIcon />
+                    <Text style={s.actionBtnTxt}>Invoice</Text>
+                  </TouchableOpacity>
+                  {/* Update Status dropdown */}
+                  <StatusDropdown
+                    current={status}
+                    onSelect={handleStatusSelect}
+                    disabled={statusSaving}
+                  />
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
 
-          {/* ── ROW 2: Order Info + Customer Info ───────────────────────── */}
-          <View style={[s.row, !isWide && s.colStack]}>
-            {/* CARD 2 — Order Information */}
-            <Card style={{ flex: 1 }}>
-              <CardHeader
-                icon={<OrderIcon size={16} color={C.primary} />}
-                title="Order Information"
-              />
-              <View style={s.cardBody}>
-                <InfoRow
-                  label="Order ID"
-                  value={`#${displayOrderId}`}
-                  valueStyle={{ color: C.primary, fontWeight: "700" }}
+            {/* ── ROW 2: Order Info + Customer Info ───────────────────────── */}
+            <View style={[s.row, !isWide && s.colStack]}>
+              {/* CARD 2 — Order Information */}
+              <Card style={{ flex: 1 }}>
+                <CardHeader
+                  icon={<OrderIcon size={16} color={C.primary} />}
+                  title="Order Information"
                 />
-                <InfoRow label="Order Date" value={order.date} />
-                <InfoRow
-                  label="Order Status"
-                  value={<StatusBadge status={status} />}
-                />
-                <InfoRow label="Payment Method" value={order.paymentMethod} />
-                <InfoRow label="GST Status" value={order.gstStatus ?? "Not Filed"} />
-                <InfoRow
-                  label="Payment Status"
-                  value={
-                    <View
-                      style={[
-                        s.badge,
-                        {
-                          backgroundColor:
-                            order.paymentStatus === "Paid"
-                              ? C.activeLight
-                              : C.warningLight,
-                        },
-                      ]}
-                    >
+                <View style={s.cardBody}>
+                  <InfoRow
+                    label="Order ID"
+                    value={`#${displayOrderId}`}
+                    valueStyle={{ color: C.primary, fontWeight: "700" }}
+                  />
+                  <InfoRow label="Order Date" value={order.date} />
+                  <InfoRow
+                    label="Order Status"
+                    value={<StatusBadge status={status} />}
+                  />
+                  <InfoRow label="Payment Method" value={order.paymentMethod} />
+                  <InfoRow label="GST Status" value={order.gstStatus ?? "Not Filed"} />
+                  {order.gstNumber ? (
+                    <InfoRow label="GST Number" value={order.gstNumber} />
+                  ) : null}
+                  <InfoRow
+                    label="Payment Status"
+                    value={
                       <View
                         style={[
-                          s.badgeDot,
+                          s.badge,
                           {
-                            backgroundColor:
-                              order.paymentStatus === "Paid"
-                                ? C.active
-                                : C.warning,
+                            backgroundColor: isPaymentPaid(order.paymentStatus)
+                              ? C.activeLight
+                              : C.warningLight,
                           },
                         ]}
-                      />
-                      <Text
-                        style={[
-                          s.badgeTxt,
-                          {
-                            color:
-                              order.paymentStatus === "Paid"
+                      >
+                        <View
+                          style={[
+                            s.badgeDot,
+                            {
+                              backgroundColor: isPaymentPaid(order.paymentStatus)
                                 ? C.active
                                 : C.warning,
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            s.badgeTxt,
+                            {
+                              color: isPaymentPaid(order.paymentStatus)
+                                ? C.active
+                                : C.warning,
+                            },
+                          ]}
+                        >
+                          {order.paymentStatus}
+                        </Text>
+                      </View>
+                    }
+                  />
+                </View>
+              </Card>
+
+              {/* CARD 3 — Customer Information */}
+              <Card style={{ flex: 1 }}>
+                <CardHeader
+                  icon={<PersonIcon size={16} color={C.primary} />}
+                  title="Customer Information"
+                />
+                <View style={s.cardBody}>
+                  {/* Name with navigate icon */}
+                  <InfoRow
+                    label="Customer Name"
+                    value={
+                      <TouchableOpacity
+                        style={s.custNameRow}
+                        onPress={() => {
+                          if (!order.customer.id) return;
+                          router.push({
+                            pathname: "/customerDetails",
+                            params: { id: String(order.customer.id) },
+                          });
+                        }}
+                        activeOpacity={0.7}
+                        disabled={!order.customer.id}
+                      >
+                        <Text
+                          style={[
+                            s.infoValue,
+                            { color: C.primary, fontWeight: "700" },
+                          ]}
+                        >
+                          {order.customer.name}
+                        </Text>
+                        <LinkIcon size={13} color={C.primary} />
+                      </TouchableOpacity>
+                    }
+                  />
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Email Address</Text>
+                    <View style={s.infoValRow}>
+                      <Text style={s.infoValue} numberOfLines={1}>
+                        {order.customer.email}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Phone Number</Text>
+                    <View style={s.infoValRow}>
+                      <Text style={s.infoValue}>{order.customer.phone}</Text>
+                    </View>
+                  </View>
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Order Notes</Text>
+                    <View style={s.infoValRow}>
+                      <Text style={[s.infoValue, { fontStyle: "italic" }]}>
+                        {order.customer.notes}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </Card>
+            </View>
+
+            {/* ── CARD 4: Addresses ───────────────────────────────────────── */}
+            <Card>
+              <CardHeader
+                icon={<MapPinIcon size={16} color={C.primary} />}
+                title="Addresses"
+              />
+              <View style={[s.cardBody, isWide ? s.addrRow : s.colStack]}>
+                <View style={{ flex: 1 }}>
+                  <AddressBlock title="Billing Address" addr={order.billing} />
+                </View>
+                {isWide && <View style={s.addrVertDivider} />}
+                {!isWide && <View style={s.addrHorizDivider} />}
+                <View style={{ flex: 1 }}>
+                  <AddressBlock title="Shipping Address" addr={order.shipping} />
+                </View>
+              </View>
+            </Card>
+
+            {/* ── ROW 3: ShipRocket + Timeline ────────────────────────────── */}
+            <View style={[s.row, !isWide && s.colStack]}>
+              {/* CARD 5 — ShipRocket Tracking */}
+              <Card style={{ flex: 1 }}>
+                <CardHeader
+                  icon={<ShiprocketIcon size={16} color={C.primary} />}
+                  title="ShipRocket Tracking"
+                  right={
+                    <TouchableOpacity
+                      style={[s.smBtn, { backgroundColor: C.blue }]}
+                      activeOpacity={0.8}
+                      onPress={handleSync}
+                    >
+                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                        <SyncIcon size={13} />
+                      </Animated.View>
+                      <Text style={s.smBtnTxt}>Sync Now</Text>
+                    </TouchableOpacity>
+                  }
+                />
+                <View style={s.cardBody}>
+                  <InfoRow
+                    label="AWB / Tracking #"
+                    value={order.shiprocket.awb}
+                  />
+                  <InfoRow
+                    label="Courier Partner"
+                    value={order.shiprocket.courier}
+                  />
+                  <InfoRow
+                    label="Shipment Status"
+                    value={
+                      <View style={[s.badge, { backgroundColor: C.blueLight }]}>
+                        <View style={[s.badgeDot, { backgroundColor: C.blue }]} />
+                        <Text style={[s.badgeTxt, { color: C.blue }]}>
+                          {order.shiprocket.status}
+                        </Text>
+                      </View>
+                    }
+                  />
+                  <InfoRow label="Last Synced" value={order.shiprocket.synced} />
+                  <TouchableOpacity
+                    style={[
+                      s.trackBtn,
+                      !order.shiprocket.url && s.trackBtnDisabled,
+                    ]}
+                    onPress={() => {
+                      if (order.shiprocket.url) {
+                        Linking.openURL(order.shiprocket.url);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                    disabled={!order.shiprocket.url}
+                  >
+                    <TrackIcon size={14} />
+                    <Text style={s.trackBtnTxt}>Track on ShipRocket</Text>
+                  </TouchableOpacity>
+                </View>
+              </Card>
+
+              {/* CARD 6 — Tracking Timeline */}
+              <Card style={{ flex: 1.2 }}>
+                <CardHeader
+                  icon={<TrackIcon size={16} color={C.primary} />}
+                  title="Tracking Timeline"
+                />
+                <View style={s.cardBody}>
+                  {order.tracking.length === 0 ? (
+                    <Text style={s.emptyTrackingTxt}>
+                      No tracking updates yet. Status changes will appear here.
+                    </Text>
+                  ) : (
+                    order.tracking.map((ev, idx) => (
+                    <View key={idx} style={s.tlItem}>
+                      {/* Line */}
+                      <View style={s.tlLeft}>
+                        <View style={[s.tlDot, idx === 0 && s.tlDotActive]} />
+                        {idx < order.tracking.length - 1 && (
+                          <View style={s.tlLine} />
+                        )}
+                      </View>
+                      {/* Content */}
+                      <View style={s.tlContent}>
+                        <Text style={s.tlDesc}>{ev.description}</Text>
+                        <Text style={s.tlLocation}>{ev.location}</Text>
+                        <Text style={s.tlDateTime}>
+                          {ev.date} · {ev.time}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                  )}
+                </View>
+              </Card>
+            </View>
+
+            {/* ── CARD 7: Order Items ─────────────────────────────────────── */}
+            <Card>
+              <CardHeader
+                icon={<OrderIcon size={16} color={C.primary} />}
+                title="Order Items"
+              />
+              <View style={{ padding: 0 }}>
+                {isDesktop ? (
+                  // Web: table layout
+                  <View style={s.tblWrap}>
+                    <View style={[s.tblRow, s.tblHead]}>
+                      {[
+                        "Product",
+                        "SKU",
+                        "Seller",
+                        "Variants",
+                        "Qty",
+                        "Price",
+                        "Total",
+                      ].map((h) => (
+                        <Text
+                          key={h}
+                          style={[
+                            s.tblHdr,
+                            h === "Product" ? { flex: 2 } : h === "Seller" ? { flex: 1.5 } : { flex: 1 }
+                          ]}
+                        >
+                          {h}
+                        </Text>
+                      ))}
+                    </View>
+                    {order.items.map((item) => (
+                      <View key={item.id} style={s.tblRow}>
+                        {/* Product with link */}
+                        <View
+                          style={[
+                            s.tblCell,
+                            {
+                              flex: 2,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 10,
+                            },
+                          ]}
+                        >
+                          <ProductThumb uri={item.imageUrl} size={44} />
+                          <Text style={[s.tblCellTxt, { flex: 1 }]} numberOfLines={2}>
+                            {item.product}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (!item.productId) return;
+                              router.push({
+                                pathname: "/productDetails",
+                                params: { id: String(item.productId) },
+                              });
+                            }}
+                            activeOpacity={0.7}
+                            disabled={!item.productId}
+                          >
+
+                            <View style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}>
+                              <BoxArrowUpRightIcon size={11} color={C.primary} />
+                              <Text style={s.viewProductTxt}>View</Text>
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+                        <View style={s.tblCell}>
+                          <Text style={s.tblCellSub}>{item.sku}</Text>
+                        </View>
+                        <View style={[s.tblCell, { flex: 1.5 }]}>
+                          <Text style={s.tblCellTxt}>{item.seller}</Text>
+                          <Text style={[s.tblCellSub, { fontSize: 11, marginTop: 2 }]}>support@flintnthread.in</Text>
+                          <Text style={[s.tblCellSub, { fontSize: 11 }]}>+91 9063499092</Text>
+                        </View>
+                        <View style={s.tblCell}>
+                          <Text style={s.tblCellSub}>{item.variant}</Text>
+                        </View>
+                        <View style={s.tblCell}>
+                          <Text style={[s.tblCellTxt, { textAlign: "center" }]}>
+                            {item.qty}
+                          </Text>
+                        </View>
+                        <View style={s.tblCell}>
+                          <Text style={s.tblCellTxt}>{rupee(item.price)}</Text>
+                        </View>
+                        <View style={s.tblCell}>
+                          <Text
+                            style={[
+                              s.tblCellTxt,
+                              { fontWeight: "700", color: C.text },
+                            ]}
+                          >
+                            {rupee(item.price * item.qty)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  // Mobile / Tablet: card format
+                  <View style={{ padding: 14, gap: 12 }}>
+                    {order.items.map((item) => (
+                      <View key={item.id} style={s.itemCard}>
+                        <View style={s.itemCardTop}>
+                          <ProductThumb uri={item.imageUrl} size={48} />
+                          <Text style={s.itemCardName}>{item.product}</Text>
+                          <TouchableOpacity
+                            style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}
+                            onPress={() => {
+                              if (!item.productId) return;
+                              router.push({
+                                pathname: "/productDetails",
+                                params: { id: String(item.productId) },
+                              });
+                            }}
+                            activeOpacity={0.7}
+                            disabled={!item.productId}
+                          >
+                            <BoxArrowUpRightIcon size={11} color={C.primary} />
+                            <Text style={s.viewProductTxt}>View</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <View style={s.itemCardGrid}>
+                          {[
+                            ["SKU", item.sku],
+                            ["Seller", item.seller],
+                            ["Variant", item.variant],
+                            ["Qty", String(item.qty)],
+                            ["Price", rupee(item.price)],
+                            ["Total", rupee(item.price * item.qty)],
+                          ].map(([lbl, val]) => (
+                            <View key={lbl} style={s.itemCardCell}>
+                              <Text style={s.itemCardLbl}>{lbl}</Text>
+                              <Text
+                                style={[
+                                  s.itemCardVal,
+                                  lbl === "Total" && {
+                                    color: C.primary,
+                                    fontWeight: "700",
+                                  },
+                                ]}
+                              >
+                                {val}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Payment Info + Order Summary */}
+              <View style={[s.cardBody, isWide ? s.addrRow : s.colStack]}>
+                {/* Payment Information */}
+                <View style={[s.summaryBox, { flex: 1 }]}>
+                  <Text style={s.summaryTitle}>Payment Information</Text>
+                  <View style={s.summaryRow}>
+                    <WalletIcon size={14} color={C.sub} />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={s.summaryLbl}>Payment Method</Text>
+                      <Text style={s.summaryVal}>{order.paymentMethod}</Text>
+                    </View>
+                  </View>
+                  <View style={s.summaryRow}>
+                    <WalletIcon
+                      size={14}
+                      color={isPaymentPaid(order.paymentStatus) ? C.active : C.warning}
+                    />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={s.summaryLbl}>Payment Status</Text>
+                      <Text
+                        style={[
+                          s.summaryVal,
+                          {
+                            color: isPaymentPaid(order.paymentStatus)
+                              ? C.active
+                              : C.warning,
                           },
                         ]}
                       >
                         {order.paymentStatus}
                       </Text>
                     </View>
-                  }
-                />
-              </View>
-            </Card>
+                  </View>
+                </View>
 
-            {/* CARD 3 — Customer Information */}
-            <Card style={{ flex: 1 }}>
-              <CardHeader
-                icon={<PersonIcon size={16} color={C.primary} />}
-                title="Customer Information"
-              />
-              <View style={s.cardBody}>
-                {/* Name with navigate icon */}
-                <InfoRow
-                  label="Customer Name"
-                  value={
-                    <TouchableOpacity
-                      style={s.custNameRow}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/customerDetails",
-                          params: { id: String(order.customer.id) },
-                        })
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          s.infoValue,
-                          { color: C.primary, fontWeight: "700" },
-                        ]}
-                      >
-                        {order.customer.name}
-                      </Text>
-                      <LinkIcon size={13} color={C.primary} />
-                    </TouchableOpacity>
-                  }
-                />
-                <View style={s.infoRow}>
-                  <Text style={s.infoLabel}>Email Address</Text>
-                  <View style={s.infoValRow}>
-                    <Text style={s.infoValue} numberOfLines={1}>
-                      {order.customer.email}
-                    </Text>
-                  </View>
-                </View>
-                <View style={s.infoRow}>
-                  <Text style={s.infoLabel}>Phone Number</Text>
-                  <View style={s.infoValRow}>
-<<<<<<< HEAD
-                    <Text style={s.infoValue}>{ORDER.customer.phone}</Text>
-=======
-                    <PhoneIcon2 />
-                    <Text style={s.infoValue}>{order.customer.phone}</Text>
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
-                  </View>
-                </View>
-                <View style={s.infoRow}>
-                  <Text style={s.infoLabel}>Order Notes</Text>
-                  <View style={s.infoValRow}>
-                    <Text style={[s.infoValue, { fontStyle: "italic" }]}>
-                      {order.customer.notes}
-                    </Text>
+                {isWide && <View style={s.addrVertDivider} />}
+                {!isWide && <View style={s.addrHorizDivider} />}
+
+                {/* Order Summary */}
+                <View style={[s.summaryBox, { flex: 1 }]}>
+                  <Text style={s.summaryTitle}>Order Summary</Text>
+                  {[
+                    ["Subtotal", rupee(order.subtotal), false],
+                    [
+                      "Shipping",
+                      order.shippingCost === 0
+                        ? "Free"
+                        : rupee(order.shippingCost),
+                      false,
+                    ],
+                    ["Tax", order.tax === 0 ? "₹0.00" : rupee(order.tax), false],
+                    ...(order.discount > 0
+                      ? [["Discount", `- ${rupee(order.discount)}`, false] as const]
+                      : []),
+                    ...(order.walletDeduction > 0
+                      ? [["Wallet", `- ${rupee(order.walletDeduction)}`, false] as const]
+                      : []),
+                    ...(order.referralDiscount > 0
+                      ? [["Referral", `- ${rupee(order.referralDiscount)}`, false] as const]
+                      : []),
+                  ].map(([lbl, val]) => (
+                    <View key={String(lbl)} style={s.summaryLineRow}>
+                      <Text style={s.summaryLineLbl}>{String(lbl)}</Text>
+                      <Text style={s.summaryLineVal}>{String(val)}</Text>
+                    </View>
+                  ))}
+                  <View style={s.summaryTotalRow}>
+                    <Text style={s.summaryTotalLbl}>Total</Text>
+                    <Text style={s.summaryTotalVal}>{rupee(order.total)}</Text>
                   </View>
                 </View>
               </View>
             </Card>
-          </View>
 
-          {/* ── CARD 4: Addresses ───────────────────────────────────────── */}
-          <Card>
-            <CardHeader
-              icon={<MapPinIcon size={16} color={C.primary} />}
-              title="Addresses"
-            />
-            <View style={[s.cardBody, isWide ? s.addrRow : s.colStack]}>
-              <View style={{ flex: 1 }}>
-                <AddressBlock title="Billing Address" addr={order.billing} />
-              </View>
-              {isWide && <View style={s.addrVertDivider} />}
-              {!isWide && <View style={s.addrHorizDivider} />}
-              <View style={{ flex: 1 }}>
-                <AddressBlock title="Shipping Address" addr={order.shipping} />
-              </View>
-            </View>
-          </Card>
-
-          {/* ── ROW 3: ShipRocket + Timeline ────────────────────────────── */}
-          <View style={[s.row, !isWide && s.colStack]}>
-            {/* CARD 5 — ShipRocket Tracking */}
-            <Card style={{ flex: 1 }}>
+            {/* ── CARD 8: Order Status History ────────────────────────────── */}
+            <Card>
               <CardHeader
-                icon={<ShiprocketIcon size={16} color={C.primary} />}
-                title="ShipRocket Tracking"
+                icon={<NoteIcon size={16} color={C.primary} />}
+                title="Order Status History"
                 right={
                   <TouchableOpacity
-                    style={[s.smBtn, { backgroundColor: C.blue }]}
+                    style={[s.smBtn, { backgroundColor: C.navy }]}
                     activeOpacity={0.8}
-                    onPress={handleSync}
+                    onPress={() => {
+                      setNewStatus(status);
+                      setUpdateModalVisible(true);
+                    }}
                   >
-                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                      <SyncIcon size={13} />
-                    </Animated.View>
-                    <Text style={s.smBtnTxt}>Sync Now</Text>
+                    <AddIcon size={13} />
+                    <Text style={s.smBtnTxt}>Add Status Update</Text>
                   </TouchableOpacity>
                 }
               />
               <View style={s.cardBody}>
-                <InfoRow
-                  label="AWB / Tracking #"
-                  value={order.shiprocket.awb}
-                />
-                <InfoRow
-                  label="Courier Partner"
-                  value={order.shiprocket.courier}
-                />
-                <InfoRow
-                  label="Shipment Status"
-                  value={
-                    <View style={[s.badge, { backgroundColor: C.blueLight }]}>
-                      <View style={[s.badgeDot, { backgroundColor: C.blue }]} />
-                      <Text style={[s.badgeTxt, { color: C.blue }]}>
-                        {order.shiprocket.status}
-                      </Text>
-                    </View>
-                  }
-                />
-                <InfoRow label="Last Synced" value={order.shiprocket.synced} />
-                <TouchableOpacity
-                  style={[
-                    s.trackBtn,
-                    !order.shiprocket.url && s.trackBtnDisabled,
-                  ]}
-                  onPress={() => {
-                    if (order.shiprocket.url) {
-                      Linking.openURL(order.shiprocket.url);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                  disabled={!order.shiprocket.url}
-                >
-                  <TrackIcon size={14} />
-                  <Text style={s.trackBtnTxt}>Track on ShipRocket</Text>
-                </TouchableOpacity>
-              </View>
-            </Card>
 
-            {/* CARD 6 — Tracking Timeline */}
-            <Card style={{ flex: 1.2 }}>
-              <CardHeader
-                icon={<TrackIcon size={16} color={C.primary} />}
-                title="Tracking Timeline"
-              />
-              <View style={s.cardBody}>
-                {order.tracking.map((ev, idx) => (
-                  <View key={idx} style={s.tlItem}>
-                    {/* Line */}
-                    <View style={s.tlLeft}>
-                      <View style={[s.tlDot, idx === 0 && s.tlDotActive]} />
-                      {idx < order.tracking.length - 1 && (
-                        <View style={s.tlLine} />
-                      )}
-                    </View>
-                    {/* Content */}
-                    <View style={s.tlContent}>
-                      <Text style={s.tlDesc}>{ev.description}</Text>
-                      <Text style={s.tlLocation}>{ev.location}</Text>
-                      <Text style={s.tlDateTime}>
-                        {ev.date} · {ev.time}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          </View>
-
-          {/* ── CARD 7: Order Items ─────────────────────────────────────── */}
-          <Card>
-            <CardHeader
-              icon={<OrderIcon size={16} color={C.primary} />}
-              title="Order Items"
-            />
-            <View style={{ padding: 0 }}>
-              {isDesktop ? (
-                // Web: table layout
-                <View style={s.tblWrap}>
-                  <View style={[s.tblRow, s.tblHead]}>
-                    {[
-                      "Product",
-                      "SKU",
-                      "Seller",
-                      "Variants",
-                      "Qty",
-                      "Price",
-                      "Total",
-                    ].map((h) => (
-                      <Text
-                        key={h}
-                        style={[
-                          s.tblHdr, 
-                          h === "Product" ? { flex: 2 } : h === "Seller" ? { flex: 1.5 } : { flex: 1 }
-                        ]}
-                      >
-                        {h}
-                      </Text>
-                    ))}
-                  </View>
-                  {order.items.map((item) => (
-                    <View key={item.id} style={s.tblRow}>
-                      {/* Product with link */}
-                      <View
-                        style={[
-                          s.tblCell,
-                          {
-                            flex: 2,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 6,
-                          },
-                        ]}
-                      >
-                        <Text style={s.tblCellTxt} numberOfLines={2}>
-                          {item.product}
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => {
-<<<<<<< HEAD
-                            router.push({
-                              pathname: "/productDetails",
-                              params: { id: String(item.id) },
-                            });
-=======
-                            if (item.productId) {
-                              router.push({
-                                pathname: "/productDetails",
-                                params: { id: String(item.productId) },
-                              });
-                            }
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
-                          }}
-                          activeOpacity={0.7}
-                          disabled={!item.productId}
-                        >
-<<<<<<< HEAD
-                          <View style={s.viewProductBtn}>
-                            <BoxArrowUpRightIcon size={11} color={C.primary} />
-=======
-                          <View style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}>
-                            <LinkIcon size={11} color={C.primary} />
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
-                            <Text style={s.viewProductTxt}>View</Text>
-                          </View>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={s.tblCell}>
-                        <Text style={s.tblCellSub}>{item.sku}</Text>
-                      </View>
-                      <View style={[s.tblCell, { flex: 1.5 }]}>
-                        <Text style={s.tblCellTxt}>{item.seller}</Text>
-                        <Text style={[s.tblCellSub, { fontSize: 11, marginTop: 2 }]}>support@flintnthread.in</Text>
-                        <Text style={[s.tblCellSub, { fontSize: 11 }]}>+91 9063499092</Text>
-                      </View>
-                      <View style={s.tblCell}>
-                        <Text style={s.tblCellSub}>{item.variant}</Text>
-                      </View>
-                      <View style={s.tblCell}>
-                        <Text style={[s.tblCellTxt, { textAlign: "center" }]}>
-                          {item.qty}
-                        </Text>
-                      </View>
-                      <View style={s.tblCell}>
-                        <Text style={s.tblCellTxt}>{rupee(item.price)}</Text>
-                      </View>
-                      <View style={s.tblCell}>
-                        <Text
-                          style={[
-                            s.tblCellTxt,
-                            { fontWeight: "700", color: C.text },
-                          ]}
-                        >
-                          {rupee(item.price * item.qty)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                // Mobile / Tablet: card format
-                <View style={{ padding: 14, gap: 12 }}>
-                  {order.items.map((item) => (
-                    <View key={item.id} style={s.itemCard}>
-                      <View style={s.itemCardTop}>
-                        <Text style={s.itemCardName}>{item.product}</Text>
-                        <TouchableOpacity
-                          style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}
-                          onPress={() => {
-<<<<<<< HEAD
-                            router.push({
-                              pathname: "/productDetails",
-                              params: { id: String(item.id) },
-                            });
-=======
-                            if (item.productId) {
-                              router.push({
-                                pathname: "/productDetails",
-                                params: { id: String(item.productId) },
-                              });
-                            }
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
-                          }}
-                          activeOpacity={0.7}
-                          disabled={!item.productId}
-                        >
-                          <BoxArrowUpRightIcon size={11} color={C.primary} />
-                          <Text style={s.viewProductTxt}>View</Text>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={s.itemCardGrid}>
-                        {[
-                          ["SKU", item.sku],
-                          ["Seller", item.seller],
-                          ["Variant", item.variant],
-                          ["Qty", String(item.qty)],
-                          ["Price", rupee(item.price)],
-                          ["Total", rupee(item.price * item.qty)],
-                        ].map(([lbl, val]) => (
-                          <View key={lbl} style={s.itemCardCell}>
-                            <Text style={s.itemCardLbl}>{lbl}</Text>
-                            <Text
-                              style={[
-                                s.itemCardVal,
-                                lbl === "Total" && {
-                                  color: C.primary,
-                                  fontWeight: "700",
-                                },
-                              ]}
-                            >
-                              {val}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            {/* Payment Info + Order Summary */}
-            <View style={[s.cardBody, isWide ? s.addrRow : s.colStack]}>
-              {/* Payment Information */}
-              <View style={[s.summaryBox, { flex: 1 }]}>
-                <Text style={s.summaryTitle}>Payment Information</Text>
-                <View style={s.summaryRow}>
-                  <WalletIcon size={14} color={C.sub} />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={s.summaryLbl}>Payment Method</Text>
-                    <Text style={s.summaryVal}>{order.paymentMethod}</Text>
-                  </View>
-                </View>
-                <View style={s.summaryRow}>
-                  <WalletIcon
-                    size={14}
-                    color={
-                      order.paymentStatus === "Paid" ? C.active : C.warning
-                    }
-                  />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={s.summaryLbl}>Payment Status</Text>
-                    <Text
-                      style={[
-                        s.summaryVal,
-                        {
-                          color:
-                            order.paymentStatus === "Paid"
-                              ? C.active
-                              : C.warning,
-                        },
-                      ]}
-                    >
-                      {order.paymentStatus}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {isWide && <View style={s.addrVertDivider} />}
-              {!isWide && <View style={s.addrHorizDivider} />}
-
-              {/* Order Summary */}
-              <View style={[s.summaryBox, { flex: 1 }]}>
-                <Text style={s.summaryTitle}>Order Summary</Text>
-                {[
-                  ["Subtotal", rupee(order.subtotal), false],
-                  [
-                    "Shipping",
-                    order.shippingCost === 0
-                      ? "Free"
-                      : rupee(order.shippingCost),
-                    false,
-                  ],
-                  ["Tax", order.tax === 0 ? "₹0.00" : rupee(order.tax), false],
-                ].map(([lbl, val]) => (
-                  <View key={String(lbl)} style={s.summaryLineRow}>
-                    <Text style={s.summaryLineLbl}>{String(lbl)}</Text>
-                    <Text style={s.summaryLineVal}>{String(val)}</Text>
-                  </View>
-                ))}
-                <View style={s.summaryTotalRow}>
-                  <Text style={s.summaryTotalLbl}>Total</Text>
-                  <Text style={s.summaryTotalVal}>{rupee(order.total)}</Text>
-                </View>
-              </View>
-            </View>
-          </Card>
-
-          {/* ── CARD 8: Order Status History ────────────────────────────── */}
-          <Card>
-            <CardHeader
-              icon={<NoteIcon size={16} color={C.primary} />}
-              title="Order Status History"
-              right={
-                <TouchableOpacity
-                  style={[s.smBtn, { backgroundColor: C.navy }]}
-                  activeOpacity={0.8}
-                  onPress={() => setUpdateModalVisible(true)}
-                >
-                  <AddIcon size={13} />
-                  <Text style={s.smBtnTxt}>Add Status Update</Text>
-                </TouchableOpacity>
-              }
-            />
-            <View style={s.cardBody}>
-<<<<<<< HEAD
-              {orderHistory.map((h, idx) => {
-=======
               {order.history.map((h, idx) => {
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                 const cfg = STATUS_CFG[h.status];
                 return (
                   <View key={idx} style={s.histItem}>
                     {/* Left: colored dot + line */}
                     <View style={s.histLeft}>
                       <View style={[s.histDot, { backgroundColor: cfg.dot }]} />
-<<<<<<< HEAD
-                      {idx < orderHistory.length - 1 && (
-=======
                       {idx < order.history.length - 1 && (
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
                         <View style={s.histLine} />
                       )}
                     </View>
@@ -1612,11 +1711,10 @@ export default function OrderDetailScreen() {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
-<<<<<<< HEAD
 
       {/* Invoice Modal */}
       <InvoiceModal
-        order={mappedOrderForInvoice as any}
+        orderId={orderId ? Number(orderId) : null}
         visible={invoiceVisible}
         onClose={() => setInvoiceVisible(false)}
       />
@@ -1698,35 +1796,27 @@ export default function OrderDetailScreen() {
                 <Text style={s.modalCancelBtnTxt}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.modalSaveBtn}
-                onPress={() => {
+                style={[s.modalSaveBtn, statusSaving && { opacity: 0.7 }]}
+                onPress={async () => {
+                  if (statusSaving) return;
+                  await applyStatusUpdate(newStatus, statusComment.trim() || undefined);
                   setUpdateModalVisible(false);
-                  
-                  const now = new Date();
-                  const dateStr = `${now.getDate().toString().padStart(2, '0')} ${now.toLocaleString('default', { month: 'short' })} ${now.getFullYear()}, ${now.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
-                  
-                  const newEntry: StatusHistory = {
-                    status: newStatus,
-                    date: dateStr,
-                    by: "Admin",
-                    comment: statusComment.trim() || "No comment provided",
-                  };
-                  
-                  setOrderHistory([newEntry, ...orderHistory]);
                   setStatusComment("");
                   setNotifyCustomer(false);
                 }}
                 activeOpacity={0.7}
+                disabled={statusSaving}
               >
-                <Text style={s.modalSaveBtnTxt}>Update Status</Text>
+                <Text style={s.modalSaveBtnTxt}>
+                  {statusSaving ? "Saving…" : "Update Status"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-=======
+        </>
     )}
->>>>>>> 658eea9a0bfce8d0e4fd19a10244bb80435c931f
     </AdminLayout>
   );
 }
@@ -1742,7 +1832,7 @@ const s = StyleSheet.create({
   colStack: { flexDirection: "column" },
 
   // ── Header ─────────────────────────────────────────────────────────────────
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navy, paddingBottom: 14 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, backgroundColor: C.navy, paddingBottom: 14 },
   headerInner: { flexDirection: "row", alignItems: "center" },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   backBtn: {
@@ -2029,6 +2119,7 @@ const s = StyleSheet.create({
   tlDesc: { fontSize: 13, fontWeight: "700", color: C.text },
   tlLocation: { fontSize: 12, color: C.sub, marginTop: 2 },
   tlDateTime: { fontSize: 11, color: C.sub, marginTop: 2 },
+  emptyTrackingTxt: { fontSize: 13, color: C.sub, fontStyle: "italic" },
 
   // ── Order items table (desktop) ────────────────────────────────────────────
   tblWrap: { borderTopWidth: 1, borderTopColor: C.border },
@@ -2073,9 +2164,9 @@ const s = StyleSheet.create({
   itemCardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 10,
-    gap: 8,
+    gap: 10,
   },
   itemCardName: { flex: 1, fontSize: 13, fontWeight: "700", color: C.text },
   itemCardGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -2138,7 +2229,7 @@ const s = StyleSheet.create({
     marginTop: 4,
     fontStyle: "italic",
   },
-  
+
   // ── Modal Styles ──
   modalOverlay: {
     flex: 1,

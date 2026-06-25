@@ -22,7 +22,9 @@ import {
 import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
-import { fetchProducts, fetchProductStats, type ProductListRow } from '@/services/productApi';
+import { fetchProducts, fetchProductStats, fetchSellers, type ProductListRow } from '@/services/productApi';
+import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from '@/services/categoryApi';
+import { fetchSubcategories as fetchProductSubcategories } from '@/services/subcategoryApi';
 import Pagination from '@/components/Pagination';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>):
     description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
     image: resolveMediaUrl(row.image) || PLACEHOLDER_IMAGE,
     seller: row.seller,
-    email: '',
+    email: row.sellerEmail ?? '',
     category: row.category,
     status: row.status as ProductStatus,
     submittedOn: row.submittedAt,
@@ -109,40 +111,6 @@ const STATUS_CONFIG: Record<
 };
 
 type FilterKey = 'all' | ProductStatus;
-
-const SELLER_OPTIONS = [
-  "All Sellers",
-  "Af Enterprises",
-  "Ahmad Expoters",
-  "Aman Rajbhar",
-  "Ambedkar Seelam",
-  "Anantha Lakshmi Mattupalli",
-  "Arhaan Collection",
-  "Arpitha Ravirekhala",
-  "Arumulla Mahima",
-  "Begari Jagadamba",
-  "Charanyan",
-  "Dominic Rathnam",
-  "Eage Sainath Kumar",
-  "Eega Mani",
-  "Finn Brooks",
-  "G Naga Malleswara Rao",
-  "Gone Mahender",
-  "Gopi Tayi"
-];
-
-const MAIN_CATEGORY_OPTIONS = [
-  "All Main Categories",
-  "Accessories (163)",
-  "Footwear (45)",
-  "Homely Hub (32)",
-  "Indoor Play (16)",
-  "Kids (0)",
-  "Men (112)",
-  "Sportswear (21)",
-  "Sweets (9)",
-  "Women (341)"
-];
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────────
 
@@ -543,6 +511,18 @@ function FilterSection({
   isMobile,
   isTablet,
   isWide,
+  sellerOptions,
+  mainCategoryOptions,
+  categoryOptions,
+  subcategoryOptions,
+  seller,
+  mainCat,
+  category,
+  subcategory,
+  onSellerChange,
+  onMainCategoryChange,
+  onCategoryChange,
+  onSubcategoryChange,
 }: {
   stats: ProductStats;
   search: string;
@@ -552,9 +532,26 @@ function FilterSection({
   isMobile: boolean;
   isTablet: boolean;
   isWide: boolean;
+  sellerOptions: string[];
+  mainCategoryOptions: string[];
+  categoryOptions: string[];
+  subcategoryOptions: string[];
+  seller: string;
+  mainCat: string;
+  category: string;
+  subcategory: string;
+  onSellerChange: (value: string) => void;
+  onMainCategoryChange: (selectedMainCat: string) => void;
+  onCategoryChange: (selectedCategory: string) => void;
+  onSubcategoryChange: (value: string) => void;
 }) {
-  const [seller, setSeller] = useState("All Sellers");
-  const [mainCat, setMainCat] = useState("All Main Categories");
+  const handleMainCategorySelect = (value: string) => {
+    onMainCategoryChange(value);
+  };
+
+  const handleCategorySelect = (value: string) => {
+    onCategoryChange(value);
+  };
 
   return (
     <View style={[styles.queueCard, { zIndex: 10, elevation: 10 }]}>
@@ -573,10 +570,10 @@ function FilterSection({
           isWide && styles.filtersGridWide,
           { zIndex: 10, elevation: 10 }
         ]}>
-        <FilterDropdown label="Seller" value={seller} onSelect={setSeller} options={SELLER_OPTIONS} wide={isWide} />
-        <FilterDropdown label="Main Category" value={mainCat} onSelect={setMainCat} options={MAIN_CATEGORY_OPTIONS} wide={isWide} />
-        <FilterDropdown label="Category" value="All Categories" wide={isWide} />
-        <FilterDropdown label="Subcategory" value="All Subcategories" wide={isWide} />
+        <FilterDropdown label="Seller" value={seller} onSelect={onSellerChange} options={sellerOptions} wide={isWide} />
+        <FilterDropdown label="Main Category" value={mainCat} onSelect={handleMainCategorySelect} options={mainCategoryOptions} wide={isWide} />
+        <FilterDropdown label="Category" value={category} onSelect={handleCategorySelect} options={categoryOptions} wide={isWide} />
+        <FilterDropdown label="Subcategory" value={subcategory} onSelect={onSubcategoryChange} options={subcategoryOptions} wide={isWide} />
       </View>
 
       <View style={[styles.searchRow, isMobile && styles.searchRowMobile]}>
@@ -699,6 +696,7 @@ function ProductTable({
               </Pressable>
 
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
+                <Image source={{ uri: product.image }} style={styles.tableThumb} contentFit="cover" />
                 <View style={styles.tableProductInfo}>
                   <View style={styles.productNameRow}>
                     <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
@@ -758,31 +756,84 @@ export default function ProductApprovalScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter options from backend
+  const [sellerFilter, setSellerFilter] = useState('All Sellers');
+  const [mainCatFilter, setMainCatFilter] = useState('All Main Categories');
+  const [categoryFilter, setCategoryFilter] = useState('All Categories');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('All Subcategories');
+
+  const [sellerOptions, setSellerOptions] = useState<string[]>(["All Sellers"]);
+  const [mainCategoryOptions, setMainCategoryOptions] = useState<string[]>(["All Main Categories"]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(["All Categories"]);
+  const [subcategoryOptions, setSubcategoryOptions] = useState<string[]>(["All Subcategories"]);
+  const [mainCategories, setMainCategories] = useState<CategoryRow[]>([]);
+  const [childCategories, setChildCategories] = useState<CategoryRow[]>([]);
+  const [productSubcategories, setProductSubcategories] = useState<{ id: number; name: string; categoryId: number }[]>([]);
+  const [sellers, setSellers] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
 
+  const loadFilterData = useCallback(async () => {
+    try {
+      const mainCats = await fetchMainCategories();
+      setMainCategories(mainCats);
+      setMainCategoryOptions(["All Main Categories", ...mainCats.map(cat => cat.categoryName)]);
+
+      const sellersPage = await fetchSellers();
+      const sellerRows = sellersPage.items.map(seller => ({
+        id: seller.id,
+        name: seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown',
+      }));
+      setSellers(sellerRows);
+      setSellerOptions(["All Sellers", ...sellerRows.map(s => s.name)]);
+    } catch (err) {
+      console.error("Failed to load filter data:", err);
+    }
+  }, []);
+
+  const resolveFilterIds = useCallback(() => {
+    const sellerId = sellerFilter === 'All Sellers'
+      ? undefined
+      : sellers.find((s) => s.name === sellerFilter)?.id;
+    const mainCategoryId = mainCatFilter === 'All Main Categories'
+      ? undefined
+      : mainCategories.find((cat) => cat.categoryName === mainCatFilter)?.id;
+    const categoryId = categoryFilter === 'All Categories'
+      ? undefined
+      : childCategories.find((cat) => cat.categoryName === categoryFilter)?.id;
+    const subcategoryId = subcategoryFilter === 'All Subcategories'
+      ? undefined
+      : productSubcategories.find((sub) => sub.name === subcategoryFilter)?.id;
+    return { sellerId, mainCategoryId, categoryId, subcategoryId };
+  }, [sellerFilter, mainCatFilter, categoryFilter, subcategoryFilter, sellers, mainCategories, childCategories, productSubcategories]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const apiStatus = filterStatusForApi(activeFilter);
+      const { sellerId, mainCategoryId, categoryId, subcategoryId } = resolveFilterIds();
       const [page, apiStats] = await Promise.all([
         fetchProducts({
           status: apiStatus,
           search: debouncedSearch.trim() || undefined,
+          sellerId,
+          mainCategoryId,
+          categoryId,
+          subcategoryId,
           page: currentPage - 1,
           size: PAGE_SIZE,
         }),
         fetchProductStats(),
       ]);
-      setProducts(
-        page.items.map((p: ProductListRow) =>
-          toApprovalProduct(mapProductListToApprovalRow(p)),
-        ),
+      const mappedProducts = page.items.map((p: ProductListRow) =>
+        toApprovalProduct(mapProductListToApprovalRow(p)),
       );
+      setProducts(mappedProducts);
       setTotalProducts(page.totalElements);
       setTotalPages(page.totalPages);
       if (currentPage > page.totalPages && page.totalPages > 0) {
@@ -800,11 +851,15 @@ export default function ProductApprovalScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, currentPage, debouncedSearch]);
+  }, [activeFilter, currentPage, debouncedSearch, resolveFilterIds]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    loadFilterData();
+  }, [loadFilterData]);
 
   const handleFilterChange = useCallback((filter: FilterKey) => {
     setActiveFilter(filter);
@@ -816,6 +871,72 @@ export default function ProductApprovalScreen() {
     setSearch(value);
     setCurrentPage(1);
     setSelected(new Set());
+  }, []);
+
+  const handleMainCategoryChange = useCallback(async (selectedMainCat: string) => {
+    setMainCatFilter(selectedMainCat);
+    setCategoryFilter('All Categories');
+    setSubcategoryFilter('All Subcategories');
+    setCurrentPage(1);
+
+    if (selectedMainCat === 'All Main Categories') {
+      setChildCategories([]);
+      setCategoryOptions(['All Categories']);
+      setProductSubcategories([]);
+      setSubcategoryOptions(['All Subcategories']);
+      return;
+    }
+
+    try {
+      const selectedMainCategory = mainCategories.find(cat => cat.categoryName === selectedMainCat);
+      if (selectedMainCategory) {
+        const categories = await fetchChildCategories(selectedMainCategory.id);
+        setChildCategories(categories);
+        setCategoryOptions(['All Categories', ...categories.map(cat => cat.categoryName)]);
+        setProductSubcategories([]);
+        setSubcategoryOptions(['All Subcategories']);
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  }, [mainCategories]);
+
+  const handleCategoryChange = useCallback(async (selectedCategory: string) => {
+    setCategoryFilter(selectedCategory);
+    setSubcategoryFilter('All Subcategories');
+    setCurrentPage(1);
+
+    if (selectedCategory === 'All Categories') {
+      setProductSubcategories([]);
+      setSubcategoryOptions(['All Subcategories']);
+      return;
+    }
+
+    try {
+      const selected = childCategories.find((cat) => cat.categoryName === selectedCategory);
+      if (selected) {
+        const subs = await fetchProductSubcategories(selected.id);
+        const mapped = subs.map((sub) => ({
+          id: sub.id,
+          name: sub.subcategoryName,
+          categoryId: sub.categoryId,
+        }));
+        setProductSubcategories(mapped);
+        setSubcategoryOptions(['All Subcategories', ...mapped.map((sub) => sub.name)]);
+      }
+    } catch (err) {
+      console.error('Failed to load subcategories:', err);
+    }
+  }, [childCategories]);
+
+  const handleSellerChange = useCallback((value: string) => {
+    setSellerFilter(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleSubcategoryChange = useCallback((value: string) => {
+    setSubcategoryFilter(value);
+    setCurrentPage(1);
   }, []);
 
   const toggleSelect = (id: string) => {
@@ -858,6 +979,18 @@ export default function ProductApprovalScreen() {
             isMobile={isMobile}
             isTablet={isTablet}
             isWide={isWide}
+            sellerOptions={sellerOptions}
+            mainCategoryOptions={mainCategoryOptions}
+            categoryOptions={categoryOptions}
+            subcategoryOptions={subcategoryOptions}
+            seller={sellerFilter}
+            mainCat={mainCatFilter}
+            category={categoryFilter}
+            subcategory={subcategoryFilter}
+            onSellerChange={handleSellerChange}
+            onMainCategoryChange={handleMainCategoryChange}
+            onCategoryChange={handleCategoryChange}
+            onSubcategoryChange={handleSubcategoryChange}
           />
 
           {loading ? (

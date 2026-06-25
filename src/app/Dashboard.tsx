@@ -50,7 +50,9 @@ import {
   fetchDashboardActivity,
   fetchDashboardTraffic,
   fetchDashboardCatalogQuality,
+  type DashboardTopProduct,
 } from "@/services/dashboardApi";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { formatDate } from "@/lib/format";
 import { fetchOrders } from "@/services/orderApi";
 import { fetchSellers, fetchSellerAnalyticsSummary } from "@/services/sellerApi";
@@ -108,6 +110,47 @@ function chartYLabels(maxVal: number) {
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+type TopProductRow = {
+  id: string;
+  name: string;
+  sales: number;
+  revenue: number;
+  stock: string;
+  stockCount: number;
+  imageUrl: string;
+};
+
+function TopProductThumb({ uri, size = 40 }: { uri: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(uri) && !failed;
+  const thumbStyle = {
+    width: size,
+    height: size,
+    borderRadius: 8,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    overflow: "hidden" as const,
+  };
+
+  if (!showImage) {
+    return (
+      <View style={thumbStyle}>
+        <Ionicons name="cube-outline" size={size * 0.45} color="#94a3b8" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={thumbStyle}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -230,7 +273,7 @@ export default function DashboardScreen() {
   const [customerStats, setCustomerStats] = useState<any>(null);
   const [sellers, setSellers] = useState<any[]>([]);
   const [revenueChart, setRevenueChart] = useState<any>(null);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<DashboardTopProduct[]>([]);
   const [topSellers, setTopSellers] = useState<any[]>([]);
   const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -712,16 +755,16 @@ export default function DashboardScreen() {
     };
   }, [revenueChart]);
 
-  // SECTION 7: Top Selling Products dataset
-  const topProductsRaw = useMemo(() => {
+  // SECTION 7: Top Selling Products dataset (from GET /api/admin/dashboard/top-products)
+  const topProductsRaw = useMemo<TopProductRow[]>(() => {
     return topProducts.map((p) => ({
-      id: p.id,
-      name: p.name,
+      id: String(p.id ?? p.productId ?? ""),
+      name: String(p.name ?? "Product").trim() || "Product",
       sales: Number(p.sales ?? 0),
       revenue: Number(p.revenue ?? 0),
       stock: p.stock ?? "In Stock",
       stockCount: Number(p.stockCount ?? 0),
-      image: p.image || "📦",
+      imageUrl: resolveMediaUrl(p.image),
     }));
   }, [topProducts]);
 
@@ -2061,10 +2104,18 @@ export default function DashboardScreen() {
                       <Text style={[styles.tableHdrCell, { width: 120, textAlign: "center" }]}>Stock Status</Text>
                     </View>
 
-                    {paginatedProducts.map((p, idx) => (
+                    {paginatedProducts.length === 0 ? (
+                      <View style={styles.tableEmptyRow}>
+                        <Text style={styles.tableEmptyText}>
+                          {topProductsRaw.length === 0
+                            ? "No sales data yet. Top products appear after orders are placed."
+                            : "No products match your search."}
+                        </Text>
+                      </View>
+                    ) : paginatedProducts.map((p) => (
                       <View key={p.id} style={styles.tableRowData}>
                         <View style={{ width: 50, alignItems: "center" }}>
-                          <Text style={{ fontSize: 18 }}>{p.image}</Text>
+                          <TopProductThumb uri={p.imageUrl} size={40} />
                         </View>
                         <Text style={[styles.tableCellText, { flex: 2, fontWeight: "600" }]} numberOfLines={1}>
                           {p.name}
@@ -2118,10 +2169,18 @@ export default function DashboardScreen() {
                 ) : (
                   // Mobile View Card List with simulated infinite scroll load-more button
                   <View style={styles.mobileCardListWrap}>
-                    {filteredProducts.slice(0, mobileProdCount).map(p => (
+                    {filteredProducts.length === 0 ? (
+                      <View style={styles.tableEmptyRow}>
+                        <Text style={styles.tableEmptyText}>
+                          {topProductsRaw.length === 0
+                            ? "No sales data yet."
+                            : "No products match your search."}
+                        </Text>
+                      </View>
+                    ) : filteredProducts.slice(0, mobileProdCount).map(p => (
                       <View key={p.id} style={styles.mobileProductCard}>
                         <View style={styles.mobileProductCardHeader}>
-                          <Text style={{ fontSize: 24 }}>{p.image}</Text>
+                          <TopProductThumb uri={p.imageUrl} size={48} />
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={styles.mobileCardProdName} numberOfLines={1}>{p.name}</Text>
                             <Text style={styles.mobileCardProdId}>ID: {p.id}</Text>
@@ -3455,6 +3514,19 @@ const getStyles = (isDark: boolean) => {
     borderTopWidth: 1,
     borderTopColor: C.border,
     backgroundColor: C.surface,
+  },
+  tableEmptyRow: {
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  tableEmptyText: {
+    fontSize: 13,
+    color: C.sub,
+    textAlign: "center",
   },
   tableCellText: {
     fontSize: 12,

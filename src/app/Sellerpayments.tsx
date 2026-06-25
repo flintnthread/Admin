@@ -2,7 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapPayoutToPaymentRow } from "@/lib/mappers";
-import { fetchPayoutStats, fetchPayouts, markPayoutPaid } from "@/services/payoutApi";
+import { fetchPayoutStats, fetchPayouts, markPayoutPaid, fetchPayoutDetail, fetchPayoutExportCsv } from "@/services/payoutApi";
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
@@ -58,6 +58,8 @@ interface SellerOrder {
     commissionRate?: string;
     finalPayableAmount?: string;
     sellerRequestNote?: string;
+    transactionRef?: string;
+    adminNote?: string;
 }
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -131,13 +133,17 @@ const OrderCard: React.FC<{
                     </View>
                 </View>
                 <View style={styles.actionsRow}>
-                    <TouchableOpacity style={styles.btnPrimary} onPress={() => onPay(order.id)}>
+                    <TouchableOpacity style={styles.btnPrimary} onPress={() => void onPay(order.id)}>
                         <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700", marginRight: 2 }}>₹</Text>
                         <Text style={styles.btnPrimaryText}>Pay</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.btnOutline} onPress={() => onView(order.id)}>
                         <Feather name="eye" size={12} color={DARK} />
                         <Text style={[styles.btnOutlineText, { color: DARK }]}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btnOutline} onPress={() => onInvoice(order.id)}>
+                        <Feather name="file-text" size={12} color={DARK} />
+                        <Text style={[styles.btnOutlineText, { color: DARK }]}>Invoice</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -163,15 +169,18 @@ const PayModal: React.FC<{
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
     useEffect(() => {
-        if (visible) {
-            setTransactionRef("");
-            setAdminNote("");
-            setSelectedStatus("Paid");
+        if (visible && order) {
+            setTransactionRef(order.transactionRef ?? "");
+            setAdminNote(order.adminNote ?? "");
+            setSelectedStatus(order.paymentStatus === "Cancelled" ? "Cancelled" : "Paid");
             setStatusDropdownOpen(false);
         }
-    }, [visible, order?.id]);
+    }, [visible, order?.id, order?.transactionRef, order?.adminNote, order?.paymentStatus]);
 
     if (!visible || !order) return null;
+
+    const isPending = order.paymentStatus === "Pending";
+    const confirmOptions: PaymentStatus[] = isPending ? ["Paid", "Cancelled"] : [];
 
     const statusColors: Record<PaymentStatus, { bg: string; color: string; dot: string }> = {
         Paid: { bg: "#e8f7ee", color: "#1a7a45", dot: "#22c55e" },
@@ -285,7 +294,7 @@ const PayModal: React.FC<{
                             </TouchableOpacity>
                             {statusDropdownOpen && (
                                 <View style={styles.statusDropdownMenu}>
-                                    {PAYMENT_STATUS_OPTIONS.map(opt => {
+                                    {(confirmOptions.length ? confirmOptions : PAYMENT_STATUS_OPTIONS).map(opt => {
                                         const s = statusColors[opt];
                                         return (
                                             <TouchableOpacity
@@ -339,8 +348,9 @@ const PayModal: React.FC<{
                             <Text style={styles.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={[styles.confirmBtn, selectedStatus === "Cancelled" && { backgroundColor: "#ef4444" }]}
+                            style={[styles.confirmBtn, selectedStatus === "Cancelled" && { backgroundColor: "#ef4444" }, !isPending && { opacity: 0.5 }]}
                             onPress={() => onConfirm(order.id, transactionRef.trim(), adminNote.trim(), selectedStatus)}
+                            disabled={!isPending}
                         >
                             <Feather name="check" size={14} color="#fff" />
                             <Text style={styles.confirmBtnText}>Process Payment</Text>
@@ -515,7 +525,8 @@ const SellerPaymentsScreen: React.FC = () => {
 
     const handleConfirmPay = async (id: number, transactionRef: string, adminNote: string, status: PaymentStatus) => {
         try {
-            await markPayoutPaid(id, transactionRef || undefined, adminNote || undefined);
+            const apiStatus = status === "Cancelled" ? "cancelled" : "paid";
+            await markPayoutPaid(id, transactionRef || undefined, adminNote || undefined, apiStatus);
             setPayModalOrder(null);
             const msg = `Payment marked as ${status}!`;
             if (Platform.OS === "web") window.alert(msg);
@@ -528,46 +539,38 @@ const SellerPaymentsScreen: React.FC = () => {
         }
     };
 
+    const openPayModal = async (id: number) => {
+        try {
+            const detail = await fetchPayoutDetail(id);
+            const mapped = mapPayoutToPaymentRow(detail as any);
+            setPayModalOrder(mapped);
+        } catch (e) {
+            const existing = orders.find((x) => x.id === id);
+            if (existing) setPayModalOrder(existing);
+            else {
+                const msg = getApiErrorMessage(e);
+                if (Platform.OS === "web") window.alert(msg);
+                else Alert.alert("Error", msg);
+            }
+        }
+    };
+
     const handleView = (id: number) => {
-        const o = orders.find(x => x.id === id);
-        if (o) router.push({ pathname: "/Spd", params: { orderData: JSON.stringify(o) } });
+        router.push({ pathname: "/Spd", params: { id: String(id) } });
     };
 
     const handleInvoice = (id: number) => {
-        if (Platform.OS === "web") window.alert("Invoice generated!");
-        else Alert.alert("Invoice", "Invoice generated!");
+        router.push({ pathname: "/Spd", params: { id: String(id), invoiceMode: "true" } });
     };
 
-    // ─── CSV EXPORT ──────────────────────────────────────────────────────────
-    const buildCsv = (rows: SellerOrder[]) => {
-        const headers = [
-            "Order ID", "Order Number", "Order Date", "Order Status",
-            "Seller Name", "Seller Email", "Seller Phone",
-            "Customer Name", "Customer Email",
-            "Customer Paid Amount", "Delivery Date", "Delivery Time",
-            "Reminder Days", "Reminder Bucket", "Payment Status", "Wallet Balance"
-        ];
-        const escape = (val: string | number) => {
-            const s = String(val ?? "");
-            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-        };
-        const csvRows = rows.map(o => [
-            o.id, o.orderId, o.orderDate, o.orderStatus,
-            o.sellerName, o.sellerEmail, o.sellerPhone,
-            o.customerName ?? "", o.customerEmail ?? "",
-            o.customerPaid, o.deliveryDate, o.deliveryTime,
-            o.reminderDays, o.reminderBucket, o.paymentStatus, o.walletBalance,
-        ].map(escape).join(","));
-        return "\uFEFF" + [headers.join(","), ...csvRows].join("\n");
-    };
-
+    // ─── CSV EXPORT (backend) ────────────────────────────────────────────────
     const downloadCsv = (content: string, suffix: string) => {
         if (Platform.OS !== "web") {
             Alert.alert("Export", "CSV export is currently supported on web only.");
             return;
         }
         const fileName = `seller_payments_${suffix}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
-        const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+        const blob = new Blob([content.startsWith("\uFEFF") ? content : "\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -578,13 +581,31 @@ const SellerPaymentsScreen: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    const downloadBackendExport = async (status?: string, minReminderDays?: number) => {
+        if (Platform.OS !== "web") {
+            Alert.alert("Export", "CSV export is currently supported on web only.");
+            return;
+        }
+        try {
+            const csv = await fetchPayoutExportCsv(status, minReminderDays);
+            const suffix = minReminderDays != null
+                ? `overdue_${minReminderDays}d`
+                : (status ?? "all");
+            downloadCsv(csv, suffix);
+        } catch (e) {
+            const msg = getApiErrorMessage(e, "Failed to export payouts.");
+            if (Platform.OS === "web") window.alert(msg);
+            else Alert.alert("Error", msg);
+        }
+    };
+
     const handleExport = (type: "all" | "pending" | "paid-cancelled") => {
         if (type === "all") {
-            downloadCsv(buildCsv(filtered), "all");
+            void downloadBackendExport();
         } else if (type === "pending") {
-            downloadCsv(buildCsv(filtered.filter(o => o.paymentStatus === "Pending")), "pending");
+            void downloadBackendExport("pending");
         } else {
-            downloadCsv(buildCsv(filtered.filter(o => o.paymentStatus === "Paid" || o.paymentStatus === "Cancelled")), "paid_cancelled");
+            void downloadBackendExport("paid-cancelled");
         }
     };
 
@@ -786,15 +807,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 {/* Export >=4d button */}
                                 <TouchableOpacity
                                     style={[styles.webExportBtn, { backgroundColor: "#ef4444" }]}
-                                    onPress={() => {
-                                        const overdueRows = filtered.filter(o => o.reminderDays >= 4);
-                                        if (overdueRows.length === 0) {
-                                            if (Platform.OS === "web") window.alert("No orders with 4+ reminder days found.");
-                                            else Alert.alert("Export", "No orders with 4+ reminder days found.");
-                                            return;
-                                        }
-                                        downloadCsv(buildCsv(overdueRows), "overdue_4d");
-                                    }}
+                                    onPress={() => void downloadBackendExport("pending", 4)}
                                 >
                                     <Feather name="clock" size={14} color="#fff" />
                                     <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
@@ -825,7 +838,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Text style={[styles.tableHeaderCell, { width: 110 }]}>Reminder</Text>
                                         <Text style={[styles.tableHeaderCell, { width: 120 }]}>Payment Status</Text>
                                         <Text style={[styles.tableHeaderCell, { width: 100 }]}>Wallet Balance</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 200 }]}>Actions</Text>
+                                        <Text style={[styles.tableHeaderCell, { width: 280 }]}>Actions</Text>
                                     </View>
                                     {filtered.map(order => {
                                         const payStyle = getPaymentStyle(order.paymentStatus);
@@ -877,20 +890,27 @@ const SellerPaymentsScreen: React.FC = () => {
                                                     <Text style={{ fontWeight: "700", color: TEXT_HEAD, fontSize: 13 }}>{order.walletBalance}</Text>
                                                 </View>
                                                 {/* Actions */}
-                                                <View style={{ width: 200, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                <View style={{ width: 280, flexDirection: "row", alignItems: "center", gap: 6 }}>
                                                     <TouchableOpacity
                                                         style={[styles.actionBtn, { backgroundColor: "#10b981" }]}
-                                                        onPress={() => { const o = orders.find(x => x.id === order.id); if (o) setPayModalOrder(o); }}
+                                                        onPress={() => void openPayModal(order.id)}
                                                     >
                                                         <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700", marginRight: 1 }}>₹</Text>
                                                         <Text style={styles.actionBtnText}>Pay</Text>
                                                     </TouchableOpacity>
                                                     <TouchableOpacity
                                                         style={[styles.actionBtn, { backgroundColor: "#14b8a6" }]}
-                                                        onPress={() => handleView(order.id)}
+                                                        onPress={() => void handleView(order.id)}
                                                     >
                                                         <Feather name="eye" size={12} color="#fff" />
                                                         <Text style={styles.actionBtnText}>View</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={[styles.actionBtn, { backgroundColor: "#6366f1" }]}
+                                                        onPress={() => void handleInvoice(order.id)}
+                                                    >
+                                                        <Feather name="file-text" size={12} color="#fff" />
+                                                        <Text style={styles.actionBtnText}>Invoice</Text>
                                                     </TouchableOpacity>
                                                 </View>
                                             </View>
@@ -905,7 +925,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 <View key={order.id} style={styles.cardWrap}>
                                     <OrderCard
                                         order={order}
-                                        onPay={id => { const o = orders.find(x => x.id === id); if (o) setPayModalOrder(o); }}
+                                        onPay={(id) => void openPayModal(id)}
                                         onView={handleView}
                                         onInvoice={handleInvoice}
                                     />

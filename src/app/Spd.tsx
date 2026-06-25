@@ -8,12 +8,16 @@ import {
     StatusBar,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { mapPayoutDetailToSpdOrder } from "@/lib/mappers";
+import { fetchPayoutDetail, generatePayoutInvoice, markPayoutPaid } from "@/services/payoutApi";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const PRIMARY = "#ef7b1a";
@@ -29,9 +33,18 @@ const GREEN = "#1a7a45";
 const GREEN_BG = "#e8f7ee";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type PaymentStatus = "Pending" | "Paid";
+type PaymentStatus = "Pending" | "Paid" | "Cancelled";
 type ReminderBucket = "green" | "orange" | "red";
 type CityType = "Intra-City" | "Metro-Metro";
+
+interface PayoutLineItem {
+    productName: string;
+    hsn: string;
+    sku: string;
+    qty: number;
+    basePrice: number;
+    total: number;
+}
 
 interface SellerOrder {
     id: number;
@@ -89,6 +102,18 @@ interface SellerOrder {
     commissionAmount?: number;
     sellingPlusCommission?: number;
     mrpWithGst?: number;
+    // Numeric breakdown from API
+    customerPaidNum?: number;
+    orderAmountNum?: number;
+    gstAmountNum?: number;
+    deliveryChargeNum?: number;
+    commissionAmountNum?: number;
+    commissionRateNum?: number;
+    finalPayableNum?: number;
+    items?: PayoutLineItem[];
+    transactionRef?: string;
+    adminNote?: string;
+    invoiceNumber?: string;
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -98,10 +123,11 @@ const getReminderColor = (bucket: ReminderBucket) => {
     return { bg: "#fce8e8", color: "#b91c1c", dot: "#ef4444" };
 };
 
-const getPaymentColor = (status: PaymentStatus) =>
-    status === "Paid"
-        ? { bg: "#e8f7ee", color: "#1a7a45" }
-        : { bg: PRIMARY_LIGHT, color: PRIMARY };
+const getPaymentColor = (status: PaymentStatus) => {
+    if (status === "Paid") return { bg: "#e8f7ee", color: "#1a7a45" };
+    if (status === "Cancelled") return { bg: "#fce8e8", color: "#b91c1c" };
+    return { bg: PRIMARY_LIGHT, color: PRIMARY };
+};
 
 const getInitials = (name?: string) =>
     (name || "N A").split(" ").map(w => w?.[0] || "").join("").toUpperCase().slice(0, 2);
@@ -465,9 +491,10 @@ interface InvoiceModalProps {
     generatedAt: string;
     orderRef: string;
     customerPaidNum: number;
-    platformFee: number;
+    gstAmount: number;
     deliveryCharge: number;
-    tax: number;
+    commissionAmount: number;
+    commissionRate: number;
     sellerEarning: number;
     onPrint: () => void;
     onRegenerate: () => void;
@@ -476,12 +503,21 @@ interface InvoiceModalProps {
 
 const InvoiceModalView: React.FC<InvoiceModalProps> = ({
     visible, onClose, order, invoiceNo, generatedAt, orderRef,
-    customerPaidNum, platformFee, deliveryCharge, tax, sellerEarning,
+    customerPaidNum, gstAmount, deliveryCharge, commissionAmount, commissionRate, sellerEarning,
     onPrint, onRegenerate, regenLoading,
 }) => {
     const isWeb = Platform.OS === "web";
     const fmtInv = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const itemTotal = order.totalAmount ?? customerPaidNum;
+    const lineItems = order.items?.length
+        ? order.items
+        : [{
+            productName: order.itemDescription || "Product",
+            hsn: order.hsn || "-",
+            sku: order.sku || "-",
+            qty: order.qty ?? 1,
+            basePrice: order.basePrice ?? customerPaidNum,
+            total: order.totalAmount ?? customerPaidNum,
+        }];
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -571,14 +607,16 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                     <Text style={[invStyles.th, invStyles.tRight]}>Base Price</Text>
                                     <Text style={[invStyles.th, invStyles.tRight]}>Total Amount</Text>
                                 </View>
-                                <View style={invStyles.tableRow}>
-                                    <Text style={[invStyles.td, { flex: 3, fontWeight: "700", color: TEXT_HEAD }]}>{order.itemDescription || "Product"}</Text>
-                                    <Text style={[invStyles.td, invStyles.tCenter]}>{order.hsn || "-"}</Text>
-                                    <Text style={[invStyles.td, invStyles.tCenter]}>{order.sku || "-"}</Text>
-                                    <Text style={[invStyles.td, invStyles.tCenter]}>{order.qty ?? 1}</Text>
-                                    <Text style={[invStyles.td, invStyles.tRight]}>{fmtInv(order.basePrice ?? itemTotal)}</Text>
-                                    <Text style={[invStyles.td, invStyles.tRight, { fontWeight: "800", color: TEXT_HEAD }]}>{fmtInv(itemTotal)}</Text>
-                                </View>
+                                {lineItems.map((item, idx) => (
+                                    <View key={idx} style={[invStyles.tableRow, idx > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}>
+                                        <Text style={[invStyles.td, { flex: 3, fontWeight: "700", color: TEXT_HEAD }]}>{item.productName || "Product"}</Text>
+                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.hsn || "-"}</Text>
+                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.sku || "-"}</Text>
+                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.qty ?? 1}</Text>
+                                        <Text style={[invStyles.td, invStyles.tRight]}>{fmtInv(item.basePrice)}</Text>
+                                        <Text style={[invStyles.td, invStyles.tRight, { fontWeight: "800", color: TEXT_HEAD }]}>{fmtInv(item.total)}</Text>
+                                    </View>
+                                ))}
                             </View>
 
                             <View style={invStyles.twoColRow}>
@@ -595,9 +633,9 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                 </View>
                                 <View style={invStyles.settlementBlock}>
                                     <InvoiceSettlementRow label="Total Order Value" value={fmtInv(customerPaidNum)} />
-                                    <InvoiceSettlementRow label="Less GST" value={`- ${fmtInv(tax)}`} negative />
+                                    <InvoiceSettlementRow label="Less GST" value={`- ${fmtInv(gstAmount)}`} negative />
                                     <InvoiceSettlementRow label="Less Shipping" value={`- ${fmtInv(deliveryCharge)}`} negative />
-                                    <InvoiceSettlementRow label="Less Commission (15.0%)" value={`- ${fmtInv(platformFee)}`} negative />
+                                    <InvoiceSettlementRow label={`Less Commission (${commissionRate.toFixed(1)}%)`} value={`- ${fmtInv(commissionAmount)}`} negative />
                                     <View style={invStyles.settlementDivider} />
                                     <View style={invStyles.netRow}>
                                         <Text style={invStyles.netLabel}>NET SETTLEMENT:</Text>
@@ -635,22 +673,135 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
     const [invoiceVisible, setInvoiceVisible] = useState(false);
     const [invoiceNo, setInvoiceNo] = useState<string | null>(null);
     const [invoiceGeneratedAt, setInvoiceGeneratedAt] = useState<string>("");
+    const [payLoading, setPayLoading] = useState(false);
+    const [payModalVisible, setPayModalVisible] = useState(false);
+    const [transactionRef, setTransactionRef] = useState("");
+    const [adminNote, setAdminNote] = useState("");
 
     const params = useLocalSearchParams();
     const router = useRouter();
 
-    const orderRaw = params.orderData ? JSON.parse(params.orderData as string) : null;
-    const order = propOrder || orderRaw;
+    const legacyOrder = params.orderData ? JSON.parse(params.orderData as string) : null;
+    const payoutId = params.id ? Number(params.id) : legacyOrder?.id ?? null;
+
+    const [order, setOrder] = useState<SellerOrder | null>(propOrder ?? legacyOrder ?? null);
+    const [loading, setLoading] = useState(!propOrder && !legacyOrder && !!payoutId);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadDetail = useCallback(async (id: number) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const detail = await fetchPayoutDetail(id);
+            setOrder(mapPayoutDetailToSpdOrder(detail) as SellerOrder);
+        } catch (e) {
+            setError(getApiErrorMessage(e));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const formatTimestamp = (iso?: string) => {
+        if (!iso) return buildTimestamp();
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return iso;
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    };
+
+    const buildTimestamp = () => {
+        const now = new Date();
+        return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}, ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    };
+
+    const buildInvoiceNo = (id: number) => {
+        const year = new Date().getFullYear();
+        const seed = String(id).padStart(6, "0").slice(-6);
+        return `SP-${year}-${seed}`;
+    };
+
+    const openInvoice = useCallback(async (target: SellerOrder) => {
+        setInvoiceLoading(true);
+        try {
+            const inv = await generatePayoutInvoice(target.id);
+            const mapped = mapPayoutDetailToSpdOrder(inv);
+            setOrder((prev) => ({ ...(prev ?? target), ...mapped } as SellerOrder));
+            setInvoiceNo(mapped.invoiceNumber || buildInvoiceNo(target.id));
+            setInvoiceGeneratedAt(formatTimestamp(String(inv.invoiceDate ?? "")));
+            setInvoiceVisible(true);
+        } catch (e) {
+            const msg = getApiErrorMessage(e);
+            if (Platform.OS === "web") window.alert(msg);
+            else Alert.alert("Error", msg);
+        } finally {
+            setInvoiceLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (propOrder || legacyOrder || !payoutId) return;
+        void loadDetail(payoutId);
+    }, [propOrder, legacyOrder, payoutId, loadDetail]);
+
+    useEffect(() => {
+        if (params.invoiceMode === "true" && order && !invoiceNo) {
+            void openInvoice(order);
+        }
+    }, [params.invoiceMode, order, invoiceNo, openInvoice]);
+
     const onBack = propOnBack || (() => {
         if (router.canGoBack()) router.back();
         else router.replace("/Sellerpayments");
     });
 
-    if (!order) {
+    const handleInvoice = () => {
+        if (order) void openInvoice(order);
+    };
+
+    const handleRegen = async () => {
+        if (!order) return;
+        setRegenLoading(true);
+        await openInvoice(order);
+        setRegenLoading(false);
+    };
+
+    const handleConfirmPay = async () => {
+        if (!order) return;
+        setPayLoading(true);
+        try {
+            await markPayoutPaid(order.id, transactionRef.trim() || undefined, adminNote.trim() || undefined, "paid");
+            setPayModalVisible(false);
+            await loadDetail(order.id);
+            const msg = "Payment marked as Paid!";
+            if (Platform.OS === "web") window.alert(msg);
+            else Alert.alert("Success", msg);
+        } catch (e) {
+            const msg = getApiErrorMessage(e);
+            if (Platform.OS === "web") window.alert(msg);
+            else Alert.alert("Error", msg);
+        } finally {
+            setPayLoading(false);
+        }
+    };
+
+    if (loading) {
         return (
             <AdminLayout>
-                <View style={[styles.root, isWeb && styles.rootWeb, { alignItems: "center", justifyContent: "center" }]}>
-                    <Text>Loading order details...</Text>
+                <View style={[styles.root, isWeb && styles.rootWeb, { alignItems: "center", justifyContent: "center", padding: 40 }]}>
+                    <ActivityIndicator size="large" color={PRIMARY} />
+                    <Text style={{ marginTop: 12, color: TEXT_MUTED }}>Loading payment details…</Text>
+                </View>
+            </AdminLayout>
+        );
+    }
+
+    if (error || !order) {
+        return (
+            <AdminLayout>
+                <View style={[styles.root, isWeb && styles.rootWeb, { alignItems: "center", justifyContent: "center", padding: 40 }]}>
+                    <Text style={{ color: "#b91c1c", marginBottom: 12 }}>{error ?? "Order not found"}</Text>
+                    <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+                        <Feather name="arrow-left" size={18} color="#fff" />
+                    </TouchableOpacity>
                 </View>
             </AdminLayout>
         );
@@ -661,42 +812,12 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
     const initials = getInitials(order.sellerName);
 
     const parseAmount = (str: string) => parseFloat(str.replace(/[^0-9.]/g, "")) || 0;
-    const customerPaidNum = parseAmount(order.customerPaid);
-    const platformFee = +(customerPaidNum * 0.05).toFixed(2);
-    const deliveryCharge = 40;
-    const tax = +(customerPaidNum * 0.02).toFixed(2);
-    const sellerEarning = +(customerPaidNum - platformFee - deliveryCharge - tax).toFixed(2);
-
-    const buildTimestamp = () => {
-        const now = new Date();
-        return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}, ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    };
-
-    const buildInvoiceNo = () => {
-        const year = new Date().getFullYear();
-        const seed = (order.id ?? Math.floor(Math.random() * 999999)).toString().padStart(6, "0").slice(-6);
-        return `SP-${year}-${seed}`;
-    };
-
-    const handleInvoice = async () => {
-        setInvoiceLoading(true);
-        setTimeout(() => {
-            setInvoiceLoading(false);
-            setInvoiceNo(buildInvoiceNo());
-            setInvoiceGeneratedAt(buildTimestamp());
-            setInvoiceVisible(true);
-        }, 700);
-    };
-
-    const handleRegen = async () => {
-        setRegenLoading(true);
-        setTimeout(() => {
-            setRegenLoading(false);
-            if (!invoiceNo) setInvoiceNo(buildInvoiceNo());
-            setInvoiceGeneratedAt(buildTimestamp());
-            setInvoiceVisible(true);
-        }, 900);
-    };
+    const customerPaidNum = order.customerPaidNum ?? parseAmount(order.customerPaid);
+    const gstAmount = order.gstAmountNum ?? 0;
+    const deliveryCharge = order.deliveryChargeNum ?? 0;
+    const commissionAmount = order.commissionAmountNum ?? 0;
+    const commissionRate = order.commissionRateNum ?? 15;
+    const sellerEarning = order.finalPayableNum ?? +(customerPaidNum - gstAmount - deliveryCharge - commissionAmount).toFixed(2);
 
     const handlePrint = () => {
         if (Platform.OS === "web") {
@@ -771,9 +892,9 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
         <View style={styles.card}>
             <SectionHeader icon="bar-chart-2" title="Cost Breakdown" accent="#7c3aed" />
             <CostRow label="Customer Paid (Total)" value={fmtAmt(customerPaidNum)} />
-            <CostRow label="Platform Fee (5%)" value={`− ${fmtAmt(platformFee)}`} dimmed />
-            <CostRow label="Delivery Charge" value={`− ${fmtAmt(deliveryCharge)}`} dimmed />
-            <CostRow label="Tax (2%)" value={`− ${fmtAmt(tax)}`} dimmed />
+            <CostRow label="Less: GST" value={`− ${fmtAmt(gstAmount)}`} dimmed />
+            <CostRow label="Less: Delivery Charge" value={`− ${fmtAmt(deliveryCharge)}`} dimmed />
+            <CostRow label={`Less: Commission (${commissionRate.toFixed(1)}%)`} value={`− ${fmtAmt(commissionAmount)}`} dimmed />
             <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Amount to Pay Seller</Text>
                 <Text style={styles.totalValue}>{fmtAmt(sellerEarning)}</Text>
@@ -787,6 +908,8 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
             <InfoRow label="Payment Status" value={order.paymentStatus} valueColor={payStyle.color} bold />
             <InfoRow label="Wallet Balance" value={order.walletBalance} />
             <InfoRow label="Reminder Days" value={`${order.reminderDays} day(s)`} valueColor={remStyle.color} />
+            {order.transactionRef ? <InfoRow label="Transaction Ref" value={order.transactionRef} valueColor={GREEN} /> : null}
+            {order.adminNote ? <InfoRow label="Admin Note" value={order.adminNote} /> : null}
         </View>
     );
 
@@ -794,14 +917,14 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
         <View style={styles.card}>
             <SectionHeader icon="zap" title="Actions" accent="#d97706" />
             <View style={styles.actionsGrid}>
-                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={handleInvoice} flex />
-                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={handleRegen} flex />
+                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={() => void handleInvoice()} flex />
+                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={() => void handleRegen()} flex />
                 <ActionButton icon="printer" label="Print Invoice" color="#3b82f6" onPress={handlePrint} flex />
                 {order.paymentStatus === "Pending" && (
                     <ActionButton icon="dollar-sign" label="Mark as Paid" color="#10b981" onPress={() => {
-                        const msg = `Mark order ${order.orderId} as paid?`;
-                        if (Platform.OS === "web") window.alert(msg);
-                        else Alert.alert("Pay", msg);
+                        setTransactionRef(order.transactionRef ?? "");
+                        setAdminNote(order.adminNote ?? "");
+                        setPayModalVisible(true);
                     }} flex />
                 )}
             </View>
@@ -876,15 +999,52 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
                         generatedAt={invoiceGeneratedAt}
                         orderRef={order.orderRef || order.orderId}
                         customerPaidNum={customerPaidNum}
-                        platformFee={platformFee}
+                        gstAmount={gstAmount}
                         deliveryCharge={deliveryCharge}
-                        tax={tax}
+                        commissionAmount={commissionAmount}
+                        commissionRate={commissionRate}
                         sellerEarning={sellerEarning}
                         onPrint={handlePrint}
                         onRegenerate={handleRegen}
                         regenLoading={regenLoading}
                     />
                 )}
+
+                <Modal visible={payModalVisible} transparent animationType="fade" onRequestClose={() => setPayModalVisible(false)}>
+                    <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 }}>
+                        <View style={{ backgroundColor: BG_CARD, borderRadius: 16, width: "100%", maxWidth: 440, padding: 20 }}>
+                            <Text style={{ fontSize: 16, fontWeight: "800", color: TEXT_HEAD, marginBottom: 4 }}>Mark as Paid</Text>
+                            <Text style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 16 }}>Order {order.orderId} · {fmtAmt(sellerEarning)}</Text>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: TEXT_MUTED, marginBottom: 6 }}>Transaction ID / UTR</Text>
+                            <TextInput
+                                style={{ borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 12, marginBottom: 12, fontSize: 13 }}
+                                placeholder="Enter transfer reference"
+                                value={transactionRef}
+                                onChangeText={setTransactionRef}
+                            />
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: TEXT_MUTED, marginBottom: 6 }}>Admin Note</Text>
+                            <TextInput
+                                style={{ borderWidth: 1, borderColor: BORDER, borderRadius: 10, padding: 12, marginBottom: 16, fontSize: 13, minHeight: 72, textAlignVertical: "top" }}
+                                placeholder="Add admin note"
+                                multiline
+                                value={adminNote}
+                                onChangeText={setAdminNote}
+                            />
+                            <View style={{ flexDirection: "row", gap: 10 }}>
+                                <TouchableOpacity style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: "center" }} onPress={() => setPayModalVisible(false)}>
+                                    <Text style={{ fontWeight: "700", color: TEXT_MUTED }}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={{ flex: 1, padding: 12, borderRadius: 10, backgroundColor: GREEN, alignItems: "center", opacity: payLoading ? 0.7 : 1 }}
+                                    onPress={() => void handleConfirmPay()}
+                                    disabled={payLoading}
+                                >
+                                    {payLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontWeight: "700", color: "#fff" }}>Confirm Pay</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </View>
         </AdminLayout>
     );
