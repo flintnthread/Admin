@@ -361,20 +361,24 @@ const ColorCard = ({
 }: {
   item: ColorItem; onEdit: () => void; onDelete: () => void; cardWidth: number | string;
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const hoverProps = IS_WEB
+  
+  // Disable hover overlay on mobile to prevent double-tap issues
+  const hoverProps = (IS_WEB && !isMobile)
     ? { onMouseEnter: () => setOverlayVisible(true), onMouseLeave: () => setOverlayVisible(false) }
     : {};
 
   return (
     <Pressable
-      onLongPress={() => !IS_WEB && setOverlayVisible(true)}
-      onPressOut={() => !IS_WEB && setOverlayVisible(false)}
+      onLongPress={() => !IS_WEB && !isMobile && setOverlayVisible(true)}
+      onPressOut={() => !IS_WEB && !isMobile && setOverlayVisible(false)}
       style={[styles.gridCard, { width: cardWidth as any }]}
       {...(hoverProps as any)}
     >
       <View style={[styles.gridSwatch, { backgroundColor: item.code }]}>
-        {overlayVisible && (
+        {overlayVisible && !isMobile && (
           <View style={styles.swatchOverlay}>
             <TouchableOpacity style={styles.overlayBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>
               <Ionicons name={BI.pencil as any} size={16} color={DARK_BTN} />
@@ -392,6 +396,17 @@ const ColorCard = ({
         </View>
         <Text style={styles.gridCardCode}>{item.code}</Text>
         <View style={[styles.gridCardBar, { backgroundColor: item.code }]} />
+        
+        {isMobile && (
+          <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+            <TouchableOpacity style={styles.editBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>
+              <Ionicons name={BI.pencil as any} size={13} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteBtn} onPress={(e) => { (e as any).stopPropagation?.(); onDelete(); }}>
+              <Ionicons name={BI.trash as any} size={13} color="#dc2626" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -468,6 +483,8 @@ const ListRow = ({
   item: ColorItem; onEdit: () => void; onDelete: () => void;
   isLast: boolean; screenWidth: number; isEven: boolean;
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
 
@@ -535,6 +552,8 @@ const ListRow = ({
 // ListHeader
 // ─────────────────────────────────────────────────────────────────────────────
 const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
 
@@ -563,7 +582,7 @@ const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
         <Text style={styles.headerCell}>STATUS</Text>
       </View>
       <View style={styles.colAction}>
-        <Text style={[styles.headerCell, { textAlign: "right", width: "100%" }]}>ACTION</Text>
+        <Text style={[styles.headerCell, { textAlign: "right", width: "100%" }]}>ACTIONS</Text>
       </View>
     </View>
   );
@@ -702,7 +721,7 @@ export default function ColorsScreen() {
       item={item}
       isLast={index === pageItems.length - 1}
       isEven={index % 2 === 0}
-      screenWidth={viewMode === "list" ? Math.max(containerWidth, 850) : width}
+      screenWidth={viewMode === "list" ? Math.max(containerWidth, 950) : width}
       onEdit={() => setEditTarget(item)}
       onDelete={() => setDeleteTarget(item)}
     />
@@ -833,6 +852,8 @@ export default function ColorsScreen() {
     );
   }
 
+  const isMobile = width < 768;
+
   // ── DEFAULT: FlatList for list view (all platforms) and native grid ────────
   const listContent = (
     <FlatList
@@ -846,12 +867,12 @@ export default function ColorsScreen() {
 
       ListHeaderComponent={
         <View>
-          {HeaderSection}
+          {!isMobile && HeaderSection}
           {/* List table header row */}
           {viewMode === "list" && (
             <View style={{ paddingHorizontal: PADDING }}>
               <View style={styles.tableCard}>
-                <ListHeader screenWidth={viewMode === "list" ? Math.max(containerWidth, 850) : width} />
+                <ListHeader screenWidth={viewMode === "list" ? Math.max(containerWidth, 950) : width} />
               </View>
             </View>
           )}
@@ -886,11 +907,11 @@ export default function ColorsScreen() {
       <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
         <StatusBar barStyle="light-content" backgroundColor={BRAND} />
 
-
+        {isMobile && HeaderSection}
 
         {viewMode === "list" ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ width: Math.max(containerWidth, 850) }}>
+            <View style={{ width: Math.max(containerWidth, 950) }}>
               {listContent}
             </View>
           </ScrollView>
@@ -979,7 +1000,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
     backgroundColor: "#1d324e",
-    borderRadius: 12,
+    borderRadius: 22,
     marginHorizontal: 16,
     marginTop: 16,
   },

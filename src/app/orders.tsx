@@ -2,7 +2,9 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrders, updateOrderGstStatus } from "@/services/orderApi";
+import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, fetchOrderExportCsv, type OrderInvoice, type OrderStats } from "@/services/orderApi";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -174,6 +176,239 @@ const ORDERS_PAGE_SIZE = 20;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCur = (n: number) =>
   `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function toNumber(value: unknown, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatInvoiceDate(value?: string) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function flattenInvoiceLineItems(invoice: OrderInvoice) {
+  return (invoice.sellerGroups ?? []).flatMap((group) =>
+    (group.products ?? []).map((product) => ({
+      ...product,
+      sellerName: group.seller?.name ?? "Seller",
+    }))
+  );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildInvoiceDownloadHtml(invoice: OrderInvoice) {
+  const company = invoice.company;
+  const billing = invoice.billing;
+  const shippingAddr = invoice.shipping;
+  const firstGroup = invoice.sellerGroups?.[0];
+  const seller = firstGroup?.seller;
+  const sellerAddress = seller?.address;
+  const lineItems = flattenInvoiceLineItems(invoice);
+  const subtotal = toNumber(invoice.totals?.subtotal);
+  const totalTax = toNumber(invoice.totals?.tax);
+  const shipping = toNumber(invoice.totals?.shipping);
+  const grandTotal = toNumber(invoice.totals?.grandTotal);
+  const isIntraState = Boolean(invoice.isIntraState);
+  const cgst = toNumber(invoice.gstBreakdown?.cgst);
+  const sgst = toNumber(invoice.gstBreakdown?.sgst);
+  const igst = toNumber(invoice.gstBreakdown?.igst);
+  const qrImg = invoice.qrCode?.imageDataUrl ?? "";
+
+  const itemRows = lineItems
+    .map(
+      (item) => `
+      <tr>
+        <td>${escapeHtml(item.name ?? "—")}</td>
+        <td style="text-align:center">${escapeHtml(item.hsnCode ?? "—")}</td>
+        <td style="text-align:right">${item.qty ?? 0}</td>
+        <td style="text-align:right">${fmtCur(toNumber(item.unitPrice))}</td>
+        <td style="text-align:right">${toNumber(item.taxPercent)}%</td>
+        <td style="text-align:right">${fmtCur(toNumber(item.taxAmount))}</td>
+        <td style="text-align:right">${fmtCur(toNumber(item.lineTotal))}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
+          h1 { color: #1E2B6B; margin: 0 0 4px; }
+          .meta { color: #6B7280; font-size: 13px; margin-bottom: 18px; }
+          .grid { display: flex; gap: 24px; margin-bottom: 20px; }
+          .col { flex: 1; }
+          .label { font-size: 11px; font-weight: 700; color: #F97316; letter-spacing: 0.5px; }
+          .name { font-weight: 700; margin: 4px 0; }
+          .muted { color: #6B7280; font-size: 13px; line-height: 1.5; }
+          table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+          th, td { border-bottom: 1px solid #E5E7EB; padding: 8px 6px; vertical-align: top; }
+          th { background: #FFF7ED; text-align: left; }
+          .totals { margin-top: 18px; width: 320px; margin-left: auto; }
+          .totals div { display: flex; justify-content: space-between; padding: 6px 0; }
+          .grand { font-size: 16px; font-weight: 800; border-top: 2px solid #1E2B6B; margin-top: 8px; padding-top: 8px; }
+          .qr { width: 88px; height: 88px; }
+        </style>
+      </head>
+      <body>
+        <div style="display:flex; justify-content:space-between; gap:20px;">
+          <div>
+            <h1>INVOICE</h1>
+            <div class="meta">${escapeHtml(invoice.invoiceNumber ?? "")}</div>
+            <div class="meta">Order: ${escapeHtml(invoice.orderNumber ?? "")}</div>
+            <div class="meta">Date: ${escapeHtml(formatInvoiceDate(invoice.invoiceDate ?? invoice.orderDate))}</div>
+            <div class="muted" style="margin-top:12px;">
+              <strong>${escapeHtml(company?.name ?? "")}</strong><br/>
+              ${escapeHtml(company?.country ?? "")}<br/>
+              Phone: ${escapeHtml(company?.phone ?? "")}<br/>
+              Email: ${escapeHtml(company?.email ?? "")}<br/>
+              GSTIN: ${escapeHtml(company?.gstin ?? "")}
+            </div>
+          </div>
+          ${qrImg ? `<img class="qr" src="${qrImg}" alt="Order QR" />` : ""}
+        </div>
+
+        <div class="grid">
+          <div class="col">
+            <div class="label">SOLD BY</div>
+            <div class="name">${escapeHtml(seller?.name ?? "Seller")}</div>
+            <div class="muted">
+              ${escapeHtml(sellerAddress?.line1 ?? "")}<br/>
+              ${escapeHtml([sellerAddress?.city, sellerAddress?.state].filter(Boolean).join(", "))}
+              ${sellerAddress?.pincode ? ` - ${escapeHtml(sellerAddress.pincode)}` : ""}<br/>
+              ${seller?.phone ? `Phone: ${escapeHtml(seller.phone)}<br/>` : ""}
+              ${seller?.email ? `Email: ${escapeHtml(seller.email)}<br/>` : ""}
+              ${seller?.gstin ? `GSTIN: ${escapeHtml(seller.gstin)}` : ""}
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="col">
+            <div class="label">BILL TO</div>
+            <div class="name">${escapeHtml(billing?.name ?? "—")}</div>
+            <div class="muted">
+              ${escapeHtml(billing?.address ?? billing?.line1 ?? "")}<br/>
+              ${escapeHtml([billing?.city, billing?.state].filter(Boolean).join(", "))}
+              ${billing?.pincode ? ` - ${escapeHtml(billing.pincode)}` : ""}<br/>
+              Phone: ${escapeHtml(billing?.phone ?? "—")}<br/>
+              Email: ${escapeHtml(billing?.email ?? "—")}
+            </div>
+          </div>
+          <div class="col">
+            <div class="label">SHIP TO</div>
+            <div class="name">${escapeHtml(shippingAddr?.name ?? "—")}</div>
+            <div class="muted">
+              ${escapeHtml(shippingAddr?.address ?? shippingAddr?.line1 ?? "")}<br/>
+              ${escapeHtml([shippingAddr?.city, shippingAddr?.state].filter(Boolean).join(", "))}
+              ${shippingAddr?.pincode ? ` - ${escapeHtml(shippingAddr.pincode)}` : ""}<br/>
+              Phone: ${escapeHtml(shippingAddr?.phone ?? "—")}<br/>
+              Email: ${escapeHtml(shippingAddr?.email ?? "—")}
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>HSN</th>
+              <th style="text-align:right">Qty</th>
+              <th style="text-align:right">Unit Price</th>
+              <th style="text-align:right">Tax %</th>
+              <th style="text-align:right">Tax Amt</th>
+              <th style="text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+
+        <div class="totals">
+          <div><span>Subtotal</span><span>${fmtCur(subtotal)}</span></div>
+          <div><span>${isIntraState ? "CGST + SGST" : "IGST"}</span><span>${fmtCur(totalTax)}</span></div>
+          <div><span>Shipping</span><span>${shipping === 0 ? "FREE" : fmtCur(shipping)}</span></div>
+          <div class="grand"><span>Grand Total</span><span>${fmtCur(grandTotal)}</span></div>
+        </div>
+
+        <div class="muted" style="margin-top:18px;">
+          CGST: ${fmtCur(cgst)} | SGST: ${fmtCur(sgst)} | IGST: ${fmtCur(igst)}<br/>
+          Payment: ${escapeHtml(invoice.payment?.method ?? "—")} |
+          Status: ${escapeHtml(invoice.payment?.status ?? "—")}
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+async function downloadInvoiceFile(invoice: OrderInvoice) {
+  const safeName = (invoice.invoiceNumber ?? `invoice-${invoice.orderId}`)
+    .replace(/[^\w.-]+/g, "_");
+  const fileName = `${safeName}.pdf`;
+
+  if (invoice.orderId) {
+    if (Platform.OS === "web") {
+      await downloadOrderInvoicePdf(invoice.orderId, fileName);
+      return;
+    }
+
+    const html = buildInvoiceDownloadHtml(invoice);
+    const { uri } = await Print.printToFileAsync({ html });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: fileName,
+        UTI: "com.adobe.pdf",
+      });
+      return;
+    }
+
+    Alert.alert("Invoice saved", uri);
+    return;
+  }
+
+  if (Platform.OS === "web" && typeof document !== "undefined") {
+    const html = buildInvoiceDownloadHtml(invoice);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeName}.html`;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+
+  const html = buildInvoiceDownloadHtml(invoice);
+  const { uri } = await Print.printToFileAsync({ html });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      dialogTitle: fileName,
+      UTI: "com.adobe.pdf",
+    });
+    return;
+  }
+
+  Alert.alert("Invoice saved", uri);
+}
 const getInitials = (name: string) =>
   name
     .split(" ")
@@ -183,7 +418,77 @@ const getInitials = (name: string) =>
     .toUpperCase();
 
 // ─── Mapper ───────────────────────────────────────────────────────────────────
-function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
+function mapStatusFilterToApi(filter: string): string | undefined {
+  if (filter === "All") return undefined;
+  const map: Record<string, string> = {
+    Processing: "processing",
+    Pending: "pending",
+    Completed: "delivered",
+    Shipped: "shipped",
+    Cancelled: "cancelled",
+    Returned: "returned",
+    Replacement: "replacement",
+  };
+  return map[filter] ?? filter.toLowerCase();
+}
+
+function mapPaymentFilterToApi(filter: string): string | undefined {
+  if (filter === "All Payments") return undefined;
+  const map: Record<string, string> = {
+    "Cash on Delivery": "cod",
+    "Online Payment": "online",
+    UPI: "upi",
+    Card: "card",
+  };
+  return map[filter];
+}
+
+export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
+  if (Array.isArray(raw.sellerGroups) && raw.sellerGroups.length > 0) {
+    return raw.sellerGroups.map((group, gi) => {
+      const sellerName = group.seller?.name ?? "Seller";
+      const addr = group.seller?.address;
+      return {
+        seller: {
+          name: sellerName,
+          email: group.seller?.email ?? addr?.email ?? "",
+          address: addr
+            ? {
+                line1: addr.line1,
+                city: addr.city,
+                state: addr.state,
+                pincode: addr.pincode,
+                phone: addr.phone ?? group.seller?.phone,
+                email: addr.email ?? group.seller?.email,
+                gstin: addr.gstin ?? group.seller?.gstin,
+              }
+            : undefined,
+        },
+        products: (group.products ?? []).map((item, pi) => ({
+          id: String(item.id ?? item.productId ?? `${gi}-${pi}`),
+          name: item.name ?? item.productName ?? "Product",
+          image: resolveMediaUrl(item.imageUrl ?? "") || "",
+          seller: sellerName,
+          sellerEmail: group.seller?.email ?? "",
+          price:
+            typeof (item as { unitPrice?: number }).unitPrice === "number"
+              ? (item as { unitPrice?: number }).unitPrice
+              : typeof item.price === "number"
+                ? item.price
+                : undefined,
+          hsnCode: item.hsnCode,
+          color: item.color,
+          size: item.size,
+          taxPercent: (item as { taxPercent?: number }).taxPercent,
+          qty: item.qty ?? item.quantity ?? 1,
+        })),
+        trackingId: raw.trackingId ?? raw.shiprocketAwbCode ?? undefined,
+        hasInvoice: true,
+        hasShippingLabel: Boolean(raw.shiprocketAwbCode ?? raw.trackingId),
+      };
+    });
+  }
+
   const rawItems: any[] =
     (raw as any).items ??
     (raw as any).orderItems ??
@@ -194,6 +499,10 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
   if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
 
   const bySeller = new Map<string, SellerGroup>();
+
+  const sellerEmailByName = new Map(
+    (raw.sellers ?? []).map((s) => [s.name ?? "", s.email ?? ""]),
+  );
 
   for (const item of rawItems) {
     const sellerName: string =
@@ -206,7 +515,7 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
 
     if (!bySeller.has(key)) {
       bySeller.set(key, {
-        seller: { name: sellerName, email: "" },
+        seller: { name: sellerName, email: sellerEmailByName.get(sellerName) ?? "" },
         products: [],
         subOrderId: item.subOrderId ?? item.suborderId ?? undefined,
         trackingId: item.trackingId ?? item.trackingNumber ?? undefined,
@@ -242,7 +551,17 @@ function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
     });
   }
 
-  return Array.from(bySeller.values());
+  const groups = Array.from(bySeller.values());
+  if (groups.length > 0) {
+    const trackingId = raw.trackingId ?? raw.shiprocketAwbCode;
+    return groups.map((g) => ({
+      ...g,
+      trackingId,
+      hasInvoice: true,
+      hasShippingLabel: Boolean(trackingId),
+    }));
+  }
+  return groups;
 }
 
 const PLACEHOLDER_PRODUCTS = [
@@ -453,7 +772,9 @@ function toUiOrder(
   const statusMap: Record<string, OrderStatus> = {
     processing: "Processing",
     pending: "Pending",
+    confirmed: "Pending",
     completed: "Completed",
+    delivered: "Completed",
     cancelled: "Cancelled",
     shipped: "Shipped",
     returned: "Returned",
@@ -472,26 +793,16 @@ function toUiOrder(
     : `#${row.orderId}`;
   const sellerGroups = buildSellerGroups(raw);
 
-  // Determine intra/inter-state by comparing buyer state to first seller's state.
-  const buyerState = (raw as any).customerState ?? (raw as any).state;
+  const buyerState = raw.shippingState;
   const sellerState = sellerGroups[0]?.seller.address?.state;
   const isIntraState =
     buyerState && sellerState
       ? String(buyerState).toLowerCase() === String(sellerState).toLowerCase()
       : false;
 
-  // Deterministic placeholder weight/dimensions (kept stable per order, falls
-  // back to real raw.weightKg / raw.dimensions when the API provides them).
-  const seedDigits = Number(orderNumber.replace(/\D/g, "").slice(-2)) || 0;
-  const weightKg =
-    (raw as any).weightKg ??
-    Math.round((0.3 + (seedDigits % 20) * 0.1) * 100) / 100;
-  const dimensionsCm =
-    (raw as any).dimensions ?? {
-      l: 20 + (seedDigits % 15),
-      w: 12 + (seedDigits % 10),
-      h: 5 + (seedDigits % 8),
-    };
+  const shippingLine = [raw.shippingAddress1, raw.shippingAddress2]
+    .filter((v) => v && String(v).trim())
+    .join(", ");
 
   return {
     id: String(row.id),
@@ -512,11 +823,11 @@ function toUiOrder(
     customer: {
       name: row.customer,
       email: row.email,
-      phone: (raw as any).customerPhone,
-      address: (raw as any).shippingAddress ?? (raw as any).address,
-      city: (raw as any).customerCity,
-      state: buyerState,
-      pincode: (raw as any).customerPincode,
+      phone: raw.shippingPhone ?? row.phone ?? "",
+      address: shippingLine || undefined,
+      city: raw.shippingCity,
+      state: raw.shippingState,
+      pincode: raw.shippingPincode,
     },
     sellerGroups,
     amount:
@@ -530,8 +841,17 @@ function toUiOrder(
     status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
     gstStatus: row.gstStatus?.toLowerCase() === "filed" ? "Filed" : "Not Filed",
     isIntraState,
-    weightKg,
-    dimensionsCm,
+    weightKg:
+      typeof raw.weightKg === "number" && raw.weightKg > 0
+        ? raw.weightKg
+        : undefined,
+    dimensionsCm: raw.dimensionsCm
+      ? {
+          l: Number(raw.dimensionsCm.l ?? 0),
+          w: Number(raw.dimensionsCm.w ?? 0),
+          h: Number(raw.dimensionsCm.h ?? 0),
+        }
+      : undefined,
   };
 }
 
@@ -1504,7 +1824,8 @@ const ShippingLabelModal = ({
 
   if (!order) return null;
   const firstGroup = order.sellerGroups[0];
-  const trackingId = firstGroup?.trackingId ?? "1345678625";
+  const trackingId =
+    (firstGroup?.trackingId ?? order.orderNumber.replace(/\D/g, "")) || "—";
   const invoiceNum = `INV-${order.orderNumber.replace(/\D/g, "")}`;
   const products = firstGroup?.products ?? [];
   const isIntraState = !!order.isIntraState;
@@ -1853,62 +2174,90 @@ const ShippingLabelModal = ({
 // HSN/Qty/Unit Price/Tax%/Tax Amt/Total, CGST/SGST/IGST breakdown panel,
 // payment info, and a single Print + Close footer.
 export const InvoiceModal = ({
-  order,
+  orderId,
   visible,
   onClose,
 }: {
-  order: Order | null;
+  orderId: number | null;
   visible: boolean;
   onClose: () => void;
 }) => {
   const { width } = useWindowDimensions();
   const sheetWidth = Math.min(width - 32, 760);
   const isNarrow = sheetWidth < 560;
+  const [invoice, setInvoice] = useState<OrderInvoice | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!order) return null;
+  useEffect(() => {
+    if (!visible || !orderId) {
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchOrderInvoice(orderId)
+      .then((data) => {
+        if (!cancelled) setInvoice(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(getApiErrorMessage(err, "Failed to load invoice."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, orderId]);
 
-  const firstGroup = order.sellerGroups[0];
-  const invoiceNum = `INV-${order.orderNumber.replace(/\D/g, "")}`;
-  const isPaid = order.status === "Completed";
-  const products = firstGroup?.products ?? [];
+  if (!visible) return null;
 
   const handlePrint = () => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       window.print();
     } else {
-      Alert.alert("Print", `Sending ${invoiceNum} to printer`);
+      Alert.alert("Print", `Sending ${invoice?.invoiceNumber ?? "invoice"} to printer`);
     }
   };
 
-  // ── Per-item tax computation ──
-  // Unit price is treated as the pre-tax price; tax amount and line total
-  // are derived per item using each product's own tax%, matching the PDF's
-  // "Unit Price / Tax % / Tax Amount / Total" columns.
-  const lineItems = products.map((p) => {
-    const unitPrice = p.price ?? 0;
-    const qty = p.qty ?? 1;
-    const taxPercent = p.taxPercent ?? 0;
-    const lineSubtotal = unitPrice * qty;
-    const taxAmount = (lineSubtotal * taxPercent) / 100;
-    const lineTotal = lineSubtotal + taxAmount;
-    return { ...p, qty, unitPrice, taxPercent, lineSubtotal, taxAmount, lineTotal };
-  });
+  const handleDownload = async () => {
+    if (!invoice || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadInvoiceFile(invoice);
+    } catch (err) {
+      Alert.alert("Download failed", getApiErrorMessage(err, "Could not download invoice."));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
-  const subtotal = lineItems.reduce((sum, li) => sum + li.lineSubtotal, 0);
-  const totalTax = lineItems.reduce((sum, li) => sum + li.taxAmount, 0);
-  const grandTotal = subtotal + totalTax;
-
-  const isIntraState = !!order.isIntraState;
-  const cgst = isIntraState ? totalTax / 2 : 0;
-  const sgst = isIntraState ? totalTax / 2 : 0;
-  const igst = isIntraState ? 0 : totalTax;
-
-  const sellerAddr = firstGroup?.seller.address;
+  const firstGroup = invoice?.sellerGroups?.[0];
+  const sellerAddr = firstGroup?.seller?.address;
   const sellerAddressLines = [
     sellerAddr?.line1,
     [sellerAddr?.city, sellerAddr?.state].filter(Boolean).join(", "),
     sellerAddr?.pincode ? `PIN: ${sellerAddr.pincode}` : undefined,
   ].filter(Boolean);
+
+  const lineItems = invoice ? flattenInvoiceLineItems(invoice) : [];
+  const subtotal = toNumber(invoice?.totals?.subtotal);
+  const totalTax = toNumber(invoice?.totals?.tax);
+  const shipping = toNumber(invoice?.totals?.shipping);
+  const discount = toNumber(invoice?.totals?.discount);
+  const wallet = toNumber(invoice?.totals?.walletDeduction);
+  const referral = toNumber(invoice?.totals?.referralDiscount);
+  const grandTotal = toNumber(invoice?.totals?.grandTotal);
+  const isIntraState = Boolean(invoice?.isIntraState);
+  const cgst = toNumber(invoice?.gstBreakdown?.cgst);
+  const sgst = toNumber(invoice?.gstBreakdown?.sgst);
+  const igst = toNumber(invoice?.gstBreakdown?.igst);
+  const isPaid = Boolean(invoice?.payment?.paid);
+  const billing = invoice?.billing;
+  const shippingAddr = invoice?.shipping;
+  const company = invoice?.company;
 
   return (
     <Modal
@@ -1929,6 +2278,20 @@ export const InvoiceModal = ({
           </TouchableOpacity>
         </View>
 
+        {loading ? (
+          <View style={s.docLoadingWrap}>
+            <ActivityIndicator size="large" color={C.orange} />
+            <Text style={s.docLoadingText}>Loading invoice…</Text>
+          </View>
+        ) : error ? (
+          <View style={s.docLoadingWrap}>
+            <Text style={s.docErrorText}>{error}</Text>
+          </View>
+        ) : !invoice ? (
+          <View style={s.docLoadingWrap}>
+            <Text style={s.docErrorText}>Invoice not available.</Text>
+          </View>
+        ) : (
         <ScrollView
           contentContainerStyle={s.docScroll}
           showsVerticalScrollIndicator={false}
@@ -1950,16 +2313,18 @@ export const InvoiceModal = ({
 
                 <View style={s.invSenderInfo}>
                   <Text style={s.invSenderName}>
-                    Flint & Thread (India) Pvt. Ltd.
+                    {company?.name ?? "Flint & Thread (India) Pvt. Ltd."}
                   </Text>
-                  <Text style={s.invSenderLine}>India</Text>
-                  <Text style={s.invSenderLine}>Phone: +91 9063499092</Text>
-                  <Text style={s.invSenderLine}>
-                    Email: support@flintnthread.in
-                  </Text>
-                  <Text style={s.invSenderLine}>
-                    GSTIN: 36AAGCF5402J1ZP
-                  </Text>
+                  <Text style={s.invSenderLine}>{company?.country ?? "India"}</Text>
+                  {company?.phone ? (
+                    <Text style={s.invSenderLine}>Phone: {company.phone}</Text>
+                  ) : null}
+                  {company?.email ? (
+                    <Text style={s.invSenderLine}>Email: {company.email}</Text>
+                  ) : null}
+                  {company?.gstin ? (
+                    <Text style={s.invSenderLine}>GSTIN: {company.gstin}</Text>
+                  ) : null}
                 </View>
               </View>
 
@@ -1970,14 +2335,24 @@ export const InvoiceModal = ({
                 ]}
               >
                 <Text style={s.invTitle}>INVOICE</Text>
-                <Text style={s.invMetaLine}>{invoiceNum}</Text>
+                <Text style={s.invMetaLine}>{invoice.invoiceNumber}</Text>
                 <Text style={s.invMetaLineMuted}>
-                  Order: {order.orderNumber}
+                  Order: {invoice.orderNumber}
                 </Text>
-                <Text style={s.invMetaLineMuted}>Date: {order.date}</Text>
+                <Text style={s.invMetaLineMuted}>
+                  Date: {formatInvoiceDate(invoice.invoiceDate ?? invoice.orderDate)}
+                </Text>
 
                 <View style={s.invQrBox}>
-                  <QrPlaceholderIcon size={62} />
+                  {invoice.qrCode?.imageDataUrl ? (
+                    <Image
+                      source={{ uri: invoice.qrCode.imageDataUrl }}
+                      style={{ width: 62, height: 62 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <QrPlaceholderIcon size={62} />
+                  )}
                 </View>
                 <Text style={s.invQrCaption}>Scan for order details</Text>
               </View>
@@ -1987,7 +2362,7 @@ export const InvoiceModal = ({
             <View style={s.invSection}>
               <Text style={s.invSectionLabelNavy}>SOLD BY</Text>
               <Text style={s.invBoldName}>
-                {firstGroup?.seller.name?.toUpperCase() ?? "UNKNOWN SELLER"}
+                {(firstGroup?.seller?.name ?? "UNKNOWN SELLER").toUpperCase()}
               </Text>
               {sellerAddressLines.length > 0 ? (
                 sellerAddressLines.map((line, i) => (
@@ -1998,126 +2373,122 @@ export const InvoiceModal = ({
               ) : (
                 <Text style={s.invMutedLine}>Seller details on file</Text>
               )}
-              {sellerAddr?.phone && (
-                <Text style={s.invMutedLine}>Phone: {sellerAddr.phone}</Text>
-              )}
-              {sellerAddr?.email && (
-                <Text style={s.invMutedLine}>Email: {sellerAddr.email}</Text>
-              )}
+              {firstGroup?.seller?.phone ? (
+                <Text style={s.invMutedLine}>Phone: {firstGroup.seller.phone}</Text>
+              ) : null}
+              {firstGroup?.seller?.email ? (
+                <Text style={s.invMutedLine}>Email: {firstGroup.seller.email}</Text>
+              ) : null}
+              {firstGroup?.seller?.gstin ? (
+                <Text style={s.invMutedLine}>GSTIN: {firstGroup.seller.gstin}</Text>
+              ) : null}
             </View>
 
             {/* ── Bill / Ship ── */}
             <View style={s.invBsGrid}>
               <View style={s.invBsCol}>
                 <Text style={s.invSectionLabelOrange}>BILL TO</Text>
-                <Text style={s.invBoldName}>{order.customer.name}</Text>
-                {order.customer.address && (
-                  <Text style={s.invMutedLine}>{order.customer.address}</Text>
-                )}
-                {(order.customer.city || order.customer.state) && (
+                <Text style={s.invBoldName}>{billing?.name || "—"}</Text>
+                {billing?.address ? (
+                  <Text style={s.invMutedLine}>{billing.address}</Text>
+                ) : null}
+                {billing?.line1 ? (
+                  <Text style={s.invMutedLine}>{billing.line1}</Text>
+                ) : null}
+                {billing?.line2 ? (
+                  <Text style={s.invMutedLine}>{billing.line2}</Text>
+                ) : null}
+                {(billing?.city || billing?.state) && (
                   <Text style={s.invMutedLine}>
-                    {[order.customer.city, order.customer.state]
-                      .filter(Boolean)
-                      .join(", ")}
-                    {order.customer.pincode
-                      ? ` - ${order.customer.pincode}`
-                      : ""}
+                    {[billing?.city, billing?.state].filter(Boolean).join(", ")}
+                    {billing?.pincode ? ` - ${billing.pincode}` : ""}
                   </Text>
                 )}
-                {order.customer.phone && (
-                  <Text style={s.invMutedLine}>
-                    Phone: {order.customer.phone}
-                  </Text>
-                )}
-                <Text style={s.invMutedLine}>
-                  Email: {order.customer.email}
-                </Text>
+                {billing?.phone ? (
+                  <Text style={s.invMutedLine}>Phone: {billing.phone}</Text>
+                ) : null}
+                <Text style={s.invMutedLine}>Email: {billing?.email || "—"}</Text>
               </View>
               <View style={s.invBsCol}>
                 <Text style={s.invSectionLabelOrange}>SHIP TO</Text>
-                <Text style={s.invBoldName}>{order.customer.name}</Text>
-                {order.customer.address && (
-                  <Text style={s.invMutedLine}>{order.customer.address}</Text>
-                )}
-                {(order.customer.city || order.customer.state) && (
+                <Text style={s.invBoldName}>{shippingAddr?.name || "—"}</Text>
+                {shippingAddr?.address ? (
+                  <Text style={s.invMutedLine}>{shippingAddr.address}</Text>
+                ) : null}
+                {shippingAddr?.line1 ? (
+                  <Text style={s.invMutedLine}>{shippingAddr.line1}</Text>
+                ) : null}
+                {shippingAddr?.line2 ? (
+                  <Text style={s.invMutedLine}>{shippingAddr.line2}</Text>
+                ) : null}
+                {(shippingAddr?.city || shippingAddr?.state) && (
                   <Text style={s.invMutedLine}>
-                    {[order.customer.city, order.customer.state]
-                      .filter(Boolean)
-                      .join(", ")}
-                    {order.customer.pincode
-                      ? ` - ${order.customer.pincode}`
-                      : ""}
+                    {[shippingAddr?.city, shippingAddr?.state].filter(Boolean).join(", ")}
+                    {shippingAddr?.pincode ? ` - ${shippingAddr.pincode}` : ""}
                   </Text>
                 )}
-                {order.customer.phone && (
-                  <Text style={s.invMutedLine}>
-                    Phone: {order.customer.phone}
-                  </Text>
-                )}
-                <Text style={s.invMutedLine}>
-                  Email: {order.customer.email}
-                </Text>
+                {shippingAddr?.phone ? (
+                  <Text style={s.invMutedLine}>Phone: {shippingAddr.phone}</Text>
+                ) : null}
+                <Text style={s.invMutedLine}>Email: {shippingAddr?.email || "—"}</Text>
               </View>
             </View>
 
-            {/* ── Items table: Item / HSN / Qty / Unit Price / Tax% / Tax Amt / Total ── */}
+            {/* ── Items table ── */}
             <View style={s.invTable}>
               <View style={s.invTableHead}>
                 <Text style={[s.invTh, { flex: 2.2 }]}>Item Description</Text>
-                <Text style={[s.invTh, s.invThCenter, { flex: 1 }]}>
-                  HSN Code
-                </Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 0.6 }]}>
-                  Qty
-                </Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>
-                  Unit Price
-                </Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 0.7 }]}>
-                  Tax %
-                </Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>
-                  Tax Amount
-                </Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>
-                  Total
-                </Text>
+                <Text style={[s.invTh, s.invThCenter, { flex: 1 }]}>HSN Code</Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 0.6 }]}>Qty</Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>Unit Price</Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 0.7 }]}>Tax %</Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>Tax Amount</Text>
+                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>Total</Text>
               </View>
               {lineItems.map((li, i) => (
                 <View
-                  key={li.id}
+                  key={`${li.id ?? i}-${li.name}`}
                   style={[s.invTr, i % 2 === 1 && { backgroundColor: C.bg }]}
                 >
-                  <View style={{ flex: 2.2 }}>
-                    <Text style={s.invTdName} numberOfLines={2}>
-                      {li.name}
-                    </Text>
-                    {(li.color || li.size) && (
-                      <Text style={s.invTdVariant}>
-                        {[
-                          li.color ? `Color: ${li.color}` : null,
-                          li.size ? `Size: ${li.size}` : null,
-                        ]
-                          .filter(Boolean)
-                          .join("  ")}
+                  <View style={{ flex: 2.2, flexDirection: "row", gap: 8, alignItems: "center" }}>
+                    {li.imageUrl ? (
+                      <Image
+                        source={{ uri: li.imageUrl }}
+                        style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: C.bg }}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.invTdName} numberOfLines={2}>
+                        {li.name}
                       </Text>
-                    )}
+                      {(li.color || li.size) && (
+                        <Text style={s.invTdVariant}>
+                          {[
+                            li.color ? `Color: ${li.color}` : null,
+                            li.size ? `Size: ${li.size}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join("  ")}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                   <Text style={[s.invTdNum, s.invTdCenter, { flex: 1 }]}>
-                    {li.hsnCode ?? "—"}
+                    {li.hsnCode || "—"}
                   </Text>
-                  <Text style={[s.invTdNum, { flex: 0.6 }]}>{li.qty}</Text>
+                  <Text style={[s.invTdNum, { flex: 0.6 }]}>{li.qty ?? 0}</Text>
                   <Text style={[s.invTdNum, { flex: 1 }]}>
-                    {fmtCur(li.unitPrice)}
+                    {fmtCur(toNumber(li.unitPrice))}
                   </Text>
                   <Text style={[s.invTdNum, { flex: 0.7 }]}>
-                    {li.taxPercent}%
+                    {toNumber(li.taxPercent)}%
                   </Text>
                   <Text style={[s.invTdNum, { flex: 1 }]}>
-                    {fmtCur(li.taxAmount)}
+                    {fmtCur(toNumber(li.taxAmount))}
                   </Text>
                   <Text style={[s.invTdNum, { flex: 1, fontWeight: "800" }]}>
-                    {fmtCur(li.lineTotal)}
+                    {fmtCur(toNumber(li.lineTotal))}
                   </Text>
                 </View>
               ))}
@@ -2133,8 +2504,7 @@ export const InvoiceModal = ({
                 <View style={s.invTotalsLine}>
                   <Text style={s.invTotalsLabel}>
                     {isIntraState ? "CGST + SGST" : "IGST"} @{" "}
-                    {subtotal > 0 ? ((totalTax / subtotal) * 100).toFixed(2) : "0.00"}
-                    %
+                    {subtotal > 0 ? ((totalTax / subtotal) * 100).toFixed(2) : "0.00"}%
                   </Text>
                   <Text style={s.invTotalsValue}>{fmtCur(totalTax)}</Text>
                 </View>
@@ -2143,12 +2513,30 @@ export const InvoiceModal = ({
                   <Text
                     style={[
                       s.invTotalsValue,
-                      { color: C.green, fontWeight: "800" },
+                      shipping === 0 && { color: C.green, fontWeight: "800" },
                     ]}
                   >
-                    FREE
+                    {shipping === 0 ? "FREE" : fmtCur(shipping)}
                   </Text>
                 </View>
+                {discount > 0 ? (
+                  <View style={s.invTotalsLine}>
+                    <Text style={s.invTotalsLabel}>Discount</Text>
+                    <Text style={s.invTotalsValue}>- {fmtCur(discount)}</Text>
+                  </View>
+                ) : null}
+                {wallet > 0 ? (
+                  <View style={s.invTotalsLine}>
+                    <Text style={s.invTotalsLabel}>Wallet</Text>
+                    <Text style={s.invTotalsValue}>- {fmtCur(wallet)}</Text>
+                  </View>
+                ) : null}
+                {referral > 0 ? (
+                  <View style={s.invTotalsLine}>
+                    <Text style={s.invTotalsLabel}>Referral</Text>
+                    <Text style={s.invTotalsValue}>- {fmtCur(referral)}</Text>
+                  </View>
+                ) : null}
                 <View style={s.invGrandLine}>
                   <Text style={s.invGrandLabel}>Grand Total</Text>
                   <Text style={s.invGrandValue}>{fmtCur(grandTotal)}</Text>
@@ -2186,7 +2574,7 @@ export const InvoiceModal = ({
             <View style={s.invPaymentBlock}>
               <Text style={s.invPaymentTitle}>Payment Information:</Text>
               <Text style={s.invPaymentLine}>
-                Payment Method: {order.paymentType}
+                Payment Method: {invoice.payment?.method || "—"}
               </Text>
               <View style={s.invPaymentStatusRow}>
                 <Text style={s.invPaymentLine}>Payment Status: </Text>
@@ -2202,38 +2590,54 @@ export const InvoiceModal = ({
                       { color: isPaid ? C.green : C.orange },
                     ]}
                   >
-                    {isPaid ? "PAID" : "PENDING"}
+                    {isPaid ? "PAID" : (invoice.payment?.status || "PENDING").toUpperCase()}
                   </Text>
                 </View>
               </View>
+              {invoice.gstNumber ? (
+                <Text style={s.invPaymentLine}>Customer GSTIN: {invoice.gstNumber}</Text>
+              ) : null}
             </View>
 
             {/* ── Thank-you footer ── */}
             <View style={s.invThankYouBlock}>
               <Text style={s.invThankYouTitle}>Thank you for your business!</Text>
               <Text style={s.invThankYouLine}>
-                If you have any questions about this invoice, please contact
-                us at
+                If you have any questions about this invoice, please contact us at
               </Text>
-              <Text style={s.invThankYouContact}>support@flintnthread.in</Text>
+              <Text style={s.invThankYouContact}>
+                {company?.email ?? "support@flintnthread.in"}
+              </Text>
             </View>
 
             <Text style={s.invDocFooter}>
-              This is a system-generated invoice and does not require a
-              signature.
+              This is a system-generated invoice and does not require a signature.
             </Text>
           </View>
         </ScrollView>
+        )}
 
-        {/* Footer: Print, Close */}
+        {/* Footer: Print, Download, Close */}
         <View style={s.docActionBar}>
           <TouchableOpacity
-            style={s.docBtnPrint}
+            style={[s.docBtnPrint, (loading || !invoice) && { opacity: 0.6 }]}
             onPress={handlePrint}
             activeOpacity={0.85}
+            disabled={loading || !invoice}
           >
             <PrintIcon color={C.white} />
             <Text style={s.docBtnPrintText}>Print</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.docBtnDownload, (loading || !invoice || downloading) && { opacity: 0.6 }]}
+            onPress={() => void handleDownload()}
+            activeOpacity={0.85}
+            disabled={loading || !invoice || downloading}
+          >
+            <DownloadIcon color={C.white} size={15} />
+            <Text style={s.docBtnDownloadText}>
+              {downloading ? "Downloading…" : "Download"}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={s.docBtnClose}
@@ -2645,41 +3049,54 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<OrderStats | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
   const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const params = useLocalSearchParams<{ status?: string }>();
   const [statusFilter, setStatusFilter] = useState("All");
-
-  useEffect(() => {
-    if (params.status) {
-      setStatusFilter(params.status);
-    }
-  }, [params.status]);
   const [paymentFilter, setPaymentFilter] = useState("All Payments");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortVisible, setSortVisible] = useState(false);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [activeAction, setActiveAction] = useState<Order | null>(null);
-
-  // Invoice / Shipping Label modal state
   const [docModal, setDocModal] = useState<DocModalType>(null);
   const [docOrder, setDocOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    if (params.status) {
+      setStatusFilter(params.status);
+    }
+  }, [params.status]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(search.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const page = await fetchOrders({
-        page: currentPage - 1,
-        size: ORDERS_PAGE_SIZE,
-      });
+      const [page, orderStats] = await Promise.all([
+        fetchOrders({
+          page: currentPage - 1,
+          size: ORDERS_PAGE_SIZE,
+          search: searchQuery || undefined,
+          status: mapStatusFilterToApi(statusFilter),
+          paymentMethod: mapPaymentFilterToApi(paymentFilter),
+          sort: sortOption,
+        }),
+        fetchOrderStats(),
+      ]);
       setOrders(page.items.map((item) => toUiOrder(mapOrderRow(item), item)));
       setTotalElements(page.totalElements);
       setTotalPages(page.totalPages);
+      setStats(orderStats);
       if (currentPage > page.totalPages && page.totalPages > 0)
         setCurrentPage(page.totalPages);
     } catch (err) {
@@ -2687,7 +3104,7 @@ export default function OrdersScreen() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage]);
+  }, [currentPage, searchQuery, statusFilter, paymentFilter, sortOption]);
 
   useEffect(() => {
     loadOrders();
@@ -2728,86 +3145,66 @@ export default function OrdersScreen() {
     setDocOrder(null);
   }, []);
 
-  const handleExportCSV = useCallback(() => {
-    const headers = [
-      "Order #",
-      "Date",
-      "Customer",
-      "Email",
-      "Amount",
-      "Payment",
-      "Status",
-      "GST",
-    ];
-    const rows = filtered.map((o) => [
-      o.orderNumber,
-      o.date,
-      o.customer.name,
-      o.customer.email,
-      o.amount,
-      o.paymentType,
-      o.status,
-      o.gstStatus,
-    ]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    if (Platform.OS === "web") {
-      const blob = new Blob([csv], { type: "text/csv" });
+  const filtered = orders;
+
+  const handleExportCSV = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert("Export", "CSV export is currently supported on web only.");
+      return;
+    }
+    try {
+      const csv = await fetchOrderExportCsv({
+        search: searchQuery || undefined,
+        status: mapStatusFilterToApi(statusFilter),
+        paymentMethod: mapPaymentFilterToApi(paymentFilter),
+        sort: sortOption,
+      });
+      const blob = new Blob([csv.startsWith("\uFEFF") ? csv : "\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "orders.csv";
+      a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-    } else {
-      Alert.alert("Export", "CSV exported successfully");
+    } catch (e) {
+      Alert.alert("Export failed", e instanceof Error ? e.message : "Could not export orders.");
     }
-  }, []);
-
-  const filtered = useMemo(() => {
-    let result = orders.filter((o) => {
-      const q = search.toLowerCase();
-      const matchSearch =
-        !search ||
-        o.orderNumber.toLowerCase().includes(q) ||
-        o.customer.name.toLowerCase().includes(q) ||
-        o.customer.email.toLowerCase().includes(q);
-      const matchStatus = statusFilter === "All" || o.status === statusFilter;
-      const matchPayment =
-        paymentFilter === "All Payments" || o.paymentType === paymentFilter;
-      return matchSearch && matchStatus && matchPayment;
-    });
-
-    result = [...result].sort((a, b) => {
-      if (sortOption === "amount_high") return b.amount - a.amount;
-      if (sortOption === "amount_low") return a.amount - b.amount;
-      if (sortOption === "oldest") return a.date.localeCompare(b.date);
-      return b.date.localeCompare(a.date);
-    });
-
-    return result;
-  }, [orders, search, statusFilter, paymentFilter, sortOption]);
+  }, [searchQuery, statusFilter, paymentFilter, sortOption]);
 
   const rangeStart =
     totalElements === 0 ? 0 : (currentPage - 1) * ORDERS_PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * ORDERS_PAGE_SIZE, totalElements);
 
-  const thisMonth = orders.filter((o) => {
-    const d = new Date(o.date);
-    const now = new Date();
-    return (
-      d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-    );
-  }).length;
-  const monthRevenue = orders
-    .filter((o) => {
-      const d = new Date(o.date);
-      const now = new Date();
-      return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      );
-    })
-    .reduce((sum, o) => sum + o.amount, 0);
-  const pendingPayment = orders.filter((o) => o.status === "Pending").length;
+  const statCards = [
+    {
+      label: "Total Orders",
+      value: String(stats?.totalOrders ?? totalElements),
+      icon: <OrderBoxIcon color={C.navy} />,
+      iconBg: "rgba(30,43,107,0.08)",
+      valueColor: C.navy,
+    },
+    {
+      label: "This Month",
+      value: String(stats?.thisMonth ?? 0),
+      icon: <CalendarIcon color={C.teal} />,
+      iconBg: "#ECFEFF",
+      valueColor: C.teal,
+    },
+    {
+      label: "Monthly Revenue",
+      value: fmtCur(Number(stats?.monthRevenue ?? 0)),
+      icon: <DownloadIcon color={C.green} />,
+      iconBg: C.greenPale,
+      valueColor: C.green,
+    },
+    {
+      label: "Pending Payment",
+      value: String(stats?.pendingPayments ?? 0),
+      icon: <ChevronRightIcon color={C.orange} />,
+      iconBg: C.orangePale,
+      valueColor: C.orange,
+    },
+  ];
 
   const currentSortLabel =
     SORT_OPTIONS.find((s) => s.key === sortOption)?.label ?? "Newest First";
@@ -2817,38 +3214,6 @@ export default function OrdersScreen() {
     const totalGutter = GRID_GUTTER * (columnCount - 1);
     return `calc((100% - ${totalGutter}px) / ${columnCount})` as unknown as number;
   }, [columnCount]);
-
-  // ── Stat card data — now rendered as overlapping cards under the header ────
-  const statCards = [
-    {
-      label: "Total Orders",
-      value: String(totalElements),
-      icon: <OrderBoxIcon color={C.navy} />,
-      iconBg: "rgba(30,43,107,0.08)",
-      valueColor: C.navy,
-    },
-    {
-      label: "This Month",
-      value: String(thisMonth),
-      icon: <CalendarIcon color={C.teal} />,
-      iconBg: "#ECFEFF",
-      valueColor: C.teal,
-    },
-    {
-      label: "Monthly Revenue",
-      value: fmtCur(monthRevenue),
-      icon: <DownloadIcon color={C.green} />,
-      iconBg: C.greenPale,
-      valueColor: C.green,
-    },
-    {
-      label: "Pending Payment",
-      value: String(pendingPayment),
-      icon: <ChevronRightIcon color={C.orange} />,
-      iconBg: C.orangePale,
-      valueColor: C.orange,
-    },
-  ];
 
   return (
     <AdminLayout>
@@ -2870,22 +3235,25 @@ export default function OrdersScreen() {
                 {
                   paddingTop: Platform.OS === "ios" ? 50 : 20,
                 },
+                isMobile && { paddingHorizontal: 16 }
               ]}
             >
               <View
-                style={[s.headerTop, { paddingHorizontal: isMobile ? 16 : 22 }]}
+                style={[s.headerTop, { paddingHorizontal: isMobile ? 0 : 22 }]}
               >
                 <View style={s.headerLeft}>
                   <View style={s.headerIcon}>
                     <OrderBoxIcon color={C.white} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
                     <Text
                       style={[s.headerTitle, { fontSize: isMobile ? 16 : 20 }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
                     >
                       Orders Management
                     </Text>
-                    <Text style={s.headerSub}>
+                    <Text style={s.headerSub} numberOfLines={1}>
                       Manage and track all customer orders
                     </Text>
                   </View>
@@ -3159,7 +3527,10 @@ export default function OrdersScreen() {
         visible={sortVisible}
         isWeb={isWeb}
         current={sortOption}
-        onSelect={setSortOption}
+        onSelect={(opt) => {
+          setSortOption(opt);
+          setCurrentPage(1);
+        }}
         onClose={() => setSortVisible(false)}
       />
 
@@ -3193,7 +3564,7 @@ export default function OrdersScreen() {
       />
 
       <InvoiceModal
-        order={docModal === "invoice" ? docOrder : null}
+        orderId={docModal === "invoice" && docOrder ? Number(docOrder.id) : null}
         visible={docModal === "invoice"}
         onClose={handleCloseDoc}
       />
@@ -3582,6 +3953,15 @@ const s = StyleSheet.create({
 
   // ── Document screen shell (Invoice / Shipping Label modals) ────────────────
   docScreen: { flex: 1, backgroundColor: C.white },
+  docLoadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 12,
+  },
+  docLoadingText: { fontSize: 14, color: C.textMid },
+  docErrorText: { fontSize: 14, color: C.red, textAlign: "center" },
   docTopBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -3615,6 +3995,7 @@ const s = StyleSheet.create({
     borderTopColor: C.border,
     flexDirection: "row",
     justifyContent: "center",
+    flexWrap: "wrap",
     gap: 12,
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -3626,12 +4007,24 @@ const s = StyleSheet.create({
     gap: 8,
     backgroundColor: C.orange,
     borderRadius: 10,
-    paddingHorizontal: 26,
+    paddingHorizontal: 20,
     paddingVertical: 13,
-    minWidth: 140,
+    minWidth: 120,
     justifyContent: "center",
   },
   docBtnPrintText: { fontSize: 14, fontWeight: "700", color: C.white },
+  docBtnDownload: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.green,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    minWidth: 120,
+    justifyContent: "center",
+  },
+  docBtnDownloadText: { fontSize: 14, fontWeight: "700", color: C.white },
   docBtnClose: {
     flexDirection: "row",
     alignItems: "center",
@@ -3640,9 +4033,9 @@ const s = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: C.navy,
-    paddingHorizontal: 26,
+    paddingHorizontal: 20,
     paddingVertical: 13,
-    minWidth: 140,
+    minWidth: 120,
     justifyContent: "center",
   },
   docBtnCloseText: { fontSize: 14, fontWeight: "700", color: C.navy },

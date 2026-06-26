@@ -1417,16 +1417,15 @@ const JobOpeningsScreen: React.FC = () => {
                 <View style={[s.pageHead, !isWeb && { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
                     {!isWeb ? (
                         <>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[s.pageTitle, { fontSize: 20 }]}>Open Positions</Text>
+                                    <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                                </View>
                                 <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => { setEditingJob(null); setEditModalVisible(true); }} activeOpacity={0.85}>
                                     <Feather name="plus" size={14} color="#fff" />
                                     <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
                                 </TouchableOpacity>
-                            </View>
-                            <View>
-                                <Text style={[s.pageTitle, { fontSize: 20 }]}>Open Positions</Text>
-                                <Text style={s.pageSub}>Manage and track all active job listings</Text>
                             </View>
                         </>
                     ) : (
@@ -1445,35 +1444,43 @@ const JobOpeningsScreen: React.FC = () => {
                 </View>
 
                 {/* ── STATS ── */}
-                <View style={s.statsRow}>
-                    <StatPill
-                        icon="briefcase"
-                        value={totalJobs}
-                        label="Total Jobs"
-                        iconBg={T.orangeLight}
-                        iconFg={T.orange}
-                    />
-                    <StatPill
-                        icon="check-circle"
-                        value={activeCount}
-                        label="Active"
-                        iconBg={T.greenBg}
-                        iconFg={T.green}
-                    />
-                    <StatPill
-                        icon="file-text"
-                        value={totalApps}
-                        label="Applications"
-                        iconBg={T.navyLight}
-                        iconFg={T.navy}
-                    />
-                    <StatPill
-                        icon="zap"
-                        value={urgentCount}
-                        label="Urgent"
-                        iconBg={T.redBg}
-                        iconFg={T.red}
-                    />
+                <View style={[s.statsRow, !isWeb && s.statsRowMobile]}>
+                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
+                        <StatPill
+                            icon="briefcase"
+                            value={totalJobs}
+                            label="Total Jobs"
+                            iconBg={T.orangeLight}
+                            iconFg={T.orange}
+                        />
+                    </View>
+                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
+                        <StatPill
+                            icon="check-circle"
+                            value={activeCount}
+                            label="Active"
+                            iconBg={T.greenBg}
+                            iconFg={T.green}
+                        />
+                    </View>
+                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
+                        <StatPill
+                            icon="file-text"
+                            value={totalApps}
+                            label="Applications"
+                            iconBg={T.navyLight}
+                            iconFg={T.navy}
+                        />
+                    </View>
+                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
+                        <StatPill
+                            icon="zap"
+                            value={urgentCount}
+                            label="Urgent"
+                            iconBg={T.redBg}
+                            iconFg={T.red}
+                        />
+                    </View>
                 </View>
 
                 {/* ── SEARCH + FILTERS ── */}
@@ -1493,6 +1500,24 @@ const JobOpeningsScreen: React.FC = () => {
                             </TouchableOpacity>
                         )}
                     </View>
+                    {!isWeb && (
+                        <View style={s.viewToggleInline}>
+                            <TouchableOpacity
+                                style={[s.viewToggleBtn, viewMode === "grid" && s.viewToggleBtnActive]}
+                                onPress={() => setViewMode("grid")}
+                                activeOpacity={0.8}
+                            >
+                                <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : T.textHint} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[s.viewToggleBtn, viewMode === "list" && s.viewToggleBtnActive]}
+                                onPress={() => setViewMode("list")}
+                                activeOpacity={0.8}
+                            >
+                                <Feather name="list" size={15} color={viewMode === "list" ? T.orange : T.textHint} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
 
                 <View style={s.filterRow}>
@@ -1541,7 +1566,7 @@ const JobOpeningsScreen: React.FC = () => {
                         <Text style={s.filterBtnTxt}>Filter</Text>
                     </TouchableOpacity>
 
-                    <ViewToggle view={viewMode} onToggle={setViewMode} />
+                    {isWeb && <ViewToggle view={viewMode} onToggle={setViewMode} />}
                 </View>
 
                 {/* ── COUNT LINE ── */}
@@ -1573,12 +1598,12 @@ const JobOpeningsScreen: React.FC = () => {
                 ) : viewMode === "grid" ? (
                     <View style={isWeb
                         ? { flexDirection: "row", flexWrap: "wrap", gap: 16 }
-                        : { gap: 12 }
+                        : { flexDirection: "row", flexWrap: "wrap", gap: 12 }
                     }>
                         {paginated.map(job => (
                             <View
                                 key={job.id}
-                                style={isWeb ? { width: "calc(33.33% - 11px)" as any } : undefined}
+                                style={isWeb ? { width: "calc(33.33% - 11px)" as any } : { width: "48%" as any }}
                             >
                                 <JobCard job={job} onEdit={handleEdit} onDelete={() => setDeleteTarget(job)} />
                             </View>
@@ -1792,6 +1817,28 @@ const s = StyleSheet.create({
         alignSelf: "center",
         width: "100%",
     },
+    statsRowMobile: {
+        flexWrap: "wrap" as any,
+    },
+
+    // Inline view toggle (mobile, next to search bar)
+    viewToggleInline: {
+        flexDirection: "row",
+        backgroundColor: T.card,
+        borderRadius: 11,
+        borderWidth: 1.5,
+        borderColor: T.border,
+        overflow: "hidden",
+    },
+    viewToggleBtn: {
+        width: 40,
+        height: 40,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    viewToggleBtnActive: {
+        backgroundColor: T.orangeLight,
+    },
 
     // Search + filters
     searchRow: {
@@ -1814,7 +1861,11 @@ const s = StyleSheet.create({
         flex: 1,
         fontSize: 13,
         color: T.textH,
-    },
+        borderWidth: 0,
+        outline: "none" as any,
+        outlineStyle: "none" as any,
+        outlineWidth: 0 as any,
+    } as any,
     filterRow: {
         flexDirection: "row",
         alignItems: "center",

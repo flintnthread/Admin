@@ -1,0 +1,33 @@
+  const [productsCsvContent, setProductsCsvContent] = useState<string>('');
+  const [ordersCsvContent, setOrdersCsvContent] = useState<string>('');
+  const [csvLoading, setCsvLoading] = useState(false);
+
+  const handleExportProductsCsv = async () => {
+    const sellerId = Number(params.sellerId);
+    if (!sellerId || Number.isNaN(sellerId)) return;
+    try {
+      setCsvLoading(true);
+      const csv = await exportSellerProductsCsv(sellerId);
+      setProductsCsvContent(csv);
+      setProductsExportModal(true);
+    } catch (e) {
+      alert(getApiErrorMessage(e));
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
+  const handleExportOrdersCsv = async () => {
+    const sellerId = Number(params.sellerId);
+    if (!sellerId || Number.isNaN(sellerId)) return;
+    try {
+      setCsvLoading(true);
+      const csv = await exportSellerOrdersCsv(sellerId);
+      setOrdersCsvContent(csv);
+      setOrdersExportModal(true);
+    } catch (e) {
+      alert(getApiErrorMessage(e));
+    } finally {
+      setCsvLoading(false);
+    }
+  };

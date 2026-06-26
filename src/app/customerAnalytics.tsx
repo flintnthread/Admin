@@ -1,6 +1,6 @@
 /**
  * customerAnalytics.tsx
- * 360° single-customer analytics dashboard (mock data only, no backend)
+ * 360° single-customer analytics dashboard — data from GET /api/admin/customers/{id}/analytics
  * React Native + Expo + TypeScript
  * Fully interactive hand-rolled SVG charts with hover crosshairs, tooltips, drill-downs,
  * time-filtering (7D, 30D, 90D, 6M, 1Y, All), fullscreen mode, legend toggles,
@@ -10,6 +10,11 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import {
+  fetchCustomerAnalytics,
+  mapApiAnalyticsToUi,
+  type CustomerAnalyticsUi,
+} from "@/services/customerApi";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -19,6 +24,7 @@ import React, {
   useEffect,
 } from "react";
 import {
+  ActivityIndicator,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -130,7 +136,7 @@ function basisForColumns(cols: number): number {
     case 1:
       return 100;
     case 2:
-      return 48.5; // Leave room for flex gaps on Web
+      return 47; // Leave room for flex gaps on Web and Mobile
     case 3:
       return 31.5; // Leave room for flex gaps on Web
     case 4:
@@ -476,6 +482,7 @@ type ChartPoint = { label: string; value: number };
 type SlicePoint = { label: string; value: number; color: string };
 type RecentOrder = {
   id: string;
+  orderNumber: string;
   productName: string;
   date: string;
   amount: number;
@@ -751,6 +758,7 @@ function buildMockAnalytics(customerId: string, name: string) {
     { length: Math.min(6, Math.max(totalOrders, 1)) },
     (_, i) => ({
       id: `FNT${20260500 + between(100, 999)}${i}`,
+      orderNumber: `ORD-${20260500 + between(100, 999)}${i}`,
       productName: pick([
         "Wireless Noise-Cancelling Headphones",
         "Ergonomic Mechanical Keyboard",
@@ -834,104 +842,81 @@ function buildMockAnalytics(customerId: string, name: string) {
     status: rng() < 0.85 ? "Active" : "Inactive",
   };
 }
-// Timeframe categorical filtering helper
+// Timeframe categorical filtering — lifetime aggregates from backend
 function getFilteredCategoricalData<T extends { label: string; value: number }>(
   baseData: T[],
-  timeframe: TimeFrame,
-  seedValue: number
+  _timeframe: TimeFrame,
 ): T[] {
-  if (timeframe === "All" || timeframe === "1Y") {
-    return baseData;
-  }
-
-  const rng = mulberry32(seedValue);
-  let scale = 1.0;
-  switch (timeframe) {
-    case "7D":
-      scale = 0.05;
-      break;
-    case "30D":
-      scale = 0.15;
-      break;
-    case "90D":
-      scale = 0.35;
-      break;
-    case "6M":
-      scale = 0.6;
-      break;
-    default:
-      scale = 1.0;
-  }
-
-  return baseData.map(item => {
-    const variation = 0.8 + rng() * 0.4;
-    const newVal = Math.max(1, Math.round(item.value * scale * variation));
-    return {
-      ...item,
-      value: newVal,
-    };
-  });
+  return baseData;
 }
 
-// Timeframe filtering helper
+function sliceMonthlyData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[] {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  let monthsToInclude = 12;
+  switch (timeframe) {
+    case "7D":
+    case "30D":
+      monthsToInclude = 1;
+      break;
+    case "90D":
+      monthsToInclude = 3;
+      break;
+    case "6M":
+      monthsToInclude = 6;
+      break;
+    default:
+      return data;
+  }
+  const indices: number[] = [];
+  for (let i = monthsToInclude - 1; i >= 0; i--) {
+    indices.push((currentMonth - i + 12) % 12);
+  }
+  return indices.map((m) => data[m] ?? { label: "", value: 0 }).filter((p) => p.label);
+}
+
+function sliceTailData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[] {
+  if (timeframe === "All" || timeframe === "1Y") return data;
+  let count = data.length;
+  switch (timeframe) {
+    case "7D":
+      count = 1;
+      break;
+    case "30D":
+      count = Math.min(4, data.length);
+      break;
+    case "90D":
+      count = Math.min(6, data.length);
+      break;
+    case "6M":
+      count = Math.min(6, data.length);
+      break;
+  }
+  return data.slice(-count);
+}
+
+// Timeframe filtering — slice real monthly / weekly series from backend
 function getFilteredData(
   baseData: ChartPoint[],
   timeframe: TimeFrame,
   metricType: "spend" | "orders" | "freq" | "time",
-  seedValue: number
 ): ChartPoint[] {
   if (timeframe === "All" || timeframe === "1Y") {
     return baseData;
   }
-
-  const rng = mulberry32(seedValue);
-  const between = (min: number, max: number) =>
-    Math.round(min + rng() * (max - min));
-
-  let count = 6;
-  let labels: string[] = [];
-
-  switch (timeframe) {
-    case "7D":
-      count = 7;
-      labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-      break;
-    case "30D":
-      count = 5;
-      labels = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"];
-      break;
-    case "90D":
-      count = 6;
-      labels = ["W1", "W2", "W3", "W4", "W5", "W6"];
-      break;
-    case "6M":
-      count = 6;
-      labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-      break;
-    default:
-      return baseData;
+  if (metricType === "spend" || metricType === "orders") {
+    return sliceMonthlyData(baseData, timeframe);
   }
-
-  let minVal = 0;
-  let maxVal = 100;
-  if (metricType === "spend") {
-    minVal = 500;
-    maxVal = 20000;
-  } else if (metricType === "orders") {
-    minVal = 0;
-    maxVal = 5;
-  } else if (metricType === "freq") {
-    minVal = 0;
-    maxVal = 3;
-  } else {
-    minVal = 5;
-    maxVal = 45;
+  if (metricType === "freq") {
+    return sliceTailData(baseData, timeframe);
   }
+  return baseData;
+}
 
-  return labels.map((l) => ({
-    label: l,
-    value: between(minVal, maxVal),
-  }));
+function parseTrendValue(val: string): Trend {
+  const num = parseFloat(val.replace("%", "").replace("+", ""));
+  if (!val || val === "0%" || Number.isNaN(num) || num === 0) return "flat";
+  return num > 0 ? "up" : "down";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2141,19 +2126,49 @@ export default function CustomerAnalyticsScreen() {
   const px = isMobile ? 12 : isTablet ? 18 : 24;
 
   const customerId = id ?? "0";
-  const customerName = name ?? "Customer";
+  const [analytics, setAnalytics] = useState<CustomerAnalyticsUi | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadAnalytics = useCallback(async () => {
+    const numericId = Number(customerId);
+    if (!numericId || Number.isNaN(numericId)) {
+      setLoadError("Invalid customer id");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const raw = await fetchCustomerAnalytics(numericId);
+      setAnalytics(mapApiAnalyticsToUi(raw));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load analytics");
+      setAnalytics(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [customerId]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
+
+  const customerName = analytics?.customer.name || name || "Customer";
 
   const customerEmail = useMemo(() => {
+    const fromApi = analytics?.customer.email;
+    if (fromApi && fromApi !== "—") return fromApi;
     if (email && email !== "—" && email !== "") return email;
-    return `${customerName.toLowerCase().replace(/\s+/g, "")}@flintandthread.com`;
-  }, [email, customerName]);
+    return "—";
+  }, [analytics?.customer.email, email]);
 
   const customerPhone = useMemo(() => {
+    const fromApi = analytics?.customer.phone;
+    if (fromApi && fromApi !== "—") return fromApi;
     if (phone && phone !== "—" && phone !== "") return phone;
-    const rng = mulberry32(seedFromString(customerId + "contact"));
-    const num = Math.floor(7000000000 + rng() * 2000000000);
-    return `+91 ${num.toString().replace(/(\d{5})(\d{5})/, "$1 $2")}`;
-  }, [phone, customerId]);
+    return "—";
+  }, [analytics?.customer.phone, phone]);
 
   const handleEmailPress = useCallback(() => {
     if (Platform.OS === 'web' && typeof window !== "undefined") {
@@ -2165,11 +2180,7 @@ export default function CustomerAnalyticsScreen() {
     }
   }, [customerEmail]);
 
-  // Build raw mock analytics
-  const data = useMemo(
-    () => buildMockAnalytics(customerId, customerName),
-    [customerId, customerName],
-  );
+  const data = analytics;
 
   // Timeframe states for charts
   const [spendTF, setSpendTF] = useState<TimeFrame>("All");
@@ -2181,20 +2192,24 @@ export default function CustomerAnalyticsScreen() {
   const [categoryTF, setCategoryTF] = useState<TimeFrame>("All");
 
   const spendData = useMemo(() => {
-    return getFilteredData(data.monthlySpend, spendTF, "spend", seedFromString(customerId + "spend"));
-  }, [data.monthlySpend, spendTF, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.monthlySpend, spendTF, "spend");
+  }, [data, spendTF]);
 
   const ordersData = useMemo(() => {
-    return getFilteredData(data.monthlyOrders, ordersTF, "orders", seedFromString(customerId + "orders"));
-  }, [data.monthlyOrders, ordersTF, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.monthlyOrders, ordersTF, "orders");
+  }, [data, ordersTF]);
 
   const freqData = useMemo(() => {
-    return getFilteredData(data.orderFrequency, freqTF, "freq", seedFromString(customerId + "freq"));
-  }, [data.orderFrequency, freqTF, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.orderFrequency, freqTF, "freq");
+  }, [data, freqTF]);
 
   const distData = useMemo(() => {
-    return getFilteredData(data.purchaseTime, distTF, "time", seedFromString(customerId + "time"));
-  }, [data.purchaseTime, distTF, customerId]);
+    if (!data) return [];
+    return getFilteredData(data.purchaseTime, distTF, "time");
+  }, [data, distTF]);
 
   // Legend toggle state
   const [hiddenStatusLabels, setHiddenStatusLabels] = useState<Set<string>>(new Set());
@@ -2202,24 +2217,27 @@ export default function CustomerAnalyticsScreen() {
   const [hiddenCategoryLabels, setHiddenCategoryLabels] = useState<Set<string>>(new Set());
 
   const scaledOrderStatus = useMemo(() => {
-    return getFilteredCategoricalData(data.orderStatusBreakdown, statusTF, seedFromString(customerId + "status"));
-  }, [data.orderStatusBreakdown, statusTF, customerId]);
+    if (!data) return [];
+    return getFilteredCategoricalData(data.orderStatusBreakdown, statusTF);
+  }, [data, statusTF]);
 
   const activeOrderStatus = useMemo(() => {
     return scaledOrderStatus.filter(item => !hiddenStatusLabels.has(item.label));
   }, [scaledOrderStatus, hiddenStatusLabels]);
 
   const scaledPaymentMethods = useMemo(() => {
-    return getFilteredCategoricalData(data.paymentMethods, paymentTF, seedFromString(customerId + "payment"));
-  }, [data.paymentMethods, paymentTF, customerId]);
+    if (!data) return [];
+    return getFilteredCategoricalData(data.paymentMethods, paymentTF);
+  }, [data, paymentTF]);
 
   const activePaymentMethods = useMemo(() => {
     return scaledPaymentMethods.filter(item => !hiddenPaymentLabels.has(item.label));
   }, [scaledPaymentMethods, hiddenPaymentLabels]);
 
   const filteredCategories = useMemo(() => {
-    return getFilteredCategoricalData(data.categories, categoryTF, seedFromString(customerId + "category"));
-  }, [data.categories, categoryTF, customerId]);
+    if (!data) return [];
+    return getFilteredCategoricalData(data.categories, categoryTF);
+  }, [data, categoryTF]);
 
   const categorySlices = useMemo(() => {
     const slices = filteredCategories.map((c, idx) => ({
@@ -2246,7 +2264,7 @@ export default function CustomerAnalyticsScreen() {
   const [drilldownTitle, setDrilldownTitle] = useState<string>("");
 
   // Grid responsiveness basis
-  const kpiBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
+  const kpiBasis = basisForColumns(isMobile ? 2 : isTablet ? 2 : (width < 1200 ? 2 : 4));
   const chartBasis = (isMobile || width < 1200) ? 100 : 48.5;
   const behaviourBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
   const actionBasis = isMobile ? 50 : isTablet ? 31.5 : 23.5;
@@ -2299,15 +2317,19 @@ export default function CustomerAnalyticsScreen() {
 
   // Dynamic status-based KPI definitions
   const kpis = useMemo(
-    () => [
+    () => {
+      if (!data) return [];
+      const spendTrend = parseTrendValue(data.trends.spendTrend);
+      const ordersTrend = parseTrendValue(data.trends.ordersTrend);
+      return [
       {
         icon: <WalletIcon color={primary} size={18} />,
         iconBg: primaryLight,
         title: "Lifetime Spend",
         value: spendLiveKPI ? spendLiveKPI : rupee(data.lifetimeSpend),
         sub: spendLiveKPI ? "Live Hover Value" : "All-time total",
-        trend: "up" as Trend,
-        trendVal: "+12%",
+        trend: spendTrend,
+        trendVal: data.trends.spendTrend,
       },
       {
         icon: <BagIcon color={navy} size={18} />,
@@ -2315,8 +2337,8 @@ export default function CustomerAnalyticsScreen() {
         title: "Total Orders",
         value: ordersLiveKPI ? ordersLiveKPI : String(data.totalOrders),
         sub: ordersLiveKPI ? "Live Hover Value" : "All-time orders",
-        trend: "up" as Trend,
-        trendVal: "+4",
+        trend: ordersTrend,
+        trendVal: data.trends.ordersTrend,
       },
       {
         icon: <CartIcon color={blue} size={18} />,
@@ -2372,7 +2394,8 @@ export default function CustomerAnalyticsScreen() {
         trend: "down" as Trend,
         trendVal: "-3%",
       },
-    ],
+    ];
+    },
     [data, spendLiveKPI, ordersLiveKPI],
   );
 
@@ -2402,6 +2425,30 @@ export default function CustomerAnalyticsScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <AdminLayout>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
+          <ActivityIndicator size="large" color={primary} />
+          <Text style={{ marginTop: 12, color: sub }}>Loading customer analytics…</Text>
+        </View>
+      </AdminLayout>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <AdminLayout>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
+          <Text style={{ color: red, fontWeight: "700" }}>{loadError ?? "No analytics data"}</Text>
+          <TouchableOpacity onPress={loadAnalytics} style={[s.tfBtn, s.tfBtnActive]}>
+            <Text style={[s.tfBtnTxt, s.tfBtnTxtActive]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={navyDeep} />
@@ -2410,7 +2457,7 @@ export default function CustomerAnalyticsScreen() {
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
+        stickyHeaderIndices={isMobile ? [] : [1]}
         onScroll={handleScroll}
         scrollEventThrottle={32}
       >
@@ -2462,7 +2509,7 @@ export default function CustomerAnalyticsScreen() {
                       <EnvelopeIcon size={11} color="rgba(255,255,255,0.7)" />
                       <Text style={s.headerMetaTxt} numberOfLines={1}>{customerEmail}</Text>
                     </TouchableOpacity>
-                    {Platform.OS !== 'web' && (
+                    {Platform.OS !== "web" && customerPhone !== "—" && (
                       <View style={s.headerMetaItem}>
                         <PhoneIcon size={11} color="rgba(255,255,255,0.7)" />
                         <Text style={s.headerMetaTxt}>{customerPhone}</Text>
@@ -2472,8 +2519,8 @@ export default function CustomerAnalyticsScreen() {
                 </View>
               </View>
 
-              <View style={[s.headerRight, !isWide && { width: "100%", marginTop: 14, alignItems: "flex-start" }]}>
-                <View style={s.healthBox}>
+              <View style={[s.headerRight, !isWide && { width: "100%", marginTop: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
+                <View style={[s.healthBox, !isWide && { alignItems: "flex-start" }]}>
                   <Text style={s.healthLabel}>Account Health</Text>
                   <Text
                     style={[
@@ -2912,7 +2959,7 @@ export default function CustomerAnalyticsScreen() {
               <View style={[s.cardBody, isWide && { flexDirection: "row", gap: 24 }]}>
                 <View style={isWide ? { flex: 1, height: 140 } : null}>
                   <MiniStatTrio
-                    style={{ height: "100%", justifyContent: "space-around" }}
+                    style={isWide ? { height: "100%", justifyContent: "space-around" } : null}
                     items={[
                       {
                         label: "Success Rate",
@@ -3010,7 +3057,7 @@ export default function CustomerAnalyticsScreen() {
                             style={{ flex: 1.6 }}
                             onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
                           >
-                            <Text style={s.orderIdText} numberOfLines={1}>{o.id}</Text>
+                            <Text style={s.orderIdText} numberOfLines={1}>{o.orderNumber}</Text>
                           </TouchableOpacity>
                           <Text style={[s.orderTableCell, { flex: 2.2 }]} numberOfLines={1}>{o.productName}</Text>
                           <Text style={s.orderTableCell}>{o.date}</Text>
@@ -3042,7 +3089,7 @@ export default function CustomerAnalyticsScreen() {
                         onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
                       >
                         <View style={s.omTop}>
-                          <Text style={s.omId} numberOfLines={1}>{o.id}</Text>
+                          <Text style={s.omId} numberOfLines={1}>{o.orderNumber}</Text>
                           <OrderStatusChip status={o.status} />
                         </View>
                         <View style={s.omRow}>
@@ -3344,7 +3391,7 @@ const s = StyleSheet.create({
     borderColor: border,
     padding: 16,
     gap: 6,
-    minWidth: 140,
+    minWidth: 130,
     shadowColor: navyDeep,
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 4 },

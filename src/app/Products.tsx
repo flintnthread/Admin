@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapProductListRow } from "@/lib/mappers";
-import { fetchProducts } from "@/services/productApi";
+import { fetchAdminCatalogProducts } from "@/services/productApi";
 import AdminLayout from "@/components/admin-layout";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -765,7 +765,7 @@ const WebProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchProducts({ size: 500 });
+            const res = await fetchAdminCatalogProducts({ size: 500 });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1175,11 +1175,23 @@ const WebProductsScreen: React.FC = () => {
                                 {visibleProducts.length === 0 ? (
                                     <View style={wst.emptyState}>
                                         <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
-                                        <Text style={wst.emptyTitle}>No products found</Text>
-                                        <Text style={wst.emptyDesc}>Try adjusting your search or filters</Text>
+                                        <Text style={wst.emptyTitle}>
+                                            {products.length === 0 ? "No admin products yet" : "No products found"}
+                                        </Text>
+                                        <Text style={wst.emptyDesc}>
+                                            {products.length === 0
+                                                ? "Products you add via Add Product appear here (not seller listings)."
+                                                : "Try adjusting your search or filters"}
+                                        </Text>
+                                        {products.length === 0 ? (
+                                            <TouchableOpacity style={wst.emptyBtn} onPress={() => router.push('/Addproduct')}>
+                                                <Text style={wst.emptyBtnTxt}>Add Product</Text>
+                                            </TouchableOpacity>
+                                        ) : (
                                         <TouchableOpacity style={wst.emptyBtn} onPress={() => { setSearchQuery(""); clearFilters(); }}>
                                             <Text style={wst.emptyBtnTxt}>Clear Filters</Text>
                                         </TouchableOpacity>
+                                        )}
                                     </View>
                                 ) : (
                                     visibleProducts.map((product, idx) => {
@@ -1265,10 +1277,23 @@ const WebProductsScreen: React.FC = () => {
                                 {visibleProducts.length === 0 ? (
                                     <View style={wst.emptyState}>
                                         <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
-                                        <Text style={wst.emptyTitle}>No products found</Text>
+                                        <Text style={wst.emptyTitle}>
+                                            {products.length === 0 ? "No admin products yet" : "No products found"}
+                                        </Text>
+                                        <Text style={wst.emptyDesc}>
+                                            {products.length === 0
+                                                ? "Products you add via Add Product appear here (not seller listings)."
+                                                : "Try adjusting your search or filters"}
+                                        </Text>
+                                        {products.length === 0 ? (
+                                            <TouchableOpacity style={wst.emptyBtn} onPress={() => router.push('/Addproduct')}>
+                                                <Text style={wst.emptyBtnTxt}>Add Product</Text>
+                                            </TouchableOpacity>
+                                        ) : (
                                         <TouchableOpacity style={wst.emptyBtn} onPress={() => { setSearchQuery(""); clearFilters(); }}>
                                             <Text style={wst.emptyBtnTxt}>Clear Filters</Text>
                                         </TouchableOpacity>
+                                        )}
                                     </View>
                                 ) : (
                                     <View style={wst.webGridContainer}>
@@ -1504,7 +1529,7 @@ const MobileProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchProducts({ size: 500 });
+            const res = await fetchAdminCatalogProducts({ size: 500 });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1663,6 +1688,21 @@ const MobileProductsScreen: React.FC = () => {
                 </View>
             )}
 
+            {!isWeb && (
+                <View style={[s.actionRow, { paddingTop: 6, paddingBottom: 6 }]}>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
+                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
+                        <Text style={s.actionTitle}>Add New Product</Text>
+                        <Text style={s.actionDesc}>Create and add a new product</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
+                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
+                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
+                        <Text style={s.actionDesc}>Upload products via CSV</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {error ? (
                     <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
@@ -1674,30 +1714,20 @@ const MobileProductsScreen: React.FC = () => {
                 ) : null}
 
                 {/* Action cards */}
-                <View style={s.actionRow}>
-                    <TouchableOpacity
-                        style={s.actionCard}
-                        activeOpacity={0.75}
-                        onPress={() => router.push('/Addproduct')}
-                    >
-                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}>
-                            <MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} />
-                        </View>
-                        <Text style={s.actionTitle}>Add New Product</Text>
-                        <Text style={s.actionDesc}>Create and add a new product</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={s.actionCard}
-                        activeOpacity={0.75}
-                        onPress={() => router.push('/Bulkupload')}
-                    >
-                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}>
-                            <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} />
-                        </View>
-                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
-                        <Text style={s.actionDesc}>Upload products via CSV</Text>
-                    </TouchableOpacity>
-                </View>
+                {isWeb && (
+                    <View style={s.actionRow}>
+                        <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
+                            <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
+                            <Text style={s.actionTitle}>Add New Product</Text>
+                            <Text style={s.actionDesc}>Create and add a new product</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
+                            <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
+                            <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
+                            <Text style={s.actionDesc}>Upload products via CSV</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Stats */}
                 <View style={s.statsCard}>
@@ -1818,11 +1848,23 @@ const MobileProductsScreen: React.FC = () => {
                 {visibleProducts.length === 0 && (
                     <View style={s.emptyState}>
                         <MaterialCommunityIcons name="package-variant-closed" size={52} color={C.textLight} />
-                        <Text style={s.emptyTitle}>No products found</Text>
-                        <Text style={s.emptyDesc}>Try adjusting your search or filters</Text>
+                        <Text style={s.emptyTitle}>
+                            {products.length === 0 ? "No admin products yet" : "No products found"}
+                        </Text>
+                        <Text style={s.emptyDesc}>
+                            {products.length === 0
+                                ? "Products you add via Add Product appear here (not seller listings)."
+                                : "Try adjusting your search or filters"}
+                        </Text>
+                        {products.length === 0 ? (
+                            <TouchableOpacity style={s.clearBtn} onPress={() => router.push('/Addproduct')}>
+                                <Text style={s.clearBtnText}>Add Product</Text>
+                            </TouchableOpacity>
+                        ) : (
                         <TouchableOpacity style={s.clearBtn} onPress={() => { setSearchQuery(""); clearFilters(); }}>
                             <Text style={s.clearBtnText}>Clear All</Text>
                         </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
@@ -1969,7 +2011,7 @@ const MobileProductsScreen: React.FC = () => {
 
 const s = StyleSheet.create({
     root:               { flex: 1, backgroundColor: C.bg },
-    headerWrapper:      { backgroundColor: C.navyDeep, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 4 : 0, paddingBottom: 4 },
+    headerWrapper:      { backgroundColor: C.navyDeep, paddingTop: isWeb ? 0 : 16, paddingBottom: isWeb ? 4 : 20, borderRadius: isWeb ? 0 : 22, marginHorizontal: isWeb ? 0 : 16, marginTop: isWeb ? 0 : 12, shadowColor: isWeb ? "transparent" : C.navyDeep, shadowOffset: { width: 0, height: isWeb ? 0 : 8 }, shadowOpacity: isWeb ? 0 : 0.2, shadowRadius: isWeb ? 0 : 16, elevation: isWeb ? 0 : 10 },
     headerRow:          { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
     searchBarRow:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
     backBtn:            { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },

@@ -17,6 +17,20 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
+import {
+  fetchSubcategories,
+  createSubcategory,
+  updateSubcategory,
+  deleteSubcategory,
+  parseMaterialSlabs,
+  serializeMaterialSlabs,
+  type SubcategoryRow,
+  type MaterialSlab,
+} from "@/services/subcategoryApi";
+import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
+import { resolveMediaUrl } from "@/lib/api/media";
+
+const isWeb = Platform.OS === "web";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -310,38 +324,6 @@ const TagIcon = () => (
 );
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MAIN_CATS = [
-  "All",
-  "Accessories",
-  "Footwear",
-  "Homely Hub",
-  "Indoor Play",
-  "Kids",
-  "Men",
-  "Women",
-  "Sportswear",
-  "Sweets",
-];
-const CATEGORY_OPTIONS = [
-  "Accessories > Bags",
-  "Accessories > Belts & Caps",
-  "Accessories > Gadgets Accessories",
-  "Accessories > Jewellery",
-  "Accessories > Other Accessories",
-  "Accessories > Watches",
-  "Beauty & Personal Care > Skincare Tools & Devices",
-  "Footwear > Kids' Footwear",
-  "Footwear > Men's Footwear",
-  "Footwear > Women's Footwear",
-  "Homely Hub > Art & Creative Gifts",
-  "Homely Hub > Chairs",
-  "Indoor Play > Board Games",
-  "Kids > Kids Wear",
-  "Men > Men's Clothing",
-  "Women > Women's Clothing",
-  "Sportswear > Gym Wear",
-  "Sweets > Indian Sweets",
-];
 const GST_RATES = ["0%", "0.1%", "0.25%", "3%", "5%", "12%", "18%", "28%"];
 const ITEMS_PER_PAGE = 9;
 
@@ -354,268 +336,154 @@ interface Material {
 }
 interface Subcategory {
   id: number;
-  mainCat: string;
-  category: string;
-  name: string;
-  materials: Material[];
-  created: string;
-  status: "Active" | "Inactive";
+  categoryId: number;
+  subcategoryName: string;
+  subcategoryImage?: string;
+  mobileImage?: string;
+  materialSlabs?: string;
+  weightSlabs?: string;
+  gstPercentage?: number;
+  status: boolean;
+  createdAt?: string;
+  sellerId?: number;
+  // UI-specific fields
+  mainCat?: string;
+  category?: string;
+  name?: string;
+  materials?: Material[];
+  created?: string;
   image?: string;
+  // For UI compatibility
+  statusText?: "Active" | "Inactive";
 }
-
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const SAMPLE: Subcategory[] = [
-  {
-    id: 68,
-    mainCat: "Accessories",
-    category: "Bags",
-    name: "Backpacks",
-    created: "16 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=300&fit=crop",
-    materials: [
-      {
-        id: "1",
-        name: "Plastic or Textile",
-        hsn: "61120000",
-        slabs: [{ min: "0", max: "500", gst: "18%" }],
-      },
-      {
-        id: "2",
-        name: "Others",
-        hsn: "61119000",
-        slabs: [{ min: "0", max: "", gst: "18%" }],
-      },
-    ],
-  },
-  {
-    id: 67,
-    mainCat: "Accessories",
-    category: "Bags",
-    name: "Handbags",
-    created: "16 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=300&h=300&fit=crop",
-    materials: [
-      {
-        id: "1",
-        name: "Cotton",
-        hsn: "42022100",
-        slabs: [{ min: "0", max: "1000", gst: "18%" }],
-      },
-      { id: "2", name: "Jute", hsn: "42022900", slabs: [] },
-      { id: "3", name: "Leather", hsn: "42021100", slabs: [] },
-      { id: "4", name: "Others", hsn: "42029900", slabs: [] },
-    ],
-  },
-  {
-    id: 71,
-    mainCat: "Accessories",
-    category: "Bags",
-    name: "Laptop Bags",
-    created: "16 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1491637639811-60e2756cc1c7?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Plastic or Textile", hsn: "42021200", slabs: [] },
-      { id: "2", name: "Others", hsn: "42029900", slabs: [] },
-    ],
-  },
-  {
-    id: 266,
-    mainCat: "Accessories",
-    category: "Bags",
-    name: "Lunch Carry Bags",
-    created: "08 Jan, 2026",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1600857544200-b2f666a9a2ec?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Plastic or Other Textile", hsn: "42021900", slabs: [] },
-      { id: "2", name: "Jute", hsn: "42022900", slabs: [] },
-    ],
-  },
-  {
-    id: 72,
-    mainCat: "Accessories",
-    category: "Jewellery",
-    name: "Necklaces",
-    created: "20 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Gold", hsn: "71131100", slabs: [] },
-      { id: "2", name: "Silver", hsn: "71131900", slabs: [] },
-    ],
-  },
-  {
-    id: 73,
-    mainCat: "Accessories",
-    category: "Watches",
-    name: "Analog Watches",
-    created: "20 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Leather Strap", hsn: "91011100", slabs: [] },
-      { id: "2", name: "Metal Strap", hsn: "91011900", slabs: [] },
-    ],
-  },
-  {
-    id: 74,
-    mainCat: "Footwear",
-    category: "Men's Footwear",
-    name: "Sneakers",
-    created: "22 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Synthetic", hsn: "64029900", slabs: [] },
-      { id: "2", name: "Leather", hsn: "64021900", slabs: [] },
-    ],
-  },
-  {
-    id: 75,
-    mainCat: "Footwear",
-    category: "Women's Footwear",
-    name: "Heels",
-    created: "25 Nov, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=300&h=300&fit=crop",
-    materials: [{ id: "1", name: "Leather", hsn: "64031200", slabs: [] }],
-  },
-  {
-    id: 76,
-    mainCat: "Kids",
-    category: "Kids Wear",
-    name: "Baby Rompers",
-    created: "01 Dec, 2025",
-    status: "Inactive",
-    image:
-      "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Cotton", hsn: "61111000", slabs: [] },
-      { id: "2", name: "Synthetic", hsn: "61113000", slabs: [] },
-    ],
-  },
-  {
-    id: 77,
-    mainCat: "Women",
-    category: "Women's Clothing",
-    name: "Sarees",
-    created: "05 Dec, 2025",
-    status: "Active",
-    image:
-      "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&h=300&fit=crop",
-    materials: [
-      { id: "1", name: "Silk", hsn: "62044100", slabs: [] },
-      { id: "2", name: "Cotton", hsn: "62044200", slabs: [] },
-    ],
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-// ─── Portal Dropdown — works inside ScrollViews and Modals ───────────────────
-//
-// Problem: `position: absolute` dropdowns get clipped by ancestors with
-// `overflow: hidden` (ScrollView, card, tableWrap).  The fix is to render
-// the menu in a full-screen Modal with `transparent` background so it floats
-// above everything, yet closes when the user taps outside.
-//
-const Dropdown = ({ value, placeholder, options, onChange, style }: any) => {
+// ─── Simple Dropdown ─────────────────────────────────────────────────────────────
+const Dropdown = ({
+  value,
+  placeholder,
+  options,
+  onChange,
+  style,
+}: {
+  value: string;
+  placeholder: string;
+  options: string[] | { label: string; value: string }[];
+  onChange: (v: string) => void;
+  style?: any;
+}) => {
   const [open, setOpen] = useState(false);
-  const [menuLayout, setMenuLayout] = useState({ x: 0, y: 0, width: 0 });
   const [hovered, setHovered] = useState<string | null>(null);
-  const triggerRef = useRef<View>(null);
+  const [menuLayout, setMenuLayout] = useState({ x: 0, y: 0, width: 0 });
 
-  const openMenu = () => {
-    triggerRef.current?.measureInWindow((x, y, width, height) => {
-      // On web, clamp so menu never overflows right edge of screen
-      const screenWidth =
-        typeof window !== "undefined" ? window.innerWidth : 400;
-      const menuW = Math.max(width, 220);
-      const clampedX = Math.min(x, screenWidth - menuW - 12);
-      setMenuLayout({ x: clampedX, y: y + height + 4, width: menuW });
-      setOpen(true);
-    });
-  };
+  // Handle both string options and object options with label/value
+  const getOptionLabel = (opt: any) => typeof opt === 'string' ? opt : opt.label;
+  const getOptionValue = (opt: any) => typeof opt === 'string' ? opt : opt.value;
 
   return (
-    <View ref={triggerRef} style={[S.ddWrap, style]} collapsable={false}>
+    <View style={[S.ddWrap, style]}>
       <TouchableOpacity
         style={[S.ddTrigger, open && S.ddTriggerOpen]}
-        onPress={openMenu}
+        onPress={() => setOpen(!open)}
+        onLayout={(e) => {
+          const { x, y, width, height } = e.nativeEvent.layout;
+          setMenuLayout({ x, y: y + height, width });
+        }}
       >
         <Text style={[S.ddVal, !value && S.ddPh]} numberOfLines={1}>
-          {value || placeholder}
+          {value ? getOptionLabel(options.find((o: any) => getOptionValue(o) === value) || value) : placeholder}
         </Text>
         <ChevronDownIcon color={open ? C.navy : C.sub} />
       </TouchableOpacity>
-
-      <Modal
-        visible={open}
-        transparent
-        animationType="none"
-        onRequestClose={() => setOpen(false)}
-      >
-        <TouchableOpacity
-          style={S.ddBackdrop}
-          activeOpacity={1}
-          onPress={() => setOpen(false)}
-        />
-        <View
-          style={[
-            S.ddPortalMenu,
-            {
-              position: "absolute",
-              top: menuLayout.y,
-              left: menuLayout.x,
-              width: menuLayout.width,
-            },
-          ]}
-        >
-          <ScrollView
-            style={{ maxHeight: 240 }}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {options.map((opt: string) => (
+      {/* Mobile: inline expanding list */}
+      {!isWeb && open && (
+        <View style={S.ddPortalMenu}>
+          {options.map((opt: any) => {
+            const optValue = getOptionValue(opt);
+            const optLabel = getOptionLabel(opt);
+            return (
               <TouchableOpacity
-                key={opt}
-                style={[
-                  S.ddItem,
-                  value === opt && S.ddItemActive,
-                  hovered === opt && S.ddItemHovered,
-                ]}
+                key={optValue}
+                style={[S.ddItem, value === optValue && S.ddItemActive]}
                 onPress={() => {
-                  onChange(opt);
+                  onChange(optValue);
                   setOpen(false);
-                  setHovered(null);
                 }}
-                onPressIn={() => setHovered(opt)}
-                onPressOut={() => setHovered(null)}
               >
-                <Text
-                  style={[S.ddItemText, value === opt && S.ddItemTextActive]}
-                >
-                  {opt}
+                <Text style={[S.ddItemText, value === optValue && S.ddItemTextActive]}>
+                  {optLabel}
                 </Text>
-                {value === opt && <View style={S.ddCheckDot} />}
+                {value === optValue && <View style={S.ddCheckDot} />}
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            );
+          })}
         </View>
-      </Modal>
+      )}
+
+      {/* Web: portal modal so menu floats above overflow:hidden containers */}
+      {isWeb && (
+        <Modal
+          visible={open}
+          transparent
+          animationType="none"
+          onRequestClose={() => setOpen(false)}
+        >
+          <TouchableOpacity
+            style={S.ddBackdrop}
+            activeOpacity={1}
+            onPress={() => setOpen(false)}
+          />
+          <View
+            style={[
+              S.ddPortalMenu,
+              {
+                position: "absolute",
+                top: menuLayout.y,
+                left: menuLayout.x,
+                width: menuLayout.width,
+              },
+            ]}
+          >
+            <ScrollView
+              style={{ maxHeight: 240 }}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {options.map((opt: any) => {
+                const optValue = getOptionValue(opt);
+                const optLabel = getOptionLabel(opt);
+                return (
+                  <TouchableOpacity
+                    key={optValue}
+                    style={[
+                      S.ddItem,
+                      value === optValue && S.ddItemActive,
+                      hovered === optValue && S.ddItemHovered,
+                    ]}
+                    onPress={() => {
+                      onChange(optValue);
+                      setOpen(false);
+                      setHovered(null);
+                    }}
+                    onPressIn={() => setHovered(optValue)}
+                    onPressOut={() => setHovered(null)}
+                  >
+                    <Text
+                      style={[S.ddItemText, value === optValue && S.ddItemTextActive]}
+                    >
+                      {optLabel}
+                    </Text>
+                    {value === optValue && <View style={S.ddCheckDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -712,40 +580,74 @@ const AddModal = ({
   onSave,
   isWeb,
   editData,
+  mainCategories,
 }: {
   visible: boolean;
   onClose: () => void;
   onSave: (d: any) => void;
   isWeb: boolean;
   editData?: Subcategory | null;
+  mainCategories: CategoryRow[];
 }) => {
-  const [category, setCategory] = useState("");
+  const [mainCategoryId, setMainCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [childCategories, setChildCategories] = useState<CategoryRow[]>([]);
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [status, setStatus] = useState("Active");
 
   const reset = () => {
-    setCategory("");
+    setMainCategoryId("");
+    setCategoryId("");
+    setChildCategories([]);
     setName("");
     setImage(null);
     setMaterials([]);
     setStatus("Active");
   };
 
+  const loadChildCategories = async (parentId: number) => {
+    try {
+      const children = await fetchChildCategories(parentId);
+      setChildCategories(children);
+    } catch {
+      setChildCategories([]);
+    }
+  };
+
   useEffect(() => {
     if (visible) {
       if (editData) {
-        setCategory(editData.mainCat && editData.category ? `${editData.mainCat} > ${editData.category}` : "");
-        setName(editData.name);
-        setImage(editData.image || null);
+        const matchedMain = mainCategories.find((cat) => cat.categoryName === editData.mainCat);
+        const mainId = matchedMain?.id?.toString() ?? "";
+        setMainCategoryId(mainId);
+        if (matchedMain?.id) {
+          void loadChildCategories(matchedMain.id).then(() => {
+            setCategoryId(editData.categoryId ? editData.categoryId.toString() : "");
+          });
+        } else {
+          setCategoryId(editData.categoryId ? editData.categoryId.toString() : "");
+        }
+        setName(editData.subcategoryName || editData.name || "");
+        setImage(resolveMediaUrl(editData.subcategoryImage || editData.image || "") || null);
         setMaterials(editData.materials || []);
-        setStatus(editData.status);
+        setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
         reset();
       }
     }
-  }, [visible, editData]);
+  }, [visible, editData, mainCategories]);
+
+  const handleMainCategoryChange = (value: string) => {
+    setMainCategoryId(value);
+    setCategoryId("");
+    setChildCategories([]);
+    const parentId = Number(value);
+    if (!Number.isNaN(parentId) && parentId > 0) {
+      void loadChildCategories(parentId);
+    }
+  };
 
   const pickImage = async () => {
     if (Platform.OS === "web") {
@@ -781,7 +683,11 @@ const AddModal = ({
     setMaterials((prev) => prev.filter((x) => x.id !== id));
 
   const handleSave = () => {
-    if (!category) {
+    if (!mainCategoryId) {
+      Alert.alert("Required", "Please select a main category.");
+      return;
+    }
+    if (!categoryId) {
       Alert.alert("Required", "Please select a category.");
       return;
     }
@@ -789,13 +695,12 @@ const AddModal = ({
       Alert.alert("Required", "Please enter a subcategory name.");
       return;
     }
-    const parts = category.split(" > ");
     onSave({
       id: editData?.id,
-      mainCat: parts[0],
-      category: parts[1] || parts[0],
+      categoryId: parseInt(categoryId, 10),
       name,
       image,
+      mobileImage: null,
       materials,
       status,
     });
@@ -838,17 +743,37 @@ const AddModal = ({
             style={S.modalBody}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
+            contentContainerStyle={!isWeb ? { paddingBottom: 24 } : undefined}
           >
-            {/* Category Select */}
+            {/* Main Category */}
             <View style={S.fg}>
               <Text style={S.fl}>
-                Select Category <Text style={S.req}>*</Text>
+                Main Category <Text style={S.req}>*</Text>
               </Text>
               <Dropdown
-                value={category}
-                placeholder="-- Select Category --"
-                options={CATEGORY_OPTIONS}
-                onChange={setCategory}
+                value={mainCategoryId}
+                placeholder="-- Select Main Category --"
+                options={mainCategories.map((cat) => ({
+                  label: cat.categoryName,
+                  value: cat.id.toString(),
+                }))}
+                onChange={handleMainCategoryChange}
+              />
+            </View>
+
+            {/* Category */}
+            <View style={S.fg}>
+              <Text style={S.fl}>
+                Category <Text style={S.req}>*</Text>
+              </Text>
+              <Dropdown
+                value={categoryId}
+                placeholder={mainCategoryId ? "-- Select Category --" : "Select main category first"}
+                options={childCategories.map((cat) => ({
+                  label: cat.categoryName,
+                  value: cat.id.toString(),
+                }))}
+                onChange={(val: string) => setCategoryId(val)}
               />
               {/* HSN helper */}
               <View style={S.hsnNote}>
@@ -954,9 +879,28 @@ const AddModal = ({
                 onChange={setStatus}
               />
             </View>
+
+            {/* Buttons — inline for mobile, footer for web */}
+            {!isWeb && (
+              <View style={[S.modalFooter, { borderTopWidth: 0, paddingHorizontal: 0, paddingTop: 16 }]}>
+                <TouchableOpacity
+                  style={S.cancelBtn}
+                  onPress={() => {
+                    reset();
+                    onClose();
+                  }}
+                >
+                  <Text style={S.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.saveBtn} onPress={handleSave}>
+                  <Text style={S.saveText}>{editData ? "Update Subcategory" : "Save Subcategory"}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
 
-          {/* Footer */}
+          {/* Footer — web only */}
+          {isWeb && (
           <View style={S.modalFooter}>
             <TouchableOpacity
               style={S.cancelBtn}
@@ -971,6 +915,7 @@ const AddModal = ({
               <Text style={S.saveText}>{editData ? "Update Subcategory" : "Save Subcategory"}</Text>
             </TouchableOpacity>
           </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -1006,17 +951,17 @@ const GridCard = ({
           S.cardStatusPill,
           {
             backgroundColor:
-              item.status === "Active" ? C.activeLight : C.inactiveLight,
+              item.status === true ? C.activeLight : C.inactiveLight,
           },
         ]}
       >
         <Text
           style={[
             S.cardStatusText,
-            { color: item.status === "Active" ? C.active : C.inactive },
+            { color: item.status === true ? C.active : C.inactive },
           ]}
         >
-          {item.status}
+          {item.status === true ? "Active" : "Inactive"}
         </Text>
       </View>
     </View>
@@ -1032,21 +977,12 @@ const GridCard = ({
 
       <Text style={S.cardName}>{item.name}</Text>
 
-      {/* Material chips */}
-      <View style={S.chips}>
-        {item.materials.slice(0, 3).map((m) => (
-          <View key={m.id} style={S.matChip}>
-            <Text style={S.matChipText}>{m.name}</Text>
-          </View>
-        ))}
-        {item.materials[0]?.slabs[0]?.gst && (
-          <View style={S.gstChipStyle}>
-            <Text style={S.gstChipText}>
-              GST: {item.materials[0].slabs[0].gst}
-            </Text>
-          </View>
-        )}
-      </View>
+      {/* Materials - simple text display */}
+      {item.materials && item.materials.length > 0 && (
+        <Text style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+          {item.materials.map(m => m.name).join(", ")}
+        </Text>
+      )}
 
       {/* Footer */}
       <View style={S.cardFooter}>
@@ -1092,36 +1028,43 @@ const ListTable = ({
 
     {items.map((item, idx) => (
       <View key={item.id} style={[S.tRow, idx % 2 === 1 && S.tRowAlt]}>
+        {/* ID */}
         <View style={[S.cell, S.cId]}>
           <Text style={S.tdId}>{item.id}</Text>
         </View>
+        {/* Main Category */}
         <View style={[S.cell, S.cMain]}>
-          <Text style={S.tdText}>{item.mainCat}</Text>
+          <Text style={S.tdText}>{item.mainCat || "—"}</Text>
         </View>
+        {/* Category */}
         <View style={[S.cell, S.cCat]}>
-          <Text style={S.tdText}>{item.category}</Text>
+          <Text style={S.tdText}>{item.category || "—"}</Text>
         </View>
+        {/* Subcategory Name */}
         <View style={[S.cell, S.cName]}>
           <Text style={S.tdBold}>{item.name}</Text>
         </View>
+        {/* Materials */}
         <View style={[S.cell, S.cMat]}>
           <Text style={S.tdMat}>
-            {item.materials.map((m) => m.name).join(", ")}
+            {item.materials?.map((m) => m.name).join(", ") || "—"}
           </Text>
         </View>
+        {/* Created Date */}
         <View style={[S.cell, S.cDate]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <CalendarIcon />
             <Text style={S.tdDate}>{item.created}</Text>
           </View>
         </View>
+        {/* Status */}
         <View style={[S.cell, S.cStatus]}>
           <View
             style={[
               S.statusBadge,
               {
                 backgroundColor:
-                  item.status === "Active" ? C.activeLight : C.inactiveLight,
+                  item.status === true ? C.activeLight : C.inactiveLight,
               },
             ]}
           >
@@ -1130,20 +1073,21 @@ const ListTable = ({
                 S.statusDot,
                 {
                   backgroundColor:
-                    item.status === "Active" ? C.active : C.inactive,
+                    item.status === true ? C.active : C.inactive,
                 },
               ]}
             />
             <Text
               style={[
                 S.statusText,
-                { color: item.status === "Active" ? C.active : C.inactive },
+                { color: item.status === true ? C.active : C.inactive },
               ]}
             >
-              {item.status}
+              {item.status === true ? "Active" : "Inactive"}
             </Text>
           </View>
         </View>
+        {/* Actions */}
         <View
           style={[
             S.cell,
@@ -1173,20 +1117,83 @@ export default function Subcategories() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
-  const [items, setItems] = useState<Subcategory[]>(SAMPLE);
+  const [items, setItems] = useState<Subcategory[]>([]);
+  const [mainCategories, setMainCategories] = useState<CategoryRow[]>([]);
+  const [mainCatOptions, setMainCatOptions] = useState<string[]>(["All"]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [mainCatFilter, setMainCatFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Load subcategories and main categories on mount
+  useEffect(() => {
+    loadSubcategories();
+    loadMainCategories();
+  }, []);
+
+  const loadSubcategories = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchSubcategories();
+      
+      const mapped: Subcategory[] = data.map((row: SubcategoryRow) => {
+        const materialSlabsValue = row.materialSlabs ?? row.material_slabs;
+        const materials = parseMaterialSlabs(materialSlabsValue);
+        const imageUrl = resolveMediaUrl(row.subcategoryImage || row.mobileImage || "");
+
+        return {
+          id: row.id,
+          categoryId: row.categoryId,
+          subcategoryName: row.subcategoryName,
+          subcategoryImage: row.subcategoryImage,
+          mobileImage: row.mobileImage,
+          materialSlabs: materialSlabsValue,
+          weightSlabs: row.weightSlabs ?? row.weight_slabs,
+          gstPercentage: row.gstPercentage,
+          status: row.status,
+          statusText: row.status ? "Active" : "Inactive",
+          createdAt: row.createdAt,
+          sellerId: row.sellerId,
+          mainCat: row.mainCat,
+          category: row.category,
+          name: row.subcategoryName,
+          image: imageUrl || undefined,
+          created: row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }) : "—",
+          materials,
+        };
+      });
+      
+      setItems(mapped);
+    } catch (error) {
+      console.error("Failed to load subcategories:", error);
+      Alert.alert("Error", "Failed to load subcategories");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMainCategories = async () => {
+    try {
+      const data = await fetchMainCategories();
+      setMainCategories(data);
+      setMainCatOptions(["All", ...data.map((cat: any) => cat.categoryName)]);
+    } catch (error) {
+      console.error("Failed to load main categories:", error);
+    }
+  };
+
   const filtered = items.filter((i) => {
     const q = search.toLowerCase();
     const matchSearch =
       !search ||
-      i.name.toLowerCase().includes(q) ||
-      i.category.toLowerCase().includes(q) ||
-      i.mainCat.toLowerCase().includes(q);
+      (i.name && i.name.toLowerCase().includes(q)) ||
+      (i.subcategoryName && i.subcategoryName.toLowerCase().includes(q));
     const matchCat = mainCatFilter === "All" || i.mainCat === mainCatFilter;
     return matchSearch && matchCat;
   });
@@ -1204,66 +1211,114 @@ export default function Subcategories() {
     setModalOpen(true);
   };
 
-  const handleSave = (data: any) => {
-    let successMsg = "";
-    if (data.id) {
-      setItems((prev) =>
-        prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
-      );
-      successMsg = "Subcategory updated successfully!";
-    } else {
-      setItems((prev) => [
-        {
-          id: Math.max(0, ...prev.map((x) => x.id)) + 1,
-          mainCat: data.mainCat,
-          category: data.category,
-          name: data.name,
-          materials: data.materials,
-          status: data.status,
-          image: data.image,
-          created: new Date().toLocaleDateString("en-GB", {
+  const handleSave = async (data: any) => {
+    try {
+      let successMsg = "";
+      const statusValue = data.status === "Active";
+      const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
+
+      if (data.id) {
+        await updateSubcategory(
+          data.id,
+          data.categoryId,
+          data.name,
+          data.image,
+          data.mobileImage,
+          materialPayload,
+          undefined,
+          undefined,
+          statusValue
+        );
+        setItems((prev) =>
+          prev.map((c) => (c.id === data.id ? { ...c, ...data, statusText: data.status } : c))
+        );
+        successMsg = "Subcategory updated successfully!";
+      } else {
+        const newRow = await createSubcategory(
+          data.categoryId,
+          data.name,
+          data.image,
+          data.mobileImage,
+          materialPayload,
+          undefined,
+          undefined,
+          statusValue
+        );
+        const newCat: Subcategory = {
+          id: newRow.id,
+          categoryId: newRow.categoryId,
+          subcategoryName: newRow.subcategoryName,
+          subcategoryImage: newRow.subcategoryImage,
+          mobileImage: newRow.mobileImage,
+          materialSlabs: newRow.materialSlabs,
+          weightSlabs: newRow.weightSlabs,
+          gstPercentage: newRow.gstPercentage,
+          status: newRow.status,
+          statusText: newRow.status ? "Active" : "Inactive",
+          createdAt: newRow.createdAt,
+          sellerId: newRow.sellerId,
+          // UI fields
+          name: newRow.subcategoryName,
+          image: newRow.subcategoryImage || newRow.mobileImage,
+          created: newRow.createdAt ? new Date(newRow.createdAt).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }) : new Date().toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
             year: "numeric",
           }),
-        },
-        ...prev,
-      ]);
-      setCurrentPage(1);
-      successMsg = "Subcategory added successfully!";
-    }
-    setEditCat(null);
+          materials: data.materials,
+        };
+        setItems((prev) => [newCat, ...prev]);
+        setCurrentPage(1);
+        successMsg = "Subcategory added successfully!";
+      }
+      setEditCat(null);
 
-    if (Platform.OS === "web") {
-      setTimeout(() => {
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "success",
-          title: successMsg,
-          showConfirmButton: false,
-          timer: 3000,
-          timerProgressBar: true,
-        });
-      }, 300);
-    } else {
-      Alert.alert("Success", successMsg);
+      if (Platform.OS === "web") {
+        setTimeout(() => {
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            icon: "success",
+            title: successMsg,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+          });
+        }, 300);
+      } else {
+        Alert.alert("Success", successMsg);
+      }
+    } catch (error) {
+      console.error("Failed to save subcategory:", error);
+      Alert.alert("Error", "Failed to save subcategory. Please try again.");
     }
   };
 
-  const handleDelete = (id: number) => {
-    const confirmDelete = () => {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      if (Platform.OS === "web") {
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "success",
-          title: "Subcategory deleted successfully!",
-          showConfirmButton: false,
-          timer: 3000,
-          timerProgressBar: true,
-        });
+  const handleDelete = async (id: number) => {
+    const confirmDelete = async () => {
+      try {
+        await deleteSubcategory(id);
+        setItems((prev) => prev.filter((i) => i.id !== id));
+        if (Platform.OS === "web") {
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            icon: "success",
+            title: "Subcategory deleted successfully!",
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+          });
+        } else {
+          Alert.alert("Success", "Subcategory deleted successfully!");
+        }
+      } catch (error) {
+        console.error("Failed to delete subcategory:", error);
+        Alert.alert("Error", "Failed to delete subcategory. Please try again.");
       }
     };
 
@@ -1289,7 +1344,36 @@ export default function Subcategories() {
     }
   };
 
-  const handleExport = () => Alert.alert("Export", "CSV export triggered.");
+  const handleExport = () => {
+    if (Platform.OS !== "web") {
+      Alert.alert("Export", "CSV export is supported on web.");
+      return;
+    }
+    const headers = ["ID", "Main Category", "Category", "Subcategory", "Materials", "Status", "Created"];
+    const escape = (val: string | number) => {
+      const s = String(val ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = filtered.map((item) => [
+      item.id,
+      item.mainCat ?? "",
+      item.category ?? "",
+      item.name ?? item.subcategoryName ?? "",
+      item.materials?.map((m) => m.name).join("; ") ?? "",
+      item.status ? "Active" : "Inactive",
+      item.created ?? "",
+    ].map(escape).join(","));
+    const csv = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `subcategories_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <AdminLayout>
@@ -1352,7 +1436,7 @@ export default function Subcategories() {
               <Dropdown
                 value={mainCatFilter === "All" ? "" : mainCatFilter}
                 placeholder="Main Category"
-                options={MAIN_CATS}
+                options={mainCatOptions}
                 onChange={(v: string | undefined) => {
                   setMainCatFilter(v || "All");
                   setCurrentPage(1);
@@ -1381,16 +1465,28 @@ export default function Subcategories() {
         {view === "grid" ? (
           <View style={[S.grid, isWeb && S.gridWeb]}>
             {paginated.map((item) => (
-              <GridCard
+              <View
                 key={item.id}
-                item={item}
-                onEdit={() => handleEdit(item)}
-                onDelete={() => handleDelete(item.id)}
-              />
+                style={isWeb ? S.gridCardWrapper : S.gridCardWrapperMobile}
+              >
+                <GridCard
+                  item={item}
+                  onEdit={() => handleEdit(item)}
+                  onDelete={() => handleDelete(item.id)}
+                />
+              </View>
             ))}
           </View>
-        ) : (
+        ) : isWeb ? (
           <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ minWidth: 900 }}
+          >
+            <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+          </ScrollView>
         )}
 
         {filtered.length === 0 && (
@@ -1425,6 +1521,7 @@ export default function Subcategories() {
         onSave={handleSave}
         isWeb={isWeb}
         editData={editCat}
+        mainCategories={mainCategories}
       />
     </AdminLayout>
   );
@@ -1537,6 +1634,18 @@ const S = StyleSheet.create({
   grid: { flexDirection: "column", gap: 14 },
   gridWeb: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
 
+  // Grid Card Wrapper - controls width on web
+  gridCardWrapper: {
+    flexBasis: "31%",
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 260,
+    maxWidth: "33%",
+  },
+  gridCardWrapperMobile: {
+    width: "100%",
+  },
+
   // Card
   card: {
     backgroundColor: C.surface,
@@ -1549,9 +1658,6 @@ const S = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 2,
-    ...(Platform.OS === "web"
-      ? { width: "calc(33.33% - 11px)" as any, minWidth: 260, flexShrink: 0 }
-      : {}),
   },
   cardImgWrap: {
     position: "relative",
@@ -1603,18 +1709,18 @@ const S = StyleSheet.create({
     marginTop: 4,
   },
   cardDate: { fontSize: 12, color: C.sub },
-  cardActions: { flexDirection: "row", gap: 7 },
+  cardActions: { flexDirection: "row", gap: 6 },
   editBtn: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     backgroundColor: C.navy,
     alignItems: "center",
     justifyContent: "center",
   },
   deleteBtn: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     backgroundColor: C.inactive,
     alignItems: "center",
@@ -1634,8 +1740,7 @@ const S = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: C.navy,
     width: "100%",
-    borderTopLeftRadius: 13,
-    borderTopRightRadius: 13,
+    borderBottomWidth: 0,
   },
   th: {
     paddingVertical: 14,
@@ -1644,20 +1749,20 @@ const S = StyleSheet.create({
     fontWeight: "700",
     color: "#FFF",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   tRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: C.border,
     alignItems: "center",
-    minHeight: 68,
+    minHeight: 72,
     width: "100%",
     backgroundColor: C.surface,
   },
   tRowAlt: { backgroundColor: C.rowAlt },
   cell: {
-    paddingVertical: 13,
+    paddingVertical: 14,
     paddingHorizontal: 12,
     justifyContent: "center",
   },
@@ -1666,12 +1771,12 @@ const S = StyleSheet.create({
   cCat: { flex: 1, minWidth: 100 },
   cName: { flex: 1.2, minWidth: 120 },
   cMat: { flex: 2, minWidth: 160 },
-  cDate: { width: 130 },
-  cStatus: { width: 96 },
+  cDate: { flex: 1, minWidth: 110 },
+  cStatus: { flex: 1, minWidth: 90 },
   cAction: { width: 90 },
-  tdId: { fontSize: 13, fontWeight: "700", color: C.sub },
-  tdText: { fontSize: 13, color: C.text },
-  tdBold: { fontSize: 13, fontWeight: "600", color: C.text },
+  tdId: { fontSize: 14, fontWeight: "700", color: C.sub },
+  tdText: { fontSize: 14, color: C.text },
+  tdBold: { fontSize: 14, fontWeight: "600", color: C.text },
   tdMat: { fontSize: 12, color: C.matChipText },
   tdDate: { fontSize: 12, color: C.sub },
   statusBadge: {
@@ -1679,7 +1784,7 @@ const S = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderRadius: 20,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     alignSelf: "flex-start",
   },
@@ -1918,7 +2023,7 @@ const S = StyleSheet.create({
   },
   addSlabText: { fontSize: 12, fontWeight: "600", color: C.navy },
 
-  ddWrap: { width: "100%" },
+  ddWrap: { position: "relative", zIndex: 10, width: "100%" },
   ddTrigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -1933,18 +2038,22 @@ const S = StyleSheet.create({
   ddTriggerOpen: { borderColor: C.navy },
   ddVal: { fontSize: 14, color: C.text, flex: 1 },
   ddPh: { color: "#9CA3AF" },
-  ddBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  ddPortalMenu: {
+  ddMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    marginTop: 4,
     backgroundColor: C.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: C.navy,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 20,
-    overflow: "hidden",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
   },
   ddItem: {
     flexDirection: "row",
@@ -1956,10 +2065,30 @@ const S = StyleSheet.create({
     borderBottomColor: "#F0EBE4",
   },
   ddItemActive: { backgroundColor: C.navyLight },
-  ddItemHovered: { backgroundColor: "#F0EBE4" },
   ddItemText: { fontSize: 14, color: C.text },
   ddItemTextActive: { color: C.navy, fontWeight: "700" },
   ddCheckDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.navy },
+  ddPortalMenu: {
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
+    overflow: "hidden",
+  },
+  ddBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  ddItemHovered: { backgroundColor: C.primaryLight },
 
   // Modal footer
   modalFooter: {

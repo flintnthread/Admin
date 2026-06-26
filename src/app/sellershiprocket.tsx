@@ -296,32 +296,9 @@ const SellerShiprocket: React.FC<Props> = () => {
   // ── Sub-components ────────────────────────────────────────────────────────
 
   // Header bar (no sidebar, no topnav — just page header)
-  const renderHeader = () => (
-    <View style={[styles.header, { paddingHorizontal: contentPadding }]}>
-      <View style={styles.headerLeft}>
-        <View style={styles.headerIconBox}>
-          <BsIcon name="upload" size={isMobile ? 20 : 24} color="#fff" />
-        </View>
-        <View style={{ marginLeft: 12 }}>
-          <Text style={[styles.headerTitle, { fontSize: fontSize.lg }]}>
-            Shiprocket Upload Tracker
-          </Text>
-          {/* Breadcrumb */}
-          <View style={styles.breadcrumb}>
-            <Text style={[styles.breadcrumbLink, { fontSize: fontSize.xs }]}>Dashboard</Text>
-            <Text style={[styles.breadcrumbSep, { fontSize: fontSize.xs }]}> › </Text>
-            <Text style={[styles.breadcrumbLink, { fontSize: fontSize.xs }]}>Sellers</Text>
-            <Text style={[styles.breadcrumbSep, { fontSize: fontSize.xs }]}> › </Text>
-            <Text style={[styles.breadcrumbCurrent, { fontSize: fontSize.xs }]}>Upload Tracker</Text>
-          </View>
-        </View>
-        <View style={styles.profileBadge}>
-          <Text style={[styles.profileBadgeText, { fontSize: fontSize.xs }]}>● Profile Completed</Text>
-        </View>
-      </View>
-
-      {/* Action Buttons */}
-      <View style={[styles.headerActions, isMobile && styles.headerActionsMobile]}>
+  const renderHeader = () => {
+    const actionButtons = (
+      <>
         <TouchableOpacity
           style={[styles.btnOutline, { paddingVertical: isMobile ? 8 : 10, paddingHorizontal: isMobile ? 12 : 16 }]}
           onPress={handleBackToSellers}
@@ -329,12 +306,12 @@ const SellerShiprocket: React.FC<Props> = () => {
         >
           <BsIcon name="arrow-left" size={isMobile ? 13 : 15} color="#6B7280" />
           <Text style={[styles.btnOutlineText, { fontSize: fontSize.sm, marginLeft: 5 }]}>
-            Back to Sellers
+            Back{isMobile ? '' : ' to Sellers'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.btnPrimary, { paddingVertical: isMobile ? 8 : 10, paddingHorizontal: isMobile ? 12 : 16, marginLeft: 8 }]}
+          style={[styles.btnPrimary, { paddingVertical: isMobile ? 8 : 10, paddingHorizontal: isMobile ? 12 : 16, marginLeft: isMobile ? 4 : 8 }]}
           onPress={handleExport}
           activeOpacity={0.8}
           disabled={exporting}
@@ -345,14 +322,60 @@ const SellerShiprocket: React.FC<Props> = () => {
             <>
               <BsIcon name="box-arrow-up-right" size={isMobile ? 13 : 15} color="#fff" />
               <Text style={[styles.btnPrimaryText, { fontSize: fontSize.sm, marginLeft: 5 }]}>
-                Export New Sellers
+                Export{isMobile ? '' : ' New Sellers'}
               </Text>
             </>
           )}
         </TouchableOpacity>
+      </>
+    );
+
+    return (
+      <View style={[styles.header, { paddingHorizontal: isMobile ? 0 : contentPadding }]}>
+        <View style={[styles.headerLeft, isMobile && { flexDirection: 'column', width: '100%' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
+            <View style={[styles.headerIconBox, isMobile && { width: 40, height: 40 }]}>
+              <BsIcon name="upload" size={isMobile ? 18 : 24} color="#fff" />
+            </View>
+            <View style={{ marginLeft: 12, flexShrink: 1 }}>
+              <Text style={[styles.headerTitle, { fontSize: isMobile ? 18 : fontSize.lg }]} numberOfLines={isMobile ? 1 : undefined}>
+                Shiprocket Upload Tracker
+              </Text>
+              {/* Breadcrumb */}
+              {/* <View style={styles.breadcrumb}>
+                <Text style={[styles.breadcrumbLink, { fontSize: fontSize.xs }]}>Dashboard</Text>
+                <Text style={[styles.breadcrumbSep, { fontSize: fontSize.xs }]}> › </Text>
+                <Text style={[styles.breadcrumbLink, { fontSize: fontSize.xs }]}>Sellers</Text>
+                <Text style={[styles.breadcrumbSep, { fontSize: fontSize.xs }]}> › </Text>
+                <Text style={[styles.breadcrumbCurrent, { fontSize: fontSize.xs }]} numberOfLines={1}>Upload Tracker</Text>
+              </View> */}
+            </View>
+          </View>
+          
+          {isMobile ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 12 }}>
+              <View style={styles.profileBadge}>
+                <Text style={[styles.profileBadgeText, { fontSize: fontSize.xs }]}>● Profile Completed</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {actionButtons}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.profileBadge}>
+              <Text style={[styles.profileBadgeText, { fontSize: fontSize.xs }]}>● Profile Completed</Text>
+            </View>
+          )}
+        </View>
+
+        {!isMobile && (
+          <View style={styles.headerActions}>
+            {actionButtons}
+          </View>
+        )}
       </View>
-    </View>
-  );
+    );
+  };
 
   // Stat cards
   const renderStatCards = () => (
@@ -710,7 +733,11 @@ const SellerShiprocket: React.FC<Props> = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Page header */}
-          <View style={[styles.pageHeaderWrapper, { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: isMobile ? 20 : 68 }]}>
+          <View style={[
+            styles.pageHeaderWrapper, 
+            { paddingHorizontal: contentPadding, paddingTop: 20, paddingBottom: isMobile ? 20 : 68 },
+            isMobile && { marginHorizontal: 12, marginTop: 12, borderRadius: 16 }
+          ]}>
             {renderHeader()}
           </View>
 

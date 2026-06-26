@@ -19,6 +19,7 @@ import {
     Modal,
     StatusBar,
     Animated,
+    useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
@@ -418,6 +419,8 @@ const QuestionGridCard: React.FC<{
 // â”€â”€â”€ MAIN SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FaqQuestionsScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
+    const { width } = useWindowDimensions();
+    const isMobile = width < 480;
 
     const [categories, setCategories] = useState<FaqCategory[]>([]);
     const [questions, setQuestions] = useState<FaqQuestion[]>([]);
@@ -547,16 +550,17 @@ const FaqQuestionsScreen: React.FC = () => {
 
                 <ScrollView style={st.scroll} showsVerticalScrollIndicator={false}>
                     {/* ——— PAGE HEADER ——— */}
-                    <View style={[st.header, isWeb && st.headerWeb, { backgroundColor: NAVY, borderBottomColor: NAVY }]}>
+                    <View style={[
+                        st.header,
+                        isWeb ? st.headerWeb : st.headerMobile,
+                        { backgroundColor: NAVY, borderBottomColor: NAVY }
+                    ]}>
                         <View style={st.headerLeft}>
                             <View style={[st.headerIcon, { backgroundColor: PRIMARY }]}>
                                 <Feather name="help-circle" size={22} color="#fff" />
                             </View>
                             <View>
                                 <Text style={[st.headerTitle, { color: "#fff" }]}>FAQ Questions</Text>
-                                <Text style={[st.headerBreadcrumb, { color: "rgba(255,255,255,0.6)" }]}>
-                                    <Text style={{ color: PRIMARY }}>Dashboard</Text>{"  ›  FAQ Questions"}
-                                </Text>
                             </View>
                         </View>
                         <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY }]}
@@ -615,9 +619,8 @@ const FaqQuestionsScreen: React.FC = () => {
                             </View>
                         </View>
 
-                        {/* â”€â”€ SEARCH + FILTER TOOLBAR â”€â”€ */}
                         <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
-                            <View style={[st.searchWrap, !isWeb && { minWidth: "100%" as any }]}>
+                            <View style={[st.searchWrap, !isWeb && { width: "100%", flex: 0 }]}>
                                 <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
                                 <TextInput style={st.searchInput}
                                     placeholder="Search questions..."
@@ -649,28 +652,44 @@ const FaqQuestionsScreen: React.FC = () => {
                                     </TouchableOpacity>
                                 ))}
                             </View>
-                            <TouchableOpacity style={st.expandAllBtn}
-                                onPress={() => {
-                                    if (expandedIds.size === filtered.length) setExpandedIds(new Set());
-                                    else setExpandedIds(new Set(filtered.map(q => q.id)));
-                                }}>
-                                <Feather name={expandedIds.size === filtered.length ? "minimize-2" : "maximize-2"} size={13} color={TEXT_BODY} />
-                                <Text style={st.expandAllTxt}>{expandedIds.size === filtered.length ? "Collapse" : "Expand"} All</Text>
-                            </TouchableOpacity>
+                            {isMobile ? (
+                                <View style={st.viewToggle}>
+                                    <TouchableOpacity
+                                        style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
+                                        onPress={() => setViewMode("list")}>
+                                        <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
+                                        onPress={() => setViewMode("grid")}>
+                                        <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <>
+                                    <TouchableOpacity style={st.expandAllBtn}
+                                        onPress={() => {
+                                            if (expandedIds.size === filtered.length) setExpandedIds(new Set());
+                                            else setExpandedIds(new Set(filtered.map(q => q.id)));
+                                        }}>
+                                        <Feather name={expandedIds.size === filtered.length ? "minimize-2" : "maximize-2"} size={13} color={TEXT_BODY} />
+                                        <Text style={st.expandAllTxt}>{expandedIds.size === filtered.length ? "Collapse" : "Expand"} All</Text>
+                                    </TouchableOpacity>
 
-                            {/* View mode toggle */}
-                            <View style={st.viewToggle}>
-                                <TouchableOpacity
-                                    style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
-                                    onPress={() => setViewMode("list")}>
-                                    <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
-                                    onPress={() => setViewMode("grid")}>
-                                    <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
-                                </TouchableOpacity>
-                            </View>
+                                    <View style={st.viewToggle}>
+                                        <TouchableOpacity
+                                            style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
+                                            onPress={() => setViewMode("list")}>
+                                            <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
+                                            onPress={() => setViewMode("grid")}>
+                                            <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
                         </View>
 
                         {/* â”€â”€ RESULT COUNT â”€â”€ */}
@@ -817,6 +836,18 @@ const st = StyleSheet.create({
 
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: BG_CARD, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
     headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    headerMobile: {
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 22,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT_HEAD, letterSpacing: -0.3 },

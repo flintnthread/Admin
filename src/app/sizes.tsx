@@ -33,40 +33,34 @@ import {
 // CLI:   import LinearGradient from "react-native-linear-gradient";
 import { LinearGradient } from "expo-linear-gradient";
 
-// ── Bootstrap Icons via 'bootstrap-icons' Font Family ────────
-const BI_MAP: Record<string, string> = {
-  "check-circle-fill": "\uF269",
-  "x-circle-fill": "\uF659",
-  "pencil-square": "\uF4CA",
-  "trash3": "\uF78B",
-  "calendar3": "\uF214",
-  "chevron-left": "\uF284",
-  "chevron-right": "\uF285",
-  "x-lg": "\uF659",
-  "check-circle": "\uF26B",
-  "x-circle": "\uF623",
-  "floppy": "\uF7D8",
-  "grid-3x3": "\uF3FA",
-  "plus-lg": "\uF64D",
-  "search": "\uF52A",
-  "grid": "\uF3FC",
-  "list-ul": "\uF478",
+import { Ionicons } from "@expo/vector-icons";
+
+const ION_MAP: Record<string, any> = {
+  "check-circle-fill": "checkmark-circle",
+  "x-circle-fill": "close-circle",
+  "pencil-square": "create-outline",
+  "trash3": "trash-outline",
+  "calendar3": "calendar-outline",
+  "chevron-left": "chevron-back-outline",
+  "chevron-right": "chevron-forward-outline",
+  "x-lg": "close",
+  "check-circle": "checkmark-circle-outline",
+  "x-circle": "close-circle-outline",
+  "floppy": "save-outline",
+  "grid-3x3": "apps-outline",
+  "plus-lg": "add",
+  "search": "search-outline",
+  "grid": "grid-outline",
+  "list-ul": "list-outline",
 };
 
-type BIName = keyof typeof BI_MAP | string;
-
-const BI: React.FC<{ name: BIName; size?: number; color?: string; style?: object }> = ({
+const BI: React.FC<{ name: string; size?: number; color?: string; style?: object }> = ({
   name,
   size = 18,
   color = "#fff",
   style,
 }) => (
-  <Text
-    style={[{ fontFamily: "bootstrap-icons", fontSize: size, color, lineHeight: size + 4 }, style]}
-    accessible={false}
-  >
-    {BI_MAP[name] ?? "•"}
-  </Text>
+  <Ionicons name={ION_MAP[name] ?? "ellipse"} size={size} color={color} style={style as any} />
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -213,6 +207,8 @@ const GridCard: React.FC<{
   onDelete: (s: SizeItem) => void;
   cardWidth: number;
 }> = ({ item, idx, onEdit, onDelete, cardWidth }) => {
+  const dims = useWindowDimensions();
+  const isMobile = dims.width < 768;
   const [showActions, setShowActions] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const colors = CARD_GRADIENTS[idx % CARD_GRADIENTS.length];
@@ -222,9 +218,9 @@ const GridCard: React.FC<{
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => setShowActions(p => !p)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onPress={() => !isMobile && setShowActions(p => !p)}
+      onMouseEnter={() => !isMobile && setIsHovered(true)}
+      onMouseLeave={() => !isMobile && setIsHovered(false)}
       style={[S.gridCard, { width: cardWidth }]}
     >
       <LinearGradient
@@ -233,8 +229,7 @@ const GridCard: React.FC<{
         end={{ x: 1, y: 1 }}
         style={S.gridCardTop}
       >
-
-        {visibleActions ? (
+        {visibleActions && !isMobile ? (
           <View style={S.gridCardActions}>
             <TouchableOpacity
               style={S.cardActionBtn}
@@ -272,6 +267,18 @@ const GridCard: React.FC<{
           </View>
           <StatusBadge status={item.status} />
         </View>
+
+        {isMobile && (
+          <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+            <TouchableOpacity style={S.mobileEditBtn} onPress={() => onEdit(item)}>
+              <BI name="pencil-square" size={13} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={S.mobileDeleteBtn} onPress={() => onDelete(item)}>
+              <BI name="trash3" size={13} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+
       </View>
     </TouchableOpacity>
   );
@@ -600,6 +607,7 @@ type ModalState =
 
 export default function SizesManagement() {
   const { width } = useWindowDimensions();
+  const isMobile = width < 600;
   const isTablet = width >= 600;
   const isDesktop = width >= 960;
 
@@ -662,21 +670,21 @@ export default function SizesManagement() {
       <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
         <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
-
-        {/* ── WEB PAGE HEADER ── */}
-        <View style={S.webPageHeader}>
-          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-            <View style={S.headerIconBox}>
-              <BI name="grid-3x3" size={18} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={S.webPageTitle}>Sizes Management</Text>
-              <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>
-            </View>
+        {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}
+        <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
+          <View style={S.headerIconBox}>
+            <BI name="grid-3x3" size={18} color="#fff" />
           </View>
-          <TouchableOpacity style={S.addBtn} onPress={() => setModal({ type: "add" })}>
+          <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
+            <Text style={S.webPageTitle}>{isMobile ? "Sizes" : "Sizes Management"}</Text>
+            {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+          </View>
+          <TouchableOpacity 
+            style={[S.addBtn, isMobile && S.addBtnMobile]} 
+            onPress={() => setModal({ type: "add" })}
+          >
             <BI name="plus-lg" size={15} color="#fff" />
-            <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
+            {!isMobile && <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>}
           </TouchableOpacity>
         </View>
 
@@ -830,6 +838,11 @@ const S = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
   },
+  webPageHeaderMobile: {
+    paddingHorizontal: 12, paddingVertical: 14,
+    marginHorizontal: 8, marginTop: 12,
+    borderRadius: 16,
+  },
   webPageTitle: { fontSize: 22, fontWeight: "800", color: "#fff" },
   webPageSubtitle: { fontSize: 13, color: "#cbd5e1", marginTop: 4 },
   headerIconBox: {
@@ -851,6 +864,11 @@ const S = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  addBtnMobile: {
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 8,
   },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 
@@ -905,6 +923,14 @@ const S = StyleSheet.create({
     justifyContent: "space-between", flexWrap: "wrap", gap: 4,
   },
   gridCardDate: { fontSize: 11, color: "#999" },
+  mobileEditBtn: {
+    width: 32, height: 32, borderRadius: 6,
+    backgroundColor: "#1a2a4a", alignItems: "center", justifyContent: "center",
+  },
+  mobileDeleteBtn: {
+    width: 32, height: 32, borderRadius: 6,
+    backgroundColor: "#e53935", alignItems: "center", justifyContent: "center",
+  },
 
   // List view
   listHeader: {

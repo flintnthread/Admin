@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapDeliverySlabRow } from "@/lib/mappers";
@@ -8,24 +9,22 @@ import {
   fetchDeliverySlabs,
   updateDeliverySlab,
 } from "@/services/deliveryApi";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  FlatList,
-  Platform,
-  useWindowDimensions,
-  Modal,
-  TextInput,
-  Alert,
-} from "react-native";
 import { Feather } from "@expo/vector-icons";
-import AdminLayout from "@/components/admin-layout";
-import Pagination from "@/components/Pagination";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from "react-native";
 import Swal from "sweetalert2";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -1010,157 +1009,157 @@ const DeliveryChargesScreen: React.FC = () => {
   if (!isWeb) {
     return (
       <AdminLayout>
-      <View style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
-        <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
+          <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
-        {/* Mobile Header */}
-        <View style={styles.mobileHeader}>
-          <View>
-            <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
-            <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
+          {/* Mobile Header */}
+          <View style={styles.mobileHeader}>
+            <View>
+              <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
+              <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.mobileAddBtn}
+              activeOpacity={0.85}
+              onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
+            >
+              <Feather name="plus" size={14} color="#1E2B6B" />
+              <Text style={styles.mobileAddBtnTxt}>Add New Charge</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.mobileAddBtn}
-            activeOpacity={0.85}
-            onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
+
+          {/* Stats cards — overlap header */}
+          <StatsFooter slabs={slabs} isWeb={false} />
+
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 32 }}
           >
-            <Feather name="plus" size={14} color="#1E2B6B" />
-            <Text style={styles.mobileAddBtnTxt}>Add New Charge</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Search + Filter toolbar */}
+            <View style={styles.mobileToolbar}>
+              {/* Search */}
+              <View style={styles.mobileSearchBox}>
+                <Feather name="search" size={15} color="#94A3B8" />
+                <TextInput
+                  style={styles.mobileSearchInput}
+                  placeholder="Search delivery charges..."
+                  placeholderTextColor="#94A3B8"
+                  value={searchQuery}
+                  onChangeText={(text) => {
+                    setSearchQuery(text);
+                    setCurrentPage(1);
+                  }}
+                />
+              </View>
 
-        {/* Stats cards — overlap header */}
-        <StatsFooter slabs={slabs} isWeb={false} />
+              {/* Filter pills + view toggle */}
+              <View style={styles.mobileFilterRow}>
+                <View style={styles.mobileFilterPills}>
+                  {(["All", "Active", "Inactive"] as const).map(status => (
+                    <TouchableOpacity
+                      key={status}
+                      style={[
+                        styles.mobilePill,
+                        filterStatus === status && styles.mobilePillActive,
+                      ]}
+                      onPress={() => { setFilterStatus(status); setCurrentPage(1); }}
+                    >
+                      <Text style={[
+                        styles.mobilePillTxt,
+                        filterStatus === status && styles.mobilePillTxtActive,
+                      ]}>{status}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-        <ScrollView
-          style={{ flex: 1 }}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        >
-          {/* Search + Filter toolbar */}
-          <View style={styles.mobileToolbar}>
-            {/* Search */}
-            <View style={styles.mobileSearchBox}>
-              <Feather name="search" size={15} color="#94A3B8" />
-              <TextInput
-                style={styles.mobileSearchInput}
-                placeholder="Search delivery charges..."
-                placeholderTextColor="#94A3B8"
-                value={searchQuery}
-                onChangeText={(text) => {
-                  setSearchQuery(text);
-                  setCurrentPage(1);
-                }}
-              />
-            </View>
-
-            {/* Filter pills + view toggle */}
-            <View style={styles.mobileFilterRow}>
-              <View style={styles.mobileFilterPills}>
-                {(["All", "Active", "Inactive"] as const).map(status => (
+                <View style={styles.mobileViewToggle}>
                   <TouchableOpacity
-                    key={status}
-                    style={[
-                      styles.mobilePill,
-                      filterStatus === status && styles.mobilePillActive,
-                    ]}
-                    onPress={() => { setFilterStatus(status); setCurrentPage(1); }}
+                    style={[styles.mobileViewBtn, viewMode === "grid" && styles.mobileViewBtnActive]}
+                    onPress={() => setViewMode("grid")}
                   >
-                    <Text style={[
-                      styles.mobilePillTxt,
-                      filterStatus === status && styles.mobilePillTxtActive,
-                    ]}>{status}</Text>
+                    <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : "#94A3B8"} />
                   </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.mobileViewToggle}>
-                <TouchableOpacity
-                  style={[styles.mobileViewBtn, viewMode === "grid" && styles.mobileViewBtnActive]}
-                  onPress={() => setViewMode("grid")}
-                >
-                  <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : "#94A3B8"} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.mobileViewBtn, viewMode === "list" && styles.mobileViewBtnActive]}
-                  onPress={() => setViewMode("list")}
-                >
-                  <Feather name="list" size={15} color={viewMode === "list" ? T.orange : "#94A3B8"} />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.mobileViewBtn, viewMode === "list" && styles.mobileViewBtnActive]}
+                    onPress={() => setViewMode("list")}
+                  >
+                    <Feather name="list" size={15} color={viewMode === "list" ? T.orange : "#94A3B8"} />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Content */}
-          <View style={{ paddingHorizontal: 16 }}>
-            {loading || authLoading ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>Loading delivery charges…</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>{error}</Text>
-                <TouchableOpacity style={styles.retryBtn} onPress={loadSlabs}>
-                  <Text style={styles.retryBtnText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : viewMode === "grid" ? (
-              <View style={{ gap: 14 }}>
-                {filteredSlabs
-                  .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-                  .map((item) => (
-                    <SlabCard
-                      key={item.id}
-                      slab={item}
-                      onActivate={handleActivate}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-              </View>
-            ) : (
-              <View style={{ gap: 12 }}>
-                {filteredSlabs
-                  .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-                  .map((item) => (
-                    <MobileSlabCard
-                      key={item.id}
-                      slab={item}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-              </View>
-            )}
+            {/* Content */}
+            <View style={{ paddingHorizontal: 16 }}>
+              {loading || authLoading ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>Loading delivery charges…</Text>
+                </View>
+              ) : error ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>{error}</Text>
+                  <TouchableOpacity style={styles.retryBtn} onPress={loadSlabs}>
+                    <Text style={styles.retryBtnText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : viewMode === "grid" ? (
+                <View style={{ gap: 14 }}>
+                  {filteredSlabs
+                    .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                    .map((item) => (
+                      <SlabCard
+                        key={item.id}
+                        slab={item}
+                        onActivate={handleActivate}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                </View>
+              ) : (
+                <View style={{ gap: 12 }}>
+                  {filteredSlabs
+                    .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                    .map((item) => (
+                      <MobileSlabCard
+                        key={item.id}
+                        slab={item}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                </View>
+              )}
 
-            {filteredSlabs.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={Math.ceil(filteredSlabs.length / ITEMS_PER_PAGE)}
-                totalItems={filteredSlabs.length}
-                itemsPerPage={ITEMS_PER_PAGE}
-                itemName="delivery charges"
-                onPageChange={setCurrentPage}
-              />
-            )}
-          </View>
-        </ScrollView>
+              {filteredSlabs.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(filteredSlabs.length / ITEMS_PER_PAGE)}
+                  totalItems={filteredSlabs.length}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                  itemName="delivery charges"
+                  onPageChange={setCurrentPage}
+                />
+              )}
+            </View>
+          </ScrollView>
 
-        <DeliveryChargeModal
-          visible={editingSlabId !== null}
-          onClose={() => setEditingSlabId(null)}
-          slab={slabs.find((s) => s.id === editingSlabId) || null}
-          isWeb={false}
-          onSave={saveSlab}
-        />
-        <DeliveryChargeModal
-          visible={isAddModalVisible}
-          onClose={() => setIsAddModalVisible(false)}
-          slab={null}
-          isWeb={false}
-          onSave={saveSlab}
-        />
-      </View>
+          <DeliveryChargeModal
+            visible={editingSlabId !== null}
+            onClose={() => setEditingSlabId(null)}
+            slab={slabs.find((s) => s.id === editingSlabId) || null}
+            isWeb={false}
+            onSave={saveSlab}
+          />
+          <DeliveryChargeModal
+            visible={isAddModalVisible}
+            onClose={() => setIsAddModalVisible(false)}
+            slab={null}
+            isWeb={false}
+            onSave={saveSlab}
+          />
+        </SafeAreaView>
       </AdminLayout>
     );
   }
@@ -1367,9 +1366,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: "#151D4F",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 16 : 52,
-    paddingBottom: 52,
+    paddingTop: 16,
+    paddingBottom: 24,
     marginBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginHorizontal: 16,
+    marginTop: 12,
   },
   mobileHeaderTitle: {
     fontSize: 22,

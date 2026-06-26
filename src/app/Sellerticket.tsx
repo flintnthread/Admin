@@ -72,7 +72,7 @@ const STATUS_TO_API: Record<string, string> = {
 
 const C = {
   brand: "#C85D1A",
-  brandDark: "#1E2B6B",
+  brandDark: "#1d324e",
   brandLight: "#F0A060",
   brandFaint: "#FDF3EC",
   bg: "#F5F6FA",
@@ -157,11 +157,11 @@ const Dropdown = ({ label, value, options, onSelect }: DropdownProps) => {
         onPress={() => setOpen(true)}
         activeOpacity={0.8}
       >
-        <Text style={styles.dropdownLabel}>{label}: </Text>
+        <Text style={[styles.dropdownLabel, { flexShrink: 0 }]}>{label}</Text>
         <Text style={styles.dropdownValue} numberOfLines={1}>
           {value}
         </Text>
-        <Text style={styles.dropdownArrow}>▾</Text>
+        <Text style={[styles.dropdownArrow, { flexShrink: 0 }]}>▾</Text>
       </TouchableOpacity>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -693,14 +693,14 @@ export default function SupportTicketManagement() {
               <SearchIcon size={16} color={C.textMuted} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search tickets..."
+                placeholder="Search tickets"
                 placeholderTextColor={C.textMuted}
                 value={searchText}
                 onChangeText={setSearchText}
               />
             </View>
             <Dropdown
-              label="Status"
+              label="Status "
               value={statusFilter}
               options={statusOptions}
               onSelect={setStatusFilter}
@@ -1000,6 +1000,7 @@ const styles = StyleSheet.create({
   },
   dropdownWrapper: {
     flex: 1,
+    minWidth: 0,
   },
   dropdownTrigger: {
     flexDirection: "row",
@@ -1010,7 +1011,8 @@ const styles = StyleSheet.create({
     height: 42,
     borderWidth: 1,
     borderColor: C.border,
-    gap: 4,
+    gap: 2,
+    overflow: "hidden",
   },
   dropdownLabel: {
     fontSize: 12,
@@ -1024,8 +1026,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   dropdownArrow: {
-    fontSize: 12,
+    fontSize: 22,
+    lineHeight: 26,
     color: C.textSecondary,
+    flexShrink: 0,
   },
   dropdownBackdrop: {
     flex: 1,

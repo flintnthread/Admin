@@ -4,9 +4,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
-  SafeAreaView,
   StatusBar,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import AdminHeader from "./admin-header";
 import AdminSidebar from "./admin-sidebar";
@@ -28,6 +29,13 @@ export default function AdminLayout({ children }: Props) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
+      {Platform.OS === "web" && (
+        <style>{`
+          html.swal2-shown, body.swal2-shown {
+            height: 100% !important;
+          }
+        `}</style>
+      )}
       <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
       <View style={styles.container}>
 
