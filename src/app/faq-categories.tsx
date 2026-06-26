@@ -18,6 +18,7 @@ import {
     Modal,
     StatusBar,
     Alert,
+    useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -163,13 +164,6 @@ const CategoryModal: React.FC<{
 };
 
 // ─── GRID CARD  (image-2 style) ───────────────────────────────────────────────
-// Layout:
-//   [ icon-box (top-left) ]          [ edit 🖊  delete 🗑 (top-right) ]
-//   Category Name (bold)
-//   Description (muted)
-//   ─────────────────────────────────────────────
-//   📋 N FAQs   📅 date    • ACTIVE / INACTIVE
-// Top border uses the category accent color.
 const GridCard: React.FC<{
     cat: FaqCategory;
     onEdit: () => void;
@@ -279,6 +273,9 @@ const ListRow: React.FC<{
 // ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
 const FaqCategoriesScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
+    const { width } = useWindowDimensions();
+    const isMobile = width < 480;
+
     const [categories, setCategories] = useState<FaqCategory[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
@@ -425,10 +422,10 @@ const FaqCategoriesScreen: React.FC = () => {
 
     // Stat cards data
     const stats = [
-        { label: "Total Categories", value: String(categories.length), icon: "grid", color: PRIMARY },
-        { label: "Active", value: String(totalActive), icon: "check-circle", color: ACCENT_TEAL },
-        { label: "Inactive", value: String(categories.length - totalActive), icon: "slash", color: ACCENT_RED },
-        { label: "Total FAQs", value: String(totalFaqs), icon: "help-circle", color: ACCENT_SKY },
+        { label: "Total Categories", subLabel: "+0 this week", value: String(categories.length), icon: "grid", color: PRIMARY },
+        { label: "Active", subLabel: "Enabled", value: String(totalActive), icon: "check-circle", color: ACCENT_TEAL },
+        { label: "Inactive", subLabel: "Needs review", value: String(categories.length - totalActive), icon: "slash", color: ACCENT_RED },
+        { label: "Total FAQs", subLabel: "Across all categories", value: String(totalFaqs), icon: "help-circle", color: ACCENT_SKY },
     ];
 
     return (
@@ -437,25 +434,63 @@ const FaqCategoriesScreen: React.FC = () => {
                 <StatusBar barStyle="light-content" backgroundColor={DARK_NAVY} />
 
                 <ScrollView style={st.scroll} showsVerticalScrollIndicator={false}>
-                    {/* ── HEADER ── */}
-                    <View style={[st.header, isWeb && st.headerWeb]}>
-                        <View style={st.headerLeft}>
-                            <View style={st.headerIcon}>
-                                <Feather name="help-circle" size={22} color="#fff" />
+
+                    {/* ── MOBILE HEADER ── */}
+                    {isMobile ? (
+                        <>
+                            {/* Header bar: title left + add button right */}
+                            <View style={st.headerMobile}>
+                                <View style={st.headerMobileLeft}>
+                                    <View style={st.headerIcon}>
+                                        <Feather name="help-circle" size={22} color="#fff" />
+                                    </View>
+                                    <Text style={st.headerTitle}>FAQ Categories</Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={st.addBtnMobile}
+                                    onPress={() => { setEditingCat(null); setModalVisible(true); }}
+                                >
+                                    <Feather name="plus" size={16} color="#fff" />
+                                </TouchableOpacity>
                             </View>
-                            <View>
-                                <Text style={st.headerTitle}>FAQ Categories</Text>
+
+                            {/* Stat cards: 2 per row grid overlapping the header */}
+                            <View style={st.statsGridMobile}>
+                                {stats.map((s, i) => (
+                                    <View key={i} style={[st.statCardMobile, { borderTopColor: s.color }]}>
+                                        <View style={st.statCardMobileTopRow}>
+                                            <View style={[st.statIconMobile, { backgroundColor: s.color + "1a" }]}>
+                                                <Feather name={s.icon as any} size={18} color={s.color} />
+                                            </View>
+                                            <Text style={[st.statValueMobile, { color: s.color }]}>{s.value}</Text>
+                                        </View>
+                                        <Text style={st.statLabelMobile}>{s.label}</Text>
+                                        <Text style={st.statSubLabelMobile}>{s.subLabel}</Text>
+                                    </View>
+                                ))}
                             </View>
+                        </>
+                    ) : (
+                        // ── WEB HEADER ──
+                        <View style={[st.header, isWeb && st.headerWeb]}>
+                            <View style={st.headerLeft}>
+                                <View style={st.headerIcon}>
+                                    <Feather name="help-circle" size={22} color="#fff" />
+                                </View>
+                                <View>
+                                    <Text style={st.headerTitle}>FAQ Categories</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity style={st.addBtn}
+                                onPress={() => { setEditingCat(null); setModalVisible(true); }}>
+                                <Feather name="plus" size={14} color="#fff" />
+                                <Text style={st.addBtnText}>Add Category</Text>
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity style={st.addBtn}
-                            onPress={() => { setEditingCat(null); setModalVisible(true); }}>
-                            <Feather name="plus" size={14} color="#fff" />
-                            <Text style={st.addBtnText}>Add Category</Text>
-                        </TouchableOpacity>
-                    </View>
+                    )}
 
                     {/* ── WEB STAT CARDS (overlapping header) ── */}
-                    {isWeb && (
+                    {!isMobile && (
                         <View style={st.statsRow}>
                             {stats.map((s, i) => (
                                 <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
@@ -477,30 +512,10 @@ const FaqCategoriesScreen: React.FC = () => {
                             <Text style={{ color: ACCENT_RED, marginBottom: 12, paddingHorizontal: 16 }}>{loadError}</Text>
                         ) : null}
 
-                        {/* ── MOBILE STAT CARDS ── */}
-                        {!isWeb && (
-                            <View style={st.statsCardSingle}>
-                                {stats.map((s, i) => (
-                                    <React.Fragment key={i}>
-                                        {i > 0 && <View style={st.statDividerSingle} />}
-                                        <View style={st.statBlockSingle}>
-                                            <View style={[st.statIconWrapperSingle, { backgroundColor: s.color + "18" }]}>
-                                                <Feather name={s.icon as any} size={20} color={s.color} />
-                                            </View>
-                                            <View style={st.statTextWrapperSingle}>
-                                                <Text style={[st.statValueSingle, { color: s.color }]}>{s.value}</Text>
-                                                <Text style={st.statLabelSingle}>{s.label.toUpperCase()}</Text>
-                                            </View>
-                                        </View>
-                                    </React.Fragment>
-                                ))}
-                            </View>
-                        )}
-
                         {/* ── TOOLBAR ── */}
                         <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
                             {/* Search */}
-                            <View style={[st.searchWrap, !isWeb && { minWidth: "100%" as any }]}>
+                            <View style={[st.searchWrap, !isWeb && { width: "100%", flex: 0 }]}>
                                 <Feather name="search" size={14} color={PRIMARY} />
                                 <TextInput style={st.searchInput}
                                     placeholder="Search categories..."
@@ -602,15 +617,18 @@ const FaqCategoriesScreen: React.FC = () => {
                             </View>
                         )}
 
+                        {/* ── PAGINATION (Centered on mobile) ── */}
                         {filtered.length > 0 && (
-                            <Pagination
-                                currentPage={currentPage}
-                                totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-                                totalItems={filtered.length}
-                                itemsPerPage={ITEMS_PER_PAGE}
-                                itemName="categories"
-                                onPageChange={setCurrentPage}
-                            />
+                            <View style={[st.paginationWrapper, isMobile && st.paginationWrapperMobile]}>
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                    totalItems={filtered.length}
+                                    itemsPerPage={ITEMS_PER_PAGE}
+                                    itemName="categories"
+                                    onPageChange={setCurrentPage}
+                                />
+                            </View>
                         )}
                     </View>
                 </ScrollView>
@@ -634,7 +652,7 @@ export default FaqCategoriesScreen;
 const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
-    // Header
+    // ── Web Header ──
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
     headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
@@ -644,27 +662,108 @@ const st = StyleSheet.create({
     addBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: PRIMARY, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
     addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-    // Scroll
+    // ── Mobile Header ──
+    headerMobile: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: DARK_NAVY,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 44,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 22,
+        shadowColor: DARK_NAVY,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    headerMobileLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        flex: 1,
+    },
+    addBtnMobile: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        backgroundColor: PRIMARY,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: PRIMARY,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+
+    // ── Mobile Stats Grid & Cards ──
+    statsGridMobile: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+        rowGap: 12,
+        marginTop: -32,
+        marginHorizontal: 24,
+        zIndex: 10,
+    },
+    statCardMobile: {
+        backgroundColor: BG_CARD,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderTopWidth: 3,
+        borderColor: BORDER,
+        padding: 14,
+        width: "48%",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    statCardMobileTopRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 10,
+    },
+    statIconMobile: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    statValueMobile: {
+        fontSize: 24,
+        fontWeight: "800",
+    },
+    statLabelMobile: {
+        fontSize: 13,
+        fontWeight: "700",
+        color: TEXT_HEAD,
+        marginBottom: 2,
+    },
+    statSubLabelMobile: {
+        fontSize: 11,
+        color: TEXT_MUTED,
+    },
+
+    // ── Scroll ──
     scroll: { flex: 1 },
     scrollContent: { padding: 16, gap: 14 },
 
-    // Stats
+    // ── Web Stat Cards ──
     statsRow: { flexDirection: "row", gap: 12, marginBottom: 4, marginTop: -42, marginHorizontal: 16, zIndex: 10, maxWidth: 900, alignSelf: "center", width: "100%" },
     statCard: { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     statIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     statValue: { fontSize: 22, fontWeight: "800" },
     statLabel: { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", letterSpacing: 0.5 },
 
-    // Stats Single Card (Mobile)
-    statsCardSingle: { backgroundColor: BG_CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2, marginBottom: 4 },
-    statBlockSingle: { flexDirection: "row", alignItems: "center", gap: 14 },
-    statIconWrapperSingle: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-    statTextWrapperSingle: { flex: 1 },
-    statValueSingle: { fontSize: 20, fontWeight: "800", marginBottom: 2 },
-    statLabelSingle: { fontSize: 11, fontWeight: "700", color: TEXT_MUTED, letterSpacing: 0.5 },
-    statDividerSingle: { height: 1, backgroundColor: BORDER, marginVertical: 12 },
-
-    // Toolbar
+    // ── Toolbar ──
     toolbar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: BG_CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
     searchWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: PRIMARY + "55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
     searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, outlineStyle: "none" } as any,
@@ -674,23 +773,27 @@ const st = StyleSheet.create({
     viewToggle: { flexDirection: "row", backgroundColor: BG_PAGE, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
     viewBtn: { padding: 8 },
 
-    // Result count
+    // ── Result count ──
     resultCount: { fontSize: 12, color: TEXT_MUTED, fontWeight: "500" },
 
-    // Grid
+    // ── Grid ──
     grid: { gap: 14 },
     gridWeb: { flexDirection: "row", flexWrap: "wrap" as any, gap: 16 },
     gridItem: { width: "100%" },
     gridItemWeb: { width: "23%", minWidth: 240 },
 
-    // List
+    // ── List ──
     listWrap: { backgroundColor: BG_CARD, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
 
-    // Empty
+    // ── Empty ──
     empty: { alignItems: "center", paddingVertical: 60, gap: 10 },
     emptyIconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: BG_CARD, alignItems: "center", justifyContent: "center", marginBottom: 4, borderWidth: 1, borderColor: BORDER },
     emptyTitle: { fontSize: 16, fontWeight: "700", color: TEXT_HEAD },
     emptySubtitle: { fontSize: 13, color: TEXT_MUTED },
+
+    // ── Pagination ──
+    paginationWrapper: { marginTop: 24 },
+    paginationWrapperMobile: { alignItems: "center" },
 });
 
 // ─── CARD STYLES (image-2) ────────────────────────────────────────────────────

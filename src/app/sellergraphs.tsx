@@ -1367,11 +1367,7 @@ export default function SellersDashboard() {
               </View>
             )}
 
-            {/* ── Footer ── */}
-            <Text style={styles.footer}>
-              2026 © Flintnthread India Pvt. Ltd.{"\n"}
-              Crafted by <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
-            </Text>
+
           </ScrollView>
 
           <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
@@ -1594,16 +1590,16 @@ export default function SellersDashboard() {
               </View>
             </View>
 
-            <View style={[styles.searchControlsRow]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.filterLabelText}>Per page</Text>
-                <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
-              </View>
-              <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { flex: 1, marginTop: 18 }]}>
+            <View style={{ marginBottom: 12, zIndex: 20 }}>
+              <Text style={styles.filterLabelText}>Per page</Text>
+              <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12, zIndex: 10 }}>
+              <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { flex: 1 }]}>
                 <Ionicons name="search" size={13} color="#fff" />
                 <Text style={styles.applyBtnText}>Search</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { flex: 1, marginTop: 18 }]}>
+              <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { flex: 1 }]}>
                 <Ionicons name="refresh" size={13} color="#475569" />
                 <Text style={styles.resetBtnText}>Reset</Text>
               </TouchableOpacity>
@@ -1654,11 +1650,7 @@ export default function SellersDashboard() {
             </View>
           )}
 
-          {/* ── Footer ── */}
-          <Text style={styles.footer}>
-            2026 © Flintnthread India Pvt. Ltd.{"\n"}
-            Crafted by <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
-          </Text>
+
         </ScrollView>
 
         <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />

@@ -1652,12 +1652,24 @@ export default function MainCategories() {
               </View>
             ))}
           </View>
-        ) : (
+        ) : isWeb ? (
           <ListTable
             categories={paginated}
             onEdit={handleEdit}
             onDelete={handleDelete}
           />
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ minWidth: 900 }}
+          >
+            <ListTable
+              categories={paginated}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          </ScrollView>
         )}
 
         {filtered.length === 0 && (

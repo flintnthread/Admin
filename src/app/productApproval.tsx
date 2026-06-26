@@ -367,17 +367,25 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide }: { isWide: boolean }) {
+function PageHeader({ isWide, stats, onFilter, isMobile }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean }) {
   return (
-    <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
-      <View style={styles.pageHeaderLeft}>
-        <View style={styles.pageIcon}>
-          <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
-        </View>
-        <View>
-          <Text style={styles.pageTitle}>Product Approvals</Text>
+    <View>
+      <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
+        <View style={styles.pageHeaderLeft}>
+          <View style={styles.pageIcon}>
+            <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
+          </View>
+          <View>
+            <Text style={styles.pageTitle}>Product Approvals</Text>
+          </View>
         </View>
       </View>
+      {/* Mobile: stat cards overlapping the header bottom */}
+      {isMobile && stats && onFilter && (
+        <View style={styles.mobileHeaderStats}>
+          <StatsRow stats={stats} onFilter={onFilter} isWide={false} />
+        </View>
+      )}
     </View>
   );
 }
@@ -908,13 +916,13 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} />
+        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
         <View style={styles.scrollContent}>
 
-          {!isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
+          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}
@@ -1173,6 +1181,13 @@ const styles = StyleSheet.create({
   },
   pageHeaderWide: {
     alignItems: 'center',
+  },
+  mobileHeaderStats: {
+    marginTop: -42,
+    marginHorizontal: 8,
+    zIndex: 10,
+    elevation: 10,
+    marginBottom: 4,
   },
   pageHeaderLeft: {
     flexDirection: 'row',

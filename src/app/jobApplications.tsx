@@ -12,6 +12,7 @@ import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate, initialsFromName } from '@/lib/format';
 import { fetchJobApplications, fetchJobs, updateJobApplicationStatus } from '@/services/hrApi';
+import { Feather } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Platform,
@@ -45,23 +46,23 @@ const C = {
   white: '#FFFFFF',
 };
 
-// ─── Bootstrap Icons via 'bootstrap-icons' Font Family ────────
-const BI_MAP: Record<string, string> = {
-  "file-earmark-text": "\uF339",
-  "hourglass-split": "\uF41C",
-  "eye": "\uF332",
-  "star-fill": "\uF586",
-  "mic-fill": "\uF4AD",
-  "x-circle-fill": "\uF659",
-  "x-lg": "\uF659",
-  "search": "\uF52A",
-  "arrow-counterclockwise": "\uF117",
-  "chevron-down": "\uF282",
-  "chevron-up": "\uF286",
-  "building": "\uF1D7",
-  "geo-alt-fill": "\uF390",
-  "envelope-fill": "\uF32F",
-  "inbox": "\uF42D",
+// ─── Feather Icons mapping ────────
+const BI_MAP: Record<string, any> = {
+  "file-earmark-text": "file-text",
+  "hourglass-split": "clock",
+  "eye": "eye",
+  "star-fill": "star",
+  "mic-fill": "mic",
+  "x-circle-fill": "x-circle",
+  "x-lg": "x",
+  "search": "search",
+  "arrow-counterclockwise": "rotate-ccw",
+  "chevron-down": "chevron-down",
+  "chevron-up": "chevron-up",
+  "building": "briefcase",
+  "geo-alt-fill": "map-pin",
+  "envelope-fill": "mail",
+  "inbox": "inbox",
 };
 
 type BIName = keyof typeof BI_MAP | string;
@@ -72,12 +73,12 @@ const BI: React.FC<{ name: BIName; size?: number; color?: string; style?: object
   color = C.sub,
   style,
 }) => (
-  <Text
-    style={[{ fontFamily: "bootstrap-icons", fontSize: size, color, lineHeight: size + 4 }, style]}
-    accessible={false}
-  >
-    {BI_MAP[name] ?? "•"}
-  </Text>
+  <Feather
+    name={BI_MAP[name] ?? "circle"}
+    size={size}
+    color={color}
+    style={style}
+  />
 );
 
 const AVATAR_COLORS = ['#5B4EFF', '#8B5CF6', '#06B6D4', '#F97316', '#EF4444', '#10B981', '#F59E0B', '#EC4899'];
@@ -367,26 +368,42 @@ export default function JobApplicationsScreen() {
           </View>
 
           {/* ── Stat Cards ── */}
-          <ScrollView
-            style={{ zIndex: 10, elevation: 10, marginTop: -42, overflow: 'visible' }}
-            horizontal={!isWeb}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.statRow, isWeb && styles.statRowWeb]}
-          >
-            {STAT_CARDS.map(s => (
-              <StatCard
-                key={s.key}
-                label={s.label}
-                count={counts[s.key] ?? 0}
-                color={s.color}
-                icon={s.icon}
-                isWeb={isWeb}
-              />
-            ))}
-          </ScrollView>
+          {isWeb ? (
+            <ScrollView
+              style={{ zIndex: 10, elevation: 10, marginTop: -42, overflow: 'visible' }}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.statRowWeb}
+            >
+              {STAT_CARDS.map(s => (
+                <StatCard
+                  key={s.key}
+                  label={s.label}
+                  count={counts[s.key] ?? 0}
+                  color={s.color}
+                  icon={s.icon}
+                  isWeb={isWeb}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={{ zIndex: 10, elevation: 10, marginTop: -32, paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              {STAT_CARDS.map(s => (
+                <View key={s.key} style={{ width: '48%' }}>
+                  <StatCard
+                    label={s.label}
+                    count={counts[s.key] ?? 0}
+                    color={s.color}
+                    icon={s.icon}
+                    isWeb={isWeb}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* ── Filters ── */}
-          <View style={[styles.filterRow, isWeb && styles.filterRowWeb]}>
+          <View style={[styles.filterRow, isWeb && styles.filterRowWeb, !isWeb && { marginTop: 16 }]}>
             <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
               <BI name="search" size={14} color={C.sub} style={{ marginRight: 8 }} />
               <TextInput
@@ -402,18 +419,38 @@ export default function JobApplicationsScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <View style={[styles.filterDropdowns, isWeb && styles.filterDropdownsWeb]}>
-              <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
-              <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
-              <TouchableOpacity
-                style={[styles.resetBtn, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}
-                onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
-                activeOpacity={0.8}
+            {!isWeb ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingRight: 16, alignItems: 'center' }}
+                style={{ overflow: 'visible', zIndex: 2000, elevation: 2000 }}
               >
-                <BI name="arrow-counterclockwise" size={13} color={C.primary} />
-                <Text style={styles.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
-            </View>
+                <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
+                <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
+                <TouchableOpacity
+                  style={[styles.resetBtn, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+                  onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
+                  activeOpacity={0.8}
+                >
+                  <BI name="arrow-counterclockwise" size={13} color={C.primary} />
+                  <Text style={styles.resetBtnText}>Reset</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : (
+              <View style={[styles.filterDropdowns, styles.filterDropdownsWeb]}>
+                <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
+                <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
+                <TouchableOpacity
+                  style={[styles.resetBtn, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+                  onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
+                  activeOpacity={0.8}
+                >
+                  <BI name="arrow-counterclockwise" size={13} color={C.primary} />
+                  <Text style={styles.resetBtnText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* ── Results info ── */}
@@ -504,6 +541,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#151D4F',
     flexDirection: 'column',
     gap: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 22,
   },
   headerWeb: {
     marginHorizontal: 16, marginTop: 16, borderRadius: 22,

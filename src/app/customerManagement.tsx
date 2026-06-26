@@ -863,7 +863,7 @@ const s = StyleSheet.create({
   scrollContent: { paddingTop: 10, paddingBottom: 40 },
 
   // Header — rounded on all four corners, top and bottom
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
+  header: { marginHorizontal: 2, marginTop: 12, backgroundColor: C.navy, paddingBottom: 44, borderRadius: 24 },
   headerInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hLeft:       { flexDirection: "row", alignItems: "center", gap: 11 },
   hIcon:       { width: 40, height: 40, borderRadius: 11, backgroundColor: C.primary, alignItems: "center", justifyContent: "center" },

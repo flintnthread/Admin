@@ -3235,22 +3235,25 @@ export default function OrdersScreen() {
                 {
                   paddingTop: Platform.OS === "ios" ? 50 : 20,
                 },
+                isMobile && { paddingHorizontal: 16 }
               ]}
             >
               <View
-                style={[s.headerTop, { paddingHorizontal: isMobile ? 16 : 22 }]}
+                style={[s.headerTop, { paddingHorizontal: isMobile ? 0 : 22 }]}
               >
                 <View style={s.headerLeft}>
                   <View style={s.headerIcon}>
                     <OrderBoxIcon color={C.white} />
                   </View>
-                  <View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
                     <Text
                       style={[s.headerTitle, { fontSize: isMobile ? 16 : 20 }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
                     >
                       Orders Management
                     </Text>
-                    <Text style={s.headerSub}>
+                    <Text style={s.headerSub} numberOfLines={1}>
                       Manage and track all customer orders
                     </Text>
                   </View>
