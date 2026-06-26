@@ -15,5 +15,11 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "scratch_*.tsx",
+    "scratch_*.ts",
+    "scratch_*.js"
   ]
 }
