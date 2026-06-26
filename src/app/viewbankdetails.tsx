@@ -61,9 +61,18 @@ function Header({ bp }: { bp: Breakpoint }) {
       <View style={styles.headerCircle1} />
       <View style={styles.headerCircle2} />
       <View style={styles.headerCircle3} />
-      <View style={styles.headerIconBox}>
-        <Icon name="history" size={isMobile ? 22 : 26} color={ORANGE} />
-      </View>
+      {isMobile ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, zIndex: 10 }}>
+          <View style={[styles.headerIconBox, { width: 44, height: 44 }]}>
+            <Icon name="history" size={22} color={ORANGE} />
+          </View>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: "#fff" }}>Bank Approval History</Text>
+        </View>
+      ) : (
+        <View style={styles.headerIconBox}>
+          <Icon name="history" size={26} color={ORANGE} />
+        </View>
+      )}
     </View>
   );
 }
@@ -93,7 +102,7 @@ function TitleSection({
   return (
     <View style={[styles.titleSection, isMobile && styles.titleSectionMobile]}>
       <View style={styles.titleLeft}>
-        <Text style={styles.pageTitle}>Bank Approval History</Text>
+        {bp !== "mobile" && <Text style={styles.pageTitle}>Bank Approval History</Text>}
         {loading ? (
           <ActivityIndicator color={ORANGE} style={{ marginTop: 12 }} />
         ) : (
@@ -108,10 +117,12 @@ function TitleSection({
       </View>
 
       <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
-        <TouchableOpacity style={styles.backBtn} activeOpacity={0.8} onPress={onBack}>
-          <Icon name="arrow-left-circle" size={16} color={ORANGE} style={styles.btnIcon} />
-          <Text style={styles.backBtnText}>Back</Text>
-        </TouchableOpacity>
+        {bp !== "mobile" && (
+          <TouchableOpacity style={styles.backBtn} activeOpacity={0.8} onPress={onBack}>
+            <Icon name="arrow-left-circle" size={16} color={ORANGE} style={styles.btnIcon} />
+            <Text style={styles.backBtnText}>Back</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.proofBtn} activeOpacity={0.8} onPress={onProof} disabled={!data}>
           <Icon name="file-document-outline" size={16} color="#fff" style={styles.btnIcon} />
@@ -143,9 +154,9 @@ function BankDetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CurrentBankDetails({ data }: { data: BankDetail | null }) {
+function CurrentBankDetails({ data, isMobile }: { data: BankDetail | null; isMobile?: boolean }) {
   return (
-    <View style={styles.card}>
+    <View style={isMobile ? { paddingHorizontal: 20, paddingBottom: 10 } : styles.card}>
       <View style={styles.cardTitleRow}>
         <Icon name="bank-outline" size={18} color={ORANGE} style={{ marginRight: 8 }} />
         <Text style={styles.cardTitle}>Current Bank Details</Text>
@@ -171,9 +182,11 @@ function CurrentBankDetails({ data }: { data: BankDetail | null }) {
 function HistoryTimeline({
   compact,
   data,
+  isMobile,
 }: {
   compact?: boolean;
   data: BankDetail | null;
+  isMobile?: boolean;
 }) {
   const events: { label: string; value: string }[] = [];
   if (data?.createdAt) {
@@ -200,7 +213,7 @@ function HistoryTimeline({
   }
 
   return (
-    <View style={[styles.card, compact && styles.historyCardCompact]}>
+    <View style={[isMobile ? { paddingHorizontal: 20, paddingBottom: 20 } : styles.card, compact && !isMobile && styles.historyCardCompact]}>
       <View style={styles.cardTitleRow}>
         <Icon name="history" size={18} color={ORANGE} style={{ marginRight: 8 }} />
         <Text style={styles.cardTitle}>History / Timeline</Text>
@@ -402,25 +415,59 @@ export default function BankApprovalHistory() {
           contentContainerStyle={[styles.scrollContent, !isMobile && { alignItems: "center" }]}
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.outerContainer, { maxWidth: contentMaxWidth, width: "100%" }]}>
-            <View style={styles.topCard}>
-              <Header bp={bp} />
-              <TitleSection
-                bp={bp}
-                data={data}
-                loading={loading}
-                acting={acting}
-                onBack={() => router.push("/sellerbankapproval")}
-                onProof={() => router.push({ pathname: "/bankproof", params: { sellerId: String(sellerId) } })}
-                onApprove={() => setApproveModalVisible(true)}
-                onReject={() => {
-                  setRejectReason("");
-                  setRejectModalVisible(true);
-                }}
-              />
-            </View>
+          <View style={[styles.outerContainer, { maxWidth: contentMaxWidth, width: "100%" }, isMobile && { paddingHorizontal: 16 }]}>
+            {isMobile ? (
+              <View style={styles.topCard}>
+                <Header bp={bp} />
+                <TitleSection
+                  bp={bp}
+                  data={data}
+                  loading={loading}
+                  acting={acting}
+                  onBack={() => router.push("/sellerbankapproval")}
+                  onProof={() => router.push({ pathname: "/bankproof", params: { sellerId: String(sellerId) } })}
+                  onApprove={() => setApproveModalVisible(true)}
+                  onReject={() => {
+                    setRejectReason("");
+                    setRejectModalVisible(true);
+                  }}
+                />
+                
+                {error ? (
+                  <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
+                    <Text style={{ color: "#DC2626", marginBottom: 8 }}>{error}</Text>
+                    <TouchableOpacity style={styles.proofBtn} onPress={loadDetails}>
+                      <Text style={styles.proofBtnText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
 
-            {error ? (
+                <View style={{ height: 1, backgroundColor: "#E5E7EB", marginHorizontal: 20, marginVertical: 12 }} />
+                <CurrentBankDetails data={data} isMobile={true} />
+                
+                <View style={{ height: 1, backgroundColor: "#E5E7EB", marginHorizontal: 20, marginVertical: 8 }} />
+                <HistoryTimeline compact={true} data={data} isMobile={true} />
+              </View>
+            ) : (
+              <View style={styles.topCard}>
+                <Header bp={bp} />
+                <TitleSection
+                  bp={bp}
+                  data={data}
+                  loading={loading}
+                  acting={acting}
+                  onBack={() => router.push("/sellerbankapproval")}
+                  onProof={() => router.push({ pathname: "/bankproof", params: { sellerId: String(sellerId) } })}
+                  onApprove={() => setApproveModalVisible(true)}
+                  onReject={() => {
+                    setRejectReason("");
+                    setRejectModalVisible(true);
+                  }}
+                />
+              </View>
+            )}
+
+            {!isMobile && error ? (
               <View style={styles.card}>
                 <Text style={{ color: "#DC2626" }}>{error}</Text>
                 <TouchableOpacity style={styles.proofBtn} onPress={loadDetails}>
@@ -429,23 +476,25 @@ export default function BankApprovalHistory() {
               </View>
             ) : null}
 
-            <View style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}>
-              {isDesktopWide ? (
-                <>
-                  <View style={styles.leftCol}>
+            {!isMobile && (
+              <View style={[styles.bodySection, isDesktopWide && styles.bodySectionRow]}>
+                {isDesktopWide ? (
+                  <>
+                    <View style={styles.leftCol}>
+                      <CurrentBankDetails data={data} />
+                    </View>
+                    <View style={styles.rightCol}>
+                      <HistoryTimeline compact={false} data={data} />
+                    </View>
+                  </>
+                ) : (
+                  <>
                     <CurrentBankDetails data={data} />
-                  </View>
-                  <View style={styles.rightCol}>
                     <HistoryTimeline compact={false} data={data} />
-                  </View>
-                </>
-              ) : (
-                <>
-                  <CurrentBankDetails data={data} />
-                  <HistoryTimeline compact={isMobile} data={data} />
-                </>
-              )}
-            </View>
+                  </>
+                )}
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>

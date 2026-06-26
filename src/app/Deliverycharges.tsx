@@ -15,6 +15,7 @@ import {
   Alert,
   Modal,
   Platform,
+  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -1008,7 +1009,7 @@ const DeliveryChargesScreen: React.FC = () => {
   if (!isWeb) {
     return (
       <AdminLayout>
-        <View style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
           <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
           {/* Mobile Header */}
@@ -1158,7 +1159,7 @@ const DeliveryChargesScreen: React.FC = () => {
             isWeb={false}
             onSave={saveSlab}
           />
-        </View>
+        </SafeAreaView>
       </AdminLayout>
     );
   }
@@ -1365,9 +1366,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: "#151D4F",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 16 : 52,
-    paddingBottom: 52,
+    paddingTop: 16,
+    paddingBottom: 24,
     marginBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginHorizontal: 16,
+    marginTop: 12,
   },
   mobileHeaderTitle: {
     fontSize: 22,

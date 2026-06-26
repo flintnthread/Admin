@@ -1,8 +1,12 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+const NAVY = "#1d324e";
+const MUTED = "#69798c";
+const BORDER = "#e5e7eb";
 
 interface PaginationProps {
-  currentPage: number; // 1-indexed for UI, but usually 0-indexed for API. We'll assume 1-indexed here.
+  currentPage: number;
   totalPages: number;
   totalItems: number;
   itemsPerPage: number;
@@ -15,169 +19,177 @@ export default function Pagination({
   totalPages,
   totalItems,
   itemsPerPage,
-  itemName = 'items',
+  itemName = "items",
   onPageChange,
 }: PaginationProps) {
-  if (totalItems === 0) return null;
+  if (totalPages <= 1 && totalItems === 0) return null;
 
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+  const start = Math.min((currentPage - 1) * itemsPerPage + 1, totalItems);
+  const end = Math.min(currentPage * itemsPerPage, totalItems);
 
-  // Generate page numbers to show
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show first, last, and a few around current
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) pages.push(i);
-        pages.push('...');
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1);
-        pages.push('...');
-        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push('...');
-        pages.push(currentPage - 1);
-        pages.push(currentPage);
-        pages.push(currentPage + 1);
-        pages.push('...');
-        pages.push(totalPages);
-      }
+  // Build page number list: always show first, last, current ± 1, with ellipsis
+  const getPages = (): (number | "...")[] => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
+    const pages: (number | "...")[] = [];
+    const addPage = (n: number) => {
+      if (!pages.includes(n)) pages.push(n);
+    };
+    addPage(1);
+    if (currentPage > 3) pages.push("...");
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      addPage(i);
+    }
+    if (currentPage < totalPages - 2) pages.push("...");
+    addPage(totalPages);
     return pages;
   };
 
+  const pages = getPages();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.infoText}>
-        Showing {startItem}-{endItem} of {totalItems} {itemName}
-      </Text>
+    <View style={styles.wrapper}>
+      {/* White card container */}
+      <View style={styles.container}>
+        {/* Left: showing label */}
+        <Text style={styles.label}>
+          Showing {start}–{end} of {totalItems} {itemName}
+        </Text>
 
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
-          disabled={currentPage === 1}
-          onPress={() => onPageChange(currentPage - 1)}
-        >
-          <Text style={[styles.arrowText, currentPage === 1 && styles.arrowTextDisabled]}>&lt;</Text>
-        </TouchableOpacity>
-
-        {getPageNumbers().map((page, index) => {
-          if (page === '...') {
-            return (
-              <View key={`ellipsis-${index}`} style={styles.ellipsisContainer}>
-                <Text style={styles.ellipsisText}>...</Text>
-              </View>
-            );
-          }
-
-          const isCurrent = page === currentPage;
-          return (
+        {/* Right: page buttons */}
+        <View style={styles.controls}>
+          {/* Previous arrow — only show when not on first page */}
+          {currentPage > 1 && (
             <TouchableOpacity
-              key={`page-${page}`}
-              style={[styles.pageBtn, isCurrent && styles.pageBtnActive]}
-              onPress={() => onPageChange(page as number)}
+              style={styles.pageBtn}
+              onPress={() => onPageChange(currentPage - 1)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.pageBtnText, isCurrent && styles.pageBtnTextActive]}>
-                {page}
-              </Text>
+              <Text style={styles.arrowText}>{"<"}</Text>
             </TouchableOpacity>
-          );
-        })}
+          )}
 
-        <TouchableOpacity
-          style={[styles.pageBtn, currentPage === totalPages && styles.pageBtnDisabled]}
-          disabled={currentPage === totalPages}
-          onPress={() => onPageChange(currentPage + 1)}
-        >
-          <Text style={[styles.arrowText, currentPage === totalPages && styles.arrowTextDisabled]}>&gt;</Text>
-        </TouchableOpacity>
+          {pages.map((p, i) =>
+            p === "..." ? (
+              <View key={`ellipsis-${i}`} style={styles.ellipsis}>
+                <Text style={styles.ellipsisText}>…</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                key={p}
+                style={[styles.pageBtn, currentPage === p && styles.pageBtnActive]}
+                onPress={() => onPageChange(p)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.pageBtnText, currentPage === p && styles.pageBtnTextActive]}>
+                  {p}
+                </Text>
+              </TouchableOpacity>
+            )
+          )}
+
+          {/* Next arrow */}
+          <TouchableOpacity
+            style={[styles.pageBtn, currentPage === totalPages && styles.pageBtnDisabled]}
+            onPress={() => currentPage < totalPages && onPageChange(currentPage + 1)}
+            activeOpacity={currentPage === totalPages ? 1 : 0.7}
+            disabled={currentPage === totalPages}
+          >
+            <Text style={[styles.arrowText, currentPage === totalPages && styles.arrowDisabled]}>
+              {">"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Outer wrapper — matches the grey page background
+  wrapper: {
+    backgroundColor: "#f1f5f9",
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+  },
+
+  // White pill/card
   container: {
-    flexDirection: 'column',
-    gap: 12,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginTop: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
+    borderColor: BORDER,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  infoText: {
+
+  // "Showing X–Y of Z items" text
+  label: {
     fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '400',
+    color: MUTED,
   },
+
+  // Page button row
   controls: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
+
+  // Individual page button — default (white + border)
   pageBtn: {
     width: 34,
     height: 34,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: BORDER,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
+  // Active page button — dark navy fill, no border
   pageBtnActive: {
-    backgroundColor: '#151D4F',
-    borderColor: '#151D4F',
+    backgroundColor: NAVY,
+    borderColor: NAVY,
   },
+
   pageBtnDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
+
   pageBtnText: {
     fontSize: 13,
-    color: '#374151',
-    fontWeight: '500',
+    fontWeight: "600",
+    color: NAVY,
   },
+
   pageBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: "#ffffff",
   },
+
   arrowText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: "600",
+    color: MUTED,
   },
-  arrowTextDisabled: {
-    color: '#D1D5DB',
+
+  arrowDisabled: {
+    color: "#c5cdd6",
   },
-  ellipsisContainer: {
-    width: 34,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  ellipsis: {
+    width: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   ellipsisText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: MUTED,
   },
 });

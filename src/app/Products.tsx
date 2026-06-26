@@ -1688,6 +1688,21 @@ const MobileProductsScreen: React.FC = () => {
                 </View>
             )}
 
+            {!isWeb && (
+                <View style={[s.actionRow, { paddingTop: 6, paddingBottom: 6 }]}>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
+                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
+                        <Text style={s.actionTitle}>Add New Product</Text>
+                        <Text style={s.actionDesc}>Create and add a new product</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
+                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
+                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
+                        <Text style={s.actionDesc}>Upload products via CSV</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {error ? (
                     <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
@@ -1699,30 +1714,20 @@ const MobileProductsScreen: React.FC = () => {
                 ) : null}
 
                 {/* Action cards */}
-                <View style={s.actionRow}>
-                    <TouchableOpacity
-                        style={s.actionCard}
-                        activeOpacity={0.75}
-                        onPress={() => router.push('/Addproduct')}
-                    >
-                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}>
-                            <MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} />
-                        </View>
-                        <Text style={s.actionTitle}>Add New Product</Text>
-                        <Text style={s.actionDesc}>Create and add a new product</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={s.actionCard}
-                        activeOpacity={0.75}
-                        onPress={() => router.push('/Bulkupload')}
-                    >
-                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}>
-                            <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} />
-                        </View>
-                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
-                        <Text style={s.actionDesc}>Upload products via CSV</Text>
-                    </TouchableOpacity>
-                </View>
+                {isWeb && (
+                    <View style={s.actionRow}>
+                        <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
+                            <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
+                            <Text style={s.actionTitle}>Add New Product</Text>
+                            <Text style={s.actionDesc}>Create and add a new product</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
+                            <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
+                            <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
+                            <Text style={s.actionDesc}>Upload products via CSV</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Stats */}
                 <View style={s.statsCard}>
@@ -2006,7 +2011,7 @@ const MobileProductsScreen: React.FC = () => {
 
 const s = StyleSheet.create({
     root:               { flex: 1, backgroundColor: C.bg },
-    headerWrapper:      { backgroundColor: C.navyDeep, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 4 : 0, paddingBottom: 4 },
+    headerWrapper:      { backgroundColor: C.navyDeep, paddingTop: isWeb ? 0 : 16, paddingBottom: isWeb ? 4 : 20, borderRadius: isWeb ? 0 : 22, marginHorizontal: isWeb ? 0 : 16, marginTop: isWeb ? 0 : 12, shadowColor: isWeb ? "transparent" : C.navyDeep, shadowOffset: { width: 0, height: isWeb ? 0 : 8 }, shadowOpacity: isWeb ? 0 : 0.2, shadowRadius: isWeb ? 0 : 16, elevation: isWeb ? 0 : 10 },
     headerRow:          { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
     searchBarRow:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
     backBtn:            { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },

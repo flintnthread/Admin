@@ -88,7 +88,6 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   return (
     <View style={[
       styles.header, 
-      showMenuButton && { marginBottom: 16 },
       { backgroundColor: colors.surface, borderBottomColor: colors.border }
     ]}>
       {/* Hamburger – shown on mobile only */}

@@ -413,13 +413,13 @@ export default function BankApproval() {
             {isMobile && (
               <View style={{ backgroundColor: "#1d324e", padding: 16, borderRadius: 12, marginBottom: 14 }}>
                 <Text style={{ fontSize: 20, fontWeight: "700", color: "#fff", marginBottom: 4 }}>Seller Bank Approval</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={{ fontSize: 12, color: "#FF6B35" }}>Dashboard</Text>
                   <Text style={{ fontSize: 10, color: "#999" }}>›</Text>
                   <Text style={{ fontSize: 12, color: "#FF6B35" }}>Sellers</Text>
                   <Text style={{ fontSize: 10, color: "#999" }}>›</Text>
                   <Text style={{ fontSize: 12, color: "#999" }}>Bank Approval</Text>
-                </View>
+                </View> */}
               </View>
             )}
 

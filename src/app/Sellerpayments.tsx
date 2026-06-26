@@ -92,7 +92,7 @@ const OrderCard: React.FC<{
     onPay: (id: number) => void;
     onView: (id: number) => void;
     onInvoice: (id: number) => void;
-}> = ({ order, onPay, onView, onInvoice }) => {
+}> = ({ order, onPay, onView }) => {
     const payStyle = getPaymentStyle(order.paymentStatus);
     const remStyle = getReminderStyle(order.reminderBucket);
     const initials = order.sellerName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -140,10 +140,6 @@ const OrderCard: React.FC<{
                     <TouchableOpacity style={styles.btnOutline} onPress={() => onView(order.id)}>
                         <Feather name="eye" size={12} color={DARK} />
                         <Text style={[styles.btnOutlineText, { color: DARK }]}>View</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.btnOutline} onPress={() => onInvoice(order.id)}>
-                        <Feather name="file-text" size={12} color={DARK} />
-                        <Text style={[styles.btnOutlineText, { color: DARK }]}>Invoice</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -401,7 +397,7 @@ const ExportDropdown: React.FC<{
 
             {isOpen && (
                 <View
-                    style={[styles.exportDropdownMenu, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}
+                    style={[styles.exportDropdownMenu, !isWeb && { position: "absolute", top: 40, left: 0, width: 200, zIndex: 999 }]}
                     // @ts-ignore
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
@@ -806,20 +802,21 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Export Buttons Container */}
-                                <View style={[{ flexDirection: "row", gap: 8 }, !isWeb && { width: "100%" }]}>
-                                    {/* Export All Dropdown */}
-                                    <View style={!isWeb ? { flex: 1 } : {}}>
+                                <View style={[{ flexDirection: "column", gap: 8 }, !isWeb && { width: "100%" }]}>
+                                    {/* Export row: button + >=4d side by side */}
+                                    <View style={{ flexDirection: "row", gap: 8 }}>
+                                        {/* Export All Dropdown trigger only (fixed width, not flex) */}
                                         <ExportDropdown onExport={handleExport} isWeb={isWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
-                                    </View>
 
-                                    {/* Export >=4d button */}
-                                    <TouchableOpacity
-                                        style={[styles.webExportBtn, { backgroundColor: "#ef4444" }, !isWeb && { flex: 1, justifyContent: "center" }]}
-                                        onPress={() => void downloadBackendExport("pending", 4)}
-                                    >
-                                        <Feather name="clock" size={14} color="#fff" />
-                                        <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
-                                    </TouchableOpacity>
+                                        {/* Export >=4d button */}
+                                        <TouchableOpacity
+                                            style={[styles.webExportBtn, { backgroundColor: "#ef4444" }]}
+                                            onPress={() => void downloadBackendExport("pending", 4)}
+                                        >
+                                            <Feather name="clock" size={14} color="#fff" />
+                                            <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
                         </View>
@@ -847,7 +844,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Text style={[styles.tableHeaderCell, { width: 110 }]}>Reminder</Text>
                                         <Text style={[styles.tableHeaderCell, { width: 120 }]}>Payment Status</Text>
                                         <Text style={[styles.tableHeaderCell, { width: 100 }]}>Wallet Balance</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 280 }]}>Actions</Text>
+                                        <Text style={[styles.tableHeaderCell, { width: 180 }]}>Actions</Text>
                                     </View>
                                     {filtered.map(order => {
                                         const payStyle = getPaymentStyle(order.paymentStatus);
@@ -899,7 +896,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                                     <Text style={{ fontWeight: "700", color: TEXT_HEAD, fontSize: 13 }}>{order.walletBalance}</Text>
                                                 </View>
                                                 {/* Actions */}
-                                                <View style={{ width: 280, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                <View style={{ width: 180, flexDirection: "row", alignItems: "center", gap: 6 }}>
                                                     <TouchableOpacity
                                                         style={[styles.actionBtn, { backgroundColor: "#10b981" }]}
                                                         onPress={() => void openPayModal(order.id)}
@@ -913,13 +910,6 @@ const SellerPaymentsScreen: React.FC = () => {
                                                     >
                                                         <Feather name="eye" size={12} color="#fff" />
                                                         <Text style={styles.actionBtnText}>View</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={[styles.actionBtn, { backgroundColor: "#6366f1" }]}
-                                                        onPress={() => void handleInvoice(order.id)}
-                                                    >
-                                                        <Feather name="file-text" size={12} color="#fff" />
-                                                        <Text style={styles.actionBtnText}>Invoice</Text>
                                                     </TouchableOpacity>
                                                 </View>
                                             </View>
@@ -1019,6 +1009,8 @@ const styles = StyleSheet.create({
         paddingVertical: 24,
         paddingBottom: 64,
         borderRadius: 22,
+        marginHorizontal: 2,
+        marginTop: 12,
         marginBottom: 0,
         zIndex: 1,
         shadowColor: "#151D4F",
