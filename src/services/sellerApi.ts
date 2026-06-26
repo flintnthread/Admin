@@ -116,7 +116,7 @@ export async function fetchSellerGraphNames(): Promise<SellerGraphNameOption[]> 
   const rows = await adminApiRequest<unknown[]>("/api/admin/sellers/graph/names");
   if (!Array.isArray(rows)) return [];
   return rows
-    .map((row) => {
+    .map((row): SellerGraphNameOption | null => {
       const r = row as Record<string, unknown>;
       const id = Number(r.id);
       if (!Number.isFinite(id)) return null;
