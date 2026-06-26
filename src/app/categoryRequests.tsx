@@ -189,7 +189,7 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.modalBody} contentContainerStyle={!isWeb ? { paddingBottom: 60 } : undefined} showsVerticalScrollIndicator={false}>
             {/* Request Details */}
             <View style={styles.modalSection}>
               <Text style={styles.modalSectionTitle}>Request Details</Text>
@@ -626,7 +626,8 @@ const styles = StyleSheet.create({
 
   // Stats
   statsRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginTop: -46,
     paddingHorizontal: 16,
@@ -635,9 +636,12 @@ const styles = StyleSheet.create({
   },
   statsRowWeb: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
   },
   statCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 140,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',

@@ -320,7 +320,7 @@ const ViewModal = ({ seller, onClose }: { seller: Seller | null; onClose: () => 
 const VM = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14 },
+  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14 },
   htitle: { fontSize: 18, fontWeight: '800', color: C.text, flex: 1 },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   closeX: { fontSize: 14, color: C.sub, fontWeight: '700' },
@@ -786,9 +786,11 @@ export default function SellersScreen() {
     gridRows.push(paginated.slice(i, i + numColsNative));
   }
 
+  const Wrapper = isMobile ? ScrollView : View;
+
   return (
     <AdminLayout>
-      <View style={SS.root}>
+      <Wrapper style={SS.root} {...(isMobile ? { showsVerticalScrollIndicator: false } : {})}>
         <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
         {/* ── Header Container (Dark Blue) ── */}
@@ -798,7 +800,7 @@ export default function SellersScreen() {
               <Text style={{ color: '#FCA5A5', marginBottom: 8 }}>{loadError} — Tap to retry</Text>
             </TouchableOpacity>
           ) : null}
-          <View style={SS.pageHeader}>
+          <View style={[SS.pageHeader, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 12 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={SS.headerIconBox}>
                 <IconPerson size={16} color="#FFF" />
@@ -813,7 +815,7 @@ export default function SellersScreen() {
         </View>
 
         {/* ── Stat Cards Row ── */}
-        <View style={SS.statGrid}>
+        <View style={[SS.statGrid, isMobile && { paddingHorizontal: 0, marginHorizontal: 16, gap: 10 }]}>
           {[
             { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
             { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
@@ -822,9 +824,9 @@ export default function SellersScreen() {
             { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
             { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
           ].map((c) => (
-            <View key={c.label} style={SS.statCard}>
+            <View key={c.label} style={[SS.statCard, isMobile && { width: "48.5%", minWidth: undefined, flex: undefined, padding: 10 }]}>
               <View style={{ flex: 1 }}>
-                <Text style={SS.statLabel}>{c.label.toUpperCase()}</Text>
+                <Text style={SS.statLabel}>{isMobile ? c.label : c.label.toUpperCase()}</Text>
                 <Text style={SS.statValue}>{c.value}</Text>
                 <Text style={SS.statSub}>{c.sub}</Text>
               </View>
@@ -866,9 +868,10 @@ export default function SellersScreen() {
 
         {/* Content */}
         <ScrollView
-          style={{ flex: 1 }}
+          style={isMobile ? { flex: 0 } : { flex: 1 }}
           contentContainerStyle={[SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined]}
           showsVerticalScrollIndicator={false}
+          scrollEnabled={!isMobile}
           keyboardShouldPersistTaps="handled"
         >
           {loading ? (
@@ -960,7 +963,7 @@ export default function SellersScreen() {
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(m => ({ ...m, visible: false }))}
         />
-      </View>
+      </Wrapper>
     </AdminLayout>
   );
 }
@@ -991,6 +994,7 @@ const SS = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between',
     marginTop: -32,
     paddingHorizontal: 20,
     marginHorizontal: 22,

@@ -4,10 +4,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
-  SafeAreaView,
   StatusBar,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import AdminHeader from "./admin-header";
 import AdminSidebar from "./admin-sidebar";

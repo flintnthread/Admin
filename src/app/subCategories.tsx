@@ -30,6 +30,8 @@ import {
 import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
 import { resolveMediaUrl } from "@/lib/api/media";
 
+const isWeb = Platform.OS === "web";
+
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
   bg: "#FFFFFF",
@@ -373,6 +375,8 @@ const Dropdown = ({
   style?: any;
 }) => {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [menuLayout, setMenuLayout] = useState({ x: 0, y: 0, width: 0 });
 
   // Handle both string options and object options with label/value
   const getOptionLabel = (opt: any) => typeof opt === 'string' ? opt : opt.label;
@@ -383,41 +387,102 @@ const Dropdown = ({
       <TouchableOpacity
         style={[S.ddTrigger, open && S.ddTriggerOpen]}
         onPress={() => setOpen(!open)}
+        onLayout={(e) => {
+          const { x, y, width, height } = e.nativeEvent.layout;
+          setMenuLayout({ x, y: y + height, width });
+        }}
       >
         <Text style={[S.ddVal, !value && S.ddPh]} numberOfLines={1}>
           {value ? getOptionLabel(options.find((o: any) => getOptionValue(o) === value) || value) : placeholder}
         </Text>
         <ChevronDownIcon color={open ? C.navy : C.sub} />
       </TouchableOpacity>
-      {open && (
-        <View style={S.ddMenu}>
-          <ScrollView
-            style={{ maxHeight: 240 }}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {options.map((opt: any) => {
-              const optValue = getOptionValue(opt);
-              const optLabel = getOptionLabel(opt);
-              return (
-                <TouchableOpacity
-                  key={optValue}
-                  style={[S.ddItem, value === optValue && S.ddItemActive]}
-                  onPress={() => {
-                    onChange(optValue);
-                    setOpen(false);
-                  }}
-                >
-                  <Text style={[S.ddItemText, value === optValue && S.ddItemTextActive]}>
-                    {optLabel}
-                  </Text>
-                  {value === optValue && <View style={S.ddCheckDot} />}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+      {/* Mobile: inline expanding list */}
+      {!isWeb && open && (
+        <View style={S.ddPortalMenu}>
+          {options.map((opt: any) => {
+            const optValue = getOptionValue(opt);
+            const optLabel = getOptionLabel(opt);
+            return (
+              <TouchableOpacity
+                key={optValue}
+                style={[S.ddItem, value === optValue && S.ddItemActive]}
+                onPress={() => {
+                  onChange(optValue);
+                  setOpen(false);
+                }}
+              >
+                <Text style={[S.ddItemText, value === optValue && S.ddItemTextActive]}>
+                  {optLabel}
+                </Text>
+                {value === optValue && <View style={S.ddCheckDot} />}
+              </TouchableOpacity>
+            );
+          })}
         </View>
+      )}
+
+      {/* Web: portal modal so menu floats above overflow:hidden containers */}
+      {isWeb && (
+        <Modal
+          visible={open}
+          transparent
+          animationType="none"
+          onRequestClose={() => setOpen(false)}
+        >
+          <TouchableOpacity
+            style={S.ddBackdrop}
+            activeOpacity={1}
+            onPress={() => setOpen(false)}
+          />
+          <View
+            style={[
+              S.ddPortalMenu,
+              {
+                position: "absolute",
+                top: menuLayout.y,
+                left: menuLayout.x,
+                width: menuLayout.width,
+              },
+            ]}
+          >
+            <ScrollView
+              style={{ maxHeight: 240 }}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {options.map((opt: any) => {
+                const optValue = getOptionValue(opt);
+                const optLabel = getOptionLabel(opt);
+                return (
+                  <TouchableOpacity
+                    key={optValue}
+                    style={[
+                      S.ddItem,
+                      value === optValue && S.ddItemActive,
+                      hovered === optValue && S.ddItemHovered,
+                    ]}
+                    onPress={() => {
+                      onChange(optValue);
+                      setOpen(false);
+                      setHovered(null);
+                    }}
+                    onPressIn={() => setHovered(optValue)}
+                    onPressOut={() => setHovered(null)}
+                  >
+                    <Text
+                      style={[S.ddItemText, value === optValue && S.ddItemTextActive]}
+                    >
+                      {optLabel}
+                    </Text>
+                    {value === optValue && <View style={S.ddCheckDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -678,6 +743,7 @@ const AddModal = ({
             style={S.modalBody}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
+            contentContainerStyle={!isWeb ? { paddingBottom: 24 } : undefined}
           >
             {/* Main Category */}
             <View style={S.fg}>
@@ -813,9 +879,28 @@ const AddModal = ({
                 onChange={setStatus}
               />
             </View>
+
+            {/* Buttons — inline for mobile, footer for web */}
+            {!isWeb && (
+              <View style={[S.modalFooter, { borderTopWidth: 0, paddingHorizontal: 0, paddingTop: 16 }]}>
+                <TouchableOpacity
+                  style={S.cancelBtn}
+                  onPress={() => {
+                    reset();
+                    onClose();
+                  }}
+                >
+                  <Text style={S.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.saveBtn} onPress={handleSave}>
+                  <Text style={S.saveText}>{editData ? "Update Subcategory" : "Save Subcategory"}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
 
-          {/* Footer */}
+          {/* Footer — web only */}
+          {isWeb && (
           <View style={S.modalFooter}>
             <TouchableOpacity
               style={S.cancelBtn}
@@ -830,6 +915,7 @@ const AddModal = ({
               <Text style={S.saveText}>{editData ? "Update Subcategory" : "Save Subcategory"}</Text>
             </TouchableOpacity>
           </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -1391,8 +1477,16 @@ export default function Subcategories() {
               </View>
             ))}
           </View>
-        ) : (
+        ) : isWeb ? (
           <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ minWidth: 900 }}
+          >
+            <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+          </ScrollView>
         )}
 
         {filtered.length === 0 && (
@@ -1974,6 +2068,27 @@ const S = StyleSheet.create({
   ddItemText: { fontSize: 14, color: C.text },
   ddItemTextActive: { color: C.navy, fontWeight: "700" },
   ddCheckDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.navy },
+  ddPortalMenu: {
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
+    overflow: "hidden",
+  },
+  ddBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  ddItemHovered: { backgroundColor: C.primaryLight },
 
   // Modal footer
   modalFooter: {

@@ -33,6 +33,7 @@ const BORDER = "#e5e7eb";
 export default function PendingSellersScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
+  const isMobile = width < 768;
 
   const [sellers, setSellers] = useState<PendingProfileSeller[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,23 +125,43 @@ export default function PendingSellersScreen() {
 
         {/* ── Dark-blue header container ── */}
         <View style={styles.headerContainer}>
-          <View style={styles.header}>
-            <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-              <View style={styles.headerIconBox}>
-                <Feather name="users" size={20} color="#fff" />
+          {isMobile ? (
+            <View style={{ flexDirection: "column", gap: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
+                  <View style={[styles.headerIconBox, { marginRight: 0 }]}>
+                    <Feather name="users" size={20} color="#fff" />
+                  </View>
+                  <Text style={[styles.title, { flex: 1, fontSize: 18 }]} numberOfLines={2}>Pending seller profiles</Text>
+                </View>
+                <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
+                  <Feather name="refresh-cw" size={16} color={ORANGE} />
+                  <Text style={styles.refreshText}>Refresh</Text>
+                </TouchableOpacity>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>Pending seller profiles</Text>
-                <Text style={styles.subtitle}>
-                  Sellers who completed KYC and are waiting for admin approval
-                </Text>
-              </View>
+              <Text style={styles.subtitle}>
+                Sellers who completed KYC and are waiting for admin approval
+              </Text>
             </View>
-            <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
-              <Feather name="refresh-cw" size={16} color={ORANGE} />
-              <Text style={styles.refreshText}>Refresh</Text>
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={styles.header}>
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+                <View style={styles.headerIconBox}>
+                  <Feather name="users" size={20} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>Pending seller profiles</Text>
+                  <Text style={styles.subtitle}>
+                    Sellers who completed KYC and are waiting for admin approval
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
+                <Feather name="refresh-cw" size={16} color={ORANGE} />
+                <Text style={styles.refreshText}>Refresh</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <View style={styles.searchRow}>

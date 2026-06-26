@@ -366,23 +366,23 @@ const em = StyleSheet.create({
     overlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "flex-end", // Bottom sheet on mobile
+        justifyContent: "flex-end",
     },
     overlayWeb: {
-        justifyContent: "center", // Centered on web
+        justifyContent: "center",
         alignItems: "center",
     },
     sheet: {
         backgroundColor: "#fff",
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
-        paddingBottom: Platform.OS === 'ios' ? 24 : 0, // Padding for safe area
+        paddingBottom: Platform.OS === 'ios' ? 24 : 0,
     },
     sheetWeb: {
         width: "90%",
         maxWidth: 500,
         borderRadius: 16,
-        overflow: "hidden", // Prevents header from escaping border radius
+        overflow: "hidden",
     },
     header: {
         marginHorizontal: 2, marginTop: 12, borderRadius: 22,
@@ -477,7 +477,7 @@ const em = StyleSheet.create({
         gap: 6,
         paddingVertical: 14,
         borderRadius: 8,
-        backgroundColor: "#505461", // Dark slate color from design
+        backgroundColor: "#505461",
     },
     cancelTxt: {
         fontSize: 14,
@@ -761,6 +761,7 @@ const DepartmentsScreen: React.FC = () => {
     useEffect(() => {
         loadDepartments();
     }, [loadDepartments]);
+
     const [search, setSearch] = useState("");
     const [editTarget, setEditTarget] = useState<Department | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
@@ -835,8 +836,6 @@ const DepartmentsScreen: React.FC = () => {
         <Container style={s.safe}>
             <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
-
-
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 12 }]}
@@ -844,35 +843,37 @@ const DepartmentsScreen: React.FC = () => {
                 keyboardShouldPersistTaps="handled"
             >
                 {/* ── PAGE HEADER ── */}
-                <View style={[s.pageHead, !isWeb && { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
-                    {!isWeb ? (
-                        <>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-
-                                <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => setAddOpen(true)} activeOpacity={0.85}>
-                                    <Feather name="plus" size={14} color="#fff" />
-                                    <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
-                                </TouchableOpacity>
+                {!isWeb ? (
+                    // ── MOBILE PAGE HEADER (title + add only) ──
+                    <View style={mob.headerCard}>
+                        <View style={mob.headerTopRow}>
+                            <View style={mob.headerTitleBlock}>
+                                <Text style={mob.headerTitle}>Manage Departments</Text>
+                                <Text style={mob.headerSub}>Organize your workforce by department structure</Text>
                             </View>
-                            <View>
-                                <Text style={[s.pageTitle, { fontSize: 20 }]}>Manage Departments</Text>
-                                <Text style={s.pageSub}>Organize your workforce by department structure</Text>
-                            </View>
-                        </>
-                    ) : (
-                        <>
-                            <View style={s.pageHeadLeft}>
-
-                                <Text style={s.pageTitle}>Manage Departments</Text>
-                                <Text style={s.pageSub}>Organize your workforce by department structure</Text>
-                            </View>
-                            <TouchableOpacity style={s.addBtn} onPress={() => setAddOpen(true)} activeOpacity={0.85}>
-                                <Feather name="plus" size={15} color="#fff" />
-                                <Text style={s.addBtnTxt}>Add Department</Text>
+                            <TouchableOpacity
+                                style={mob.addBtn}
+                                onPress={() => setAddOpen(true)}
+                                activeOpacity={0.85}
+                            >
+                                <Feather name="plus" size={14} color="#fff" />
+                                <Text style={mob.addBtnTxt}>Add</Text>
                             </TouchableOpacity>
-                        </>
-                    )}
-                </View>
+                        </View>
+                    </View>
+                ) : (
+                    // ── WEB PAGE HEADER (unchanged) ──
+                    <View style={s.pageHead}>
+                        <View style={s.pageHeadLeft}>
+                            <Text style={s.pageTitle}>Manage Departments</Text>
+                            <Text style={s.pageSub}>Organize your workforce by department structure</Text>
+                        </View>
+                        <TouchableOpacity style={s.addBtn} onPress={() => setAddOpen(true)} activeOpacity={0.85}>
+                            <Feather name="plus" size={15} color="#fff" />
+                            <Text style={s.addBtnTxt}>Add Department</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* ── STATS STRIP ── */}
                 <View style={s.statsRow}>
@@ -899,40 +900,118 @@ const DepartmentsScreen: React.FC = () => {
                     />
                 </View>
 
-                {/* ── SEARCH + FILTERS ── */}
-                <View style={s.toolBar}>
-                    <View style={s.searchBox}>
-                        <Feather name="search" size={15} color={T.textHint} />
-                        <TextInput
-                            style={s.searchInput}
-                            placeholder="Search departments…"
-                            placeholderTextColor={T.textHint}
-                            value={search}
-                            onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
-                        />
-                        {search.length > 0 && (
-                            <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                                <Feather name="x-circle" size={15} color={T.textHint} />
+                {/* ── MOBILE CONTROLS CARD (search + grid/list/filter/sort) ── */}
+                {!isWeb && (
+                    <View style={mob.controlsCard}>
+                        {/* Search bar */}
+                        <View style={mob.searchBox}>
+                            <Feather name="search" size={15} color={T.textHint} />
+                            <TextInput
+                                style={mob.searchInput}
+                                placeholder="Search departments…"
+                                placeholderTextColor={T.textHint}
+                                value={search}
+                                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+                            />
+                            {search.length > 0 && (
+                                <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
+                                    <Feather name="x-circle" size={15} color={T.textHint} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Grid / List / Filter / Sort row */}
+                        <View style={mob.controlsRow}>
+                            <View style={mob.toggleGroup}>
+                                <TouchableOpacity
+                                    style={[mob.toggleBtn, viewMode === 'grid' && mob.toggleBtnActive]}
+                                    onPress={() => setViewMode('grid')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Feather name="grid" size={14} color={viewMode === 'grid' ? T.orange : T.textHint} />
+                                    <Text style={[mob.toggleTxt, viewMode === 'grid' && mob.toggleTxtActive]}>Grid</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[mob.toggleBtn, mob.toggleBtnMid, viewMode === 'list' && mob.toggleBtnActive]}
+                                    onPress={() => setViewMode('list')}
+                                    activeOpacity={0.8}
+                                >
+                                    <Feather name="list" size={14} color={viewMode === 'list' ? T.orange : T.textHint} />
+                                    <Text style={[mob.toggleTxt, viewMode === 'list' && mob.toggleTxtActive]}>List</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[mob.chipBtn, filterStatus !== "All" && mob.chipBtnActive]}
+                                onPress={() => {
+                                    setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All");
+                                    setCurrentPage(1);
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
+                                <Text style={[mob.chipTxt, filterStatus !== "All" && mob.chipTxtActive]}>
+                                    {filterStatus === "All" ? "Filter" : filterStatus}
+                                </Text>
                             </TouchableOpacity>
-                        )}
+
+                            <TouchableOpacity
+                                style={[mob.chipBtn, sortOrder !== null && mob.chipBtnActive]}
+                                onPress={() => {
+                                    setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc");
+                                    setCurrentPage(1);
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Feather
+                                    name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"}
+                                    size={13}
+                                    color={sortOrder ? T.orange : T.textM}
+                                />
+                                <Text style={[mob.chipTxt, sortOrder !== null && mob.chipTxtActive]}>
+                                    {sortOrder === "asc" ? "A–Z" : sortOrder === "desc" ? "Z–A" : "Sort"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <View style={s.filterGroup}>
-                        <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
-                            <Feather name="grid" size={16} color={viewMode === 'grid' ? T.orange : T.textHint} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
-                            <Feather name="list" size={16} color={viewMode === 'list' ? T.orange : T.textHint} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
-                            <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
-                            <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => { setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc"); setCurrentPage(1); }}>
-                            <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={13} color={sortOrder ? T.orange : T.textM} />
-                            <Text style={[s.filterBtnTxt, sortOrder !== null && { color: T.orange }]}>{sortOrder === "asc" ? "Sort A-Z" : sortOrder === "desc" ? "Sort Z-A" : "Sort"}</Text>
-                        </TouchableOpacity>
+                )}
+
+                {/* ── SEARCH + FILTERS (web only) ── */}
+                {isWeb && (
+                    <View style={s.toolBar}>
+                        <View style={s.searchBox}>
+                            <Feather name="search" size={15} color={T.textHint} />
+                            <TextInput
+                                style={s.searchInput}
+                                placeholder="Search departments…"
+                                placeholderTextColor={T.textHint}
+                                value={search}
+                                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+                            />
+                            {search.length > 0 && (
+                                <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
+                                    <Feather name="x-circle" size={15} color={T.textHint} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <View style={s.filterGroup}>
+                            <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
+                                <Feather name="grid" size={16} color={viewMode === 'grid' ? T.orange : T.textHint} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
+                                <Feather name="list" size={16} color={viewMode === 'list' ? T.orange : T.textHint} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
+                                <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
+                                <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => { setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc"); setCurrentPage(1); }}>
+                                <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={13} color={sortOrder ? T.orange : T.textM} />
+                                <Text style={[s.filterBtnTxt, sortOrder !== null && { color: T.orange }]}>{sortOrder === "asc" ? "Sort A-Z" : sortOrder === "desc" ? "Sort Z-A" : "Sort"}</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
+                )}
 
                 {/* ── COUNT LINE ── */}
                 <Text style={s.countLine}>
@@ -996,6 +1075,7 @@ const DepartmentsScreen: React.FC = () => {
                             ))}
                         </View>
                     ) : (
+                        // ── MOBILE LIST VIEW ──
                         <View style={{ gap: 10 }}>
                             {paginated.map(dept => (
                                 <View key={dept.id} style={{ backgroundColor: T.card, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: T.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -1100,6 +1180,154 @@ const DepartmentsScreen: React.FC = () => {
 export default DepartmentsScreen;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MOBILE-ONLY HEADER STYLES
+// ─────────────────────────────────────────────────────────────────────────────
+const mob = StyleSheet.create({
+    // Header card: title + add button only (no search/controls inside)
+    headerCard: {
+        backgroundColor: "#151D4F",
+        borderRadius: 22,
+        marginHorizontal: 2,
+        marginTop: 12,
+        paddingTop: 16,
+        paddingHorizontal: 16,
+        paddingBottom: 46,
+    },
+
+    // Controls card: sits below stats strip, white background
+    controlsCard: {
+        backgroundColor: T.card,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 12,
+        gap: 9,
+    },
+
+    // Title row: title block + add button
+    headerTopRow: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 10,
+    },
+    headerTitleBlock: {
+        flex: 1,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#FFFFFF",
+        letterSpacing: -0.4,
+        lineHeight: 22,
+    },
+    headerSub: {
+        fontSize: 11,
+        color: "#D1D5DB",
+        marginTop: 3,
+        fontWeight: "400",
+    },
+    addBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: T.orange,
+        paddingHorizontal: 13,
+        paddingVertical: 9,
+        borderRadius: 10,
+        flexShrink: 0,
+    },
+    addBtnTxt: {
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: "800",
+        letterSpacing: -0.2,
+    },
+
+    // Search bar (light, inside white controlsCard)
+    searchBox: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 9,
+        backgroundColor: T.bg,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 13,
+        color: T.textH,
+    },
+
+    // Controls row
+    controlsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+
+    // Grid/List segmented toggle (light)
+    toggleGroup: {
+        flexDirection: "row",
+        backgroundColor: T.bg,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        overflow: "hidden",
+    },
+    toggleBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    toggleBtnMid: {
+        borderLeftWidth: 1,
+        borderLeftColor: T.border,
+    },
+    toggleBtnActive: {
+        backgroundColor: T.orangeLight,
+    },
+    toggleTxt: {
+        fontSize: 12,
+        fontWeight: "600",
+        color: T.textHint,
+    },
+    toggleTxtActive: {
+        color: T.orange,
+    },
+
+    // Filter / Sort chip buttons (light)
+    chipBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        backgroundColor: T.bg,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    chipBtnActive: {
+        backgroundColor: T.orangeLight,
+        borderColor: T.orange,
+    },
+    chipTxt: {
+        fontSize: 12,
+        fontWeight: "600",
+        color: T.textM,
+    },
+    chipTxtActive: {
+        color: T.orange,
+    },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN STYLES
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -1158,7 +1386,7 @@ const s = StyleSheet.create({
         gap: 14,
     },
 
-    // ── Page Header ──
+    // ── Page Header (web only) ──
     pageHead: {
         flexDirection: "row",
         alignItems: "center",
@@ -1232,7 +1460,7 @@ const s = StyleSheet.create({
         width: "100%",
     },
 
-    // ── Toolbar ──
+    // ── Toolbar (web only) ──
     toolBar: {
         flexDirection: "row",
         alignItems: "center",
