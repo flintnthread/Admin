@@ -78,11 +78,11 @@ export default function ApiDevHint() {
         <Text style={styles.help}>
           {errorDetail ?? "Cannot reach admin-backend."}
           {"\n\n"}
-          1) Backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run (port 8082)
+          1) Backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run (port 8082)
           {"\n"}
           2) Web UI: cd Admin && npm run web → open {webDevUrl}/login
           {"\n"}
-          3) Phone: set EXPO_PUBLIC_ADMIN_API_BASE_URL=http://YOUR_PC_IP:8082 in Admin/.env
+          3) Phone: same Wi‑Fi as PC — API host is auto-detected from Expo (no .env IP)
         </Text>
       ) : null}
       <TouchableOpacity style={styles.retryBtn} onPress={() => void checkHealth()}>

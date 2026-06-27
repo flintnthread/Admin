@@ -56,8 +56,8 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
       const tried = getAdminApiBaseUrlCandidates().join(", ");
       const hint =
         Platform.OS === "web"
-          ? "\n• Start admin-backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run"
-          : "\n• Set EXPO_PUBLIC_ADMIN_API_BASE_URL=http://YOUR_PC_IP:8082 in Admin/.env";
+          ? "\n• Start admin-backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run"
+          : "\n• Ensure admin-backend is running on port 8082 (phone and PC on same Wi‑Fi)";
       throw new AdminApiError(
         `Cannot reach admin API. Tried: ${tried}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
       );
@@ -88,8 +88,8 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     const tried = getAdminApiBaseUrlCandidates().join(", ");
     const hint =
       Platform.OS === "web"
-        ? "\n• Start admin-backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run"
-        : "\n• Set EXPO_PUBLIC_ADMIN_API_BASE_URL=http://YOUR_PC_IP:8082 in Admin/.env";
+        ? "\n• Start admin-backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run"
+        : "\n• Ensure phone and PC are on the same Wi‑Fi (API host is detected from Expo automatically)";
     throw new AdminApiError(
       `Cannot reach admin API at ${debug}. Also tried: ${tried}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
     );
