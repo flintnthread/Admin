@@ -127,15 +127,14 @@ export function getAdminApiBaseUrlCandidates(): string[] {
     if (webLan) candidates.push(buildUrl(webLan));
 
     candidates.push(buildUrl("localhost"), buildUrl("127.0.0.1"));
-    if (configured) candidates.push(configured);
 
     const devHost = getExpoDevLanHost();
     if (devHost) candidates.push(buildUrl(devHost));
 
+    if (configured) candidates.push(configured);
+
     return uniqueUrls(candidates);
   }
-
-  if (configured) candidates.push(configured);
 
   const devHost = getExpoDevLanHost();
   if (devHost) candidates.push(buildUrl(devHost));
@@ -153,6 +152,8 @@ export function getAdminApiBaseUrlCandidates(): string[] {
   if (Platform.OS === "android") {
     candidates.push(buildUrl("10.0.2.2"));
   }
+
+  if (configured) candidates.push(configured);
 
   return uniqueUrls(candidates);
 }
@@ -224,7 +225,7 @@ export async function ensureAdminApiReachable(): Promise<string> {
   clearWorkingAdminApiBaseUrl();
   if (lastError instanceof Error) throw lastError;
   throw new Error(
-    `Admin API not reachable. Start backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run (port ${ADMIN_API_PORT})`
+    `Admin API not reachable. Start backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run (port ${ADMIN_API_PORT})`
   );
 }
 

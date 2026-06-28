@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
   },
 
   // Header
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
+  header: { marginHorizontal: 2, marginTop: 12, 
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
