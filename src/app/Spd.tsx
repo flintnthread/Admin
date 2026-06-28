@@ -218,8 +218,8 @@ const addressChipStyles = StyleSheet.create({
 });
 
 // ─── ACTION BUTTON ────────────────────────────────────────────────────────────
-const ActionButton: React.FC<{ icon: string; label: string; color: string; onPress: () => void; flex?: boolean }> = ({ icon, label, color, onPress, flex }) => (
-    <TouchableOpacity style={[actionStyles.btn, { backgroundColor: color, flex: flex ? 1 : undefined }]} onPress={onPress} activeOpacity={0.8}>
+const ActionButton: React.FC<{ icon: string; label: string; color: string; onPress: () => void; flex?: boolean; width?: any }> = ({ icon, label, color, onPress, flex, width }) => (
+    <TouchableOpacity style={[actionStyles.btn, { backgroundColor: color, flex: flex ? 1 : undefined, width }]} onPress={onPress} activeOpacity={0.8}>
         {icon === "dollar-sign" ? (
             <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800", marginTop: -1 }}>₹</Text>
         ) : (
@@ -573,7 +573,7 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
 
                             <View style={invStyles.divider} />
 
-                            <View style={invStyles.twoColRow}>
+                            <View style={[invStyles.twoColRow, !isWeb && { flexDirection: "column", alignItems: "stretch" }]}>
                                 <View style={invStyles.infoCard}>
                                     <Text style={invStyles.infoCardTitle}>BENEFICIARY DETAILS</Text>
                                     <Text style={invStyles.beneficiaryName}>{order.sellerName}</Text>
@@ -617,7 +617,7 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                 ))}
                             </View>
 
-                            <View style={invStyles.twoColRow}>
+                            <View style={[invStyles.twoColRow, !isWeb && { flexDirection: "column", alignItems: "stretch" }]}>
                                 <View style={invStyles.wordsBlock}>
                                     <Text style={invStyles.wordsLabel}>Amount Payable (in words):</Text>
                                     <Text style={invStyles.wordsValue}>{amountInWords(sellerEarning)}</Text>
@@ -915,15 +915,15 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
         <View style={styles.card}>
             <SectionHeader icon="zap" title="Actions" accent="#d97706" />
             <View style={styles.actionsGrid}>
-                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={() => void handleInvoice()} flex />
-                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={() => void handleRegen()} flex />
-                <ActionButton icon="printer" label="Print Invoice" color="#3b82f6" onPress={handlePrint} flex />
+                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={() => void handleInvoice()} flex={isWeb} width={!isWeb ? "48%" : undefined} />
+                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={() => void handleRegen()} flex={isWeb} width={!isWeb ? "48%" : undefined} />
+                <ActionButton icon="printer" label="Print Invoice" color="#3b82f6" onPress={handlePrint} flex={isWeb} width={!isWeb ? "48%" : undefined} />
                 {order.paymentStatus === "Pending" && (
                     <ActionButton icon="dollar-sign" label="Mark as Paid" color="#10b981" onPress={() => {
                         setTransactionRef(order.transactionRef ?? "");
                         setAdminNote(order.adminNote ?? "");
                         setPayModalVisible(true);
-                    }} flex />
+                    }} flex={isWeb} width={!isWeb ? "48%" : undefined} />
                 )}
             </View>
         </View>
