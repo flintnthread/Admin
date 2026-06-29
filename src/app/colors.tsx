@@ -12,8 +12,10 @@
 
 import AdminLayout from "@/components/admin-layout";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -28,6 +30,14 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  createColor,
+  deleteColor,
+  fetchColors,
+  updateColor,
+  type CatalogColor,
+} from "@/services/colorApi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap-like icon name map → Ionicons
@@ -77,58 +87,15 @@ interface ColorItem {
 }
 type ViewMode = "grid" | "list";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Seed Data
-// ─────────────────────────────────────────────────────────────────────────────
-const generateSeedColors = (): ColorItem[] => {
-  const base: ColorItem[] = [
-    { id: 11, name: "Black", code: "#000000", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 12, name: "White", code: "#ffffff", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 13, name: "Red", code: "#ff0000", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 14, name: "Blue", code: "#0000ff", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 15, name: "Green", code: "#008000", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 16, name: "Yellow", code: "#ffff00", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 17, name: "Orange", code: "#ffa500", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 18, name: "Pink", code: "#ffc0cb", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 19, name: "Purple", code: "#800080", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 20, name: "Brown", code: "#a52a2a", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 21, name: "Grey", code: "#808080", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 22, name: "Navy Blue", code: "#152238", status: "Active", createdDate: "12 Oct, 2025" },
-    { id: 23, name: "Teal", code: "#008080", status: "Active", createdDate: "15 Oct, 2025" },
-    { id: 24, name: "Maroon", code: "#800000", status: "Active", createdDate: "15 Oct, 2025" },
-    { id: 25, name: "Olive", code: "#808000", status: "Active", createdDate: "15 Oct, 2025" },
-    { id: 26, name: "Cyan", code: "#00ffff", status: "Active", createdDate: "16 Oct, 2025" },
-    { id: 27, name: "Magenta", code: "#ff00ff", status: "Active", createdDate: "16 Oct, 2025" },
-    { id: 28, name: "Coral", code: "#ff7f50", status: "Active", createdDate: "17 Oct, 2025" },
-    { id: 29, name: "Salmon", code: "#fa8072", status: "Active", createdDate: "17 Oct, 2025" },
-    { id: 30, name: "Indigo", code: "#4b0082", status: "Active", createdDate: "18 Oct, 2025" },
-    { id: 31, name: "Violet", code: "#ee82ee", status: "Inactive", createdDate: "18 Oct, 2025" },
-    { id: 32, name: "Gold", code: "#ffd700", status: "Active", createdDate: "19 Oct, 2025" },
-    { id: 33, name: "Silver", code: "#c0c0c0", status: "Active", createdDate: "19 Oct, 2025" },
-    { id: 34, name: "Khaki", code: "#f0e68c", status: "Active", createdDate: "20 Oct, 2025" },
-    { id: 35, name: "Lavender", code: "#e6e6fa", status: "Active", createdDate: "20 Oct, 2025" },
-    { id: 36, name: "Beige", code: "#f5f5dc", status: "Active", createdDate: "21 Oct, 2025" },
-    { id: 37, name: "Mint", code: "#98ff98", status: "Active", createdDate: "21 Oct, 2025" },
-    { id: 38, name: "Peach", code: "#ffcba4", status: "Active", createdDate: "22 Oct, 2025" },
-    { id: 39, name: "Lilac", code: "#c8a2c8", status: "Active", createdDate: "22 Oct, 2025" },
-    { id: 40, name: "Cream", code: "#fffdd0", status: "Active", createdDate: "23 Oct, 2025" },
-  ];
-  const palette = [
-    "#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c",
-    "#e67e22", "#34495e", "#e91e63", "#00bcd4", "#8bc34a", "#ff5722",
-  ];
-  for (let i = 41; i <= 91; i++) {
-    base.push({
-      id: i,
-      name: `Color ${i}`,
-      code: palette[i % palette.length],
-      status: i % 7 === 0 ? "Inactive" : "Active",
-      createdDate: "01 Nov, 2025",
-    });
-  }
-  return base;
-};
-const SEED_COLORS = generateSeedColors();
+function mapColorRow(row: CatalogColor): ColorItem {
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    status: row.status,
+    createdDate: row.createdDate ?? todayStr(),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -666,7 +633,10 @@ export default function ColorsScreen() {
   const cardWidth = (width - PADDING * 2 - GAP * (numCols - 1)) / numCols;
 
   const [containerWidth, setContainerWidth] = useState(width);
-  const [colors, setColors] = useState<ColorItem[]>(SEED_COLORS);
+  const [colors, setColors] = useState<ColorItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -686,24 +656,64 @@ export default function ColorsScreen() {
 
   const handleSearch = useCallback((val: string) => { setSearch(val); setPage(1); }, []);
 
-  const handleAdd = useCallback((data: { name: string; code: string; status: "Active" | "Inactive" }) => {
-    const newId = Math.max(...colors.map((c) => c.id)) + 1;
-    setColors((prev) => [...prev, { id: newId, ...data, createdDate: todayStr() }]);
-    setAddOpen(false);
-  }, [colors]);
+  const loadColors = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchColors();
+      setColors(rows.map(mapColorRow));
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error, "Failed to load colors."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleEdit = useCallback((data: { name: string; code: string; status: "Active" | "Inactive" }) => {
+  useEffect(() => {
+    void loadColors();
+  }, [loadColors]);
+
+  const handleAdd = useCallback(async (data: { name: string; code: string; status: "Active" | "Inactive" }) => {
+    setSaving(true);
+    try {
+      const created = await createColor(data);
+      setColors((prev) => [...prev, mapColorRow(created)]);
+      setAddOpen(false);
+    } catch (error) {
+      Alert.alert("Error", getApiErrorMessage(error, "Could not add color."));
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const handleEdit = useCallback(async (data: { name: string; code: string; status: "Active" | "Inactive" }) => {
     if (!editTarget) return;
-    setColors((prev) => prev.map((c) => c.id === editTarget.id ? { ...c, ...data } : c));
-    setEditTarget(null);
+    setSaving(true);
+    try {
+      const updated = await updateColor(editTarget.id, data);
+      setColors((prev) => prev.map((c) => (c.id === editTarget.id ? mapColorRow(updated) : c)));
+      setEditTarget(null);
+    } catch (error) {
+      Alert.alert("Error", getApiErrorMessage(error, "Could not update color."));
+    } finally {
+      setSaving(false);
+    }
   }, [editTarget]);
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
-    setColors((prev) => prev.filter((c) => c.id !== deleteTarget.id));
-    const maxPage = Math.max(1, Math.ceil((filtered.length - 1) / PAGE_SIZE));
-    if (page > maxPage) setPage(maxPage);
-    setDeleteTarget(null);
+    setSaving(true);
+    try {
+      await deleteColor(deleteTarget.id);
+      setColors((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      const maxPage = Math.max(1, Math.ceil((filtered.length - 1) / PAGE_SIZE));
+      if (page > maxPage) setPage(maxPage);
+      setDeleteTarget(null);
+    } catch (error) {
+      Alert.alert("Error", getApiErrorMessage(error, "Could not delete color."));
+    } finally {
+      setSaving(false);
+    }
   }, [deleteTarget, filtered.length, page]);
 
   // ── Native-only FlatList grid render ──────────────────────────────────────
@@ -747,6 +757,14 @@ export default function ColorsScreen() {
       </View>
 
       <View style={{ paddingHorizontal: PADDING, marginTop: 24 }}>
+        {loadError ? (
+          <Text style={{ color: "#dc2626", marginBottom: 8 }}>{loadError}</Text>
+        ) : null}
+        {loading ? (
+          <View style={{ paddingVertical: 24, alignItems: "center" }}>
+            <ActivityIndicator size="large" color="#D4690A" />
+          </View>
+        ) : null}
         {/* Toolbar */}
         <View style={styles.toolbar}>
           <View style={styles.searchBox}>
