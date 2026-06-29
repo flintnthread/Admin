@@ -826,6 +826,9 @@ const styles = StyleSheet.create({
     borderRightColor: "#E5E7EB",
     height: "100%",
     flexDirection: "column",
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: "hidden",
   },
   sidebarCollapsed: {
     width: 64,

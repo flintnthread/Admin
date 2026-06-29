@@ -612,120 +612,122 @@ export default function CustomerManagementScreen() {
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ══ HEADER (now scrolls away with content) ═══════════════════════ */}
-        <View style={{ paddingHorizontal: 16 }}>
-          <View
-            style={[
-              s.header,
-              {
-                paddingTop: Platform.OS === "ios" ? 50 : 16,
-                marginTop: 12,
-              },
-            ]}
-          >
-            <View style={[s.headerInner, { paddingHorizontal: isMobile ? 16 : 22 }]}>
-              <View style={s.hLeft}>
-                <View style={s.hIcon}><PeopleIcon size={isMobile ? 17 : 21} /></View>
-                <View>
-                  <Text style={[s.hTitle, { fontSize: isMobile ? 16 : 20 }]}>Customer Management</Text>
-                  <Text style={s.hSub}>Manage and track all your customers</Text>
-                </View>
+      {/* ══ HEADER (Fixed) ═══════════════════════ */}
+      <View style={{ paddingHorizontal: 16 }}>
+        <View
+          style={[
+            s.header,
+            {
+              paddingTop: Platform.OS === "ios" ? 50 : 16,
+              marginTop: 12,
+            },
+          ]}
+        >
+          <View style={[s.headerInner, { paddingHorizontal: isMobile ? 16 : 22 }]}>
+            <View style={s.hLeft}>
+              <View style={s.hIcon}><PeopleIcon size={isMobile ? 17 : 21} /></View>
+              <View>
+                <Text style={[s.hTitle, { fontSize: isMobile ? 16 : 20 }]}>Customer Management</Text>
+                <Text style={s.hSub}>Manage and track all your customers</Text>
               </View>
             </View>
           </View>
         </View>
+      </View>
 
-        {/* ══ OVERLAPPING STAT CARDS ════════════════════════════════════════ */}
-        <View
-          style={[
-            s.statCardsWrap,
-            { paddingHorizontal: px + 10 },
-            isMobile && s.statCardsWrapMobile,
-          ]}
-        >
-          <StatCard
-            compact={isMobile}
-            icon={<PeopleIcon color={C.primary} size={isMobile ? 13 : 16} />}
-            iconBg={C.primaryLight}
-            value={total}
-            label="Total Customers"
-            sub="All registered customers"
-          />
-          <StatCard
-            compact={isMobile}
-            icon={<CheckCircleIcon color={C.active} size={isMobile ? 13 : 16} />}
-            iconBg={C.activeLight}
-            value={active}
-            label="Active"
-            valueColor={C.active}
-            sub="Currently active"
-          />
-          <StatCard
-            compact={isMobile}
-            icon={<BanIcon color={C.inactive} size={isMobile ? 13 : 16} />}
-            iconBg={C.inactiveLight}
-            value={inactive}
-            label="Inactive"
-            valueColor={C.inactive}
-            sub="Needs attention"
-          />
-          <StatCard
-            compact={isMobile}
-            icon={<WalletIcon color={C.navy} size={isMobile ? 13 : 16} />}
-            iconBg="rgba(29,50,78,0.08)"
-            value={rupee(revenue)}
-            label="Revenue"
-            valueColor={C.primary}
-            sub="Total lifetime revenue"
-          />
-        </View>
+      {/* ══ OVERLAPPING STAT CARDS (Fixed) ════════════════════════════════════════ */}
+      <View
+        style={[
+          s.statCardsWrap,
+          { paddingHorizontal: px + 10 },
+          isMobile && s.statCardsWrapMobile,
+        ]}
+      >
+        <StatCard
+          compact={isMobile}
+          icon={<PeopleIcon color={C.primary} size={isMobile ? 13 : 16} />}
+          iconBg={C.primaryLight}
+          value={total}
+          label="Total Customers"
+          sub="All registered customers"
+        />
+        <StatCard
+          compact={isMobile}
+          icon={<CheckCircleIcon color={C.active} size={isMobile ? 13 : 16} />}
+          iconBg={C.activeLight}
+          value={active}
+          label="Active"
+          valueColor={C.active}
+          sub="Currently active"
+        />
+        <StatCard
+          compact={isMobile}
+          icon={<BanIcon color={C.inactive} size={isMobile ? 13 : 16} />}
+          iconBg={C.inactiveLight}
+          value={inactive}
+          label="Inactive"
+          valueColor={C.inactive}
+          sub="Needs attention"
+        />
+        <StatCard
+          compact={isMobile}
+          icon={<WalletIcon color={C.navy} size={isMobile ? 13 : 16} />}
+          iconBg="rgba(29,50,78,0.08)"
+          value={rupee(revenue)}
+          label="Revenue"
+          valueColor={C.primary}
+          sub="Total lifetime revenue"
+        />
+      </View>
 
-        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
-
-          {/* ══ TOOLBAR ═════════════════════════════════════════════════════ */}
-          <View style={s.toolbar}>
-            {/* Search */}
-            <View style={s.searchBox}>
-              <SearchIcon />
-              <TextInput
-                style={[s.searchInput, { fontSize: isMobile ? 12 : 14 }]}
-                placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
-                placeholderTextColor={C.sub}
-                value={search}
-                onChangeText={(text) => {
-                  setSearch(text);
-                  setPage(1);
-                }}
-                numberOfLines={1}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch("")} style={{ padding: 4 }}>
-                  <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Grid / List toggle */}
-            <View style={s.toggle}>
-              {(["grid", "list"] as const).map((mode) => (
-                <TouchableOpacity
-                  key={mode}
-                  style={[s.toggleBtn, view === mode && s.toggleActive]}
-                  onPress={() => setView(mode)}
-                  activeOpacity={0.8}
-                >
-                  {mode === "grid"
-                    ? <GridIcon color={view === "grid" ? "#fff" : C.sub} size={16} />
-                    : <ListIcon color={view === "list" ? "#fff" : C.sub} size={16} />}
-                </TouchableOpacity>
-              ))}
-            </View>
+      {/* ══ TOOLBAR (Fixed) ═════════════════════════════════════════════════════ */}
+      <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px, marginTop: 10, marginBottom: 4 }}>
+        <View style={s.toolbar}>
+          {/* Search */}
+          <View style={s.searchBox}>
+            <SearchIcon />
+            <TextInput
+              style={[s.searchInput, { fontSize: isMobile ? 12 : 14 }]}
+              placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
+              placeholderTextColor={C.sub}
+              value={search}
+              onChangeText={(text) => {
+                setSearch(text);
+                setPage(1);
+              }}
+              numberOfLines={1}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch("")} style={{ padding: 4 }}>
+                <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
+
+          {/* Grid / List toggle */}
+          <View style={s.toggle}>
+            {(["grid", "list"] as const).map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                style={[s.toggleBtn, view === mode && s.toggleActive]}
+                onPress={() => setView(mode)}
+                activeOpacity={0.8}
+              >
+                {mode === "grid"
+                  ? <GridIcon color={view === "grid" ? "#fff" : C.sub} size={16} />
+                  : <ListIcon color={view === "list" ? "#fff" : C.sub} size={16} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
 
           {loading ? (
             <View style={s.stateBox}>
