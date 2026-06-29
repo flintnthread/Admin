@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -1634,6 +1634,13 @@ export default function ApprovedSellersScreen() {
           {/* --- BREADCRUMB BANNER --- */}
           <View style={stylesMobile.pageBannerCard}>
             <Text style={stylesMobile.pageBannerTitle}>Approved Sellers</Text>
+
+
+
+
+
+
+            
           </View>
 
           <View style={stylesMobile.actionButtonsRow}>
