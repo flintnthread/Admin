@@ -14,6 +14,8 @@ import {
   type CategoryRow,
   type CategoryCounts,
 } from "@/services/categoryApi";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
 import {
   Alert,
   Image,
@@ -1338,6 +1340,7 @@ export default function MainCategories() {
   const [search, setSearch] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [mainCatModalOpen, setMainCatModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
@@ -1347,6 +1350,7 @@ export default function MainCategories() {
   const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const mainCats = await fetchMainCategories();
       const allCats: Category[] = mainCats.map((row: CategoryRow) => ({
         id: row.id,
@@ -1365,7 +1369,7 @@ export default function MainCategories() {
           year: "numeric",
         }),
         status: row.status ? "Active" : "Inactive",
-        image: row.categoryImage || row.mobileImage || row.bannerImage,
+        image: pickCategoryImageUrl(row, "categories"),
       }));
 
       // Fetch subcategories for each main category
@@ -1390,13 +1394,15 @@ export default function MainCategories() {
               year: "numeric",
             }),
             status: row.status ? "Active" : "Inactive",
-            image: row.categoryImage || row.mobileImage || row.bannerImage,
+            image: pickCategoryImageUrl(row, "categories"),
           });
         });
       }
 
       setCategories(allCats);
     } catch (error) {
+      const message = getApiErrorMessage(error, "Failed to load categories.");
+      setLoadError(message);
       console.error("Failed to load categories:", error);
     } finally {
       setLoading(false);
@@ -1475,7 +1481,7 @@ export default function MainCategories() {
             year: "numeric",
           }),
           status: newRow.status ? "Active" : "Inactive",
-          image: data.image || data.mobileImage || data.bannerImage || newRow.categoryImage,
+          image: pickCategoryImageUrl(newRow, "categories") || data.image || undefined,
         };
         setCategories((prev) => [newCat, ...prev]);
         setCurrentPage(1);
@@ -1553,6 +1559,15 @@ export default function MainCategories() {
             </View>
           </View>
         </View>
+
+        {loadError ? (
+          <View style={{ marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 8, backgroundColor: "#FEF2F2" }}>
+            <Text style={{ color: "#DC2626", fontSize: 13 }}>{loadError}</Text>
+            <TouchableOpacity onPress={() => void loadCategories()} style={{ marginTop: 8 }}>
+              <Text style={{ color: "#1E3A5F", fontWeight: "600", fontSize: 13 }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* ── Toolbar ── */}
         <View style={styles.toolbar}>

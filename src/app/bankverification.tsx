@@ -734,18 +734,7 @@ export default function BankVerifications() {
                   </View>
                 )}
 
-                {/* ── Footer ── */}
-                <View style={{
-                  marginTop: 16, paddingVertical: 16,
-                  borderTopWidth: 1, borderTopColor: BORDER,
-                  backgroundColor: "#fff", borderRadius: 8,
-                  alignItems: "center",
-                }}>
-                  <Text style={{ fontSize: 13, color: "#94A3B8", textAlign: "center" }}>
-                    2026 © Flintnthread India Pvt. Ltd.{"\n"}Crafted by{" "}
-                    <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
-                  </Text>
-                </View>
+
               </View>
             }
           />
@@ -970,18 +959,7 @@ export default function BankVerifications() {
               </View>
             </View>
 
-            {/* ── Footer ── */}
-            <View style={{
-              marginTop: 16, paddingVertical: 16,
-              borderTopWidth: 1, borderTopColor: BORDER,
-              backgroundColor: "#fff", borderRadius: 8,
-              alignItems: "center",
-            }}>
-              <Text style={{ fontSize: 13, color: "#94A3B8", textAlign: "center" }}>
-                2026 © Flintnthread India Pvt. Ltd.{"\n"}Crafted by{" "}
-                <Text style={{ color: "#16A34A", fontWeight: "700" }}>Flinththread India Pvt. Ltd.</Text>
-              </Text>
-            </View>
+
           </ScrollView>
         )}
       </View>

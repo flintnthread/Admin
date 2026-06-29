@@ -1,6 +1,5 @@
-import { adminApiRequest } from "@/lib/api/client";
+import { adminApiRequest, adminApiFetch } from "@/lib/api/client";
 import { resolveAdminApiBaseUrl } from "@/lib/api/config";
-import { getAdminToken } from "@/lib/api/session";
 import type { PageResponse, PayoutSummary } from "@/lib/api/types";
 
 export async function fetchPayoutStats(): Promise<Record<string, number>> {
@@ -44,10 +43,12 @@ export function getPayoutExportUrl(status?: string, minReminderDays?: number): s
 }
 
 export async function fetchPayoutExportCsv(status?: string, minReminderDays?: number): Promise<string> {
-  const token = await getAdminToken();
-  const response = await fetch(getPayoutExportUrl(status, minReminderDays), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const q = new URLSearchParams();
+  if (status) q.set("status", status);
+  if (minReminderDays != null) q.set("minReminderDays", String(minReminderDays));
+  const qs = q.toString();
+  const path = `/api/admin/payouts/export${qs ? `?${qs}` : ""}`;
+  const response = await adminApiFetch(path, { headers: { Accept: "text/csv" } });
   if (!response.ok) {
     throw new Error("Export failed");
   }
