@@ -40,7 +40,7 @@ type RequestOptions = RequestInit & {
   auth?: boolean;
 };
 
-export async function adminApiRequest<T>(path: string, init?: RequestOptions): Promise<T> {
+async function buildAdminRequest(path: string, init?: RequestOptions): Promise<{ url: string; headers: Record<string, string> }> {
   const auth = init?.auth !== false;
   const token = getAdminToken();
 
@@ -48,18 +48,13 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     throw new AdminApiError("Not signed in. Please log in again.", 401);
   }
 
-  // Login and other unauthenticated calls probe candidates so mobile/web find the right host.
   if (!auth) {
     try {
       await ensureAdminApiReachable();
     } catch {
       const tried = getAdminApiBaseUrlCandidates().join(", ");
-      const hint =
-        Platform.OS === "web"
-          ? "\n• Start admin-backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run"
-          : "\n• Ensure admin-backend is running on port 8082 (phone and PC on same Wi‑Fi)";
       throw new AdminApiError(
-        `Cannot reach admin API. Tried: ${tried}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
+        `Cannot reach admin API. Tried: ${tried}.\n• Ensure https://flintnthread.online/api/admin/health returns ok on VPS.`
       );
     }
   }
@@ -80,18 +75,39 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     headers.Authorization = `Bearer ${token}`;
   }
 
+  return { url, headers };
+}
+
+/** Authenticated fetch returning the raw Response (CSV, PDF, etc.). */
+export async function adminApiFetch(path: string, init?: RequestOptions): Promise<Response> {
+  const { url, headers } = await buildAdminRequest(path, init);
+  try {
+    const res = await fetch(url, { ...init, headers });
+    if (res.status === 401 && init?.auth !== false) {
+      clearAdminSession();
+      notifySessionCleared();
+    }
+    return res;
+  } catch {
+    const debug = resolveAdminApiBaseUrl();
+    const tried = getAdminApiBaseUrlCandidates().join(", ");
+    throw new AdminApiError(
+      `Cannot reach admin API at ${debug}. Also tried: ${tried}.\n• Check network and https://flintnthread.online/api/admin/health`
+    );
+  }
+}
+
+export async function adminApiRequest<T>(path: string, init?: RequestOptions): Promise<T> {
+  const { url, headers } = await buildAdminRequest(path, init);
+
   let res: Response;
   try {
     res = await fetch(url, { ...init, headers });
   } catch {
     const debug = resolveAdminApiBaseUrl();
     const tried = getAdminApiBaseUrlCandidates().join(", ");
-    const hint =
-      Platform.OS === "web"
-        ? "\n• Start admin-backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run"
-        : "\n• Ensure phone and PC are on the same Wi‑Fi (API host is detected from Expo automatically)";
     throw new AdminApiError(
-      `Cannot reach admin API at ${debug}. Also tried: ${tried}.${hint}\n• Ensure admin-backend is running on port 8082 (server.address=0.0.0.0)`
+      `Cannot reach admin API at ${debug}. Also tried: ${tried}.\n• Check network and https://flintnthread.online/api/admin/health`
     );
   }
 
@@ -119,7 +135,7 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
   const raw = await res.text();
   if (!contentType.includes("application/json") && raw.trimStart().startsWith("<")) {
     throw new AdminApiError(
-      `Admin API returned HTML instead of JSON at ${url}. Start admin-backend on port 8082 and open the Admin app on a different port (not 8082).`,
+      `Admin API returned HTML instead of JSON at ${url}. Expected JSON from https://flintnthread.online/api/admin/...`,
       res.status
     );
   }
@@ -128,7 +144,7 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     return JSON.parse(raw) as T;
   } catch {
     throw new AdminApiError(
-      `Invalid JSON from admin API at ${url}. Ensure admin-backend is running on port 8082.`,
+      `Invalid JSON from admin API at ${url}. Check https://flintnthread.online/api/admin/health`,
       res.status
     );
   }

@@ -76,13 +76,11 @@ export default function ApiDevHint() {
       <Text style={[styles.status, { color: healthColor }]}>{healthLabel}</Text>
       {health === "fail" ? (
         <Text style={styles.help}>
-          {errorDetail ?? "Cannot reach admin-backend."}
+          {errorDetail ?? "Cannot reach admin API."}
           {"\n\n"}
-          1) Backend: cd flintnthread-platform/admin-service && ..\\mvnw.cmd spring-boot:run (port 8082)
+          Production: https://flintnthread.online/api/admin/health
           {"\n"}
-          2) Web UI: cd Admin && npm run web → open {webDevUrl}/login
-          {"\n"}
-          3) Phone: same Wi‑Fi as PC — API host is auto-detected from Expo (no .env IP)
+          Local dev: set EXPO_PUBLIC_ADMIN_API_USE_LOCAL=true in .env
         </Text>
       ) : null}
       <TouchableOpacity style={styles.retryBtn} onPress={() => void checkHealth()}>

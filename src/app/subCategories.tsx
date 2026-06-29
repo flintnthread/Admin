@@ -28,7 +28,8 @@ import {
   type MaterialSlab,
 } from "@/services/subcategoryApi";
 import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
-import { resolveMediaUrl } from "@/lib/api/media";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
 
@@ -630,7 +631,11 @@ const AddModal = ({
           setCategoryId(editData.categoryId ? editData.categoryId.toString() : "");
         }
         setName(editData.subcategoryName || editData.name || "");
-        setImage(resolveMediaUrl(editData.subcategoryImage || editData.image || "") || null);
+        setImage(
+          pickCategoryImageUrl(editData, "subcategories") ||
+            resolveCatalogMediaUrl(editData.subcategoryImage || editData.image || "", "subcategories") ||
+            null
+        );
         setMaterials(editData.materials || []);
         setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
@@ -1121,6 +1126,7 @@ export default function Subcategories() {
   const [mainCategories, setMainCategories] = useState<CategoryRow[]>([]);
   const [mainCatOptions, setMainCatOptions] = useState<string[]>(["All"]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [mainCatFilter, setMainCatFilter] = useState("All");
@@ -1136,12 +1142,13 @@ export default function Subcategories() {
   const loadSubcategories = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await fetchSubcategories();
       
       const mapped: Subcategory[] = data.map((row: SubcategoryRow) => {
         const materialSlabsValue = row.materialSlabs ?? row.material_slabs;
         const materials = parseMaterialSlabs(materialSlabsValue);
-        const imageUrl = resolveMediaUrl(row.subcategoryImage || row.mobileImage || "");
+        const imageUrl = pickCategoryImageUrl(row, "subcategories");
 
         return {
           id: row.id,
@@ -1171,8 +1178,10 @@ export default function Subcategories() {
       
       setItems(mapped);
     } catch (error) {
+      const message = getApiErrorMessage(error, "Failed to load subcategories.");
+      setLoadError(message);
       console.error("Failed to load subcategories:", error);
-      Alert.alert("Error", "Failed to load subcategories");
+      Alert.alert("Error", message);
     } finally {
       setLoading(false);
     }
@@ -1259,7 +1268,7 @@ export default function Subcategories() {
           sellerId: newRow.sellerId,
           // UI fields
           name: newRow.subcategoryName,
-          image: newRow.subcategoryImage || newRow.mobileImage,
+          image: pickCategoryImageUrl(newRow, "subcategories") || data.image,
           created: newRow.createdAt ? new Date(newRow.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -1398,6 +1407,15 @@ export default function Subcategories() {
             <Text style={S.exportText}>{isWeb ? "Export CSV" : "CSV"}</Text>
           </TouchableOpacity>
         </View>
+
+        {loadError ? (
+          <View style={{ marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 8, backgroundColor: "#FEF2F2" }}>
+            <Text style={{ color: "#DC2626", fontSize: 13 }}>{loadError}</Text>
+            <TouchableOpacity onPress={() => void loadSubcategories()} style={{ marginTop: 8 }}>
+              <Text style={{ color: "#1E3A5F", fontWeight: "600", fontSize: 13 }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* ── Toolbar ── */}
         <View style={S.toolbar}>
