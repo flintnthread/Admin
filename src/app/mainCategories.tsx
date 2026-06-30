@@ -1639,13 +1639,6 @@ export default function MainCategories() {
           </View>
         </View>
 
-        {/* ── Count Row ── */}
-        <View style={styles.countRow}>
-          <Text style={styles.countText}>
-            Showing {paginated.length} of {filtered.length} categories
-          </Text>
-        </View>
-
         {/* ── Content ── */}
         {viewMode === "grid" ? (
           // ✅ UPDATED: wrapper View per card handles responsive width

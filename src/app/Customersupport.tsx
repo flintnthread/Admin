@@ -327,88 +327,92 @@ interface WebTableProps {
 }
 
 const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
-  <View style={styles.tableWrapper}>
-    {/* Table Header */}
-    <View style={styles.tableHeader}>
-      <Text style={[styles.th, { width: 60 }]}>ID</Text>
-      <Text style={[styles.th, { flex: 2.5 }]}>Subject</Text>
-      <Text style={[styles.th, { flex: 1.4 }]}>Customer</Text>
-      <Text style={[styles.th, { width: 100 }]}>Type</Text>
-      <Text style={[styles.th, { width: 160 }]}>Order</Text>
-      <Text style={[styles.th, { width: 100 }]}>Status</Text>
-      <Text style={[styles.th, { width: 110 }]}>Created</Text>
-      <Text style={[styles.th, { width: 90, textAlign: "center" }]}>
-        Actions
-      </Text>
-    </View>
-
-    {/* Table Rows */}
-    {tickets.map((ticket, idx) => (
-      <View
-        key={ticket.id}
-        style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
-      >
-        <Text style={[styles.td, { width: 60 }, styles.tdId]}>{ticket.id}</Text>
-        <Text style={[styles.td, { flex: 2.5 }]} numberOfLines={2}>
-          {ticket.subject}
+  <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScrollWrapper}>
+    <View style={styles.tableWrapper}>
+      {/* Table Header */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.th, { width: 120, minWidth: 120 }]}>ID</Text>
+        <Text style={[styles.th, { width: 200, minWidth: 200 }]}>Subject</Text>
+        <Text style={[styles.th, { width: 180, minWidth: 180 }]}>Customer</Text>
+        <Text style={[styles.th, { width: 130, minWidth: 130 }]}>Type</Text>
+        <Text style={[styles.th, { width: 160, minWidth: 160 }]}>Order</Text>
+        <Text style={[styles.th, { width: 110, minWidth: 110 }]}>Status</Text>
+        <Text style={[styles.th, { width: 120, minWidth: 120 }]}>Created</Text>
+        <Text style={[styles.th, { width: 100, minWidth: 100, textAlign: "center" }]}>
+          Actions
         </Text>
-        <View
-          style={[{ flex: 1.4, paddingVertical: 13, paddingHorizontal: 12 }]}
-        >
-          <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
-          <Text style={styles.tdCustomerEmail} numberOfLines={1}>
-            {ticket.email}
-          </Text>
-        </View>
-        <View
-          style={[
-            {
-              width: 100,
-              paddingVertical: 13,
-              paddingHorizontal: 12,
-              justifyContent: "center",
-              alignItems: "flex-start",
-            },
-          ]}
-        >
-          <TypeBadge type={ticket.type} />
-        </View>
-        <Text style={[styles.td, { width: 160 }, styles.orderLink]}>
-          {ticket.order}
-        </Text>
-        <View
-          style={[
-            {
-              width: 100,
-              paddingVertical: 13,
-              paddingHorizontal: 12,
-              justifyContent: "center",
-              alignItems: "flex-start",
-            },
-          ]}
-        >
-          <StatusBadge status={ticket.status} />
-        </View>
-        <Text style={[styles.td, { width: 110 }, styles.tdMuted]}>
-          {ticket.created}
-        </Text>
-        <View style={[styles.tdActions, { width: 90 }]}>
-          <TouchableOpacity
-            style={styles.actionBtnView}
-            onPress={() => onView(ticket)}
-          >
-            <EyeIcon />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionBtnRefresh}
-            onPress={() => onRefresh(ticket)}
-          >
-            <RefreshIcon />
-          </TouchableOpacity>
-        </View>
       </View>
-    ))}
-  </View>
+
+      {/* Table Rows */}
+      {tickets.map((ticket, idx) => (
+        <View
+          key={ticket.id}
+          style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
+        >
+          <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdId]} numberOfLines={2}>{ticket.id}</Text>
+          <Text style={[styles.td, { width: 200, minWidth: 200 }]} numberOfLines={2}>
+            {ticket.subject}
+          </Text>
+          <View
+            style={[{ width: 180, minWidth: 180, paddingVertical: 13, paddingHorizontal: 12 }]}
+          >
+            <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
+            <Text style={styles.tdCustomerEmail} numberOfLines={1}>
+              {ticket.email}
+            </Text>
+          </View>
+          <View
+            style={[
+              {
+                width: 130,
+                minWidth: 130,
+                paddingVertical: 13,
+                paddingHorizontal: 12,
+                justifyContent: "center",
+                alignItems: "flex-start",
+              },
+            ]}
+          >
+            <TypeBadge type={ticket.type} />
+          </View>
+          <Text style={[styles.td, { width: 160, minWidth: 160 }, styles.orderLink]}>
+            {ticket.order}
+          </Text>
+          <View
+            style={[
+              {
+                width: 110,
+                minWidth: 110,
+                paddingVertical: 13,
+                paddingHorizontal: 12,
+                justifyContent: "center",
+                alignItems: "flex-start",
+              },
+            ]}
+          >
+            <StatusBadge status={ticket.status} />
+          </View>
+          <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdMuted]}>
+            {ticket.created}
+          </Text>
+          <View style={[styles.tdActions, { width: 100, minWidth: 100 }]}>
+            <TouchableOpacity
+              style={styles.actionBtnView}
+              onPress={() => onView(ticket)}
+            >
+              <EyeIcon />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionBtnRefresh}
+              onPress={() => onRefresh(ticket)}
+            >
+              <RefreshIcon />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </View>
+  </ScrollView>
 );
 
 // â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -818,12 +822,15 @@ const styles = StyleSheet.create({
   },
 
   // Table
-  tableWrapper: {
-    backgroundColor: "#FFFFFF",
+  tableScrollWrapper: {
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     overflow: "hidden",
+  } as any,
+  tableWrapper: {
+    backgroundColor: "#FFFFFF",
+    minWidth: 1120,
   },
   tableHeader: {
     flexDirection: "row",
@@ -859,6 +866,7 @@ const styles = StyleSheet.create({
   tdId: {
     fontWeight: "700",
     color: "#1E3A5F",
+    flexWrap: "wrap",
   },
   tdCustomerName: {
     fontSize: 13,
