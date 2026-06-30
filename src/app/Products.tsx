@@ -1648,12 +1648,8 @@ const MobileProductsScreen: React.FC = () => {
     const currentSortOption = SORT_OPTIONS.find(o => o.value === sortBy);
 
 
-
-    return (
-        <AdminLayout>
-        <SafeAreaView style={s.root}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
-
+    const headerAndMobileActions = (
+        <>
             {/* Header */}
             {showSearch ? (
                 <View style={s.headerWrapper}>
@@ -1691,7 +1687,33 @@ const MobileProductsScreen: React.FC = () => {
                 </View>
             )}
 
+            {!isWeb && (
+                <View style={[s.actionRow, { paddingTop: 6, paddingBottom: 6 }]}>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
+                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
+                        <Text style={s.actionTitle}>Add New Product</Text>
+                        <Text style={s.actionDesc}>Create and add a new product</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
+                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
+                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
+                        <Text style={s.actionDesc}>Upload products via CSV</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+        </>
+    );
+
+    return (
+        <AdminLayout>
+        <SafeAreaView style={s.root}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
+
+            {isWeb && headerAndMobileActions}
+
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                {!isWeb && headerAndMobileActions}
                 {error ? (
                     <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
                         <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>

@@ -998,7 +998,7 @@ const SS = StyleSheet.create({
   backButton: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
   backButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600', marginLeft: 4 },
   headerContainer: {
-    backgroundColor: "#1d324e",
+    backgroundColor: "#151D4F",
     marginHorizontal: 18,
     marginTop: 22,
     borderRadius: 22,

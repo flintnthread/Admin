@@ -175,17 +175,17 @@ function StatCard({
       {grid ? (
         <>
           <View style={styles.statCardTop}>
-            <View style={[styles.statIconWrap, styles.statIconWrapGrid, { backgroundColor: bg }]}>
-              <MaterialCommunityIcons name={icon} size={18} color={color} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={[styles.statIconWrap, styles.statIconWrapGrid, { backgroundColor: bg }]}>
+                <MaterialCommunityIcons name={icon} size={18} color={color} />
+              </View>
+              <Text style={[styles.statCount, styles.statCountGrid, { color }]}>{count}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={16} color={color} />
           </View>
-          <View style={styles.statContent}>
-            <Text style={[styles.statCount, styles.statCountGrid]}>{count}</Text>
-            <Text style={[styles.statLabel, styles.statLabelGrid]} numberOfLines={2}>
-              {label}
-            </Text>
-          </View>
+          <Text style={[styles.statLabel, styles.statLabelGrid]} numberOfLines={2}>
+            {label}
+          </Text>
         </>
       ) : (
         <>
@@ -463,7 +463,7 @@ function StatusTabs({
   isMobile: boolean;
 }) {
   const tabs: { key: FilterKey; label: string; count: number; color: string; bg: string }[] = [
-    { key: 'all', label: 'All', count: stats.all, color: '#FFF', bg: PALETTE.brandOrange },
+    { key: 'all', label: 'All', count: stats.all, color: PALETTE.brandOrange, bg: PALETTE.brandOrange },
     { key: 'pending', label: 'Pending', count: stats.pending, color: PALETTE.orange, bg: PALETTE.orangeLight },
     { key: 'review', label: 'Review', count: stats.review, color: PALETTE.blue, bg: PALETTE.blueLight },
     { key: 'approved', label: 'Approved', count: stats.approved, color: PALETTE.green, bg: PALETTE.greenLight },
@@ -478,7 +478,7 @@ function StatusTabs({
         onPress={() => onChange(tab.key)}
         style={[
           styles.statusTab,
-          isActive && tab.key === 'all' && { backgroundColor: PALETTE.brandOrange },
+          isActive && tab.key === 'all' && { backgroundColor: PALETTE.brandOrange, borderColor: PALETTE.brandOrange },
           isActive && tab.key !== 'all' && { backgroundColor: tab.bg, borderColor: tab.color },
           !isActive && { borderColor: tab.color, backgroundColor: '#FFF' },
         ]}>
@@ -564,9 +564,6 @@ function FilterSection({
     <View style={[styles.queueCard, { zIndex: 10, elevation: 10 }]}>
       <View style={[styles.queueHeader, { zIndex: 1, elevation: 1 }]}>
         <Text style={styles.queueTitle}>Product Approval Queue</Text>
-        <Pressable style={styles.filterIconBtn}>
-          <MaterialCommunityIcons name="filter-variant" size={18} color={PALETTE.brandOrange} />
-        </Pressable>
       </View>
 
       <View
@@ -675,11 +672,6 @@ function ProductTable({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Pressable style={styles.tableColCheck} onPress={onToggleAll}>
-              <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
-                {allSelected && <MaterialCommunityIcons name="check" size={12} color="#FFF" />}
-              </View>
-            </Pressable>
             <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
             <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
             <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
@@ -690,17 +682,6 @@ function ProductTable({
 
           {products.map((product) => (
             <View key={product.id} style={styles.tableRow}>
-              <Pressable style={styles.tableColCheck} onPress={() => onToggle(product.id)}>
-                <View
-                  style={[
-                    styles.checkbox,
-                    selected.has(product.id) && styles.checkboxChecked,
-                  ]}>
-                  {selected.has(product.id) && (
-                    <MaterialCommunityIcons name="check" size={12} color="#FFF" />
-                  )}
-                </View>
-              </Pressable>
 
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
              <Image
@@ -1262,7 +1243,7 @@ const styles = StyleSheet.create({
   },
   statsGridWide: {
     flexWrap: 'nowrap',
-    marginTop: -42,
+    marginTop: -60,
     marginHorizontal: 16,
     zIndex: 10,
     marginBottom: 4,
@@ -1720,28 +1701,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tableColProduct: {
-    flex: 2.5,
+    flex: 1,
     minWidth: 200,
+    paddingRight: 16,
   },
   tableColSeller: {
-    flex: 1.5,
-    minWidth: 140,
+    flex: 1,
+    minWidth: 160,
+    paddingRight: 16,
   },
   tableColCategory: {
-    flex: 1.5,
-    minWidth: 120,
+    flex: 1.4,
+    minWidth: 220,
+    paddingRight: 16,
   },
   tableColStatus: {
-    flex: 1.2,
-    minWidth: 100,
+    flex: 0.8,
+    minWidth: 120,
+    paddingRight: 16,
   },
   tableColDate: {
-    flex: 1.5,
-    minWidth: 140,
+    flex: 1,
+    minWidth: 150,
+    paddingRight: 16,
   },
   tableColActions: {
-    flex: 2.5,
-    minWidth: 220,
+    flex: 1.2,
+    minWidth: 200,
   },
   checkbox: {
     width: 18,

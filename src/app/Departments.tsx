@@ -794,6 +794,7 @@ const DepartmentsScreen: React.FC = () => {
 
     const totalJobs = departments.reduce((s, d) => s + d.jobs, 0);
     const activeCount = departments.filter(d => d.status === "Active").length;
+    const inactiveCount = departments.length - activeCount;
 
     const handleSave = async (updated: Department) => {
         try {
@@ -892,11 +893,11 @@ const DepartmentsScreen: React.FC = () => {
                         iconFg={T.navy}
                     />
                     <StatCard
-                        icon="briefcase"
-                        value={totalJobs}
-                        label="Open Jobs"
-                        iconBg={T.greenBg}
-                        iconFg={T.green}
+                        icon="x-circle"
+                        value={inactiveCount}
+                        label="Inactive"
+                        iconBg={T.redBg}
+                        iconFg={T.red}
                     />
                 </View>
 
@@ -1187,11 +1188,11 @@ const mob = StyleSheet.create({
     headerCard: {
         backgroundColor: "#151D4F",
         borderRadius: 22,
-        marginHorizontal: 2,
-        marginTop: 12,
-        paddingTop: 16,
+        marginHorizontal: 4,
+        marginTop: 16,
+        paddingTop: Platform.OS === 'android' ? 16 : 12,
         paddingHorizontal: 16,
-        paddingBottom: 46,
+        paddingBottom: 48,
     },
 
     // Controls card: sits below stats strip, white background
