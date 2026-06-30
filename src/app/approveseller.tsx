@@ -1584,18 +1584,14 @@ export default function ApprovedSellersScreen() {
     }
 
     return (
-      <View style={stylesMobile.container}>
-        {/* --- REDESIGNED TOP BAR HEADER --- */}
-        <View style={stylesMobile.newTopBar}>
-          <TouchableOpacity onPress={() => setMobileMenuOpen(true)}>
-            <Feather name="menu" size={22} color="#1E293B" />
-          </TouchableOpacity>
-          
-          <View style={stylesMobile.topBarSearchContainer}>
+      <AdminLayout>
+        <View style={stylesMobile.container}>
+          {/* Search bar inside content */}
+          <View style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 12, height: 42, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
             <Feather name="search" size={16} color="#64748B" style={{ marginRight: 6 }} />
             <TextInput
-              style={stylesMobile.topBarSearchInput}
-              placeholder="Search..."
+              style={{ flex: 1, fontSize: 14, color: '#1E293B' }}
+              placeholder="Search by name, email, business..."
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={(text) => {
@@ -1605,35 +1601,16 @@ export default function ApprovedSellersScreen() {
             />
           </View>
 
-          <TouchableOpacity style={stylesMobile.topBarIconBtn} onPress={toggleTheme}>
-            <Feather name={isDark ? "sun" : "moon"} size={18} color="#1E293B" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={stylesMobile.topBarIconBtn} onPress={() => Alert.alert("Notifications", "You have 3 new verification requests.")}>
-            <Feather name="bell" size={18} color="#1E293B" />
-            <View style={stylesMobile.topBarBadge}>
-              <Text style={stylesMobile.topBarBadgeText}>3</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={stylesMobile.topBarIconBtn} onPress={() => router.push("/adminpanel")}>
-            <Feather name="settings" size={18} color="#1E293B" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={stylesMobile.topBarAvatar} onPress={() => router.push("/profile")}>
-            <Text style={stylesMobile.topBarAvatarText}>FL</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* --- SCROLLABLE BODY --- */}
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-        >
+          {/* --- SCROLLABLE BODY --- */}
+          <ScrollView 
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+          >
           {/* --- BREADCRUMB BANNER --- */}
           <View style={stylesMobile.pageBannerCard}>
             <Text style={stylesMobile.pageBannerTitle}>Approved Sellers</Text>
+            <Text style={stylesMobile.pageBannerSubtitle}>Manage and monitor verified merchant accounts</Text>
           </View>
 
           <View style={stylesMobile.actionButtonsRow}>
@@ -1925,29 +1902,7 @@ export default function ApprovedSellersScreen() {
 
         {/* FAB REMOVED */}
 
-        {/* --- BOTTOM TAB NAVIGATION --- */}
-        <View style={stylesMobile.bottomTabNav}>
-          <TouchableOpacity style={stylesMobile.bottomTabItem} onPress={() => router.push("/Dashboard")}>
-            <Feather name="home" size={20} color="#64748B" />
-            <Text style={stylesMobile.bottomTabLabel}>Dashboard</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={stylesMobile.bottomTabItem} onPress={() => router.push("/Products")}>
-            <Feather name="box" size={20} color="#64748B" />
-            <Text style={stylesMobile.bottomTabLabel}>Catalog</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={stylesMobile.bottomTabItem} onPress={() => router.push("/approveseller")}>
-            <Feather name="users" size={20} color="#EA580C" />
-            <Text style={[stylesMobile.bottomTabLabel, { color: "#EA580C" }]}>Sellers</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={stylesMobile.bottomTabItem} onPress={() => router.push("/sellergraphs")}>
-            <Feather name="bar-chart-2" size={20} color="#64748B" />
-            <Text style={stylesMobile.bottomTabLabel}>Analytics</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={stylesMobile.bottomTabItem} onPress={() => router.push("/adminpanel")}>
-            <Feather name="settings" size={20} color="#64748B" />
-            <Text style={stylesMobile.bottomTabLabel}>Settings</Text>
-          </TouchableOpacity>
-        </View>
+
 
         {/* --- FILTER BOTTOM SHEET MODAL --- */}
         {renderMobileFilterModal()}
@@ -1961,74 +1916,7 @@ export default function ApprovedSellersScreen() {
         {/* --- ALL CITIES INSIGHTS MODAL --- */}
         {renderAllCitiesModal()}
 
-        {/* --- MOBILE DRAWER SLIDE-OUT MENU --- */}
-        {mobileMenuOpen && (
-          <Modal
-            visible={mobileMenuOpen}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setMobileMenuOpen(false)}
-          >
-            <TouchableOpacity 
-              style={stylesMobile.drawerOverlay} 
-              activeOpacity={1} 
-              onPress={() => setMobileMenuOpen(false)}
-            >
-              <View style={stylesMobile.drawerPanel}>
-                <View style={stylesMobile.drawerHeader}>
-                  <Text style={stylesMobile.drawerHeaderText}>Navigation</Text>
-                  <TouchableOpacity onPress={() => setMobileMenuOpen(false)}>
-                    <Feather name="x" size={20} color="#1E293B" />
-                  </TouchableOpacity>
-                </View>
-                <View style={stylesMobile.drawerContent}>
-                  <TouchableOpacity 
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/Dashboard"); }}
-                  >
-                    <Feather name="home" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Dashboard</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/Products"); }}
-                  >
-                    <Feather name="box" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Catalog</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[stylesMobile.drawerItem, { backgroundColor: "#FFF7ED" }]}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/approveseller"); }}
-                  >
-                    <Feather name="users" size={18} color="#EA580C" style={{ marginRight: 12 }} />
-                    <Text style={[stylesMobile.drawerItemText, { color: "#EA580C", fontWeight: "600" }]}>Sellers</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/sellergraphs"); }}
-                  >
-                    <Feather name="bar-chart-2" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Analytics</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/adminpanel"); }}
-                  >
-                    <Feather name="settings" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Settings</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/profile"); }}
-                  >
-                    <Feather name="user" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Profile</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-        )}
+
 
         {/* --- DYNAMIC MODALS FOR MOBILE LIST VIEW --- */}
         {previewDoc && (
@@ -2285,7 +2173,8 @@ export default function ApprovedSellersScreen() {
             </View>
           </Modal>
         )}
-      </View>
+        </View>
+      </AdminLayout>
     );
   };
 
@@ -5685,7 +5574,12 @@ const stylesMobile = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 6,
+    marginBottom: 2,
+  },
+  pageBannerSubtitle: {
+    color: "rgba(255, 255, 255, 0.75)",
+    fontSize: 12,
+    fontWeight: "500",
   },
   breadcrumbContainer: {
     flexDirection: "row",

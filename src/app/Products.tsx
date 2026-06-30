@@ -881,16 +881,17 @@ const WebProductsScreen: React.FC = () => {
     return (
         <AdminLayout>
         <View style={wst.root}>
-            <ScrollView style={wst.pageScroll} showsVerticalScrollIndicator={false} contentContainerStyle={wst.pageContent}>
-                {error ? (
-                    <View style={{ marginBottom: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
-                        <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
-                        <TouchableOpacity onPress={reload} style={{ marginTop: 8, alignSelf: "flex-start" }}>
-                            <Text style={{ fontSize: 12, color: C.navy }}>Retry</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : null}
+            {error ? (
+                <View style={{ marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
+                    <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
+                    <TouchableOpacity onPress={reload} style={{ marginTop: 8, alignSelf: "flex-start" }}>
+                        <Text style={{ fontSize: 12, color: C.navy }}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
 
+            {/* Page header and Stats (Fixed) */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
                 {/* Page header */}
                 <View style={wst.pageHeader}>
                     <View style={wst.titleContainer}>
@@ -937,7 +938,9 @@ const WebProductsScreen: React.FC = () => {
                         </View>
                     ))}
                 </View>
+            </View>
 
+            <ScrollView style={wst.pageScroll} showsVerticalScrollIndicator={false} contentContainerStyle={[wst.pageContent, { paddingTop: 0 }]}>
                 {/* Main area */}
                 <View style={wst.contentArea}>
 
@@ -1376,7 +1379,7 @@ const wst = StyleSheet.create({
     breadcrumb:            { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
     breadcrumbDim:         { fontSize: 13, color: "rgba(255,255,255,0.75)" },
     breadcrumbActive:      { fontSize: 13, color: C.white },
-    pageTitle:             { fontSize: 26, color: C.white, letterSpacing: -0.5 },
+    pageTitle:             { fontSize: 26, color: C.white, letterSpacing: -0.5, fontWeight: "bold" },
     navAddBtn:             { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.white, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
     navAddBtnTxt:          { fontSize: 14, color: C.navy },
     navBulkBtn:            { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
@@ -1688,21 +1691,6 @@ const MobileProductsScreen: React.FC = () => {
                 </View>
             )}
 
-            {!isWeb && (
-                <View style={[s.actionRow, { paddingTop: 6, paddingBottom: 6 }]}>
-                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
-                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
-                        <Text style={s.actionTitle}>Add New Product</Text>
-                        <Text style={s.actionDesc}>Create and add a new product</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
-                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
-                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
-                        <Text style={s.actionDesc}>Upload products via CSV</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {error ? (
                     <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
@@ -1714,20 +1702,18 @@ const MobileProductsScreen: React.FC = () => {
                 ) : null}
 
                 {/* Action cards */}
-                {isWeb && (
-                    <View style={s.actionRow}>
-                        <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
-                            <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
-                            <Text style={s.actionTitle}>Add New Product</Text>
-                            <Text style={s.actionDesc}>Create and add a new product</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
-                            <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
-                            <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
-                            <Text style={s.actionDesc}>Upload products via CSV</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                <View style={s.actionRow}>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
+                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
+                        <Text style={s.actionTitle}>Add New Product</Text>
+                        <Text style={s.actionDesc}>Create and add a new product</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
+                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
+                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
+                        <Text style={s.actionDesc}>Upload products via CSV</Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* Stats */}
                 <View style={s.statsCard}>
@@ -2016,7 +2002,7 @@ const s = StyleSheet.create({
     searchBarRow:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
     backBtn:            { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
     headerContent:      { flex: 1 },
-    headerTitle:        { fontSize: 19, color: C.white, marginBottom: 1 },
+    headerTitle:        { fontSize: 19, color: C.white, marginBottom: 1, fontWeight: "bold" },
     headerSub:          { fontSize: 12, color: "rgba(255,255,255,0.65)" },
     headerIcon:         { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
     searchInput:        { flex: 1, fontSize: 14, color: C.white, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.4)", paddingVertical: 4 },
