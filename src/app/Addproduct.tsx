@@ -2851,15 +2851,13 @@ const AddNewProduct: React.FC = () => {
                     <StatusBar barStyle="dark-content" backgroundColor={C.white} />
                     <View style={ds.topBar}>
                         <TouchableOpacity onPress={resetForm} style={ds.topBtn}>
-                            <Ionicons name="arrow-back" size={22} color={C.navy} />
+                            <Ionicons name="arrow-back" size={22} color={C.white} />
                         </TouchableOpacity>
                         <View style={ds.topCenter}>
                             <AppText style={ds.topTitle}>Add New Product</AppText>
                             <AppText style={ds.topSub}>{STEPS[step]?.label} · Step {step + 1} of {STEPS.length}</AppText>
                         </View>
-                        <TouchableOpacity onPress={resetForm} style={ds.topBtn}>
-                            <Ionicons name="close" size={22} color={C.textMid} />
-                        </TouchableOpacity>
+                        <View style={ds.topBtn} />
                     </View>
                     <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} isDesktop />
                     <View style={ds.mainColumn}>
@@ -2884,9 +2882,7 @@ const AddNewProduct: React.FC = () => {
                         <AppText style={sc.hTitle}>Add New Product</AppText>
                         <AppText style={sc.hSub}>Step {step + 1} of {STEPS.length}</AppText>
                     </View>
-                    <TouchableOpacity onPress={resetForm} style={sc.hBtn}>
-                        <Ionicons name="close" size={22} color={C.white} />
-                    </TouchableOpacity>
+                    <View style={sc.hBtn} />
                 </View>
                 <StepProgressBar step={step} maxUnlocked={maxUnlocked} onTabPress={handleTabPress} />
                 <View style={{ flex: 1, backgroundColor: C.bg }}>{stepContent}</View>
@@ -3006,11 +3002,11 @@ const ds = StyleSheet.create({
         backgroundColor: C.bg,
         ...(Platform.OS === "web" ? ({ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" } as object) : {}),
     },
-    topBar: { flexDirection: "row", alignItems: "center", backgroundColor: C.white, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border, shadowColor: "#0F1A4A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 4 },
-    topBtn: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.navyGhost },
+    topBar: { flexDirection: "row", alignItems: "center", backgroundColor: C.navyDeep, paddingHorizontal: 20, paddingVertical: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 12, borderRadius: 22, shadowColor: C.navyDeep, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
+    topBtn: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     topCenter: { flex: 1, alignItems: "center", paddingHorizontal: 12 },
-    topTitle: { fontFamily: fontFamilies.bold, fontSize: 20, color: C.textDark, letterSpacing: 0.2 },
-    topSub: { fontFamily: fontFamilies.medium, fontSize: 13, color: C.textLight, marginTop: 2 },
+    topTitle: { fontFamily: fontFamilies.bold, fontSize: 20, color: C.white, letterSpacing: 0.2, fontWeight: "bold" },
+    topSub: { fontFamily: fontFamilies.medium, fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 2 },
     hStepBar: { paddingTop: 12, paddingBottom: 14, maxWidth: CONTENT_MAX + 64, width: "100%", alignSelf: "center" },
     mainColumn: { flex: 1, minWidth: 0, width: "100%", backgroundColor: C.bg },
     mainScroll: { flex: 1 },
@@ -3034,10 +3030,10 @@ const ds = StyleSheet.create({
 
 const sc = StyleSheet.create({
     root: { flex: 1, backgroundColor: C.bg },
-    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navyDeep, flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 10, paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 10 : 10 },
+    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22,  backgroundColor: C.navyDeep, flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 8, paddingTop: 8 },
     hBtn: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
     hCenter: { flex: 1, alignItems: "center" },
-    hTitle: { fontFamily: fontFamilies.bold, fontSize: 17, color: C.white },
+    hTitle: { fontFamily: fontFamilies.bold, fontSize: 17, color: C.white, fontWeight: "bold" },
     hSub: { fontFamily: fontFamilies.regular, fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 1 },
     bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, backgroundColor: C.white, borderWidth: 1, borderColor: C.border, borderRadius: 16, shadowColor: "#0F1A4A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, marginTop: 24, marginBottom: 12 },
     barLeft: { alignItems: "flex-start" },

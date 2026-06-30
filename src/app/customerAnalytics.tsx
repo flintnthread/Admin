@@ -15,47 +15,46 @@ import {
   mapApiAnalyticsToUi,
   type CustomerAnalyticsUi,
 } from "@/services/customerApi";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Print from "expo-print";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
 import React, {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
-  useEffect,
 } from "react";
 import {
   ActivityIndicator,
+  Animated,
   LayoutChangeEvent,
+  Linking,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
-  Pressable,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
-  Modal,
-  Share,
-  Animated,
-  Linking,
 } from "react-native";
 import Svg, {
   Circle,
+  Defs,
+  G,
+  Line,
   Path,
   Rect,
-  Defs,
-  LinearGradient as SvgLinearGradient,
   Stop,
-  Line,
-  G,
+  LinearGradient as SvgLinearGradient,
   Text as SvgText,
 } from "react-native-svg";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import { LinearGradient } from "expo-linear-gradient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PALETTE
@@ -762,7 +761,7 @@ function buildMockAnalytics(customerId: string, name: string) {
       productName: pick([
         "Wireless Noise-Cancelling Headphones",
         "Ergonomic Mechanical Keyboard",
-        "Ultra-Wide Curved Monitor 34\"",
+        'Ultra-Wide Curved Monitor 34"',
         "Smart Fitness Watch v2",
         "Portable USB-C SSD 1TB",
         "Dual-Band Wi-Fi 6 Router",
@@ -850,7 +849,10 @@ function getFilteredCategoricalData<T extends { label: string; value: number }>(
   return baseData;
 }
 
-function sliceMonthlyData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[] {
+function sliceMonthlyData(
+  data: ChartPoint[],
+  timeframe: TimeFrame,
+): ChartPoint[] {
   const now = new Date();
   const currentMonth = now.getMonth();
   let monthsToInclude = 12;
@@ -872,7 +874,9 @@ function sliceMonthlyData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[
   for (let i = monthsToInclude - 1; i >= 0; i--) {
     indices.push((currentMonth - i + 12) % 12);
   }
-  return indices.map((m) => data[m] ?? { label: "", value: 0 }).filter((p) => p.label);
+  return indices
+    .map((m) => data[m] ?? { label: "", value: 0 })
+    .filter((p) => p.label);
 }
 
 function sliceTailData(data: ChartPoint[], timeframe: TimeFrame): ChartPoint[] {
@@ -999,7 +1003,10 @@ const KpiCard = React.memo(function KpiCard({
     <TouchableOpacity
       activeOpacity={onPress ? 0.85 : 1}
       onPress={onPress}
-      style={[s.kpiCard, { flexBasis: `${basisPct}%` as const, flexGrow: 1, flexShrink: 1 }]}
+      style={[
+        s.kpiCard,
+        { flexBasis: `${basisPct}%` as const, flexGrow: 1, flexShrink: 1 },
+      ]}
     >
       <View style={s.kpiTop}>
         <View style={[s.kpiIconBox, { backgroundColor: iconBg }]}>{icon}</View>
@@ -1045,7 +1052,7 @@ const MiniStatTrio = React.memo(function MiniStatTrio({
   return (
     <View style={[s.miniTrio, style]}>
       {items.map((it, i) => (
-        <React.Fragment key={it.label}>
+        <React.Fragment key={`${it.label}-${i}`}>
           <View style={s.miniTrioItem}>
             <Text
               style={[s.miniTrioVal, it.color ? { color: it.color } : null]}
@@ -1064,13 +1071,19 @@ const MiniStatTrio = React.memo(function MiniStatTrio({
   );
 });
 
-const BarList = React.memo(function BarList({ data, onRowPress }: { data: ChartPoint[]; onRowPress?: (row: ChartPoint) => void }) {
+const BarList = React.memo(function BarList({
+  data,
+  onRowPress,
+}: {
+  data: ChartPoint[];
+  onRowPress?: (row: ChartPoint) => void;
+}) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <View style={{ gap: 10 }}>
       {data.map((d, i) => (
         <TouchableOpacity
-          key={d.label}
+          key={`${d.label}-${i}`}
           activeOpacity={onRowPress ? 0.75 : 1}
           onPress={() => onRowPress?.(d)}
           style={s.barListRow}
@@ -1117,14 +1130,15 @@ const Badge = React.memo(function Badge({
 // EXPORTING HELPERS (CSV / PDF)
 // ─────────────────────────────────────────────────────────────────────────────
 const shareData = async (title: string, data: ChartPoint[]) => {
-  const csvString = "Label,Value\n" + data.map(d => `"${d.label}",${d.value}`).join("\n");
+  const csvString =
+    "Label,Value\n" + data.map((d) => `"${d.label}",${d.value}`).join("\n");
   try {
-    if (Platform.OS === 'web') {
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    if (Platform.OS === "web") {
+      const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `${title.replace(/\s+/g, '_')}_data.csv`);
+      link.setAttribute("download", `${title.replace(/\s+/g, "_")}_data.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1139,13 +1153,21 @@ const shareData = async (title: string, data: ChartPoint[]) => {
   }
 };
 
-const printDataPDF = async (title: string, data: ChartPoint[], customerId: string) => {
-  const rows = data.map(d => `
+const printDataPDF = async (
+  title: string,
+  data: ChartPoint[],
+  customerId: string,
+) => {
+  const rows = data
+    .map(
+      (d) => `
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #E5E7EB; font-family: system-ui;">${d.label}</td>
       <td style="padding: 8px; border-bottom: 1px solid #E5E7EB; text-align: right; font-weight: bold; font-family: system-ui;">${d.value.toLocaleString()}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
   const html = `
     <html>
@@ -1169,7 +1191,7 @@ const printDataPDF = async (title: string, data: ChartPoint[], customerId: strin
   `;
 
   try {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === "web") {
       await Print.printAsync({ html });
     } else {
       const { uri } = await Print.printToFileAsync({ html });
@@ -1189,15 +1211,23 @@ interface MeasuredChartProps {
 }
 function MeasuredChart({ plotHeight = 140, render }: MeasuredChartProps) {
   const [w, setW] = useState(0);
-  const onLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = Math.round(e.nativeEvent.layout.width);
-    if (next > 0 && next !== w) setW(next);
-  }, [w]);
+  const onLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const next = Math.round(e.nativeEvent.layout.width);
+      if (next > 0 && next !== w) setW(next);
+    },
+    [w],
+  );
 
-  const effectivePlotHeight = w > 0 && w < 280 ? Math.max(100, plotHeight - 20) : plotHeight;
+  const effectivePlotHeight =
+    w > 0 && w < 280 ? Math.max(100, plotHeight - 20) : plotHeight;
   return (
     <View onLayout={onLayout} style={{ width: "100%" }}>
-      {w > 0 ? render(w, effectivePlotHeight) : <View style={{ height: effectivePlotHeight }} />}
+      {w > 0 ? (
+        render(w, effectivePlotHeight)
+      ) : (
+        <View style={{ height: effectivePlotHeight }} />
+      )}
     </View>
   );
 }
@@ -1205,9 +1235,18 @@ function MeasuredChart({ plotHeight = 140, render }: MeasuredChartProps) {
 // Helper to format month abbreviations to full Month Year (e.g. "Jan" to "Jan 2026")
 function formatPeriodLabel(label: string) {
   const monthMap: Record<string, string> = {
-    Jan: "Jan 2026", Feb: "Feb 2026", Mar: "Mar 2026", Apr: "Apr 2026",
-    May: "May 2026", Jun: "Jun 2026", Jul: "Jul 2026", Aug: "Aug 2026",
-    Sep: "Sep 2026", Oct: "Oct 2026", Nov: "Nov 2026", Dec: "Dec 2026"
+    Jan: "Jan 2026",
+    Feb: "Feb 2026",
+    Mar: "Mar 2026",
+    Apr: "Apr 2026",
+    May: "May 2026",
+    Jun: "Jun 2026",
+    Jul: "Jul 2026",
+    Aug: "Aug 2026",
+    Sep: "Sep 2026",
+    Oct: "Oct 2026",
+    Nov: "Nov 2026",
+    Dec: "Dec 2026",
   };
   return monthMap[label] ?? label;
 }
@@ -1255,20 +1294,39 @@ const ChartTooltip = React.memo(function ChartTooltip({
   top = Math.min(Math.max(top, 4), plotHeight - bubbleH - 4);
 
   return (
-    <View pointerEvents="none" style={[s.tooltipBubble, { left, top, width: bubbleW }]}>
-      <Text style={s.tooltipMetricName} numberOfLines={1}>{metricName}</Text>
-      <Text style={s.tooltipLabel} numberOfLines={1}>{formatPeriodLabel(label)}</Text>
-      <Text style={[s.tooltipValue, { color }]} numberOfLines={1}>{value}</Text>
+    <View
+      pointerEvents="none"
+      style={[s.tooltipBubble, { left, top, width: bubbleW }]}
+    >
+      <Text style={s.tooltipMetricName} numberOfLines={1}>
+        {metricName}
+      </Text>
+      <Text style={s.tooltipLabel} numberOfLines={1}>
+        {formatPeriodLabel(label)}
+      </Text>
+      <Text style={[s.tooltipValue, { color }]} numberOfLines={1}>
+        {value}
+      </Text>
       {pctChange ? (
-        <Text style={[s.tooltipPctChange, { color: pctChange.startsWith("-") ? C.red : C.green }]} numberOfLines={1}>
+        <Text
+          style={[
+            s.tooltipPctChange,
+            { color: pctChange.startsWith("-") ? C.red : C.green },
+          ]}
+          numberOfLines={1}
+        >
           {pctChange}
         </Text>
       ) : null}
       {percentageShare ? (
-        <Text style={s.tooltipPctShare} numberOfLines={1}>{percentageShare}</Text>
+        <Text style={s.tooltipPctShare} numberOfLines={1}>
+          {percentageShare}
+        </Text>
       ) : null}
       {contributionStr ? (
-        <Text style={s.tooltipContribution} numberOfLines={1}>{contributionStr}</Text>
+        <Text style={s.tooltipContribution} numberOfLines={1}>
+          {contributionStr}
+        </Text>
       ) : null}
     </View>
   );
@@ -1324,7 +1382,9 @@ function LineChartSvg({
 
   const linePath = useMemo(() => {
     if (pts.length === 0) return "";
-    return pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+    return pts
+      .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
+      .join(" ");
   }, [pts]);
 
   const areaPath = useMemo(() => {
@@ -1342,7 +1402,9 @@ function LineChartSvg({
     if (clamped !== activeIdx) {
       setActiveIdx(clamped);
       if (onHoverValueChange) {
-        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+        onHoverValueChange(
+          `${data[clamped].label}: ${formatValue(data[clamped].value)}`,
+        );
       }
     }
   };
@@ -1364,23 +1426,29 @@ function LineChartSvg({
     if (clamped !== activeIdx) {
       setActiveIdx(clamped);
       if (onHoverValueChange) {
-        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+        onHoverValueChange(
+          `${data[clamped].label}: ${formatValue(data[clamped].value)}`,
+        );
       }
     }
   };
 
-  const pointerProps = Platform.OS === 'web' ? {
-    onMouseMove: handleWebMove,
-    onMouseLeave: handleTouchEnd,
-  } : {
-    onTouchStart: handleTouch,
-    onTouchMove: handleTouch,
-    onTouchEnd: handleTouchEnd,
-  };
+  const pointerProps =
+    Platform.OS === "web"
+      ? {
+          onMouseMove: handleWebMove,
+          onMouseLeave: handleTouchEnd,
+        }
+      : {
+          onTouchStart: handleTouch,
+          onTouchMove: handleTouch,
+          onTouchEnd: handleTouchEnd,
+        };
 
   // Percentage change from previous period
   const pctChange = useMemo(() => {
-    if (activeIdx === null || activeIdx === 0 || !data[activeIdx - 1]) return null;
+    if (activeIdx === null || activeIdx === 0 || !data[activeIdx - 1])
+      return null;
     const prev = data[activeIdx - 1].value;
     const curr = data[activeIdx].value;
     if (prev === 0) {
@@ -1388,12 +1456,23 @@ function LineChartSvg({
     }
     const pct = ((curr - prev) / prev) * 100;
     const sign = pct >= 0 ? "+" : "";
-    const period = timeframe === "7D" ? "day" : (timeframe === "30D" || timeframe === "90D" ? "week" : "month");
+    const period =
+      timeframe === "7D"
+        ? "day"
+        : timeframe === "30D" || timeframe === "90D"
+          ? "week"
+          : "month";
     return `${sign}${pct.toFixed(1)}% from previous ${period}`;
   }, [activeIdx, data, timeframe]);
 
   return (
-    <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
+    <View
+      style={{
+        width,
+        height: height + 24,
+        zIndex: activeIdx !== null ? 10 : 1,
+      }}
+    >
       {/* Chart Canvas Area */}
       <View
         {...pointerProps}
@@ -1401,20 +1480,56 @@ function LineChartSvg({
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           <Defs>
-            <SvgLinearGradient id={`areaGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
+            <SvgLinearGradient
+              id={`areaGrad-${color}`}
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
               <Stop offset="0%" stopColor={color} stopOpacity={0.24} />
               <Stop offset="100%" stopColor={color} stopOpacity={0.0} />
             </SvgLinearGradient>
           </Defs>
 
           {/* Grid lines */}
-          <Line x1={padX} y1={padY} x2={width - padX} y2={padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="4,4" />
-          <Line x1={padX} y1={height / 2} x2={width - padX} y2={height / 2} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="4,4" />
-          <Line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="4,4" />
+          <Line
+            x1={padX}
+            y1={padY}
+            x2={width - padX}
+            y2={padY}
+            stroke="#E5E7EB"
+            strokeWidth={1}
+            strokeDasharray="4,4"
+          />
+          <Line
+            x1={padX}
+            y1={height / 2}
+            x2={width - padX}
+            y2={height / 2}
+            stroke="#E5E7EB"
+            strokeWidth={1}
+            strokeDasharray="4,4"
+          />
+          <Line
+            x1={padX}
+            y1={height - padY}
+            x2={width - padX}
+            y2={height - padY}
+            stroke="#E5E7EB"
+            strokeWidth={1}
+            strokeDasharray="4,4"
+          />
 
           {/* Paths */}
           <Path d={areaPath} fill={`url(#areaGrad-${color})`} />
-          <Path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+          <Path
+            d={linePath}
+            fill="none"
+            stroke={color}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
 
           {/* Active Crosshair line */}
           {activeIdx !== null && pts[activeIdx] && (
@@ -1478,7 +1593,7 @@ function LineChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { flex: 1, textAlign: "center" }
+              { flex: 1, textAlign: "center" },
             ]}
             numberOfLines={1}
           >
@@ -1511,7 +1626,10 @@ function BarChartSvg({
 
   const bars = useMemo(() => {
     return data.map((d, i) => {
-      const h = Math.max((d.value / max) * (height - padY * 2), d.value > 0 ? 4 : 0);
+      const h = Math.max(
+        (d.value / max) * (height - padY * 2),
+        d.value > 0 ? 4 : 0,
+      );
       const x = padX + i * slot + (slot - barW) / 2;
       const y = height - padY - h;
       return { x, y, h, d, index: i };
@@ -1519,7 +1637,10 @@ function BarChartSvg({
   }, [data, max, slot, barW, padX, height]);
 
   const totalVal = useMemo(() => {
-    return Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
+    return Math.max(
+      data.reduce((sum, d) => sum + d.value, 0),
+      1,
+    );
   }, [data]);
 
   const handleTouch = (evt: any) => {
@@ -1530,7 +1651,9 @@ function BarChartSvg({
     if (clamped !== activeIdx) {
       setActiveIdx(clamped);
       if (onHoverValueChange) {
-        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+        onHoverValueChange(
+          `${data[clamped].label}: ${formatValue(data[clamped].value)}`,
+        );
       }
     }
   };
@@ -1551,31 +1674,66 @@ function BarChartSvg({
     if (clamped !== activeIdx) {
       setActiveIdx(clamped);
       if (onHoverValueChange) {
-        onHoverValueChange(`${data[clamped].label}: ${formatValue(data[clamped].value)}`);
+        onHoverValueChange(
+          `${data[clamped].label}: ${formatValue(data[clamped].value)}`,
+        );
       }
     }
   };
 
-  const pointerProps = Platform.OS === 'web' ? {
-    onMouseMove: handleWebMove,
-    onMouseLeave: handleTouchEnd,
-  } : {
-    onTouchStart: handleTouch,
-    onTouchMove: handleTouch,
-    onTouchEnd: handleTouchEnd,
-  };
+  const pointerProps =
+    Platform.OS === "web"
+      ? {
+          onMouseMove: handleWebMove,
+          onMouseLeave: handleTouchEnd,
+        }
+      : {
+          onTouchStart: handleTouch,
+          onTouchMove: handleTouch,
+          onTouchEnd: handleTouchEnd,
+        };
 
   return (
-    <View style={{ width, height: height + 24, zIndex: activeIdx !== null ? 10 : 1 }}>
+    <View
+      style={{
+        width,
+        height: height + 24,
+        zIndex: activeIdx !== null ? 10 : 1,
+      }}
+    >
       <View
         {...pointerProps}
         style={{ width, height, position: "relative", zIndex: 10 }}
       >
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           {/* Horizontal lines */}
-          <Line x1={padX} y1={padY} x2={width - padX} y2={padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="3,3" />
-          <Line x1={padX} y1={height / 2} x2={width - padX} y2={height / 2} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="3,3" />
-          <Line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} stroke="#E5E7EB" strokeWidth={1} strokeDasharray="3,3" />
+          <Line
+            x1={padX}
+            y1={padY}
+            x2={width - padX}
+            y2={padY}
+            stroke="#E5E7EB"
+            strokeWidth={1}
+            strokeDasharray="3,3"
+          />
+          <Line
+            x1={padX}
+            y1={height / 2}
+            x2={width - padX}
+            y2={height / 2}
+            stroke="#E5E7EB"
+            strokeWidth={1}
+            strokeDasharray="3,3"
+          />
+          <Line
+            x1={padX}
+            y1={height - padY}
+            x2={width - padX}
+            y2={height - padY}
+            stroke="#E5E7EB"
+            strokeWidth={1}
+            strokeDasharray="3,3"
+          />
 
           {bars.map((b) => (
             <Rect
@@ -1586,7 +1744,9 @@ function BarChartSvg({
               height={b.h}
               rx={4}
               fill={color}
-              opacity={activeIdx === b.index ? 1.0 : activeIdx === null ? 0.65 : 0.45}
+              opacity={
+                activeIdx === b.index ? 1.0 : activeIdx === null ? 0.65 : 0.45
+              }
               stroke={activeIdx === b.index ? color : "none"}
               strokeWidth={activeIdx === b.index ? 1 : 0}
               onPress={() => onPointPress?.(b.d)}
@@ -1616,7 +1776,7 @@ function BarChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { flex: 1, textAlign: "center" }
+              { flex: 1, textAlign: "center" },
             ]}
             numberOfLines={1}
           >
@@ -1676,7 +1836,10 @@ const RingChart = React.memo(function RingChart({
 }) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
-  const total = Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
+  const total = Math.max(
+    data.reduce((sum, d) => sum + d.value, 0),
+    1,
+  );
   const cx = size / 2,
     cy = size / 2,
     rOuter = size / 2 - 6,
@@ -1685,8 +1848,17 @@ const RingChart = React.memo(function RingChart({
 
   if (data.length === 0) {
     return (
-      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontSize: 12, color: C.textLight }}>No Active Slices</Text>
+      <View
+        style={{
+          width: size,
+          height: size,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ fontSize: 12, color: C.textLight }}>
+          No Active Slices
+        </Text>
       </View>
     );
   }
@@ -1779,7 +1951,9 @@ const RingChart = React.memo(function RingChart({
   }
 
   const activeSlice = activeIdx !== null ? data[activeIdx] : null;
-  const activePct = activeSlice ? ((activeSlice.value / total) * 100).toFixed(1) + "%" : "";
+  const activePct = activeSlice
+    ? ((activeSlice.value / total) * 100).toFixed(1) + "%"
+    : "";
   const InteractivePath = Path as any;
 
   return (
@@ -1788,7 +1962,14 @@ const RingChart = React.memo(function RingChart({
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           {slices.map((sl, i) => {
             const isActive = activeIdx === i;
-            const path = donutSlicePath(cx, cy, rOuter, rInner, sl.startAngle, sl.startAngle + sl.sweep - sl.gap);
+            const path = donutSlicePath(
+              cx,
+              cy,
+              rOuter,
+              rInner,
+              sl.startAngle,
+              sl.startAngle + sl.sweep - sl.gap,
+            );
 
             return (
               <G key={i}>
@@ -1801,7 +1982,9 @@ const RingChart = React.memo(function RingChart({
                   onPressIn={() => setActiveIdx(i)}
                   onPressOut={() => setActiveIdx(null)}
                   onPress={() => setActiveIdx(i)}
-                  style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+                  style={
+                    Platform.OS === "web" ? { cursor: "pointer" } : undefined
+                  }
                 />
               </G>
             );
@@ -1809,15 +1992,31 @@ const RingChart = React.memo(function RingChart({
           {centerTextElement}
         </Svg>
       </View>
-      
+
       {/* Simple un-intrusive text label below the chart */}
-      <View style={{ height: 20, marginTop: 4, justifyContent: "center", alignItems: "center" }}>
+      <View
+        style={{
+          height: 20,
+          marginTop: 4,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         {activeSlice ? (
-          <Text style={{ fontSize: 11, fontWeight: "700", color: activeSlice.color }}>
-            {activeSlice.label}: {activeSlice.value.toLocaleString()} {unit} ({activePct})
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              color: activeSlice.color,
+            }}
+          >
+            {activeSlice.label}: {activeSlice.value.toLocaleString()} {unit} (
+            {activePct})
           </Text>
         ) : (
-          <Text style={{ fontSize: 10, color: C.textLight, fontStyle: "italic" }}>
+          <Text
+            style={{ fontSize: 10, color: C.textLight, fontStyle: "italic" }}
+          >
             Hover slices for details
           </Text>
         )}
@@ -1835,20 +2034,34 @@ const LegendList = React.memo(function LegendList({
   hiddenLabels: Set<string>;
   onToggleLabel: (label: string) => void;
 }) {
-  const total = Math.max(data.reduce((sum, d) => sum + d.value, 0), 1);
+  const total = Math.max(
+    data.reduce((sum, d) => sum + d.value, 0),
+    1,
+  );
   return (
     <View style={{ gap: 8, width: "100%" }}>
-      {data.map((d) => {
+      {data.map((d, i) => {
         const isHidden = hiddenLabels.has(d.label);
         return (
           <TouchableOpacity
-            key={d.label}
+            key={`${d.label}-${i}`}
             activeOpacity={0.7}
             onPress={() => onToggleLabel(d.label)}
             style={[s.legendRow, isHidden && { opacity: 0.4 }]}
           >
-            <View style={[s.legendDot, { backgroundColor: isHidden ? C.border : d.color }]} />
-            <Text style={[s.legendLbl, isHidden && { textDecorationLine: "line-through" }]} numberOfLines={1}>
+            <View
+              style={[
+                s.legendDot,
+                { backgroundColor: isHidden ? C.border : d.color },
+              ]}
+            />
+            <Text
+              style={[
+                s.legendLbl,
+                isHidden && { textDecorationLine: "line-through" },
+              ]}
+              numberOfLines={1}
+            >
               {d.label}
             </Text>
             <Text style={s.legendVal}>
@@ -1959,7 +2172,10 @@ const SectionNav = React.memo(function SectionNav({
               activeOpacity={0.75}
             >
               {sec.icon}
-              <Text style={[s.navTabTxt, isActive && s.navTabTxtActive]} numberOfLines={1}>
+              <Text
+                style={[s.navTabTxt, isActive && s.navTabTxtActive]}
+                numberOfLines={1}
+              >
                 {sec.label}
               </Text>
             </TouchableOpacity>
@@ -1993,7 +2209,8 @@ const DrillDownModal = React.memo(function DrillDownModal({
 
   // Generate deterministic breakout orders
   const rng = mulberry32(seedFromString(dataPoint.label + customerId));
-  const between = (min: number, max: number) => Math.round(min + rng() * (max - min));
+  const between = (min: number, max: number) =>
+    Math.round(min + rng() * (max - min));
   const ordersCount = between(1, 3);
   const simulatedOrders = Array.from({ length: ordersCount }, (_, i) => ({
     id: `FNT${20260000 + between(1000, 9999)}${i}`,
@@ -2022,12 +2239,16 @@ const DrillDownModal = React.memo(function DrillDownModal({
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={s.breakoutLbl}>Calculated Value</Text>
                 <Text style={[s.breakoutVal, { color: primary }]}>
-                  {dataPoint.value > 100 ? rupee(dataPoint.value) : dataPoint.value}
+                  {dataPoint.value > 100
+                    ? rupee(dataPoint.value)
+                    : dataPoint.value}
                 </Text>
               </View>
             </View>
 
-            <Text style={s.modalSubheading}>Simulated Transactions ({simulatedOrders.length})</Text>
+            <Text style={s.modalSubheading}>
+              Simulated Transactions ({simulatedOrders.length})
+            </Text>
             <View style={{ gap: 8 }}>
               {simulatedOrders.map((o) => (
                 <View key={o.id} style={s.breakoutRow}>
@@ -2094,8 +2315,8 @@ const FullscreenChartModal = React.memo(function FullscreenChartModal({
 
             <Text style={s.modalSubheading}>Dataset</Text>
             <View style={s.datasetTable}>
-              {data.map((d) => (
-                <View key={d.label} style={s.datasetRow}>
+              {data.map((d, i) => (
+                <View key={`${d.label}-${i}`} style={s.datasetRow}>
                   <Text style={s.datasetCellLabel}>{d.label}</Text>
                   <Text style={s.datasetCellValue}>
                     {d.value > 100 ? rupee(d.value) : d.value}
@@ -2143,7 +2364,9 @@ export default function CustomerAnalyticsScreen() {
       const raw = await fetchCustomerAnalytics(numericId);
       setAnalytics(mapApiAnalyticsToUi(raw));
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Failed to load analytics");
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load analytics",
+      );
       setAnalytics(null);
     } finally {
       setLoading(false);
@@ -2171,11 +2394,14 @@ export default function CustomerAnalyticsScreen() {
   }, [analytics?.customer.phone, phone]);
 
   const handleEmailPress = useCallback(() => {
-    if (Platform.OS === 'web' && typeof window !== "undefined") {
-      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customerEmail)}`, '_blank');
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.open(
+        `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customerEmail)}`,
+        "_blank",
+      );
     } else {
-      Linking.openURL(`mailto:${customerEmail}`).catch(err =>
-        console.error("Failed to open mail client:", err)
+      Linking.openURL(`mailto:${customerEmail}`).catch((err) =>
+        console.error("Failed to open mail client:", err),
       );
     }
   }, [customerEmail]);
@@ -2212,9 +2438,15 @@ export default function CustomerAnalyticsScreen() {
   }, [data, distTF]);
 
   // Legend toggle state
-  const [hiddenStatusLabels, setHiddenStatusLabels] = useState<Set<string>>(new Set());
-  const [hiddenPaymentLabels, setHiddenPaymentLabels] = useState<Set<string>>(new Set());
-  const [hiddenCategoryLabels, setHiddenCategoryLabels] = useState<Set<string>>(new Set());
+  const [hiddenStatusLabels, setHiddenStatusLabels] = useState<Set<string>>(
+    new Set(),
+  );
+  const [hiddenPaymentLabels, setHiddenPaymentLabels] = useState<Set<string>>(
+    new Set(),
+  );
+  const [hiddenCategoryLabels, setHiddenCategoryLabels] = useState<Set<string>>(
+    new Set(),
+  );
 
   const scaledOrderStatus = useMemo(() => {
     if (!data) return [];
@@ -2222,7 +2454,9 @@ export default function CustomerAnalyticsScreen() {
   }, [data, statusTF]);
 
   const activeOrderStatus = useMemo(() => {
-    return scaledOrderStatus.filter(item => !hiddenStatusLabels.has(item.label));
+    return scaledOrderStatus.filter(
+      (item) => !hiddenStatusLabels.has(item.label),
+    );
   }, [scaledOrderStatus, hiddenStatusLabels]);
 
   const scaledPaymentMethods = useMemo(() => {
@@ -2231,7 +2465,9 @@ export default function CustomerAnalyticsScreen() {
   }, [data, paymentTF]);
 
   const activePaymentMethods = useMemo(() => {
-    return scaledPaymentMethods.filter(item => !hiddenPaymentLabels.has(item.label));
+    return scaledPaymentMethods.filter(
+      (item) => !hiddenPaymentLabels.has(item.label),
+    );
   }, [scaledPaymentMethods, hiddenPaymentLabels]);
 
   const filteredCategories = useMemo(() => {
@@ -2245,7 +2481,7 @@ export default function CustomerAnalyticsScreen() {
       value: c.value,
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }));
-    return slices.filter(item => !hiddenCategoryLabels.has(item.label));
+    return slices.filter((item) => !hiddenCategoryLabels.has(item.label));
   }, [filteredCategories, hiddenCategoryLabels]);
 
   // Live KPI scrubbing displays
@@ -2255,18 +2491,26 @@ export default function CustomerAnalyticsScreen() {
   const [distLiveKPI, setDistLiveKPI] = useState<string | null>(null);
 
   // Fullscreen modals states
-  const [fullscreenChartTitle, setFullscreenChartTitle] = useState<string | null>(null);
+  const [fullscreenChartTitle, setFullscreenChartTitle] = useState<
+    string | null
+  >(null);
   const [fullscreenData, setFullscreenData] = useState<ChartPoint[]>([]);
-  const [fullscreenRender, setFullscreenRender] = useState<((w: number, h: number) => React.ReactNode) | null>(null);
+  const [fullscreenRender, setFullscreenRender] = useState<
+    ((w: number, h: number) => React.ReactNode) | null
+  >(null);
 
   // Drill-down Modal state
   const [drilldownPoint, setDrilldownPoint] = useState<ChartPoint | null>(null);
   const [drilldownTitle, setDrilldownTitle] = useState<string>("");
 
   // Grid responsiveness basis
-  const kpiBasis = basisForColumns(isMobile ? 2 : isTablet ? 2 : (width < 1200 ? 2 : 4));
-  const chartBasis = (isMobile || width < 1200) ? 100 : 48.5;
-  const behaviourBasis = basisForColumns(isMobile ? 1 : isTablet ? 2 : (width < 1200 ? 2 : 4));
+  const kpiBasis = basisForColumns(
+    isMobile ? 2 : isTablet ? 2 : width < 1200 ? 2 : 4,
+  );
+  const chartBasis = isMobile || width < 1200 ? 100 : 48.5;
+  const behaviourBasis = basisForColumns(
+    isMobile ? 1 : isTablet ? 2 : width < 1200 ? 2 : 4,
+  );
   const actionBasis = isMobile ? 50 : isTablet ? 31.5 : 23.5;
 
   // Sticky Section scroll logic
@@ -2274,19 +2518,32 @@ export default function CustomerAnalyticsScreen() {
   const sectionOffsets = useRef<Partial<Record<SectionId, number>>>({});
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
 
-  const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode }[] = useMemo(
-    () => [
-      { id: "overview", label: "Overview", icon: <BarChartFillIcon size={13} /> },
-      { id: "analytics", label: "Analytics", icon: <GraphUpIcon size={13} /> },
-      { id: "behaviour", label: "Behaviour", icon: <PersonIcon size={13} /> },
-      { id: "payments", label: "Payments", icon: <CreditCardIcon size={13} /> },
-      { id: "returns", label: "Returns", icon: <ReplyIcon size={13} /> },
-      { id: "orders", label: "Orders", icon: <BagIcon size={13} /> },
-      { id: "timeline", label: "Timeline", icon: <ActivityIcon size={13} /> },
-      { id: "profile", label: "Profile", icon: <ShieldIcon size={13} /> },
-    ],
-    [],
-  );
+  const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode }[] =
+    useMemo(
+      () => [
+        {
+          id: "overview",
+          label: "Overview",
+          icon: <BarChartFillIcon size={13} />,
+        },
+        {
+          id: "analytics",
+          label: "Analytics",
+          icon: <GraphUpIcon size={13} />,
+        },
+        { id: "behaviour", label: "Behaviour", icon: <PersonIcon size={13} /> },
+        {
+          id: "payments",
+          label: "Payments",
+          icon: <CreditCardIcon size={13} />,
+        },
+        { id: "returns", label: "Returns", icon: <ReplyIcon size={13} /> },
+        { id: "orders", label: "Orders", icon: <BagIcon size={13} /> },
+        { id: "timeline", label: "Timeline", icon: <ActivityIcon size={13} /> },
+        { id: "profile", label: "Profile", icon: <ShieldIcon size={13} /> },
+      ],
+      [],
+    );
 
   const handleMeasure = useCallback((id: SectionId, y: number) => {
     sectionOffsets.current[id] = y;
@@ -2316,12 +2573,11 @@ export default function CustomerAnalyticsScreen() {
   );
 
   // Dynamic status-based KPI definitions
-  const kpis = useMemo(
-    () => {
-      if (!data) return [];
-      const spendTrend = parseTrendValue(data.trends.spendTrend);
-      const ordersTrend = parseTrendValue(data.trends.ordersTrend);
-      return [
+  const kpis = useMemo(() => {
+    if (!data) return [];
+    const spendTrend = parseTrendValue(data.trends.spendTrend);
+    const ordersTrend = parseTrendValue(data.trends.ordersTrend);
+    return [
       {
         icon: <WalletIcon color={primary} size={18} />,
         iconBg: primaryLight,
@@ -2395,9 +2651,7 @@ export default function CustomerAnalyticsScreen() {
         trendVal: "-3%",
       },
     ];
-    },
-    [data, spendLiveKPI, ordersLiveKPI],
-  );
+  }, [data, spendLiveKPI, ordersLiveKPI]);
 
   const initials = useMemo(
     () =>
@@ -2411,7 +2665,10 @@ export default function CustomerAnalyticsScreen() {
   );
 
   // Time filter rendering
-  const renderTimeFilters = (current: TimeFrame, setFilter: (tf: TimeFrame) => void) => (
+  const renderTimeFilters = (
+    current: TimeFrame,
+    setFilter: (tf: TimeFrame) => void,
+  ) => (
     <View style={s.tfRow}>
       {(["7D", "30D", "90D", "6M", "1Y", "All"] as TimeFrame[]).map((tf) => (
         <TouchableOpacity
@@ -2419,7 +2676,9 @@ export default function CustomerAnalyticsScreen() {
           onPress={() => setFilter(tf)}
           style={[s.tfBtn, current === tf && s.tfBtnActive]}
         >
-          <Text style={[s.tfBtnTxt, current === tf && s.tfBtnTxtActive]}>{tf}</Text>
+          <Text style={[s.tfBtnTxt, current === tf && s.tfBtnTxtActive]}>
+            {tf}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -2428,9 +2687,18 @@ export default function CustomerAnalyticsScreen() {
   if (loading) {
     return (
       <AdminLayout>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 40,
+          }}
+        >
           <ActivityIndicator size="large" color={primary} />
-          <Text style={{ marginTop: 12, color: sub }}>Loading customer analytics…</Text>
+          <Text style={{ marginTop: 12, color: sub }}>
+            Loading customer analytics…
+          </Text>
         </View>
       </AdminLayout>
     );
@@ -2439,9 +2707,22 @@ export default function CustomerAnalyticsScreen() {
   if (loadError || !data) {
     return (
       <AdminLayout>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
-          <Text style={{ color: red, fontWeight: "700" }}>{loadError ?? "No analytics data"}</Text>
-          <TouchableOpacity onPress={loadAnalytics} style={[s.tfBtn, s.tfBtnActive]}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 40,
+            gap: 12,
+          }}
+        >
+          <Text style={{ color: red, fontWeight: "700" }}>
+            {loadError ?? "No analytics data"}
+          </Text>
+          <TouchableOpacity
+            onPress={loadAnalytics}
+            style={[s.tfBtn, s.tfBtnActive]}
+          >
             <Text style={[s.tfBtnTxt, s.tfBtnTxtActive]}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -2486,9 +2767,22 @@ export default function CustomerAnalyticsScreen() {
               <Text style={s.headerCrumb}>Customer Analytics Suite</Text>
             </View>
 
-            <View style={[s.headerProfile, !isWide && { flexDirection: "column", alignItems: "flex-start" }]}>
+            <View
+              style={[
+                s.headerProfile,
+                !isWide && {
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                },
+              ]}
+            >
               <View style={s.headerProfileLeft}>
-                <View style={[s.avatar, { backgroundColor: avatarColor(customerName) }]}>
+                <View
+                  style={[
+                    s.avatar,
+                    { backgroundColor: avatarColor(customerName) },
+                  ]}
+                >
                   <Text style={s.avatarTxt}>{initials}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -2507,7 +2801,9 @@ export default function CustomerAnalyticsScreen() {
                       style={s.headerMetaItem}
                     >
                       <EnvelopeIcon size={11} color="rgba(255,255,255,0.7)" />
-                      <Text style={s.headerMetaTxt} numberOfLines={1}>{customerEmail}</Text>
+                      <Text style={s.headerMetaTxt} numberOfLines={1}>
+                        {customerEmail}
+                      </Text>
                     </TouchableOpacity>
                     {Platform.OS !== "web" && customerPhone !== "—" && (
                       <View style={s.headerMetaItem}>
@@ -2519,8 +2815,21 @@ export default function CustomerAnalyticsScreen() {
                 </View>
               </View>
 
-              <View style={[s.headerRight, !isWide && { width: "100%", marginTop: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
-                <View style={[s.healthBox, !isWide && { alignItems: "flex-start" }]}>
+              <View
+                style={[
+                  s.headerRight,
+                  !isWide && {
+                    width: "100%",
+                    marginTop: 14,
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  },
+                ]}
+              >
+                <View
+                  style={[s.healthBox, !isWide && { alignItems: "flex-start" }]}
+                >
                   <Text style={s.healthLabel}>Account Health</Text>
                   <Text
                     style={[
@@ -2539,11 +2848,11 @@ export default function CustomerAnalyticsScreen() {
                   </Text>
                 </View>
                 <View style={s.quickActions}>
-                  {Platform.OS !== 'web' && (
+                  {Platform.OS !== "web" && (
                     <TouchableOpacity
                       style={s.quickBtn}
                       activeOpacity={0.8}
-                      onPress={() => Linking.openURL('tel:' + customerPhone)}
+                      onPress={() => Linking.openURL("tel:" + customerPhone)}
                     >
                       <PhoneIcon size={13} color="#fff" />
                     </TouchableOpacity>
@@ -2575,11 +2884,15 @@ export default function CustomerAnalyticsScreen() {
             <View style={[s.headerFootRow, isMobile && { flexWrap: "wrap" }]}>
               <View style={s.headerFootItem}>
                 <CalendarIcon size={12} color="rgba(255,255,255,0.7)" />
-                <Text style={s.headerFootTxt}>Customer Since: {data.customerSince}</Text>
+                <Text style={s.headerFootTxt}>
+                  Customer Since: {data.customerSince}
+                </Text>
               </View>
               <View style={s.headerFootItem}>
                 <ClockIcon size={12} color="rgba(255,255,255,0.7)" />
-                <Text style={s.headerFootTxt}>Last Purchase: {data.lastPurchase}</Text>
+                <Text style={s.headerFootTxt}>
+                  Last Purchase: {data.lastPurchase}
+                </Text>
               </View>
             </View>
           </LinearGradient>
@@ -2593,13 +2906,26 @@ export default function CustomerAnalyticsScreen() {
         />
 
         {/* ══ DASHBOARD BODY CONTAINER ══════════════════════════════════ */}
-        <View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%", paddingHorizontal: px }]}>
-          
+        <View
+          style={[
+            s.body,
+            {
+              maxWidth: 1600,
+              alignSelf: "center",
+              width: "100%",
+              paddingHorizontal: px,
+            },
+          ]}
+        >
           {/* ══ KPI OVERVIEW GRID ═════════════════════════════════════════ */}
           <PageSection id="overview" onMeasure={handleMeasure}>
             <View style={[s.kpiGrid, { gap: 12 }]}>
-              {kpis.map((k) => (
-                <KpiCard key={k.title} {...k} basisPct={kpiBasis} />
+              {kpis.map((k, index) => (
+                <KpiCard
+                  key={`${k.title}-${index}`}
+                  {...k}
+                  basisPct={kpiBasis}
+                />
               ))}
             </View>
           </PageSection>
@@ -2610,31 +2936,44 @@ export default function CustomerAnalyticsScreen() {
               {/* Time Series Charts Grid */}
               <View style={[s.chartGrid, { gap: 16 }]}>
                 {/* Spending Line Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
                   <SectionHeader
                     icon={<GraphUpIcon color={primary} size={16} />}
                     title="Spending Trend"
                     right={
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 8,
+                          alignItems: "center",
+                        }}
+                      >
                         <TouchableOpacity
                           onPress={() => {
                             setFullscreenChartTitle("Monthly Spending Trend");
                             setFullscreenData(spendData);
-                            setFullscreenRender(() => (w: number, h: number) => (
-                              <LineChartSvg
-                                data={spendData}
-                                color={primary}
-                                width={w}
-                                height={h}
-                                formatValue={rupee}
-                                metricName="Revenue"
-                                timeframe={spendTF}
-                                onPointPress={(p) => {
-                                  setDrilldownPoint(p);
-                                  setDrilldownTitle("Monthly Spending");
-                                }}
-                              />
-                            ));
+                            setFullscreenRender(
+                              () => (w: number, h: number) => (
+                                <LineChartSvg
+                                  data={spendData}
+                                  color={primary}
+                                  width={w}
+                                  height={h}
+                                  formatValue={rupee}
+                                  metricName="Revenue"
+                                  timeframe={spendTF}
+                                  onPointPress={(p) => {
+                                    setDrilldownPoint(p);
+                                    setDrilldownTitle("Monthly Spending");
+                                  }}
+                                />
+                              ),
+                            );
                           }}
                         >
                           <MaximizeIcon size={14} color={C.textLight} />
@@ -2667,7 +3006,12 @@ export default function CustomerAnalyticsScreen() {
                 </Card>
 
                 {/* Orders Bar Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
                   <SectionHeader
                     icon={<BarChartFillIcon color={blue} size={16} />}
                     title="Orders Placed"
@@ -2682,7 +3026,9 @@ export default function CustomerAnalyticsScreen() {
                               color={blue}
                               width={w}
                               height={h}
-                              formatValue={(v) => `${v.toLocaleString()} Orders`}
+                              formatValue={(v) =>
+                                `${v.toLocaleString()} Orders`
+                              }
                               metricName="Orders"
                               timeframe={ordersTF}
                               onPointPress={(p) => {
@@ -2722,7 +3068,12 @@ export default function CustomerAnalyticsScreen() {
                 </Card>
 
                 {/* Frequency Line Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
                   <SectionHeader
                     icon={<GraphUpIcon color={green} size={16} />}
                     title="Order Frequency"
@@ -2777,7 +3128,12 @@ export default function CustomerAnalyticsScreen() {
                 </Card>
 
                 {/* Distribution Bar Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
                   <SectionHeader
                     icon={<ClockIcon color={yellow} size={16} />}
                     title="Purchase Time Breakdown"
@@ -2835,13 +3191,26 @@ export default function CustomerAnalyticsScreen() {
               {/* Categorical Distribution Grid */}
               <View style={[s.chartGrid, { gap: 16 }]}>
                 {/* Order Status Donut Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
-                  <SectionHeader icon={<PieChartIcon color={purple} size={16} />} title="Order Status Distribution" />
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
+                  <SectionHeader
+                    icon={<PieChartIcon color={purple} size={16} />}
+                    title="Order Status Distribution"
+                  />
                   <View style={[s.cardBody, s.ringCardBody]}>
                     <View style={{ width: "100%", marginBottom: 8 }}>
                       {renderTimeFilters(statusTF, setStatusTF)}
                     </View>
-                    <RingChart data={activeOrderStatus} donut metricName="Order Status" unit="Orders" />
+                    <RingChart
+                      data={activeOrderStatus}
+                      donut
+                      metricName="Order Status"
+                      unit="Orders"
+                    />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
                         data={scaledOrderStatus}
@@ -2860,13 +3229,26 @@ export default function CustomerAnalyticsScreen() {
                 </Card>
 
                 {/* Payment Methods Donut Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
-                  <SectionHeader icon={<CreditCardIcon color={navy} size={16} />} title="Preferred Payment Methods" />
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
+                  <SectionHeader
+                    icon={<CreditCardIcon color={navy} size={16} />}
+                    title="Preferred Payment Methods"
+                  />
                   <View style={[s.cardBody, s.ringCardBody]}>
                     <View style={{ width: "100%", marginBottom: 8 }}>
                       {renderTimeFilters(paymentTF, setPaymentTF)}
                     </View>
-                    <RingChart data={activePaymentMethods} donut metricName="Payment Method" unit="Orders" />
+                    <RingChart
+                      data={activePaymentMethods}
+                      donut
+                      metricName="Payment Method"
+                      unit="Orders"
+                    />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
                         data={scaledPaymentMethods}
@@ -2885,13 +3267,32 @@ export default function CustomerAnalyticsScreen() {
                 </Card>
 
                 {/* Purchase Categories Donut Chart */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
-                  <SectionHeader icon={<PieChartIcon color={teal} size={16} />} title="Purchase Categories" />
-                  <View style={[s.cardBody, s.ringCardBody, { paddingVertical: 16 }]}>
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
+                  <SectionHeader
+                    icon={<PieChartIcon color={teal} size={16} />}
+                    title="Purchase Categories"
+                  />
+                  <View
+                    style={[
+                      s.cardBody,
+                      s.ringCardBody,
+                      { paddingVertical: 16 },
+                    ]}
+                  >
                     <View style={{ width: "100%", marginBottom: 8 }}>
                       {renderTimeFilters(categoryTF, setCategoryTF)}
                     </View>
-                    <RingChart data={categorySlices} donut metricName="Categories" unit="Orders" />
+                    <RingChart
+                      data={categorySlices}
+                      donut
+                      metricName="Categories"
+                      unit="Orders"
+                    />
                     <View style={{ flex: 1, width: "100%", minWidth: 140 }}>
                       <LegendList
                         data={categorySlices}
@@ -2910,8 +3311,16 @@ export default function CustomerAnalyticsScreen() {
                 </Card>
 
                 {/* Most Purchased Categories List */}
-                <Card style={{ flexBasis: `${chartBasis}%` as const, minWidth: 280 }}>
-                  <SectionHeader icon={<TagIcon color={pink} size={16} />} title="Most Purchased Categories" />
+                <Card
+                  style={{
+                    flexBasis: `${chartBasis}%` as const,
+                    minWidth: 280,
+                  }}
+                >
+                  <SectionHeader
+                    icon={<TagIcon color={pink} size={16} />}
+                    title="Most Purchased Categories"
+                  />
                   <View style={[s.cardBody, { paddingVertical: 16 }]}>
                     {renderTimeFilters(categoryTF, setCategoryTF)}
                     <View style={{ marginTop: 12 }}>
@@ -2932,10 +3341,21 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ CUSTOMER BEHAVIOUR ════════════════════════════════════════ */}
           <PageSection id="behaviour" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<PersonIcon size={16} />} title="Customer Behaviour Metrics" />
-              <View style={[s.cardBody, { flexDirection: "row", flexWrap: "wrap", gap: 12 }]}>
+              <SectionHeader
+                icon={<PersonIcon size={16} />}
+                title="Customer Behaviour Metrics"
+              />
+              <View
+                style={[
+                  s.cardBody,
+                  { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+                ]}
+              >
                 {[
-                  ["Most Purchased Category", data.behaviour.mostPurchasedCategory],
+                  [
+                    "Most Purchased Category",
+                    data.behaviour.mostPurchasedCategory,
+                  ],
                   ["Favourite Brand", data.behaviour.favouriteBrand],
                   ["Average Basket Size", data.behaviour.avgBasketSize],
                   ["Most Active Shopping Day", data.behaviour.mostActiveDay],
@@ -2943,8 +3363,14 @@ export default function CustomerAnalyticsScreen() {
                   ["Average Delivery Time", data.behaviour.avgDeliveryTime],
                   ["Longest Purchase Gap", data.behaviour.longestGap],
                   ["Current Purchase Streak", data.behaviour.currentStreak],
-                ].map(([label, value]) => (
-                  <View key={label} style={{ flexBasis: `${behaviourBasis}%` as const, minWidth: 130 }}>
+                ].map(([label, value], index) => (
+                  <View
+                    key={`${label}-${index}`}
+                    style={{
+                      flexBasis: `${behaviourBasis}%` as const,
+                      minWidth: 130,
+                    }}
+                  >
                     <StatPair label={label} value={value} />
                   </View>
                 ))}
@@ -2955,11 +3381,23 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ PAYMENTS DETAIL ═══════════════════════════════════════════ */}
           <PageSection id="payments" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<CreditCardIcon size={16} />} title="Financial Transactions" />
-              <View style={[s.cardBody, isWide && { flexDirection: "row", gap: 24 }]}>
+              <SectionHeader
+                icon={<CreditCardIcon size={16} />}
+                title="Financial Transactions"
+              />
+              <View
+                style={[
+                  s.cardBody,
+                  isWide && { flexDirection: "row", gap: 24 },
+                ]}
+              >
                 <View style={isWide ? { flex: 1, height: 140 } : null}>
                   <MiniStatTrio
-                    style={isWide ? { height: "100%", justifyContent: "space-around" } : null}
+                    style={
+                      isWide
+                        ? { height: "100%", justifyContent: "space-around" }
+                        : null
+                    }
                     items={[
                       {
                         label: "Success Rate",
@@ -2973,13 +3411,25 @@ export default function CustomerAnalyticsScreen() {
                       {
                         label: "Failed Payments",
                         value: String(data.paymentsData.failedPayments),
-                        color: data.paymentsData.failedPayments > 0 ? red : green,
+                        color:
+                          data.paymentsData.failedPayments > 0 ? red : green,
                       },
                     ]}
                   />
                 </View>
-                <View style={isWide ? { flex: 1.2, height: 140 } : { marginTop: 16 }}>
-                  <Text style={[s.subHeading, { marginTop: isWide ? 0 : 16, marginBottom: 6 }]}>Refund History</Text>
+                <View
+                  style={
+                    isWide ? { flex: 1.2, height: 140 } : { marginTop: 16 }
+                  }
+                >
+                  <Text
+                    style={[
+                      s.subHeading,
+                      { marginTop: isWide ? 0 : 16, marginBottom: 6 },
+                    ]}
+                  >
+                    Refund History
+                  </Text>
                   <ScrollView
                     showsVerticalScrollIndicator={false}
                     style={isWide ? { flex: 1 } : { maxHeight: 100 }}
@@ -2987,7 +3437,9 @@ export default function CustomerAnalyticsScreen() {
                     <View style={{ gap: 8 }}>
                       {data.paymentsData.refundHistory.map((r, i) => (
                         <View key={i} style={s.listRow}>
-                          <Text style={s.listRowMain} numberOfLines={1}>{r.reason}</Text>
+                          <Text style={s.listRowMain} numberOfLines={1}>
+                            {r.reason}
+                          </Text>
                           <Text style={s.listRowSub}>{r.date}</Text>
                           <Text style={s.listRowAmt}>{rupee(r.amount)}</Text>
                         </View>
@@ -3002,7 +3454,10 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ RETURNS DETAIL ════════════════════════════════════════════ */}
           <PageSection id="returns" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<ReplyIcon size={16} />} title="Returns Log" />
+              <SectionHeader
+                icon={<ReplyIcon size={16} />}
+                title="Returns Log"
+              />
               <View style={s.cardBody}>
                 <MiniStatTrio
                   items={[
@@ -3031,7 +3486,10 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ RECENT ORDERS LIST ════════════════════════════════════════ */}
           <PageSection id="orders" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<BagIcon size={16} />} title="Recent Customer Orders" />
+              <SectionHeader
+                icon={<BagIcon size={16} />}
+                title="Recent Customer Orders"
+              />
               <View style={{ padding: 0 }}>
                 {isDesktop ? (
                   <ScrollView
@@ -3040,28 +3498,62 @@ export default function CustomerAnalyticsScreen() {
                     style={{ width: "100%" }}
                     contentContainerStyle={{ flexGrow: 1 }}
                   >
-                    <View style={[s.orderTable, { minWidth: 800, width: "100%" }]}>
+                    <View
+                      style={[s.orderTable, { minWidth: 800, width: "100%" }]}
+                    >
                       <View style={[s.orderTableRow, s.orderTableHead]}>
-                        <Text style={[s.orderTableHdr, { flex: 1.6 }]}>Order ID</Text>
-                        <Text style={[s.orderTableHdr, { flex: 2.2 }]}>Product Name</Text>
+                        <Text style={[s.orderTableHdr, { flex: 1.6 }]}>
+                          Order ID
+                        </Text>
+                        <Text style={[s.orderTableHdr, { flex: 2.2 }]}>
+                          Product Name
+                        </Text>
                         <Text style={s.orderTableHdr}>Date</Text>
                         <Text style={s.orderTableHdr}>Amount</Text>
-                        <Text style={[s.orderTableHdr, { flex: 1.2 }]}>Status</Text>
+                        <Text style={[s.orderTableHdr, { flex: 1.2 }]}>
+                          Status
+                        </Text>
                         <Text style={s.orderTableHdr}>Payment</Text>
-                        <Text style={[s.orderTableHdr, { flex: 0.6, textAlign: "center" }]}>Action</Text>
+                        <Text
+                          style={[
+                            s.orderTableHdr,
+                            { flex: 0.6, textAlign: "center" },
+                          ]}
+                        >
+                          Action
+                        </Text>
                       </View>
                       {data.recentOrders.map((o) => (
                         <View key={o.id} style={s.orderTableRow}>
                           <TouchableOpacity
                             activeOpacity={0.7}
                             style={{ flex: 1.6 }}
-                            onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/orderDetails",
+                                params: { orderId: o.id },
+                              })
+                            }
                           >
-                            <Text style={s.orderIdText} numberOfLines={1}>{o.orderNumber}</Text>
+                            <Text style={s.orderIdText} numberOfLines={1}>
+                              {o.orderNumber}
+                            </Text>
                           </TouchableOpacity>
-                          <Text style={[s.orderTableCell, { flex: 2.2 }]} numberOfLines={1}>{o.productName}</Text>
+                          <Text
+                            style={[s.orderTableCell, { flex: 2.2 }]}
+                            numberOfLines={1}
+                          >
+                            {o.productName}
+                          </Text>
                           <Text style={s.orderTableCell}>{o.date}</Text>
-                          <Text style={[s.orderTableCell, { fontWeight: "700", color: text }]}>{rupee(o.amount)}</Text>
+                          <Text
+                            style={[
+                              s.orderTableCell,
+                              { fontWeight: "700", color: text },
+                            ]}
+                          >
+                            {rupee(o.amount)}
+                          </Text>
                           <View style={{ flex: 1.2 }}>
                             <OrderStatusChip status={o.status} />
                           </View>
@@ -3070,7 +3562,12 @@ export default function CustomerAnalyticsScreen() {
                             <TouchableOpacity
                               style={s.eyeBtn}
                               activeOpacity={0.8}
-                              onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
+                              onPress={() =>
+                                router.push({
+                                  pathname: "/orderDetails",
+                                  params: { orderId: o.id },
+                                })
+                              }
                             >
                               <EyeIcon size={14} />
                             </TouchableOpacity>
@@ -3086,19 +3583,35 @@ export default function CustomerAnalyticsScreen() {
                         key={o.id}
                         activeOpacity={0.8}
                         style={s.orderMobileCard}
-                        onPress={() => router.push({ pathname: "/orderDetails", params: { orderId: o.id } })}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/orderDetails",
+                            params: { orderId: o.id },
+                          })
+                        }
                       >
                         <View style={s.omTop}>
-                          <Text style={s.omId} numberOfLines={1}>{o.orderNumber}</Text>
+                          <Text style={s.omId} numberOfLines={1}>
+                            {o.orderNumber}
+                          </Text>
                           <OrderStatusChip status={o.status} />
                         </View>
                         <View style={s.omRow}>
-                          <Text style={{ fontSize: 13, fontWeight: "600", color: text }} numberOfLines={1}>
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: "600",
+                              color: text,
+                            }}
+                            numberOfLines={1}
+                          >
                             {o.productName}
                           </Text>
                         </View>
                         <View style={s.omRow}>
-                          <Text style={s.omSub}>{o.date} &middot; {o.payment}</Text>
+                          <Text style={s.omSub}>
+                            {o.date} &middot; {o.payment}
+                          </Text>
                           <Text style={s.omAmt}>{rupee(o.amount)}</Text>
                         </View>
                       </TouchableOpacity>
@@ -3112,15 +3625,25 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ ACTIVITY TIMELINE ═════════════════════════════════════════ */}
           <PageSection id="timeline" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<ActivityIcon size={16} />} title="Historical Timeline" />
+              <SectionHeader
+                icon={<ActivityIcon size={16} />}
+                title="Historical Timeline"
+              />
               <View style={s.cardBody}>
                 {data.timeline.map((ev, i) => {
-                  const cfg = TIMELINE_ICON_CFG[ev.type] ?? TIMELINE_ICON_CFG.order;
+                  const cfg =
+                    TIMELINE_ICON_CFG[ev.type] ?? TIMELINE_ICON_CFG.order;
                   return (
                     <View key={i} style={s.tlRow}>
                       <View style={s.tlLeft}>
-                        <View style={[s.tlIconBox, { backgroundColor: cfg.bg }]}>{cfg.icon}</View>
-                        {i < data.timeline.length - 1 && <View style={s.tlLine} />}
+                        <View
+                          style={[s.tlIconBox, { backgroundColor: cfg.bg }]}
+                        >
+                          {cfg.icon}
+                        </View>
+                        {i < data.timeline.length - 1 && (
+                          <View style={s.tlLine} />
+                        )}
                       </View>
                       <View style={s.tlContent}>
                         <Text style={s.tlTitle}>{ev.title}</Text>
@@ -3136,48 +3659,103 @@ export default function CustomerAnalyticsScreen() {
           {/* ══ CUSTOMER PROFILE CARD ═════════════════════════════════════ */}
           <PageSection id="profile" onMeasure={handleMeasure}>
             <Card>
-              <SectionHeader icon={<ShieldIcon size={16} />} title="Customer Identity & Risk Profile" />
+              <SectionHeader
+                icon={<ShieldIcon size={16} />}
+                title="Customer Identity & Risk Profile"
+              />
               <View style={s.cardBody}>
-                <StatPair label="Primary shipping address" value={data.addressData.primary} />
-                <View style={{ flexDirection: "row", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+                <StatPair
+                  label="Primary shipping address"
+                  value={data.addressData.primary}
+                />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 12,
+                    marginTop: 12,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <View style={{ flex: 1, minWidth: 140 }}>
-                    <StatPair label="Saved Addresses" value={`${data.addressData.savedCount} locations`} />
+                    <StatPair
+                      label="Saved Addresses"
+                      value={`${data.addressData.savedCount} locations`}
+                    />
                   </View>
                   <View style={{ flex: 1, minWidth: 140 }}>
-                    <StatPair label="Most Delivered City" value={data.addressData.mostDelivered} />
+                    <StatPair
+                      label="Most Delivered City"
+                      value={data.addressData.mostDelivered}
+                    />
                   </View>
                   <View style={{ flex: 1, minWidth: 140 }}>
-                    <StatPair label="Loyalty Tier" value={data.loyaltyData.tier} />
+                    <StatPair
+                      label="Loyalty Tier"
+                      value={data.loyaltyData.tier}
+                    />
                   </View>
                   <View style={{ flex: 1, minWidth: 140 }}>
-                    <StatPair label="Loyalty Points" value={String(data.loyaltyData.points)} />
+                    <StatPair
+                      label="Loyalty Points"
+                      value={String(data.loyaltyData.points)}
+                    />
                   </View>
                 </View>
 
                 {/* Risk Badges */}
-                <Text style={s.subHeading}>System Risk Analysis Indicators</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                <Text style={s.subHeading}>
+                  System Risk Analysis Indicators
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 16,
+                  }}
+                >
                   {data.riskBadges.map((b) => (
-                    <Badge key={b.label} label={b.label} color={b.color} bg={b.bg} />
+                    <Badge
+                      key={b.label}
+                      label={b.label}
+                      color={b.color}
+                      bg={b.bg}
+                    />
                   ))}
                 </View>
 
-                <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap", borderTopWidth: 1, borderTopColor: border, paddingTop: 14 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    borderTopWidth: 1,
+                    borderTopColor: border,
+                    paddingTop: 14,
+                  }}
+                >
                   <View style={{ flex: 1, minWidth: 130 }}>
-                    <StatPair label="Feedback Rating" value={`${data.reviewsData.avgRating}★ (${data.reviewsData.submitted} reviews)`} />
+                    <StatPair
+                      label="Feedback Rating"
+                      value={`${data.reviewsData.avgRating}★ (${data.reviewsData.submitted} reviews)`}
+                    />
                   </View>
                   <View style={{ flex: 1, minWidth: 130 }}>
-                    <StatPair label="Pending Support Tickets" value={String(data.supportData.pending)} />
+                    <StatPair
+                      label="Pending Support Tickets"
+                      value={String(data.supportData.pending)}
+                    />
                   </View>
                   <View style={{ flex: 1, minWidth: 130 }}>
-                    <StatPair label="Loyalty Savings" value={rupee(data.loyaltyData.lifetimeSavings)} />
+                    <StatPair
+                      label="Loyalty Savings"
+                      value={rupee(data.loyaltyData.lifetimeSavings)}
+                    />
                   </View>
                 </View>
               </View>
             </Card>
           </PageSection>
-
-
 
           <View style={{ height: 40 }} />
         </View>
@@ -3202,8 +3780,16 @@ export default function CustomerAnalyticsScreen() {
         }}
         title={fullscreenChartTitle ?? ""}
         data={fullscreenData}
-        exportCSV={() => shareData(fullscreenChartTitle ?? "Chart", fullscreenData)}
-        exportPDF={() => printDataPDF(fullscreenChartTitle ?? "Chart", fullscreenData, customerId)}
+        exportCSV={() =>
+          shareData(fullscreenChartTitle ?? "Chart", fullscreenData)
+        }
+        exportPDF={() =>
+          printDataPDF(
+            fullscreenChartTitle ?? "Chart",
+            fullscreenData,
+            customerId,
+          )
+        }
       >
         {fullscreenChartTitle && fullscreenRender && (
           <MeasuredChart
@@ -3224,8 +3810,19 @@ const s = StyleSheet.create({
   scrollContent: { paddingTop: 0, backgroundColor: surface },
   body: { gap: 16, paddingTop: 16 },
 
-  heroOuter: { width: "100%", alignSelf: "center", maxWidth: 1600, paddingHorizontal: 10 },
-  header: { marginHorizontal: 2, marginTop: 12, paddingBottom: 20, borderRadius: 24, paddingHorizontal: 20 },
+  heroOuter: {
+    width: "100%",
+    alignSelf: "center",
+    maxWidth: 1600,
+    paddingHorizontal: 10,
+  },
+  header: {
+    marginHorizontal: 2,
+    marginTop: 12,
+    paddingBottom: 20,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+  },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -3469,7 +4066,12 @@ const s = StyleSheet.create({
   },
 
   tfRow: { flexDirection: "row", gap: 6, marginBottom: 12, flexWrap: "wrap" },
-  tfBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, backgroundColor: cardBg },
+  tfBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: cardBg,
+  },
   tfBtnActive: { backgroundColor: primary },
   tfBtnTxt: { fontSize: 11, fontWeight: "700", color: sub },
   tfBtnTxtActive: { color: "#fff" },
@@ -3490,7 +4092,12 @@ const s = StyleSheet.create({
   miniTrioLbl: { fontSize: 10, color: sub, marginTop: 3, textAlign: "center" },
   miniTrioDiv: { width: 1, height: 28, backgroundColor: border },
 
-  barListRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 },
+  barListRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 2,
+  },
   barListLbl: { width: 100, fontSize: 12, color: text },
   barListTrack: {
     flex: 1,
@@ -3519,7 +4126,12 @@ const s = StyleSheet.create({
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
   badgeTxt: { fontSize: 12, fontWeight: "700" },
 
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 2,
+  },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendLbl: { flex: 1, fontSize: 12, color: text },
   legendVal: { fontSize: 12, fontWeight: "700", color: sub },
@@ -3758,9 +4370,20 @@ const s = StyleSheet.create({
     borderColor: border,
   },
   breakoutLbl: { fontSize: 11, color: sub },
-  breakoutVal: { fontSize: 18, fontWeight: "800", color: navyDeep, marginTop: 4 },
+  breakoutVal: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: navyDeep,
+    marginTop: 4,
+  },
 
-  modalSubheading: { fontSize: 14, fontWeight: "700", color: text, marginBottom: 10, marginTop: 12 },
+  modalSubheading: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: text,
+    marginBottom: 10,
+    marginTop: 12,
+  },
   breakoutRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3773,7 +4396,12 @@ const s = StyleSheet.create({
   },
   breakoutRowId: { fontSize: 13, fontWeight: "700", color: primary },
   breakoutRowSub: { fontSize: 11, color: sub, marginTop: 2 },
-  breakoutRowAmt: { fontSize: 13, fontWeight: "800", color: text, marginBottom: 4 },
+  breakoutRowAmt: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: text,
+    marginBottom: 4,
+  },
 
   fullscreenChartContainer: {
     backgroundColor: "#fff",
