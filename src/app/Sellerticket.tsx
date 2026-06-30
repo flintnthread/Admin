@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapSellerSupportTicket } from "@/lib/mappers";
 import {
@@ -644,10 +646,8 @@ export default function SupportTicketManagement() {
           <View style={styles.headerOuter}>
             <View style={styles.headerPanel}>
               <View style={styles.headerTitleRow}>
-                <TouchableOpacity style={styles.menuBtn}>
-                  <View style={styles.menuLine} />
-                  <View style={[styles.menuLine, { width: 16 }]} />
-                  <View style={styles.menuLine} />
+                <TouchableOpacity onPress={() => router.back()} style={styles.menuBtn}>
+                  <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleTextWrap}>
                   <Text style={styles.headerTitle}>Support Tickets</Text>
@@ -688,8 +688,8 @@ export default function SupportTicketManagement() {
           ) : null}
 
           {/* ── Filters ── */}
-          <View style={styles.filtersRow}>
-            <View style={styles.searchBox}>
+          <View style={[styles.filtersRow, !isDesktop && { flexDirection: "column", alignItems: "stretch", gap: 10 }]}>
+            <View style={[styles.searchBox, !isDesktop && { flex: undefined, width: "100%" }]}>
               <SearchIcon size={16} color={C.textMuted} />
               <TextInput
                 style={styles.searchInput}
@@ -699,18 +699,20 @@ export default function SupportTicketManagement() {
                 onChangeText={setSearchText}
               />
             </View>
-            <Dropdown
-              label="Status "
-              value={statusFilter}
-              options={statusOptions}
-              onSelect={setStatusFilter}
-            />
-            <Dropdown
-              label="Priority"
-              value={priorityFilter}
-              options={priorityOptions}
-              onSelect={setPriorityFilter}
-            />
+            <View style={!isDesktop ? { flexDirection: "row", gap: 10 } : { flexDirection: "row", gap: 12, flex: 2 }}>
+              <Dropdown
+                label="Status "
+                value={statusFilter}
+                options={statusOptions}
+                onSelect={setStatusFilter}
+              />
+              <Dropdown
+                label="Priority"
+                value={priorityFilter}
+                options={priorityOptions}
+                onSelect={setPriorityFilter}
+              />
+            </View>
           </View>
 
           {/* ── Main Content ── */}
@@ -993,7 +995,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: C.textPrimary,
-  },
+    outlineStyle: "none",
+    borderWidth: 0,
+    padding: 0,
+  } as any,
   dropdownsRow: {
     flexDirection: "row",
     gap: 10,
@@ -1032,7 +1037,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   dropdownBackdrop: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",

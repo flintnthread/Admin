@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -1611,6 +1611,7 @@ export default function ApprovedSellersScreen() {
           <View style={stylesMobile.pageBannerCard}>
             <Text style={stylesMobile.pageBannerTitle}>Approved Sellers</Text>
             <Text style={stylesMobile.pageBannerSubtitle}>Manage and monitor verified merchant accounts</Text>
+
           </View>
 
           <View style={stylesMobile.actionButtonsRow}>
