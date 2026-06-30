@@ -283,9 +283,6 @@ const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
         <TouchableOpacity style={styles.actionBtnView} onPress={onView}>
           <EyeIcon />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtnRefresh} onPress={onRefresh}>
-          <RefreshIcon />
-        </TouchableOpacity>
       </View>
     </View>
 
@@ -395,18 +392,12 @@ const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
           <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdMuted]}>
             {ticket.created}
           </Text>
-          <View style={[styles.tdActions, { width: 100, minWidth: 100 }]}>
+          <View style={[styles.tdActions, { width: 60, minWidth: 60 }]}>
             <TouchableOpacity
               style={styles.actionBtnView}
               onPress={() => onView(ticket)}
             >
               <EyeIcon />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtnRefresh}
-              onPress={() => onRefresh(ticket)}
-            >
-              <RefreshIcon />
             </TouchableOpacity>
           </View>
         </View>
@@ -548,7 +539,7 @@ export default function CustomerSupportTickets() {
             <SearchIcon />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search tickets by ID, subject or customer..."
+              placeholder="Search tickets..."
               placeholderTextColor="#9CA3AF"
               value={search}
               onChangeText={handleSearch}
@@ -558,7 +549,7 @@ export default function CustomerSupportTickets() {
           </View>
 
           {/* Filter Buttons */}
-          <View style={styles.filterRow}>
+          <View style={[styles.filterRow, !isWeb && { width: '100%' }]}>
             <TouchableOpacity
               style={[
                 styles.filterBtn,
@@ -768,14 +759,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "space-between",
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     height: 42,
   },
@@ -900,7 +892,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: "#1E3A5F",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1111,9 +1103,9 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
+    flexWrap: 'nowrap',
+    justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 16,
     marginTop: -40,
     zIndex: 10,
@@ -1121,13 +1113,12 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    minWidth: 120,
-    maxWidth: 240,
+    minWidth: 70,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    padding: 14,
+    padding: 10,
     alignItems: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -1136,7 +1127,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1E3A5F',
   },
