@@ -43,6 +43,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, G, Circle, Text as SvgText } from 'react-native-svg';
 
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { ThemedText } from '@/components/themed-text';
 import { LocationColors, ROW_THEMES } from '@/constants/locations-theme';
 
@@ -555,60 +556,6 @@ function OverviewPanel({
 
   return (
     <View style={s.overviewRoot}>
-      {/* Summary stat cards */}
-      {isMobile ? (
-        // ── Mobile: 3 cards in a row + Pincodes full width ──
-        <View style={s.summaryMobileGrid}>
-          {[
-            { label: 'Countries', value: countriesCount || 195, icon: 'public' as MaterialIconName, ...LocationColors.statBlue },
-            { label: 'States', value: statesCount || 36, icon: 'map' as MaterialIconName, ...LocationColors.statPurple },
-            { label: 'Cities', value: citiesCount || 532, icon: 'location-city' as MaterialIconName, ...LocationColors.statOrange },
-          ].map((stat, i) => (
-            <View key={i} style={s.summaryCardMobileThird}>
-              <View style={[s.summaryIcon, { backgroundColor: stat.bg }]}>
-                <MaterialIcons name={stat.icon} size={18} color={stat.color} />
-              </View>
-              <View>
-                <ThemedText style={[s.summaryValue, { fontSize: 16 }]}>
-                  {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
-                </ThemedText>
-                <ThemedText style={s.summaryLabel}>{stat.label}</ThemedText>
-              </View>
-            </View>
-          ))}
-          {/* Pincodes full width */}
-          <View style={s.summaryCardMobileFull}>
-            <View style={[s.summaryIcon, { backgroundColor: LocationColors.statGreen.bg }]}>
-              <MaterialIcons name="mail-outline" size={20} color={LocationColors.statGreen.color} />
-            </View>
-            <View>
-              <ThemedText style={s.summaryValue}>{`${(pincodesCount || 19000).toLocaleString()}+`}</ThemedText>
-              <ThemedText style={s.summaryLabel}>Pincodes</ThemedText>
-            </View>
-          </View>
-        </View>
-      ) : (
-        // ── Web: original layout ──
-        <View style={[s.summaryRow, s.summaryRowMobile]}>
-          {[
-            { label: 'Countries', value: countriesCount || 195, icon: 'public' as MaterialIconName, ...LocationColors.statBlue },
-            { label: 'States', value: statesCount || 36, icon: 'map' as MaterialIconName, ...LocationColors.statPurple },
-            { label: 'Cities', value: citiesCount || 532, icon: 'location-city' as MaterialIconName, ...LocationColors.statOrange },
-            { label: 'Pincodes', value: `${(pincodesCount || 19000).toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, ...LocationColors.statGreen },
-          ].map((stat, i) => (
-            <View key={i} style={[s.summaryCard, s.summaryCardMobile]}>
-              <View style={[s.summaryIcon, { backgroundColor: stat.bg }]}>
-                <MaterialIcons name={stat.icon} size={20} color={stat.color} />
-              </View>
-              <View>
-                <ThemedText style={s.summaryValue}>{typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}</ThemedText>
-                <ThemedText style={s.summaryLabel}>{stat.label}</ThemedText>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-
       {/* Drill-down card */}
       <View style={s.drillCard}>
         <View style={s.drillHeader}>
@@ -677,10 +624,10 @@ function OverviewPanel({
                 !selectedCountry
                   ? 'Global'
                   : !selectedState
-                  ? selectedCountry.name.slice(0, 8)
-                  : !selectedCity
-                  ? selectedState.name.slice(0, 8)
-                  : selectedCity.name.slice(0, 8)
+                    ? selectedCountry.name.slice(0, 8)
+                    : !selectedCity
+                      ? selectedState.name.slice(0, 8)
+                      : selectedCity.name.slice(0, 8)
               }
             />
             {selectedCity && !pincodesLoading && cityPincodes && cityPincodes.length > 0 && (
@@ -1173,6 +1120,8 @@ export default function LocationsScreen() {
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [rows, setRows] = useState<ListRow[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [modalMode, setModalMode] = useState<ModalMode>('add');
   const [modalVisible, setModalVisible] = useState(false);
@@ -1210,7 +1159,8 @@ export default function LocationsScreen() {
   }, [detailTab]);
 
   useEffect(() => { loadRows(); }, [loadRows]);
-  useEffect(() => setQuery(''), [detailTab]);
+  useEffect(() => { setQuery(''); setCurrentPage(1); }, [detailTab]);
+  useEffect(() => { setCurrentPage(1); }, [query]);
 
   useEffect(() => {
     if (detailTab !== 'overview' || analysisCountries.length > 0) return;
@@ -1285,6 +1235,11 @@ export default function LocationsScreen() {
     if (!q) return rows;
     return rows.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q));
   }, [query, rows]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const paginatedRows = useMemo(() => {
+    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
 
   const openAdd = () => { setActiveRow(null); setModalMode('add'); setModalVisible(true); };
   const openEdit = (row: ListRow) => { setActiveRow(row); setModalMode('edit'); setModalVisible(true); };
@@ -1400,29 +1355,21 @@ export default function LocationsScreen() {
             </View>
 
             {viewMode === 'grid' ? (
-              <GridView rows={filtered} columns={gridColumns} tab={detailTab} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+              <GridView rows={paginatedRows} columns={gridColumns} tab={detailTab} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             ) : isWeb ? (
-              <ListTable rows={filtered} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+              <ListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             ) : (
-              <MobileListTable rows={filtered} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+              <MobileListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             )}
 
-            <View style={[s.pagination, isMobile && s.paginationMobile]}>
-              <ThemedText style={s.paginationText}>
-                Showing {Math.min(1, filtered.length)}–{Math.min(10, filtered.length)} of {meta.total.toLocaleString()} {meta.plural}
-              </ThemedText>
-              <View style={s.pages}>
-                <Pressable style={s.pageArrow}><MaterialIcons name="chevron-left" size={16} color={LocationColors.textMuted} /></Pressable>
-                {[1, 2, 3].map((p) => (
-                  <Pressable key={p} style={[s.pageNum, p === 1 && s.pageNumActive]}>
-                    <ThemedText style={[s.pageNumText, p === 1 && s.pageNumTextActive]}>{p}</ThemedText>
-                  </Pressable>
-                ))}
-                <ThemedText style={{ color: LocationColors.textMuted, paddingHorizontal: 4 }}>…</ThemedText>
-                <Pressable style={s.pageNum}><ThemedText style={s.pageNumText}>39</ThemedText></Pressable>
-                <Pressable style={s.pageArrow}><MaterialIcons name="chevron-right" size={16} color={LocationColors.textMuted} /></Pressable>
-              </View>
-            </View>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              itemsPerPage={itemsPerPage}
+              itemName={meta.plural}
+              onPageChange={setCurrentPage}
+            />
           </>
         )}
       </ScrollView>
@@ -1603,10 +1550,11 @@ const s = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: LocationColors.cardBg,
     borderRadius: 14,
-    padding: 12,
-    flexDirection: 'row',
+    padding: 10,
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,

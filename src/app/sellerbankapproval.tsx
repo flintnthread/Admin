@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
 
   /* Desktop Header Styles */
   desktopHeader: {
-    backgroundColor: "#1d324e",
+    backgroundColor: "#151D4F",
     paddingHorizontal: 32,
     paddingTop: 24,
     paddingBottom: 64,

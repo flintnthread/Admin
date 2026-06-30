@@ -322,11 +322,12 @@ const styles = StyleSheet.create({
 
   // ── Header container: dark blue background ──
   headerContainer: {
-    backgroundColor: NAVY,
+    backgroundColor: "#151D4F",
     borderRadius: 12,
     padding: 16,
   },
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
+  header: {
+    marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

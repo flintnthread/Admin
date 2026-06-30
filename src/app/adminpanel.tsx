@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
 
   // ── Mobile Header Card ──
   mobileHeaderCard: {
-    backgroundColor: C.navy, borderRadius: 14, padding: 16,
+    backgroundColor:   "#151D4F", borderRadius: 14, padding: 16,
     marginBottom: 16,
     shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
   },
@@ -965,7 +965,7 @@ const styles = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: C.navy,
+    backgroundColor:   "#151D4F",
     borderRadius: 12,
     marginHorizontal: 24,
     marginTop: 24,

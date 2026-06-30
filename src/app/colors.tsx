@@ -828,21 +828,15 @@ export default function ColorsScreen() {
     </View>
   );
 
-  // ── WEB: Grid view rendered in a ScrollView with flexWrap ─────────────────
-  if (IS_WEB && viewMode === "grid") {
-    return (
-      <AdminLayout>
-        {/* <StatusBar barStyle="light-content" backgroundColor={BRAND} /> */}
-        <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        >
-
+  return (
+    <AdminLayout>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+          <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
 
           {HeaderSection}
 
-          {pageItems.length === 0 ? EmptyComponent : (
+          {pageItems.length === 0 ? EmptyComponent : viewMode === "grid" ? (
             <WebGridView
               items={pageItems}
               onEdit={(item) => setEditTarget(item)}
@@ -851,104 +845,48 @@ export default function ColorsScreen() {
               padding={PADDING}
               gap={GAP}
             />
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ width: Math.max(containerWidth, 950) }}>
+                <View style={{ paddingHorizontal: PADDING }}>
+                  <View style={styles.tableCard}>
+                    <ListHeader screenWidth={Math.max(containerWidth, 950)} />
+                  </View>
+                </View>
+                <View style={{ paddingHorizontal: PADDING }}>
+                  <View style={styles.tableCardRows}>
+                    {pageItems.map((item, index) => (
+                      <ListRow
+                        key={item.id}
+                        item={item}
+                        isLast={index === pageItems.length - 1}
+                        isEven={index % 2 === 0}
+                        screenWidth={Math.max(containerWidth, 950)}
+                        onEdit={() => setEditTarget(item)}
+                        onDelete={() => setDeleteTarget(item)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
           )}
 
           {FooterSection}
-        </ScrollView>
-
-        {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
-        {editTarget && (
-          <ColorFormModal
-            mode="edit"
-            initial={editTarget}
-            onSave={handleEdit}
-            onClose={() => setEditTarget(null)}
-          />
-        )}
-        {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
-      </AdminLayout>
-    );
-  }
-
-  const isMobile = width < 768;
-
-  // ── DEFAULT: FlatList for list view (all platforms) and native grid ────────
-  const listContent = (
-    <FlatList
-      data={pageItems}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={viewMode === "grid" ? renderGridItem : renderListItem}
-      numColumns={viewMode === "grid" ? numCols : 1}
-      key={`${viewMode}-${numCols}`}
-      contentContainerStyle={{ paddingBottom: 32 }}
-      showsVerticalScrollIndicator={false}
-
-      ListHeaderComponent={
-        <View>
-          {!isMobile && HeaderSection}
-          {/* List table header row */}
-          {viewMode === "list" && (
-            <View style={{ paddingHorizontal: PADDING }}>
-              <View style={styles.tableCard}>
-                <ListHeader screenWidth={viewMode === "list" ? Math.max(containerWidth, 950) : width} />
-              </View>
-            </View>
-          )}
         </View>
-      }
+      </ScrollView>
 
-      columnWrapperStyle={viewMode === "grid"
-        ? { gap: GAP, paddingHorizontal: PADDING }
-        : undefined}
-      ItemSeparatorComponent={viewMode === "grid"
-        ? () => <View style={{ height: GAP }} />
-        : undefined}
-
-      CellRendererComponent={viewMode === "list"
-        ? ({ children, style, ...rest }: any) => (
-          <View style={[{ paddingHorizontal: PADDING }, style]} {...rest}>
-            <View style={styles.tableCardRows}>
-              {children}
-            </View>
-          </View>
-        )
-        : undefined}
-
-      ListEmptyComponent={EmptyComponent}
-
-      ListFooterComponent={FooterSection}
-    />
-  );
-
-  return (
-    <AdminLayout>
-      <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
-        <StatusBar barStyle="light-content" backgroundColor={BRAND} />
-
-        {isMobile && HeaderSection}
-
-        {viewMode === "list" ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ width: Math.max(containerWidth, 950) }}>
-              {listContent}
-            </View>
-          </ScrollView>
-        ) : (
-          listContent
-        )}
-
-        {/* Modals */}
-        {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
-        {editTarget && (
-          <ColorFormModal
-            mode="edit"
-            initial={editTarget}
-            onSave={handleEdit}
-            onClose={() => setEditTarget(null)}
-          />
-        )}
-        {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
-      </View>
+      {/* Modals */}
+      {addOpen && <ColorFormModal mode="add" onSave={handleAdd} onClose={() => setAddOpen(false)} />}
+      {editTarget && (
+        <ColorFormModal
+          mode="edit"
+          initial={editTarget}
+          onSave={handleEdit}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
+      {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
     </AdminLayout>
   );
 }
@@ -1017,7 +955,7 @@ const styles = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: "#1d324e",
+    backgroundColor: "#151D4F",
     borderRadius: 22,
     marginHorizontal: 16,
     marginTop: 16,

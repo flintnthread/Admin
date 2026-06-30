@@ -48,22 +48,22 @@ const LayersIcon = ({ color = '#1E3A5F', size = 20 }: { color?: string; size?: n
   </Svg>
 );
 
-const ClockIcon = ({ color = '#D97706' }: { color?: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+const ClockIcon = ({ color = '#D97706', size = 20 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
     <Path d="M12 6v6l4 2" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
   </Svg>
 );
 
-const CheckCircleIcon = ({ color = '#16A34A' }: { color?: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+const CheckCircleIcon = ({ color = '#16A34A', size = 20 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
     <Path d="M9 12l2 2 4-4" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
 
-const XCircleIcon = ({ color = '#DC2626' }: { color?: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+const XCircleIcon = ({ color = '#DC2626', size = 20 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={1.8} />
     <Path d="M15 9l-6 6M9 9l6 6" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
   </Svg>
@@ -88,12 +88,12 @@ const CheckIcon = ({ color = '#FFFFFF' }: { color?: string }) => (
   </Svg>
 );
 
-const TotalIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-    <Rect x="3" y="3" width="7" height="7" rx="1" stroke="#1E3A5F" strokeWidth={1.8} />
-    <Rect x="14" y="3" width="7" height="7" rx="1" stroke="#1E3A5F" strokeWidth={1.8} />
-    <Rect x="3" y="14" width="7" height="7" rx="1" stroke="#1E3A5F" strokeWidth={1.8} />
-    <Rect x="14" y="14" width="7" height="7" rx="1" stroke="#1E3A5F" strokeWidth={1.8} />
+const TotalIcon = ({ size = 20, color = '#1E3A5F' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={1.8} />
+    <Rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={1.8} />
+    <Rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth={1.8} />
+    <Rect x="14" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth={1.8} />
   </Svg>
 );
 
@@ -126,14 +126,23 @@ interface StatCardProps {
   icon: React.ReactNode;
   accent: string;
   bg: string;
+  isWeb: boolean;
+  cardWidth?: number;
 }
 
-const StatCard = ({ label, value, icon, accent, bg }: StatCardProps) => (
-  <View style={[styles.statCard, { borderTopColor: accent }]}>
-    <View style={[styles.statIconWrap, { backgroundColor: bg }]}>{icon}</View>
+const StatCard = ({ label, value, icon, accent, bg, isWeb, cardWidth }: StatCardProps) => (
+  <View style={[
+    styles.statCard,
+    !isWeb && styles.statCardMobile,
+    { borderTopColor: accent },
+    cardWidth ? { width: cardWidth } : null
+  ]}>
+    <View style={[styles.statIconWrap, !isWeb && styles.statIconWrapMobile, { backgroundColor: bg }]}>
+      {icon}
+    </View>
     <View style={styles.statTextWrap}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, !isWeb && styles.statValueMobile]}>{value}</Text>
+      <Text style={[styles.statLabel, !isWeb && styles.statLabelMobile]} numberOfLines={1} adjustsFontSizeToFit>{label}</Text>
     </View>
   </View>
 );
@@ -360,11 +369,38 @@ export default function CategoryRequests() {
 
   const FILTERS: Array<'All' | Status> = ['All', 'Pending', 'Approved', 'Rejected'];
 
+  const cardWidth = isWeb ? undefined : (width - 32 - 8) / 2;
+
+  const filterTabs = FILTERS.map((f) => {
+    const count = f === 'All'
+      ? requests.length
+      : requests.filter((r) => r.status === f).length;
+    return (
+      <TouchableOpacity
+        key={f}
+        style={[styles.filterTab, filter === f && styles.filterTabActive, !isWeb && styles.filterTabMobile]}
+        onPress={() => {
+          setFilter(f);
+          setCurrentPage(1);
+        }}
+      >
+        <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
+          {f}
+        </Text>
+        <View style={[styles.filterCount, filter === f && styles.filterCountActive]}>
+          <Text style={[styles.filterCountText, filter === f && styles.filterCountTextActive]}>
+            {count}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  });
+
   return (
     <AdminLayout>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={styles.rootContent}
+        contentContainerStyle={[styles.rootContent, !isWeb && styles.rootContentMobile]}
         showsVerticalScrollIndicator={false}
       >
         {loadError ? (
@@ -373,80 +409,76 @@ export default function CategoryRequests() {
 
         {/* Page Header and Stats Overlap */}
         <View style={styles.headerOuter}>
-          <View style={styles.pageHeader}>
+          <View style={[styles.pageHeader, !isWeb && styles.pageHeaderMobile]}>
             <View style={styles.pageHeaderTop}>
               <View style={styles.pageHeaderLeft}>
-                <View style={styles.pageIconWrap}>
-                  <LayersIcon color="#1E3A5F" size={20} />
+                <View style={[styles.pageIconWrap, !isWeb && styles.pageIconWrapMobile]}>
+                  <LayersIcon color="#1E3A5F" size={isWeb ? 20 : 16} />
                 </View>
                 <View>
-                  <Text style={styles.pageTitle}>Category Requests</Text>
-                  <Text style={styles.pageSubtitle}>Review and manage seller category requests</Text>
+                  <Text style={[styles.pageTitle, !isWeb && styles.pageTitleMobile]}>Category Requests</Text>
+                  <Text style={[styles.pageSubtitle, !isWeb && styles.pageSubtitleMobile]}>Review & manage seller category requests</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          {/* â”€â”€ Stats Cards â”€â”€ */}
-          <View style={[styles.statsRow, isWeb && styles.statsRowWeb]}>
+          {/* Stats Cards */}
+          <View style={[styles.statsRow, !isWeb && styles.statsRowMobile, isWeb && styles.statsRowWeb]}>
           <StatCard
             label="Total Requests"
             value={stats.total}
-            icon={<TotalIcon />}
-            accent="#1E3A5F"
-            bg="#EBF0F8"
+            icon={<TotalIcon size={isWeb ? 20 : 16} color="#4F46E5" />}
+            accent="#4F46E5"
+            bg="#EEF2FF"
+            isWeb={isWeb}
+            cardWidth={cardWidth}
           />
           <StatCard
             label="Pending"
             value={stats.pending}
-            icon={<ClockIcon color="#D97706" />}
+            icon={<ClockIcon color="#D97706" size={isWeb ? 20 : 16} />}
             accent="#F59E0B"
             bg="#FEF9C3"
+            isWeb={isWeb}
+            cardWidth={cardWidth}
           />
           <StatCard
             label="Approved"
             value={stats.approved}
-            icon={<CheckCircleIcon color="#16A34A" />}
+            icon={<CheckCircleIcon color="#16A34A" size={isWeb ? 20 : 16} />}
             accent="#16A34A"
             bg="#DCFCE7"
+            isWeb={isWeb}
+            cardWidth={cardWidth}
           />
           <StatCard
             label="Rejected"
             value={stats.rejected}
-            icon={<XCircleIcon color="#DC2626" />}
+            icon={<XCircleIcon color="#DC2626" size={isWeb ? 20 : 16} />}
             accent="#DC2626"
             bg="#FEE2E2"
+            isWeb={isWeb}
+            cardWidth={cardWidth}
           />
           </View>
         </View>
 
         {/* â”€â”€ Filter Tabs â”€â”€ */}
-        <View style={styles.filterRow}>
-          {FILTERS.map((f) => {
-            const count = f === 'All'
-              ? requests.length
-              : requests.filter((r) => r.status === f).length;
-            return (
-              <TouchableOpacity
-                key={f}
-                style={[styles.filterTab, filter === f && styles.filterTabActive]}
-                onPress={() => {
-                  setFilter(f);
-                  setCurrentPage(1);
-                }}
-              >
-                <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
-                  {f}
-                </Text>
-                <View style={[styles.filterCount, filter === f && styles.filterCountActive]}>
-                  <Text style={[styles.filterCountText, filter === f && styles.filterCountTextActive]}>
-                    {count}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {isWeb ? (
+          <View style={styles.filterRow}>
+            {filterTabs}
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScrollMobile}
+            contentContainerStyle={styles.filterRowMobile}
+          >
+            {filterTabs}
+          </ScrollView>
+        )}
 
         {/* â”€â”€ Web Table / Mobile Cards â”€â”€ */}
         {isWeb ? (
@@ -500,9 +532,9 @@ export default function CategoryRequests() {
           </View>
         ) : (
           /* Mobile Cards */
-          <View style={styles.cardList}>
+          <View style={[styles.cardList, !isWeb && styles.cardListMobile]}>
             {paginated.map((req) => (
-              <View key={req.id} style={styles.card}>
+              <View key={req.id} style={[styles.card, !isWeb && styles.cardMobile]}>
                 <View style={styles.cardTop}>
                   <View style={styles.cardTopLeft}>
                     <Text style={styles.cardId}>{req.id}</Text>
@@ -514,11 +546,11 @@ export default function CategoryRequests() {
                   <StatusBadge status={req.status} />
                 </View>
 
-                <Text style={styles.cardDesc} numberOfLines={2}>{req.description}</Text>
+                <Text style={[styles.cardDesc, !isWeb && styles.cardDescMobile]} numberOfLines={2}>{req.description}</Text>
 
-                <View style={styles.cardDivider} />
+                <View style={[styles.cardDivider, !isWeb && styles.cardDividerMobile]} />
 
-                <View style={styles.cardMeta}>
+                <View style={[styles.cardMeta, !isWeb && styles.cardMetaMobile]}>
                   <View style={styles.cardMetaRow}>
                     <Text style={styles.cardMetaLabel}>Seller</Text>
                     <Text style={styles.cardMetaValue}>{req.sellerName}</Text>
@@ -530,7 +562,7 @@ export default function CategoryRequests() {
                 </View>
 
                 <TouchableOpacity
-                  style={styles.cardViewBtn}
+                  style={[styles.cardViewBtn, !isWeb && styles.cardViewBtnMobile]}
                   onPress={() => setSelectedRequest(req)}
                 >
                   <EyeIcon />
@@ -583,6 +615,10 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 48,
   },
+  rootContentMobile: {
+    padding: 16,
+    paddingBottom: 32,
+  },
 
   // Page Header
   headerOuter: {
@@ -593,6 +629,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 20,
     paddingBottom: 64,
+  },
+  pageHeaderMobile: {
+    borderRadius: 12,
+    padding: 16,
+    paddingBottom: 40,
   },
   pageHeaderTop: {
     flexDirection: 'row',
@@ -612,16 +653,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pageIconWrapMobile: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
   pageTitle: {
     fontSize: 22,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
+  pageTitleMobile: {
+    fontSize: 18,
+  },
   pageSubtitle: {
     fontSize: 13,
     color: '#9CA3AF',
     marginTop: 2,
+  },
+  pageSubtitleMobile: {
+    fontSize: 11,
+    marginTop: 1,
   },
 
   // Stats
@@ -633,6 +686,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     zIndex: 10,
     marginBottom: 20,
+  },
+  statsRowMobile: {
+    marginTop: -24,
+    paddingHorizontal: 0,
+    marginBottom: 16,
+    gap: 8,
   },
   statsRowWeb: {
     flexDirection: 'row',
@@ -657,12 +716,27 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  statCardMobile: {
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    borderTopWidth: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
   statIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statIconWrapMobile: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
   },
   statTextWrap: {
     flex: 1,
@@ -674,11 +748,20 @@ const styles = StyleSheet.create({
     color: '#111827',
     letterSpacing: -0.5,
   },
+  statValueMobile: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
   statLabel: {
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
     marginTop: 2,
+  },
+  statLabelMobile: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
   },
 
   // Filter Tabs
@@ -687,6 +770,16 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 20,
     flexWrap: 'wrap',
+  },
+  filterScrollMobile: {
+    marginBottom: 16,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  filterRowMobile: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 32,
   },
   filterTab: {
     flexDirection: 'row',
@@ -698,6 +791,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  filterTabMobile: {
+    height: 44,
+    paddingVertical: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
   filterTabActive: {
     backgroundColor: '#1E3A5F',
@@ -843,6 +943,9 @@ const styles = StyleSheet.create({
   cardList: {
     gap: 12,
   },
+  cardListMobile: {
+    gap: 8,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -851,6 +954,14 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardMobile: {
+    borderRadius: 12,
+    padding: 12,
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
@@ -892,14 +1003,23 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 12,
   },
+  cardDescMobile: {
+    marginBottom: 8,
+  },
   cardDivider: {
     height: 1,
     backgroundColor: '#F3F4F6',
     marginBottom: 12,
   },
+  cardDividerMobile: {
+    marginBottom: 8,
+  },
   cardMeta: {
     gap: 8,
     marginBottom: 14,
+  },
+  cardMetaMobile: {
+    marginBottom: 12,
   },
   cardMetaRow: {
     flexDirection: 'row',
@@ -923,6 +1043,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E3A5F',
     borderRadius: 10,
     paddingVertical: 11,
+  },
+  cardViewBtnMobile: {
+    borderRadius: 8,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   cardViewBtnText: {
     fontSize: 13,

@@ -283,9 +283,6 @@ const MobileCard = ({ ticket, onView, onRefresh }: MobileCardProps) => (
         <TouchableOpacity style={styles.actionBtnView} onPress={onView}>
           <EyeIcon />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtnRefresh} onPress={onRefresh}>
-          <RefreshIcon />
-        </TouchableOpacity>
       </View>
     </View>
 
@@ -327,88 +324,86 @@ interface WebTableProps {
 }
 
 const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
-  <View style={styles.tableWrapper}>
-    {/* Table Header */}
-    <View style={styles.tableHeader}>
-      <Text style={[styles.th, { width: 60 }]}>ID</Text>
-      <Text style={[styles.th, { flex: 2.5 }]}>Subject</Text>
-      <Text style={[styles.th, { flex: 1.4 }]}>Customer</Text>
-      <Text style={[styles.th, { width: 100 }]}>Type</Text>
-      <Text style={[styles.th, { width: 160 }]}>Order</Text>
-      <Text style={[styles.th, { width: 100 }]}>Status</Text>
-      <Text style={[styles.th, { width: 110 }]}>Created</Text>
-      <Text style={[styles.th, { width: 90, textAlign: "center" }]}>
-        Actions
-      </Text>
-    </View>
-
-    {/* Table Rows */}
-    {tickets.map((ticket, idx) => (
-      <View
-        key={ticket.id}
-        style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
-      >
-        <Text style={[styles.td, { width: 60 }, styles.tdId]}>{ticket.id}</Text>
-        <Text style={[styles.td, { flex: 2.5 }]} numberOfLines={2}>
-          {ticket.subject}
+  <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScrollWrapper}>
+    <View style={styles.tableWrapper}>
+      {/* Table Header */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.th, { width: 120, minWidth: 120 }]}>ID</Text>
+        <Text style={[styles.th, { width: 200, minWidth: 200 }]}>Subject</Text>
+        <Text style={[styles.th, { width: 180, minWidth: 180 }]}>Customer</Text>
+        <Text style={[styles.th, { width: 130, minWidth: 130 }]}>Type</Text>
+        <Text style={[styles.th, { width: 160, minWidth: 160 }]}>Order</Text>
+        <Text style={[styles.th, { width: 110, minWidth: 110 }]}>Status</Text>
+        <Text style={[styles.th, { width: 120, minWidth: 120 }]}>Created</Text>
+        <Text style={[styles.th, { width: 100, minWidth: 100, textAlign: "center" }]}>
+          Actions
         </Text>
-        <View
-          style={[{ flex: 1.4, paddingVertical: 13, paddingHorizontal: 12 }]}
-        >
-          <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
-          <Text style={styles.tdCustomerEmail} numberOfLines={1}>
-            {ticket.email}
-          </Text>
-        </View>
-        <View
-          style={[
-            {
-              width: 100,
-              paddingVertical: 13,
-              paddingHorizontal: 12,
-              justifyContent: "center",
-              alignItems: "flex-start",
-            },
-          ]}
-        >
-          <TypeBadge type={ticket.type} />
-        </View>
-        <Text style={[styles.td, { width: 160 }, styles.orderLink]}>
-          {ticket.order}
-        </Text>
-        <View
-          style={[
-            {
-              width: 100,
-              paddingVertical: 13,
-              paddingHorizontal: 12,
-              justifyContent: "center",
-              alignItems: "flex-start",
-            },
-          ]}
-        >
-          <StatusBadge status={ticket.status} />
-        </View>
-        <Text style={[styles.td, { width: 110 }, styles.tdMuted]}>
-          {ticket.created}
-        </Text>
-        <View style={[styles.tdActions, { width: 90 }]}>
-          <TouchableOpacity
-            style={styles.actionBtnView}
-            onPress={() => onView(ticket)}
-          >
-            <EyeIcon />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionBtnRefresh}
-            onPress={() => onRefresh(ticket)}
-          >
-            <RefreshIcon />
-          </TouchableOpacity>
-        </View>
       </View>
-    ))}
-  </View>
+
+      {/* Table Rows */}
+      {tickets.map((ticket, idx) => (
+        <View
+          key={ticket.id}
+          style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
+        >
+          <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdId]} numberOfLines={2}>{ticket.id}</Text>
+          <Text style={[styles.td, { width: 200, minWidth: 200 }]} numberOfLines={2}>
+            {ticket.subject}
+          </Text>
+          <View
+            style={[{ width: 180, minWidth: 180, paddingVertical: 13, paddingHorizontal: 12 }]}
+          >
+            <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
+            <Text style={styles.tdCustomerEmail} numberOfLines={1}>
+              {ticket.email}
+            </Text>
+          </View>
+          <View
+            style={[
+              {
+                width: 130,
+                minWidth: 130,
+                paddingVertical: 13,
+                paddingHorizontal: 12,
+                justifyContent: "center",
+                alignItems: "flex-start",
+              },
+            ]}
+          >
+            <TypeBadge type={ticket.type} />
+          </View>
+          <Text style={[styles.td, { width: 160, minWidth: 160 }, styles.orderLink]}>
+            {ticket.order}
+          </Text>
+          <View
+            style={[
+              {
+                width: 110,
+                minWidth: 110,
+                paddingVertical: 13,
+                paddingHorizontal: 12,
+                justifyContent: "center",
+                alignItems: "flex-start",
+              },
+            ]}
+          >
+            <StatusBadge status={ticket.status} />
+          </View>
+          <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdMuted]}>
+            {ticket.created}
+          </Text>
+          <View style={[styles.tdActions, { width: 60, minWidth: 60 }]}>
+            <TouchableOpacity
+              style={styles.actionBtnView}
+              onPress={() => onView(ticket)}
+            >
+              <EyeIcon />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </View>
+  </ScrollView>
 );
 
 // â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -544,7 +539,7 @@ export default function CustomerSupportTickets() {
             <SearchIcon />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search tickets by ID, subject or customer..."
+              placeholder="Search tickets..."
               placeholderTextColor="#9CA3AF"
               value={search}
               onChangeText={handleSearch}
@@ -554,7 +549,7 @@ export default function CustomerSupportTickets() {
           </View>
 
           {/* Filter Buttons */}
-          <View style={styles.filterRow}>
+          <View style={[styles.filterRow, !isWeb && { width: '100%' }]}>
             <TouchableOpacity
               style={[
                 styles.filterBtn,
@@ -764,14 +759,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "space-between",
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     height: 42,
   },
@@ -818,12 +814,15 @@ const styles = StyleSheet.create({
   },
 
   // Table
-  tableWrapper: {
-    backgroundColor: "#FFFFFF",
+  tableScrollWrapper: {
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     overflow: "hidden",
+  } as any,
+  tableWrapper: {
+    backgroundColor: "#FFFFFF",
+    minWidth: 1120,
   },
   tableHeader: {
     flexDirection: "row",
@@ -859,6 +858,7 @@ const styles = StyleSheet.create({
   tdId: {
     fontWeight: "700",
     color: "#1E3A5F",
+    flexWrap: "wrap",
   },
   tdCustomerName: {
     fontSize: 13,
@@ -892,7 +892,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: "#1E3A5F",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1103,9 +1103,9 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
+    flexWrap: 'nowrap',
+    justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 16,
     marginTop: -40,
     zIndex: 10,
@@ -1113,13 +1113,12 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    minWidth: 120,
-    maxWidth: 240,
+    minWidth: 70,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    padding: 14,
+    padding: 10,
     alignItems: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -1128,7 +1127,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1E3A5F',
   },
