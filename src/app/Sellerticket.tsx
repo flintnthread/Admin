@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapSellerSupportTicket } from "@/lib/mappers";
 import {
@@ -765,10 +767,8 @@ export default function SupportTicketManagement() {
           <View style={styles.headerOuter}>
             <View style={[styles.headerPanel, !isDesktop && styles.headerPanelMobile]}>
               <View style={[styles.headerTitleRow, !isDesktop && styles.headerTitleRowMobile]}>
-                <TouchableOpacity style={styles.menuBtn}>
-                  <View style={styles.menuLine} />
-                  <View style={[styles.menuLine, { width: 16 }]} />
-                  <View style={styles.menuLine} />
+                <TouchableOpacity onPress={() => router.back()} style={styles.menuBtn}>
+                  <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleTextWrap}>
                   <Text style={[styles.headerTitle, !isDesktop && styles.headerTitleMobile]}>Support Tickets</Text>
@@ -842,7 +842,6 @@ export default function SupportTicketManagement() {
             </View>
           ) : (
             <View style={styles.filtersContainerMobile}>
-              {/* Search bar — full width */}
               <View style={styles.searchBoxMobile}>
                 <SearchIcon size={18} color={C.textMuted} />
                 <TextInput
@@ -861,7 +860,6 @@ export default function SupportTicketManagement() {
                   </TouchableOpacity>
                 )}
               </View>
-              {/* Dropdowns row — equal width */}
               <View style={styles.dropdownsRowMobile}>
                 <Dropdown
                   label="Status"
@@ -1254,7 +1252,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: C.textPrimary,
-  },
+    outlineStyle: "none",
+    borderWidth: 0,
+    padding: 0,
+  } as any,
   dropdownsRow: {
     flexDirection: "row",
     gap: 10,
@@ -1303,7 +1304,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   dropdownBackdrop: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",

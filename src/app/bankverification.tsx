@@ -14,7 +14,7 @@ import type { SellerSummary } from "@/lib/api/types";
 import { initialsFromName, maskAccount } from "@/lib/format";
 import { fetchBankStats, fetchBankVerifications } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { router, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -312,22 +312,29 @@ function VerificationCard({ item, onViewPress }: { item: Verification; onViewPre
     }}>
       {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <Avatar initials={item.initials} color={item.color} size={44} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontWeight: "700", color: DARK, fontSize: 15 }} numberOfLines={1}>{item.sellerName}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 }}>
-            <Ionicons name="mail-outline" size={11} color="#94A3B8" />
-            <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>
-              {item.email}
-            </Text>
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
+          style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 10 }}
+        >
+          <Avatar initials={item.initials} color={item.color} size={44} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontWeight: "700", color: DARK, fontSize: 15 }} numberOfLines={1}>{item.sellerName}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 }}>
+              <Ionicons name="mail-outline" size={11} color="#94A3B8" />
+              <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>
+                {item.email}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Ionicons name="call-outline" size={11} color="#94A3B8" />
+              <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
+            </View>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Ionicons name="call-outline" size={11} color="#94A3B8" />
-            <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
-          </View>
-        </View>
+        </TouchableOpacity>
         <View style={{ alignItems: "flex-end", gap: 4 }}>
-          <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>{item.id}</Text>
+          <TouchableOpacity onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}>
+            <Text style={{ fontSize: 11, fontWeight: "700", color: BLUE }}>{item.id}</Text>
+          </TouchableOpacity>
           <StatusBadge status={item.status} small />
         </View>
       </View>
@@ -509,6 +516,9 @@ export default function BankVerifications() {
                 {/* ── Page Title (Orange Container) ── */}
                 <View style={{ backgroundColor: "#1d324e", borderRadius: 16, padding: 16, marginBottom: 20 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 4 }}>
+                      <Ionicons name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
                     <Ionicons name="business-outline" size={24} color="#fff" />
                     <Text style={{ fontSize: isTablet ? 24 : 20, fontWeight: "800", color: "#fff" }}>
                       Bank Verifications
@@ -600,12 +610,12 @@ export default function BankVerifications() {
                     style={{
                       backgroundColor: BLUE, borderRadius: 8,
                       paddingVertical: 10,
-                      paddingHorizontal: isTablet ? 16 : 12,
+                      paddingHorizontal: 16,
                       flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
                     }}
                   >
                     <Ionicons name="search-outline" size={16} color="#fff" />
-                    {isTablet && <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Filter</Text>}
+                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Apply</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -746,6 +756,9 @@ export default function BankVerifications() {
             {/* ── Page Title (Orange Container) ── */}
             <View style={{ backgroundColor: "#1d324e", borderRadius: 16, padding: 16, marginBottom: 20 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 4 }}>
+                  <Ionicons name="arrow-back" size={24} color="#fff" />
+                </TouchableOpacity>
                 <Ionicons name="business-outline" size={24} color="#fff" />
                 <Text style={{ fontSize: 24, fontWeight: "800", color: "#fff" }}>
                   Bank Verifications
@@ -815,7 +828,7 @@ export default function BankVerifications() {
                 }}
               >
                 <Ionicons name="search-outline" size={16} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Filter</Text>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Apply</Text>
               </TouchableOpacity>
             </View>
 
@@ -854,11 +867,19 @@ export default function BankVerifications() {
                     borderBottomColor: BORDER,
                     backgroundColor: idx % 2 === 0 ? "#fff" : "#F8FAFC",
                   }}>
-                    <Text style={{ flex: 0.4, fontSize: 12, color: "#555", fontWeight: "600" }}>{item.id}</Text>
-                    <View style={{ flex: 1.2 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.sellerName}</Text>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
+                      style={{ flex: 0.4, justifyContent: "center" }}
+                    >
+                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingHorizontal: 12 }]}>{item.id}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
+                      style={[styles.tableCell, { flex: 1.2, justifyContent: "center" }]}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: BLUE }}>{item.sellerName}</Text>
                       <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
-                    </View>
+                    </TouchableOpacity>
                     <View style={{ flex: 0.7 }}>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
                       <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
