@@ -653,7 +653,7 @@ const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
     // ── Web Header ──
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: DARK_NAVY, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor:   "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
     headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
@@ -667,7 +667,7 @@ const st = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: DARK_NAVY,
+        backgroundColor:  "#151D4F",
         paddingHorizontal: 16,
         paddingTop: 14,
         paddingBottom: 44,

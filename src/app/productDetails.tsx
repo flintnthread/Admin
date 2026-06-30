@@ -264,6 +264,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
   product: ProductDetail;
   variants: ProductVariant[];
   extras: ProductDetailExtras;
+  sellerPhone: string;
 } {
   const images = (data.images as ApiImage[] | undefined) ?? [];
   const gallery = images
@@ -433,7 +434,7 @@ function VariantsTab({
   variants: ProductVariant[];
 }) {
   const stats = getVariantStats(variants);
-  const [viewMode, setViewMode] = useState<'table' | 'grid' | 'list'>('table');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   return (
     <View style={styles.tabContent}>
@@ -480,21 +481,11 @@ function VariantsTab({
                 color={viewMode === 'list' ? PALETTE.navy : PALETTE.textMuted}
               />
             </Pressable>
-            <Pressable
-              onPress={() => setViewMode('table')}
-              style={[styles.viewBtn, viewMode === 'table' && styles.viewBtnActive]}>
-              <MaterialCommunityIcons
-                name="table"
-                size={16}
-                color={viewMode === 'table' ? PALETTE.navy : PALETTE.textMuted}
-              />
-            </Pressable>
           </View>
         </View>
       </View>
 
-      {/* Table view (wide) or cards (mobile) */}
-      {isWide && viewMode === 'table' ? (
+      {viewMode === 'list' ? (
         <View style={styles.variantTableCard}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.variantTable}>
@@ -503,14 +494,20 @@ function VariantsTab({
                 <Text style={[styles.vth, styles.vcolSize]}>Size</Text>
                 <Text style={[styles.vth, styles.vcolSku]}>SKU</Text>
                 <Text style={[styles.vth, styles.vcolStock]}>Stock</Text>
-                <Text style={[styles.vth, styles.vcolMrp]}>MRP (Excl. GST)</Text>
-                <Text style={[styles.vth, styles.vcolDisc]}>Discount (%)</Text>
-                <Text style={[styles.vth, styles.vcolSell]}>Selling Price (Excl. GST)</Text>
-                <Text style={[styles.vth, styles.vcolGst]}>GST (%)</Text>
-                <Text style={[styles.vth, styles.vcolSellGst]}>Selling Price (With GST)</Text>
-                <Text style={[styles.vth, styles.vcolComm]}>Commission (% of SP w/ GST)</Text>
-                <Text style={[styles.vth, styles.vcolDel]}>Intra-City Delivery</Text>
-                <Text style={[styles.vth, styles.vcolDel]}>Metro-Metro Delivery</Text>
+                <Text style={[styles.vth, styles.vcolMrp]}>MRP{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
+                <Text style={[styles.vth, styles.vcolDisc]}>Discount{'\n'}<Text style={{ fontSize: 9 }}>(%)</Text></Text>
+                <Text style={[styles.vth, styles.vcolSell]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
+                <Text style={[styles.vth, styles.vcolGst]}>GST{'\n'}<Text style={{ fontSize: 9 }}>(%)</Text></Text>
+                <Text style={[styles.vth, styles.vcolSellGst]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(With GST)</Text></Text>
+                <Text style={[styles.vth, styles.vcolComm]}>Commission{'\n'}<Text style={{ fontSize: 9 }}>(15%)</Text></Text>
+                <Text style={[styles.vth, styles.vcolDel]}>Intra-{'\n'}City{'\n'}<Text style={{ fontSize: 9 }}>Delivery</Text></Text>
+                <Text style={[styles.vth, styles.vcolDel]}>Metro-{'\n'}Metro{'\n'}<Text style={{ fontSize: 9 }}>Delivery</Text></Text>
+                <View style={styles.vcolTotalIntraHeader}>
+                  <Text style={[styles.vth, styles.vcolTotalHeaderText]}>Total{'\n'}<Text style={{ fontSize: 9 }}>(Intra-City)</Text></Text>
+                </View>
+                <View style={styles.vcolTotalMetroHeader}>
+                  <Text style={[styles.vth, styles.vcolTotalHeaderText]}>Total{'\n'}<Text style={{ fontSize: 9 }}>(Metro-Metro)</Text></Text>
+                </View>
               </View>
               {variants.map((v) => (
                 <VariantTableRow key={v.id} variant={v} />
@@ -518,27 +515,21 @@ function VariantsTab({
             </View>
           </ScrollView>
         </View>
-      ) : isWide ? (
-        <View style={viewMode === 'grid' ? styles.variantGrid : styles.variantCardList}>
+      ) : (
+        <View style={styles.variantGrid}>
           {variants.map((v) => (
             <VariantCard key={v.id} variant={v} compact={false} />
           ))}
         </View>
-      ) : (
-        // Mobile: horizontal scrollable cards
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginHorizontal: -4 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 4, paddingBottom: 8 }}>
-          {variants.map((v) => (
-            <View key={v.id} style={{ width: 260 }}>
-              <VariantCard variant={v} compact={true} />
-            </View>
-          ))}
-        </ScrollView>
       )}
     </View>
   );
 }
 
 function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
+  const intraCityTotal = v.sellingPriceWithGst + v.commissionAmount + v.intraCityDelivery;
+  const metroMetroTotal = v.sellingPriceWithGst + v.commissionAmount + v.metroDelivery;
+
   return (
     <View style={styles.variantTableRow}>
       <View style={[styles.vcolColor, styles.vcellColor]}>
@@ -551,29 +542,54 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
           <Text style={styles.vSizeText}>{v.size}</Text>
         </View>
       </View>
-      <Text style={[styles.vcolSku, styles.vSkuText]}>{v.sku}</Text>
+      <View style={styles.vcolSku}>
+        <View style={{ backgroundColor: '#FFEDD5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+          <Text style={{ fontSize: 10, color: '#C2410C', fontWeight: 'bold' }}>{v.sku}</Text>
+        </View>
+      </View>
       <View style={styles.vcolStock}>
         <View style={styles.vStockPill}>
           <Text style={styles.vStockText}>{v.stock} units</Text>
         </View>
       </View>
-      <Text style={[styles.vcolMrp, styles.vMrpText]}>₹{v.mrp.toFixed(2)}</Text>
-      <Text style={[styles.vcolDisc, styles.vDiscText]}>{v.discountPercent.toFixed(2)}% OFF</Text>
-      <Text style={[styles.vcolSell, styles.vcellText]}>₹{v.sellingPriceExclGst.toFixed(2)}</Text>
+      <View style={styles.vcolMrp}>
+        <Text style={styles.vMrpText}>₹{v.mrp.toFixed(2)}</Text>
+      </View>
+      <View style={styles.vcolDisc}>
+        <View style={styles.vStockPill}>
+          <Text style={styles.vStockText}>{v.discountPercent.toFixed(2)}% OFF</Text>
+        </View>
+      </View>
+      <View style={styles.vcolSell}>
+        <Text style={styles.vcellText}>₹{v.sellingPriceExclGst.toFixed(2)}</Text>
+      </View>
       <View style={styles.vcolGst}>
         <Text style={styles.vGstAmount}>+ ₹{v.gstAmount.toFixed(2)}</Text>
         <Text style={styles.vGstPct}>({v.gstPercent}%)</Text>
       </View>
-      <Text style={[styles.vcolSellGst, styles.vSellGstText]}>₹{v.sellingPriceWithGst.toFixed(2)}</Text>
+      <View style={styles.vcolSellGst}>
+        <Text style={styles.vSellGstText}>₹{v.sellingPriceWithGst.toFixed(2)}</Text>
+      </View>
       <View style={styles.vcolComm}>
         <Text style={styles.vCommAmount}>+ ₹{v.commissionAmount.toFixed(2)}</Text>
         <Text style={styles.vCommPct}>({v.commissionPercent}%)</Text>
       </View>
-      <Text style={[styles.vcolDel, styles.vcellText]}>+ ₹{v.intraCityDelivery.toFixed(2)}</Text>
-      <Text style={[styles.vcolDel, styles.vcellText]}>+ ₹{v.metroDelivery.toFixed(2)}</Text>
+      <View style={styles.vcolDel}>
+        <Text style={styles.vcellText}>+ ₹{v.intraCityDelivery.toFixed(2)}</Text>
+      </View>
+      <View style={styles.vcolDel}>
+        <Text style={styles.vcellText}>+ ₹{v.metroDelivery.toFixed(2)}</Text>
+      </View>
+      <View style={styles.vcolTotalIntra}>
+        <Text style={styles.vcolTotalIntraText}>₹{intraCityTotal.toFixed(2)}</Text>
+      </View>
+      <View style={styles.vcolTotalMetro}>
+        <Text style={styles.vcolTotalMetroText}>₹{metroMetroTotal.toFixed(2)}</Text>
+      </View>
     </View>
   );
 }
+
 
 function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact?: boolean }) {
   return (
@@ -930,6 +946,13 @@ export default function ProductDetailsScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  const handleBack = () => {
+    if (product?.status === 'pending' || product?.status === 'review') {
+      router.push('/productApproval');
+    } else {
+      router.push('/productApproval');
+    }
+  };
 
   const loadProduct = useCallback(async () => {
     const productId = Number(id);
@@ -974,7 +997,7 @@ export default function ProductDetailsScreen() {
         await approveProduct(productId);
         if (Platform.OS === 'web') window.alert('Product approved.');
         else Alert.alert('Success', 'Product approved.');
-        router.back();
+        handleBack();
       } catch (err) {
         const msg = getApiErrorMessage(err, 'Failed to approve product.');
         if (Platform.OS === 'web') window.alert(msg);
@@ -1004,7 +1027,7 @@ export default function ProductDetailsScreen() {
       setRejectNote('');
       if (Platform.OS === 'web') window.alert('Product rejected.');
       else Alert.alert('Done', 'Product rejected.');
-      router.back();
+      handleBack();
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to reject product.');
       if (Platform.OS === 'web') window.alert(msg);
@@ -1033,7 +1056,7 @@ export default function ProductDetailsScreen() {
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.notFound}>
             <Text style={styles.notFoundText}>{error ?? 'Product not found'}</Text>
-            <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : router.back())}>
+            <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : handleBack())}>
               <Text style={styles.backBtnLightText}>{error ? 'Retry' : 'Go Back'}</Text>
             </Pressable>
           </View>
@@ -1047,65 +1070,6 @@ export default function ProductDetailsScreen() {
   return (
     <AdminLayout>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={[styles.header, !isWide && styles.headerMobile]}>
-          <View style={styles.headerLeft}>
-            <Pressable style={styles.backBtn} onPress={() => router.back()}>
-              <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
-              <Text style={styles.backBtnText}>Back</Text>
-            </Pressable>
-            <View>
-              <Text style={styles.headerTitle} numberOfLines={2}>
-                {isWide ? product.name : "Product Detail"}
-              </Text>
-              {isWide && (
-                <Text style={styles.headerSub} numberOfLines={1}>
-                  {product.category} · {product.seller} · Updated {product.lastUpdated}
-                </Text>
-              )}
-            </View>
-          </View>
-          {canReview && isWide ? (
-            <View style={styles.headerActions}>
-              <Pressable
-                style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
-                disabled={actionLoading}
-                onPress={() => void handleApprove()}
-              >
-                <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
-                <Text style={styles.approveActionText}>Approve</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.rejectActionBtn, actionLoading && { opacity: 0.6 }]}
-                disabled={actionLoading}
-                onPress={() => setShowRejectModal(true)}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
-                <Text style={styles.rejectActionText}>Reject</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-
-        {canReview && !isWide ? (
-          <View style={styles.mobileHeaderActions}>
-            <Pressable
-              style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-              disabled={actionLoading}
-              onPress={() => void handleApprove()}
-            >
-              <Text style={styles.approveActionText}>Approve</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-              disabled={actionLoading}
-              onPress={() => setShowRejectModal(true)}
-            >
-              <Text style={styles.rejectActionText}>Reject</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         <Modal visible={showRejectModal} transparent animationType="fade">
           <View style={styles.rejectModalBackdrop}>
             <View style={styles.rejectModalCard}>
@@ -1139,229 +1103,286 @@ export default function ProductDetailsScreen() {
           style={styles.scroll}
           contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax, alignSelf: 'center', width: '100%' }]}
           showsVerticalScrollIndicator={false}>
-          {/* Hero card */}
-          <View style={styles.heroCard}>
-            <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
-              {/* Gallery */}
-              <View style={[styles.galleryCol, !isWide && styles.galleryColMobile]}>
-                <View style={[styles.mainImageWrap, !isWide && { borderRadius: 0 }]}>
-                  <Image
-                    source={{ uri: product.gallery[activeImage] || product.image }}
-                    style={[styles.mainImage, !isWide && styles.mainImageMobile]}
-                    contentFit="cover"
-                  />
-                  {product.discount > 0 ? (
-                    <View style={styles.discountBadge}>
-                      <Text style={styles.discountText}>{product.discount.toFixed(0)}% OFF</Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.stockBadge}>
-                    <MaterialCommunityIcons name="check-circle" size={12} color={PALETTE.green} />
-                    <Text style={styles.stockBadgeText}>{product.stock} units</Text>
-                  </View>
-                </View>
-                <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 10 }]}>
-                  <Pressable 
-                    style={styles.thumbNav}
-                    onPress={() => setActiveImage(prev => Math.max(0, prev - 1))}
-                  >
-                    <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
-                  </Pressable>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
-                    {product.gallery.map((uri, index) => (
-                      <Pressable key={uri + index} onPress={() => setActiveImage(index)}>
-                        <Image
-                          source={{ uri }}
-                          style={[styles.thumb, activeImage === index && styles.thumbActive]}
-                          contentFit="cover"
-                          pointerEvents="none"
-                        />
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                  <Pressable 
-                    style={styles.thumbNav}
-                    onPress={() => setActiveImage(prev => Math.min(product.gallery.length - 1, prev + 1))}
-                  >
-                    <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
-                  </Pressable>
-                </View>
-              </View>
 
-              {/* Product info */}
-              <View style={[styles.infoCol, !isWide && styles.infoColMobile]}>
-                <View style={styles.infoTopRow}>
-                  <View style={styles.categoryPill}>
-                    <Text style={styles.categoryPillText}>
-                      {product.categoryLabel} · {product.subcategory}
-                    </Text>
-                  </View>
-                  <View style={styles.stockStatus}>
-                    <View style={styles.stockDot} />
-                    <Text style={styles.stockStatusText}>{product.stockStatus}</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.productTitle}>{product.name}</Text>
-                <Text style={styles.productSku}>
-                  {product.category} · SKU: {product.sku}
+          {/* Header */}
+          <View style={[styles.header, !isWide && styles.headerMobile]}>
+            <View style={styles.headerLeft}>
+              <Pressable style={styles.backBtn} onPress={handleBack}>
+                <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
+                <Text style={styles.backBtnText}>Back</Text>
+              </Pressable>
+              <View>
+                <Text style={styles.headerTitle} numberOfLines={2}>
+                  Product Detail
                 </Text>
-
-                <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
-                <Text style={styles.priceSub}>
-                  MRP Excl. GST ₹{product.mrp.toLocaleString('en-IN')} · GST {product.gst}%
-                </Text>
-
-                <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>
-                  <View style={styles.attrBox}>
-                    <Text style={styles.attrLabel}>Material</Text>
-                    <Text style={styles.attrValue}>{product.material}</Text>
-                  </View>
-                  <View style={styles.attrBox}>
-                    <Text style={styles.attrLabel}>Weight</Text>
-                    <Text style={styles.attrValue}>{product.weight}</Text>
-                  </View>
-                  <View style={styles.attrBox}>
-                    <Text style={styles.attrLabel}>HSN Code</Text>
-                    <Text style={styles.attrValue}>{product.hsnCode}</Text>
-                  </View>
-                  <View style={styles.attrBox}>
-                    <Text style={styles.attrLabel}>Warranty</Text>
-                    <Text style={styles.attrValue}>{product.warranty}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.returnBox}>
-                  <Text style={styles.returnLabel}>Return Policy</Text>
-                  <Text style={styles.returnText}>{product.returnPolicy}</Text>
-                </View>
-
-                <View style={styles.footerTags}>
-                  <View style={styles.footerTag}>
-                    <Text style={styles.footerTagText}>Size: {product.size}</Text>
-                  </View>
-                  <View style={styles.footerTag}>
-                    <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
-                      Delivery: {product.delivery}
-                    </Text>
-                  </View>
-                  <View style={styles.footerTag}>
-                    <Text style={[styles.footerTagText, { color: PALETTE.navy }]}>
-                      Stock: {product.stock} units
-                    </Text>
-                  </View>
-                </View>
               </View>
             </View>
+            {canReview && isWide ? (
+              <View style={styles.headerActions}>
+                <Pressable
+                  style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => void handleApprove()}
+                >
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.approveActionText}>Approve</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.rejectActionBtn, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => setShowRejectModal(true)}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.rejectActionText}>Reject</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
-          {/* Tabs */}
-          {isWide ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {TABS.map((tab) => {
-                const active = activeTab === tab.key;
-                return (
-                  <Pressable
-                    key={tab.key}
-                    onPress={() => setActiveTab(tab.key)}
-                    style={[styles.tab, active && styles.tabActive]}>
-                    {tab.key === 'overview' && <MaterialCommunityIcons name="information-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'variants' && <MaterialCommunityIcons name="tune" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'specifications' && <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'delivery' && <MaterialCommunityIcons name="truck-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'returns' && <MaterialCommunityIcons name="backup-restore" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'sizechart' && <MaterialCommunityIcons name="ruler" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
-                    {tab.key === 'variants' && (
-                      <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
-                        <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{variants.length}</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          ) : (
-            <View style={styles.tabsGrid}>
-              {TABS.map((tab) => {
-                const active = activeTab === tab.key;
-                return (
-                  <Pressable
-                    key={tab.key}
-                    onPress={() => setActiveTab(tab.key)}
-                    style={[styles.tab, styles.tabMobile, active && styles.tabActive]}>
-                    {tab.key === 'overview' && <MaterialCommunityIcons name="information-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'variants' && <MaterialCommunityIcons name="tune" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'specifications' && <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'delivery' && <MaterialCommunityIcons name="truck-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'returns' && <MaterialCommunityIcons name="backup-restore" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    {tab.key === 'sizechart' && <MaterialCommunityIcons name="ruler" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
-                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
-                    {tab.key === 'variants' && (
-                      <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
-                        <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{variants.length}</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })}
+          {canReview && !isWide ? (
+            <View style={styles.mobileHeaderActions}>
+              <Pressable
+                style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
+                disabled={actionLoading}
+                onPress={() => void handleApprove()}
+              >
+                <Text style={styles.approveActionText}>Approve</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
+                disabled={actionLoading}
+                onPress={() => setShowRejectModal(true)}
+              >
+                <Text style={styles.rejectActionText}>Reject</Text>
+              </Pressable>
             </View>
-          )}
+          ) : null}
 
-          {/* Overview tab */}
-          {activeTab === 'overview' && (
-            <View style={styles.tabContent}>
-              <SectionCard title="Full Description" icon="file-document-outline">
-                <Text style={styles.descriptionText}>{product.fullDescription}</Text>
-              </SectionCard>
+          <View style={styles.scrollBody}>
+            {/* Hero card */}
+            <View style={styles.heroCard}>
+              <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
+                {/* Gallery */}
+                <View style={[styles.galleryCol, !isWide && styles.galleryColMobile]}>
+                  <View style={[styles.mainImageWrap, !isWide && { borderRadius: 0 }]}>
+                    <Image
+                      source={{ uri: product.gallery[activeImage] || product.image }}
+                      style={[styles.mainImage, !isWide && styles.mainImageMobile]}
+                      contentFit="cover"
+                    />
+                    {product.discount > 0 ? (
+                      <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>{product.discount.toFixed(0)}% OFF</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.stockBadge}>
+                      <MaterialCommunityIcons name="check-circle" size={12} color={PALETTE.green} />
+                      <Text style={styles.stockBadgeText}>{product.stock} units</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 10 }]}>
+                    <Pressable
+                      style={styles.thumbNav}
+                      onPress={() => setActiveImage(prev => Math.max(0, prev - 1))}
+                    >
+                      <MaterialCommunityIcons name="chevron-left" size={18} color={PALETTE.textSecondary} />
+                    </Pressable>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
+                      {product.gallery.map((uri, index) => (
+                        <Pressable key={uri + index} onPress={() => setActiveImage(index)}>
+                          <Image
+                            source={{ uri }}
+                            style={[styles.thumb, activeImage === index && styles.thumbActive]}
+                            contentFit="cover"
+                            pointerEvents="none"
+                          />
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                    <Pressable
+                      style={styles.thumbNav}
+                      onPress={() => setActiveImage(prev => Math.min(product.gallery.length - 1, prev + 1))}
+                    >
+                      <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
+                    </Pressable>
+                  </View>
+                </View>
 
-              <View style={[styles.twoCol, !isWide && styles.twoColMobile]}>
-                <SectionCard title="Classification" icon="tag-outline" flex={1}>
-                  <InfoRow label="Category" value={product.categoryLabel} />
-                  <InfoRow label="Subcategory" value={product.subcategory} />
-                  <InfoRow label="Seller" value={product.seller} />
-                  {product.email ? <InfoRow label="Seller Email" value={product.email} /> : null}
-                  {sellerPhone ? <InfoRow label="Seller Phone" value={sellerPhone} /> : null}
-                  <InfoRow label="Color" value={product.color} />
-                  <InfoRow label="Size" value={product.size} />
-                  <InfoRow label="HSN Code" value={product.hsnCode} />
-                  <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
-                  <InfoRow label="Material" value={product.material} />
-                  <InfoRow label="Return" value={product.returnPolicy} />
-                  <InfoRow label="Warranty" value={product.warranty} />
+                {/* Product info */}
+                <View style={[styles.infoCol, !isWide && styles.infoColMobile]}>
+                  <View style={styles.infoTopRow}>
+                    <View style={styles.categoryPill}>
+                      <Text style={styles.categoryPillText}>
+                        {product.categoryLabel} · {product.subcategory}
+                      </Text>
+                    </View>
+                    <View style={styles.stockStatus}>
+                      <View style={styles.stockDot} />
+                      <Text style={styles.stockStatusText}>{product.stockStatus}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.productTitle}>{product.name}</Text>
+                  <Text style={styles.productSku}>
+                    {product.category} · SKU: {product.sku}
+                  </Text>
+
+                  <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.priceSub}>
+                    MRP Excl. GST ₹{product.mrp.toLocaleString('en-IN')} · GST {product.gst}%
+                  </Text>
+
+                  <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>
+                    <View style={styles.attrBox}>
+                      <Text style={styles.attrLabel}>Material</Text>
+                      <Text style={styles.attrValue}>{product.material}</Text>
+                    </View>
+                    <View style={styles.attrBox}>
+                      <Text style={styles.attrLabel}>Weight</Text>
+                      <Text style={styles.attrValue}>{product.weight}</Text>
+                    </View>
+                    <View style={styles.attrBox}>
+                      <Text style={styles.attrLabel}>HSN Code</Text>
+                      <Text style={styles.attrValue}>{product.hsnCode}</Text>
+                    </View>
+                    <View style={styles.attrBox}>
+                      <Text style={styles.attrLabel}>Warranty</Text>
+                      <Text style={styles.attrValue}>{product.warranty}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.returnBox}>
+                    <Text style={styles.returnLabel}>Return Policy</Text>
+                    <Text style={styles.returnText}>{product.returnPolicy}</Text>
+                  </View>
+
+                  <View style={styles.footerTags}>
+                    <View style={styles.footerTag}>
+                      <Text style={styles.footerTagText}>Size: {product.size}</Text>
+                    </View>
+                    <View style={styles.footerTag}>
+                      <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
+                        Delivery: {product.delivery}
+                      </Text>
+                    </View>
+                    <View style={styles.footerTag}>
+                      <Text style={[styles.footerTagText, { color: PALETTE.navy }]}>
+                        Stock: {product.stock} units
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Tabs */}
+            {isWide ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+                {TABS.map((tab) => {
+                  const active = activeTab === tab.key;
+                  return (
+                    <Pressable
+                      key={tab.key}
+                      onPress={() => setActiveTab(tab.key)}
+                      style={[styles.tab, active && styles.tabActive]}>
+                      {tab.key === 'overview' && <MaterialCommunityIcons name="information-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'variants' && <MaterialCommunityIcons name="tune" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'specifications' && <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'delivery' && <MaterialCommunityIcons name="truck-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'returns' && <MaterialCommunityIcons name="backup-restore" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'sizechart' && <MaterialCommunityIcons name="ruler" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                      {tab.key === 'variants' && (
+                        <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                          <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{variants.length}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={styles.tabsGrid}>
+                {TABS.map((tab) => {
+                  const active = activeTab === tab.key;
+                  return (
+                    <Pressable
+                      key={tab.key}
+                      onPress={() => setActiveTab(tab.key)}
+                      style={[styles.tab, styles.tabMobile, active && styles.tabActive]}>
+                      {tab.key === 'overview' && <MaterialCommunityIcons name="information-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'variants' && <MaterialCommunityIcons name="tune" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'specifications' && <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'delivery' && <MaterialCommunityIcons name="truck-outline" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'returns' && <MaterialCommunityIcons name="backup-restore" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      {tab.key === 'sizechart' && <MaterialCommunityIcons name="ruler" size={14} color={active ? '#FFF' : PALETTE.textSecondary} />}
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                      {tab.key === 'variants' && (
+                        <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                          <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{variants.length}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Overview tab */}
+            {activeTab === 'overview' && (
+              <View style={styles.tabContent}>
+                <SectionCard title="Full Description" icon="file-document-outline">
+                  <Text style={styles.descriptionText}>{product.fullDescription.replace(/<\/?[^>]+(>|$)/g, "")}</Text>
                 </SectionCard>
 
-                <SectionCard title="Inventory" icon="warehouse" flex={1}>
-                  <InfoRow label="Stock Quantity" value={`${product.stock} units`} valueColor={PALETTE.green} />
-                  <InfoRow label="Status" value={product.stockStatus} valueColor={PALETTE.red} />
-                  <InfoRow label="DB Status" value={product.dbStatus} />
-                  <InfoRow label="Last Updated" value={product.lastUpdated} />
-                  <InfoRow label="Created At" value={product.createdAt} />
-                  <InfoRow label="Approved At" value={product.approvedAt} />
+                <View style={[styles.twoCol, !isWide && styles.twoColMobile]}>
+                  <SectionCard title="Classification" icon="tag-outline" flex={1}>
+                    <InfoRow label="Category" value={product.categoryLabel} />
+                    <InfoRow label="Subcategory" value={product.subcategory} />
+                    <InfoRow label="Seller" value={product.seller} />
+                    {product.email ? <InfoRow label="Seller Email" value={product.email} /> : null}
+                    {sellerPhone ? <InfoRow label="Seller Phone" value={sellerPhone} /> : null}
+                    <InfoRow label="Color" value={product.color} />
+                    <InfoRow label="Size" value={product.size} />
+                    <InfoRow label="HSN Code" value={product.hsnCode} />
+                    <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
+                    <InfoRow label="Material" value={product.material} />
+                    <InfoRow label="Return" value={product.returnPolicy} />
+                    <InfoRow label="Warranty" value={product.warranty} />
+                  </SectionCard>
+
+                  <SectionCard title="Inventory" icon="warehouse" flex={1}>
+                    <InfoRow label="Stock Quantity" value={`${product.stock} units`} valueColor={PALETTE.green} />
+                    <InfoRow label="Status" value={product.stockStatus} valueColor={PALETTE.red} />
+                    <InfoRow label="DB Status" value={product.dbStatus} />
+                    <InfoRow label="Last Updated" value={product.lastUpdated} />
+                    <InfoRow label="Created At" value={product.createdAt} />
+                    <InfoRow label="Approved At" value={product.approvedAt} />
+                  </SectionCard>
+                </View>
+
+                <SectionCard title="Admin Notes" icon="bell-outline">
+                  <View style={styles.adminNote}>
+                    <Text style={styles.adminNoteText}>{product.adminNote}</Text>
+                  </View>
                 </SectionCard>
               </View>
+            )}
 
-              <SectionCard title="Admin Notes" icon="bell-outline">
-                <View style={styles.adminNote}>
-                  <Text style={styles.adminNoteText}>{product.adminNote}</Text>
-                </View>
-              </SectionCard>
-            </View>
-          )}
+            {activeTab === 'variants' && (
+              <VariantsTab isWide={isWide} variants={variants} />
+            )}
 
-          {activeTab === 'variants' && (
-            <VariantsTab isWide={isWide} variants={variants} />
-          )}
+            {activeTab === 'specifications' && extras && (
+              <SpecificationsTab isWide={isWide} extras={extras} />
+            )}
 
-          {activeTab === 'specifications' && extras && (
-            <SpecificationsTab isWide={isWide} extras={extras} />
-          )}
+            {activeTab === 'delivery' && extras && <DeliveryTab isWide={isWide} extras={extras} />}
 
-          {activeTab === 'delivery' && extras && <DeliveryTab isWide={isWide} extras={extras} />}
+            {activeTab === 'returns' && extras && <ReturnsTab isWide={isWide} extras={extras} />}
 
-          {activeTab === 'returns' && extras && <ReturnsTab isWide={isWide} extras={extras} />}
-
-          {activeTab === 'sizechart' && extras && <SizeChartTab isWide={isWide} extras={extras} />}
+            {activeTab === 'sizechart' && extras && <SizeChartTab isWide={isWide} extras={extras} />}
+          </View>
         </ScrollView>
 
       </SafeAreaView>
@@ -1372,11 +1393,12 @@ export default function ProductDetailsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: PALETTE.pageBg },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 16, paddingBottom: 32 },
+  scrollContent: { paddingBottom: 32 },
+  scrollBody: { padding: 16, gap: 16 },
 
   header: {
     marginHorizontal: 2, marginTop: 12, borderRadius: 22,
-    backgroundColor: PALETTE.navy,
+    backgroundColor: "#151D4F",
     paddingHorizontal: 16,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -1387,7 +1409,7 @@ const styles = StyleSheet.create({
   headerMobile: {
     marginHorizontal: 0,
     marginTop: 0,
-    borderRadius: 0,
+    borderRadius: 22,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   backBtn: {
@@ -1679,13 +1701,11 @@ const styles = StyleSheet.create({
     borderColor: PALETTE.border,
     overflow: 'hidden',
   },
-  variantTable: { minWidth: 1400 },
+  variantTable: { minWidth: 1480 },
   variantTableHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: '#F5F0E8',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: PALETTE.border,
   },
@@ -1694,26 +1714,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: PALETTE.textSecondary,
     textTransform: 'uppercase',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   variantTableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    minHeight: 60,
   },
-  vcolColor: { width: 140 },
-  vcolSize: { width: 60, alignItems: 'center' },
-  vcolSku: { width: 120 },
-  vcolStock: { width: 90, alignItems: 'center' },
-  vcolMrp: { width: 110 },
-  vcolDisc: { width: 100 },
-  vcolSell: { width: 130 },
-  vcolGst: { width: 90 },
-  vcolSellGst: { width: 130 },
-  vcolComm: { width: 130 },
-  vcolDel: { width: 110 },
+  vcolColor: { width: 148, paddingHorizontal: 8 },
+  vcolSize: { width: 64, alignItems: 'center', paddingHorizontal: 4 },
+  vcolSku: { width: 120, paddingHorizontal: 8 },
+  vcolStock: { width: 90, alignItems: 'center', paddingHorizontal: 4 },
+  vcolMrp: { width: 100, paddingHorizontal: 8 },
+  vcolDisc: { width: 88, paddingHorizontal: 8 },
+  vcolSell: { width: 110, paddingHorizontal: 8 },
+  vcolGst: { width: 100, paddingHorizontal: 8 },
+  vcolSellGst: { width: 110, paddingHorizontal: 8 },
+  vcolComm: { width: 120, paddingHorizontal: 8 },
+  vcolDel: { width: 90, paddingHorizontal: 8 },
+  vcolTotalIntraHeader: { width: 108, backgroundColor: '#D1FAE5', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalMetroHeader: { width: 108, backgroundColor: '#FEF3C7', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalHeaderText: { color: '#111827', fontWeight: '800' },
+  vcolTotalIntra: { width: 108, backgroundColor: '#D1FAE5', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalMetro: { width: 108, backgroundColor: '#FEF3C7', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalIntraText: { fontSize: 13, fontWeight: '800', color: '#166534' },
+  vcolTotalMetroText: { fontSize: 13, fontWeight: '800', color: '#92400E' },
   vcellColor: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   vColorImg: { width: 36, height: 36, borderRadius: 6 },
   vColorDot: { width: 10, height: 10, borderRadius: 5 },

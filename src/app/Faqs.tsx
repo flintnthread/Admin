@@ -67,6 +67,25 @@ interface FaqQuestion {
 
 // FAQ categories and questions load from /api/admin/faq
 
+const getSafeIcon = (category?: FaqCategory | null): string => {
+    if (!category) return "help-circle";
+    const name = (category.name || "").toLowerCase();
+    
+    if (name.includes("order") || name.includes("shipping") || name.includes("delivery")) return "truck";
+    if (name.includes("payment") || name.includes("wallet") || name.includes("card") || name.includes("bank")) return "credit-card";
+    if (name.includes("return") || name.includes("refund") || name.includes("exchange")) return "refresh-ccw";
+    if (name.includes("account") || name.includes("profile") || name.includes("user")) return "user";
+    if (name.includes("product") || name.includes("item") || name.includes("inventory")) return "box";
+    if (name.includes("offer") || name.includes("discount") || name.includes("promo") || name.includes("sale")) return "tag";
+    if (name.includes("security") || name.includes("privacy") || name.includes("policy")) return "shield";
+    if (name.includes("setting") || name.includes("preference")) return "settings";
+    if (name.includes("seller") || name.includes("vendor") || name.includes("store")) return "shopping-bag";
+    if (name.includes("support") || name.includes("contact") || name.includes("help")) return "message-circle";
+
+    const defaults = ["info", "star", "bookmark", "layers", "list", "file-text"];
+    return category.icon && category.icon !== "help-circle" ? category.icon : defaults[(category.id || 0) % defaults.length];
+};
+
 // â”€â”€â”€ VIEW QUESTION MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ViewModal: React.FC<{
     visible: boolean;
@@ -83,7 +102,7 @@ const ViewModal: React.FC<{
                     <View style={[mSt.headerBar, { borderBottomColor: category?.color ?? PRIMARY }]}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                             <View style={[mSt.iconSmall, { backgroundColor: (category?.color ?? PRIMARY) + "20" }]}>
-                                <Feather name={(category?.icon ?? "help-circle") as any} size={16} color={category?.color ?? PRIMARY} />
+                                <Feather name={getSafeIcon(category) as any} size={16} color={category?.color ?? PRIMARY} />
                             </View>
                             <View>
                                 <Text style={mSt.sheetTitle}>View Question</Text>
@@ -185,7 +204,7 @@ const QuestionModal: React.FC<{
                                     <TouchableOpacity key={c.id}
                                         style={[mSt.catChip, catId === c.id && { backgroundColor: c.color, borderColor: c.color }]}
                                         onPress={() => setCatId(c.id)}>
-                                        <Feather name={c.icon as any} size={11} color={catId === c.id ? "#fff" : c.color} />
+                                        <Feather name={getSafeIcon(c) as any} size={11} color={catId === c.id ? "#fff" : c.color} />
                                         <Text style={[mSt.catChipText, catId === c.id && { color: "#fff" }]}>{c.name}</Text>
                                     </TouchableOpacity>
                                 ))}
@@ -566,7 +585,7 @@ const FaqQuestionsScreen: React.FC = () => {
                         <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY }]}
                             onPress={() => { setEditModal(null); setAddModal(true); }}>
                             <Feather name="plus" size={14} color="#fff" />
-                            <Text style={st.addBtnText}>Add Question</Text>
+                            <Text style={st.addBtnText}>Add </Text>
                         </TouchableOpacity>
                     </View>
 
@@ -584,6 +603,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                 {categories.map(cat => {
                                     const catQCount = questions.filter(q => q.categoryId === cat.id).length;
                                     const isSelected = cat.id === selectedCatId;
+                                    
                                     return (
                                         <TouchableOpacity key={cat.id}
                                             style={[st.catBtn,
@@ -591,7 +611,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                             isSelected && { backgroundColor: NAVY }]}
                                             onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}>
                                             <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
-                                                <Feather name={cat.icon as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
+                                                <Feather name={getSafeIcon(cat) as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
                                             </View>
                                             <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
                                             <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
@@ -607,7 +627,7 @@ const FaqQuestionsScreen: React.FC = () => {
                         <View style={[st.heroCard, { borderLeftColor: selectedCat?.color ?? PRIMARY }]}>
                             <View style={st.heroLeft}>
                                 <View style={[st.heroIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
-                                    <Feather name={(selectedCat?.icon ?? "help-circle") as any} size={28} color={selectedCat?.color ?? PRIMARY} />
+                                    <Feather name={getSafeIcon(selectedCat) as any} size={28} color={selectedCat?.color ?? PRIMARY} />
                                 </View>
                                 <View>
                                     <Text style={st.heroTitle}>{selectedCat?.name}</Text>
@@ -708,7 +728,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                 <TouchableOpacity style={[st.emptyAddBtn, { backgroundColor: selectedCat?.color ?? PRIMARY }]}
                                     onPress={() => { setEditModal(null); setAddModal(true); }}>
                                     <Feather name="plus" size={14} color="#fff" />
-                                    <Text style={st.emptyAddTxt}>Add Question</Text>
+                                    <Text style={st.emptyAddTxt}>Add </Text>
                                 </TouchableOpacity>
                             </View>
                         ) : viewMode === "grid" ? (
@@ -834,7 +854,7 @@ export default FaqQuestionsScreen;
 const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: BG_CARD, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
     headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerMobile: {
         marginHorizontal: 16,

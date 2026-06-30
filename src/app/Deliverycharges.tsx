@@ -1012,30 +1012,29 @@ const DeliveryChargesScreen: React.FC = () => {
         <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
           <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
 
-          {/* Mobile Header */}
-          <View style={styles.mobileHeader}>
-            <View>
-              <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
-              <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.mobileAddBtn}
-              activeOpacity={0.85}
-              onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
-            >
-              <Feather name="plus" size={14} color="#1E2B6B" />
-              <Text style={styles.mobileAddBtnTxt}>Add New Charge</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Stats cards — overlap header */}
-          <StatsFooter slabs={slabs} isWeb={false} />
-
           <ScrollView
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 32 }}
           >
+            {/* Mobile Header */}
+            <View style={styles.mobileHeader}>
+              <View>
+                <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
+                <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.mobileAddBtn}
+                activeOpacity={0.85}
+                onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
+              >
+                <Feather name="plus" size={14} color="#1E2B6B" />
+                <Text style={styles.mobileAddBtnTxt}>Add New</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Stats cards — overlap header */}
+            <StatsFooter slabs={slabs} isWeb={false} />
             {/* Search + Filter toolbar */}
             <View style={styles.mobileToolbar}>
               {/* Search */}
@@ -1118,18 +1117,43 @@ const DeliveryChargesScreen: React.FC = () => {
                     ))}
                 </View>
               ) : (
-                <View style={{ gap: 12 }}>
-                  {filteredSlabs
-                    .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-                    .map((item) => (
-                      <MobileSlabCard
-                        key={item.id}
-                        slab={item}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={[styles.tableCard, { width: "100%" }]}>
+                    <View style={{ width: "100%", minWidth: 880 }}>
+                      <View style={styles.tableHeader}>
+                        <Text style={[styles.th, { flex: 1.5, minWidth: 140 }]}>Weight Slab</Text>
+                        <Text style={[styles.th, { flex: 1.5, minWidth: 160 }]}>Weight Range</Text>
+                        <Text style={[styles.th, { flex: 1, minWidth: 120 }]}>Intra-City (₹)</Text>
+                        <Text style={[styles.th, { flex: 1, minWidth: 120 }]}>Metro-Metro (₹)</Text>
+                        <Text style={[styles.th, { flex: 1.2, minWidth: 130 }]}>Type</Text>
+                        <Text style={[styles.th, { flex: 1, minWidth: 90 }]}>Status</Text>
+                        <Text style={[styles.th, { flex: 1, minWidth: 120, textAlign: "center" }]}>Action</Text>
+                      </View>
+                      {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((slab, idx) => (
+                        <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
+                          <Text style={[styles.td, { flex: 1.5, minWidth: 140, fontWeight: "700", color: T.textH }]}>{slab.label}</Text>
+                          <Text style={[styles.td, { flex: 1.5, minWidth: 160 }]}>{slab.range}</Text>
+                          <Text style={[styles.td, { flex: 1, minWidth: 120, color: T.orange, fontWeight: "700" }]}>{slab.intracity}</Text>
+                          <Text style={[styles.td, { flex: 1, minWidth: 120, color: T.navy, fontWeight: "700" }]}>{slab.metroMetro}</Text>
+                          <View style={{ flex: 1.2, minWidth: 130 }}>
+                            <FixedRateBadge custom={slab.isCustom} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 90 }}>
+                            <StatusBadge status={slab.status} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 120, flexDirection: "row", justifyContent: "center", gap: 6 }}>
+                            <TouchableOpacity style={dc.actBtn} onPress={() => handleEdit(slab.id)}>
+                              <Feather name="edit-2" size={13} color={T.textM} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[dc.actBtn, { borderColor: "#FCA5A5" }]} onPress={() => handleDelete(slab.id)}>
+                              <Feather name="trash-2" size={13} color={T.red} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </ScrollView>
               )}
 
               {filteredSlabs.length > 0 && (
@@ -1179,7 +1203,7 @@ const DeliveryChargesScreen: React.FC = () => {
           onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
         >
           <Feather name="plus" size={15} color="#1E2B6B" />
-          <Text style={styles.addBtnWhiteTxt}>Add New Charge</Text>
+          <Text style={styles.addBtnWhiteTxt}>Add New </Text>
         </TouchableOpacity>
       </View>
 
@@ -1264,31 +1288,31 @@ const DeliveryChargesScreen: React.FC = () => {
             ))}
           </View>
         ) : (
-          <View style={[styles.tableCard, { width: "75%" }]}>
+          <View style={[styles.tableCard, { width: "100%" }]}>
             <View style={[{ width: "100%", overflowX: "auto" } as any]}>
-              <View style={{ minWidth: 880 }}>
+              <View style={{ width: "100%", minWidth: 880 }}>
                 <View style={styles.tableHeader}>
-                  <Text style={[styles.th, { width: 140 }]}>Weight Slab</Text>
-                  <Text style={[styles.th, { width: 160 }]}>Weight Range</Text>
-                  <Text style={[styles.th, { width: 120 }]}>Intra-City (₹)</Text>
-                  <Text style={[styles.th, { width: 120 }]}>Metro-Metro (₹)</Text>
-                  <Text style={[styles.th, { width: 130 }]}>Type</Text>
-                  <Text style={[styles.th, { width: 90 }]}>Status</Text>
-                  <Text style={[styles.th, { width: 120, textAlign: "center" }]}>Action</Text>
+                  <Text style={[styles.th, { flex: 1.5, minWidth: 140 }]}>Weight Slab</Text>
+                  <Text style={[styles.th, { flex: 1.5, minWidth: 160 }]}>Weight Range</Text>
+                  <Text style={[styles.th, { flex: 1, minWidth: 120 }]}>Intra-City (₹)</Text>
+                  <Text style={[styles.th, { flex: 1, minWidth: 120 }]}>Metro-Metro (₹)</Text>
+                  <Text style={[styles.th, { flex: 1.2, minWidth: 130 }]}>Type</Text>
+                  <Text style={[styles.th, { flex: 1, minWidth: 90 }]}>Status</Text>
+                  <Text style={[styles.th, { flex: 1, minWidth: 120, textAlign: "center" }]}>Action</Text>
                 </View>
                 {filteredSlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((slab, idx) => (
                   <View key={slab.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
-                    <Text style={[styles.td, { width: 140, fontWeight: "700", color: T.textH }]}>{slab.label}</Text>
-                    <Text style={[styles.td, { width: 160 }]}>{slab.range}</Text>
-                    <Text style={[styles.td, { width: 120, color: T.orange, fontWeight: "700" }]}>{slab.intracity}</Text>
-                    <Text style={[styles.td, { width: 120, color: T.navy, fontWeight: "700" }]}>{slab.metroMetro}</Text>
-                    <View style={{ width: 130 }}>
+                    <Text style={[styles.td, { flex: 1.5, minWidth: 140, fontWeight: "700", color: T.textH }]}>{slab.label}</Text>
+                    <Text style={[styles.td, { flex: 1.5, minWidth: 160 }]}>{slab.range}</Text>
+                    <Text style={[styles.td, { flex: 1, minWidth: 120, color: T.orange, fontWeight: "700" }]}>{slab.intracity}</Text>
+                    <Text style={[styles.td, { flex: 1, minWidth: 120, color: T.navy, fontWeight: "700" }]}>{slab.metroMetro}</Text>
+                    <View style={{ flex: 1.2, minWidth: 130 }}>
                       <FixedRateBadge custom={slab.isCustom} />
                     </View>
-                    <View style={{ width: 90 }}>
+                    <View style={{ flex: 1, minWidth: 90 }}>
                       <StatusBadge status={slab.status} />
                     </View>
-                    <View style={{ width: 120, flexDirection: "row", justifyContent: "center", gap: 6 }}>
+                    <View style={{ flex: 1, minWidth: 120, flexDirection: "row", justifyContent: "center", gap: 6 }}>
                       <TouchableOpacity style={dc.actBtn} onPress={() => handleEdit(slab.id)}>
                         <Feather name="edit-2" size={13} color={T.textM} />
                       </TouchableOpacity>

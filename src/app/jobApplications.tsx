@@ -369,23 +369,25 @@ export default function JobApplicationsScreen() {
 
           {/* ── Stat Cards ── */}
           {isWeb ? (
-            <ScrollView
-              style={{ zIndex: 10, elevation: 10, marginTop: -42, overflow: 'visible' }}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.statRowWeb}
-            >
-              {STAT_CARDS.map(s => (
-                <StatCard
-                  key={s.key}
-                  label={s.label}
-                  count={counts[s.key] ?? 0}
-                  color={s.color}
-                  icon={s.icon}
-                  isWeb={isWeb}
-                />
-              ))}
-            </ScrollView>
+            <View style={{ width: '100%', alignItems: 'center', zIndex: 10, elevation: 10, marginTop: -42 }}>
+              <ScrollView
+                style={{ overflow: 'visible', maxWidth: '100%' }}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.statRowWeb}
+              >
+                {STAT_CARDS.map(s => (
+                  <StatCard
+                    key={s.key}
+                    label={s.label}
+                    count={counts[s.key] ?? 0}
+                    color={s.color}
+                    icon={s.icon}
+                    isWeb={isWeb}
+                  />
+                ))}
+              </ScrollView>
+            </View>
           ) : (
             <View style={{ zIndex: 10, elevation: 10, marginTop: -32, paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
               {STAT_CARDS.map(s => (
@@ -577,10 +579,13 @@ const styles = StyleSheet.create({
   },
   statRowWeb: {
     paddingHorizontal: 28,
+    flexDirection: 'row',
     flexWrap: 'nowrap',
     maxWidth: 1000,
     alignSelf: 'center',
-    width: '100%',
+    flexGrow: 1,
+    gap: 16,
+    justifyContent: 'center',
   },
   statCard: {
     backgroundColor: C.white,
@@ -637,6 +642,7 @@ const styles = StyleSheet.create({
     gap: 12,
     zIndex: 1000,
     elevation: 1000,
+    marginTop: 24,
   },
   searchBox: {
     flexDirection: 'row',

@@ -1645,12 +1645,8 @@ const MobileProductsScreen: React.FC = () => {
     const currentSortOption = SORT_OPTIONS.find(o => o.value === sortBy);
 
 
-
-    return (
-        <AdminLayout>
-        <SafeAreaView style={s.root}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
-
+    const headerAndMobileActions = (
+        <>
             {/* Header */}
             {showSearch ? (
                 <View style={s.headerWrapper}>
@@ -1702,8 +1698,18 @@ const MobileProductsScreen: React.FC = () => {
                     </TouchableOpacity>
                 </View>
             )}
+        </>
+    );
+
+    return (
+        <AdminLayout>
+        <SafeAreaView style={s.root}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyDeep} />
+
+            {isWeb && headerAndMobileActions}
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                {!isWeb && headerAndMobileActions}
                 {error ? (
                     <View style={{ marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
                         <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
