@@ -12,7 +12,7 @@
 
 import AdminLayout from "@/components/admin-layout";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -174,12 +174,72 @@ const StatusDropdown = ({
   onChange: (v: "Active" | "Inactive") => void;
 }) => {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = useWindowDimensions();
+  const isMobile = screenW < 768;
+
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        setMenuPosition({ top: pageY + height, left: pageX, width });
+      });
+    }
+    setOpen((o) => !o);
+  };
+
+  if (!isMobile) {
+    return (
+      <View style={styles.dropdownWrapper}>
+        <TouchableOpacity
+          style={[styles.dropdownBtn, open && styles.dropdownBtnOpen]}
+          onPress={() => setOpen((o) => !o)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.dropdownBtnText}>{value}</Text>
+          <Ionicons
+            name={BI.chevronDown as any}
+            size={18}
+            color={BRAND}
+            style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
+          />
+        </TouchableOpacity>
+
+        {open && (
+          <>
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={() => setOpen(false)}
+              hitSlop={{ top: 600, bottom: 600, left: 600, right: 600 }}
+            />
+            <View style={styles.dropdownList}>
+              {STATUS_OPTIONS.map((opt) => {
+                const isSelected = value === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                    onPress={() => { onChange(opt); setOpen(false); }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.dropdownWrapper}>
+    <View style={styles.dropdownWrapper} ref={triggerRef}>
       <TouchableOpacity
         style={[styles.dropdownBtn, open && styles.dropdownBtnOpen]}
-        onPress={() => setOpen((o) => !o)}
+        onPress={handlePress}
         activeOpacity={0.85}
       >
         <Text style={styles.dropdownBtnText}>{value}</Text>
@@ -191,32 +251,30 @@ const StatusDropdown = ({
         />
       </TouchableOpacity>
 
-      {open && (
-        <>
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={() => setOpen(false)}
-            hitSlop={{ top: 600, bottom: 600, left: 600, right: 600 }}
-          />
-          <View style={styles.dropdownList}>
-            {STATUS_OPTIONS.map((opt) => {
-              const isSelected = value === opt;
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
-                  onPress={() => { onChange(opt); setOpen(false); }}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
-                    {opt}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
+            <View style={[styles.dropdownMenu, { borderColor: BRAND, borderWidth: 1.5, borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
+              {STATUS_OPTIONS.map((opt) => {
+                const isSelected = value === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                    onPress={() => { onChange(opt); setOpen(false); }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        </>
-      )}
+        )}
+      </Modal>
     </View>
   );
 };
@@ -1247,6 +1305,14 @@ const styles = StyleSheet.create({
 
   // Inline Dropdown
   dropdownWrapper: { position: "relative", zIndex: 100 },
+  dropdownOverlay: { position: "absolute", paddingHorizontal: 0, zIndex: 9999 },
+  dropdownMenu: {
+    backgroundColor: "#fff", borderRadius: 12,
+    borderWidth: 1, borderColor: "#e5e7eb",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
+    overflow: "hidden", width: "100%", zIndex: 10000,
+  },
   dropdownBtn: {
     borderWidth: 1.5, borderColor: "#e0e0e0", borderRadius: 8,
     paddingHorizontal: 14, paddingVertical: 11,

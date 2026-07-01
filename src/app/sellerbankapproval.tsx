@@ -460,10 +460,6 @@ export default function BankApproval() {
             <View style={{ backgroundColor: isMobile ? "transparent" : "#fff", paddingHorizontal: isMobile ? 0 : 28, paddingTop: isMobile ? 0 : 20, paddingBottom: isMobile ? 0 : 20, borderBottomWidth: isMobile ? 0 : 1, borderBottomColor: isMobile ? "transparent" : "#f0f2f5", marginBottom: isMobile ? 0 : 0 }}>
               {!isMobile ? (
                 <View style={styles.desktopFilterRow}>
-                  <View style={styles.desktopFilterItem}>
-                    <Text style={styles.desktopFilterLabel}>Status</Text>
-                    <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
-                  </View>
                   {/* <View style={styles.desktopFilterItem}>   */}
                   <View style={[styles.desktopFilterItem, { flexBasis: 600 }]}>
                     <Text style={styles.desktopFilterLabel}>Search</Text>
@@ -477,6 +473,10 @@ export default function BankApproval() {
                       }}
                     />
                   </View>
+                  <View style={styles.desktopFilterItem}>
+                    <Text style={styles.desktopFilterLabel}>Status</Text>
+                    <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+                  </View>
                   <TouchableOpacity style={styles.desktopFilterBtn}>
                     <Text style={styles.desktopFilterBtnText}>Filter</Text>
                   </TouchableOpacity>
@@ -484,10 +484,6 @@ export default function BankApproval() {
               ) : (
                 <View style={{ marginBottom: 14 }}>
                   <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Status</Text>
-                      <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
-                    </View>
                     <View style={{ flex: 2 }}>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Search</Text>
                       <TextInput
@@ -499,6 +495,10 @@ export default function BankApproval() {
                           setCurrentPage(1);
                         }}
                       />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Status</Text>
+                      <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
                     </View>
                   </View>
                   <TouchableOpacity style={[styles.filterBtn, { width: "100%", justifyContent: "center" }]}>

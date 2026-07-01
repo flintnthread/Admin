@@ -391,6 +391,9 @@ function DatePicker({ value, onChange, placeholder }: {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  const { width: screenW } = Dimensions.get("window");
+  const isMobile = screenW < 768;
+
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
@@ -419,12 +422,22 @@ function DatePicker({ value, onChange, placeholder }: {
 
   return (
     <View>
-      <TouchableOpacity onPress={() => setOpen(true)} style={styles.dateInputContainer}>
+      <TouchableOpacity
+        onPress={() => setOpen(true)}
+        style={[
+          styles.dateInputContainer,
+          isMobile && { paddingHorizontal: 6, paddingVertical: 8 }
+        ]}
+      >
         <TextInput
           value={value} editable={false} placeholder={placeholder}
-          placeholderTextColor="#94A3B8" style={styles.dateInput}
+          placeholderTextColor="#94A3B8"
+          style={[
+            styles.dateInput,
+            isMobile && { fontSize: 11 }
+          ]}
         />
-        <Ionicons name="calendar" size={16} color="#64748B" />
+        <Ionicons name="calendar" size={isMobile ? 13 : 16} color="#64748B" />
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -1884,7 +1897,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, borderRadius: 8,
     backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 9,
   },
-  dateInput: { flex: 1, fontSize: 13, color: "#374151", outlineStyle: "none" } as any,
+  dateInput: { flex: 1, fontSize: 13, color: "#374151", outlineStyle: "none", padding: 0 } as any,
 
   /* DatePicker Modal */
   datePickerOverlay: {
