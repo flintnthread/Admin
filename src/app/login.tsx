@@ -213,7 +213,7 @@ function MobileLoginScreen() {
                     style={stylesMobile.eyeButton}
                   >
                     <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      name={showPassword ? "eye-outline" : "eye-off-outline"}
                       size={22}
                       color="#55657E"
                     />
@@ -493,7 +493,7 @@ function WebLoginScreen() {
                       style={stylesWeb.webEyeButton}
                     >
                       <Ionicons
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        name={showPassword ? "eye-outline" : "eye-off-outline"}
                         size={22}
                         color="#6B7280"
                       />

@@ -12,10 +12,11 @@
 //   Then replace the two import lines below accordingly.
 
 import AdminLayout from "@/components/admin-layout";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Dimensions,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +28,15 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  createSize,
+  deleteSize,
+  fetchSizes,
+  updateSize,
+  type CatalogSize,
+} from "@/services/sizeApi";
 
 // ── Linear Gradient ──────────────────────────────────────────
 // Expo:  import { LinearGradient } from "expo-linear-gradient";
@@ -74,80 +84,15 @@ interface SizeItem {
   status: "Active" | "Inactive";
 }
 
-const INITIAL_SIZES: SizeItem[] = [
-  { id: 53, name: "1 Seater", code: "1 Seater", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 40, name: "1 Year", code: "1Y", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 38, name: "10", code: "10", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 73, name: "10–11 Years", code: "10–11Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 39, name: "11", code: "11", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 74, name: "11–12 Years", code: "11–12Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 49, name: "12", code: "X-Small Choker", createdDate: "09 Dec, 2025", status: "Active" },
-  { id: 41, name: "12-18 Months", code: "12-18M", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 75, name: "12–13 Years", code: "12–13Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 76, name: "13–14 Years", code: "13–14Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 77, name: "14–15 Years", code: "14–15Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 78, name: "15–16 Years", code: "15–16Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 79, name: "16–17 Years", code: "16–17Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 80, name: "17–18 Years", code: "17–18Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 81, name: "2 Seater", code: "2 Seater", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 42, name: "2 Years", code: "2Y", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 43, name: "3 Years", code: "3Y", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 44, name: "3-6 Months", code: "3-6M", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 45, name: "4 Years", code: "4Y", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 46, name: "5 Years", code: "5Y", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 47, name: "6-12 Months", code: "6-12M", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 48, name: "6 Years", code: "6Y", createdDate: "02 Dec, 2025", status: "Active" },
-  { id: 82, name: "7 Years", code: "7Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 83, name: "8 Years", code: "8Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 84, name: "9 Years", code: "9Y", createdDate: "04 May, 2026", status: "Active" },
-  { id: 85, name: "Free Size", code: "FREE", createdDate: "04 May, 2026", status: "Active" },
-  { id: 86, name: "L", code: "L", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 87, name: "M", code: "M", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 88, name: "S", code: "S", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 89, name: "XL", code: "XL", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 90, name: "XS", code: "XS", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 91, name: "XXL", code: "XXL", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 92, name: "XXXL", code: "XXXL", createdDate: "29 Nov, 2025", status: "Active" },
-  { id: 93, name: "4 Seater", code: "4 Seater", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 94, name: "6 Seater", code: "6 Seater", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 95, name: "King", code: "KING", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 96, name: "Queen", code: "QUEEN", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 97, name: "Single", code: "SINGLE", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 98, name: "Double", code: "DOUBLE", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 99, name: "Twin", code: "TWIN", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 100, name: "Standard", code: "STD", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 101, name: "Mini", code: "MINI", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 102, name: "Maxi", code: "MAXI", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 103, name: "Micro", code: "MICRO", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 104, name: "Petite", code: "PETITE", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 105, name: "Plus", code: "PLUS", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 106, name: "Tall", code: "TALL", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 107, name: "Short", code: "SHORT", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 108, name: "Regular", code: "REG", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 109, name: "Slim", code: "SLIM", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 110, name: "Wide", code: "WIDE", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 111, name: "Narrow", code: "NARROW", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 112, name: "Oversized", code: "OVER", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 113, name: "Cropped", code: "CROP", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 114, name: "Full Length", code: "FULL", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 115, name: "Half Sleeve", code: "HALF", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 116, name: "Full Sleeve", code: "FSLEEVE", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 117, name: "Sleeveless", code: "SLS", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 118, name: "Knee Length", code: "KNEE", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 119, name: "Midi", code: "MIDI", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 120, name: "Maxi Length", code: "MAXIL", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 121, name: "Mini Length", code: "MINIL", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 122, name: "36", code: "36", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 123, name: "38", code: "38", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 124, name: "40", code: "40", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 125, name: "42", code: "42", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 126, name: "44", code: "44", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 127, name: "46", code: "46", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 128, name: "48", code: "48", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 129, name: "50", code: "50", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 130, name: "52", code: "52", createdDate: "22 Jan, 2026", status: "Active" },
-  { id: 131, name: "54", code: "54", createdDate: "22 Jan, 2026", status: "Active" },
-];
+function mapSizeRow(row: CatalogSize): SizeItem {
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    status: row.status,
+    createdDate: row.createdDate ?? todayStr(),
+  };
+}
 
 const PAGE_SIZE = 12;
 
@@ -741,7 +686,10 @@ export default function SizesManagement() {
   const PADDING = 16;
   const GAP = 12;
 
-  const [sizes, setSizes] = useState<SizeItem[]>(INITIAL_SIZES);
+  const [sizes, setSizes] = useState<SizeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -764,18 +712,64 @@ export default function SizesManagement() {
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
 
-  function handleAdd(d: { name: string; code: string; status: "Active" | "Inactive" }) {
-    const newId = Math.max(...sizes.map(s => s.id)) + 1;
-    setSizes(prev => [...prev, { id: newId, ...d, createdDate: todayStr() }]);
+  const loadSizes = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchSizes();
+      setSizes(rows.map(mapSizeRow));
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error, "Failed to load sizes."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSizes();
+  }, [loadSizes]);
+
+  async function handleAdd(d: { name: string; code: string; status: "Active" | "Inactive" }) {
+    setSaving(true);
+    try {
+      const created = await createSize(d);
+      setSizes((prev) => [...prev, mapSizeRow(created)]);
+      setModal(null);
+    } catch (error) {
+      Alert.alert("Error", getApiErrorMessage(error, "Could not add size."));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleUpdate(updated: SizeItem) {
-    setSizes(prev => prev.map(s => s.id === updated.id ? updated : s));
+  async function handleUpdate(updated: SizeItem) {
+    setSaving(true);
+    try {
+      const saved = await updateSize(updated.id, {
+        name: updated.name,
+        code: updated.code,
+        status: updated.status,
+      });
+      setSizes((prev) => prev.map((s) => (s.id === updated.id ? mapSizeRow(saved) : s)));
+      setModal(null);
+    } catch (error) {
+      Alert.alert("Error", getApiErrorMessage(error, "Could not update size."));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleDelete(id: number) {
-    setSizes(prev => prev.filter(s => s.id !== id));
-    setModal(null);
+  async function handleDelete(id: number) {
+    setSaving(true);
+    try {
+      await deleteSize(id);
+      setSizes((prev) => prev.filter((s) => s.id !== id));
+      setModal(null);
+    } catch (error) {
+      Alert.alert("Error", getApiErrorMessage(error, "Could not delete size."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ── Footer shared between both views
@@ -793,140 +787,132 @@ export default function SizesManagement() {
 
   return (
     <AdminLayout>
-      <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
-        <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1, minHeight: Dimensions.get('window').height }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+          <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
-        {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}
-        <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
-          <View style={S.headerIconBox}>
-            <BI name="grid-3x3" size={18} color="#fff" />
-          </View>
-          <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
-            <Text style={S.webPageTitle}>{isMobile ? "Sizes" : "Sizes Management"}</Text>
-            {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
-          </View>
-          <TouchableOpacity 
-            style={[S.addBtn, isMobile && S.addBtnMobile]} 
-            onPress={() => setModal({ type: "add" })}
-          >
-            <BI name="plus-lg" size={15} color="#fff" />
-            {!isMobile && <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>}
-          </TouchableOpacity>
-        </View>
-
-        {/* ── CONTROL BAR ── */}
-        <View style={[S.controlBar, { marginHorizontal: PADDING }]}>
-          <View style={S.searchBox}>
-            {/* Bootstrap: search */}
-            <BI name="search" size={15} color="#aaa" />
-            <TextInput
-              style={S.searchInput}
-              value={search}
-              onChangeText={handleSearch}
-              placeholder="Search sizes..."
-              placeholderTextColor="#bbb"
-            />
-            {!!search && (
-              <TouchableOpacity onPress={() => handleSearch("")}>
-                {/* Bootstrap: x-lg */}
-                <BI name="x-lg" size={13} color="#aaa" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={S.viewToggle}>
-            {/* Bootstrap: grid (grid view) */}
+          {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}
+          <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
+            <View style={S.headerIconBox}>
+              <BI name="grid-3x3" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
+              <Text style={S.webPageTitle}>{isMobile ? "Sizes" : "Sizes Management"}</Text>
+              {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+            </View>
             <TouchableOpacity
-              style={[S.viewBtn, view === "grid" && S.viewBtnActive]}
-              onPress={() => setView("grid")}
+              style={[S.addBtn, isMobile && S.addBtnMobile]}
+              onPress={() => setModal({ type: "add" })}
             >
-              <BI name="grid" size={17} color={view === "grid" ? "#fff" : "#666"} />
-            </TouchableOpacity>
-            {/* Bootstrap: list-ul (list view) */}
-            <TouchableOpacity
-              style={[S.viewBtn, view === "list" && S.viewBtnActive]}
-              onPress={() => setView("list")}
-            >
-              <BI name="list-ul" size={17} color={view === "list" ? "#fff" : "#666"} />
+              <BI name="plus-lg" size={15} color="#fff" />
+              {!isMobile && <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>}
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* ── GRID VIEW ── */}
-        {view === "grid" ? (
-          <FlatList
-            key={`grid-${numCols}`}
-            data={paginated}
-            keyExtractor={item => String(item.id)}
-            numColumns={numCols}
-            renderItem={({ item, index }) => (
-              <GridCard
-                item={item}
-                idx={(safePage - 1) * PAGE_SIZE + index}
-                onEdit={s => setModal({ type: "edit", size: s })}
-                onDelete={s => setModal({ type: "delete", size: s })}
-                cardWidth={cardWidth}
+          {/* ── CONTROL BAR ── */}
+          {loadError ? (
+            <Text style={{ color: "#dc2626", marginHorizontal: PADDING, marginTop: 12 }}>{loadError}</Text>
+          ) : null}
+          {loading ? (
+            <View style={{ padding: 24, alignItems: "center" }}>
+              <ActivityIndicator size="large" color="#8b3e0f" />
+            </View>
+          ) : null}
+          <View style={[S.controlBar, { marginHorizontal: PADDING }]}>
+            <View style={S.searchBox}>
+              {/* Bootstrap: search */}
+              <BI name="search" size={15} color="#aaa" />
+              <TextInput
+                style={S.searchInput}
+                value={search}
+                onChangeText={handleSearch}
+                placeholder="Search sizes..."
+                placeholderTextColor="#bbb"
               />
-            )}
-            contentContainerStyle={{
+              {!!search && (
+                <TouchableOpacity onPress={() => handleSearch("")}>
+                  {/* Bootstrap: x-lg */}
+                  <BI name="x-lg" size={13} color="#aaa" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={S.viewToggle}>
+              {/* Bootstrap: grid (grid view) */}
+              <TouchableOpacity
+                style={[S.viewBtn, view === "grid" && S.viewBtnActive]}
+                onPress={() => setView("grid")}
+              >
+                <BI name="grid" size={17} color={view === "grid" ? "#fff" : "#666"} />
+              </TouchableOpacity>
+              {/* Bootstrap: list-ul (list view) */}
+              <TouchableOpacity
+                style={[S.viewBtn, view === "list" && S.viewBtnActive]}
+                onPress={() => setView("list")}
+              >
+                <BI name="list-ul" size={17} color={view === "list" ? "#fff" : "#666"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── LIST / GRID ── */}
+          {paginated.length === 0 ? (
+            <View style={S.emptyBox}>
+              <BI name="search" size={40} color="#ccc" />
+              <Text style={S.emptyText}>No sizes found</Text>
+            </View>
+          ) : view === "grid" ? (
+            <View style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
               paddingHorizontal: PADDING,
               paddingTop: 12,
               paddingBottom: 24,
-              gap: GAP,
-            }}
-            columnWrapperStyle={{ gap: GAP }}
-            ListEmptyComponent={
-              <View style={S.emptyBox}>
-                {/* Bootstrap: search (empty state) */}
-                <BI name="search" size={40} color="#ccc" />
-                <Text style={S.emptyText}>No sizes found</Text>
-              </View>
-            }
-            ListFooterComponent={Footer}
-          />
-        ) : (
-          /* ── LIST VIEW ── */
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ width: Math.max(containerWidth, 800) }}>
-              <FlatList
-                key="list"
-                data={paginated}
-                keyExtractor={item => String(item.id)}
-                ListHeaderComponent={
-                  <View style={{ paddingHorizontal: PADDING }}>
-                    <View style={S.listHeader}>
-                      <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                      <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
-                      <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
-                    </View>
+              marginHorizontal: -GAP / 2
+            }}>
+              {paginated.map((item, index) => (
+                <View key={item.id} style={{ paddingHorizontal: GAP / 2, paddingBottom: GAP }}>
+                  <GridCard
+                    item={item}
+                    idx={(safePage - 1) * PAGE_SIZE + index}
+                    onEdit={s => setModal({ type: "edit", size: s })}
+                    onDelete={s => setModal({ type: "delete", size: s })}
+                    cardWidth={cardWidth}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ width: Math.max(containerWidth, 800) }}>
+                <View style={{ paddingHorizontal: PADDING, paddingTop: 12 }}>
+                  <View style={S.listHeader}>
+                    <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
+                    <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
+                    <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                    <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
+                    <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
+                    <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
                   </View>
-                }
-                renderItem={({ item, index }) => (
-                  <View style={{ paddingHorizontal: PADDING }}>
+                </View>
+                <View style={{ paddingHorizontal: PADDING, paddingBottom: 24 }}>
+                  {paginated.map((item, index) => (
                     <ListRow
+                      key={item.id}
                       item={item}
                       idx={index}
                       onEdit={s => setModal({ type: "edit", size: s })}
                       onDelete={s => setModal({ type: "delete", size: s })}
                     />
-                  </View>
-                )}
-                ListEmptyComponent={
-                  <View style={S.emptyBox}>
-                    <BI name="search" size={40} color="#ccc" />
-                    <Text style={S.emptyText}>No sizes found</Text>
-                  </View>
-                }
-                ListFooterComponent={Footer}
-                contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
-              />
-            </View>
-          </ScrollView>
-        )}
-      </View>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+          )}
+
+          {Footer}
+        </View>
+      </ScrollView>
 
       {/* ── MODALS ── */}
       <AddSizeModal
@@ -959,7 +945,7 @@ const S = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: "#1d324e",
+    backgroundColor: "#151D4F",
     borderRadius: 12,
     marginHorizontal: 16,
     marginTop: 16,
@@ -1060,11 +1046,11 @@ const S = StyleSheet.create({
 
   // List view
   listHeader: {
-    flexDirection: "row", backgroundColor: "#fff8f2",
+    flexDirection: "row", backgroundColor: "#151D4F",
     paddingHorizontal: 12, paddingVertical: 12,
     borderBottomWidth: 1.5, borderBottomColor: "#f0e8e0",
   },
-  listHeaderCell: { fontSize: 13, fontWeight: "600", color: "#555" },
+  listHeaderCell: { fontSize: 13, fontWeight: "600", color: "#fff" },
   listRow: {
     flexDirection: "row", paddingHorizontal: 12, paddingVertical: 13,
     borderBottomWidth: 1, borderBottomColor: "#f5f0eb", alignItems: "center",

@@ -18,6 +18,7 @@ import {
   useWindowDimensions
 } from "react-native";
 
+
 type BankRow = Omit<ReturnType<typeof mapBankPendingRow>, "status" | "statusLabel"> & {
   status: "pending" | "approved" | "not_requested";
   statusLabel: string;
@@ -101,6 +102,8 @@ const MOCK_EXTRA_SELLERS: BankRow[] = [
     adminApprove: "—",
   }
 ];
+
+const BLUE = "#2563EB";
 
 const STAT_DEFS = [
   { icon: "people", label: "Total Sellers", key: "total", sub: "Bank submissions", color: "#FF6B35", bg: "#FFF3EE" },
@@ -272,8 +275,7 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 // }, []);
 export default function BankApproval() {
   const router = useRouter();
-  const [activeNav, setActiveNav] = useState("Pending Sellers");
-  const [activeTab, setActiveTab] = useState("Dashboard");
+
 
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -283,22 +285,20 @@ export default function BankApproval() {
   const [statusFilter, setStatusFilter] = useState("All");
   const STATUS_OPTIONS = ["All", "Pending", "Approved", "Not Requested"];
   const [sellers, setSellers] = useState<BankRow[]>([]);
-  const [bankStats, setBankStats] = useState<Record<string, number>>({});
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
-      const [pendingRes, statsRes] = await Promise.all([
+      const [pendingRes] = await Promise.all([
         fetchPendingBankSellers(0, 200),
         fetchBankStats(),
       ]);
       setSellers([...(pendingRes?.items ?? []).map(mapBankPendingRow), ...MOCK_EXTRA_SELLERS]);
-      setBankStats(statsRes ?? {});
     } catch (e) {
       setLoadError(getApiErrorMessage(e));
       setSellers([...MOCK_EXTRA_SELLERS]);
-      setBankStats({});
     }
   }, []);
 
@@ -478,7 +478,7 @@ export default function BankApproval() {
                     <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
                   </View>
                   <TouchableOpacity style={styles.desktopFilterBtn}>
-                    <Text style={styles.desktopFilterBtnText}>Filter</Text>
+                    <Text style={styles.desktopFilterBtnText}>Apply</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -488,7 +488,7 @@ export default function BankApproval() {
                       <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Search</Text>
                       <TextInput
                         style={[styles.searchInput, { paddingRight: 36, fontSize: 12 }]}
-                        placeholder="Seller name / email / mobile / business"
+                        placeholder="Search..."
                         value={searchQuery}
                         onChangeText={(text) => {
                           setSearchQuery(text);
@@ -502,7 +502,7 @@ export default function BankApproval() {
                     </View>
                   </View>
                   <TouchableOpacity style={[styles.filterBtn, { width: "100%", justifyContent: "center" }]}>
-                    <Text style={styles.filterBtnText}>Filter</Text>
+                    <Text style={styles.filterBtnText}>Apply</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -550,17 +550,25 @@ export default function BankApproval() {
                 </View>
                 {pagedSellers.map((s, i) => (
                   <View key={startIndex + i} style={styles.tableRow}>
-                    <Text style={[styles.tableCell, { color: "#555", fontWeight: "600", flex: 0.4 }]}>{s.id}</Text>
-                    <View style={[styles.tableCell, { flex: 1.5 }]}>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(s.sellerId) } })}
+                      style={{ flex: 0.4, justifyContent: "center" }}
+                    >
+                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingHorizontal: 12 }]}>{s.id}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(s.sellerId) } })}
+                      style={[styles.tableCell, { flex: 1.5, justifyContent: "center" }]}
+                    >
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                         <Avatar initials={s.initials} color={s.color} />
                         <View>
-                          <Text style={{ fontWeight: "600", color: "#1a2332", fontSize: 12 }}>{s.name}</Text>
+                          <Text style={{ fontWeight: "600", color: BLUE, fontSize: 12 }}>{s.name}</Text>
                           <Text style={{ color: "#888", fontSize: 11 }}>{s.email}</Text>
                           <Text style={{ color: "#888", fontSize: 11 }}>{s.phone}</Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                     <Text style={[styles.tableCell, { fontWeight: "600", fontSize: 11, flex: 1.0 }]}>{s.business}</Text>
                     <View style={[styles.tableCell, { flex: 0.6 }]}><StatusBadge status={s.status} label={s.statusLabel} /></View>
                     <View style={[styles.tableCell, { flex: 1.0 }]}>
@@ -614,12 +622,20 @@ export default function BankApproval() {
                 return (
                   <View style={styles.mobileSellerCard} key={i}>
                     <View style={{ flexDirection: "row", gap: 12, marginBottom: 10 }}>
-                      <Avatar initials={s.initials} color={s.color} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "700", fontSize: 14, color: "#1a2332" }}>{s.name}</Text>
-                        <Text style={{ fontSize: 11.5, color: "#888" }}>{s.email}</Text>
-                        <Text style={{ fontSize: 11.5, color: "#888" }}>{s.phone}</Text>
-                      </View>
+                      <TouchableOpacity
+                        onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(s.sellerId) } })}
+                        style={{ flexDirection: "row", gap: 12, flex: 1 }}
+                      >
+                        <Avatar initials={s.initials} color={s.color} />
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Text style={{ fontWeight: "700", fontSize: 14, color: BLUE }}>{s.name}</Text>
+                            <Text style={{ fontSize: 11.5, color: "#888", fontWeight: "600" }}>#{s.sellerId}</Text>
+                          </View>
+                          <Text style={{ fontSize: 11.5, color: "#888" }}>{s.email}</Text>
+                          <Text style={{ fontSize: 11.5, color: "#888" }}>{s.phone}</Text>
+                        </View>
+                      </TouchableOpacity>
                       <TouchableOpacity style={{ borderWidth: 1.5, borderColor: "#FF6B35", backgroundColor: "#fff", borderRadius: 7, padding: 5, flexDirection: "row", alignItems: "center", gap: 4 }} onPress={() => router.push({ pathname: '/viewbankdetails', params: { sellerId: String(s.sellerId) } })}>
                         <Text style={{ color: "#FF6B35", fontWeight: "600", fontSize: 12 }}>View</Text>
                       </TouchableOpacity>
@@ -741,7 +757,7 @@ const styles = StyleSheet.create({
 
   /* Desktop Header Styles */
   desktopHeader: {
-    backgroundColor: "#1d324e",
+    backgroundColor: "#151D4F",
     paddingHorizontal: 32,
     paddingTop: 24,
     paddingBottom: 64,

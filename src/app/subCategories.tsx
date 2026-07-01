@@ -28,7 +28,8 @@ import {
   type MaterialSlab,
 } from "@/services/subcategoryApi";
 import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
-import { resolveMediaUrl } from "@/lib/api/media";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
 
@@ -38,7 +39,7 @@ const C = {
   surface: "#FFFFFF",
   primary: "#ef7b1a",
   primaryLight: "#FFF0EA",
-  navy: "#1d324e",
+  navy: "#151D4F",
   navyLight: "#e8ecf2",
   text: "#1C2B4A",
   sub: "#6B7280",
@@ -253,6 +254,24 @@ const UploadIcon = () => (
     />
   </Svg>
 );
+const RefreshIcon = ({ color = C.navy }: { color?: string }) => (
+  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M1 4v6h6"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M3.51 15a9 9 0 1 0 .49-4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
 const DownloadIcon = () => (
   <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
     <Path
@@ -367,29 +386,38 @@ const Dropdown = ({
   options,
   onChange,
   style,
+  bottomSheet = true,
 }: {
   value: string;
   placeholder: string;
   options: string[] | { label: string; value: string }[];
   onChange: (v: string) => void;
   style?: any;
+  bottomSheet?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuLayout, setMenuLayout] = useState({ x: 0, y: 0, width: 0 });
+  const triggerRef = useRef<View>(null);
 
   // Handle both string options and object options with label/value
   const getOptionLabel = (opt: any) => typeof opt === 'string' ? opt : opt.label;
   const getOptionValue = (opt: any) => typeof opt === 'string' ? opt : opt.value;
 
   return (
-    <View style={[S.ddWrap, style]}>
+    <View style={[S.ddWrap, style, open && { zIndex: 50 }]}>
       <TouchableOpacity
+        ref={triggerRef as any}
         style={[S.ddTrigger, open && S.ddTriggerOpen]}
-        onPress={() => setOpen(!open)}
-        onLayout={(e) => {
-          const { x, y, width, height } = e.nativeEvent.layout;
-          setMenuLayout({ x, y: y + height, width });
+        onPress={() => {
+          if (!open && triggerRef.current) {
+            triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+              setMenuLayout({ x: pageX, y: pageY + height, width });
+              setOpen(true);
+            });
+          } else {
+            setOpen(!open);
+          }
         }}
       >
         <Text style={[S.ddVal, !value && S.ddPh]} numberOfLines={1}>
@@ -397,93 +425,113 @@ const Dropdown = ({
         </Text>
         <ChevronDownIcon color={open ? C.navy : C.sub} />
       </TouchableOpacity>
-      {/* Mobile: inline expanding list */}
-      {!isWeb && open && (
-        <View style={S.ddPortalMenu}>
-          {options.map((opt: any) => {
-            const optValue = getOptionValue(opt);
-            const optLabel = getOptionLabel(opt);
-            return (
-              <TouchableOpacity
-                key={optValue}
-                style={[S.ddItem, value === optValue && S.ddItemActive]}
-                onPress={() => {
-                  onChange(optValue);
-                  setOpen(false);
-                }}
-              >
-                <Text style={[S.ddItemText, value === optValue && S.ddItemTextActive]}>
-                  {optLabel}
-                </Text>
-                {value === optValue && <View style={S.ddCheckDot} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
 
-      {/* Web: portal modal so menu floats above overflow:hidden containers */}
-      {isWeb && (
-        <Modal
-          visible={open}
-          transparent
-          animationType="none"
-          onRequestClose={() => setOpen(false)}
+      {/* Portal modal so menu floats perfectly on both Web and Mobile without getting clipped by touch bounds */}
+      <Modal
+        visible={open}
+        transparent
+        animationType={isWeb ? "none" : (bottomSheet ? "slide" : "none")}
+        onRequestClose={() => setOpen(false)}
+      >
+        <TouchableOpacity
+          style={S.ddBackdrop}
+          activeOpacity={1}
+          onPress={() => setOpen(false)}
+        />
+        <View
+          style={[
+            S.ddPortalMenu,
+            isWeb ? {
+              position: "absolute",
+              top: menuLayout.y,
+              left: menuLayout.x,
+              width: menuLayout.width,
+            } : bottomSheet ? {
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingBottom: 24,
+              paddingTop: 8,
+              maxHeight: "60%",
+            } : {
+              position: "absolute",
+              top: menuLayout.y,
+              left: menuLayout.x,
+              width: menuLayout.width,
+              minWidth: 180,
+            },
+          ]}
         >
-          <TouchableOpacity
-            style={S.ddBackdrop}
-            activeOpacity={1}
-            onPress={() => setOpen(false)}
-          />
-          <View
-            style={[
-              S.ddPortalMenu,
-              {
-                position: "absolute",
-                top: menuLayout.y,
-                left: menuLayout.x,
-                width: menuLayout.width,
-              },
-            ]}
+          {!isWeb && bottomSheet && (
+            <View style={{ marginBottom: 12, paddingHorizontal: 20, paddingTop: 4, flexDirection: "row", justifyContent: "center", alignItems: "center", position: "relative" }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: "#D1D5DB" }} />
+              <TouchableOpacity onPress={() => setOpen(false)} style={{ position: "absolute", right: 16, top: -4, padding: 8 }}>
+                <XIcon color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+          )}
+          <ScrollView
+            style={isWeb ? { maxHeight: 240 } : undefined}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <ScrollView
-              style={{ maxHeight: 240 }}
-              nestedScrollEnabled
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {options.map((opt: any) => {
-                const optValue = getOptionValue(opt);
-                const optLabel = getOptionLabel(opt);
-                return (
-                  <TouchableOpacity
-                    key={optValue}
-                    style={[
-                      S.ddItem,
-                      value === optValue && S.ddItemActive,
-                      hovered === optValue && S.ddItemHovered,
-                    ]}
-                    onPress={() => {
-                      onChange(optValue);
-                      setOpen(false);
-                      setHovered(null);
-                    }}
-                    onPressIn={() => setHovered(optValue)}
-                    onPressOut={() => setHovered(null)}
-                  >
-                    <Text
-                      style={[S.ddItemText, value === optValue && S.ddItemTextActive]}
+            {options.map((opt: any) => {
+              const optValue = getOptionValue(opt);
+              const optLabel = getOptionLabel(opt);
+              return (
+                <TouchableOpacity
+                  key={optValue}
+                  style={[
+                    S.ddItem,
+                    isWeb && value === optValue && S.ddItemActive,
+                    isWeb && hovered === optValue && S.ddItemHovered,
+                    !isWeb && { justifyContent: "flex-start" }
+                  ]}
+                  onPress={() => {
+                    onChange(optValue);
+                    setOpen(false);
+                    setHovered(null);
+                  }}
+                  onPressIn={() => setHovered(optValue)}
+                  onPressOut={() => setHovered(null)}
+                >
+                  {!isWeb && (
+                    <View
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        borderWidth: 2,
+                        borderColor: value === optValue ? C.primary : "#D1D5DB",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginRight: 12,
+                      }}
                     >
-                      {optLabel}
-                    </Text>
-                    {value === optValue && <View style={S.ddCheckDot} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </Modal>
-      )}
+                      {value === optValue && (
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: C.primary }} />
+                      )}
+                    </View>
+                  )}
+                  <Text
+                    style={[S.ddItemText, value === optValue && S.ddItemTextActive, !isWeb && { flex: 1, color: value === optValue ? C.primary : C.text }]}
+                    numberOfLines={1}
+                  >
+                    {optLabel}
+                  </Text>
+                  {isWeb && value === optValue && <View style={S.ddCheckDot} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -630,7 +678,11 @@ const AddModal = ({
           setCategoryId(editData.categoryId ? editData.categoryId.toString() : "");
         }
         setName(editData.subcategoryName || editData.name || "");
-        setImage(resolveMediaUrl(editData.subcategoryImage || editData.image || "") || null);
+        setImage(
+          pickCategoryImageUrl(editData, "subcategories") ||
+            resolveCatalogMediaUrl(editData.subcategoryImage || editData.image || "", "subcategories") ||
+            null
+        );
         setMaterials(editData.materials || []);
         setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
@@ -826,24 +878,34 @@ const AddModal = ({
                 )}
               </TouchableOpacity>
               {image && (
-                <TouchableOpacity onPress={() => setImage(null)}>
-                  <Text
-                    style={{ fontSize: 12, color: C.inactive, marginTop: 4 }}
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <TouchableOpacity
+                    onPress={pickImage}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.navyLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
                   >
-                    Remove image
-                  </Text>
-                </TouchableOpacity>
+                    <RefreshIcon color={C.navy} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: C.navy }}>Retake</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setImage(null)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.inactiveLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
+                  >
+                    <TrashIcon color={C.inactive} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: C.inactive }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
 
             {/* Materials */}
             <View style={S.fg}>
-              <View style={S.matHeader}>
+              <View style={[S.matHeader, !isWeb && { flexWrap: "wrap", gap: 8 }]}>
                 <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 7 }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 7, flexShrink: 1 }}
                 >
                   <TagIcon />
-                  <Text style={S.fl}>Material type → HSN & Price Slabs</Text>
+                  <Text style={[S.fl, { flexShrink: 1 }]}>Material type → HSN & Price Slabs</Text>
                 </View>
                 <TouchableOpacity style={S.addMatBtn} onPress={addMaterial}>
                   <PlusIcon color="#FFF" />
@@ -877,6 +939,7 @@ const AddModal = ({
                 placeholder="Select Status"
                 options={["Active", "Inactive"]}
                 onChange={setStatus}
+                bottomSheet={false}
               />
             </View>
 
@@ -1017,6 +1080,7 @@ const ListTable = ({
     {/* Header */}
     <View style={S.tHead}>
       <Text style={[S.th, S.cId]}>ID</Text>
+      <Text style={[S.th, S.cImg]}>Image</Text>
       <Text style={[S.th, S.cMain]}>Main Category</Text>
       <Text style={[S.th, S.cCat]}>Category</Text>
       <Text style={[S.th, S.cName]}>Subcategory Name</Text>
@@ -1031,6 +1095,20 @@ const ListTable = ({
         {/* ID */}
         <View style={[S.cell, S.cId]}>
           <Text style={S.tdId}>{item.id}</Text>
+        </View>
+        {/* Image */}
+        <View style={[S.cell, S.cImg]}>
+          {item.image ? (
+            <Image
+              source={{ uri: item.image }}
+              style={S.tableThumb}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={S.tableThumbPlaceholder}>
+              <LayersIcon color={C.navy} />
+            </View>
+          )}
         </View>
         {/* Main Category */}
         <View style={[S.cell, S.cMain]}>
@@ -1110,9 +1188,91 @@ const ListTable = ({
   </View>
 );
 
+// ─── Mobile List Card ─────────────────────────────────────────────────────────
+// Used only on mobile when view === "list"
+const MobileListCard = ({
+  item,
+  onEdit,
+  onDelete,
+}: {
+  item: Subcategory;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => (
+  <View style={S.mlCard}>
+    {/* Top: image + info */}
+    <View style={S.mlCardTop}>
+      <View style={S.mlThumb}>
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={S.mlThumbImg} resizeMode="cover" />
+        ) : (
+          <View style={S.mlThumbPlaceholder}>
+            <LayersIcon color={C.navy} />
+          </View>
+        )}
+      </View>
+      <View style={S.mlInfo}>
+        {/* Breadcrumb */}
+        <View style={S.breadcrumb}>
+          <LayersIcon color={C.sub} />
+          <Text style={S.breadcrumbText} numberOfLines={1}>{item.mainCat}</Text>
+          <Text style={S.breadcrumbSep}>›</Text>
+          <Text style={S.breadcrumbText} numberOfLines={1}>{item.category}</Text>
+        </View>
+        {/* Name + ID */}
+        <View style={S.mlNameRow}>
+          <Text style={S.mlName} numberOfLines={2}>{item.name}</Text>
+          <View style={S.mlIdBadge}>
+            <Text style={S.mlIdText}>#{item.id}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+
+    {/* Materials chips */}
+    {item.materials && item.materials.length > 0 && (
+      <View style={S.mlChips}>
+        {item.materials.map((m, i) => (
+          <View key={i} style={S.mlChip}>
+            <Text style={S.mlChipText}>{m.name}</Text>
+          </View>
+        ))}
+      </View>
+    )}
+
+    {/* Footer: date + status + actions */}
+    <View style={S.mlFooter}>
+      <View style={S.mlFooterLeft}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <CalendarIcon />
+          <Text style={S.cardDate}>{item.created}</Text>
+        </View>
+        <View
+          style={[
+            S.statusBadge,
+            { backgroundColor: item.status === true ? C.activeLight : C.inactiveLight },
+          ]}
+        >
+          <View style={[S.statusDot, { backgroundColor: item.status === true ? C.active : C.inactive }]} />
+          <Text style={[S.statusText, { color: item.status === true ? C.active : C.inactive }]}>
+            {item.status === true ? "Active" : "Inactive"}
+          </Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <TouchableOpacity style={S.editBtn} onPress={onEdit}>
+          <EditIcon />
+        </TouchableOpacity>
+        <TouchableOpacity style={S.deleteBtn} onPress={onDelete}>
+          <TrashIcon />
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+);
 
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function Subcategories() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
@@ -1121,6 +1281,7 @@ export default function Subcategories() {
   const [mainCategories, setMainCategories] = useState<CategoryRow[]>([]);
   const [mainCatOptions, setMainCatOptions] = useState<string[]>(["All"]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [mainCatFilter, setMainCatFilter] = useState("All");
@@ -1136,12 +1297,13 @@ export default function Subcategories() {
   const loadSubcategories = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await fetchSubcategories();
       
       const mapped: Subcategory[] = data.map((row: SubcategoryRow) => {
         const materialSlabsValue = row.materialSlabs ?? row.material_slabs;
         const materials = parseMaterialSlabs(materialSlabsValue);
-        const imageUrl = resolveMediaUrl(row.subcategoryImage || row.mobileImage || "");
+        const imageUrl = pickCategoryImageUrl(row, "subcategories");
 
         return {
           id: row.id,
@@ -1171,8 +1333,10 @@ export default function Subcategories() {
       
       setItems(mapped);
     } catch (error) {
+      const message = getApiErrorMessage(error, "Failed to load subcategories.");
+      setLoadError(message);
       console.error("Failed to load subcategories:", error);
-      Alert.alert("Error", "Failed to load subcategories");
+      Alert.alert("Error", message);
     } finally {
       setLoading(false);
     }
@@ -1259,7 +1423,7 @@ export default function Subcategories() {
           sellerId: newRow.sellerId,
           // UI fields
           name: newRow.subcategoryName,
-          image: newRow.subcategoryImage || newRow.mobileImage,
+          image: pickCategoryImageUrl(newRow, "subcategories") || data.image,
           created: newRow.createdAt ? new Date(newRow.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -1383,21 +1547,30 @@ export default function Subcategories() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header ── */}
-        <View style={S.pageHeader}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <View style={S.pageIconWrap}>
+        <View style={[S.pageHeader, !isWeb && { paddingVertical: 12, marginBottom: 14 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: !isWeb ? 8 : 12, flex: 1, flexShrink: 1 }}>
+            <View style={[S.pageIconWrap, !isWeb && { width: 36, height: 36, borderRadius: 9 }]}>
               <LayersIcon color="#FFF" />
             </View>
-            <View>
-              <Text style={S.pageTitle}>Subcategories</Text>
-              <Text style={S.pageSub}>Manage product subcategories</Text>
+            <View style={{ flex: 1, flexShrink: 1 }}>
+              <Text style={[S.pageTitle, !isWeb && { fontSize: 17 }]} numberOfLines={1}>Subcategories</Text>
+              <Text style={[S.pageSub, !isWeb && { fontSize: 11 }]} numberOfLines={1}>Manage product subcategories</Text>
             </View>
           </View>
-          <TouchableOpacity style={S.exportBtn} onPress={handleExport}>
+          <TouchableOpacity style={[S.exportBtn, !isWeb && { paddingHorizontal: 12, paddingVertical: 10, gap: 0 }]} onPress={handleExport}>
             <DownloadIcon />
-            <Text style={S.exportText}>{isWeb ? "Export CSV" : "CSV"}</Text>
+            {isWeb && <Text style={S.exportText}>Export CSV</Text>}
           </TouchableOpacity>
         </View>
+
+        {loadError ? (
+          <View style={{ marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 8, backgroundColor: "#FEF2F2" }}>
+            <Text style={{ color: "#DC2626", fontSize: 13 }}>{loadError}</Text>
+            <TouchableOpacity onPress={() => void loadSubcategories()} style={{ marginTop: 8 }}>
+              <Text style={{ color: "#1E3A5F", fontWeight: "600", fontSize: 13 }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* ── Toolbar ── */}
         <View style={S.toolbar}>
@@ -1406,7 +1579,7 @@ export default function Subcategories() {
             <SearchIcon />
             <TextInput
               style={S.searchInput}
-              placeholder="Search subcategories..."
+              placeholder="Search subcategories"
               placeholderTextColor="#9CA3AF"
               value={search}
               onChangeText={(t) => {
@@ -1415,33 +1588,35 @@ export default function Subcategories() {
               }}
             />
           </View>
-          <View style={S.toolbarRight}>
-            {/* View Toggle */}
-            <View style={S.viewToggle}>
-              <TouchableOpacity
-                style={[S.vtBtn, view === "grid" && S.vtBtnActive]}
-                onPress={() => setView("grid")}
-              >
-                <GridIcon active={view === "grid"} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[S.vtBtn, view === "list" && S.vtBtnActive]}
-                onPress={() => setView("list")}
-              >
-                <ListIcon active={view === "list"} />
-              </TouchableOpacity>
-            </View>
-            {/* Main Category Filter */}
-            <View style={{ width: isWeb ? 180 : 150 }}>
-              <Dropdown
-                value={mainCatFilter === "All" ? "" : mainCatFilter}
-                placeholder="Main Category"
-                options={mainCatOptions}
-                onChange={(v: string | undefined) => {
-                  setMainCatFilter(v || "All");
-                  setCurrentPage(1);
-                }}
-              />
+          <View style={[S.toolbarRight, !isWeb && { width: "100%", justifyContent: "space-between" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: !isWeb ? 1 : undefined, marginRight: !isWeb ? 8 : 0 }}>
+              {/* View Toggle */}
+              <View style={S.viewToggle}>
+                <TouchableOpacity
+                  style={[S.vtBtn, view === "grid" && S.vtBtnActive]}
+                  onPress={() => setView("grid")}
+                >
+                  <GridIcon active={view === "grid"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[S.vtBtn, view === "list" && S.vtBtnActive]}
+                  onPress={() => setView("list")}
+                >
+                  <ListIcon active={view === "list"} />
+                </TouchableOpacity>
+              </View>
+              {/* Main Category Filter */}
+              <View style={{ width: isWeb ? 180 : undefined, flex: !isWeb ? 1 : undefined }}>
+                <Dropdown
+                  value={mainCatFilter === "All" ? "" : mainCatFilter}
+                  placeholder="Main Category"
+                  options={mainCatOptions}
+                  onChange={(v: string | undefined) => {
+                    setMainCatFilter(v || "All");
+                    setCurrentPage(1);
+                  }}
+                />
+              </View>
             </View>
             {/* Add Button */}
             <TouchableOpacity
@@ -1457,9 +1632,9 @@ export default function Subcategories() {
         </View>
 
         {/* ── Count ── */}
-        <Text style={S.countText}>
+        {/* <Text style={S.countText}>
           Showing {paginated.length} of {filtered.length} subcategories
-        </Text>
+        </Text> */}
 
         {/* ── Content ── */}
         {view === "grid" ? (
@@ -1480,13 +1655,17 @@ export default function Subcategories() {
         ) : isWeb ? (
           <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ minWidth: 900 }}
-          >
-            <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
-          </ScrollView>
+          // Mobile list view: responsive card layout, no horizontal scroll
+          <View style={S.mlList}>
+            {paginated.map((item) => (
+              <MobileListCard
+                key={item.id}
+                item={item}
+                onEdit={() => handleEdit(item)}
+                onDelete={() => handleDelete(item.id)}
+              />
+            ))}
+          </View>
         )}
 
         {filtered.length === 0 && (
@@ -1557,7 +1736,7 @@ const S = StyleSheet.create({
     color: "#FFF",
     letterSpacing: -0.3,
   },
-  pageSub: { fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 1 },
+  pageSub: { fontSize: 12, color: "rgba(255,255,255,0.90)", marginTop: 1, flexShrink: 1 },
   exportBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1683,8 +1862,8 @@ const S = StyleSheet.create({
   },
   cardStatusText: { fontSize: 11, fontWeight: "700" },
   cardBody: { padding: 14, gap: 8 },
-  breadcrumb: { flexDirection: "row", alignItems: "center", gap: 4 },
-  breadcrumbText: { fontSize: 11, color: C.sub, fontWeight: "500" },
+  breadcrumb: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap", flexShrink: 1 },
+  breadcrumbText: { fontSize: 11, color: C.sub, fontWeight: "500", flexShrink: 1 },
   breadcrumbSep: { fontSize: 11, color: C.sub },
   cardName: { fontSize: 16, fontWeight: "700", color: C.text },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
@@ -1766,7 +1945,8 @@ const S = StyleSheet.create({
     paddingHorizontal: 12,
     justifyContent: "center",
   },
-  cId: { width: 60 },
+  cId: { width: 56 },
+  cImg: { width: 70 },
   cMain: { flex: 1, minWidth: 110 },
   cCat: { flex: 1, minWidth: 100 },
   cName: { flex: 1.2, minWidth: 120 },
@@ -1818,6 +1998,81 @@ const S = StyleSheet.create({
   empty: { alignItems: "center", paddingVertical: 60, gap: 10 },
   emptyTitle: { fontSize: 16, fontWeight: "600", color: C.text, marginTop: 8 },
   emptySub: { fontSize: 13, color: C.sub },
+
+  // Mobile List Card
+  mlList: { gap: 12 },
+  mlCard: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 14,
+    gap: 12,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  mlCardTop: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  mlThumb: {
+    width: 68,
+    height: 68,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: C.navyLight,
+    flexShrink: 0,
+  },
+  mlThumbImg: { width: "100%", height: "100%" },
+  mlThumbPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mlInfo: { flex: 1, gap: 6 },
+  mlNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  mlName: { fontSize: 15, fontWeight: "700", color: C.text, flex: 1 },
+  mlIdBadge: {
+    backgroundColor: C.navy,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  mlIdText: { fontSize: 11, fontWeight: "700", color: "#FFF" },
+  mlChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  mlChip: {
+    backgroundColor: C.matChip,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  mlChipText: { fontSize: 11, fontWeight: "600", color: C.matChipText },
+  mlFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    paddingTop: 10,
+  },
+  mlFooterLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1, flexWrap: "wrap" },
+
+  // Table
+  tableThumb: { width: 46, height: 46, borderRadius: 8 },
+  tableThumbPlaceholder: {
+    width: 46,
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: C.navyLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // Modal
   modalOverlay: {

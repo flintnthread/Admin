@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapSellerSupportTicket } from "@/lib/mappers";
 import {
@@ -23,6 +25,7 @@ import {
   Platform,
 } from "react-native";
 import AdminLayout from "@/components/admin-layout";
+import Svg, { Path } from "react-native-svg";
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -150,6 +153,8 @@ interface DropdownProps {
 
 const Dropdown = ({ label, value, options, onSelect }: DropdownProps) => {
   const [open, setOpen] = useState(false);
+  // Show a short display value: strip "All " prefix for compactness
+  const displayValue = value.replace(/^All /, "") || value;
   return (
     <View style={styles.dropdownWrapper}>
       <TouchableOpacity
@@ -157,14 +162,13 @@ const Dropdown = ({ label, value, options, onSelect }: DropdownProps) => {
         onPress={() => setOpen(true)}
         activeOpacity={0.8}
       >
-        <Text style={[styles.dropdownLabel, { flexShrink: 0 }]}>{label}</Text>
-        <Text style={styles.dropdownValue} numberOfLines={1}>
-          {value}
+        <Text style={styles.dropdownTriggerText} numberOfLines={1}>
+          {displayValue}
         </Text>
-        <Text style={[styles.dropdownArrow, { flexShrink: 0 }]}>▾</Text>
+        <ChevronDownIcon size={14} color={C.textSecondary} />
       </TouchableOpacity>
 
-      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal transparent visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <TouchableOpacity style={styles.dropdownBackdrop} activeOpacity={1} onPress={() => setOpen(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.dropdownMenu} onPress={(e) => e.stopPropagation()}>
             <View style={styles.dropdownMenuHeader}>
@@ -206,63 +210,132 @@ const Dropdown = ({ label, value, options, onSelect }: DropdownProps) => {
 
 // ─── Lightweight inline icons (no external icon lib dependency) ─────────────
 
-const SearchIcon = ({ size = 16, color = C.textMuted }: { size?: number; color?: string }) => {
-  const circleSize = size * 0.62;
-  const strokeWidth = Math.max(1.5, size * 0.11);
-  const handleLength = size * 0.4;
-  return (
-    <View style={{ width: size, height: size }}>
-      <View
-        style={{
-          width: circleSize,
-          height: circleSize,
-          borderRadius: circleSize / 2,
-          borderWidth: strokeWidth,
-          borderColor: color,
-          position: "absolute",
-          top: 0,
-          left: 0,
-        }}
-      />
-      <View
-        style={{
-          width: handleLength,
-          height: strokeWidth,
-          backgroundColor: color,
-          borderRadius: strokeWidth / 2,
-          position: "absolute",
-          top: circleSize - strokeWidth * 0.5,
-          left: circleSize - strokeWidth * 0.5,
-          transform: [{ rotate: "45deg" }, { translateX: handleLength / 2 }],
-        }}
-      />
-    </View>
-  );
-};
+// ─── Lightweight inline Bootstrap vector icons ─────────────────────────────
+
+const SearchIcon = ({ size = 16, color = C.textMuted }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"
+      fill={color}
+    />
+  </Svg>
+);
 
 const CloseIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
-  <View style={{ width: size, height: size, justifyContent: "center", alignItems: "center" }}>
-    <View
-      style={{
-        width: size * 0.78,
-        height: 1.8,
-        backgroundColor: color,
-        borderRadius: 1,
-        position: "absolute",
-        transform: [{ rotate: "45deg" }],
-      }}
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"
+      fill={color}
     />
-    <View
-      style={{
-        width: size * 0.78,
-        height: 1.8,
-        backgroundColor: color,
-        borderRadius: 1,
-        position: "absolute",
-        transform: [{ rotate: "-45deg" }],
-      }}
+  </Svg>
+);
+
+const ClockIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"
+      fill={color}
     />
-  </View>
+    <Path
+      d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"
+      fill={color}
+    />
+  </Svg>
+);
+
+const FileTextIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5M5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1z"
+      fill={color}
+    />
+    <Path
+      d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1"
+      fill={color}
+    />
+  </Svg>
+);
+
+const CircleUserIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"
+      fill={color}
+    />
+    <Path
+      fillRule="evenodd"
+      d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"
+      fill={color}
+      clipRule="evenodd"
+    />
+  </Svg>
+);
+
+const EnvelopeIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"
+      fill={color}
+    />
+  </Svg>
+);
+
+const SmartphoneIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M11 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
+      fill={color}
+    />
+    <Path
+      d="M8 14a1 1 0 1 0 0-2 1 1 0 0 0 0 2"
+      fill={color}
+    />
+  </Svg>
+);
+
+const FolderIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.056 1.353l.543 1.447H14.5A1.5 1.5 0 0 1 16 6.3V14a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 14V5v-.5A1.5 1.5 0 0 1 1.5 3.5m.3 1H1.5a.5.5 0 0 0-.5.5V14a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5V6.3a.5.5 0 0 0-.5-.5H8.3a.5.5 0 0 0-.414-.218L7.09 4.133A.5.5 0 0 0 6.637 4H2.5a.5.5 0 0 0-.5.5z"
+      fill={color}
+    />
+  </Svg>
+);
+
+const ChatIcon = ({ size = 16, color = C.textMuted }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M2 1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h9.586a1 1 0 0 1 .707.293l2.853 2.853a.5.5 0 0 0 .854-.353V2a1 1 0 0 0-1-1zM2 0h12a2 2 0 0 1 2 2v12.793a.5.5 0 0 1-.854.353l-2.853-2.853a1 1 0 0 0-.707-.293H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2"
+      fill={color}
+    />
+  </Svg>
+);
+
+const LockIcon = ({ size = 16, color = C.textMuted }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1"
+      fill={color}
+    />
+  </Svg>
+);
+
+const InboxIcon = ({ size = 16, color = C.textMuted }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M4.98 4a.5.5 0 0 0-.39.188L1.54 8H6a.5.5 0 0 1 .5.5 1.5 1.5 0 1 0 3 0A.5.5 0 0 1 10 8h4.46l-3.05-3.813A.5.5 0 0 0 11.02 4zm-1.11-.471A1.5 1.5 0 0 1 4.98 3h6.04a1.5 1.5 0 0 1 1.11.471L15.906 8.5A1.5 1.5 0 0 1 14.5 11h-13a1.5 1.5 0 0 1-1.406-2.5zM1.5 12a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5zM0 12.5A1.5 1.5 0 0 1 1.5 11h13a1.5 1.5 0 0 1 1.5 1.5v2a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 14.5z"
+      fill={color}
+    />
+  </Svg>
+);
+
+const ChevronDownIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"
+      fill={color}
+    />
+  </Svg>
 );
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -276,18 +349,19 @@ interface StatCardProps {
   icon: string;
 }
 
-const StatCard = ({ label, sublabel, count, color, bgColor, icon }: StatCardProps) => (
-  <View style={styles.statCard}>
-    <View style={styles.statCardTop}>
-      <View style={[styles.statIconChip, { backgroundColor: bgColor }]}>
-        <Text style={[styles.statIconText, { color }]}>{icon}</Text>
+const StatCard = ({ label, sublabel, count, color, bgColor, icon, compact }: StatCardProps & { compact?: boolean }) => (
+  <View style={[styles.statCard, compact && styles.statCardMobile]}>
+    <View style={[styles.statCardTop, compact && styles.statCardTopMobile]}>
+      <View style={[styles.statIconChip, { backgroundColor: bgColor }, compact && styles.statIconChipMobile]}>
+        <Text style={[styles.statIconText, { color }, compact && styles.statIconTextMobile]}>{icon}</Text>
       </View>
-      <Text style={[styles.statCount, { color }]}>{count}</Text>
+      <Text style={[styles.statCount, { color }, compact && styles.statCountMobile]}>{count}</Text>
     </View>
-    <Text style={styles.statLabel}>{label}</Text>
-    <Text style={styles.statSublabel}>{sublabel}</Text>
+    <Text style={[styles.statLabel, compact && styles.statLabelMobile]}>{label}</Text>
+    <Text style={[styles.statSublabel, compact && styles.statSublabelMobile]}>{sublabel}</Text>
   </View>
 );
+
 
 // ─── Ticket List Item ─────────────────────────────────────────────────────────
 
@@ -297,26 +371,49 @@ interface TicketItemProps {
   onPress: () => void;
 }
 
-const TicketItem = ({ ticket, selected, onPress }: TicketItemProps) => (
+const TicketItem = ({ ticket, selected, onPress, compact }: TicketItemProps & { compact?: boolean }) => (
   <TouchableOpacity
-    style={[styles.ticketItem, selected && styles.ticketItemSelected]}
+    style={[styles.ticketItem, compact && styles.ticketItemMobile, selected && styles.ticketItemSelected]}
     onPress={onPress}
     activeOpacity={0.85}
   >
-    <Text style={styles.ticketDescription} numberOfLines={2}>
+    <Text style={[styles.ticketDescription, compact && styles.ticketDescriptionMobile]} numberOfLines={2}>
       {ticket.description}
     </Text>
-    <View style={styles.ticketSeller}>
-      <Text style={styles.ticketSellerIcon}>⊙</Text>
-      <Text style={styles.ticketSellerName}>{ticket.sellerName}</Text>
-    </View>
-    <View style={styles.ticketBadges}>
-      <StatusBadge status={ticket.status} />
-      <PriorityBadge priority={ticket.priority} />
-    </View>
-    <View style={styles.ticketMeta}>
-      <Text style={styles.ticketMetaText}>⊞ {ticket.ticketCode}</Text>
-      <Text style={styles.ticketMetaText}>🕐 {ticket.createdAt}</Text>
+    {compact ? (
+      // Mobile layout: seller + badges inline
+      <View style={styles.ticketMetaRow}>
+        <View style={styles.metaItem}>
+          <CircleUserIcon size={14} color={C.textSecondary} />
+          <Text style={styles.ticketSellerNameMobile}>{ticket.sellerName}</Text>
+        </View>
+        <View style={styles.ticketBadgesMobile}>
+          <StatusBadge status={ticket.status} />
+          <PriorityBadge priority={ticket.priority} />
+        </View>
+      </View>
+    ) : (
+      // Desktop layout
+      <>
+        <View style={styles.ticketSeller}>
+          <CircleUserIcon size={14} color={C.textSecondary} />
+          <Text style={styles.ticketSellerName}>{ticket.sellerName}</Text>
+        </View>
+        <View style={styles.ticketBadges}>
+          <StatusBadge status={ticket.status} />
+          <PriorityBadge priority={ticket.priority} />
+        </View>
+      </>
+    )}
+    <View style={[styles.ticketMeta, compact && styles.ticketMetaMobile]}>
+      <View style={styles.metaItem}>
+        <FileTextIcon size={14} color={C.textSecondary} />
+        <Text style={[styles.ticketMetaText, compact && styles.ticketMetaTextMobile]}>{ticket.ticketCode}</Text>
+      </View>
+      <View style={styles.metaItem}>
+        <ClockIcon size={14} color={C.textSecondary} />
+        <Text style={[styles.ticketMetaText, compact && styles.ticketMetaTextMobile]}>{ticket.createdAt}</Text>
+      </View>
     </View>
   </TouchableOpacity>
 );
@@ -356,14 +453,35 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
             {ticket.description}
           </Text>
           <View style={styles.chatHeaderMeta}>
-            <Text style={styles.chatHeaderMetaText}>⊞ {ticket.ticketCode}</Text>
-            <Text style={styles.chatHeaderMetaText}>  ⊙ {ticket.sellerName}</Text>
+            <View style={styles.chatHeaderMetaItem}>
+              <FileTextIcon size={14} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.chatHeaderMetaText}>{ticket.ticketCode}</Text>
+            </View>
+            <View style={styles.chatHeaderMetaItem}>
+              <CircleUserIcon size={14} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.chatHeaderMetaText}>{ticket.sellerName}</Text>
+            </View>
             <StatusBadge status={ticket.status} />
           </View>
           <View style={styles.chatHeaderContact}>
-            {!!ticket.email && <Text style={styles.chatContactText}>✉ {ticket.email}</Text>}
-            {!!ticket.phone && <Text style={styles.chatContactText}>  📱 {ticket.phone}</Text>}
-            {!!ticket.department && <Text style={styles.chatContactText}>  🗂 {ticket.department}</Text>}
+            {!!ticket.email && (
+              <View style={styles.chatContactItem}>
+                <EnvelopeIcon size={14} color="rgba(255,255,255,0.75)" />
+                <Text style={styles.chatContactText}>{ticket.email}</Text>
+              </View>
+            )}
+            {!!ticket.phone && (
+              <View style={styles.chatContactItem}>
+                <SmartphoneIcon size={14} color="rgba(255,255,255,0.75)" />
+                <Text style={styles.chatContactText}>{ticket.phone}</Text>
+              </View>
+            )}
+            {!!ticket.department && (
+              <View style={styles.chatContactItem}>
+                <FolderIcon size={14} color="rgba(255,255,255,0.75)" />
+                <Text style={styles.chatContactText}>{ticket.department}</Text>
+              </View>
+            )}
           </View>
         </View>
         {isClosed && (
@@ -384,7 +502,7 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
       >
         {!hasMessages && (
           <View style={styles.emptyMessages}>
-            <Text style={styles.emptyMessagesIcon}>💬</Text>
+            <ChatIcon size={36} color={C.textMuted} />
             <Text style={styles.emptyMessagesText}>No messages yet</Text>
           </View>
         )}
@@ -413,22 +531,27 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
               >
                 {msg.text}
               </Text>
-              <Text
-                style={[
-                  styles.messageTimestamp,
-                  msg.sender === "admin" && styles.messageTimestampAdmin,
-                ]}
-              >
-                {msg.sender === "admin" ? "👤 " : "⊙ "}
-                {msg.senderName} · {msg.timestamp}
-              </Text>
+              <View style={styles.messageMetaRow}>
+                <CircleUserIcon
+                  size={12}
+                  color={msg.sender === "admin" ? "rgba(255,255,255,0.65)" : C.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.messageTimestampText,
+                    msg.sender === "admin" && styles.messageTimestampAdminText,
+                  ]}
+                >
+                  {msg.senderName} · {msg.timestamp}
+                </Text>
+              </View>
             </View>
           </View>
         ))}
 
         {isClosed && (
           <View style={styles.closedNotice}>
-            <Text style={styles.closedNoticeIcon}>🔒</Text>
+            <LockIcon size={32} color={C.textMuted} />
             <Text style={styles.closedNoticeText}>This ticket is {ticket.status.toLowerCase()}</Text>
           </View>
         )}
@@ -642,32 +765,35 @@ export default function SupportTicketManagement() {
         >
           {/* ── Header panel: rounded dark card with title row + overlapping stat cards ── */}
           <View style={styles.headerOuter}>
-            <View style={styles.headerPanel}>
-              <View style={styles.headerTitleRow}>
-                <TouchableOpacity style={styles.menuBtn}>
-                  <View style={styles.menuLine} />
-                  <View style={[styles.menuLine, { width: 16 }]} />
-                  <View style={styles.menuLine} />
+            <View style={[styles.headerPanel, !isDesktop && styles.headerPanelMobile]}>
+              <View style={[styles.headerTitleRow, !isDesktop && styles.headerTitleRowMobile]}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.menuBtn}>
+                  <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
                 <View style={styles.headerTitleTextWrap}>
-                  <Text style={styles.headerTitle}>Support Tickets</Text>
+                  <Text style={[styles.headerTitle, !isDesktop && styles.headerTitleMobile]}>Support Tickets</Text>
                   <Text style={styles.headerSubtitle}>Admin Panel · Manage all support requests</Text>
                 </View>
-                <TouchableOpacity style={styles.headerAvatar}>
-                  <Text style={styles.headerAvatarText}>A</Text>
+                <TouchableOpacity style={[styles.headerAvatar, !isDesktop && styles.headerAvatarMobile]}>
+                  <Text style={[styles.headerAvatarText, !isDesktop && styles.headerAvatarTextMobile]}>A</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Spacer so the panel has enough height for cards to overlap into */}
-              <View style={styles.headerCardSpacer} />
+              <View style={[styles.headerCardSpacer, !isDesktop && styles.headerCardSpacerMobile]} />
             </View>
 
             {/* Stat cards: horizontally scrollable, overlapping the bottom edge of the dark panel */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.statsScroll}
-              contentContainerStyle={styles.statsRow}
+              {...(!isDesktop && {
+                decelerationRate: "fast",
+                snapToInterval: 140,
+                snapToAlignment: "start",
+              })}
+              style={[styles.statsScroll, !isDesktop && styles.statsScrollMobile]}
+              contentContainerStyle={[styles.statsRow, !isDesktop && styles.statsRowMobile]}
             >
               {statCards.map((card) => (
                 <StatCard
@@ -678,40 +804,78 @@ export default function SupportTicketManagement() {
                   color={card.color}
                   bgColor={card.bgColor}
                   icon={card.icon}
+                  compact={!isDesktop}
                 />
               ))}
             </ScrollView>
           </View>
 
           {loadError ? (
-            <Text style={{ color: C.brand, marginBottom: 12, paddingHorizontal: 4 }}>{loadError}</Text>
+            <Text style={{ color: C.brand, marginBottom: 8, paddingHorizontal: 4 }}>{loadError}</Text>
           ) : null}
 
-          {/* ── Filters ── */}
-          <View style={styles.filtersRow}>
-            <View style={styles.searchBox}>
-              <SearchIcon size={16} color={C.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search tickets"
-                placeholderTextColor={C.textMuted}
-                value={searchText}
-                onChangeText={setSearchText}
+          {/* ── Filters: desktop keeps original row, mobile gets stacked layout ── */}
+          {isDesktop ? (
+            <View style={styles.filtersRow}>
+              <View style={styles.searchBox}>
+                <SearchIcon size={18} color={C.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search tickets"
+                  placeholderTextColor={C.textMuted}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+              </View>
+              <Dropdown
+                label="Status "
+                value={statusFilter}
+                options={statusOptions}
+                onSelect={setStatusFilter}
+              />
+              <Dropdown
+                label="Priority"
+                value={priorityFilter}
+                options={priorityOptions}
+                onSelect={setPriorityFilter}
               />
             </View>
-            <Dropdown
-              label="Status "
-              value={statusFilter}
-              options={statusOptions}
-              onSelect={setStatusFilter}
-            />
-            <Dropdown
-              label="Priority"
-              value={priorityFilter}
-              options={priorityOptions}
-              onSelect={setPriorityFilter}
-            />
-          </View>
+          ) : (
+            <View style={styles.filtersContainerMobile}>
+              <View style={styles.searchBoxMobile}>
+                <SearchIcon size={18} color={C.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search tickets..."
+                  placeholderTextColor={C.textMuted}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+                {!!searchText && (
+                  <TouchableOpacity
+                    onPress={() => setSearchText("")}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <CloseIcon size={14} color={C.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.dropdownsRowMobile}>
+                <Dropdown
+                  label="Status"
+                  value={statusFilter}
+                  options={statusOptions}
+                  onSelect={setStatusFilter}
+                />
+                <Dropdown
+                  label="Priority"
+                  value={priorityFilter}
+                  options={priorityOptions}
+                  onSelect={setPriorityFilter}
+                />
+              </View>
+            </View>
+          )}
 
           {/* ── Main Content ── */}
           {isDesktop ? (
@@ -729,7 +893,7 @@ export default function SupportTicketManagement() {
                 >
                   {filteredTickets.length === 0 ? (
                     <View style={styles.emptyState}>
-                      <Text style={styles.emptyIcon}>📭</Text>
+                      <InboxIcon size={40} color={C.textMuted} />
                       <Text style={styles.emptyText}>No tickets match your filters</Text>
                     </View>
                   ) : (
@@ -755,7 +919,7 @@ export default function SupportTicketManagement() {
                   />
                 ) : (
                   <View style={styles.emptyDetail}>
-                    <Text style={styles.emptyDetailIcon}>💬</Text>
+                    <ChatIcon size={48} color={C.textMuted} />
                     <Text style={styles.emptyDetailTitle}>Select a Ticket</Text>
                     <Text style={styles.emptyDetailSub}>
                       Choose a support ticket from the list to view details and respond.
@@ -767,13 +931,15 @@ export default function SupportTicketManagement() {
           ) : (
             /* Mobile: list view, modal for detail */
             <View style={styles.mobileList}>
-              <View style={styles.panelHeader}>
+              <View style={[styles.panelHeader, styles.panelHeaderMobile]}>
                 <Text style={styles.panelTitle}>Support Tickets</Text>
-                <Text style={styles.panelCount}>{filteredTickets.length}</Text>
+                <Text style={styles.panelCountLabel}>
+                  {filteredTickets.length} {filteredTickets.length === 1 ? "Ticket" : "Tickets"}
+                </Text>
               </View>
               {filteredTickets.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyIcon}>📭</Text>
+                  <InboxIcon size={40} color={C.textMuted} />
                   <Text style={styles.emptyText}>No tickets match your filters</Text>
                 </View>
               ) : (
@@ -782,6 +948,7 @@ export default function SupportTicketManagement() {
                     key={t.id}
                     ticket={t}
                     selected={false}
+                    compact
                     onPress={() => handleSelectTicket(t)}
                   />
                 ))
@@ -835,16 +1002,27 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     overflow: "hidden",
   },
+  // Mobile override — ~15-20% shorter
+  headerPanelMobile: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+  },
   headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  headerTitleRowMobile: {
+    gap: 10,
   },
   headerTitleTextWrap: {
     flex: 1,
   },
   headerCardSpacer: {
     height: 54,
+  },
+  headerCardSpacerMobile: {
+    height: 40,
   },
   menuBtn: {
     gap: 4,
@@ -862,6 +1040,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.3,
   },
+  headerTitleMobile: {
+    fontSize: 17,
+  },
   headerSubtitle: {
     color: "rgba(255,255,255,0.65)",
     fontSize: 11,
@@ -875,10 +1056,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerAvatarMobile: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
   headerAvatarText: {
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+  headerAvatarTextMobile: {
+    fontSize: 13,
   },
 
   // Body
@@ -901,9 +1090,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // Stats — overlap the bottom edge of the dark header panel
+  // Stats — overlap the bottom edge of the dark header panel (desktop defaults)
   statsScroll: {
     marginTop: -46,
+  },
+  // Mobile override
+  statsScrollMobile: {
+    marginTop: -36,
   },
   statsRow: {
     flexDirection: "row",
@@ -912,6 +1105,14 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingBottom: 4,
+  },
+  // Mobile override
+  statsRowMobile: {
+    justifyContent: undefined,
+    flexGrow: undefined,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    paddingTop: 2,
   },
   statCard: {
     backgroundColor: C.surface,
@@ -927,11 +1128,25 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
+  // Mobile override
+  statCardMobile: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    width: 128,
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
   statCardTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
+  },
+  statCardTopMobile: {
+    marginBottom: 6,
   },
   statIconChip: {
     width: 32,
@@ -940,27 +1155,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  statIconChipMobile: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
   statIconText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  statIconTextMobile: {
+    fontSize: 12,
   },
   statCount: {
     fontSize: 22,
     fontWeight: "800",
     letterSpacing: -0.5,
   },
+  statCountMobile: {
+    fontSize: 24,
+  },
   statLabel: {
     fontSize: 13,
     color: C.textPrimary,
     fontWeight: "700",
+  },
+  statLabelMobile: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   statSublabel: {
     fontSize: 11,
     color: C.textMuted,
     marginTop: 2,
   },
+  statSublabelMobile: {
+    fontSize: 10,
+    marginTop: 1,
+  },
 
-  // Filters
+  // Filters — desktop: single row; mobile: stacked
   filtersRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -969,6 +1203,20 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  filtersContainerMobile: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 10,
+    gap: 8,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000",
@@ -989,14 +1237,32 @@ const styles = StyleSheet.create({
     borderColor: C.border,
     gap: 8,
   },
+  searchBoxMobile: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.bg,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 8,
+  },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: C.textPrimary,
-  },
+    outlineStyle: "none",
+    borderWidth: 0,
+    padding: 0,
+  } as any,
   dropdownsRow: {
     flexDirection: "row",
     gap: 10,
+  },
+  dropdownsRowMobile: {
+    flexDirection: "row",
+    gap: 8,
   },
   dropdownWrapper: {
     flex: 1,
@@ -1005,14 +1271,20 @@ const styles = StyleSheet.create({
   dropdownTrigger: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: C.surface,
+    backgroundColor: C.bg,
     borderRadius: 10,
     paddingHorizontal: 12,
-    height: 42,
+    height: 44,
     borderWidth: 1,
     borderColor: C.border,
-    gap: 2,
+    gap: 4,
     overflow: "hidden",
+  },
+  dropdownTriggerText: {
+    flex: 1,
+    fontSize: 13,
+    color: C.textPrimary,
+    fontWeight: "600",
   },
   dropdownLabel: {
     fontSize: 12,
@@ -1026,13 +1298,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   dropdownArrow: {
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 22,
     color: C.textSecondary,
     flexShrink: 0,
   },
   dropdownBackdrop: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",
@@ -1153,11 +1429,22 @@ const styles = StyleSheet.create({
     borderBottomColor: C.border,
     backgroundColor: C.surfaceAlt,
   },
+  // Mobile override — tighter
+  panelHeaderMobile: {
+    paddingVertical: 10,
+  },
   panelTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: C.textPrimary,
   },
+  // Descriptive count label for mobile (instead of opaque orange badge)
+  panelCountLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.textSecondary,
+  },
+  // Orange badge used on desktop list panel
   panelCount: {
     fontSize: 12,
     fontWeight: "700",
@@ -1169,11 +1456,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // Ticket items
+  // Ticket items (desktop defaults)
   ticketItem: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
+  },
+  // Mobile override — tighter
+  ticketItemMobile: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 44,
   },
   ticketItemSelected: {
     backgroundColor: C.brandFaint,
@@ -1187,11 +1480,33 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     lineHeight: 20,
   },
+  ticketDescriptionMobile: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 4,
+    lineHeight: 19,
+  },
+  // Mobile-only row: seller name + badges side-by-side
+  ticketMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 4,
+  },
+  // Desktop seller row
   ticketSeller: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginBottom: 8,
+  },
+  // Mobile seller row (inside ticketMetaRow, no marginBottom)
+  ticketSellerMobile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   ticketSellerIcon: {
     fontSize: 11,
@@ -1202,10 +1517,22 @@ const styles = StyleSheet.create({
     color: C.textSecondary,
     fontWeight: "500",
   },
+  ticketSellerNameMobile: {
+    fontSize: 11,
+    color: C.textSecondary,
+    fontWeight: "500",
+  },
+  // Desktop badges row
   ticketBadges: {
     flexDirection: "row",
     gap: 6,
     marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  // Mobile badges row (no marginBottom, tighter gap)
+  ticketBadgesMobile: {
+    flexDirection: "row",
+    gap: 4,
     flexWrap: "wrap",
   },
   ticketMeta: {
@@ -1213,9 +1540,15 @@ const styles = StyleSheet.create({
     gap: 12,
     flexWrap: "wrap",
   },
+  ticketMetaMobile: {
+    gap: 10,
+  },
   ticketMetaText: {
     fontSize: 11,
     color: C.textMuted,
+  },
+  ticketMetaTextMobile: {
+    fontSize: 10,
   },
 
   // Badges
@@ -1461,5 +1794,37 @@ const styles = StyleSheet.create({
   modalSafe: {
     flex: 1,
     backgroundColor: C.surface,
+  },
+
+  // Alignment helpers for inline icons
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  chatHeaderMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginRight: 10,
+  },
+  chatContactItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginRight: 12,
+  },
+  messageMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  messageTimestampText: {
+    fontSize: 10,
+    color: C.textMuted,
+  },
+  messageTimestampAdminText: {
+    color: "rgba(255,255,255,0.65)",
   },
 });

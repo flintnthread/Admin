@@ -2,6 +2,9 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 
+/** Production admin API — same domain as user app; nginx routes /api/admin/ → 8082 */
+export const PRODUCTION_ADMIN_API_URL = "https://flintnthread.online";
+
 const ADMIN_API_PORT = 8082;
 const ADMIN_WEB_DEV_PORT = 8081;
 
@@ -72,7 +75,7 @@ function getWebLanHost(): string | null {
   return host;
 }
 
-function buildUrl(host: string): string {
+function buildLocalUrl(host: string): string {
   return `http://${host}:${ADMIN_API_PORT}`;
 }
 
@@ -86,6 +89,16 @@ function uniqueUrls(urls: string[]): string[] {
     out.push(normalized);
   }
   return out;
+}
+
+function getProductionApiUrl(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_ADMIN_API_BASE_URL?.trim().replace(/\/$/, "");
+  const fromExtra = getExtra().adminApiBaseUrl?.trim().replace(/\/$/, "");
+  return fromEnv || fromExtra || PRODUCTION_ADMIN_API_URL;
+}
+
+function useLocalApiFallbacks(): boolean {
+  return process.env.EXPO_PUBLIC_ADMIN_API_USE_LOCAL === "true";
 }
 
 /** True when the browser opened the Admin UI on the API port (8082) — login will fail. */
@@ -107,51 +120,42 @@ export function getAdminWebDevUrl(): string {
 }
 
 /**
- * Candidate admin API base URLs to try (most likely first).
- * Web on PC: EXPO_PUBLIC_ADMIN_API_WEB_BASE_URL → localhost → 127.0.0.1
- * Web on phone (LAN): http://PC_IP:8082
- * Native Expo Go: Metro LAN host → configured URL
- * Android emulator: 10.0.2.2
+ * Candidate admin API base URLs (most likely first).
+ * Default: https://flintnthread.online (VPS nginx → admin :8082).
+ * Local fallbacks only when EXPO_PUBLIC_ADMIN_API_USE_LOCAL=true.
  */
 export function getAdminApiBaseUrlCandidates(): string[] {
-  const fromExtra = getExtra().adminApiBaseUrl?.trim().replace(/\/$/, "");
-  const fromEnv = process.env.EXPO_PUBLIC_ADMIN_API_BASE_URL?.trim().replace(/\/$/, "");
-  const configured = fromExtra || fromEnv;
-  const candidates: string[] = [];
+  const candidates: string[] = [getProductionApiUrl()];
+
+  if (!useLocalApiFallbacks()) {
+    return uniqueUrls(candidates);
+  }
 
   if (Platform.OS === "web") {
     const webOverride = process.env.EXPO_PUBLIC_ADMIN_API_WEB_BASE_URL?.trim().replace(/\/$/, "");
     if (webOverride) candidates.push(webOverride);
 
     const webLan = getWebLanHost();
-    if (webLan) candidates.push(buildUrl(webLan));
+    if (webLan) candidates.push(buildLocalUrl(webLan));
 
-    candidates.push(buildUrl("localhost"), buildUrl("127.0.0.1"));
-    if (configured) candidates.push(configured);
-
-    const devHost = getExpoDevLanHost();
-    if (devHost) candidates.push(buildUrl(devHost));
-
-    return uniqueUrls(candidates);
+    candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
   }
 
-  if (configured) candidates.push(configured);
-
   const devHost = getExpoDevLanHost();
-  if (devHost) candidates.push(buildUrl(devHost));
+  if (devHost) candidates.push(buildLocalUrl(devHost));
 
   if (Platform.OS === "android" && isAndroidEmulator()) {
-    candidates.push(buildUrl("10.0.2.2"));
+    candidates.push(buildLocalUrl("10.0.2.2"));
   }
 
   if (isIosSimulator()) {
-    candidates.push(buildUrl("localhost"), buildUrl("127.0.0.1"));
+    candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
   }
 
-  candidates.push(buildUrl("localhost"), buildUrl("127.0.0.1"));
+  candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
 
   if (Platform.OS === "android") {
-    candidates.push(buildUrl("10.0.2.2"));
+    candidates.push(buildLocalUrl("10.0.2.2"));
   }
 
   return uniqueUrls(candidates);
@@ -159,13 +163,13 @@ export function getAdminApiBaseUrlCandidates(): string[] {
 
 /**
  * Admin API base URL (no trailing slash).
- * Uses the first candidate; call `ensureAdminApiReachable()` before login for auto-fallback.
+ * Uses cached URL after health probe, else production first.
  */
 export function resolveAdminApiBaseUrl(): string {
   if (cachedWorkingBaseUrl && Date.now() < cacheExpiresAt) {
     return cachedWorkingBaseUrl;
   }
-  return getAdminApiBaseUrlCandidates()[0] ?? buildUrl("localhost");
+  return getAdminApiBaseUrlCandidates()[0] ?? PRODUCTION_ADMIN_API_URL;
 }
 
 export function setWorkingAdminApiBaseUrl(url: string): void {
@@ -191,7 +195,7 @@ export async function ensureAdminApiReachable(): Promise<string> {
   for (const baseUrl of candidates) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      const timeout = setTimeout(() => controller.abort(), 12000);
       const res = await fetch(`${baseUrl}/api/admin/health`, {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -202,15 +206,13 @@ export async function ensureAdminApiReachable(): Promise<string> {
       const raw = await res.text();
       if (!res.ok) continue;
       if (!contentType.includes("application/json") && raw.trimStart().startsWith("<")) {
-        throw new Error(
-          `${baseUrl} returned HTML (not the API). Stop Expo on port 8082 and run: cd Admin && npm run web`
-        );
+        continue;
       }
       let body: { status?: string; service?: string } | null = null;
       try {
         body = JSON.parse(raw) as { status?: string; service?: string };
       } catch {
-        throw new Error(`${baseUrl} health check did not return valid JSON.`);
+        continue;
       }
       if (body?.status === "ok" && body?.service === "admin-backend") {
         setWorkingAdminApiBaseUrl(baseUrl);
@@ -224,11 +226,11 @@ export async function ensureAdminApiReachable(): Promise<string> {
   clearWorkingAdminApiBaseUrl();
   if (lastError instanceof Error) throw lastError;
   throw new Error(
-    `Admin API not reachable. Start backend: mvn -f seller-backend/admin-backend/pom.xml spring-boot:run (port ${ADMIN_API_PORT})`
+    `Admin API not reachable at ${PRODUCTION_ADMIN_API_URL}. Check VPS nginx /api/admin/ routing and flint-admin service.`
   );
 }
 
-/** Public CDN for all uploads — matches admin-backend app.media.public-base-url */
+/** Public CDN for uploads — matches admin-backend app.media.public-base-url */
 export function resolvePublicMediaBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "");
   if (fromEnv) return fromEnv;
@@ -247,6 +249,8 @@ export function getApiDebugInfo(): {
   webPort: string | null;
   portConflict: string | null;
   webDevUrl: string;
+  productionUrl: string;
+  localFallbacks: boolean;
 } {
   return {
     baseUrl: resolveAdminApiBaseUrl(),
@@ -258,5 +262,7 @@ export function getApiDebugInfo(): {
     webPort: Platform.OS === "web" && typeof window !== "undefined" ? (window.location.port || "80") : null,
     portConflict: getWebDevPortConflict(),
     webDevUrl: getAdminWebDevUrl(),
+    productionUrl: getProductionApiUrl(),
+    localFallbacks: useLocalApiFallbacks(),
   };
 }

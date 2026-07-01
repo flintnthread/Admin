@@ -30,7 +30,7 @@ import {
   type SellerGraphRow,
 } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { router, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -230,15 +230,17 @@ function SellerFilterDropdown({
 
   return (
     <View style={[{ minWidth: 160 }, style]}>
-      <TouchableOpacity
+      <Pressable
         ref={triggerRef as any}
-        activeOpacity={0.8}
         onPress={handlePress}
-        style={styles.dropdownTrigger}
+        style={({ hovered }: any) => [
+          styles.dropdownTrigger,
+          hovered && { backgroundColor: "#FFF7ED" }
+        ]}
       >
         <Text style={styles.dropdownText} numberOfLines={1}>{display}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
-      </TouchableOpacity>
+      </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => { setOpen(false); setSearch(""); }} />
@@ -262,27 +264,33 @@ function SellerFilterDropdown({
                 )}
               </View>
               <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
-                <TouchableOpacity
+                <Pressable
                   onPress={() => selectSeller(null)}
-                  style={[styles.dropdownItem, value == null && { backgroundColor: ORANGE }]}
+                  style={({ hovered }: any) => [
+                    styles.dropdownItem,
+                    value == null ? { backgroundColor: ORANGE } : (hovered && { backgroundColor: "#FFF7ED" })
+                  ]}
                 >
                   <Text style={{ fontSize: 13, color: value == null ? "#fff" : "#374151", fontWeight: value == null ? "700" : "400" }}>
                     All Sellers
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
                 {filtered.map((s) => {
                   const label = formatSellerLabel(s);
                   const active = value === s.id;
                   return (
-                    <TouchableOpacity
+                    <Pressable
                       key={s.id}
                       onPress={() => selectSeller(s.id)}
-                      style={[styles.dropdownItem, active && { backgroundColor: ORANGE }]}
+                      style={({ hovered }: any) => [
+                        styles.dropdownItem,
+                        active ? { backgroundColor: ORANGE } : (hovered && { backgroundColor: "#FFF7ED" })
+                      ]}
                     >
                       <Text style={{ fontSize: 13, color: active ? "#fff" : "#374151", fontWeight: active ? "700" : "400" }} numberOfLines={2}>
                         {label}
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   );
                 })}
                 {filtered.length === 0 && (
@@ -327,15 +335,17 @@ function Dropdown({
 
   return (
     <View style={[{ minWidth: 120 }, style]}>
-      <TouchableOpacity
+      <Pressable
         ref={triggerRef as any}
-        activeOpacity={0.8}
         onPress={handlePress}
-        style={styles.dropdownTrigger}
+        style={({ hovered }: any) => [
+          styles.dropdownTrigger,
+          hovered && { backgroundColor: "#FFF7ED" }
+        ]}
       >
         <Text style={styles.dropdownText} numberOfLines={1}>{value}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
-      </TouchableOpacity>
+      </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
@@ -344,18 +354,18 @@ function Dropdown({
             <View style={[styles.dropdownMenu, isDesktop && styles.dropdownMenuDesktop]}>
               <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
                 {options.map(opt => (
-                  <TouchableOpacity
+                  <Pressable
                     key={opt}
                     onPress={() => { onChange(opt); setOpen(false); }}
-                    style={[
+                    style={({ hovered }: any) => [
                       styles.dropdownItem,
-                      value === opt && { backgroundColor: ORANGE },
+                      value === opt ? { backgroundColor: ORANGE } : (hovered && { backgroundColor: "#FFF7ED" }),
                     ]}
                   >
                     <Text style={{ fontSize: 13, color: value === opt ? "#fff" : "#374151", fontWeight: value === opt ? "700" : "400" }}>
                       {opt}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </ScrollView>
             </View>
@@ -387,6 +397,7 @@ function DatePicker({ value, onChange, placeholder }: {
   value: string; onChange: (date: string) => void; placeholder: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<"calendar" | "month" | "year">("calendar");
   const [selectedDate, setSelectedDate] = useState(value);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -410,6 +421,24 @@ function DatePicker({ value, onChange, placeholder }: {
     setOpen(false);
   };
 
+  const handleMonthSelect = (idx: number) => {
+    setCurrentMonth(idx);
+    const day = Number(selectedDate.split('/')[0]) || 1;
+    const dateStr = `${String(day).padStart(2, '0')}/${String(idx + 1).padStart(2, '0')}/${currentYear}`;
+    setSelectedDate(dateStr);
+    onChange(dateStr);
+    setOpen(false);
+  };
+
+  const handleYearSelect = (y: number) => {
+    setCurrentYear(y);
+    const day = Number(selectedDate.split('/')[0]) || 1;
+    const dateStr = `${String(day).padStart(2, '0')}/${String(currentMonth + 1).padStart(2, '0')}/${y}`;
+    setSelectedDate(dateStr);
+    onChange(dateStr);
+    setOpen(false);
+  };
+
   const handlePrevMonth = () => {
     if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
     else { setCurrentMonth(currentMonth - 1); }
@@ -420,15 +449,22 @@ function DatePicker({ value, onChange, placeholder }: {
     else { setCurrentMonth(currentMonth + 1); }
   };
 
+  const handleOpenPicker = () => {
+    setPickerMode("calendar");
+    setOpen(true);
+  };
+
   return (
     <View>
-      <TouchableOpacity
-        onPress={() => setOpen(true)}
-        style={[
+      <Pressable
+        onPress={handleOpenPicker}
+        style={({ hovered }: any) => [
           styles.dateInputContainer,
+          hovered && { backgroundColor: "#FFF7ED" },
           isMobile && { paddingHorizontal: 6, paddingVertical: 8 }
         ]}
       >
+        <Ionicons name="calendar" size={isMobile ? 13 : 16} color="#64748B" />
         <TextInput
           value={value} editable={false} placeholder={placeholder}
           placeholderTextColor="#94A3B8"
@@ -436,48 +472,124 @@ function DatePicker({ value, onChange, placeholder }: {
             styles.dateInput,
             isMobile && { fontSize: 11 }
           ]}
+          pointerEvents="none"
         />
-        <Ionicons name="calendar" size={isMobile ? 13 : 16} color="#64748B" />
-      </TouchableOpacity>
+      </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.datePickerOverlay} onPress={() => setOpen(false)}>
           <View style={styles.datePickerModal}>
             <View style={styles.datePickerHeader}>
-              <TouchableOpacity onPress={handlePrevMonth}>
-                <Ionicons name="chevron-back" size={20} color="#374151" />
-              </TouchableOpacity>
-              <Text style={styles.datePickerTitle}>{monthNames[currentMonth]} {currentYear}</Text>
-              <TouchableOpacity onPress={handleNextMonth}>
-                <Ionicons name="chevron-forward" size={20} color="#374151" />
-              </TouchableOpacity>
+              {pickerMode === "calendar" ? (
+                <>
+                  <TouchableOpacity onPress={handlePrevMonth}>
+                    <Ionicons name="chevron-back" size={20} color="#374151" />
+                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <TouchableOpacity onPress={() => setPickerMode("month")}>
+                      <Text style={[styles.datePickerTitle, { color: ORANGE }]}>
+                        {monthNames[currentMonth]}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setPickerMode("year")}>
+                      <Text style={[styles.datePickerTitle, { color: ORANGE }]}>
+                        {currentYear}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity onPress={handleNextMonth}>
+                    <Ionicons name="chevron-forward" size={20} color="#374151" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => setPickerMode("calendar")} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="arrow-back" size={20} color="#374151" />
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.datePickerTitle}>
+                    {pickerMode === "month" ? "Select Month" : "Select Year"}
+                  </Text>
+                  <View style={{ width: 40 }} />
+                </>
+              )}
             </View>
-            <View style={styles.datePickerWeekHeader}>
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-                <Text key={day} style={styles.datePickerWeekDay}>{day}</Text>
-              ))}
-            </View>
-            <View style={styles.datePickerDays}>
-              {days.map((day, index) => (
-                <TouchableOpacity
-                  key={index} onPress={() => day && handleDateSelect(day)} disabled={!day}
-                  style={[
-                    styles.datePickerDay,
-                    !day && styles.datePickerDayEmpty,
-                    selectedDate === `${String(day).padStart(2, '0')}/${String(currentMonth + 1).padStart(2, '0')}/${currentYear}` && styles.datePickerDaySelected,
-                  ]}
-                >
-                  <Text style={[
-                    styles.datePickerDayText,
-                    !day && styles.datePickerDayTextEmpty,
-                    selectedDate === `${String(day).padStart(2, '0')}/${String(currentMonth + 1).padStart(2, '0')}/${currentYear}` && styles.datePickerDayTextSelected,
-                  ]}>{day || ""}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.datePickerCloseBtn} onPress={() => setOpen(false)}>
-              <Text style={styles.datePickerCloseBtnText}>Close</Text>
-            </TouchableOpacity>
+
+            {pickerMode === "calendar" && (
+              <View style={{ marginBottom: 0 }}>
+                <View style={styles.datePickerWeekHeader}>
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                    <Text key={day} style={styles.datePickerWeekDay}>{day}</Text>
+                  ))}
+                </View>
+                <View style={styles.datePickerDays}>
+                  {days.map((day, index) => (
+                    <TouchableOpacity
+                      key={index} onPress={() => day && handleDateSelect(day)} disabled={!day}
+                      style={[
+                        styles.datePickerDay,
+                        !day && styles.datePickerDayEmpty,
+                        selectedDate === `${String(day).padStart(2, '0')}/${String(currentMonth + 1).padStart(2, '0')}/${currentYear}` && styles.datePickerDaySelected,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.datePickerDayText,
+                        !day && styles.datePickerDayTextEmpty,
+                        selectedDate === `${String(day).padStart(2, '0')}/${String(currentMonth + 1).padStart(2, '0')}/${currentYear}` && styles.datePickerDayTextSelected,
+                      ]}>{day || ""}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {pickerMode === "month" && (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginVertical: 12 }}>
+                {monthNames.map((m, idx) => (
+                  <TouchableOpacity
+                    key={m}
+                    onPress={() => handleMonthSelect(idx)}
+                    style={{
+                      width: "30%",
+                      paddingVertical: 10,
+                      alignItems: "center",
+                      borderRadius: 8,
+                      backgroundColor: currentMonth === idx ? ORANGE : "#F1F5F9",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ color: currentMonth === idx ? "#fff" : "#374151", fontWeight: currentMonth === idx ? "700" : "500", fontSize: 13 }}>
+                      {m}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {pickerMode === "year" && (
+              <ScrollView style={{ maxHeight: 180, marginVertical: 12 }} showsVerticalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
+                  {Array.from({ length: 15 }, (_, i) => 2018 + i).map((y) => (
+                    <TouchableOpacity
+                      key={y}
+                      onPress={() => handleYearSelect(y)}
+                      style={{
+                        width: "30%",
+                        paddingVertical: 10,
+                        alignItems: "center",
+                        borderRadius: 8,
+                        backgroundColor: currentYear === y ? ORANGE : "#F1F5F9",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Text style={{ color: currentYear === y ? "#fff" : "#374151", fontWeight: currentYear === y ? "700" : "500", fontSize: 13 }}>
+                        {y}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
           </View>
         </Pressable>
       </Modal>
@@ -782,18 +894,24 @@ function SellerModal({ seller, onClose }: { seller: Seller | null; onClose: () =
    SELLER CARD (mobile list item)
 ═══════════════════════════════════════════════════════════════════════ */
 function SellerCard({ item, onView, isDesktop }: { item: Seller; onView: () => void; isDesktop?: boolean }) {
+  const handleRedirect = () => {
+    router.push({ pathname: "/Viewseller", params: { sellerId: String(item.id) } });
+  };
+
   return (
     <View style={[styles.sellerCard, isDesktop && styles.sellerCardDesktop]}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Avatar initials={item.initials} color={item.color} size={46} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.sellerCardName}>{item.name}</Text>
-          <Text style={styles.sellerCardSub} numberOfLines={1}>✉  {item.email}</Text>
-          <Text style={styles.sellerCardSub}>📞 {item.phone}</Text>
-        </View>
-        <View style={styles.idBadge}>
-          <Text style={styles.idBadgeText}>#{item.id}</Text>
-        </View>
+        <TouchableOpacity onPress={handleRedirect} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+          <Avatar initials={item.initials} color={item.color} size={46} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.sellerCardName}>{item.name}</Text>
+            <Text style={styles.sellerCardSub} numberOfLines={1}>✉  {item.email}</Text>
+            <Text style={styles.sellerCardSub}>📞 {item.phone}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleRedirect} style={styles.idBadge}>
+          <Text style={[styles.idBadgeText, { color: ORANGE }]}>#{item.id}</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.sellerMetaGrid}>
         {[
@@ -835,13 +953,19 @@ function SellerCard({ item, onView, isDesktop }: { item: Seller; onView: () => v
    DESKTOP SELLER TABLE ROW
 ═══════════════════════════════════════════════════════════════════════ */
 function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onView: () => void }) {
+  const handleRedirect = () => {
+    router.push({ pathname: "/Viewseller", params: { sellerId: String(item.id) } });
+  };
+
   return (
     <View style={[
       styles.tableRow,
       idx % 2 === 0 ? { backgroundColor: "#fff" } : { backgroundColor: "#F8FAFC" },
     ]}>
-      <Text style={[styles.tableCell, { flex: 0.5, fontWeight: "700", color: "#64748B" }]}>#{item.id}</Text>
-      <View style={{ flex: 1.6 }}>
+      <TouchableOpacity onPress={handleRedirect} style={{ flex: 0.5 }}>
+          <Text style={[styles.tableCell, { fontWeight: "700", color: ORANGE }]}>#{item.id}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={handleRedirect} style={{ flex: 1.6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Avatar initials={item.initials} color={item.color} size={32} />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -850,7 +974,7 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
             <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
       <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>{item.business}</Text>
       <Text style={[styles.tableCell, { flex: 0.9 }]}>{item.onboard}</Text>
       <View style={{ flex: 0.7, justifyContent: "center" }}>
@@ -1802,7 +1926,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: DARK_NAV,
+    backgroundColor: "#151D4F",
     paddingVertical: 12, paddingHorizontal: 14,
   },
   tableHeaderCell: {
@@ -1893,11 +2017,11 @@ const styles = StyleSheet.create({
 
   /* Date Input */
   dateInputContainer: {
-    flexDirection: "row", alignItems: "center",
+    flexDirection: "row", alignItems: "center", gap: 8,
     borderWidth: 1, borderColor: BORDER, borderRadius: 8,
     backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 9,
   },
-  dateInput: { flex: 1, fontSize: 13, color: "#374151", outlineStyle: "none", padding: 0 } as any,
+  dateInput: { flex: 1, fontSize: 13, color: "#374151", padding: 0, margin: 0, outlineStyle: "none" } as any,
 
   /* DatePicker Modal */
   datePickerOverlay: {
@@ -1905,7 +2029,7 @@ const styles = StyleSheet.create({
     justifyContent: "center", alignItems: "center",
   },
   datePickerModal: {
-    backgroundColor: "#fff", borderRadius: 12, padding: 16,
+    backgroundColor: "#fff", borderRadius: 12, padding: 16, paddingBottom: 10,
     width: "90%", maxWidth: 350,
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25, shadowRadius: 8, elevation: 8,
@@ -1914,7 +2038,7 @@ const styles = StyleSheet.create({
   datePickerTitle: { fontSize: 16, fontWeight: "700", color: "#1a2332" },
   datePickerWeekHeader: { flexDirection: "row", marginBottom: 8 },
   datePickerWeekDay: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600", color: "#64748B" },
-  datePickerDays: { flexDirection: "row", flexWrap: "wrap", marginBottom: 16 },
+  datePickerDays: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 },
   datePickerDay: { width: "14.28%", aspectRatio: 1, justifyContent: "center", alignItems: "center", borderRadius: 8, marginBottom: 4 },
   datePickerDayEmpty: { backgroundColor: "transparent" },
   datePickerDaySelected: { backgroundColor: ORANGE },

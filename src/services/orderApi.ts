@@ -1,6 +1,5 @@
-import { adminApiRequest, AdminApiError } from "@/lib/api/client";
+import { adminApiRequest, adminApiFetch, AdminApiError } from "@/lib/api/client";
 import { resolveAdminApiBaseUrl } from "@/lib/api/config";
-import { getAdminToken } from "@/lib/api/session";
 import type { OrderSummary, PageResponse } from "@/lib/api/types";
 
 export async function fetchOrders(params?: {
@@ -58,10 +57,15 @@ export async function fetchOrderExportCsv(params?: {
   search?: string;
   sort?: string;
 }): Promise<string> {
-  const token = await getAdminToken();
-  const response = await fetch(getOrderExportUrl(params), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.paymentStatus) q.set("paymentStatus", params.paymentStatus);
+  if (params?.paymentMethod) q.set("paymentMethod", params.paymentMethod);
+  if (params?.search) q.set("search", params.search);
+  if (params?.sort) q.set("sort", params.sort);
+  const qs = q.toString();
+  const path = `/api/admin/orders/export${qs ? `?${qs}` : ""}`;
+  const response = await adminApiFetch(path, { headers: { Accept: "text/csv" } });
   if (!response.ok) {
     throw new Error("Export failed");
   }
@@ -217,10 +221,8 @@ export async function downloadOrderInvoicePdf(
   id: number,
   preferredFileName?: string
 ): Promise<void> {
-  const baseUrl = resolveAdminApiBaseUrl();
-  const token = getAdminToken();
-  const res = await fetch(`${baseUrl}/api/admin/orders/${id}/invoice/pdf`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  const res = await adminApiFetch(`/api/admin/orders/${id}/invoice/pdf`, {
+    headers: { Accept: "application/pdf" },
   });
 
   if (!res.ok) {

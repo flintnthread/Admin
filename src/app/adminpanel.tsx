@@ -50,7 +50,7 @@ const C = {
   red: "#dc2626",
   redBg: "#fee2e2",
   inputBg: "#f0f4ff",
-  tableHeaderBg: "#fff7f0",
+  tableHeaderBg: "#151D4F",
 };
 
 // Role badge colours
@@ -346,74 +346,85 @@ function DeleteModal({ visible, user, onClose, onConfirm }: { visible: boolean; 
 
 // ─── Mobile User Card ─────────────────────────────────────────────────────────
 function UserCard({ user, index, onEdit, onDelete }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void }) {
+  const bg = AVATAR_BG[index % AVATAR_BG.length];
   return (
-    <View style={styles.card}>
-      <View style={styles.cardRow}>
-        <Avatar name={user.name} colorIndex={index} />
-        {/* <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userSub}>{user.username}</Text>
-          <Text style={styles.userSub}>{user.email}</Text>
+    <View style={styles.mobileCard}>
+      {/* Colored top banner */}
+      <View style={[styles.mobileCardBanner, { backgroundColor: bg }]}>
+        <View style={styles.mobileCardAvatarCircle}>
+          <Text style={styles.mobileCardAvatarText}>{initials(user.name)}</Text>
+        </View>
+      </View>
+
+      {/* Card body */}
+      <View style={styles.mobileCardBody}>
+        <Text style={styles.mobileCardName}>{user.name}</Text>
+
+        <View style={styles.mobileCardInfoRow}>
+          <Icon name="mail-outline" size={13} color={C.subtext} />
+          <Text style={styles.mobileCardInfoText} numberOfLines={1}>{user.email}</Text>
+        </View>
+
+        <View style={styles.mobileCardInfoRow}>
+          <Icon name="person-outline" size={13} color={C.subtext} />
+          <Text style={styles.mobileCardInfoText}>{user.username}</Text>
+        </View>
+
+        <View style={styles.mobileCardBadgeRow}>
           <RoleBadge role={user.role} />
-        </View>
-        <View style={{ alignItems: "flex-end", gap: 6 }}>
           <StatusBadge status={user.status} />
-          <View style={styles.timeRow}>
-            <Icon name="time-outline" size={12} color={C.subtext} />
-            <Text style={styles.timeText}>{user.lastLogin}</Text>
-          </View>
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-            <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(user)}>
-              <Icon name="create-outline" size={16} color={C.white} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(user)}>
-              <Icon name="trash-outline" size={16} color={C.white} />
-            </TouchableOpacity>
-          </View>
-        </View> */}
-        <View
-          style={{
-            flex: 1,
-            marginLeft: 12,
-            paddingRight: 110, // reserve space for status/actions
-          }}
-        >
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userSub}>{user.username}</Text>
-          <Text style={styles.userSub}>{user.email}</Text>
+        </View>
+
+        <View style={styles.mobileCardTimeRow}>
+          <Icon name="time-outline" size={12} color={C.subtext} />
+          <Text style={styles.mobileCardTimeText}>
+            {user.lastLogin === "Never" ? "Never logged in" : user.lastLogin}
+          </Text>
+        </View>
+
+        <View style={styles.mobileCardActions}>
+          <TouchableOpacity style={[styles.mobileCardActionBtn, { backgroundColor: C.navy }]} onPress={() => onEdit(user)}>
+            <Icon name="create-outline" size={16} color={C.white} />
+            <Text style={styles.mobileCardActionText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.mobileCardActionBtn, { backgroundColor: C.red }]} onPress={() => onDelete(user)}>
+            <Icon name="trash-outline" size={16} color={C.white} />
+            <Text style={styles.mobileCardActionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Mobile List Row ─────────────────────────────────────────────────────────
+function MobileListRow({ user, index, onEdit, onDelete }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void }) {
+  const bg = AVATAR_BG[index % AVATAR_BG.length];
+  return (
+    <View style={[styles.mobileListRow, index % 2 === 1 && { backgroundColor: "#fafafa" }]}>
+      {/* Avatar */}
+      <View style={[styles.mobileListAvatar, { backgroundColor: bg }]}>
+        <Text style={styles.mobileListAvatarText}>{initials(user.name)}</Text>
+      </View>
+
+      {/* Info */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.mobileListName} numberOfLines={1}>{user.name}</Text>
+        <Text style={styles.mobileListEmail} numberOfLines={1}>{user.email}</Text>
+        <View style={{ flexDirection: "row", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
           <RoleBadge role={user.role} />
-        </View>
-
-        <View
-          style={{
-            width: 100, // fixed width
-            alignItems: "flex-end",
-            gap: 6,
-          }}
-        >
           <StatusBadge status={user.status} />
-
-          <View style={styles.timeRow}>
-            <Icon name="time-outline" size={12} color={C.subtext} />
-            <Text style={styles.timeText}>{user.lastLogin}</Text>
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => onEdit(user)}
-            >
-              <Icon name="create-outline" size={16} color={C.white} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.deleteBtn}
-              onPress={() => onDelete(user)}
-            >
-              <Icon name="trash-outline" size={16} color={C.white} />
-            </TouchableOpacity>
-          </View>
         </View>
+      </View>
+
+      {/* Actions */}
+      <View style={styles.mobileListActions}>
+        <TouchableOpacity style={styles.mobileListEditBtn} onPress={() => onEdit(user)}>
+          <Icon name="create-outline" size={16} color={C.white} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.mobileListDeleteBtn} onPress={() => onDelete(user)}>
+          <Icon name="trash-outline" size={16} color={C.white} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -606,60 +617,67 @@ export default function AdminUsersScreen() {
 
   // ── Mobile Layout ────────────────────────────────────────────────────────
   const MobileLayout = () => (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.navy }}>
-      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>Admin Panel Users</Text>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
       {/* Content */}
-      <View style={{ flex: 1, backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
-          {/* Stats Card */}
-          <View style={styles.statsCard}>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+          {/* Header Card */}
+          <View style={styles.mobileHeaderCard}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={styles.statsIcon}>
-                <Icon name="people" size={26} color={C.orange} />
+              <View style={styles.headerCardIcon}>
+                <Icon name="people" size={26} color={C.white} />
               </View>
-              <View>
-                <Text style={styles.statsLabel}>Total Users</Text>
-                <Text style={styles.statsCount}>{users.length}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerCardSubtitle}>Manage system administrators, roles,{"\n"}permissions, and account statuses</Text>
               </View>
+              <TouchableOpacity style={styles.mobileAddBtn} onPress={() => setAddVisible(true)}>
+                <Icon name="add" size={18} color={C.white} />
+                <Text style={styles.mobileAddBtnText}>Add User</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
-              <Icon name="add" size={18} color={C.white} />
-              <Text style={styles.addBtnText}>Add New User</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* Sort Row */}
-          {/* <View style={styles.sortRow}>
-            <Text style={styles.sortLabel}>Sort By</Text>
-            <View style={{ position: "relative" }}>
-              <TouchableOpacity style={styles.sortBox} onPress={() => setSortOpen(!sortOpen)}>
-                <Text style={styles.sortBoxText}>{sortBy}</Text>
-                <Icon name={sortOpen ? "chevron-up" : "chevron-down"} size={16} color={C.text} />
-              </TouchableOpacity>
-              {sortOpen && (
-                <View style={styles.sortDropdown}>
-                  {["Last Login", "Name"].map(o => (
-                    <TouchableOpacity key={o} style={styles.sortItem}
-                      onPress={() => { setSortBy(o as "Last Login" | "Name"); setSortOpen(false); }}>
-                      <Text style={[styles.sortItemText, o === sortBy && { color: C.orange }]}>{o}</Text>
-                    </TouchableOpacity>
-                  ))}
+          {/* Stats + View Toggle Card */}
+          <View style={styles.mobileStatsCard}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={styles.mobileStatsText}>Total Users: <Text style={styles.mobileStatsCount}>{users.length}</Text></Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={styles.sortLabel}>View:</Text>
+                <View style={styles.viewToggle}>
+                  <TouchableOpacity
+                    style={[styles.viewToggleBtn, viewMode === "grid" && styles.viewToggleBtnActive]}
+                    onPress={() => setViewMode("grid")}>
+                    <Icon name="grid-outline" size={18} color={viewMode === "grid" ? C.white : C.subtext} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.viewToggleBtn, viewMode === "list" && styles.viewToggleBtnActive]}
+                    onPress={() => setViewMode("list")}>
+                    <Icon name="list-outline" size={18} color={viewMode === "list" ? C.white : C.subtext} />
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
             </View>
-          </View> */}
+          </View>
 
-          {/* User Cards */}
-          {paginatedUsers.map((u, i) => (
-            <UserCard key={u.id} user={u} index={i}
-              onEdit={u => setEditUser(u)}
-              onDelete={u => setDeleteUser(u)} />
-          ))}
+          {/* User Cards / List Rows */}
+          {viewMode === "grid"
+            ? paginatedUsers.map((u, i) => (
+              <UserCard key={u.id} user={u} index={i}
+                onEdit={u => setEditUser(u)}
+                onDelete={u => setDeleteUser(u)} />
+            ))
+            : (
+              <View style={styles.mobileListContainer}>
+                {paginatedUsers.map((u, i) => (
+                  <MobileListRow key={u.id} user={u} index={i}
+                    onEdit={u => setEditUser(u)}
+                    onDelete={u => setDeleteUser(u)} />
+                ))}
+              </View>
+            )
+          }
 
           <Pagination
             currentPage={currentPage}
@@ -671,53 +689,33 @@ export default function AdminUsersScreen() {
           />
         </ScrollView>
       </View>
-
-      {/* Bottom Nav */}
-      <View style={styles.bottomNav}>
-        {([
-          { icon: "people", label: "Users", active: true },
-          { icon: "grid-outline", label: "Dashboard", active: false },
-          { icon: "bag-outline", label: "Orders", active: false },
-          { icon: "cube-outline", label: "Products", active: false },
-          { icon: "ellipsis-horizontal", label: "More", active: false },
-        ] as const).map(tab => (
-          <TouchableOpacity key={tab.label} style={styles.navTab}>
-            <Icon name={tab.icon} size={22} color={tab.active ? C.orange : C.subtext} />
-            <Text style={[styles.navTabLabel, tab.active && { color: C.orange }]}>{tab.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
     </SafeAreaView>
   );
 
   // ── Web Layout (NO sidebar) ───────────────────────────────────────────────
   const WebLayout = () => (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 24 }}>
 
-
-
-      {/* ── Page Header ── */}
-      <View style={styles.webPageHeader}>
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-          <View style={styles.headerIconBox}>
-            <Icon name="people" size={24} color={C.white} />
+        {/* ── Page Header ── */}
+        <View style={styles.webPageHeader}>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+            <View style={styles.headerIconBox}>
+              <Icon name="people" size={24} color={C.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.webPageTitle}>Admin Panel Users</Text>
+              <Text style={styles.webPageSubtitle}>Manage system administrators, roles, permissions, and account statuses</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.webPageTitle}>Admin Panel Users</Text>
-            <Text style={styles.webPageSubtitle}>Manage system administrators, roles, permissions, and account statuses</Text>
-          </View>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
+            <Icon name="add" size={18} color={C.white} />
+            <Text style={styles.addBtnText}>Add New User</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setAddVisible(true)}>
-          <Icon name="add" size={18} color={C.white} />
-          <Text style={styles.addBtnText}>Add New User</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Content ── */}
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 16 }}>
 
         {/* Stats + View Toggle Row */}
-        <View style={styles.webStatsRow}>
+        <View style={[styles.webStatsRow, { marginTop: 16 }]}>
           <View style={styles.webTotalBadge}>
             <Text style={styles.webTotalText}>Total Users: <Text style={styles.webTotalCount}>{users.length}</Text></Text>
           </View>
@@ -790,13 +788,6 @@ export default function AdminUsersScreen() {
           onPageChange={setCurrentPage}
         />
 
-        {/* Footer */}
-        <View style={styles.webFooter}>
-          <Text style={styles.webFooterText}>
-            2026 © Flintnthread India Pvt. Ltd. Crafted by{" "}
-            <Text style={{ color: C.orange, fontWeight: "700" }}>Flintnthread India Pvt. Ltd.</Text>
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -852,60 +843,68 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: "600" },
 
   // ── Mobile Top Bar ──
-  topBar: {
+  mobileTopBar: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14,
     backgroundColor: C.navy,
   },
   topBarTitle: { color: C.white, fontSize: 20, fontWeight: "700" },
-  topBarIcons: { flexDirection: "row", alignItems: "center", gap: 14 },
-  topBarAdd: { backgroundColor: C.orange, borderRadius: 10, padding: 8, justifyContent: "center", alignItems: "center" },
-  avatarSmall: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.orange, justifyContent: "center", alignItems: "center" },
-  avatarSmallText: { color: C.white, fontWeight: "700", fontSize: 13 },
-  notifBadge: { position: "absolute", top: -4, right: -4, backgroundColor: C.orange, borderRadius: 8, width: 16, height: 16, justifyContent: "center", alignItems: "center" },
-  notifBadgeText: { color: C.white, fontSize: 10, fontWeight: "700" },
 
-  // ── Stats Card (mobile) ──
-  statsCard: {
-    backgroundColor: C.white, borderRadius: 14, padding: 16,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+  // ── Mobile Header Card ──
+  mobileHeaderCard: {
+    backgroundColor: "#151D4F", borderRadius: 14, padding: 16,
     marginBottom: 16,
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
   },
-  statsIcon: { backgroundColor: C.orangeLight, borderRadius: 12, padding: 10 },
-  statsLabel: { color: C.subtext, fontSize: 13 },
-  statsCount: { color: C.orange, fontSize: 22, fontWeight: "800" },
+  headerCardIcon: { backgroundColor: C.orange, borderRadius: 10, padding: 8 },
+  headerCardTitle: { color: C.white, fontSize: 18, fontWeight: "700" },
+  headerCardSubtitle: { color: "#cbd5e1", fontSize: 12, marginTop: 2 },
+  mobileAddBtn: { backgroundColor: C.orange, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10 },
+  mobileAddBtnText: { color: C.white, fontWeight: "700", fontSize: 13 },
 
-  // ── Add Button ──
-  addBtn: { backgroundColor: C.orange, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10 },
-  addBtnText: { color: C.white, fontWeight: "700", fontSize: 14 },
-
-  // ── Sort ──
-  sortRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: C.white, borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 12,
+  // ── Mobile Stats Card ──
+  mobileStatsCard: {
+    backgroundColor: C.white, borderRadius: 10, padding: 14,
+    marginBottom: 16,
     shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  sortLabel: { color: C.subtext, fontSize: 14 },
-  sortBox: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, minWidth: 140 },
-  sortBoxText: { color: C.text, fontSize: 14, flex: 1 },
-  sortDropdown: { position: "absolute", top: 38, right: 0, backgroundColor: C.white, borderRadius: 8, borderWidth: 1, borderColor: C.border, zIndex: 99, minWidth: 140, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
-  sortItem: { paddingHorizontal: 14, paddingVertical: 10 },
-  sortItemText: { fontSize: 14, color: C.text },
+  mobileStatsText: { color: C.subtext, fontSize: 14 },
+  mobileStatsCount: { color: C.orange, fontWeight: "800", fontSize: 16 },
+
+  // ── Mobile View Toggle ──
+  mobileViewToggleRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
 
   // ── Mobile Card ──
-  card: { backgroundColor: C.white, borderRadius: 14, padding: 14, marginBottom: 10, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  cardRow: { flexDirection: "row", alignItems: "flex-start" },
-  userName: { fontSize: 15, fontWeight: "700", color: C.text, marginBottom: 2 },
-  userSub: { fontSize: 12, color: C.subtext, marginBottom: 2 },
-  timeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  timeText: { fontSize: 11, color: C.subtext },
+  mobileCard: { backgroundColor: C.white, borderRadius: 14, overflow: "hidden", marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  mobileCardBanner: { height: 100, justifyContent: "flex-end", alignItems: "center", paddingBottom: 0 },
+  mobileCardAvatarCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.95)", justifyContent: "center", alignItems: "center", marginBottom: -32, borderWidth: 3, borderColor: C.white },
+  mobileCardAvatarText: { fontSize: 20, fontWeight: "800", color: C.navy },
+  mobileCardBody: { paddingHorizontal: 16, paddingTop: 40, paddingBottom: 16 },
+  mobileCardName: { fontSize: 16, fontWeight: "800", color: C.text, textAlign: "center", marginBottom: 12 },
+  mobileCardInfoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  mobileCardInfoText: { fontSize: 13, color: C.subtext, flex: 1 },
+  mobileCardBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 10, flexWrap: "wrap" },
+  mobileCardTimeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 14 },
+  mobileCardTimeText: { fontSize: 12, color: C.subtext },
+  mobileCardActions: { flexDirection: "row", gap: 8 },
+  mobileCardActionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 8, paddingVertical: 10 },
+  mobileCardActionText: { color: C.white, fontSize: 14, fontWeight: "600" },
 
   // ── Action buttons ──
   editBtn: { backgroundColor: C.navy, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
   deleteBtn: { backgroundColor: C.red, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
+
+  // ── Mobile List Row ──
+  mobileListContainer: { backgroundColor: C.white, borderRadius: 14, overflow: "hidden", marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  mobileListRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.white },
+  mobileListAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  mobileListAvatarText: { color: C.white, fontWeight: "700", fontSize: 14 },
+  mobileListName: { fontSize: 14, fontWeight: "700", color: C.text },
+  mobileListEmail: { fontSize: 12, color: C.subtext, marginTop: 2 },
+  mobileListActions: { flexDirection: "row", gap: 6, flexShrink: 0 },
+  mobileListEditBtn: { backgroundColor: C.navy, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
+  mobileListDeleteBtn: { backgroundColor: C.red, borderRadius: 8, padding: 8, justifyContent: "center", alignItems: "center" },
 
   // ── Pagination ──
   pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
@@ -966,9 +965,9 @@ const styles = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: C.navy,
+    backgroundColor: "#151D4F",
     borderRadius: 12,
-    marginHorizontal: 24,
+    //marginHorizontal: 24,
     marginTop: 24,
   },
   webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },
@@ -999,7 +998,7 @@ const styles = StyleSheet.create({
   tableHeader: { backgroundColor: C.tableHeaderBg },
   tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
   tableCell: { paddingRight: 8 },
-  tableHeadCell: { paddingRight: 8, fontSize: 12, fontWeight: "700", color: C.subtext, textTransform: "uppercase", letterSpacing: 0.5 },
+  tableHeadCell: { paddingRight: 8, fontSize: 12, fontWeight: "700", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
 
   // ── Grid ──
   gridContainer: { flexDirection: "row", flexWrap: "wrap", gap: 20, marginBottom: 20 },
@@ -1019,7 +1018,6 @@ const styles = StyleSheet.create({
   gridName: { fontSize: 16, fontWeight: "800", color: C.text, textAlign: "center", marginBottom: 10 },
   gridInfoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
   gridInfoText: { fontSize: 12, color: C.subtext, flex: 1 },
-  // gridBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 8, marginBottom: 6 },
   gridBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1037,4 +1035,12 @@ const styles = StyleSheet.create({
   // ── Web Footer ──
   webFooter: { paddingTop: 24, paddingBottom: 8, alignItems: "center" },
   webFooterText: { fontSize: 13, color: C.subtext },
+
+  // ── Shared ──
+  timeText: { fontSize: 11, color: C.subtext },
+  userName: { fontSize: 15, fontWeight: "700", color: C.text, marginBottom: 2 },
+  userSub: { fontSize: 12, color: C.subtext, marginBottom: 2 },
+  sortLabel: { color: C.subtext, fontSize: 14 },
+  addBtn: { backgroundColor: C.orange, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10 },
+  addBtnText: { color: C.white, fontWeight: "700", fontSize: 14 },
 });

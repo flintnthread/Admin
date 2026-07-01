@@ -14,6 +14,8 @@ import {
   type CategoryRow,
   type CategoryCounts,
 } from "@/services/categoryApi";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
 import {
   Alert,
   Image,
@@ -1308,7 +1310,7 @@ const ListTable = ({
           style={[
             styles.cell,
             styles.colAction,
-            { flexDirection: "row", gap: 6, justifyContent: "center" },
+            { flexDirection: "row", gap: 6, justifyContent: "center", paddingRight: 16 },
           ]}
         >
           <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(cat)}>
@@ -1326,9 +1328,125 @@ const ListTable = ({
   </View>
 );
 
+// ─── Mobile List Card ─────────────────────────────────────────────────────────
+// Used only on mobile when viewMode === "list". Desktop uses ListTable above.
+
+const MobileListCard = ({
+  cat,
+  onEdit,
+  onDelete,
+}: {
+  cat: Category;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => (
+  <View style={styles.mobileCard}>
+    {/* Top row: image + main info */}
+    <View style={styles.mobileCardTop}>
+      {/* Thumbnail */}
+      <View style={styles.mobileCardThumb}>
+        {cat.image ? (
+          <Image
+            source={{ uri: cat.image }}
+            style={styles.mobileCardImg}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.mobileCardImgPlaceholder}>
+            <LayersIcon color={C.navy} />
+          </View>
+        )}
+      </View>
+
+      {/* Name + S.No + Type */}
+      <View style={styles.mobileCardInfo}>
+        <View style={styles.mobileCardNameRow}>
+          <Text style={styles.mobileCardName} numberOfLines={2}>
+            {cat.name}
+          </Text>
+          <View style={styles.snoBadge}>
+            <Text style={styles.snoText}>#{cat.id}</Text>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.typeTag,
+            cat.type === "Main Category" ? styles.typeTagMain : styles.typeTagSub,
+          ]}
+        >
+          <Text
+            style={[
+              styles.typeTagText,
+              cat.type === "Main Category"
+                ? styles.typeTagTextMain
+                : styles.typeTagTextSub,
+            ]}
+          >
+            {cat.type === "Main Category"
+              ? "⊟ Main Category"
+              : `↳ ${cat.parent || "Category"}`}
+          </Text>
+        </View>
+      </View>
+    </View>
+
+    {/* Chips row: HSN + GST */}
+    <View style={styles.mobileCardChips}>
+      <View style={styles.hsnChip}>
+        <HsnIcon />
+        <Text style={styles.hsnChipText}>HSN: {cat.hsn}</Text>
+      </View>
+      <View style={styles.gstChip}>
+        <GstIcon />
+        <Text style={styles.gstChipText}>GST: {cat.gst}</Text>
+      </View>
+    </View>
+
+    {/* Footer: date + status + actions */}
+    <View style={styles.mobileCardFooter}>
+      <View style={styles.mobileCardFooterLeft}>
+        <View style={styles.dateRow}>
+          <CalendarIcon />
+          <Text style={styles.dateText}>{cat.created}</Text>
+        </View>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: cat.status === "Active" ? "#DCFCE7" : "#FEE2E2" },
+          ]}
+        >
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: cat.status === "Active" ? "#16A34A" : "#DC2626" },
+            ]}
+          />
+          <Text
+            style={[
+              styles.statusText,
+              { color: cat.status === "Active" ? "#16A34A" : "#DC2626" },
+            ]}
+          >
+            {cat.status}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.mobileCardActions}>
+        <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+          <EditIcon />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
+          <TrashIcon />
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+);
 
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 
 export default function MainCategories() {
   const { width } = useWindowDimensions();
@@ -1338,6 +1456,7 @@ export default function MainCategories() {
   const [search, setSearch] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [mainCatModalOpen, setMainCatModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
@@ -1347,6 +1466,7 @@ export default function MainCategories() {
   const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const mainCats = await fetchMainCategories();
       const allCats: Category[] = mainCats.map((row: CategoryRow) => ({
         id: row.id,
@@ -1365,7 +1485,7 @@ export default function MainCategories() {
           year: "numeric",
         }),
         status: row.status ? "Active" : "Inactive",
-        image: row.categoryImage || row.mobileImage || row.bannerImage,
+        image: pickCategoryImageUrl(row, "categories"),
       }));
 
       // Fetch subcategories for each main category
@@ -1390,13 +1510,15 @@ export default function MainCategories() {
               year: "numeric",
             }),
             status: row.status ? "Active" : "Inactive",
-            image: row.categoryImage || row.mobileImage || row.bannerImage,
+            image: pickCategoryImageUrl(row, "categories"),
           });
         });
       }
 
       setCategories(allCats);
     } catch (error) {
+      const message = getApiErrorMessage(error, "Failed to load categories.");
+      setLoadError(message);
       console.error("Failed to load categories:", error);
     } finally {
       setLoading(false);
@@ -1475,7 +1597,7 @@ export default function MainCategories() {
             year: "numeric",
           }),
           status: newRow.status ? "Active" : "Inactive",
-          image: data.image || data.mobileImage || data.bannerImage || newRow.categoryImage,
+          image: pickCategoryImageUrl(newRow, "categories") || data.image || undefined,
         };
         setCategories((prev) => [newCat, ...prev]);
         setCurrentPage(1);
@@ -1554,6 +1676,15 @@ export default function MainCategories() {
           </View>
         </View>
 
+        {loadError ? (
+          <View style={{ marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 8, backgroundColor: "#FEF2F2" }}>
+            <Text style={{ color: "#DC2626", fontSize: 13 }}>{loadError}</Text>
+            <TouchableOpacity onPress={() => void loadCategories()} style={{ marginTop: 8 }}>
+              <Text style={{ color: "#1E3A5F", fontWeight: "600", fontSize: 13 }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* ── Toolbar ── */}
         <View style={styles.toolbar}>
           {/* Search */}
@@ -1624,13 +1755,6 @@ export default function MainCategories() {
           </View>
         </View>
 
-        {/* ── Count Row ── */}
-        <View style={styles.countRow}>
-          <Text style={styles.countText}>
-            Showing {paginated.length} of {filtered.length} categories
-          </Text>
-        </View>
-
         {/* ── Content ── */}
         {viewMode === "grid" ? (
           // ✅ UPDATED: wrapper View per card handles responsive width
@@ -1659,17 +1783,17 @@ export default function MainCategories() {
             onDelete={handleDelete}
           />
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ minWidth: 900 }}
-          >
-            <ListTable
-              categories={paginated}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          </ScrollView>
+          // Mobile list view: card-based, no horizontal scrolling
+          <View style={styles.mobileCardList}>
+            {paginated.map((cat) => (
+              <MobileListCard
+                key={cat.id}
+                cat={cat}
+                onEdit={() => handleEdit(cat)}
+                onDelete={() => handleDelete(cat)}
+              />
+            ))}
+          </View>
         )}
 
         {filtered.length === 0 && (
@@ -1737,7 +1861,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
   },
-  pageHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  pageHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, flexShrink: 1 },
   pageIconWrap: {
     width: 44,
     height: 44,
@@ -1752,7 +1876,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: -0.3,
   },
-  pageSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  pageSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.90)", marginTop: 2, flexShrink: 1, flexWrap: "wrap" },
 
   // ── Toolbar ───────────────────────────────────────────────────────────────
   toolbar: {
@@ -1992,6 +2116,87 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  // ── Mobile List Cards ─────────────────────────────────────────────────────
+  mobileCardList: {
+    gap: 12,
+  },
+  mobileCard: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 14,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 12,
+  },
+  mobileCardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  mobileCardThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: C.navyLight,
+    flexShrink: 0,
+  },
+  mobileCardImg: {
+    width: "100%",
+    height: "100%",
+  },
+  mobileCardImgPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileCardInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  mobileCardNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  mobileCardName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.text,
+    flex: 1,
+  },
+  mobileCardChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  mobileCardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    paddingTop: 10,
+  },
+  mobileCardFooterLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    flex: 1,
+  },
+  mobileCardActions: {
+    flexDirection: "row",
+    gap: 8,
+    flexShrink: 0,
+  },
+
   // ── Table ─────────────────────────────────────────────────────────────────
   tableWrapper: {
     backgroundColor: C.surface,
@@ -2032,15 +2237,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  colSno: { width: 60 },
-  colImage: { width: 80 },
-  colName: { flex: 1, minWidth: 100 },
-  colType: { flex: 1, minWidth: 110 },
-  colHsn: { flex: 1, minWidth: 90 },
-  colGst: { flex: 1, minWidth: 80 },
-  colDate: { flex: 1, minWidth: 110 },
-  colStatus: { flex: 1, minWidth: 90 },
-  colAction: { width: 90 },
+  colSno: { width: 56 },
+  colImage: { width: 72 },
+  colName: { flex: 2.2, minWidth: 160 },
+  colType: { flex: 1.2, minWidth: 110 },
+  colHsn: { flex: 0.9, minWidth: 80 },
+  colGst: { flex: 0.6, minWidth: 60 },
+  colDate: { flex: 0.9, minWidth: 100 },
+  colStatus: { flex: 0.8, minWidth: 80 },
+  colAction: { width: 100 },
 
   tdSno: { fontSize: 14, fontWeight: "700", color: C.sub },
   tableThumb: { width: 50, height: 50, borderRadius: 10 },

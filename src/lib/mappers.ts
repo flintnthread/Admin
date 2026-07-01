@@ -35,6 +35,21 @@ export function mapSellerToApprovedRow(s: SellerSummary) {
     state: normalizeLocation(s.state),
     city: normalizeLocation(s.city),
     status: s.status === "suspended" ? ("Blocked" as const) : ("Active" as const),
+    mobile: s.mobile ?? "",
+    bankName: s.bankName ?? "",
+    accountNumber: s.accountNumber ?? "",
+    ifscCode: s.ifscCode ?? "",
+    accountHolder: s.accountHolder ?? "",
+    branchName: s.branchName ?? "",
+    sellerUniqueId: s.sellerUniqueId ?? "",
+    referralCode: s.referralCode ?? "",
+    gstNumber: s.businessType === "Individual" || !s.businessType ? "No" : (s.businessName ? "Yes" : "—"),
+    panNumber: "",
+    country: s.country ?? "India",
+    totalOrders: Number(s.totalOrders ?? 0),
+    profilePicPath: s.profilePicPath,
+    liveSelfiePath: s.liveSelfiePath,
+    profilePicUrl: s.profilePicUrl,
   };
 }
 

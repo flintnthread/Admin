@@ -9,6 +9,7 @@ import {
   type PendingProfileSeller,
 } from "@/services/sellerApi";
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -126,26 +127,23 @@ export default function PendingSellersScreen() {
         {/* ── Dark-blue header container ── */}
         <View style={styles.headerContainer}>
           {isMobile ? (
-            <View style={{ flexDirection: "column", gap: 10 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, marginRight: 8 }}>
-                  <View style={[styles.headerIconBox, { marginRight: 0 }]}>
-                    <Feather name="users" size={20} color="#fff" />
-                  </View>
-                  <Text style={[styles.title, { flex: 1, fontSize: 18 }]} numberOfLines={2}>Pending seller profiles</Text>
-                </View>
-                <TouchableOpacity style={styles.refreshBtn} onPress={() => void load()}>
-                  <Feather name="refresh-cw" size={16} color={ORANGE} />
-                  <Text style={styles.refreshText}>Refresh</Text>
+            <View style={{ flexDirection: "column", gap: 2 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <TouchableOpacity onPress={() => router.back()} style={{ padding: 4, marginRight: 10 }}>
+                  <Feather name="arrow-left" size={24} color="#fff" />
                 </TouchableOpacity>
+                <Text style={[styles.title, { flex: 1, fontSize: 18 }]}>Pending seller profiles</Text>
               </View>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.subtitle, { marginLeft: 42, marginTop: 0 }]}>
                 Sellers who completed KYC and are waiting for admin approval
               </Text>
             </View>
           ) : (
             <View style={styles.header}>
               <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+                <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
+                  <Feather name="arrow-left" size={24} color="#fff" />
+                </TouchableOpacity>
                 <View style={styles.headerIconBox}>
                   <Feather name="users" size={20} color="#fff" />
                 </View>
@@ -324,11 +322,12 @@ const styles = StyleSheet.create({
 
   // ── Header container: dark blue background ──
   headerContainer: {
-    backgroundColor: NAVY,
+    backgroundColor: "#151D4F",
     borderRadius: 12,
     padding: 16,
   },
-  header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
+  header: {
+    marginHorizontal: 2, marginTop: 12, borderRadius: 22,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

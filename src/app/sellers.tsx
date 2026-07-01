@@ -354,57 +354,78 @@ const GridCard = ({
 
   return (
     <View style={[GC.card, { width: cardWidth as any }]}>
-      {/* Banner — only real DB image */}
-      <View style={GC.bannerWrap} {...(imageHoverProps as any)}>
-        {bannerUri ? (
-          <Image
-            source={{ uri: bannerUri }}
-            style={GC.banner}
-            onError={() => {
-              if (bannerIndex < candidates.length - 1) setBannerIndex((i) => i + 1);
-            }}
-          />
-        ) : (
-          <View style={[GC.banner, GC.bannerEmpty]}>
-            <IconPerson size={36} color="rgba(255,255,255,0.9)" />
-          </View>
-        )}
-        {/* Hover Overlay with View Option */}
-        {(isImageHovered || !IS_WEB) && (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={onView}
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: 'rgba(0, 0, 0, 0.4)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              zIndex: 10,
-            }}
-          >
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: '#fff',
-              paddingVertical: 8,
-              paddingHorizontal: 16,
-              borderRadius: 20,
-              gap: 6,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              elevation: 4,
-            }}>
-              <IconEye size={16} color="#1E3A8A" />
-              <Text style={{ color: '#1E3A8A', fontWeight: '700', fontSize: 13 }}>View Profile</Text>
+      {/* Banner */}
+      {IS_WEB ? (
+        <View style={GC.bannerWrap} {...(imageHoverProps as any)}>
+          {bannerUri ? (
+            <Image
+              source={{ uri: bannerUri }}
+              style={GC.banner}
+              onError={() => {
+                if (bannerIndex < candidates.length - 1) setBannerIndex((i) => i + 1);
+              }}
+            />
+          ) : (
+            <View style={[GC.banner, GC.bannerEmpty]}>
+              <IconPerson size={36} color="rgba(255,255,255,0.9)" />
             </View>
-          </TouchableOpacity>
-        )}
-        {/* S.No badge top-right */}
-        <View style={GC.snoBadge}>
-          <Text style={GC.snoTxt}>S.No: {seller.serialNo}</Text>
+          )}
+          {isImageHovered && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={onView}
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 10,
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#fff',
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 20,
+                gap: 6,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 4,
+              }}>
+                <IconEye size={16} color="#1E3A8A" />
+                <Text style={{ color: '#1E3A8A', fontWeight: '700', fontSize: 13 }}>View Profile</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onView}
+          style={GC.bannerWrap}
+        >
+          {bannerUri ? (
+            <Image
+              source={{ uri: bannerUri }}
+              style={GC.banner}
+              onError={() => {
+                if (bannerIndex < candidates.length - 1) setBannerIndex((i) => i + 1);
+              }}
+            />
+          ) : (
+            <View style={[GC.banner, GC.bannerEmpty]}>
+              <IconPerson size={36} color="rgba(255,255,255,0.9)" />
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
+      {/* S.No badge top-right */}
+      <View style={GC.snoBadge}>
+        <Text style={GC.snoTxt}>S.No: {seller.serialNo}</Text>
       </View>
 
       {/* Card body */}
@@ -641,8 +662,8 @@ const ListRow = ({
 };
 
 const LV = StyleSheet.create({
-  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, width: '100%' },
-  hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 16 },
+  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#151D4F', borderBottomWidth: 2, borderBottomColor: C.border, width: '100%' },
+  hcell: { fontSize: 11, fontWeight: '700', color: '#fff', textTransform: 'uppercase', paddingRight: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, width: '100%' },
   mrow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   cell: { fontSize: 13, color: C.sub, paddingRight: 16 },
@@ -815,7 +836,7 @@ export default function SellersScreen() {
         </View>
 
         {/* ── Stat Cards Row ── */}
-        <View style={[SS.statGrid, isMobile && { paddingHorizontal: 0, marginHorizontal: 16, gap: 10 }]}>
+        <View style={[SS.statGrid, Platform.OS !== 'web' && { paddingHorizontal: 0, marginHorizontal: 16, gap: 10 }]}>
           {[
             { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
             { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
@@ -824,9 +845,9 @@ export default function SellersScreen() {
             { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
             { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
           ].map((c) => (
-            <View key={c.label} style={[SS.statCard, isMobile && { width: "48.5%", minWidth: undefined, flex: undefined, padding: 10 }]}>
+            <View key={c.label} style={[SS.statCard, Platform.OS !== 'web' && { width: "48%", minWidth: 0, flex: 0, padding: 10 }]}>
               <View style={{ flex: 1 }}>
-                <Text style={SS.statLabel}>{isMobile ? c.label : c.label.toUpperCase()}</Text>
+                <Text style={SS.statLabel}>{Platform.OS !== 'web' ? c.label : c.label.toUpperCase()}</Text>
                 <Text style={SS.statValue}>{c.value}</Text>
                 <Text style={SS.statSub}>{c.sub}</Text>
               </View>
@@ -977,7 +998,7 @@ const SS = StyleSheet.create({
   backButton: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
   backButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600', marginLeft: 4 },
   headerContainer: {
-    backgroundColor: "#1d324e",
+    backgroundColor: "#151D4F",
     marginHorizontal: 18,
     marginTop: 22,
     borderRadius: 22,
