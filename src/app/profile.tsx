@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 import React, { useState } from "react";
 import {
   View,
@@ -13,21 +11,9 @@ import {
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
->>>>>>> 4f8346cb348e887c2e6c674eeef810b6206698f4
 import AdminLayout from "@/components/admin-layout";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "@/hooks/use-theme";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
 
 export default function ProfileScreen() {
   const { user } = useAuth();
@@ -70,17 +56,6 @@ export default function ProfileScreen() {
         contentContainerStyle={{ padding: isMobile ? 0 : 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-<<<<<<< HEAD
-        {/* Page Header Banner */}
-        <View style={styles.pageHeader}>
-          <View style={styles.pageHeaderLeft}>
-            <Text style={{ fontFamily: "bootstrap-icons", color: "#FFFFFF", fontSize: 20 }}>{"\uF425"}</Text>
-            <Text style={styles.pageTitle}>Admin Profile</Text>
-          </View>
-        </View>
-
-        <View style={styles.contentContainer}>
-=======
         <View style={[styles.pageHeaderWrapper, isMobile && { marginHorizontal: 12, marginTop: 12, borderRadius: 16, padding: 16 }]}>
           {/* Header Breadcrumb */}
           <View style={styles.breadcrumb}>
@@ -95,7 +70,6 @@ export default function ProfileScreen() {
         </View>
 
         <View style={[styles.contentContainer, isMobile && { flexDirection: "column", paddingHorizontal: 12, marginTop: 0 }]}>
->>>>>>> 4f8346cb348e887c2e6c674eeef810b6206698f4
           {/* Left Column: Avatar & Role */}
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, !isMobile && { flex: 1 }, isMobile && { width: "100%" }]}>
             <View style={styles.avatarSection}>
