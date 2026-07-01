@@ -12,12 +12,11 @@
 //   Then replace the two import lines below accordingly.
 
 import AdminLayout from "@/components/admin-layout";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -142,6 +141,123 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => (
     </Text>
   </View>
 );
+// ─────────────────────────────────────────────────────────────
+// STATUS DROPDOWN
+// ─────────────────────────────────────────────────────────────
+const STATUS_OPTIONS = ["Active", "Inactive"] as const;
+
+const StatusDropdown = ({
+  value,
+  onChange,
+}: {
+  value: "Active" | "Inactive";
+  onChange: (v: "Active" | "Inactive") => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const dims = useWindowDimensions();
+  const isMobile = dims.width < 768;
+
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        setMenuPosition({ top: pageY + height, left: pageX, width });
+      });
+    }
+    setOpen((o) => !o);
+  };
+
+  if (!isMobile) {
+    return (
+      <View style={S.dropdownWrapper}>
+        <TouchableOpacity
+          style={[S.dropdownBtn, open && S.dropdownBtnOpen]}
+          onPress={() => setOpen((o) => !o)}
+          activeOpacity={0.85}
+        >
+          <Text style={S.dropdownBtnText}>{value}</Text>
+          <Ionicons
+            name="chevron-down"
+            size={18}
+            color="#e07820"
+            style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
+          />
+        </TouchableOpacity>
+
+        {open && (
+          <>
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={() => setOpen(false)}
+              hitSlop={{ top: 600, bottom: 600, left: 600, right: 600 }}
+            />
+            <View style={S.dropdownList}>
+              {STATUS_OPTIONS.map((opt) => {
+                const isSelected = value === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[S.dropdownItem, isSelected && S.dropdownItemSelected]}
+                    onPress={() => { onChange(opt); setOpen(false); }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[S.dropdownItemText, isSelected && S.dropdownItemTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={S.dropdownWrapper} ref={triggerRef}>
+      <TouchableOpacity
+        style={[S.dropdownBtn, open && S.dropdownBtnOpen]}
+        onPress={handlePress}
+        activeOpacity={0.85}
+      >
+        <Text style={S.dropdownBtnText}>{value}</Text>
+        <Ionicons
+          name="chevron-down"
+          size={18}
+          color="#e07820"
+          style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
+        />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={[S.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
+            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
+              {STATUS_OPTIONS.map((opt) => {
+                const isSelected = value === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[S.dropdownItem, isSelected && S.dropdownItemSelected]}
+                    onPress={() => { onChange(opt); setOpen(false); }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[S.dropdownItemText, isSelected && S.dropdownItemTextSelected]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────
 // GRID CARD
@@ -370,48 +486,57 @@ const SizeForm: React.FC<{
   name: string; setName: (v: string) => void;
   code: string; setCode: (v: string) => void;
   status: "Active" | "Inactive"; setStatus: (v: "Active" | "Inactive") => void;
-}> = ({ name, setName, code, setCode, status, setStatus }) => (
-  <View>
-    <Text style={S.label}>Size Name</Text>
-    <TextInput
-      style={S.input}
-      value={name}
-      onChangeText={setName}
-      placeholder="Enter size name"
-      placeholderTextColor="#bbb"
-    />
+}> = ({ name, setName, code, setCode, status, setStatus }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 600;
 
-    <Text style={S.label}>Size Code</Text>
-    <TextInput
-      style={S.input}
-      value={code}
-      onChangeText={setCode}
-      placeholder="Enter size code"
-      placeholderTextColor="#bbb"
-    />
+  return (
+    <View>
+      <Text style={S.label}>Size Name</Text>
+      <TextInput
+        style={S.input}
+        value={name}
+        onChangeText={setName}
+        placeholder="Enter size name"
+        placeholderTextColor="#bbb"
+      />
 
-    <Text style={S.label}>Status</Text>
-    <View style={S.statusToggleRow}>
-      {(["Active", "Inactive"] as const).map(s => (
-        <TouchableOpacity
-          key={s}
-          style={[S.statusToggleBtn, status === s && S.statusToggleBtnActive]}
-          onPress={() => setStatus(s)}
-        >
-          {/* Bootstrap: check-circle / x-circle */}
-          <BI
-            name={s === "Active" ? "check-circle" : "x-circle"}
-            size={14}
-            color={status === s ? "#fff" : "#888"}
-          />
-          <Text style={[S.statusToggleBtnText, status === s && { color: "#fff" }, { marginLeft: 6 }]}>
-            {s}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      <Text style={S.label}>Size Code</Text>
+      <TextInput
+        style={S.input}
+        value={code}
+        onChangeText={setCode}
+        placeholder="Enter size code"
+        placeholderTextColor="#bbb"
+      />
+
+      <Text style={S.label}>Status</Text>
+      {isMobile ? (
+        <StatusDropdown value={status} onChange={setStatus} />
+      ) : (
+        <View style={S.statusToggleRow}>
+          {(["Active", "Inactive"] as const).map(s => (
+            <TouchableOpacity
+              key={s}
+              style={[S.statusToggleBtn, status === s && S.statusToggleBtnActive]}
+              onPress={() => setStatus(s)}
+            >
+              {/* Bootstrap: check-circle / x-circle */}
+              <BI
+                name={s === "Active" ? "check-circle" : "x-circle"}
+                size={14}
+                color={status === s ? "#fff" : "#888"}
+              />
+              <Text style={[S.statusToggleBtnText, status === s && { color: "#fff" }, { marginLeft: 6 }]}>
+                {s}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
-  </View>
-);
+  );
+};
 
 // ─────────────────────────────────────────────────────────────
 // MODAL FOOTER BUTTONS
@@ -675,8 +800,8 @@ export default function SizesManagement() {
               <Text style={S.webPageTitle}>{isMobile ? "Sizes" : "Sizes Management"}</Text>
               {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
             </View>
-            <TouchableOpacity 
-              style={[S.addBtn, isMobile && S.addBtnMobile]} 
+            <TouchableOpacity
+              style={[S.addBtn, isMobile && S.addBtnMobile]}
               onPress={() => setModal({ type: "add" })}
             >
               <BI name="plus-lg" size={15} color="#fff" />
@@ -820,7 +945,7 @@ const S = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor:   "#151D4F",
+    backgroundColor: "#151D4F",
     borderRadius: 12,
     marginHorizontal: 16,
     marginTop: 16,
@@ -921,11 +1046,11 @@ const S = StyleSheet.create({
 
   // List view
   listHeader: {
-    flexDirection: "row", backgroundColor: "#fff8f2",
+    flexDirection: "row", backgroundColor: "#151D4F",
     paddingHorizontal: 12, paddingVertical: 12,
     borderBottomWidth: 1.5, borderBottomColor: "#f0e8e0",
   },
-  listHeaderCell: { fontSize: 13, fontWeight: "600", color: "#555" },
+  listHeaderCell: { fontSize: 13, fontWeight: "600", color: "#fff" },
   listRow: {
     flexDirection: "row", paddingHorizontal: 12, paddingVertical: 13,
     borderBottomWidth: 1, borderBottomColor: "#f5f0eb", alignItems: "center",
@@ -1035,4 +1160,43 @@ const S = StyleSheet.create({
   deleteSubtitle: {
     fontSize: 14, color: "#666", textAlign: "center", lineHeight: 20, paddingHorizontal: 8,
   },
+
+  // Dropdown styles
+  dropdownWrapper: { position: "relative", zIndex: 100 },
+  dropdownOverlay: { position: "absolute", paddingHorizontal: 0, zIndex: 9999 },
+  dropdownMenu: {
+    backgroundColor: "#fff", borderRadius: 12,
+    borderWidth: 1, borderColor: "#e5e7eb",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
+    overflow: "hidden", width: "100%", zIndex: 10000,
+  },
+  dropdownBtn: {
+    borderWidth: 1.5, borderColor: "#ddd", borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 11,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: "#fafafa",
+  },
+  dropdownBtnOpen: {
+    borderColor: "#e07820",
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomWidth: 0,
+  },
+  dropdownBtnText: { fontSize: 14, color: "#333" },
+  dropdownList: {
+    position: "absolute",
+    top: "100%" as any,
+    left: 0, right: 0,
+    backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: "#e07820", borderTopWidth: 0,
+    borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
+    overflow: "hidden", zIndex: 200,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1, shadowRadius: 10, elevation: 16,
+  },
+  dropdownItem: { paddingHorizontal: 16, paddingVertical: 13, backgroundColor: "#fff" },
+  dropdownItemSelected: { backgroundColor: "#2563eb" },
+  dropdownItemText: { fontSize: 14, color: "#222" },
+  dropdownItemTextSelected: { color: "#fff", fontWeight: "600" },
 });

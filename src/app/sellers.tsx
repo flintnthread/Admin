@@ -662,8 +662,8 @@ const ListRow = ({
 };
 
 const LV = StyleSheet.create({
-  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#FFF5EC', borderBottomWidth: 2, borderBottomColor: C.border, width: '100%' },
-  hcell: { fontSize: 11, fontWeight: '700', color: C.sub, textTransform: 'uppercase', paddingRight: 16 },
+  hrow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#151D4F', borderBottomWidth: 2, borderBottomColor: C.border, width: '100%' },
+  hcell: { fontSize: 11, fontWeight: '700', color: '#fff', textTransform: 'uppercase', paddingRight: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border, width: '100%' },
   mrow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   cell: { fontSize: 13, color: C.sub, paddingRight: 16 },

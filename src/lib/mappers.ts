@@ -325,7 +325,7 @@ export function mapBankPendingRow(s: SellerSummary) {
     branch: s.branchName ?? "—",
     account: maskAccount(s.accountNumber),
     ifsc: s.ifscCode ?? "—",
-    status: s.bankVerified ? "approved" : "pending",
+    status: (s.bankVerified ? "approved" : "pending") as "approved" | "pending",
     statusLabel: s.bankVerified ? "Approved" : "Pending",
     requested: formatDate(s.updatedAt ?? s.createdAt),
     sellerConfirm: formatDate(s.updatedAt ?? s.createdAt),

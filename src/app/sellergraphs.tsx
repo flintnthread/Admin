@@ -402,6 +402,9 @@ function DatePicker({ value, onChange, placeholder }: {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  const { width: screenW } = Dimensions.get("window");
+  const isMobile = screenW < 768;
+
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
@@ -457,13 +460,18 @@ function DatePicker({ value, onChange, placeholder }: {
         onPress={handleOpenPicker}
         style={({ hovered }: any) => [
           styles.dateInputContainer,
-          hovered && { backgroundColor: "#FFF7ED" }
+          hovered && { backgroundColor: "#FFF7ED" },
+          isMobile && { paddingHorizontal: 6, paddingVertical: 8 }
         ]}
       >
-        <Ionicons name="calendar" size={16} color="#64748B" />
+        <Ionicons name="calendar" size={isMobile ? 13 : 16} color="#64748B" />
         <TextInput
           value={value} editable={false} placeholder={placeholder}
-          placeholderTextColor="#94A3B8" style={styles.dateInput}
+          placeholderTextColor="#94A3B8"
+          style={[
+            styles.dateInput,
+            isMobile && { fontSize: 11 }
+          ]}
           pointerEvents="none"
         />
       </Pressable>
@@ -1918,7 +1926,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: DARK_NAV,
+    backgroundColor: "#151D4F",
     paddingVertical: 12, paddingHorizontal: 14,
   },
   tableHeaderCell: {
