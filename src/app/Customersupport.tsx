@@ -116,6 +116,33 @@ const TicketIcon = () => (
   </Svg>
 );
 
+const StatTotalIcon = ({ color = "#F97316" }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const StatOpenIcon = ({ color = "#10B981" }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} />
+    <Path d="M8 12l3 3 5-5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const StatProgressIcon = ({ color = "#F59E0B" }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} />
+    <Path d="M12 6v6l4 2" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const StatClosedIcon = ({ color = "#6B7280" }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} />
+    <Path d="M15 9l-6 6M9 9l6 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // â”€â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Tickets loaded from /api/admin/contacts
 
@@ -204,17 +231,12 @@ const FilterModal = ({
             isWeb ? styles.modalWeb : styles.modalMobile,
           ]}
         >
-          {/* Mobile handle */}
-          {!isWeb && <View style={styles.mobileHandle} />}
-
-          {/* Header */}
+          {/* Header — navy blue */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
-            {isWeb && (
-              <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-                <XIcon />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+              <XIcon />
+            </TouchableOpacity>
           </View>
 
           {/* Options */}
@@ -247,13 +269,13 @@ const FilterModal = ({
             })}
             {/* Clear option */}
             <TouchableOpacity
-              style={styles.modalOption}
+              style={[styles.modalOption, styles.modalOptionClear]}
               onPress={() => {
                 onSelect("");
                 onClose();
               }}
             >
-              <Text style={[styles.modalOptionText, { color: "#9CA3AF" }]}>
+              <Text style={styles.modalOptionClearText}>
                 Clear filter
               </Text>
             </TouchableOpacity>
@@ -324,86 +346,47 @@ interface WebTableProps {
 }
 
 const WebTable = ({ tickets, onView, onRefresh }: WebTableProps) => (
-  <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScrollWrapper}>
-    <View style={styles.tableWrapper}>
-      {/* Table Header */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.th, { width: 120, minWidth: 120 }]}>ID</Text>
-        <Text style={[styles.th, { width: 200, minWidth: 200 }]}>Subject</Text>
-        <Text style={[styles.th, { width: 180, minWidth: 180 }]}>Customer</Text>
-        <Text style={[styles.th, { width: 130, minWidth: 130 }]}>Type</Text>
-        <Text style={[styles.th, { width: 160, minWidth: 160 }]}>Order</Text>
-        <Text style={[styles.th, { width: 110, minWidth: 110 }]}>Status</Text>
-        <Text style={[styles.th, { width: 120, minWidth: 120 }]}>Created</Text>
-        <Text style={[styles.th, { width: 100, minWidth: 100, textAlign: "center" }]}>
-          Actions
-        </Text>
-      </View>
-
-      {/* Table Rows */}
-      {tickets.map((ticket, idx) => (
-        <View
-          key={ticket.id}
-          style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
-        >
-          <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdId]} numberOfLines={2}>{ticket.id}</Text>
-          <Text style={[styles.td, { width: 200, minWidth: 200 }]} numberOfLines={2}>
-            {ticket.subject}
-          </Text>
-          <View
-            style={[{ width: 180, minWidth: 180, paddingVertical: 13, paddingHorizontal: 12 }]}
-          >
-            <Text style={styles.tdCustomerName}>{ticket.customer}</Text>
-            <Text style={styles.tdCustomerEmail} numberOfLines={1}>
-              {ticket.email}
-            </Text>
-          </View>
-          <View
-            style={[
-              {
-                width: 130,
-                minWidth: 130,
-                paddingVertical: 13,
-                paddingHorizontal: 12,
-                justifyContent: "center",
-                alignItems: "flex-start",
-              },
-            ]}
-          >
-            <TypeBadge type={ticket.type} />
-          </View>
-          <Text style={[styles.td, { width: 160, minWidth: 160 }, styles.orderLink]}>
-            {ticket.order}
-          </Text>
-          <View
-            style={[
-              {
-                width: 110,
-                minWidth: 110,
-                paddingVertical: 13,
-                paddingHorizontal: 12,
-                justifyContent: "center",
-                alignItems: "flex-start",
-              },
-            ]}
-          >
-            <StatusBadge status={ticket.status} />
-          </View>
-          <Text style={[styles.td, { width: 120, minWidth: 120 }, styles.tdMuted]}>
-            {ticket.created}
-          </Text>
-          <View style={[styles.tdActions, { width: 60, minWidth: 60 }]}>
-            <TouchableOpacity
-              style={styles.actionBtnView}
-              onPress={() => onView(ticket)}
-            >
-              <EyeIcon />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
+  <View style={styles.webTableCard}>
+    {/* Table Header */}
+    <View style={styles.webTableHeader}>
+      <Text style={[styles.webTh, { flex: 1.2 }]}>ID</Text>
+      <Text style={[styles.webTh, { flex: 1.8 }]}>Subject</Text>
+      <Text style={[styles.webTh, { flex: 2 }]}>Customer</Text>
+      <Text style={[styles.webTh, { flex: 1.4 }]}>Type</Text>
+      <Text style={[styles.webTh, { flex: 1.2 }]}>Order</Text>
+      <Text style={[styles.webTh, { flex: 1.2 }]}>Status</Text>
+      <Text style={[styles.webTh, { flex: 1.2 }]}>Created</Text>
+      <Text style={[styles.webTh, { flex: 0.8, textAlign: "center" }]}>Actions</Text>
     </View>
-  </ScrollView>
+
+    {/* Table Rows */}
+    {tickets.map((ticket, idx) => (
+      <View
+        key={ticket.id}
+        style={[styles.webTableRow, idx % 2 === 1 && styles.webTableRowAlt]}
+      >
+        <Text style={[styles.webTd, { flex: 1.2 }, styles.webTdId]} numberOfLines={2}>{ticket.id}</Text>
+        <Text style={[styles.webTd, { flex: 1.8 }]} numberOfLines={2}>{ticket.subject}</Text>
+        <View style={[styles.webTdCell, { flex: 2 }]}>
+          <Text style={styles.webTdCustomerName}>{ticket.customer}</Text>
+          <Text style={styles.webTdCustomerEmail} numberOfLines={1}>{ticket.email}</Text>
+        </View>
+        <View style={[styles.webTdCell, { flex: 1.4 }]}>
+          <TypeBadge type={ticket.type} />
+        </View>
+        <Text style={[styles.webTd, { flex: 1.2 }, styles.webOrderLink]}>{ticket.order}</Text>
+        <View style={[styles.webTdCell, { flex: 1.2 }]}>
+          <StatusBadge status={ticket.status} />
+        </View>
+        <Text style={[styles.webTd, { flex: 1.2 }, styles.webTdMuted]}>{ticket.created}</Text>
+        <View style={[styles.webTdActions, { flex: 0.8 }]}>
+          <TouchableOpacity style={styles.actionBtnView} onPress={() => onView(ticket)}>
+            <EyeIcon />
+          </TouchableOpacity>
+        </View>
+      </View>
+    ))}
+  </View>
 );
 
 // â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -492,35 +475,60 @@ export default function CustomerSupportTickets() {
       >
         <View style={styles.pageHeader}>
           <View style={styles.pageHeaderLeft}>
-            <TicketIcon />
-            <Text style={styles.pageTitle}>Support Tickets</Text>
-          </View>
-          <View style={styles.ticketCount}>
-            <Text style={styles.ticketCountText}>
-              {filtered.length} tickets
-            </Text>
+            <View style={styles.pageHeaderIcon}>
+              <TicketIcon />
+            </View>
+            <View>
+              <Text style={styles.pageTitle}>Support Tickets</Text>
+              <Text style={styles.pageSubTitle}>Manage and track all support tickets</Text>
+            </View>
           </View>
         </View>
 
         {stats ? (
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.total}</Text>
-              <Text style={styles.statLabel}>Total</Text>
+          isWeb ? (
+            // ── Web: desktop-style full-width stat cards (icon+value row, label below)
+            <View style={styles.statsRowWeb}>
+              {[
+                { icon: <StatTotalIcon color="#F97316" />, iconBg: '#FFF0EA', value: stats.total,      label: 'Total Tickets',   sub: 'All support tickets',  valueColor: '#1d324e' },
+                { icon: <StatOpenIcon color="#10B981" />,  iconBg: '#ECFDF5', value: stats.open,       label: 'Open',            sub: 'Awaiting response',    valueColor: '#16A34A' },
+                { icon: <StatProgressIcon color="#F59E0B" />, iconBg: '#FEF3C7', value: stats.inProgress, label: 'In Progress',  sub: 'Being worked on',      valueColor: '#CA8A04' },
+                { icon: <StatClosedIcon color="#6B7280" />, iconBg: '#F3F4F6', value: stats.closed,    label: 'Closed',          sub: 'Resolved tickets',     valueColor: '#6B7280' },
+              ].map((item) => (
+                <View key={item.label} style={styles.statCardWeb}>
+                  <View style={styles.statCardWebTop}>
+                    <View style={[styles.statCardWebIconBox, { backgroundColor: item.iconBg }]}>{item.icon}</View>
+                    <Text style={[styles.statCardWebValue, { color: item.valueColor }]} numberOfLines={1} adjustsFontSizeToFit>{item.value}</Text>
+                  </View>
+                  <Text style={styles.statCardWebLabel}>{item.label}</Text>
+                  <Text style={styles.statCardWebSub}>{item.sub}</Text>
+                </View>
+              ))}
             </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: '#16A34A' }]}>{stats.open}</Text>
-              <Text style={styles.statLabel}>Open</Text>
+          ) : (
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <View style={[styles.statCardIconBox, { backgroundColor: '#FFF0EA' }]}><StatTotalIcon color="#F97316" /></View>
+                <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{stats.total}</Text>
+                <Text style={styles.statLabel} numberOfLines={1}>Total</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={[styles.statCardIconBox, { backgroundColor: '#ECFDF5' }]}><StatOpenIcon color="#10B981" /></View>
+                <Text style={[styles.statValue, { color: '#16A34A' }]} numberOfLines={1} adjustsFontSizeToFit>{stats.open}</Text>
+                <Text style={styles.statLabel} numberOfLines={1}>Open</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={[styles.statCardIconBox, { backgroundColor: '#FEF3C7' }]}><StatProgressIcon color="#F59E0B" /></View>
+                <Text style={[styles.statValue, { color: '#CA8A04' }]} numberOfLines={1} adjustsFontSizeToFit>{stats.inProgress}</Text>
+                <Text style={styles.statLabel} numberOfLines={1}>In Progress</Text>
+              </View>
+              <View style={styles.statCard}>
+                <View style={[styles.statCardIconBox, { backgroundColor: '#F3F4F6' }]}><StatClosedIcon color="#6B7280" /></View>
+                <Text style={[styles.statValue, { color: '#6B7280' }]} numberOfLines={1} adjustsFontSizeToFit>{stats.closed}</Text>
+                <Text style={styles.statLabel} numberOfLines={1}>Closed</Text>
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: '#CA8A04' }]}>{stats.inProgress}</Text>
-              <Text style={styles.statLabel}>In Progress</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: '#6B7280' }]}>{stats.closed}</Text>
-              <Text style={styles.statLabel}>Closed</Text>
-            </View>
-          </View>
+          )
         ) : null}
 
         {loadError ? (
@@ -533,7 +541,7 @@ export default function CustomerSupportTickets() {
         ) : null}
 
         {/* â”€â”€ Search + Filters Row â”€â”€ */}
-        <View style={styles.toolbarRow}>
+        <View style={[styles.toolbarRow, isWeb && styles.toolbarRowWeb]}>
           {/* Search */}
           <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
             <SearchIcon />
@@ -563,7 +571,7 @@ export default function CustomerSupportTickets() {
                   selectedStatus ? styles.filterBtnTextActive : null,
                 ]}
               >
-                {selectedStatus || "All Statuses"}
+                {selectedStatus || "Status"}
               </Text>
               <ChevronDownIcon color={selectedStatus ? "#1E3A5F" : "#374151"} />
             </TouchableOpacity>
@@ -581,7 +589,7 @@ export default function CustomerSupportTickets() {
                   selectedType ? styles.filterBtnTextActive : null,
                 ]}
               >
-                {selectedType || "All Types"}
+                {selectedType || "Type"}
               </Text>
               <ChevronDownIcon color={selectedType ? "#1E3A5F" : "#374151"} />
             </TouchableOpacity>
@@ -674,53 +682,55 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F9FB",
   },
   rootContent: {
-    padding: 20,
+    paddingHorizontal: 16,
     paddingBottom: 40,
   },
 
   // Page Header
   pageHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     marginBottom: 0,
     backgroundColor: "#151D4F",
-    padding: 20,
-    paddingTop: 24,
-    paddingBottom: 64,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 42,
+    borderRadius: 24,
+    marginHorizontal: 2,
+    marginTop: 12,
   },
   pageHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 11,
+  },
+  pageHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: "#ef7b1a",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: -0.3,
   },
-  ticketCount: {
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  ticketCountText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#FFFFFF",
+  pageSubTitle: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.5)",
+    marginTop: 1,
   },
 
-  // Toolbar
+  // Toolbar — bare on web, card on mobile
   toolbarRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 16,
     alignItems: "center",
     justifyContent: "space-between",
+    // mobile card styling
     backgroundColor: "#FFFFFF",
     padding: 12,
     borderRadius: 12,
@@ -732,21 +742,37 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  toolbarRowWeb: {
+    // on web, strip the card appearance
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
+    shadowOpacity: 0,
+    elevation: 0,
+    padding: 0,
+    flexWrap: "nowrap",
+    marginBottom: 14,
+  },
   searchBox: {
     flex: 1,
     minWidth: 200,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
     paddingHorizontal: 12,
     height: 42,
     gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   searchBoxWeb: {
-    maxWidth: 400,
+    flex: 1,
   },
   searchInput: {
     flex: 1,
@@ -770,10 +796,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     height: 42,
+    gap: 6,
   },
   filterBtnActive: {
-    backgroundColor: "#EBF0F8",
-    borderColor: "#1E3A5F",
+    backgroundColor: "#FFF5EE",
+    borderColor: "#ef7b1a",
   },
   filterBtnText: {
     fontSize: 13,
@@ -781,7 +808,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   filterBtnTextActive: {
-    color: "#1E3A5F",
+    color: "#ef7b1a",
     fontWeight: "600",
   },
 
@@ -984,29 +1011,29 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: "#FFFFFF",
     width: "100%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 20,
   },
   modalWeb: {
-    width: 360,
-    borderRadius: 16,
+    width: 320,
+    borderRadius: 24,
     marginBottom: 0,
     alignSelf: "center",
     position: "absolute",
     top: "50%",
     transform: [{ translateY: -160 }],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 20,
   },
   modalMobile: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingBottom: 32,
-  },
-  mobileHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#D1D5DB",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 12,
-    marginBottom: 4,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1014,46 +1041,58 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    backgroundColor: "#1d324e",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: "#FFFFFF",
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: 8,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
   modalOptions: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   modalOption: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
     borderRadius: 10,
     marginVertical: 2,
   },
   modalOptionSelected: {
-    backgroundColor: "#EBF0F8",
+    backgroundColor: "#FFF5EE",
   },
   modalOptionText: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#374151",
     fontWeight: "500",
   },
   modalOptionTextSelected: {
-    color: "#1E3A5F",
+    color: "#ef7b1a",
     fontWeight: "700",
+  },
+  modalOptionClear: {
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+    marginTop: 4,
+    borderRadius: 0,
+  },
+  modalOptionClearText: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    fontWeight: "500",
   },
 
   // Empty State
@@ -1101,41 +1140,183 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
+  // Mobile compact stat cards row
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     justifyContent: 'space-between',
     gap: 6,
     marginBottom: 16,
-    marginTop: -40,
+    marginTop: -34,
+    zIndex: 10,
+    elevation: 5,
+    paddingHorizontal: 4,
+  },
+  // Web desktop stat cards row
+  statsRowWeb: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: -32,
+    marginBottom: 14,
     zIndex: 10,
     elevation: 5,
   },
+  statCardWeb: {
+    flex: 1,
+    minWidth: 130,
+    maxWidth: 240,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E8E2D9',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  statCardWebTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  statCardWebIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statCardWebValue: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  statCardWebLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C2B4A',
+  },
+  statCardWebSub: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 1,
+  },
   statCard: {
     flex: 1,
-    minWidth: 70,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowRadius: 6,
     elevation: 3,
   },
+  statCardIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   statValue: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '800',
     color: '#1E3A5F',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 2,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Web table — flex columns, no horizontal scroll
+  webTableCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8E2D9',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  webTableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7F3EE',
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#E8E2D9',
+  },
+  webTh: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingRight: 6,
+  },
+  webTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  webTableRowAlt: {
+    backgroundColor: '#FAFAFA',
+  },
+  webTd: {
+    fontSize: 13,
+    color: '#374151',
+    paddingRight: 8,
+  },
+  webTdId: {
+    fontWeight: '700',
+    color: '#1d324e',
+  },
+  webTdCell: {
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingRight: 8,
+  },
+  webTdCustomerName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1C2B4A',
+    marginBottom: 2,
+  },
+  webTdCustomerEmail: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  webTdMuted: {
+    color: '#9CA3AF',
+    fontSize: 12,
+  },
+  webOrderLink: {
+    color: '#3B82F6',
     fontWeight: '500',
+  },
+  webTdActions: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingWrap: {
     alignItems: 'center',
