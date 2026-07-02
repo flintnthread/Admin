@@ -50,7 +50,7 @@ const C = {
   red: "#dc2626",
   redBg: "#fee2e2",
   inputBg: "#f0f4ff",
-  tableHeaderBg: "#fff7f0",
+  tableHeaderBg: "#151D4F",
 };
 
 // Role badge colours
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
 
   // ── Mobile Header Card ──
   mobileHeaderCard: {
-    backgroundColor:   "#151D4F", borderRadius: 14, padding: 16,
+    backgroundColor: "#151D4F", borderRadius: 14, padding: 16,
     marginBottom: 16,
     shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
   },
@@ -965,9 +965,9 @@ const styles = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor:   "#151D4F",
+    backgroundColor: "#151D4F",
     borderRadius: 12,
-    marginHorizontal: 24,
+    //marginHorizontal: 24,
     marginTop: 24,
   },
   webPageTitle: { fontSize: 22, fontWeight: "800", color: C.white },
@@ -998,7 +998,7 @@ const styles = StyleSheet.create({
   tableHeader: { backgroundColor: C.tableHeaderBg },
   tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
   tableCell: { paddingRight: 8 },
-  tableHeadCell: { paddingRight: 8, fontSize: 12, fontWeight: "700", color: C.subtext, textTransform: "uppercase", letterSpacing: 0.5 },
+  tableHeadCell: { paddingRight: 8, fontSize: 12, fontWeight: "700", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
 
   // ── Grid ──
   gridContainer: { flexDirection: "row", flexWrap: "wrap", gap: 20, marginBottom: 20 },
