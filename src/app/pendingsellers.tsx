@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  searchInput: { flex: 1, fontSize: 14, color: NAVY },
+  searchInput: { flex: 1, fontSize: 14, color: NAVY, outlineStyle: "none" } as any,
   center: { alignItems: "center", paddingVertical: 48, gap: 12 },
   muted: { color: MUTED, fontSize: 13 },
   error: { color: "#dc2626", fontSize: 14, textAlign: "center" },
