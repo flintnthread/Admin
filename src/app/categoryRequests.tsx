@@ -88,6 +88,18 @@ const CheckIcon = ({ color = '#FFFFFF' }: { color?: string }) => (
   </Svg>
 );
 
+const SearchIcon = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+
+const ChevronDownIcon = ({ color = '#374151' }: { color?: string }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Path d="M6 9l6 6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 const TotalIcon = ({ size = 20, color = '#1E3A5F' }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={1.8} />
@@ -97,10 +109,10 @@ const TotalIcon = ({ size = 20, color = '#1E3A5F' }: { size?: number; color?: st
   </Svg>
 );
 
-// â”€â”€â”€ Sample Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —————————————————————————————————————————————————————— Sample Data ——————————————————————————————————————————————————————————————
   // Loaded from /api/admin/category-requests
 
-// â”€â”€â”€ Status Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// —————————————————————————————————————————————————————— Status Badge ——————————————————————————————————————————————————————————————
 
 const statusConfig: Record<Status, { bg: string; text: string; dot: string }> = {
   Pending: { bg: '#FEF9C3', text: '#CA8A04', dot: '#CA8A04' },
@@ -118,34 +130,6 @@ const StatusBadge = ({ status }: { status: Status }) => {
   );
 };
 
-// â”€â”€â”€ Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-interface StatCardProps {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  accent: string;
-  bg: string;
-  isWeb: boolean;
-  cardWidth?: number;
-}
-
-const StatCard = ({ label, value, icon, accent, bg, isWeb, cardWidth }: StatCardProps) => (
-  <View style={[
-    styles.statCard,
-    !isWeb && styles.statCardMobile,
-    { borderTopColor: accent },
-    cardWidth ? { width: cardWidth } : null
-  ]}>
-    <View style={[styles.statIconWrap, !isWeb && styles.statIconWrapMobile, { backgroundColor: bg }]}>
-      {icon}
-    </View>
-    <View style={styles.statTextWrap}>
-      <Text style={[styles.statValue, !isWeb && styles.statValueMobile]}>{value}</Text>
-      <Text style={[styles.statLabel, !isWeb && styles.statLabelMobile]} numberOfLines={1} adjustsFontSizeToFit>{label}</Text>
-    </View>
-  </View>
-);
 
 // â”€â”€â”€ View Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -307,7 +291,7 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
   );
 };
 
-// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Main Screen 
 
 export default function CategoryRequests() {
   const { width } = useWindowDimensions();
@@ -317,6 +301,9 @@ export default function CategoryRequests() {
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | Status>('All');
+  const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<CategoryRequest | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -347,7 +334,21 @@ export default function CategoryRequests() {
     void loadData();
   }, [loadData]);
 
-  const filtered = requests;
+  const filtered = requests.filter(req => {
+    if (filter !== 'All' && req.status !== filter) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      return (
+        req.id.toLowerCase().includes(q) ||
+        req.categoryName.toLowerCase().includes(q) ||
+        req.sellerName.toLowerCase().includes(q) ||
+        req.sellerEmail.toLowerCase().includes(q) ||
+        req.description.toLowerCase().includes(q) ||
+        req.reason.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
   const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleUpdate = (id: string, status: 'Approved' | 'Rejected', reason: string) => {
@@ -369,16 +370,24 @@ export default function CategoryRequests() {
 
   const FILTERS: Array<'All' | Status> = ['All', 'Pending', 'Approved', 'Rejected'];
 
+  const getFilterCount = (f: 'All' | Status) => {
+    switch (f) {
+      case 'All': return stats.total;
+      case 'Pending': return stats.pending;
+      case 'Approved': return stats.approved;
+      case 'Rejected': return stats.rejected;
+      default: return 0;
+    }
+  };
+
   const cardWidth = isWeb ? undefined : (width - 32 - 8) / 2;
 
-  const filterTabs = FILTERS.map((f) => {
-    const count = f === 'All'
-      ? requests.length
-      : requests.filter((r) => r.status === f).length;
+  const filterTabsMobile = FILTERS.map((f) => {
+    const count = getFilterCount(f);
     return (
       <TouchableOpacity
         key={f}
-        style={[styles.filterTab, filter === f && styles.filterTabActive, !isWeb && styles.filterTabMobile]}
+        style={[styles.filterTab, filter === f && styles.filterTabActive, styles.filterTabMobile]}
         onPress={() => {
           setFilter(f);
           setCurrentPage(1);
@@ -396,6 +405,41 @@ export default function CategoryRequests() {
     );
   });
 
+  const filterTabsWeb = (
+    <View style={styles.filterContainerWeb}>
+      {FILTERS.map((f, i) => {
+        const count = getFilterCount(f);
+        const isActive = filter === f;
+        
+        // Only show divider if neither this tab nor the next tab is active, and it's not the last tab
+        const isNextActive = i < FILTERS.length - 1 && filter === FILTERS[i + 1];
+        const showDivider = !isActive && !isNextActive && i !== FILTERS.length - 1;
+
+        return (
+          <React.Fragment key={f}>
+            <TouchableOpacity
+              style={[styles.filterTabWeb, isActive && styles.filterTabWebActive]}
+              onPress={() => {
+                setFilter(f);
+                setCurrentPage(1);
+              }}
+            >
+              <Text style={[styles.filterTabTextWeb, isActive && styles.filterTabTextWebActive]}>
+                {f}
+              </Text>
+              <View style={[styles.filterCountWeb, isActive && styles.filterCountWebActive]}>
+                <Text style={[styles.filterCountTextWeb, isActive && styles.filterCountTextWebActive]}>
+                  {count}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            {showDivider && <View style={styles.filterDividerWeb} />}
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+
   return (
     <AdminLayout>
       <ScrollView
@@ -407,80 +451,127 @@ export default function CategoryRequests() {
           <Text style={{ color: '#DC2626', marginBottom: 12 }}>{loadError}</Text>
         ) : null}
 
-        {/* Page Header and Stats Overlap */}
-        <View style={styles.headerOuter}>
-          <View style={[styles.pageHeader, !isWeb && styles.pageHeaderMobile]}>
-            <View style={styles.pageHeaderTop}>
-              <View style={styles.pageHeaderLeft}>
-                <View style={[styles.pageIconWrap, !isWeb && styles.pageIconWrapMobile]}>
-                  <LayersIcon color="#1E3A5F" size={isWeb ? 20 : 16} />
-                </View>
-                <View>
-                  <Text style={[styles.pageTitle, !isWeb && styles.pageTitleMobile]}>Category Requests</Text>
-                  <Text style={[styles.pageSubtitle, !isWeb && styles.pageSubtitleMobile]}>Review & manage seller category requests</Text>
-                </View>
-              </View>
-            </View>
+        {/* ── Status Dropdown Modal (Mobile) ── */}
+      <Modal visible={statusModalOpen} transparent animationType="fade" onRequestClose={() => setStatusModalOpen(false)}>
+        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setStatusModalOpen(false)}>
+          <View style={styles.dropdownMenu}>
+            {FILTERS.map(f => {
+              const count = getFilterCount(f);
+              const isActive = filter === f;
+              return (
+                <TouchableOpacity
+                  key={f}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setFilter(f);
+                    setCurrentPage(1);
+                    setStatusModalOpen(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownItemText, isActive && styles.dropdownItemTextActive]}>
+                    {f} ({count})
+                  </Text>
+                  {isActive && <CheckIcon color="#1E3A5F" />}
+                </TouchableOpacity>
+              )
+            })}
           </View>
+        </TouchableOpacity>
+      </Modal>
 
-          {/* Stats Cards */}
-          <View style={[styles.statsRow, !isWeb && styles.statsRowMobile, isWeb && styles.statsRowWeb]}>
-          <StatCard
-            label="Total Requests"
-            value={stats.total}
-            icon={<TotalIcon size={isWeb ? 20 : 16} color="#4F46E5" />}
-            accent="#4F46E5"
-            bg="#EEF2FF"
-            isWeb={isWeb}
-            cardWidth={cardWidth}
-          />
-          <StatCard
-            label="Pending"
-            value={stats.pending}
-            icon={<ClockIcon color="#D97706" size={isWeb ? 20 : 16} />}
-            accent="#F59E0B"
-            bg="#FEF9C3"
-            isWeb={isWeb}
-            cardWidth={cardWidth}
-          />
-          <StatCard
-            label="Approved"
-            value={stats.approved}
-            icon={<CheckCircleIcon color="#16A34A" size={isWeb ? 20 : 16} />}
-            accent="#16A34A"
-            bg="#DCFCE7"
-            isWeb={isWeb}
-            cardWidth={cardWidth}
-          />
-          <StatCard
-            label="Rejected"
-            value={stats.rejected}
-            icon={<XCircleIcon color="#DC2626" size={isWeb ? 20 : 16} />}
-            accent="#DC2626"
-            bg="#FEE2E2"
-            isWeb={isWeb}
-            cardWidth={cardWidth}
-          />
+      {/* ── View Modal ── */}
+        <View style={styles.pageHeader}>
+          <View style={styles.pageHeaderLeft}>
+            <View style={styles.pageHeaderIcon}>
+              <LayersIcon color="#FFFFFF" size={20} />
+            </View>
+            <View>
+              <Text style={styles.pageTitle}>Category Requests</Text>
+              <Text style={styles.pageSubTitle}>Manage seller category requests</Text>
+            </View>
           </View>
         </View>
 
-        {/* â”€â”€ Filter Tabs â”€â”€ */}
+        {/* ── Stats Cards ── */}
         {isWeb ? (
-          <View style={styles.filterRow}>
-            {filterTabs}
+          // Web: desktop-style full-width stat cards (icon+value row, label below)
+          <View style={styles.statsRowWeb}>
+            {[
+              { icon: <TotalIcon color="#4F46E5" size={20} />, iconBg: '#EEF2FF', value: stats.total,      label: 'Total Requests', sub: 'All requests', valueColor: '#1d324e' },
+              { icon: <ClockIcon color="#D97706" size={20} />,  iconBg: '#FEF9C3', value: stats.pending,    label: 'Pending',        sub: 'Awaiting review', valueColor: '#D97706' },
+              { icon: <CheckCircleIcon color="#16A34A" size={20} />, iconBg: '#DCFCE7', value: stats.approved, label: 'Approved',       sub: 'Accepted requests', valueColor: '#16A34A' },
+              { icon: <XCircleIcon color="#DC2626" size={20} />, iconBg: '#FEE2E2', value: stats.rejected,   label: 'Rejected',       sub: 'Declined requests', valueColor: '#DC2626' },
+            ].map((item) => (
+              <View key={item.label} style={styles.statCardWeb}>
+                <View style={styles.statCardWebTop}>
+                  <View style={[styles.statCardWebIconBox, { backgroundColor: item.iconBg }]}>{item.icon}</View>
+                  <Text style={[styles.statCardWebValue, { color: item.valueColor }]} numberOfLines={1} adjustsFontSizeToFit>{item.value}</Text>
+                </View>
+                <Text style={styles.statCardWebLabel}>{item.label}</Text>
+                <Text style={styles.statCardWebSub}>{item.sub}</Text>
+              </View>
+            ))}
           </View>
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScrollMobile}
-            contentContainerStyle={styles.filterRowMobile}
-          >
-            {filterTabs}
-          </ScrollView>
+          // Mobile: compact stat cards
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <View style={[styles.statCardIconBox, { backgroundColor: '#EEF2FF' }]}><TotalIcon color="#4F46E5" size={16} /></View>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{stats.total}</Text>
+              <Text style={styles.statLabel} numberOfLines={1}>Total</Text>
+            </View>
+            <View style={styles.statCard}>
+              <View style={[styles.statCardIconBox, { backgroundColor: '#FEF9C3' }]}><ClockIcon color="#D97706" size={16} /></View>
+              <Text style={[styles.statValue, { color: '#D97706' }]} numberOfLines={1} adjustsFontSizeToFit>{stats.pending}</Text>
+              <Text style={styles.statLabel} numberOfLines={1}>Pending</Text>
+            </View>
+            <View style={styles.statCard}>
+              <View style={[styles.statCardIconBox, { backgroundColor: '#DCFCE7' }]}><CheckCircleIcon color="#16A34A" size={16} /></View>
+              <Text style={[styles.statValue, { color: '#16A34A' }]} numberOfLines={1} adjustsFontSizeToFit>{stats.approved}</Text>
+              <Text style={styles.statLabel} numberOfLines={1}>Approved</Text>
+            </View>
+            <View style={styles.statCard}>
+              <View style={[styles.statCardIconBox, { backgroundColor: '#FEE2E2' }]}><XCircleIcon color="#DC2626" size={16} /></View>
+              <Text style={[styles.statValue, { color: '#DC2626' }]} numberOfLines={1} adjustsFontSizeToFit>{stats.rejected}</Text>
+              <Text style={styles.statLabel} numberOfLines={1}>Rejected</Text>
+            </View>
+          </View>
         )}
 
-        {/* â”€â”€ Web Table / Mobile Cards â”€â”€ */}
+        {/* ── Toolbar ── */}
+        <View style={[styles.toolbarRow, isWeb && styles.toolbarRowWeb]}>
+          <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
+            <SearchIcon />
+            <TextInput
+              style={styles.searchInput as any}
+              placeholder="Search requests..."
+              placeholderTextColor="#9CA3AF"
+              value={search}
+              onChangeText={setSearch}
+              onSubmitEditing={() => {
+                setSearchQ(search);
+                setCurrentPage(1);
+              }}
+              returnKeyType="search"
+            />
+          </View>
+          
+          {isWeb ? (
+            <View style={styles.filterRowWeb}>
+              {filterTabsWeb}
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.statusDropdownBtn}
+              onPress={() => setStatusModalOpen(true)}
+            >
+              <Text style={styles.statusDropdownText} numberOfLines={1} adjustsFontSizeToFit>{filter === 'All' ? 'Status' : filter}</Text>
+              <ChevronDownIcon />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Web Table / Mobile Cards ── */}
         {isWeb ? (
           <View style={styles.tableWrapper}>
             {/* Table Header */}
@@ -604,7 +695,7 @@ export default function CategoryRequests() {
   );
 }
 
-// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ Styles 
 
 const styles = StyleSheet.create({
   root: {
@@ -621,156 +712,310 @@ const styles = StyleSheet.create({
   },
 
   // Page Header
-  headerOuter: {
-    marginBottom: 8,
-  },
   pageHeader: {
-    backgroundColor: '#151D4F',
-    borderRadius: 14,
-    padding: 20,
-    paddingBottom: 64,
-  },
-  pageHeaderMobile: {
-    borderRadius: 12,
-    padding: 16,
-    paddingBottom: 40,
-  },
-  pageHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    marginBottom: 0,
+    backgroundColor: "#151D4F", // Dark navy modified by user
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 42,
+    borderRadius: 24,
+    marginHorizontal: 2,
+    marginTop: 12,
   },
   pageHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
-  pageIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#EBF0F8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageIconWrapMobile: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+  pageHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: "#F97316",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
     letterSpacing: -0.3,
   },
-  pageTitleMobile: {
-    fontSize: 18,
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  pageSubtitleMobile: {
+  pageSubTitle: {
     fontSize: 11,
+    color: "rgba(255,255,255,0.5)",
     marginTop: 1,
   },
 
   // Stats
+  // Mobile compact stat cards row
   statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: -46,
-    paddingHorizontal: 16,
-    zIndex: 10,
-    marginBottom: 20,
-  },
-  statsRowMobile: {
-    marginTop: -24,
-    paddingHorizontal: 0,
+    flexWrap: 'nowrap',
+    justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 16,
-    gap: 8,
+    marginTop: -34,
+    zIndex: 10,
+    elevation: 5,
+    paddingHorizontal: 4,
   },
+  // Web desktop stat cards row
   statsRowWeb: {
     flexDirection: 'row',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: -32,
+    marginBottom: 14,
+    zIndex: 10,
+    elevation: 5,
   },
-  statCard: {
-    flexGrow: 1,
-    flexShrink: 1,
-    minWidth: 140,
-    flexDirection: 'row',
-    alignItems: 'center',
+  statCardWeb: {
+    flex: 1,
+    minWidth: 130,
+    maxWidth: 240,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    padding: 18,
-    borderTopWidth: 3,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E8E2D9',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  statCardWebTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  statCardWebIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statCardWebValue: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  statCardWebLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C2B4A',
+  },
+  statCardWebSub: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    gap: 14,
-    shadowColor: '#000',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  statCardIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1E3A5F',
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 2,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  // Toolbar
+  toolbarRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toolbarRowWeb: {
+    marginBottom: 24,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 8,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
-  statCardMobile: {
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-    borderTopWidth: 3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+  searchBoxWeb: {
+    flex: 1.5, // Reduced from 2.2 to give filters more space
   },
-  statIconWrap: {
-    width: 44,
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#111827",
+    outlineStyle: "none",
+  } as any,
+  statusDropdownBtn: {
+    width: '28%', // ~25-30% width
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
     height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  statIconWrapMobile: {
-    width: 32,
-    height: 32,
+  statusDropdownText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  dropdownMenu: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 8,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 8,
   },
-  statTextWrap: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: -0.5,
-  },
-  statValueMobile: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#6B7280',
+  dropdownItemText: {
+    fontSize: 15,
     fontWeight: '500',
-    marginTop: 2,
+    color: '#374151',
   },
-  statLabelMobile: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 1,
+  dropdownItemTextActive: {
+    fontWeight: '700',
+    color: '#1E3A5F',
   },
 
   // Filter Tabs
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-    flexWrap: 'wrap',
+  filterRowWeb: {
+    flex: 1.5, // Increased from 1 to give filters more space
   },
+  filterContainerWeb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  filterTabWeb: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  filterTabWebActive: {
+    backgroundColor: '#151D4F',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  filterDividerWeb: {
+    width: 1,
+    height: '60%',
+    backgroundColor: '#E5E7EB',
+  },
+  filterTabTextWeb: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  filterTabTextWebActive: {
+    color: '#FFFFFF',
+  },
+  filterCountWeb: {
+    minWidth: 24,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  filterCountWebActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  filterCountTextWeb: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  filterCountTextWebActive: {
+    color: '#FFFFFF',
+  },
+
+  // Mobile Filter Tabs
   filterScrollMobile: {
     marginBottom: 16,
     marginHorizontal: -16,
@@ -800,8 +1045,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   filterTabActive: {
-    backgroundColor: '#1E3A5F',
-    borderColor: '#1E3A5F',
+    backgroundColor: '#151D4F',
+    borderColor: '#151D4F',
   },
   filterTabText: {
     fontSize: 13,
@@ -920,7 +1165,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#151D4F',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -1040,7 +1285,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#151D4F',
     borderRadius: 10,
     paddingVertical: 11,
   },

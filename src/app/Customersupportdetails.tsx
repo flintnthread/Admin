@@ -25,9 +25,9 @@ import Svg, { Path, Circle, Polyline, Line } from 'react-native-svg';
 // ─── SVG Icons ──────────────────────────────────────────────────────────────
 
 const BackArrowIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
     <Path
-      d="M12.5 15L7.5 10L12.5 5"
+      d="M19 12H5M5 12L12 19M5 12L12 5"
       stroke="#FFFFFF"
       strokeWidth={2}
       strokeLinecap="round"
@@ -522,24 +522,33 @@ const styles = StyleSheet.create({
   },
 
   // Header
-  header: { marginHorizontal: 2, marginTop: 12, 
+  header: { 
+    marginHorizontal: 2, 
+    // marginTop: 6, 
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    marginBottom: 24,
-    backgroundColor: '#1E3A5F',
-    padding: 15,
-    borderRadius: 10,
+    gap: 8,
+    marginBottom: 15,
+    backgroundColor: '#151D4F',
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 16,
+    borderRadius: 24,
+  },
+  pageHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: "#F97316",
+    alignItems: "center",
+    justifyContent: "center",
   },
   backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: -8, // slight adjustment to align better visually since it has no background
   },
   headerText: {
     gap: 2,

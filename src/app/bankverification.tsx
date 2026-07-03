@@ -843,7 +843,7 @@ export default function BankVerifications() {
                 {/* Table Header */}
                 <View style={{
                   flexDirection: "row",
-                  backgroundColor: "#1a2332",
+                  backgroundColor: "#151D4F",
                   paddingVertical: 12,
                   paddingHorizontal: 16,
                 }}>
@@ -869,13 +869,13 @@ export default function BankVerifications() {
                   }}>
                     <TouchableOpacity
                       onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
-                      style={{ flex: 0.4, justifyContent: "center" }}
+                      style={{ flex: 0.4, justifyContent: "center", alignItems: "flex-start" }}
                     >
-                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingHorizontal: 12 }]}>{item.id}</Text>
+                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingLeft: 0, paddingRight: 12 }]}>{item.id}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
-                      style={[styles.tableCell, { flex: 1.2, justifyContent: "center" }]}
+                      style={{ flex: 1.2, justifyContent: "center" }}
                     >
                       <Text style={{ fontSize: 12, fontWeight: "600", color: BLUE }}>{item.sellerName}</Text>
                       <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
@@ -994,5 +994,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#64748B",
     marginBottom: 6,
+  },
+  tableCell: {
+    fontSize: 12,
+    color: "#374151",
   },
 });
