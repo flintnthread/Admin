@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import React, {
   useCallback,
   useEffect,
@@ -498,7 +499,8 @@ type SectionId =
   | "timeline"
   | "profile";
 
-type TimeFrame = "7D" | "30D" | "90D" | "6M" | "1Y" | "All";
+export type CustomDateRange = { from: Date; to: Date };
+type TimeFrame = "7D" | "30D" | "90D" | "6M" | "1Y" | "All" | CustomDateRange;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK DATA BUILDER
@@ -907,6 +909,22 @@ function getFilteredData(
 ): ChartPoint[] {
   if (timeframe === "All" || timeframe === "1Y") {
     return baseData;
+  }
+  if (typeof timeframe === "object" && timeframe.from && timeframe.to) {
+    const fromTime = timeframe.from.getTime();
+    const toTime = timeframe.to.getTime();
+    const filtered = baseData.filter(d => {
+       let dateStr = d.label;
+       if (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].includes(d.label)) {
+           dateStr = `${d.label} 1, ${new Date().getFullYear()}`;
+       }
+       const dTime = new Date(dateStr).getTime();
+       if (!isNaN(dTime)) {
+           return dTime >= fromTime && dTime <= toTime;
+       }
+       return true; 
+    });
+    return filtered.length > 0 ? filtered : baseData;
   }
   if (metricType === "spend" || metricType === "orders") {
     return sliceMonthlyData(baseData, timeframe);
@@ -2270,61 +2288,107 @@ const DrillDownModal = React.memo(function DrillDownModal({
   );
 });
 
-interface FullscreenChartModalProps {
+interface DateRangePickerModalProps {
   visible: boolean;
   onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  data: ChartPoint[];
-  exportCSV: () => void;
-  exportPDF: () => void;
+  onApply: (from: Date, to: Date) => void;
+  initialFrom?: Date;
+  initialTo?: Date;
+  title?: string;
 }
-const FullscreenChartModal = React.memo(function FullscreenChartModal({
+
+const DateRangePickerModal = React.memo(function DateRangePickerModal({
   visible,
   onClose,
+  onApply,
+  initialFrom,
+  initialTo,
   title,
-  children,
-  data,
-  exportCSV,
-  exportPDF,
-}: FullscreenChartModalProps) {
+}: DateRangePickerModalProps) {
+  const [from, setFrom] = useState<Date>(initialFrom || new Date());
+  const [to, setTo] = useState<Date>(initialTo || new Date());
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+
+  const handleApply = () => {
+    onApply(from, to);
+    onClose();
+  };
+
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={s.modalOverlay}>
-        <View style={[s.modalContent, { height: "70%", maxHeight: 600 }]}>
+        <View style={[s.modalContent, { maxWidth: 400 }]}>
           <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Fullscreen: {title}</Text>
+            <Text style={s.modalTitle}>Select Date Range {title ? `(${title})` : ''}</Text>
             <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-              <Text style={s.closeBtnTxt}>Exit</Text>
+              <Text style={s.closeBtnTxt}>Cancel</Text>
             </TouchableOpacity>
           </View>
+          <View style={[s.modalBody, { padding: 20 }]}>
+             <View style={{ gap: 16 }}>
+               <View>
+                 <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>From Date</Text>
+                 {Platform.OS === 'web' ? (
+                   <input 
+                     type="date" 
+                     style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
+                     value={from.toISOString().split('T')[0]}
+                     onChange={(e) => {
+                       const d = new Date(e.target.value);
+                       if (!isNaN(d.getTime())) setFrom(d);
+                     }}
+                   />
+                 ) : (
+                   <TouchableOpacity onPress={() => setShowFromPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
+                     <Text>{from.toISOString().split('T')[0]}</Text>
+                   </TouchableOpacity>
+                 )}
+                 {showFromPicker && Platform.OS !== 'web' && (
+                   <DateTimePicker
+                     value={from}
+                     mode="date"
+                     display="default"
+                     onChange={(e, d) => { setShowFromPicker(false); if(d) setFrom(d); }}
+                   />
+                 )}
+               </View>
 
-          <ScrollView style={s.modalBody} contentContainerStyle={{ gap: 20 }}>
-            <View style={s.fullscreenChartContainer}>{children}</View>
+               <View>
+                 <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>To Date</Text>
+                 {Platform.OS === 'web' ? (
+                   <input 
+                     type="date" 
+                     style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
+                     value={to.toISOString().split('T')[0]}
+                     onChange={(e) => {
+                       const d = new Date(e.target.value);
+                       if (!isNaN(d.getTime())) setTo(d);
+                     }}
+                   />
+                 ) : (
+                   <TouchableOpacity onPress={() => setShowToPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
+                     <Text>{to.toISOString().split('T')[0]}</Text>
+                   </TouchableOpacity>
+                 )}
+                 {showToPicker && Platform.OS !== 'web' && (
+                   <DateTimePicker
+                     value={to}
+                     mode="date"
+                     display="default"
+                     onChange={(e, d) => { setShowToPicker(false); if(d) setTo(d); }}
+                   />
+                 )}
+               </View>
 
-            <View style={s.fullscreenActions}>
-              <TouchableOpacity onPress={exportCSV} style={s.actionOutline}>
-                <DownloadIcon size={12} color={primary} />
-                <Text style={s.actionOutlineTxt}>CSV Export</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={exportPDF} style={s.actionOutline}>
-                <DownloadIcon size={12} color={blue} />
-                <Text style={s.actionOutlineTxt}>PDF Export</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={s.modalSubheading}>Dataset</Text>
-            <View style={s.datasetTable}>
-              {data.map((d, i) => (
-                <View key={`${d.label}-${i}`} style={s.datasetRow}>
-                  <Text style={s.datasetCellLabel}>{d.label}</Text>
-                  <Text style={s.datasetCellValue}>
-                    {d.value > 100 ? rupee(d.value) : d.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+               <TouchableOpacity 
+                 style={{ backgroundColor: primary, padding: 12, borderRadius: 6, alignItems: 'center', marginTop: 10 }}
+                 onPress={handleApply}
+               >
+                 <Text style={{ color: '#fff', fontWeight: 'bold' }}>Apply Filter</Text>
+               </TouchableOpacity>
+             </View>
+          </View>
         </View>
       </View>
     </Modal>
@@ -2490,13 +2554,9 @@ export default function CustomerAnalyticsScreen() {
   const [freqLiveKPI, setFreqLiveKPI] = useState<string | null>(null);
   const [distLiveKPI, setDistLiveKPI] = useState<string | null>(null);
 
-  // Fullscreen modals states
-  const [fullscreenChartTitle, setFullscreenChartTitle] = useState<
-    string | null
-  >(null);
-  const [fullscreenData, setFullscreenData] = useState<ChartPoint[]>([]);
-  const [fullscreenRender, setFullscreenRender] = useState<
-    ((w: number, h: number) => React.ReactNode) | null
+  // Date range modal state
+  const [dateRangeModalTarget, setDateRangeModalTarget] = useState<
+    "spend" | "orders" | "freq" | "dist" | "status" | "payment" | "category" | null
   >(null);
 
   // Drill-down Modal state
@@ -2670,10 +2730,10 @@ export default function CustomerAnalyticsScreen() {
     setFilter: (tf: TimeFrame) => void,
   ) => (
     <View style={s.tfRow}>
-      {(["7D", "30D", "90D", "6M", "1Y", "All"] as TimeFrame[]).map((tf) => (
+      {(["7D", "30D", "90D", "6M", "1Y", "All"] as string[]).map((tf) => (
         <TouchableOpacity
           key={tf}
-          onPress={() => setFilter(tf)}
+          onPress={() => setFilter(tf as TimeFrame)}
           style={[s.tfBtn, current === tf && s.tfBtnActive]}
         >
           <Text style={[s.tfBtnTxt, current === tf && s.tfBtnTxtActive]}>
@@ -2954,29 +3014,9 @@ export default function CustomerAnalyticsScreen() {
                         }}
                       >
                         <TouchableOpacity
-                          onPress={() => {
-                            setFullscreenChartTitle("Monthly Spending Trend");
-                            setFullscreenData(spendData);
-                            setFullscreenRender(
-                              () => (w: number, h: number) => (
-                                <LineChartSvg
-                                  data={spendData}
-                                  color={primary}
-                                  width={w}
-                                  height={h}
-                                  formatValue={rupee}
-                                  metricName="Revenue"
-                                  timeframe={spendTF}
-                                  onPointPress={(p) => {
-                                    setDrilldownPoint(p);
-                                    setDrilldownTitle("Monthly Spending");
-                                  }}
-                                />
-                              ),
-                            );
-                          }}
+                          onPress={() => setDateRangeModalTarget("spend")}
                         >
-                          <MaximizeIcon size={14} color={C.textLight} />
+                          <CalendarIcon size={14} color={C.textLight} />
                         </TouchableOpacity>
                       </View>
                     }
@@ -3017,29 +3057,9 @@ export default function CustomerAnalyticsScreen() {
                     title="Orders Placed"
                     right={
                       <TouchableOpacity
-                        onPress={() => {
-                          setFullscreenChartTitle("Orders Count");
-                          setFullscreenData(ordersData);
-                          setFullscreenRender(() => (w: number, h: number) => (
-                            <BarChartSvg
-                              data={ordersData}
-                              color={blue}
-                              width={w}
-                              height={h}
-                              formatValue={(v) =>
-                                `${v.toLocaleString()} Orders`
-                              }
-                              metricName="Orders"
-                              timeframe={ordersTF}
-                              onPointPress={(p) => {
-                                setDrilldownPoint(p);
-                                setDrilldownTitle("Orders Placed");
-                              }}
-                            />
-                          ));
-                        }}
+                        onPress={() => setDateRangeModalTarget("orders")}
                       >
-                        <MaximizeIcon size={14} color={C.textLight} />
+                        <CalendarIcon size={14} color={C.textLight} />
                       </TouchableOpacity>
                     }
                   />
@@ -3079,27 +3099,9 @@ export default function CustomerAnalyticsScreen() {
                     title="Order Frequency"
                     right={
                       <TouchableOpacity
-                        onPress={() => {
-                          setFullscreenChartTitle("Order Frequency");
-                          setFullscreenData(freqData);
-                          setFullscreenRender(() => (w: number, h: number) => (
-                            <LineChartSvg
-                              data={freqData}
-                              color={green}
-                              width={w}
-                              height={h}
-                              formatValue={(v) => `${v.toFixed(1)} orders/wk`}
-                              metricName="Order Frequency"
-                              timeframe={freqTF}
-                              onPointPress={(p) => {
-                                setDrilldownPoint(p);
-                                setDrilldownTitle("Order Frequency");
-                              }}
-                            />
-                          ));
-                        }}
+                        onPress={() => setDateRangeModalTarget("freq")}
                       >
-                        <MaximizeIcon size={14} color={C.textLight} />
+                        <CalendarIcon size={14} color={C.textLight} />
                       </TouchableOpacity>
                     }
                   />
@@ -3139,27 +3141,9 @@ export default function CustomerAnalyticsScreen() {
                     title="Purchase Time Breakdown"
                     right={
                       <TouchableOpacity
-                        onPress={() => {
-                          setFullscreenChartTitle("Purchase Time");
-                          setFullscreenData(distData);
-                          setFullscreenRender(() => (w: number, h: number) => (
-                            <BarChartSvg
-                              data={distData}
-                              color={yellow}
-                              width={w}
-                              height={h}
-                              formatValue={(v) => `${v.toFixed(1)}% of orders`}
-                              metricName="Purchase Time Breakdown"
-                              timeframe={distTF}
-                              onPointPress={(p) => {
-                                setDrilldownPoint(p);
-                                setDrilldownTitle("Purchase Time Distribution");
-                              }}
-                            />
-                          ));
-                        }}
+                        onPress={() => setDateRangeModalTarget("dist")}
                       >
-                        <MaximizeIcon size={14} color={C.textLight} />
+                        <CalendarIcon size={14} color={C.textLight} />
                       </TouchableOpacity>
                     }
                   />
@@ -3320,6 +3304,13 @@ export default function CustomerAnalyticsScreen() {
                   <SectionHeader
                     icon={<TagIcon color={pink} size={16} />}
                     title="Most Purchased Categories"
+                    right={
+                      <TouchableOpacity
+                        onPress={() => setDateRangeModalTarget("category")}
+                      >
+                        <CalendarIcon size={14} color={C.textLight} />
+                      </TouchableOpacity>
+                    }
                   />
                   <View style={[s.cardBody, { paddingVertical: 16 }]}>
                     {renderTimeFilters(categoryTF, setCategoryTF)}
@@ -3771,33 +3762,37 @@ export default function CustomerAnalyticsScreen() {
         customerName={customerName}
       />
 
-      {/* Chart Fullscreen Viewer Modal */}
-      <FullscreenChartModal
-        visible={!!fullscreenChartTitle}
-        onClose={() => {
-          setFullscreenChartTitle(null);
-          setFullscreenRender(null);
+      {/* Chart Date Range Picker Modal */}
+      <DateRangePickerModal
+        visible={!!dateRangeModalTarget}
+        onClose={() => setDateRangeModalTarget(null)}
+        title={
+          dateRangeModalTarget === "spend"
+            ? "Spending Trend"
+            : dateRangeModalTarget === "orders"
+            ? "Orders Placed"
+            : dateRangeModalTarget === "freq"
+            ? "Order Frequency"
+            : dateRangeModalTarget === "dist"
+            ? "Purchase Time Breakdown"
+            : dateRangeModalTarget === "category"
+            ? "Most Purchased Categories"
+            : "Custom Range"
+        }
+        onApply={(from, to) => {
+          if (!dateRangeModalTarget) return;
+          const range = { from, to };
+          switch (dateRangeModalTarget) {
+            case "spend": setSpendTF(range); break;
+            case "orders": setOrdersTF(range); break;
+            case "freq": setFreqTF(range); break;
+            case "dist": setDistTF(range); break;
+            case "category": setCategoryTF(range); break;
+            case "status": setStatusTF(range); break;
+            case "payment": setPaymentTF(range); break;
+          }
         }}
-        title={fullscreenChartTitle ?? ""}
-        data={fullscreenData}
-        exportCSV={() =>
-          shareData(fullscreenChartTitle ?? "Chart", fullscreenData)
-        }
-        exportPDF={() =>
-          printDataPDF(
-            fullscreenChartTitle ?? "Chart",
-            fullscreenData,
-            customerId,
-          )
-        }
-      >
-        {fullscreenChartTitle && fullscreenRender && (
-          <MeasuredChart
-            plotHeight={280}
-            render={(w, h) => fullscreenRender(w, h)}
-          />
-        )}
-      </FullscreenChartModal>
+      />
     </AdminLayout>
   );
 }
