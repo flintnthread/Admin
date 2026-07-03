@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -2903,44 +2903,32 @@ export default function ApprovedSellersScreen() {
           })()
         ) : showPending ? (
           <>
-            {/* --- PENDING HEADER BANNER CARD --- */}
-            <View style={styles.pageHeaderCard}>
-              <View style={styles.bannerTop}>
-                <TouchableOpacity
-                    style={styles.bannerBackBtn}
+            {/* --- PENDING HEADER (Dark-blue, matching other screens) --- */}
+            <View style={styles.webHeaderContainer}>
+              <View style={styles.webHeaderRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <TouchableOpacity
                     onPress={() => router.push("/approveseller")}
+                    style={{ marginRight: 10 }}
                   >
-                  <Feather name="arrow-left" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.bannerBackBtnText}>Back</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={[styles.bannerBottom, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                <View style={styles.bannerBottomLeft}>
-                  <View style={styles.overlapBadgeContainer}>
-                    <View style={styles.overlapBadgeCircle}>
-                      <Feather name="map-pin" size={20} color="#FFFFFF" />
-                    </View>
+                    <Feather name="arrow-left" size={24} color="#fff" />
+                  </TouchableOpacity>
+                  <View style={styles.webHeaderIconBox}>
+                    <Feather name="users" size={20} color="#fff" />
                   </View>
-                  
-                  <View style={styles.bannerTitleContainer}>
-                    <Text style={styles.bannerTitle}>Pending Sellers</Text>
-                    <View style={styles.breadcrumbs}>
-                      <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
-                      <TouchableOpacity onPress={() => router.push("/approveseller")}>
-                        <Text style={styles.breadcrumbActive}>Dashboard</Text>
-                      </TouchableOpacity>
-                      <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                      <Text style={styles.breadcrumbText}>Pending Sellers</Text>
-                    </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.webHeaderTitle}>Pending Sellers</Text>
+                    <Text style={styles.webHeaderSubtitle}>
+                      Sellers who completed KYC and are waiting for admin approval
+                    </Text>
                   </View>
                 </View>
-
                 <TouchableOpacity
-                  style={styles.bannerPendingBadge}
+                  style={styles.webHeaderActionBtn}
                   onPress={() => router.push("/approveseller")}
                 >
-                  <Feather name="clock" size={14} color="#1F2937" />
-                  <Text style={styles.bannerPendingBadgeText}>{pendingSellers.length} Pending</Text>
+                  <Feather name="clock" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.webHeaderActionBtnText}>{pendingSellers.length} Pending</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3033,39 +3021,26 @@ export default function ApprovedSellersScreen() {
         ) : (
           <>
 
-            {/* --- PAGE HEADER BANNER CARD --- */}
-            <View style={styles.pageHeaderCard}>
-              {/* Banner Top Portion (Orange Gradient) */}
-              <View style={styles.bannerTop} />
-
-              {/* Banner Details Portion */}
-              <View style={[styles.bannerBottom, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                <View style={styles.bannerBottomLeft}>
-                  {/* Overlapping Badge */}
-                  <View style={styles.overlapBadgeContainer}>
-                    <View style={styles.overlapBadgeCircle}>
-                      <Feather name="check" size={20} color="#FFFFFF" />
-                    </View>
+            {/* --- PAGE HEADER (Dark-blue, matching other screens) --- */}
+            <View style={styles.webHeaderContainer}>
+              <View style={styles.webHeaderRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <View style={styles.webHeaderIconBox}>
+                    <Feather name="check-circle" size={20} color="#fff" />
                   </View>
-                  
-                  {/* Title & Breadcrumbs */}
-                  <View style={styles.bannerTitleContainer}>
-                    <Text style={styles.bannerTitle}>Approved Sellers</Text>
-                    <View style={styles.breadcrumbs}>
-                      <Feather name="home" size={12} color="#EA580C" style={styles.breadcrumbHomeIcon} />
-                      <Text style={styles.breadcrumbActive}>Dashboard</Text>
-                      <Feather name="chevron-right" size={10} color="#9CA3AF" style={styles.breadcrumbSeparator} />
-                      <Text style={styles.breadcrumbText}>Approved Sellers</Text>
-                    </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.webHeaderTitle}>Approved Sellers</Text>
+                    <Text style={styles.webHeaderSubtitle}>
+                      Manage and monitor verified merchant accounts
+                    </Text>
                   </View>
                 </View>
-
                 <TouchableOpacity
-                  style={styles.bannerActionBtn}
+                  style={styles.webHeaderActionBtn}
                   onPress={() => router.push("/approveseller?tab=pending")}
                 >
-                  <Feather name="clock" size={14} color="#FFFFFF" style={styles.bannerActionIcon} />
-                  <Text style={styles.bannerActionBtnText}>Pending Sellers</Text>
+                  <Feather name="clock" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.webHeaderActionBtnText}>Pending Sellers</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3890,6 +3865,53 @@ const styles = StyleSheet.create({
   },
   columnLayout: {
     flexDirection: "column",
+  },
+
+  // --- WEB HEADER (Dark-blue, matching other screens) ---
+  webHeaderContainer: {
+    backgroundColor: "#151D4F",
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    marginBottom: 24,
+  },
+  webHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  webHeaderIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#ef7b1a",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  webHeaderTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  webHeaderSubtitle: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 4,
+  },
+  webHeaderActionBtn: {
+    flexDirection: "row",
+    height: 38,
+    paddingHorizontal: 16,
+    backgroundColor: "#EA580C",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  webHeaderActionBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
 
   // --- PAGE HEADER BANNER CARD ---
