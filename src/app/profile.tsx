@@ -184,6 +184,28 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 16,
   },
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 0,
+    backgroundColor: "#1d324e",
+    padding: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+    borderRadius: 20,
+  },
+  pageHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+  },
   title: {
     fontSize: 24,
     fontWeight: "700",
@@ -193,6 +215,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 20,
+    marginTop: 20,
   },
   card: {
     borderRadius: 8,

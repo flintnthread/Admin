@@ -3,7 +3,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import { mapBankPendingRow } from "@/lib/mappers";
 import { fetchBankStats, fetchPendingBankSellers } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
@@ -18,7 +18,91 @@ import {
   useWindowDimensions
 } from "react-native";
 
-type BankRow = ReturnType<typeof mapBankPendingRow>;
+
+type BankRow = Omit<ReturnType<typeof mapBankPendingRow>, "status" | "statusLabel"> & {
+  status: "pending" | "approved" | "not_requested";
+  statusLabel: string;
+};
+
+const MOCK_EXTRA_SELLERS: BankRow[] = [
+  {
+    id: "#S991",
+    sellerId: 991,
+    initials: "JD",
+    color: "#2196F3",
+    name: "John Doe",
+    email: "john.doe@example.com",
+    phone: "+91 9876543210",
+    business: "Doe Enterprises",
+    bank: "HDFC Bank",
+    branch: "Mumbai Main",
+    account: "••••••••5678",
+    ifsc: "HDFC0000123",
+    status: "approved",
+    statusLabel: "Approved",
+    requested: "10 Jun, 2026",
+    sellerConfirm: "10 Jun, 2026",
+    adminApprove: "11 Jun, 2026",
+  },
+  {
+    id: "#S992",
+    sellerId: 992,
+    initials: "AS",
+    color: "#4CAF50",
+    name: "Alice Smith",
+    email: "alice.smith@example.com",
+    phone: "+91 9998887776",
+    business: "Smith Garments",
+    bank: "ICICI Bank",
+    branch: "Delhi West",
+    account: "••••••••4321",
+    ifsc: "ICIC0000456",
+    status: "approved",
+    statusLabel: "Approved",
+    requested: "12 Jun, 2026",
+    sellerConfirm: "12 Jun, 2026",
+    adminApprove: "13 Jun, 2026",
+  },
+  {
+    id: "#S993",
+    sellerId: 993,
+    initials: "RB",
+    color: "#9C27B0",
+    name: "Robert Brown",
+    email: "robert.b@example.com",
+    phone: "+91 9123456789",
+    business: "Brown Trading Co.",
+    bank: "State Bank of India",
+    branch: "Bangalore Rural",
+    account: "••••••••9876",
+    ifsc: "SBIN0000789",
+    status: "not_requested",
+    statusLabel: "Not Requested",
+    requested: "—",
+    sellerConfirm: "—",
+    adminApprove: "—",
+  },
+  {
+    id: "#S994",
+    sellerId: 994,
+    initials: "EM",
+    color: "#E91E63",
+    name: "Emma Miller",
+    email: "emma.miller@example.com",
+    phone: "+91 8887776665",
+    business: "Emma Couture",
+    bank: "Axis Bank",
+    branch: "Chennai North",
+    account: "••••••••2468",
+    ifsc: "UTIB0000234",
+    status: "not_requested",
+    statusLabel: "Not Requested",
+    requested: "—",
+    sellerConfirm: "—",
+    adminApprove: "—",
+  }
+];
+
 const BLUE = "#2563EB";
 
 const STAT_DEFS = [
@@ -191,8 +275,7 @@ function Avatar({ initials, color }: { initials: string; color: string }) {
 // }, []);
 export default function BankApproval() {
   const router = useRouter();
-  const [activeNav, setActiveNav] = useState("Pending Sellers");
-  const [activeTab, setActiveTab] = useState("Dashboard");
+
 
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -202,22 +285,20 @@ export default function BankApproval() {
   const [statusFilter, setStatusFilter] = useState("All");
   const STATUS_OPTIONS = ["All", "Pending", "Approved", "Not Requested"];
   const [sellers, setSellers] = useState<BankRow[]>([]);
-  const [bankStats, setBankStats] = useState<Record<string, number>>({});
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
-      const [pendingRes, statsRes] = await Promise.all([
+      const [pendingRes] = await Promise.all([
         fetchPendingBankSellers(0, 200),
         fetchBankStats(),
       ]);
-      setSellers((pendingRes?.items ?? []).map(mapBankPendingRow));
-      setBankStats(statsRes ?? {});
+      setSellers([...(pendingRes?.items ?? []).map(mapBankPendingRow), ...MOCK_EXTRA_SELLERS]);
     } catch (e) {
       setLoadError(getApiErrorMessage(e));
-      setSellers([]);
-      setBankStats({});
+      setSellers([...MOCK_EXTRA_SELLERS]);
     }
   }, []);
 
@@ -240,8 +321,8 @@ export default function BankApproval() {
     return matchStatus && matchSearch;
   });
 
-  const pending = bankStats.pending ?? 0;
-  const verified = bankStats.verified ?? 0;
+  const pending = sellers.filter((s) => s.status === "pending").length;
+  const verified = sellers.filter((s) => s.status === "approved").length;
   const total = pending + verified;
   const rate = total > 0 ? `${Math.round((verified / total) * 1000) / 10}%` : "—";
   const stats = STAT_DEFS.map((s) => {
@@ -379,10 +460,6 @@ export default function BankApproval() {
             <View style={{ backgroundColor: isMobile ? "transparent" : "#fff", paddingHorizontal: isMobile ? 0 : 28, paddingTop: isMobile ? 0 : 20, paddingBottom: isMobile ? 0 : 20, borderBottomWidth: isMobile ? 0 : 1, borderBottomColor: isMobile ? "transparent" : "#f0f2f5", marginBottom: isMobile ? 0 : 0 }}>
               {!isMobile ? (
                 <View style={styles.desktopFilterRow}>
-                  <View style={styles.desktopFilterItem}>
-                    <Text style={styles.desktopFilterLabel}>Status</Text>
-                    <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
-                  </View>
                   {/* <View style={styles.desktopFilterItem}>   */}
                   <View style={[styles.desktopFilterItem, { flexBasis: 600 }]}>
                     <Text style={styles.desktopFilterLabel}>Search</Text>
@@ -396,6 +473,10 @@ export default function BankApproval() {
                       }}
                     />
                   </View>
+                  <View style={styles.desktopFilterItem}>
+                    <Text style={styles.desktopFilterLabel}>Status</Text>
+                    <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+                  </View>
                   <TouchableOpacity style={styles.desktopFilterBtn}>
                     <Text style={styles.desktopFilterBtnText}>Apply</Text>
                   </TouchableOpacity>
@@ -403,10 +484,6 @@ export default function BankApproval() {
               ) : (
                 <View style={{ marginBottom: 14 }}>
                   <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Status</Text>
-                      <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
-                    </View>
                     <View style={{ flex: 2 }}>
                       <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Search</Text>
                       <TextInput
@@ -419,6 +496,10 @@ export default function BankApproval() {
                         }}
                       />
                     </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Status</Text>
+                      <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+                    </View>
                   </View>
                   <TouchableOpacity style={[styles.filterBtn, { width: "100%", justifyContent: "center" }]}>
                     <Text style={styles.filterBtnText}>Apply</Text>
@@ -429,27 +510,49 @@ export default function BankApproval() {
 
             {/* Stats (Mobile/Tablet only) */}
             {isMobile && (
-              <View style={{ paddingHorizontal: isMobile ? 0 : 28, paddingTop: isMobile ? 0 : 24, paddingBottom: isMobile ? 0 : 24, backgroundColor: isMobile ? "transparent" : "#fff", borderBottomWidth: isMobile ? 0 : 1, borderBottomColor: isMobile ? "transparent" : "#f0f2f5", marginBottom: isMobile ? 14 : 24 }}>
-                <View
-                  style={{
+              <View style={{ marginBottom: 14 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
                     flexDirection: "row",
-                    flexWrap: "wrap",
-                    gap: isMobile ? 10 : isDesktop ? 14 : 16,
+                    gap: 12,
+                    paddingVertical: 6,
                   }}
                 >
                   {stats.map((s, i) => (
-                    <View style={[styles.statCard, isMobile && styles.statCardMobile, isDesktop && styles.statCardDesktop, { paddingVertical: isMobile ? 8 : 10, paddingHorizontal: isMobile ? 10 : 14, gap: isMobile ? 6 : 10, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }]} key={i}>
-                      <View style={[styles.statIcon, { backgroundColor: s.bg, width: isMobile ? 30 : 38, height: isMobile ? 30 : 38 }]}>
-                        <Ionicons name={s.icon as any} size={isMobile ? 14 : 18} color={s.color} />
+                    <View
+                      style={[
+                        styles.statCard,
+                        {
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          gap: 6,
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          width: 135,
+                          borderWidth: 1,
+                          borderColor: "#E8EDF5",
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.05,
+                          shadowRadius: 6,
+                          elevation: 3,
+                        }
+                      ]}
+                      key={i}
+                    >
+                      <View style={[styles.statIcon, { backgroundColor: s.bg, width: 30, height: 30 }]}>
+                        <Ionicons name={s.icon as any} size={14} color={s.color} />
                       </View>
                       <View>
-                        <Text style={{ fontSize: isMobile ? 9 : 11, color: "#888", fontWeight: "500", marginBottom: 2 }}>{s.label}</Text>
-                        <Text style={{ fontSize: isMobile ? 14 : 18, fontWeight: "800", color: "#1a2332", lineHeight: 14 }}>{s.value}</Text>
-                        <Text style={{ fontSize: isMobile ? 8 : 10, color: "#aaa", marginTop: 2 }}>{s.sub}</Text>
+                        <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{s.label}</Text>
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{s.value}</Text>
+                        <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{s.sub}</Text>
                       </View>
                     </View>
                   ))}
-                </View>
+                </ScrollView>
               </View>
             )}
 
@@ -835,7 +938,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   tableHeader: {
-    backgroundColor: "#1a2332",
+    backgroundColor: "#151D4F",
     flexDirection: "row",
     paddingVertical: 14,
     paddingHorizontal: 16,

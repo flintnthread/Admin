@@ -48,7 +48,7 @@ const C = {
   cardBg:        "#F7F3EE",
   primary:       "#ef7b1a",
   primaryLight:  "#FFF0EA",
-  navy:          "#1d324e",
+  navy:          "#151D4F",
   text:          "#1C2B4A",
   sub:           "#6B7280",
   border:        "#E8E2D9",
