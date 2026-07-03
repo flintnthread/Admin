@@ -1858,7 +1858,8 @@ const s = StyleSheet.create({
         borderColor: T.border,
     },
     searchInput: {
-        flex: 1,
+        flex: 
+        1,
         fontSize: 13,
         color: T.textH,
         borderWidth: 0,

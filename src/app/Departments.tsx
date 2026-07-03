@@ -839,7 +839,7 @@ const DepartmentsScreen: React.FC = () => {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 12 }]}
+                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 12, marginTop: -20 }]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
@@ -1189,7 +1189,7 @@ const mob = StyleSheet.create({
         backgroundColor: "#151D4F",
         borderRadius: 22,
         marginHorizontal: 4,
-        marginTop: 16,
+        marginTop: 19,
         paddingTop: Platform.OS === 'android' ? 16 : 12,
         paddingHorizontal: 16,
         paddingBottom: 48,
