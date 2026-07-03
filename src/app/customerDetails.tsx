@@ -9,6 +9,9 @@ import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import { fetchCustomerDetail } from "@/services/customerApi";
+import { Feather } from "@expo/vector-icons";
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -67,7 +70,7 @@ const C = {
   cardBg:        "#FFF8F4",
   primary:       "#ef7b1a",
   primaryLight:  "#FFF0EA",
-  navy:          "#1d324e",
+  navy:          "#151D4F",
   text:          "#1C2B4A",
   sub:           "#6B7280",
   border:        "#E8E2D9",
@@ -290,7 +293,23 @@ function MiniStatCard({
 }) {
   const { width } = useWindowDimensions();
   const { isMobile, isTablet } = useLayout(width);
-  const flexBasis = isMobile ? "45%" : isTablet ? "30%" : "15%";
+
+  if (isMobile) {
+    // Compact fixed-width card — fits in a single horizontal scroll row
+    return (
+      <View style={s.statCardCompact}>
+        <View style={[s.statCardIconBoxCompact, { backgroundColor: iconBg }]}>{icon}</View>
+        <Text style={[s.statCardValueCompact, { color: valueColor }]} numberOfLines={1}>
+          {value}
+        </Text>
+        <Text style={s.statCardLabelCompact} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    );
+  }
+
+  const flexBasis = isTablet ? "30%" : "15%";
 
   return (
     <View style={[s.statCard, { flexBasis }]}>
@@ -760,6 +779,89 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
   const c = customer;
 
+  const handleDownload = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        let csvContent = "Customer Name,Customer ID,Status,Orders,Total Spent,Last Order\n";
+        csvContent += `"${c.name}","${c.id}","${c.status}","${c.orders}","${c.totalSpent}","${c.lastOrder ?? 'N/A'}"\n\n`;
+        
+        csvContent += "Order #,Date,Items,Amount,Payment,Status\n";
+        (c.orderHistory || []).forEach(o => {
+          csvContent += `"${o.orderNumber}","${o.date}","${o.items}","${o.amount}","${o.payment}","${o.status}"\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Customer_${c.id}_Export.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const htmlContent = `
+          <html>
+            <head>
+              <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; }
+                h1 { color: #151D4F; margin-bottom: 5px; }
+                .info-box { background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e5e7eb; }
+                .info-box p { margin: 5px 0; font-size: 14px; color: #374151; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+                th, td { border: 1px solid #e5e7eb; padding: 12px 10px; text-align: left; color: #374151; }
+                th { background-color: #f3f4f6; font-weight: bold; }
+                tr:nth-child(even) { background-color: #fafafa; }
+              </style>
+            </head>
+            <body>
+              <h1>Customer Details</h1>
+              <div class="info-box">
+                <p><strong>Customer Name:</strong> ${c.name}</p>
+                <p><strong>Customer ID:</strong> ${c.id}</p>
+                <p><strong>Status:</strong> ${c.status}</p>
+                <p><strong>Orders:</strong> ${c.orders}</p>
+                <p><strong>Total Spent:</strong> ₹${c.totalSpent}</p>
+                <p><strong>Last Order:</strong> ${c.lastOrder ?? 'N/A'}</p>
+              </div>
+              <h2 style="color: #151D4F; margin-top: 30px;">Order History</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Date</th>
+                    <th>Items</th>
+                    <th>Amount</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(c.orderHistory || []).map(o => `
+                    <tr>
+                      <td>${o.orderNumber}</td>
+                      <td>${o.date}</td>
+                      <td>${o.items}</td>
+                      <td>₹${o.amount}</td>
+                      <td>${o.payment}</td>
+                      <td>${o.status}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </body>
+          </html>
+        `;
+        
+        const { uri } = await Print.printToFileAsync({ html: htmlContent });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+        }
+      }
+    } catch (err) {
+      console.error("Error generating file:", err);
+    }
+  };
+
   const monthlyData: MonthlyData[] = c.monthlySpending ?? [];
   const weekly   = monthlyData.length
     ? monthlyData[monthlyData.length - 1]?.amount ?? 0
@@ -802,8 +904,12 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
   const OrderHistoryActions = (
     <View style={s.orderActions}>
-      <TouchableOpacity style={[s.orderActionBtn, { backgroundColor: C.green }]} activeOpacity={0.8}>
-        <BackupIcon size={13} /><Text style={s.orderActionTxt}>Export CSV</Text>
+      <TouchableOpacity 
+        style={[s.orderActionBtn, { backgroundColor: C.green }]} 
+        activeOpacity={0.8}
+        onPress={handleDownload}
+      >
+        <BackupIcon size={13} /><Text style={s.orderActionTxt}>{isMobile ? "Download" : "Export CSV"}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[s.orderActionBtn, { backgroundColor: C.primary }]}
@@ -859,68 +965,122 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
         </View>
 
         {/* ══ OVERLAPPING ORDER-STATUS STAT CARDS ════════════════════════ */}
-        <View style={[s.statCardsWrap, { paddingHorizontal: 10 }, isMobile && s.statCardsWrapMobile]}>
-          <MiniStatCard
-            icon={<CartIcon color={C.navy} size={15} />}
-            iconBg="rgba(29,50,78,0.08)"
-            value={totalOrders}
-            label="Total Orders"
-            valueColor={C.navy}
-          />
-          <MiniStatCard
-            icon={<BagIcon color="#3B82F6" size={15} />}
-            iconBg="#EFF6FF"
-            value={statusCounts.pending}
-            label="Pending"
-            valueColor="#3B82F6"
-          />
-          <MiniStatCard
-            icon={<ClockIcon color="#CA8A04" size={15} />}
-            iconBg="#FEF9C3"
-            value={statusCounts.processing}
-            label="Processing"
-            valueColor="#CA8A04"
-          />
-          <MiniStatCard
-            icon={<CheckIcon color={C.green} size={15} />}
-            iconBg={C.activeLight}
-            value={statusCounts.delivered}
-            label="Delivered"
-            valueColor={C.green}
-          />
-          <MiniStatCard
-            icon={<BanIcon color={C.red} size={15} />}
-            iconBg={C.inactiveLight}
-            value={statusCounts.cancelled}
-            label="Cancelled"
-            valueColor={C.red}
-          />
-          <MiniStatCard
-            icon={<ReplyIcon color="#8B5CF6" size={15} />}
-            iconBg="#F3E8FF"
-            value={statusCounts.returned}
-            label="Returned"
-            valueColor="#8B5CF6"
-          />
-          {/* <MiniStatCard
-            icon={<SwapIcon color={C.primary} size={15} />}
-            iconBg={C.primaryLight}
-            value={statusCounts.replacement}
-            label="Replacement"
-            valueColor={C.primary}
-          /> */}
-        </View>
+        {isMobile ? (
+          // Mobile: single horizontally-scrollable row (matches customerManagement)
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.statCardsScrollContent}
+            style={[s.statCardsWrapMobile]}
+          >
+            <MiniStatCard
+              icon={<CartIcon color={C.navy} size={13} />}
+              iconBg="rgba(29,50,78,0.08)"
+              value={totalOrders}
+              label="Total Orders"
+              valueColor={C.navy}
+            />
+            <MiniStatCard
+              icon={<BagIcon color="#3B82F6" size={13} />}
+              iconBg="#EFF6FF"
+              value={statusCounts.pending}
+              label="Pending"
+              valueColor="#3B82F6"
+            />
+            <MiniStatCard
+              icon={<ClockIcon color="#CA8A04" size={13} />}
+              iconBg="#FEF9C3"
+              value={statusCounts.processing}
+              label="Processing"
+              valueColor="#CA8A04"
+            />
+            <MiniStatCard
+              icon={<CheckIcon color={C.green} size={13} />}
+              iconBg={C.activeLight}
+              value={statusCounts.delivered}
+              label="Delivered"
+              valueColor={C.green}
+            />
+            <MiniStatCard
+              icon={<BanIcon color={C.red} size={13} />}
+              iconBg={C.inactiveLight}
+              value={statusCounts.cancelled}
+              label="Cancelled"
+              valueColor={C.red}
+            />
+            <MiniStatCard
+              icon={<ReplyIcon color="#8B5CF6" size={13} />}
+              iconBg="#F3E8FF"
+              value={statusCounts.returned}
+              label="Returned"
+              valueColor="#8B5CF6"
+            />
+          </ScrollView>
+        ) : (
+          // Tablet / Desktop: existing wrapped row — unchanged
+          <View style={[s.statCardsWrap, { paddingHorizontal: 10 }]}>
+            <MiniStatCard
+              icon={<CartIcon color={C.navy} size={15} />}
+              iconBg="rgba(29,50,78,0.08)"
+              value={totalOrders}
+              label="Total Orders"
+              valueColor={C.navy}
+            />
+            <MiniStatCard
+              icon={<BagIcon color="#3B82F6" size={15} />}
+              iconBg="#EFF6FF"
+              value={statusCounts.pending}
+              label="Pending"
+              valueColor="#3B82F6"
+            />
+            <MiniStatCard
+              icon={<ClockIcon color="#CA8A04" size={15} />}
+              iconBg="#FEF9C3"
+              value={statusCounts.processing}
+              label="Processing"
+              valueColor="#CA8A04"
+            />
+            <MiniStatCard
+              icon={<CheckIcon color={C.green} size={15} />}
+              iconBg={C.activeLight}
+              value={statusCounts.delivered}
+              label="Delivered"
+              valueColor={C.green}
+            />
+            <MiniStatCard
+              icon={<BanIcon color={C.red} size={15} />}
+              iconBg={C.inactiveLight}
+              value={statusCounts.cancelled}
+              label="Cancelled"
+              valueColor={C.red}
+            />
+            <MiniStatCard
+              icon={<ReplyIcon color="#8B5CF6" size={15} />}
+              iconBg="#F3E8FF"
+              value={statusCounts.returned}
+              label="Returned"
+              valueColor="#8B5CF6"
+            />
+            {/* <MiniStatCard
+              icon={<SwapIcon color={C.primary} size={15} />}
+              iconBg={C.primaryLight}
+              value={statusCounts.replacement}
+              label="Replacement"
+              valueColor={C.primary}
+            /> */}
+          </View>
+        )}
       </View>
 
 <View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%", paddingHorizontal: px }]}>
           {/* Profile card */}
-          <Card style={s.profileCard}>
-            <View style={s.profileInner}>
-              <Avatar name={c.name} size={isMobile ? 68 : 84} />
+          <Card style={[s.profileCard, isMobile && { padding: 14, gap: 12 }]}>
+            <View style={[s.profileInner, isMobile && { gap: 12 }]}>
+              <Avatar name={c.name} size={isMobile ? 48 : 84} />
               <View style={s.profileInfo}>
-                <Text style={s.profileName} numberOfLines={1}>{c.name}</Text>
-                <View style={s.profileMeta}>
-                  <Text style={s.profileId}>Customer #{c.id}</Text>
+                <Text style={[s.profileName, isMobile && { fontSize: 15 }]} numberOfLines={1}>{c.name}</Text>
+                <View style={[s.profileMeta, isMobile && { gap: 6, marginTop: 4 }]}>
+                  <Text style={[s.profileId, isMobile && { fontSize: 11 }]}>Customer #{c.id}</Text>
                   <View style={s.metaDot} />
                   <StatusPill status={c.status} />
                 </View>
@@ -928,17 +1088,31 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
             </View>
             <View style={s.profileStatRow}>
               <View style={s.profileStat}>
-                <Text style={[s.profileStatVal, { color: c.orders > 0 ? C.primary : C.sub }]}>{c.orders}</Text>
+                <Text style={[s.profileStatVal, { color: c.orders > 0 ? C.primary : C.sub }, isMobile && { fontSize: 14 }]}>{c.orders}</Text>
                 <Text style={s.profileStatLbl}>Orders</Text>
               </View>
               <View style={s.profileStatDiv} />
               <View style={s.profileStat}>
-                <Text style={s.profileStatVal}>{rupee(c.totalSpent)}</Text>
+                <Text
+                  style={[s.profileStatVal, isMobile && { fontSize: 13 }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {rupee(c.totalSpent)}
+                </Text>
                 <Text style={s.profileStatLbl}>Total Spent</Text>
               </View>
               <View style={s.profileStatDiv} />
               <View style={s.profileStat}>
-                <Text style={[s.profileStatVal, { fontSize: isMobile ? 12 : 15 }]}>{c.lastOrder ?? "N/A"}</Text>
+                <Text
+                  style={[s.profileStatVal, { fontSize: isMobile ? 11 : 15 }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {c.lastOrder ?? "N/A"}
+                </Text>
                 <Text style={s.profileStatLbl}>Last Order</Text>
               </View>
             </View>
@@ -1020,41 +1194,46 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                   {isMobile ? (
                     paginatedOrders.map((o) => (
                       <View key={o.orderId} style={s.orderMobileCard}>
+                        {/* Top Row */}
                         <View style={s.omHeader}>
-                          <View style={s.omHeaderLeft}>
-                            <Text style={s.omId} numberOfLines={1}>{o.orderNumber}</Text>
-                          </View>
+                          <TouchableOpacity 
+                            style={{ flex: 1, marginRight: 10 }} 
+                            onPress={() => handleViewOrder(o.orderId)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[s.omId, { flex: 0, marginRight: 0 }]} numberOfLines={1}>{o.orderNumber}</Text>
+                          </TouchableOpacity>
                           <OrderStatusPill status={o.status} />
                         </View>
-                        <View style={s.omInfoStrip}>
-                          <View style={s.omInfoRow}>
-                            <View style={s.omInfoCell}>
-                              <Text style={s.omInfoLbl}>Date</Text>
-                              <Text style={s.omInfoVal}>{o.date}</Text>
+                        
+                        {/* Middle Sections */}
+                        <View style={s.omBody}>
+                          <Text style={s.omDateTxt}>{o.date}</Text>
+                          <Text style={s.omAmountTxt}>{rupee(o.amount)}</Text>
+                          
+                          <View style={s.omMetaRow}>
+                            <View style={s.omMetaBadge}>
+                              <Feather name="package" size={13} color={C.sub} style={{ marginRight: 2 }} />
+                              <Text style={s.omMetaTxt}>{o.items} item{o.items !== 1 ? "s" : ""}</Text>
                             </View>
-                            <View style={s.omInfoCell}>
-                              <Text style={s.omInfoLbl}>Items</Text>
-                              <Text style={[s.omInfoVal, { color: C.primary }]}>{o.items} item{o.items !== 1 ? "s" : ""}</Text>
-                            </View>
-                          </View>
-                          <View style={s.omInfoRow}>
-                            <View style={s.omInfoCell}>
-                              <Text style={s.omInfoLbl}>Amount</Text>
-                              <Text style={[s.omInfoVal, { color: C.text, fontWeight: "700" }]}>{rupee(o.amount)}</Text>
-                            </View>
-                            <View style={s.omInfoCell}>
-                              <Text style={s.omInfoLbl}>Payment</Text>
-                              <Text style={s.omInfoVal}>{o.payment}</Text>
+                            <View style={s.omMetaBadge}>
+                              <Feather name="credit-card" size={13} color={C.sub} style={{ marginRight: 2 }} />
+                              <Text style={s.omMetaTxt}>{o.payment}</Text>
                             </View>
                           </View>
                         </View>
+
+                        {/* Bottom Row */}
                         <TouchableOpacity
                           style={s.orderViewBtn}
-                          activeOpacity={0.8}
+                          activeOpacity={0.7}
                           onPress={() => handleViewOrder(o.orderId)}
                         >
-                          <EyeIcon size={14} />
-                          <Text style={s.orderViewTxt}>View Order Details</Text>
+                          <View style={s.orderViewBtnLeft}>
+                            <EyeIcon size={15} color={C.primary} />
+                            <Text style={s.orderViewTxt}>View Order Details</Text>
+                          </View>
+                          <ChevronRightIcon size={14} color={C.primary} />
                         </TouchableOpacity>
                       </View>
                     ))
@@ -1071,7 +1250,13 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                       </View>
                       {paginatedOrders.map((o) => (
                         <View key={o.orderId} style={s.orderTableRow}>
-                          <Text style={[s.orderIdText, { flex: 2.5 }]}>{o.orderNumber}</Text>
+                          <TouchableOpacity 
+                            style={{ flex: 2.5 }} 
+                            onPress={() => handleViewOrder(o.orderId)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[s.orderIdText, { flex: 0 }]}>{o.orderNumber}</Text>
+                          </TouchableOpacity>
                           <Text style={s.orderTableCell}>{o.date}</Text>
                           <View style={{ flex: 1 }}>
                             <View style={s.itemsBadge}><CartIcon size={12} color={C.primary} /><Text style={s.itemsBadgeTxt}>{o.items} item{o.items !== 1 ? "s" : ""}</Text></View>
@@ -1139,15 +1324,22 @@ const s = StyleSheet.create({
   hSub:          { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
 
   // Overlapping order-status stat cards
-  statCardsWrap:       { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: -30, marginBottom: 16 },
-  statCardsWrapMobile: { gap: 8, marginTop: -24 },
-  statCard:            { flexGrow: 1, flexShrink: 1, alignItems: "center", backgroundColor: C.surface, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, gap: 4 },
-  statCardIconBox:     { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  statCardValue:       { fontSize: 15, fontWeight: "800" },
-  statCardLabel:       { fontSize: 10, fontWeight: "600", color: C.sub, textAlign: "center" },
+  statCardsWrap:           { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: -30, marginBottom: 16 },
+  // Mobile: horizontal scroll strip (overlaps the navy header)
+  statCardsWrapMobile:     { marginTop: -24, marginBottom: 14, paddingHorizontal: 10 },
+  statCardsScrollContent:  { flexDirection: "row", gap: 7, paddingRight: 10 },
+  statCard:                { flexGrow: 1, flexShrink: 1, alignItems: "center", backgroundColor: C.surface, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, gap: 4 },
+  statCardIconBox:         { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  statCardValue:           { fontSize: 15, fontWeight: "800" },
+  statCardLabel:           { fontSize: 10, fontWeight: "600", color: C.sub, textAlign: "center" },
+  // Compact card — mobile horizontal scroll row
+  statCardCompact:         { width: 82, alignItems: "center", backgroundColor: C.surface, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 4, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6, elevation: 3, gap: 4 },
+  statCardIconBoxCompact:  { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  statCardValueCompact:    { fontSize: 14, fontWeight: "800" },
+  statCardLabelCompact:    { fontSize: 9, fontWeight: "600", color: C.sub, textAlign: "center" },
 
   card:           { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, overflow: "hidden" },
-  cardHeader:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14, backgroundColor: C.cardBg, borderBottomWidth: 1, borderBottomColor: C.border, flexWrap: "wrap", gap: 10 },
+  cardHeader:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border, flexWrap: "wrap", gap: 10 },
   cardHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   cardIconBox:    { width: 32, height: 32, borderRadius: 9, backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center" },
   cardTitle:      { fontSize: 15, fontWeight: "700", color: C.text },
@@ -1236,17 +1428,18 @@ const s = StyleSheet.create({
   orderStatus:    { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, alignSelf: "flex-start" },
   orderStatusTxt: { fontSize: 11, fontWeight: "700" },
 
-  orderMobileCard:  { backgroundColor: C.surface, borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 2 },
-  omHeader:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, backgroundColor: C.cardBg },
-  omHeaderLeft:     { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 10 },
-  omId:             { fontSize: 13, fontWeight: "700", color: C.primary, flex: 1 },
-  omInfoStrip:      { padding: 12, gap: 10 },
-  omInfoRow:        { flexDirection: "row", gap: 10 },
-  omInfoCell:       { flex: 1, backgroundColor: "#FAFAFA", borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: "center" },
-  omInfoLbl:        { fontSize: 10, color: C.sub, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
-  omInfoVal:        { fontSize: 13, fontWeight: "600", color: C.sub },
-  orderViewBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.navy, paddingVertical: 13 },
-  orderViewTxt:     { color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: 0.2 },
+  orderMobileCard:  { backgroundColor: C.surface, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 3, marginBottom: 16 },
+  omHeader:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  omId:             { fontSize: 14, fontWeight: "700", color: C.primary, flex: 1, marginRight: 10 },
+  omBody:           { paddingHorizontal: 16, paddingBottom: 14, gap: 2 },
+  omDateTxt:        { fontSize: 12, color: C.sub },
+  omAmountTxt:      { fontSize: 18, fontWeight: "800", color: C.text, marginTop: 2, marginBottom: 6 },
+  omMetaRow:        { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+  omMetaBadge:      { flexDirection: "row", alignItems: "center", gap: 4 },
+  omMetaTxt:        { fontSize: 13, color: C.sub, fontWeight: "600" },
+  orderViewBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, backgroundColor: "#FDFBF9", borderTopWidth: 1, borderTopColor: C.border },
+  orderViewBtnLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  orderViewTxt:     { color: C.primary, fontSize: 13, fontWeight: "700", letterSpacing: 0.2 },
 
   // Legacy compat
   orderMobileTopRow:{}, orderMobileDivider:{}, orderMobileGrid:{},
