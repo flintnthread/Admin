@@ -22,7 +22,7 @@ import {
 import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
-import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow } from '@/services/productApi';
+import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow, type SellerRow } from '@/services/productApi';
 import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
 import Pagination from '@/components/Pagination';
 
@@ -85,13 +85,18 @@ function truncateWords(text: string, maxWords: number = 4): string {
   return text;
 }
 
+function cleanText(text: string): string {
+  if (!text) return '';
+  return text.replace(/[\x00-\x1F\x7F-\x9F\u2018-\u201F\u00B4\u0060\u25A1\uFFFD\u0092]/g, "'").replace(/&#39;|&apos;|&rsquo;|&#8217;|&#x2019;/gi, "'");
+}
+
 function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): ApprovalProduct {
   return {
     id: row.id,
-    name: row.name,
+    name: cleanText(row.name),
     description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
     image: resolveMediaUrl(row.image) || PLACEHOLDER_IMAGE,
-    seller: row.seller,
+    seller: cleanText(row.seller),
     email: '',
     category: row.category,
     status: row.status as ProductStatus,
@@ -211,19 +216,21 @@ function FilterDropdown({
   options,
   onSelect,
   wide,
+  isOpen,
+  onOpenChange,
 }: {
   label: string;
   value: string;
   options?: string[];
   onSelect?: (val: string) => void;
   wide?: boolean;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-
   return (
     <View style={[styles.filterDropdown, wide ? styles.filterDropdownWide : styles.filterDropdownCompact, isOpen && { zIndex: 100, elevation: 100 }]}>
       <Text style={styles.filterLabel}>{label}</Text>
-      <Pressable style={styles.filterSelect} onPress={() => setIsOpen(!isOpen)}>
+      <Pressable style={styles.filterSelect} onPress={() => onOpenChange(!isOpen)}>
         <Text style={styles.filterSelectText} numberOfLines={1}>
           {value}
         </Text>
@@ -238,7 +245,7 @@ function FilterDropdown({
                 style={[styles.dropdownItem, value === opt && styles.dropdownItemActive]}
                 onPress={() => {
                   if (onSelect) onSelect(opt);
-                  setIsOpen(false);
+                  onOpenChange(false);
                 }}
               >
                 <Text style={[styles.dropdownItemText, value === opt && styles.dropdownItemTextActive]}>
@@ -525,6 +532,7 @@ function FilterSection({
   mainCategories,
   onMainCategoryChange,
   onCategoryChange,
+  onSellerChange,
 }: {
   stats: ProductStats;
   search: string;
@@ -541,11 +549,13 @@ function FilterSection({
   mainCategories: CategoryRow[];
   onMainCategoryChange: (selectedMainCat: string) => void;
   onCategoryChange: (selectedCategory: string) => void;
+  onSellerChange?: (selectedSeller: string) => void;
 }) {
   const [seller, setSeller] = useState("All Sellers");
   const [mainCat, setMainCat] = useState("All Main Categories");
   const [category, setCategory] = useState("All Categories");
   const [subcategory, setSubcategory] = useState("All Subcategories");
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const handleMainCategorySelect = (value: string) => {
     setMainCat(value);
@@ -558,6 +568,11 @@ function FilterSection({
     setCategory(value);
     setSubcategory("All Subcategories");
     onCategoryChange(value);
+  };
+
+  const handleSellerSelect = (value: string) => {
+    setSeller(value);
+    if (onSellerChange) onSellerChange(value);
   };
 
   return (
@@ -574,10 +589,42 @@ function FilterSection({
           isWide && styles.filtersGridWide,
           { zIndex: 10, elevation: 10 }
         ]}>
-        <FilterDropdown label="Seller" value={seller} onSelect={setSeller} options={sellerOptions} wide={isWide} />
-        <FilterDropdown label="Main Category" value={mainCat} onSelect={handleMainCategorySelect} options={mainCategoryOptions} wide={isWide} />
-        <FilterDropdown label="Category" value={category} onSelect={handleCategorySelect} options={categoryOptions} wide={isWide} />
-        <FilterDropdown label="Subcategory" value={subcategory} onSelect={setSubcategory} options={subcategoryOptions} wide={isWide} />
+        <FilterDropdown
+          label="Seller"
+          value={seller}
+          onSelect={handleSellerSelect}
+          options={sellerOptions}
+          wide={isWide}
+          isOpen={openDropdown === 'seller'}
+          onOpenChange={(open) => setOpenDropdown(open ? 'seller' : null)}
+        />
+        <FilterDropdown
+          label="Main Category"
+          value={mainCat}
+          onSelect={handleMainCategorySelect}
+          options={mainCategoryOptions}
+          wide={isWide}
+          isOpen={openDropdown === 'mainCat'}
+          onOpenChange={(open) => setOpenDropdown(open ? 'mainCat' : null)}
+        />
+        <FilterDropdown
+          label="Category"
+          value={category}
+          onSelect={handleCategorySelect}
+          options={categoryOptions}
+          wide={isWide}
+          isOpen={openDropdown === 'category'}
+          onOpenChange={(open) => setOpenDropdown(open ? 'category' : null)}
+        />
+        <FilterDropdown
+          label="Subcategory"
+          value={subcategory}
+          onSelect={setSubcategory}
+          options={subcategoryOptions}
+          wide={isWide}
+          isOpen={openDropdown === 'subcategory'}
+          onOpenChange={(open) => setOpenDropdown(open ? 'subcategory' : null)}
+        />
       </View>
 
       <View style={[styles.searchRow, isMobile && styles.searchRowMobile]}>
@@ -684,11 +731,11 @@ function ProductTable({
             <View key={product.id} style={styles.tableRow}>
 
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
-             <Image
-  source={{ uri: product.image }}
-  style={styles.tableThumb}
-  contentFit="cover"
-/>
+                <Image
+                  source={{ uri: product.image }}
+                  style={styles.tableThumb}
+                  contentFit="cover"
+                />
                 <View style={styles.tableProductInfo}>
                   <View style={styles.productNameRow}>
                     <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
@@ -748,7 +795,9 @@ export default function ProductApprovalScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [selectedSeller, setSelectedSeller] = useState("All Sellers");
+  const [sellers, setSellers] = useState<SellerRow[]>([]);
+
   // Filter options from backend
   const [sellerOptions, setSellerOptions] = useState<string[]>(["All Sellers"]);
   const [mainCategoryOptions, setMainCategoryOptions] = useState<string[]>(["All Main Categories"]);
@@ -767,14 +816,15 @@ export default function ProductApprovalScreen() {
       const mainCats = await fetchMainCategories();
       setMainCategories(mainCats);
       setMainCategoryOptions(["All Main Categories", ...mainCats.map(cat => cat.categoryName)]);
-      
+
       // Fetch sellers from backend
       const sellersPage = await fetchSellers();
-      const sellerNames = sellersPage.items.map(seller => 
+      setSellers(sellersPage.items);
+      const sellerNames = sellersPage.items.map(seller =>
         seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown'
       );
       setSellerOptions(["All Sellers", ...sellerNames]);
-      
+
       // Categories (parentId is NOT NULL) and subcategories will be updated based on main category selection
     } catch (err) {
       console.error("Failed to load filter data:", err);
@@ -786,10 +836,22 @@ export default function ProductApprovalScreen() {
     setError(null);
     try {
       const apiStatus = filterStatusForApi(activeFilter);
+      let sellerId: number | undefined;
+      if (selectedSeller !== "All Sellers") {
+        const foundSeller = sellers.find(seller => {
+          const name = seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown';
+          return name === selectedSeller;
+        });
+        if (foundSeller) {
+          sellerId = foundSeller.id;
+        }
+      }
+
       const [page, apiStats] = await Promise.all([
         fetchProducts({
           status: apiStatus,
           search: debouncedSearch.trim() || undefined,
+          sellerId: sellerId,
           page: currentPage - 1,
           size: PAGE_SIZE,
         }),
@@ -811,20 +873,20 @@ export default function ProductApprovalScreen() {
         rejected: Number(apiStats.rejected ?? 0),
         all: Number(apiStats.total ?? 0),
       });
-      
+
       // Extract unique categories from products
       const uniqueCategories = new Set<string>(["All Categories"]);
       mappedProducts.forEach(p => {
         if (p.category) uniqueCategories.add(p.category);
       });
       setCategoryOptions(Array.from(uniqueCategories));
-      
+
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to load products.'));
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, currentPage, debouncedSearch]);
+  }, [activeFilter, currentPage, debouncedSearch, selectedSeller]);
 
   useEffect(() => {
     loadData();
@@ -846,20 +908,26 @@ export default function ProductApprovalScreen() {
     setSelected(new Set());
   }, []);
 
+  const handleSellerChange = useCallback((seller: string) => {
+    setSelectedSeller(seller);
+    setCurrentPage(1);
+    setSelected(new Set());
+  }, []);
+
   const handleMainCategoryChange = useCallback(async (selectedMainCat: string) => {
     if (selectedMainCat === "All Main Categories") {
       setCategoryOptions(["All Categories"]);
       setSubcategoryOptions(["All Subcategories"]);
       return;
     }
-    
+
     try {
       const selectedMainCategory = mainCategories.find(cat => cat.categoryName === selectedMainCat);
       if (selectedMainCategory) {
         // Fetch categories (parentId is NOT NULL - these are children of main category)
         const categories = await fetchSubcategories(selectedMainCategory.id);
         setCategoryOptions(["All Categories", ...categories.map(cat => cat.categoryName)]);
-        
+
         // Reset subcategories until a category is selected
         setSubcategoryOptions(["All Subcategories"]);
       }
@@ -921,6 +989,7 @@ export default function ProductApprovalScreen() {
             mainCategories={mainCategories}
             onMainCategoryChange={handleMainCategoryChange}
             onCategoryChange={handleCategoryChange}
+            onSellerChange={handleSellerChange}
           />
 
           {loading ? (
@@ -1463,6 +1532,7 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'web' ? 10 : 8,
     fontSize: 14,
     color: PALETTE.textPrimary,
+    outlineStyle: 'none' as any,
   },
   searchBtn: {
     backgroundColor: PALETTE.brandOrange,

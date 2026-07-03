@@ -99,6 +99,11 @@ export type ProductDetailExtras = {
   };
 };
 
+function cleanText(text: string): string {
+  if (!text) return '';
+  return text.replace(/[\x00-\x1F\x7F-\x9F\u2018-\u201F\u00B4\u0060\u25A1\uFFFD\u0092]/g, "'").replace(/&#39;|&apos;|&rsquo;|&#8217;|&#x2019;/gi, "'");
+}
+
 function dash(value: unknown): string {
   if (value == null || value === '') return '—';
   return String(value);
@@ -328,8 +333,8 @@ function mapApiProductDetail(data: Record<string, unknown>): {
 
   const product: ProductDetail = {
     id: String(data.id ?? ''),
-    name: String(data.name ?? 'Product'),
-    description: String(data.shortDescription ?? data.description ?? ''),
+    name: cleanText(String(data.name ?? 'Product')),
+    description: cleanText(String(data.shortDescription ?? data.description ?? '')),
     image: primaryImage,
     seller: sellerLabel,
     email: String(data.sellerEmail ?? ''),
@@ -340,7 +345,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     lastUpdated: formatDate(String(data.updatedAt ?? data.createdAt ?? '')),
     categoryLabel,
     subcategory: String(data.subcategoryName ?? `Subcategory #${data.subcategoryId ?? '—'}`),
-    fullTitle: String(data.name ?? 'Product'),
+    fullTitle: cleanText(String(data.name ?? 'Product')),
     price: displayPrice,
     mrp: displayMrp,
     gst,
@@ -364,7 +369,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     createdAt: formatDate(String(data.createdAt ?? '')),
     approvedAt: data.reviewedAt ? formatDateTime(String(data.reviewedAt)) : '—',
     adminNote: String(data.adminNotes ?? '—'),
-    fullDescription: String(data.description ?? data.shortDescription ?? ''),
+    fullDescription: cleanText(String(data.description ?? data.shortDescription ?? '')),
     gallery: gallery.length > 0 ? gallery : primaryImage ? [primaryImage] : [],
   };
 
@@ -1735,11 +1740,11 @@ const styles = StyleSheet.create({
   vcolSellGst: { width: 110, paddingHorizontal: 8 },
   vcolComm: { width: 120, paddingHorizontal: 8 },
   vcolDel: { width: 90, paddingHorizontal: 8 },
-  vcolTotalIntraHeader: { width: 108, backgroundColor: '#D1FAE5', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
-  vcolTotalMetroHeader: { width: 108, backgroundColor: '#FEF3C7', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalIntraHeader: { width: 108, backgroundColor: '#FFFFFF', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalMetroHeader: { width: 108, backgroundColor: '#FFFFFF', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
   vcolTotalHeaderText: { color: '#111827', fontWeight: '800' },
-  vcolTotalIntra: { width: 108, backgroundColor: '#D1FAE5', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
-  vcolTotalMetro: { width: 108, backgroundColor: '#FEF3C7', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalIntra: { width: 108, backgroundColor: '#FFFFFF', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
+  vcolTotalMetro: { width: 108, backgroundColor: '#FFFFFF', paddingHorizontal: 8, justifyContent: 'center', alignSelf: 'stretch' },
   vcolTotalIntraText: { fontSize: 13, fontWeight: '800', color: '#166534' },
   vcolTotalMetroText: { fontSize: 13, fontWeight: '800', color: '#92400E' },
   vcellColor: { flexDirection: 'row', alignItems: 'center', gap: 6 },
