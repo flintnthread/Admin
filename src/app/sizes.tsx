@@ -20,6 +20,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -797,7 +798,7 @@ export default function SizesManagement() {
               <BI name="grid-3x3" size={18} color="#fff" />
             </View>
             <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
-              <Text style={S.webPageTitle}>{isMobile ? "Sizes" : "Sizes Management"}</Text>
+              <Text style={S.webPageTitle}>Sizes Management</Text>
               {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
             </View>
             <TouchableOpacity
@@ -805,7 +806,7 @@ export default function SizesManagement() {
               onPress={() => setModal({ type: "add" })}
             >
               <BI name="plus-lg" size={15} color="#fff" />
-              {!isMobile && <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>}
+              <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
             </TouchableOpacity>
           </View>
 
