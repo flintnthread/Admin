@@ -754,8 +754,51 @@ const DeliveryChargeModal: React.FC<{
   if (!visible) return null;
 
   const handleSave = () => {
+    if (!label.trim()) {
+      if (Platform.OS === "web") {
+        Swal.fire({ icon: "error", title: "Error", text: "Please enter a weight slab description.", confirmButtonColor: "#1E2B6B" });
+      } else {
+        Alert.alert("Validation Error", "Please enter a weight slab description.");
+      }
+      return;
+    }
+    if (minKg.trim() === "") {
+      if (Platform.OS === "web") {
+        Swal.fire({ icon: "error", title: "Error", text: "Please enter a minimum weight.", confirmButtonColor: "#1E2B6B" });
+      } else {
+        Alert.alert("Validation Error", "Please enter a minimum weight.");
+      }
+      return;
+    }
+    if (maxKg.trim() === "") {
+      if (Platform.OS === "web") {
+        Swal.fire({ icon: "error", title: "Error", text: "Please enter a maximum weight.", confirmButtonColor: "#1E2B6B" });
+      } else {
+        Alert.alert("Validation Error", "Please enter a maximum weight.");
+      }
+      return;
+    }
+    if (!isCustomPricing) {
+      if (intraCity.trim() === "") {
+        if (Platform.OS === "web") {
+          Swal.fire({ icon: "error", title: "Error", text: "Please enter an intra-city charge.", confirmButtonColor: "#1E2B6B" });
+        } else {
+          Alert.alert("Validation Error", "Please enter an intra-city charge.");
+        }
+        return;
+      }
+      if (metroMetro.trim() === "") {
+        if (Platform.OS === "web") {
+          Swal.fire({ icon: "error", title: "Error", text: "Please enter a metro-metro charge.", confirmButtonColor: "#1E2B6B" });
+        } else {
+          Alert.alert("Validation Error", "Please enter a metro-metro charge.");
+        }
+        return;
+      }
+    }
+
     onSave({
-      label: label.trim() || "Slab",
+      label: label.trim(),
       minKg: Number(minKg) || 0,
       maxKg: Number(maxKg) || 0,
       intraCity: isCustomPricing ? 0 : Number(intraCity) || 0,
@@ -975,9 +1018,16 @@ const DeliveryChargesScreen: React.FC = () => {
         await loadSlabs();
         if (Platform.OS === "web") {
           Swal.fire({ icon: "success", title: "Deleted!", text: "Delivery charge deleted successfully!", confirmButtonColor: "#1E2B6B" });
-        } else Alert.alert("Deleted", "Delivery charge deleted successfully!");
+        } else {
+          Alert.alert("Deleted", "Delivery charge deleted successfully!");
+        }
       } catch (e) {
-        console.warn(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e, "Failed to delete delivery charge.");
+        if (Platform.OS === "web") {
+          Swal.fire({ icon: "error", title: "Error!", text: msg, confirmButtonColor: "#1E2B6B" });
+        } else {
+          Alert.alert("Error", msg);
+        }
       }
     };
 

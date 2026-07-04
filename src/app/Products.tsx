@@ -881,66 +881,65 @@ const WebProductsScreen: React.FC = () => {
     return (
         <AdminLayout>
         <View style={wst.root}>
-            {error ? (
-                <View style={{ marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
-                    <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
-                    <TouchableOpacity onPress={reload} style={{ marginTop: 8, alignSelf: "flex-start" }}>
-                        <Text style={{ fontSize: 12, color: C.navy }}>Retry</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : null}
-
-            {/* Page header and Stats (Fixed) */}
-            <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
-                {/* Page header */}
-                <View style={wst.pageHeader}>
-                    <View style={wst.titleContainer}>
-                        <Text style={wst.pageTitle}>Product Management</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                        <TouchableOpacity
-                            style={wst.navAddBtn}
-                            onPress={() => router.push('/Addproduct')}
-                            activeOpacity={0.85}
-                        >
-                            <MaterialCommunityIcons name="plus" size={18} color={C.navy} />
-                            <Text style={wst.navAddBtnTxt}>Add Product</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={wst.navBulkBtn}
-                            onPress={() => router.push('/Bulkupload')}
-                            activeOpacity={0.85}
-                        >
-                            <MaterialCommunityIcons name="cloud-upload-outline" size={16} color={C.white} />
-                            <Text style={wst.navBulkBtnTxt}>Bulk Upload</Text>
+            <ScrollView style={wst.pageScroll} showsVerticalScrollIndicator={false} contentContainerStyle={wst.pageContent}>
+                {error ? (
+                    <View style={{ marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: C.redPale, borderWidth: 1, borderColor: "#FECACA" }}>
+                        <Text style={{ fontSize: 12, color: C.red }}>{error}</Text>
+                        <TouchableOpacity onPress={reload} style={{ marginTop: 8, alignSelf: "flex-start" }}>
+                            <Text style={{ fontSize: 12, color: C.navy }}>Retry</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                ) : null}
 
-                {/* Stats row */}
-                <View style={wst.statsRow}>
-                    {[
-                        { label: "Total Products", value: totalCount,      icon: "package-variant-closed", color: C.navy,    bg: "#EEF1FF",    trend: "+3 this week" },
-                        { label: "Active",          value: activeCount,     icon: "check-circle",           color: "#16A34A", bg: "#DCFCE7",    trend: "Selling well" },
-                        { label: "Inactive",        value: inactiveCount,   icon: "pause-circle",           color: "#B45309", bg: "#FEF9C3",    trend: "Needs review" },
-                        { label: "Out of Stock",    value: outOfStockCount, icon: "close-circle-outline",   color: "#DC2626", bg: "#FEE2E2",    trend: "Restock soon" },
-                        { label: "Low Stock",       value: lowStockCount,   icon: "alert-circle-outline",   color: C.orange,  bg: C.orangePale, trend: "≤10 units"    },
-                    ].map((stat, i) => (
-                        <View key={i} style={wst.statCard}>
-                            <View style={wst.statCardTop}>
-                                <View style={[wst.statCardIcon, { backgroundColor: stat.bg }]}>
-                                    <MaterialCommunityIcons name={stat.icon as any} size={20} color={stat.color} />
-                                </View>
-                                <Text style={[wst.statCardVal, { color: stat.color }]}>{stat.value}</Text>
-                            </View>
-                            <Text style={wst.statCardLabel}>{stat.label}</Text>
-                            <Text style={wst.statCardTrend}>{stat.trend}</Text>
+                {/* Page header and Stats */}
+                <View style={{ paddingHorizontal: 0 }}>
+                    {/* Page header */}
+                    <View style={wst.pageHeader}>
+                        <View style={wst.titleContainer}>
+                            <Text style={wst.pageTitle}>Product Management</Text>
                         </View>
-                    ))}
-                </View>
-            </View>
+                        <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                            <TouchableOpacity
+                                style={wst.navAddBtn}
+                                onPress={() => router.push('/Addproduct')}
+                                activeOpacity={0.85}
+                            >
+                                <MaterialCommunityIcons name="plus" size={18} color={C.navy} />
+                                <Text style={wst.navAddBtnTxt}>Add Product</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={wst.navBulkBtn}
+                                onPress={() => router.push('/Bulkupload')}
+                                activeOpacity={0.85}
+                            >
+                                <MaterialCommunityIcons name="cloud-upload-outline" size={16} color={C.white} />
+                                <Text style={wst.navBulkBtnTxt}>Bulk Upload</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
-            <ScrollView style={wst.pageScroll} showsVerticalScrollIndicator={false} contentContainerStyle={[wst.pageContent, { paddingTop: 0 }]}>
+                    {/* Stats row */}
+                    <View style={wst.statsRow}>
+                        {[
+                            { label: "Total Products", value: totalCount,      icon: "package-variant-closed", color: C.navy,    bg: "#EEF1FF",    trend: "+3 this week" },
+                            { label: "Active",          value: activeCount,     icon: "check-circle",           color: "#16A34A", bg: "#DCFCE7",    trend: "Selling well" },
+                            { label: "Inactive",        value: inactiveCount,   icon: "pause-circle",           color: "#B45309", bg: "#FEF9C3",    trend: "Needs review" },
+                            { label: "Out of Stock",    value: outOfStockCount, icon: "close-circle-outline",   color: "#DC2626", bg: "#FEE2E2",    trend: "Restock soon" },
+                            { label: "Low Stock",       value: lowStockCount,   icon: "alert-circle-outline",   color: C.orange,  bg: C.orangePale, trend: "≤10 units"    },
+                        ].map((stat, i) => (
+                            <View key={i} style={wst.statCard}>
+                                <View style={wst.statCardTop}>
+                                    <View style={[wst.statCardIcon, { backgroundColor: stat.bg }]}>
+                                        <MaterialCommunityIcons name={stat.icon as any} size={20} color={stat.color} />
+                                    </View>
+                                    <Text style={[wst.statCardVal, { color: stat.color }]}>{stat.value}</Text>
+                                </View>
+                                <Text style={wst.statCardLabel}>{stat.label}</Text>
+                                <Text style={wst.statCardTrend}>{stat.trend}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
                 {/* Main area */}
                 <View style={wst.contentArea}>
 
@@ -1357,7 +1356,9 @@ const WebProductsScreen: React.FC = () => {
                         )}
                     </View>
                 </View>
+                {/* Main area ends */}
             </ScrollView>
+            {/* Main page scroll ends */}
 
             {productActionId && (
                 <WebProductActionPopup product={activeActionProduct} onClose={() => setProductActionId(null)} onDelete={handleDelete} onUpdateLocation={handleUpdateLocation} />
@@ -1722,20 +1723,6 @@ const MobileProductsScreen: React.FC = () => {
                         </TouchableOpacity>
                     </View>
                 ) : null}
-
-                {/* Action cards */}
-                <View style={s.actionRow}>
-                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Addproduct')}>
-                        <View style={[s.actionIconBox, { backgroundColor: "rgba(30,43,107,0.10)" }]}><MaterialCommunityIcons name="plus-box-outline" size={28} color={C.navy} /></View>
-                        <Text style={s.actionTitle}>Add New Product</Text>
-                        <Text style={s.actionDesc}>Create and add a new product</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.actionCard} activeOpacity={0.75} onPress={() => router.push('/Bulkupload')}>
-                        <View style={[s.actionIconBox, { backgroundColor: C.greenPale }]}><MaterialCommunityIcons name="cloud-upload-outline" size={28} color={C.green} /></View>
-                        <Text style={[s.actionTitle, { color: C.green }]}>Bulk Upload</Text>
-                        <Text style={s.actionDesc}>Upload products via CSV</Text>
-                    </TouchableOpacity>
-                </View>
 
                 {/* Stats */}
                 <View style={s.statsCard}>

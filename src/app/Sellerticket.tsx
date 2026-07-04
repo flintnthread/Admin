@@ -75,7 +75,7 @@ const STATUS_TO_API: Record<string, string> = {
 
 const C = {
   brand: "#C85D1A",
-  brandDark: "#1d324e",
+  brandDark: "#151D4F",
   brandLight: "#F0A060",
   brandFaint: "#FDF3EC",
   bg: "#F5F6FA",

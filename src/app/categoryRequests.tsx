@@ -370,12 +370,20 @@ export default function CategoryRequests() {
 
   const FILTERS: Array<'All' | Status> = ['All', 'Pending', 'Approved', 'Rejected'];
 
+  const getFilterCount = (f: 'All' | Status) => {
+    switch (f) {
+      case 'All': return stats.total;
+      case 'Pending': return stats.pending;
+      case 'Approved': return stats.approved;
+      case 'Rejected': return stats.rejected;
+      default: return 0;
+    }
+  };
+
   const cardWidth = isWeb ? undefined : (width - 32 - 8) / 2;
 
   const filterTabsMobile = FILTERS.map((f) => {
-    const count = f === 'All'
-      ? requests.length
-      : requests.filter((r) => r.status === f).length;
+    const count = getFilterCount(f);
     return (
       <TouchableOpacity
         key={f}
@@ -400,9 +408,7 @@ export default function CategoryRequests() {
   const filterTabsWeb = (
     <View style={styles.filterContainerWeb}>
       {FILTERS.map((f, i) => {
-        const count = f === 'All'
-          ? requests.length
-          : requests.filter((r) => r.status === f).length;
+        const count = getFilterCount(f);
         const isActive = filter === f;
         
         // Only show divider if neither this tab nor the next tab is active, and it's not the last tab
@@ -450,7 +456,7 @@ export default function CategoryRequests() {
         <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setStatusModalOpen(false)}>
           <View style={styles.dropdownMenu}>
             {FILTERS.map(f => {
-              const count = f === 'All' ? requests.length : requests.filter(r => r.status === f).length;
+              const count = getFilterCount(f);
               const isActive = filter === f;
               return (
                 <TouchableOpacity
