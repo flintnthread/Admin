@@ -162,8 +162,8 @@ const StatusDropdown = ({
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        setMenuPosition({ top: pageY + height, left: pageX, width });
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        setMenuPosition({ top: y + height, left: x, width });
       });
     }
     setOpen((o) => !o);
@@ -217,8 +217,9 @@ const StatusDropdown = ({
   }
 
   return (
-    <View style={S.dropdownWrapper} ref={triggerRef}>
+    <View style={S.dropdownWrapper}>
       <TouchableOpacity
+        ref={triggerRef as any}
         style={[S.dropdownBtn, open && S.dropdownBtnOpen]}
         onPress={handlePress}
         activeOpacity={0.85}
@@ -232,11 +233,11 @@ const StatusDropdown = ({
         />
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
         {menuPosition && (
           <View style={[S.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
-            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
+            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
               {STATUS_OPTIONS.map((opt) => {
                 const isSelected = value === opt;
                 return (

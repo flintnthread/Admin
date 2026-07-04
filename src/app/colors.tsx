@@ -11,12 +11,19 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  createColor,
+  deleteColor,
+  fetchColors,
+  updateColor,
+  type CatalogColor,
+} from "@/services/colorApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -30,14 +37,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import { getApiErrorMessage } from "@/lib/api/client";
-import {
-  createColor,
-  deleteColor,
-  fetchColors,
-  updateColor,
-  type CatalogColor,
-} from "@/services/colorApi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap-like icon name map → Ionicons
@@ -389,7 +388,7 @@ const ColorCard = ({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const [overlayVisible, setOverlayVisible] = useState(false);
-  
+
   // Disable hover overlay on mobile to prevent double-tap issues
   const hoverProps = (IS_WEB && !isMobile)
     ? { onMouseEnter: () => setOverlayVisible(true), onMouseLeave: () => setOverlayVisible(false) }
@@ -421,7 +420,7 @@ const ColorCard = ({
         </View>
         <Text style={styles.gridCardCode}>{item.code}</Text>
         <View style={[styles.gridCardBar, { backgroundColor: item.code }]} />
-        
+
         {isMobile && (
           <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
             <TouchableOpacity style={styles.editBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>

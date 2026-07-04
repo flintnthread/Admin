@@ -111,7 +111,7 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     );
   }
 
-  if (res.status === 401 && auth) {
+  if (res.status === 401 && init?.auth !== false) {
     clearAdminSession();
     notifySessionCleared();
   }

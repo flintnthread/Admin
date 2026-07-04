@@ -161,11 +161,11 @@ function Dropdown({
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
         const { width: screenWidth } = Dimensions.get("window");
         const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
-        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
     setOpen(o => !o);
@@ -514,9 +514,9 @@ export default function BankVerifications() {
             ListHeaderComponent={
               <View>
                 {/* ── Page Title (Orange Container) ── */}
-                <View style={{ backgroundColor: "#1d324e", borderRadius: 16, padding: 16, marginBottom: 20 }}>
+                <View style={{ backgroundColor: "#1d324e", borderRadius: 16, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, marginBottom: 0 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                    <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 4 }}>
+                    <TouchableOpacity onPress={() => router.push("/sellerbankapproval")} style={{ paddingRight: 4 }}>
                       <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Ionicons name="business-outline" size={24} color="#fff" />
@@ -528,16 +528,19 @@ export default function BankVerifications() {
 
                 {/* ── Stat Cards (Mobile/Tablet) ── */}
                 {isMobile && (
-                  <View style={{
-                    backgroundColor: "#fff", borderRadius: 14,
-                    borderWidth: 1, borderColor: BORDER,
-                    padding: 14, marginBottom: 14,
-                  }}>
-                    <View style={{
-                      flexDirection: "row", flexWrap: "wrap", gap: 10,
-                    }}>
+                  <View style={{ marginTop: -26, zIndex: 10, marginBottom: 14 }}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{
+                        flexDirection: "row",
+                        gap: 12,
+                        paddingHorizontal: 4,
+                        paddingVertical: 6,
+                      }}
+                    >
                       {STAT_CARDS.map((c, idx) => (
-                        <View key={c.label} style={{ width: "47%" }}>
+                        <View key={c.label} style={{ width: 155 }}>
                           <StatCard
                             label={c.label}
                             value={c.value}
@@ -549,7 +552,7 @@ export default function BankVerifications() {
                           />
                         </View>
                       ))}
-                    </View>
+                    </ScrollView>
                   </View>
                 )}
 
@@ -756,7 +759,7 @@ export default function BankVerifications() {
             {/* ── Page Title (Orange Container) ── */}
             <View style={{ backgroundColor: "#1d324e", borderRadius: 16, padding: 16, marginBottom: 20 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 4 }}>
+                <TouchableOpacity onPress={() => router.push("/sellerbankapproval")} style={{ paddingRight: 4 }}>
                   <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Ionicons name="business-outline" size={24} color="#fff" />
