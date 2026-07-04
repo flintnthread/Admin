@@ -971,7 +971,7 @@ function EntityModal({
 }: {
   visible: boolean; mode: ModalMode; onClose: () => void; tab: DetailTab;
   isMobile: boolean; initialRow: ListRow | null;
-  onSave: (d: { name: string; code: string; status: RowStatus }) => void;
+  onSave: (d: { name: string; code: string; status: RowStatus }) => Promise<void>;
 }) {
   const meta = TAB_META[tab];
   const insets = useSafeAreaInsets();
@@ -989,10 +989,14 @@ function EntityModal({
 
   const heading = mode === 'add' ? `Add ${meta.singular}` : mode === 'edit' ? `Edit ${meta.singular}` : `${meta.singular} Details`;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) { setError(`${meta.singular} name is required.`); return; }
     if (showCode && !code.trim()) { setError('Country code is required.'); return; }
-    onSave({ name: name.trim(), code: code.trim(), status });
+    try {
+      await onSave({ name: name.trim(), code: code.trim(), status });
+    } catch (e: any) {
+      setError(e.message || 'Something went wrong');
+    }
   };
 
   return (
@@ -1249,25 +1253,27 @@ export default function LocationsScreen() {
   const handleSave = async (data: { name: string; code: string; status: RowStatus }) => {
     try {
       if (modalMode === 'edit' && activeRow) {
-        if (detailTab === 'countries') await updateCountry(activeRow.id, data.name);
-        else if (detailTab === 'states') await updateState(activeRow.id, data.name);
-        else if (detailTab === 'cities') await updateCity(activeRow.id, data.name);
-        else if (detailTab === 'areas') await updateArea(activeRow.id, data.name);
-        else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name);
+        if (detailTab === 'countries') await updateCountry(activeRow.id, data.name, data.code, data.status === 'Active');
+        else if (detailTab === 'states') await updateState(activeRow.id, data.name, data.status === 'Active');
+        else if (detailTab === 'cities') await updateCity(activeRow.id, data.name, data.status === 'Active');
+        else if (detailTab === 'areas') await updateArea(activeRow.id, data.name, data.status === 'Active');
+        else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name, data.status === 'Active');
         setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, ...data } : r));
       } else {
         let newRow: LocationRow;
-        if (detailTab === 'countries') newRow = await createCountry(data.name);
-        else if (detailTab === 'states') newRow = await createState(0, data.name);
-        else if (detailTab === 'cities') newRow = await createCity(0, data.name);
-        else if (detailTab === 'areas') newRow = await createArea(0, data.name);
+        if (detailTab === 'countries') newRow = await createCountry(data.name, data.code, data.status === 'Active');
+        else if (detailTab === 'states') newRow = await createState(0, data.name, data.status === 'Active');
+        else if (detailTab === 'cities') newRow = await createCity(0, data.name, data.status === 'Active');
+        else if (detailTab === 'areas') newRow = await createArea(0, data.name, data.status === 'Active');
+        else if (detailTab === 'pincodes') newRow = await createPincode(0, data.name, data.status === 'Active');
         else return;
         const theme = ROW_THEMES[newRow.id % ROW_THEMES.length];
-        setRows((prev) => [{ ...mapLocationRow(newRow, 0, detailTab), status: data.status, iconBg: theme.bg, iconColor: theme.color }, ...prev]);
+        setRows((prev) => [{ ...mapLocationRow(newRow, 0, detailTab), status: data.status, code: data.code, iconBg: theme.bg, iconColor: theme.color }, ...prev]);
       }
       closeModal();
-    } catch (e) {
+    } catch (e: any) {
       console.warn(getApiErrorMessage(e));
+      throw new Error(getApiErrorMessage(e));
     }
   };
 

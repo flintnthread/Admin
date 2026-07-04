@@ -341,6 +341,9 @@ const FaqCategoriesScreen: React.FC = () => {
                     }
                 }
                 await loadCategories();
+                setSearch("");
+                setStatusFilter("All");
+                setCurrentPage(1);
                 setModalVisible(false);
                 setEditingCat(null);
             } catch (e) {
@@ -366,6 +369,8 @@ const FaqCategoriesScreen: React.FC = () => {
                 if (Platform.OS === "web") {
                     Swal.fire("Updated!", "Status has been changed.", "success");
                 }
+                setStatusFilter("All");
+                setCurrentPage(1);
                 await loadCategories();
             } catch (e) {
                 setLoadError(getApiErrorMessage(e));
