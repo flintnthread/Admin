@@ -40,7 +40,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 const C = {
   bg: "#FFFFFF",
   surface: "#FFFFFF",
-  cardBg: "#FFF8F4",
+  cardBg: "#F4F6F9",
   primary: "#F97316",
   primaryLight: "#FFF0EA",
   navy: "#1C2B4A",
@@ -821,7 +821,6 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   const cfg = STATUS_CFG[status];
   return (
     <View style={[s.badge, { backgroundColor: cfg.bg }]}>
-      <View style={[s.badgeDot, { backgroundColor: cfg.dot }]} />
       <Text style={[s.badgeTxt, { color: cfg.color }]}>{status}</Text>
     </View>
   );
@@ -1005,20 +1004,20 @@ export default function OrderDetailScreen() {
 
   const displayOrderId = orderId ?? order.id;
 
-  const loadOrder = useCallback(async () => {
-    setLoading(true);
+  const loadOrder = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
 
     if (!orderId) {
       setError("Order ID missing.");
-      setLoading(false);
+      if (showLoading) setLoading(false);
       return;
     }
 
     const id = Number(orderId);
     if (Number.isNaN(id)) {
       setError("Invalid order ID.");
-      setLoading(false);
+      if (showLoading) setLoading(false);
       return;
     }
 
@@ -1030,12 +1029,12 @@ export default function OrderDetailScreen() {
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [orderId]);
 
   useEffect(() => {
-    loadOrder();
+    loadOrder(true);
   }, [loadOrder]);
 
   // Sync animation
@@ -1082,7 +1081,7 @@ export default function OrderDetailScreen() {
     ).start();
 
     try {
-      await loadOrder();
+      await loadOrder(false);
     } finally {
       syncSpinAnim.stopAnimation();
       syncSpinAnim.setValue(0);
@@ -1100,30 +1099,29 @@ export default function OrderDetailScreen() {
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
       {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
-      <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
-        <View style={[s.headerInner, { paddingHorizontal: px }]}>
-          <View style={s.headerLeft}>
-            <TouchableOpacity
-              style={s.backBtn}
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.push("/orders");
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <BackIcon size={18} />
-            </TouchableOpacity>
-            <View style={s.headerIconBox}>
-              <OrderIcon size={isMobile ? 17 : 20} />
-            </View>
-            <View>
-              <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>
-                Order Details
-              </Text>
-              <Text style={s.hSub}>#{order.id}</Text>
+      <View style={{ backgroundColor: '#fff', paddingHorizontal: 16 }}>
+        <View style={[s.header, { paddingTop: Platform.OS === "ios" ? 50 : 16 }]}>
+          <View style={[s.headerInner, { paddingHorizontal: px }]}>
+            <View style={s.headerLeft}>
+              <TouchableOpacity
+                style={s.backBtn}
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.push("/orders");
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <BackIcon size={18} />
+              </TouchableOpacity>
+              <View>
+                <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>
+                  Order Details
+                </Text>
+                <Text style={s.hSub}>#{order.id}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -1138,7 +1136,7 @@ export default function OrderDetailScreen() {
       ) : error ? (
         <View style={s.errorContainer}>
           <Text style={s.errorText}>{error}</Text>
-          <TouchableOpacity style={s.errorRetryBtn} onPress={loadOrder} activeOpacity={0.8}>
+          <TouchableOpacity style={s.errorRetryBtn} onPress={() => loadOrder(true)} activeOpacity={0.8}>
             <Text style={s.errorRetryTxt}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -1161,27 +1159,26 @@ export default function OrderDetailScreen() {
                 style={[
                   s.actionBar,
                   isMobile && {
-                    flexDirection: "column",
-                    alignItems: "flex-start",
+                    flexWrap: "nowrap",
                   },
                 ]}
               >
                 {/* Order ID */}
-                <View style={s.actionOrderId}>
+                <View style={[s.actionOrderId, isMobile && { flex: 1 }]}>
                   <Text style={s.actionOrderLbl}>Order</Text>
-                  <Text style={s.actionOrderNum}>#{displayOrderId}</Text>
+                  <Text style={[s.actionOrderNum, isMobile && { fontSize: 13 }]} numberOfLines={1}>#{displayOrderId}</Text>
                 </View>
 
                 {/* Buttons */}
-                <View style={[s.actionBtns, isMobile && { flexWrap: "wrap" }]}>
+                <View style={[s.actionBtns, isMobile && { flex: 0, gap: 6 }]}>
                   {/* Invoice */}
                   <TouchableOpacity
-                    style={[s.actionBtn, { backgroundColor: C.navy }]}
+                    style={[s.actionBtn, { backgroundColor: C.navy }, isMobile && { paddingHorizontal: 10 }]}
                     activeOpacity={0.8}
                     onPress={() => setInvoiceVisible(true)}
                   >
                     <InvoiceIcon />
-                    <Text style={s.actionBtnTxt}>Invoice</Text>
+                    <Text style={[s.actionBtnTxt, isMobile && { fontSize: 11, marginLeft: -4 }]}>Invoice</Text>
                   </TouchableOpacity>
                   {/* Update Status dropdown */}
                   <StatusDropdown
@@ -1230,16 +1227,6 @@ export default function OrderDetailScreen() {
                           },
                         ]}
                       >
-                        <View
-                          style={[
-                            s.badgeDot,
-                            {
-                              backgroundColor: isPaymentPaid(order.paymentStatus)
-                                ? C.active
-                                : C.warning,
-                            },
-                          ]}
-                        />
                         <Text
                           style={[
                             s.badgeTxt,
@@ -1512,7 +1499,7 @@ export default function OrderDetailScreen() {
                           <Text style={s.tblCellSub}>{item.variant}</Text>
                         </View>
                         <View style={s.tblCell}>
-                          <Text style={[s.tblCellTxt, { textAlign: "center" }]}>
+                          <Text style={s.tblCellTxt}>
                             {item.qty}
                           </Text>
                         </View>

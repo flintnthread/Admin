@@ -3229,18 +3229,17 @@ export default function OrdersScreen() {
               paddingHorizontal: 16,
             }}
           >
-            <View
-              style={[
-                s.headerBlock,
-                {
-                  paddingTop: Platform.OS === "ios" ? 50 : 20,
-                },
-                isMobile && { paddingHorizontal: 16 }
-              ]}
-            >
               <View
-                style={[s.headerTop, { paddingHorizontal: isMobile ? 0 : 22 }]}
+              style={[
+                  s.headerBlock,
+                  {
+                    paddingTop: Platform.OS === "ios" ? (isMobile ? 40 : 50) : (isMobile ? 12 : 20),
+                    paddingBottom: isMobile ? 44 : 48,
+                  },
+                  isMobile && { paddingHorizontal: 16, paddingVertical: 16 }
+                ]}
               >
+              <View style={s.headerTop}>
                 <View style={s.headerLeft}>
                   <View style={s.headerIcon}>
                     <OrderBoxIcon color={C.white} />
@@ -3253,7 +3252,10 @@ export default function OrdersScreen() {
                     >
                       Orders Management
                     </Text>
-                    <Text style={s.headerSub} numberOfLines={1}>
+                    <Text 
+                      style={[s.headerSub, isMobile && { color: "rgba(255,255,255,0.8)", fontSize: 11 }]} 
+                      numberOfLines={isMobile ? 2 : 1}
+                    >
                       Manage and track all customer orders
                     </Text>
                   </View>
@@ -3273,7 +3275,6 @@ export default function OrdersScreen() {
               </View>
             </View>
 
-            {/* ── Overlapping stat cards ── */}
             <View
               style={[
                 s.statCardsWrap,
@@ -3281,26 +3282,38 @@ export default function OrdersScreen() {
                 isMobile && s.statCardsWrapMobile,
               ]}
             >
-              {statCards.map((stat, i) => (
-                <View key={i} style={[s.statCard, isMobile && { width: '48%', flex: undefined, minWidth: undefined, maxWidth: undefined }]}>
-                  <View
-                    style={[s.statIconBox, { backgroundColor: stat.iconBg }]}
-                  >
-                    {stat.icon}
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text
-                      style={[s.statValue, { color: stat.valueColor }]}
-                      numberOfLines={1}
-                    >
-                      {stat.value}
-                    </Text>
+              {statCards.map((stat, i) => {
+                if (isMobile) {
+                  return (
+                    <View key={i} style={s.statCardCompact}>
+                      <View style={[s.statCardIconBoxCompact, { backgroundColor: stat.iconBg }]}>
+                        {React.cloneElement(stat.icon as React.ReactElement<{ size: number }>, { size: 14 })}
+                      </View>
+                      <Text style={[s.statCardValueCompact, { color: stat.valueColor }]} numberOfLines={1}>
+                        {stat.value}
+                      </Text>
+                      <Text style={s.statCardLabelCompact} numberOfLines={1}>
+                        {stat.label}
+                      </Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View key={i} style={s.statCard}>
+                    <View style={s.statCardTop}>
+                      <View style={[s.statIconBox, { backgroundColor: stat.iconBg }]}>
+                        {stat.icon}
+                      </View>
+                      <Text style={[s.statValue, { color: stat.valueColor }]} numberOfLines={1}>
+                        {stat.value}
+                      </Text>
+                    </View>
                     <Text style={s.statLabel} numberOfLines={1}>
                       {stat.label}
                     </Text>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
 
@@ -3368,9 +3381,9 @@ export default function OrdersScreen() {
               />
             </View>
 
-            <View style={s.toolbarRight}>
+            <View style={[s.toolbarRight, isMobile && { width: '100%' }]}>
               <TouchableOpacity
-                style={s.paymentDrop}
+                style={[s.paymentDrop, isMobile && { flex: 1, justifyContent: "center" }]}
                 onPress={() => setPaymentVisible(true)}
                 activeOpacity={0.8}
               >
@@ -3381,7 +3394,7 @@ export default function OrdersScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={s.sortBtn}
+                style={[s.sortBtn, isMobile && { flex: 1, justifyContent: "center" }]}
                 onPress={() => setSortVisible(true)}
                 activeOpacity={0.8}
               >
@@ -3392,11 +3405,12 @@ export default function OrdersScreen() {
                 <ChevronDownIcon color={C.navy} />
               </TouchableOpacity>
 
-              <View style={s.viewToggle}>
+              <View style={[s.viewToggle, isMobile && { flex: 1, justifyContent: "center" }]}>
                 <TouchableOpacity
                   style={[
                     s.viewToggleBtn,
                     viewMode === "grid" && s.viewToggleBtnActive,
+                    isMobile && { flex: 1 }
                   ]}
                   onPress={() => setViewMode("grid")}
                   activeOpacity={0.8}
@@ -3407,6 +3421,7 @@ export default function OrdersScreen() {
                   style={[
                     s.viewToggleBtn,
                     viewMode === "list" && s.viewToggleBtnActive,
+                    isMobile && { flex: 1 }
                   ]}
                   onPress={() => setViewMode("list")}
                   activeOpacity={0.8}
@@ -3579,7 +3594,7 @@ const s = StyleSheet.create({
   // ── Header — floating rounded card (all 4 corners) ──────────────────────────
   headerBlock: {
     backgroundColor: C.navyDeep,
-    paddingHorizontal: 32,
+    paddingHorizontal: 22,
     paddingVertical: 28,
     paddingBottom: 68,
     borderRadius: 22,
@@ -3596,12 +3611,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 11, flex: 1 },
   headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: C.orange,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -3629,19 +3644,17 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
-    marginTop: -42,
+    marginTop: -32,
     marginBottom: 4,
   },
-  statCardsWrapMobile: { flexWrap: "wrap", gap: 8, marginTop: -26, justifyContent: "space-between" },
+  statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26, justifyContent: "center" },
   statCard: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
     minWidth: 130,
     maxWidth: 240,
     backgroundColor: C.card,
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: C.navyDeep,
@@ -3649,15 +3662,24 @@ const s = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
-    gap: 12,
+  },
+  statCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
   },
   statIconBox: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
+  statCardCompact: { flex: 1, alignItems: "center", backgroundColor: C.card, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 2, borderWidth: 1, borderColor: C.border, shadowColor: C.navyDeep, shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6, elevation: 3, gap: 4 },
+  statCardIconBoxCompact: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  statCardValueCompact: { fontSize: 14, fontWeight: "800" },
+  statCardLabelCompact: { fontSize: 9, fontWeight: "600", color: C.textLight, textAlign: "center" },
   statValue: {
     fontSize: 18,
     fontWeight: "800",
