@@ -3,6 +3,7 @@ import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { SellerSummary } from "@/lib/api/types";
+import { blurActiveElementOnWeb } from "@/lib/focus";
 import { formatDate } from "@/lib/format";
 import { fetchSellers, resendSellerVerification } from "@/services/sellerApi";
 import { Feather } from "@expo/vector-icons";
@@ -181,6 +182,7 @@ export default function SellerManagementScreen() {
   };
 
   const handleView = (sellerId: number) => {
+    blurActiveElementOnWeb();
     router.push({ pathname: "/approveseller", params: { sellerId: String(sellerId) } });
   };
 
