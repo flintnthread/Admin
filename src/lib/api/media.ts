@@ -276,3 +276,41 @@ export function getPublicMediaBaseUrl(): string {
 }
 
 
+
+/** Placeholder when a seller document / live selfie image is missing or fails to load. */
+
+export function getSellerDocumentPlaceholderUrl(): string {
+
+  const fromEnv = process.env.EXPO_PUBLIC_SELLER_DOCUMENT_PLACEHOLDER_URL?.trim();
+
+  if (fromEnv) return fromEnv;
+
+  return `${resolvePublicMediaBaseUrl()}/uploads/seller_documents/document_placeholder.png`;
+
+}
+
+
+
+/**
+
+ * Resolve seller KYC / document image to CDN URL (https://flintnthread.in/uploads/seller_documents/...).
+
+ * Falls back to placeholder when path and backend URL are empty.
+
+ */
+
+export function resolveSellerDocumentImageUrl(
+
+  path?: string | null,
+
+  backendUrl?: string | null,
+
+): string {
+
+  const resolved = buildMediaUrlCandidates(path, backendUrl)[0];
+
+  return resolved || getSellerDocumentPlaceholderUrl();
+
+}
+
+

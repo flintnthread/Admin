@@ -40,6 +40,28 @@ export type SellerSummary = {
   totalRevenue?: number;
   totalOrders?: number;
   country?: string;
+  area?: string;
+  pincode?: string;
+  address?: string;
+  panNumber?: string;
+  gstNumber?: string;
+  hasGst?: boolean;
+  firstName?: string;
+  lastName?: string;
+  warehouseAddress?: string;
+  warehouseArea?: string;
+  warehouseCity?: string;
+  warehouseState?: string;
+  warehouseCountry?: string;
+  kycSubmittedAt?: string;
+  kycVerifiedAt?: string;
+  kycRemarks?: string;
+  adminRemarks?: string;
+  kycStatusLabel?: string;
+  kycVerificationStatus?: string;
+  kycImageCount?: number;
+  emailVerified?: boolean;
+  mobileVerified?: boolean;
 };
 
 export type ProductSummary = {

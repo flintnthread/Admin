@@ -14,7 +14,25 @@ function normalizePageResponse<T>(raw: unknown): PageResponse<T> {
 }
 
 export async function fetchDepartments(): Promise<Department[]> {
-  return adminApiRequest("/api/admin/departments");
+  const raw = await adminApiRequest<unknown>("/api/admin/departments");
+  if (Array.isArray(raw)) return raw as Department[];
+  if (raw && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+    if (Array.isArray(record.items)) return record.items as Department[];
+    if (Array.isArray(record.data)) return record.data as Department[];
+  }
+  return [];
+}
+
+export async function fetchJobs(): Promise<JobOpening[]> {
+  const raw = await adminApiRequest<unknown>("/api/admin/jobs");
+  if (Array.isArray(raw)) return raw as JobOpening[];
+  if (raw && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+    if (Array.isArray(record.items)) return record.items as JobOpening[];
+    if (Array.isArray(record.data)) return record.data as JobOpening[];
+  }
+  return [];
 }
 
 export async function createDepartment(data: Partial<Department>): Promise<Department> {
@@ -27,10 +45,6 @@ export async function updateDepartment(id: number, data: Partial<Department>): P
 
 export async function deleteDepartment(id: number): Promise<void> {
   await adminApiRequest(`/api/admin/departments/${id}`, { method: "DELETE" });
-}
-
-export async function fetchJobs(): Promise<JobOpening[]> {
-  return adminApiRequest("/api/admin/jobs");
 }
 
 export async function createJob(data: Partial<JobOpening>): Promise<JobOpening> {

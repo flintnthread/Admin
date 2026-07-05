@@ -11,8 +11,191 @@ import type {
   SupportTicketSummary,
 } from "@/lib/api/types";
 import type { PendingProfileSeller } from "@/services/sellerApi";
-import { resolveMediaUrl, resolveSellerProfileImage } from "@/lib/api/media";
+import { resolveMediaUrl, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from "@/lib/api/media";
+import {
+  mapBusinessProofDocuments,
+  mapLiveSelfieDocuments,
+  mergeSellerVerificationDocuments,
+} from "@/lib/sellerDocuments";
 import { formatDate, formatRupee, initialsFromName, maskAccount } from "@/lib/format";
+
+export type SellerDocumentView = {
+  name: string;
+  path?: string;
+  url?: string;
+  available?: boolean;
+};
+
+export type SellerDetailView = {
+  id: number;
+  sellerUniqueId: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  mobile: string;
+  registeredOn: string;
+  businessName: string;
+  businessType: string;
+  sellerCategory: string;
+  address: string;
+  hasGst: string;
+  gstNumber: string;
+  panNumber: string;
+  bankName: string;
+  branchName: string;
+  accountNumber: string;
+  maskedAccountNumber: string;
+  ifscCode: string;
+  accountHolder: string;
+  country: string;
+  state: string;
+  city: string;
+  area: string;
+  pincode: string;
+  warehouseAddress: string;
+  warehouseCountry: string;
+  warehouseState: string;
+  warehouseCity: string;
+  warehouseArea: string;
+  accountStatus: "Pending" | "Active" | "Rejected" | "Inactive";
+  kycStatusLabel: string;
+  kycVerificationStatus: string;
+  kycSubmittedOn: string;
+  kycImageCount: number;
+  kycVerificationBadge: string;
+  kycVerifiedBy: string;
+  kycVerifiedOn: string;
+  kycRemarks: string;
+  profilePicUrl: string;
+  documents: SellerDocumentView[];
+  liveSelfieImages: SellerDocumentView[];
+  businessProofDocuments: SellerDocumentView[];
+};
+
+function displayValue(value?: string | null): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "null") return "—";
+  return trimmed;
+}
+
+function mapAccountStatus(status?: string | null): SellerDetailView["accountStatus"] {
+  const raw = (status ?? "").toLowerCase();
+  if (raw === "active") return "Active";
+  if (raw === "rejected") return "Rejected";
+  if (raw === "pending" || raw === "email_pending") return "Pending";
+  return "Inactive";
+}
+
+function mapKycVerificationBadge(detail: Record<string, unknown>): string {
+  if (detail.kycVerified === true) return "Verified";
+  if (detail.kycCompleted === true) return "Pending";
+  return "Not Started";
+}
+
+function kycBadgeColor(label: string): string {
+  if (label === "Completed" || label === "Verified") return "#10B981";
+  if (label === "Submitted" || label === "Pending" || label === "Pending Verification") return "#FBBF24";
+  return "#EF4444";
+}
+
+export function sellerKycBadgeColor(label: string): string {
+  return kycBadgeColor(label);
+}
+
+function parseDocuments(raw: unknown): SellerDocumentView[] {
+  if (!Array.isArray(raw)) return [];
+  const docs: SellerDocumentView[] = [];
+  for (const item of raw) {
+    const doc = item as Record<string, unknown>;
+    const name = String(doc.name ?? "").trim();
+    if (!name) continue;
+    const path = doc.path != null ? String(doc.path).trim() : undefined;
+    const backendUrl = doc.url != null ? String(doc.url).trim() : undefined;
+    const hasSource = Boolean(path || backendUrl);
+    docs.push({
+      name,
+      path: path || undefined,
+      url: resolveSellerDocumentImageUrl(path, backendUrl),
+      available: doc.available !== false && hasSource,
+    });
+  }
+  return docs;
+}
+
+export function mapSellerDetailView(detail: Record<string, unknown>): SellerDetailView {
+  const rawDocuments = parseDocuments(detail.documents);
+  const rawLiveSelfieImages = parseDocuments(detail.liveSelfieImages);
+  const documents = mergeSellerVerificationDocuments(rawDocuments);
+  const liveSelfieImages = mapLiveSelfieDocuments(rawLiveSelfieImages);
+  const businessProofDocuments = mapBusinessProofDocuments(
+    rawDocuments.filter((doc) => /business proof/i.test(doc.name)),
+  );
+
+  const hasGst = detail.hasGst === true
+    ? (detail.gstNumber ? `Yes (${String(detail.gstNumber)})` : "Yes")
+    : "No";
+
+  const kycStatusLabel = String(detail.kycStatusLabel ?? "Not Completed");
+  const kycVerificationStatus = String(detail.kycVerificationStatus ?? "Pending Verification");
+
+  return {
+    id: Number(detail.id),
+    sellerUniqueId: displayValue(
+      detail.sellerUniqueId != null ? String(detail.sellerUniqueId) : undefined
+    ),
+    firstName: displayValue(detail.firstName != null ? String(detail.firstName) : undefined),
+    lastName: displayValue(detail.lastName != null ? String(detail.lastName) : undefined),
+    fullName: displayValue(detail.fullName != null ? String(detail.fullName) : undefined),
+    email: displayValue(detail.email != null ? String(detail.email) : undefined),
+    mobile: displayValue(detail.mobile != null ? String(detail.mobile) : undefined),
+    registeredOn: formatDate(
+      detail.registeredOn != null
+        ? String(detail.registeredOn)
+        : detail.createdAt != null
+          ? String(detail.createdAt)
+          : undefined
+    ),
+    businessName: displayValue(detail.businessName != null ? String(detail.businessName) : undefined),
+    businessType: displayValue(detail.businessType != null ? String(detail.businessType) : undefined),
+    sellerCategory: displayValue(
+      detail.sellerCategory != null ? String(detail.sellerCategory).toUpperCase() : undefined
+    ),
+    address: displayValue(detail.address != null ? String(detail.address) : undefined),
+    hasGst,
+    gstNumber: displayValue(detail.gstNumber != null ? String(detail.gstNumber) : undefined),
+    panNumber: displayValue(detail.panNumber != null ? String(detail.panNumber) : undefined),
+    bankName: displayValue(detail.bankName != null ? String(detail.bankName) : undefined),
+    branchName: displayValue(detail.branchName != null ? String(detail.branchName) : undefined),
+    accountNumber: displayValue(detail.accountNumber != null ? String(detail.accountNumber) : undefined),
+    maskedAccountNumber: maskAccount(detail.accountNumber != null ? String(detail.accountNumber) : undefined),
+    ifscCode: displayValue(detail.ifscCode != null ? String(detail.ifscCode) : undefined),
+    accountHolder: displayValue(detail.accountHolder != null ? String(detail.accountHolder) : undefined),
+    country: displayValue(detail.country != null ? String(detail.country) : undefined),
+    state: displayValue(detail.state != null ? String(detail.state) : undefined),
+    city: displayValue(detail.city != null ? String(detail.city) : undefined),
+    area: displayValue(detail.area != null ? String(detail.area) : undefined),
+    pincode: displayValue(detail.pincode != null ? String(detail.pincode) : undefined),
+    warehouseAddress: displayValue(detail.warehouseAddress != null ? String(detail.warehouseAddress) : undefined),
+    warehouseCountry: displayValue(detail.warehouseCountry != null ? String(detail.warehouseCountry) : undefined),
+    warehouseState: displayValue(detail.warehouseState != null ? String(detail.warehouseState) : undefined),
+    warehouseCity: displayValue(detail.warehouseCity != null ? String(detail.warehouseCity) : undefined),
+    warehouseArea: displayValue(detail.warehouseArea != null ? String(detail.warehouseArea) : undefined),
+    accountStatus: mapAccountStatus(detail.status != null ? String(detail.status) : undefined),
+    kycStatusLabel,
+    kycVerificationStatus,
+    kycSubmittedOn: formatDate(detail.kycSubmittedAt != null ? String(detail.kycSubmittedAt) : undefined),
+    kycImageCount: Number(detail.kycImageCount ?? 0) || 0,
+    kycVerificationBadge: mapKycVerificationBadge(detail),
+    kycVerifiedBy: displayValue(detail.verifiedBy != null ? String(detail.verifiedBy) : undefined),
+    kycVerifiedOn: formatDate(detail.kycVerifiedAt != null ? String(detail.kycVerifiedAt) : undefined),
+    kycRemarks: String(detail.kycRemarks ?? ""),
+    profilePicUrl: resolveSellerProfileImage(detail as never),
+    documents,
+    liveSelfieImages,
+    businessProofDocuments,
+  };
+}
 
 function normalizeLocation(value?: string | null): string {
   const trimmed = (value ?? "").trim();
@@ -20,21 +203,94 @@ function normalizeLocation(value?: string | null): string {
   return trimmed;
 }
 
-export function mapSellerToApprovedRow(s: SellerSummary) {
+export type ApprovedSellerRow = {
+  id: number;
+  name: string;
+  email: string;
+  avatar: string;
+  businessName: string;
+  businessType: string;
+  sellerCategory: string;
+  products: number;
+  walletBalance: number;
+  joinDate: string;
+  revenue: number;
+  state: string;
+  city: string;
+  status: "Pending" | "Active" | "Rejected" | "Inactive";
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  accountHolder: string;
+  branchName: string;
+  sellerUniqueId: string;
+  referralCode: string;
+  gstNumber: string;
+  gstNumberRaw: string;
+  panNumber: string;
+  country: string;
+  area: string;
+  pincode: string;
+  address: string;
+  warehouseAddress: string;
+  warehouseArea: string;
+  warehouseCity: string;
+  warehouseState: string;
+  warehouseCountry: string;
+  kycStatusLabel: string;
+  kycVerificationStatus: string;
+  kycSubmittedOn: string;
+  kycVerifiedOn: string;
+  kycImageCount: number;
+  kycRemarks: string;
+  adminRemarks: string;
+  totalOrders: number;
+  bankVerified: boolean;
+  emailVerified: boolean;
+  mobileVerified: boolean;
+  profilePicPath?: string;
+  liveSelfiePath?: string;
+  profilePicUrl?: string;
+};
+
+export function mapSellerToApprovedRow(s: SellerSummary): ApprovedSellerRow {
+  const kycStatusLabel = s.kycVerified
+    ? "Completed"
+    : s.kycCompleted
+      ? "Submitted"
+      : "Not Completed";
+  const kycVerificationStatus = s.kycVerified
+    ? "Verified"
+    : s.kycCompleted
+      ? "Pending Verification"
+      : "Pending Verification";
+
   return {
     id: s.id,
     name: s.fullName ?? "Seller",
     email: s.email ?? "",
     avatar: resolveSellerProfileImage(s),
     businessName: s.businessName?.trim() || "—",
-    businessType: s.businessType ?? s.sellerCategory?.toUpperCase() ?? "—",
+    businessType: s.businessType ?? "—",
+    sellerCategory: s.sellerCategory?.toUpperCase() ?? "—",
     products: Number(s.productCount ?? 0),
     walletBalance: Number(s.walletBalance ?? 0),
     joinDate: formatDate(s.createdAt),
     revenue: Number(s.totalRevenue ?? 0),
     state: normalizeLocation(s.state),
     city: normalizeLocation(s.city),
-    status: s.status === "suspended" ? ("Blocked" as const) : ("Active" as const),
+    status: s.status === "active"
+      ? ("Active" as const)
+      : s.status === "rejected"
+        ? ("Rejected" as const)
+        : s.status === "pending" || s.status === "email_pending"
+          ? ("Pending" as const)
+          : ("Inactive" as const),
+    firstName: s.firstName?.trim() || "—",
+    lastName: s.lastName?.trim() || "—",
     mobile: s.mobile ?? "",
     bankName: s.bankName ?? "",
     accountNumber: s.accountNumber ?? "",
@@ -43,10 +299,29 @@ export function mapSellerToApprovedRow(s: SellerSummary) {
     branchName: s.branchName ?? "",
     sellerUniqueId: s.sellerUniqueId ?? "",
     referralCode: s.referralCode ?? "",
-    gstNumber: s.businessType === "Individual" || !s.businessType ? "No" : (s.businessName ? "Yes" : "—"),
-    panNumber: "",
-    country: s.country ?? "India",
+    gstNumber: s.hasGst ? (s.gstNumber?.trim() || "Yes") : "No",
+    gstNumberRaw: s.gstNumber ?? "",
+    panNumber: s.panNumber ?? "",
+    country: s.country ?? "",
+    area: s.area ?? "",
+    pincode: s.pincode ?? "",
+    address: s.address ?? "",
+    warehouseAddress: s.warehouseAddress ?? "",
+    warehouseArea: s.warehouseArea ?? "",
+    warehouseCity: s.warehouseCity ?? "",
+    warehouseState: s.warehouseState ?? "",
+    warehouseCountry: s.warehouseCountry ?? "",
+    kycStatusLabel: s.kycStatusLabel ?? kycStatusLabel,
+    kycVerificationStatus: s.kycVerificationStatus ?? kycVerificationStatus,
+    kycSubmittedOn: formatDate(s.kycSubmittedAt),
+    kycVerifiedOn: formatDate(s.kycVerifiedAt),
+    kycImageCount: Number(s.kycImageCount ?? 0),
+    kycRemarks: s.kycRemarks ?? "",
+    adminRemarks: s.adminRemarks ?? "",
     totalOrders: Number(s.totalOrders ?? 0),
+    bankVerified: Boolean(s.bankVerified),
+    emailVerified: Boolean(s.emailVerified),
+    mobileVerified: Boolean(s.mobileVerified),
     profilePicPath: s.profilePicPath,
     liveSelfiePath: s.liveSelfiePath,
     profilePicUrl: s.profilePicUrl,
