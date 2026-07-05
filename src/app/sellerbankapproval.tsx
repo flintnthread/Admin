@@ -1,7 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapBankPendingRow } from "@/lib/mappers";
-import { fetchBankStats, fetchPendingBankSellers } from "@/services/sellerApi";
+import { fetchBankStats, fetchBankVerifications, fetchPendingBankSellers, fetchSellers } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -24,84 +25,7 @@ type BankRow = Omit<ReturnType<typeof mapBankPendingRow>, "status" | "statusLabe
   statusLabel: string;
 };
 
-const MOCK_EXTRA_SELLERS: BankRow[] = [
-  {
-    id: "#S991",
-    sellerId: 991,
-    initials: "JD",
-    color: "#2196F3",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+91 9876543210",
-    business: "Doe Enterprises",
-    bank: "HDFC Bank",
-    branch: "Mumbai Main",
-    account: "••••••••5678",
-    ifsc: "HDFC0000123",
-    status: "approved",
-    statusLabel: "Approved",
-    requested: "10 Jun, 2026",
-    sellerConfirm: "10 Jun, 2026",
-    adminApprove: "11 Jun, 2026",
-  },
-  {
-    id: "#S992",
-    sellerId: 992,
-    initials: "AS",
-    color: "#4CAF50",
-    name: "Alice Smith",
-    email: "alice.smith@example.com",
-    phone: "+91 9998887776",
-    business: "Smith Garments",
-    bank: "ICICI Bank",
-    branch: "Delhi West",
-    account: "••••••••4321",
-    ifsc: "ICIC0000456",
-    status: "approved",
-    statusLabel: "Approved",
-    requested: "12 Jun, 2026",
-    sellerConfirm: "12 Jun, 2026",
-    adminApprove: "13 Jun, 2026",
-  },
-  {
-    id: "#S993",
-    sellerId: 993,
-    initials: "RB",
-    color: "#9C27B0",
-    name: "Robert Brown",
-    email: "robert.b@example.com",
-    phone: "+91 9123456789",
-    business: "Brown Trading Co.",
-    bank: "State Bank of India",
-    branch: "Bangalore Rural",
-    account: "••••••••9876",
-    ifsc: "SBIN0000789",
-    status: "not_requested",
-    statusLabel: "Not Requested",
-    requested: "—",
-    sellerConfirm: "—",
-    adminApprove: "—",
-  },
-  {
-    id: "#S994",
-    sellerId: 994,
-    initials: "EM",
-    color: "#E91E63",
-    name: "Emma Miller",
-    email: "emma.miller@example.com",
-    phone: "+91 8887776665",
-    business: "Emma Couture",
-    bank: "Axis Bank",
-    branch: "Chennai North",
-    account: "••••••••2468",
-    ifsc: "UTIB0000234",
-    status: "not_requested",
-    statusLabel: "Not Requested",
-    requested: "—",
-    sellerConfirm: "—",
-    adminApprove: "—",
-  }
-];
+
 
 const BLUE = "#2563EB";
 
@@ -129,11 +53,11 @@ function Dropdown({
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
         const { width: screenWidth } = Dimensions.get("window");
         const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
-        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
     setOpen(o => !o);
@@ -291,14 +215,45 @@ export default function BankApproval() {
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
-      const [pendingRes] = await Promise.all([
+      const [pendingRes, verifiedRes, allSellersRes] = await Promise.all([
         fetchPendingBankSellers(0, 200),
+        fetchBankVerifications("verified", 0, 200),
+        fetchSellers({ page: 0, size: 200 }),
         fetchBankStats(),
       ]);
-      setSellers([...(pendingRes?.items ?? []).map(mapBankPendingRow), ...MOCK_EXTRA_SELLERS]);
+
+      // 1. Map pending sellers
+      const pendingSellers: BankRow[] = (pendingRes?.items ?? []).map(s => ({
+        ...mapBankPendingRow(s),
+        status: "pending" as const,
+        statusLabel: "Pending",
+      }));
+
+      // 2. Map verified/approved sellers
+      const approvedSellers: BankRow[] = (verifiedRes?.items ?? []).map(s => ({
+        ...mapBankPendingRow(s),
+        status: "approved" as const,
+        statusLabel: "Approved",
+      }));
+
+      // 3. Map not requested sellers
+      const existingIds = new Set([
+        ...pendingSellers.map(s => s.sellerId),
+        ...approvedSellers.map(s => s.sellerId),
+      ]);
+
+      const notRequestedSellers: BankRow[] = (allSellersRes?.items ?? [])
+        .filter(s => !existingIds.has(s.id) && !s.bankVerified && !(s.bankName || s.accountNumber || s.ifscCode))
+        .map(s => ({
+          ...mapBankPendingRow(s),
+          status: "not_requested" as const,
+          statusLabel: "Not Requested",
+        }));
+
+      setSellers([...pendingSellers, ...approvedSellers, ...notRequestedSellers]);
     } catch (e) {
       setLoadError(getApiErrorMessage(e));
-      setSellers([...MOCK_EXTRA_SELLERS]);
+      setSellers([]);
     }
   }, []);
 
@@ -350,26 +305,7 @@ export default function BankApproval() {
   const endIndex = Math.min(startIndex + pageSize, totalEntries);
   const pagedSellers = filteredSellers.slice(startIndex, endIndex);
 
-  function gotoPage(n: number) {
-    const v = Math.max(1, Math.min(totalPages, n));
-    setCurrentPage(v);
-  }
 
-  function makePageList() {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-      return pages;
-    }
-    pages.push(1);
-    const left = Math.max(2, currentPage - 1);
-    const right = Math.min(totalPages - 1, currentPage + 1);
-    if (left > 2) pages.push("...");
-    for (let i = left; i <= right; i++) pages.push(i);
-    if (right < totalPages - 1) pages.push("...");
-    pages.push(totalPages);
-    return pages;
-  }
 
   return (
     <AdminLayout>
@@ -409,30 +345,67 @@ export default function BankApproval() {
               </View>
             )}
 
-            {/* Mobile Page Title */}
+            {/* Mobile Header Container */}
             {isMobile && (
-              <View style={{ backgroundColor: "#1d324e", padding: 16, borderRadius: 12, marginBottom: 14 }}>
-                <Text style={{ fontSize: 20, fontWeight: "700", color: "#fff", marginBottom: 4 }}>Seller Bank Approval</Text>
-                {/* <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 12, color: "#FF6B35" }}>Dashboard</Text>
-                  <Text style={{ fontSize: 10, color: "#999" }}>›</Text>
-                  <Text style={{ fontSize: 12, color: "#FF6B35" }}>Sellers</Text>
-                  <Text style={{ fontSize: 10, color: "#999" }}>›</Text>
-                  <Text style={{ fontSize: 12, color: "#999" }}>Bank Approval</Text>
-                </View> */}
+              <View style={{ backgroundColor: "#1d324e", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, borderRadius: 12 }}>
+                <Text style={{ fontSize: 20, fontWeight: "700", color: "#fff", marginBottom: 12 }}>Seller Bank Approval</Text>
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <TouchableOpacity style={[styles.btnOutline, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/bankverification')}>
+                    <Text style={styles.btnOutlineText}>Bank Verifications</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center", backgroundColor: '#16A34A' }]} onPress={() => router.push('/Sellerticket')}>
+                    <Text style={styles.btnDarkText}>Seller Support</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
-            {/* Mobile action buttons */}
+            {/* Stats (Mobile/Tablet only) */}
             {isMobile && (
-              <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
-                <TouchableOpacity style={[styles.btnOutline, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/bankverification')}>
-                  <Text style={styles.btnOutlineText}>Bank Verifications</Text>
-                </TouchableOpacity>
-                {/* <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center" }]} onPress={() => router.push('/supportticket')}> */}
-                <TouchableOpacity style={[styles.btnDark, { flex: 1, justifyContent: "center", backgroundColor: '#16A34A' }]} onPress={() => router.push('/Sellerticket')}>
-                  <Text style={styles.btnDarkText}>Seller Support</Text>
-                </TouchableOpacity>
+              <View style={{ marginTop: -26, zIndex: 10, marginBottom: 14 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    flexDirection: "row",
+                    gap: 12,
+                    paddingHorizontal: 4,
+                    paddingVertical: 6,
+                  }}
+                >
+                  {stats.map((s, i) => (
+                    <View
+                      style={[
+                        styles.statCard,
+                        {
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          gap: 6,
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          width: 135,
+                          borderWidth: 1,
+                          borderColor: "#E8EDF5",
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.05,
+                          shadowRadius: 6,
+                          elevation: 3,
+                        }
+                      ]}
+                      key={i}
+                    >
+                      <View style={[styles.statIcon, { backgroundColor: s.bg, width: 30, height: 30 }]}>
+                        <Ionicons name={s.icon as any} size={14} color={s.color} />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{s.label}</Text>
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{s.value}</Text>
+                        <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{s.sub}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
             )}
 
@@ -483,11 +456,11 @@ export default function BankApproval() {
                 </View>
               ) : (
                 <View style={{ marginBottom: 14 }}>
-                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                    <View style={{ flex: 2 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Search</Text>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-end" }}>
+                    <View style={{ flex: 1.8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: "#333", marginBottom: 4 }}>Search</Text>
                       <TextInput
-                        style={[styles.searchInput, { paddingRight: 36, fontSize: 12 }]}
+                        style={[styles.searchInput, { paddingRight: 36, fontSize: 12, paddingVertical: 10 }]}
                         placeholder="Search..."
                         value={searchQuery}
                         onChangeText={(text) => {
@@ -496,65 +469,17 @@ export default function BankApproval() {
                         }}
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#333", marginBottom: 6 }}>Status</Text>
+                    <View style={{ flex: 1.2 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: "#333", marginBottom: 4 }}>Status</Text>
                       <Dropdown value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
                     </View>
+                    <TouchableOpacity style={[styles.filterBtn, { paddingVertical: 11.5, paddingHorizontal: 14, justifyContent: "center" }]}>
+                      <Text style={[styles.filterBtnText, { fontSize: 13 }]}>Apply</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity style={[styles.filterBtn, { width: "100%", justifyContent: "center" }]}>
-                    <Text style={styles.filterBtnText}>Apply</Text>
-                  </TouchableOpacity>
                 </View>
               )}
             </View>
-
-            {/* Stats (Mobile/Tablet only) */}
-            {isMobile && (
-              <View style={{ marginBottom: 14 }}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{
-                    flexDirection: "row",
-                    gap: 12,
-                    paddingVertical: 6,
-                  }}
-                >
-                  {stats.map((s, i) => (
-                    <View
-                      style={[
-                        styles.statCard,
-                        {
-                          paddingVertical: 10,
-                          paddingHorizontal: 12,
-                          gap: 6,
-                          flexDirection: "column",
-                          alignItems: "flex-start",
-                          width: 135,
-                          borderWidth: 1,
-                          borderColor: "#E8EDF5",
-                          shadowColor: "#000",
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 6,
-                          elevation: 3,
-                        }
-                      ]}
-                      key={i}
-                    >
-                      <View style={[styles.statIcon, { backgroundColor: s.bg, width: 30, height: 30 }]}>
-                        <Ionicons name={s.icon as any} size={14} color={s.color} />
-                      </View>
-                      <View>
-                        <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{s.label}</Text>
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{s.value}</Text>
-                        <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{s.sub}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
 
             {/* Desktop Table */}
             {!isMobile && (
@@ -563,7 +488,7 @@ export default function BankApproval() {
                   <Text style={[styles.tableHeaderCell, { flex: 0.4 }]}>ID</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Seller</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Business</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.6, paddingRight: 24 }]}>Status</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Bank</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Account</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Requested</Text>
@@ -576,26 +501,26 @@ export default function BankApproval() {
                       onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(s.sellerId) } })}
                       style={{ flex: 0.4, justifyContent: "center" }}
                     >
-                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingHorizontal: 12 }]}>{s.id}</Text>
+                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600" }]}>{s.id}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(s.sellerId) } })}
                       style={[styles.tableCell, { flex: 1.5, justifyContent: "center" }]}
                     >
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
                         <Avatar initials={s.initials} color={s.color} />
-                        <View>
-                          <Text style={{ fontWeight: "600", color: BLUE, fontSize: 12 }}>{s.name}</Text>
-                          <Text style={{ color: "#888", fontSize: 11 }}>{s.email}</Text>
-                          <Text style={{ color: "#888", fontSize: 11 }}>{s.phone}</Text>
+                        <View style={{ flex: 1, flexShrink: 1 }}>
+                          <Text style={{ fontWeight: "600", color: BLUE, fontSize: 12 }} numberOfLines={1}>{s.name}</Text>
+                          <Text style={{ color: "#888", fontSize: 11 }} numberOfLines={1}>{s.email}</Text>
+                          <Text style={{ color: "#888", fontSize: 11 }} numberOfLines={1}>{s.phone}</Text>
                         </View>
                       </View>
                     </TouchableOpacity>
-                    <Text style={[styles.tableCell, { fontWeight: "600", fontSize: 11, flex: 1.0 }]}>{s.business}</Text>
-                    <View style={[styles.tableCell, { flex: 0.6 }]}><StatusBadge status={s.status} label={s.statusLabel} /></View>
-                    <View style={[styles.tableCell, { flex: 1.0 }]}>
-                      <Text style={{ fontWeight: "600", fontSize: 12 }}>{s.bank}</Text>
-                      <Text style={{ color: "#888", fontSize: 10 }}>{s.branch}</Text>
+                    <Text style={[styles.tableCell, { fontWeight: "600", fontSize: 11, flex: 1.0, paddingRight: 8 }]} numberOfLines={2}>{s.business}</Text>
+                    <View style={[styles.tableCell, { flex: 0.6, paddingRight: 24 }]}><StatusBadge status={s.status} label={s.statusLabel} /></View>
+                    <View style={[styles.tableCell, { flex: 1.0, flexShrink: 1, paddingRight: 8 }]}>
+                      <Text style={{ fontWeight: "600", fontSize: 12 }} numberOfLines={1}>{s.bank}</Text>
+                      <Text style={{ color: "#888", fontSize: 10 }} numberOfLines={1}>{s.branch}</Text>
                     </View>
                     <View style={[styles.tableCell, { flex: 0.9 }]}>
                       <Text style={{ fontSize: 12 }}>{s.account}</Text>
@@ -610,28 +535,14 @@ export default function BankApproval() {
                     </View>
                   </View>
                 ))}
-                <View style={styles.tableFooter}>
-                  <Text style={{ fontSize: 13, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</Text>
-                  <View style={{ flexDirection: "row", gap: 4 }}>
-                    <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}>
-                      <Text style={{ color: currentPage === 1 ? '#9CA3AF' : '#374151', fontWeight: '600' }}>←</Text>
-                    </TouchableOpacity>
-                    {makePageList().map((p, i) => (
-                      typeof p === 'number' ? (
-                        <TouchableOpacity key={i} style={[styles.pageBtn, p === currentPage && styles.pageBtnActive]} onPress={() => gotoPage(p as number)}>
-                          <Text style={{ color: p === currentPage ? '#FFF' : '#374151', fontWeight: '600' }}>{p}</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View key={i} style={[styles.pageBtn, { borderWidth: 0 }]}>
-                          <Text style={{ color: '#6B7280', fontWeight: '600' }}>{p}</Text>
-                        </View>
-                      )
-                    ))}
-                    <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}>
-                      <Text style={{ color: currentPage === totalPages ? '#9CA3AF' : '#374151', fontWeight: '600' }}>→</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalEntries}
+                  itemsPerPage={pageSize}
+                  itemName="entries"
+                  onPageChange={setCurrentPage}
+                />
               </View>
             )}
 
@@ -712,28 +623,14 @@ export default function BankApproval() {
               })}
 
               {/* Mobile Pagination */}
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-                <Text style={{ fontSize: 12, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</Text>
-                <View style={{ flexDirection: "row", gap: 4 }}>
-                  <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}>
-                    <Text style={{ color: currentPage === 1 ? '#9CA3AF' : '#374151', fontWeight: '600' }}>←</Text>
-                  </TouchableOpacity>
-                  {makePageList().map((p, i) => (
-                    typeof p === 'number' ? (
-                      <TouchableOpacity key={i} style={[styles.pageBtn, p === currentPage && styles.pageBtnActive]} onPress={() => gotoPage(p as number)}>
-                        <Text style={{ color: p === currentPage ? '#FFF' : '#374151', fontWeight: '600' }}>{p}</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View key={i} style={[styles.pageBtn, { borderWidth: 0 }]}>
-                        <Text style={{ color: '#6B7280', fontWeight: '600' }}>{p}</Text>
-                      </View>
-                    )
-                  ))}
-                  <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}>
-                    <Text style={{ color: currentPage === totalPages ? '#9CA3AF' : '#374151', fontWeight: '600' }}>→</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalEntries}
+                itemsPerPage={pageSize}
+                itemName="entries"
+                onPageChange={setCurrentPage}
+              />
             </View>
           </View>
         </View>

@@ -20,7 +20,6 @@ import {
   type ProductStatus,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { resolveMediaUrl } from '@/lib/api/media';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
 import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow, type SellerRow } from '@/services/productApi';
 import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
@@ -74,7 +73,33 @@ const DEFAULT_STATS: ProductStats = {
   all: 0,
 };
 
-const PLACEHOLDER_IMAGE = '';
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23F3F4F6' width='80' height='80'/%3E%3Ctext x='50%25' y='52%25' dominant-baseline='middle' text-anchor='middle' fill='%239CA3AF' font-size='12' font-family='Arial,sans-serif'%3ENo image%3C/text%3E%3C/svg%3E";
+
+function sellerDisplayName(seller: SellerRow): string {
+  return (
+    seller.storeName?.trim() ||
+    seller.businessName?.trim() ||
+    seller.fullName?.trim() ||
+    `${seller.firstName || ""} ${seller.lastName || ""}`.trim() ||
+    seller.email?.trim() ||
+    "Unknown"
+  );
+}
+
+function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): ApprovalProduct {
+  return {
+    id: row.id,
+    name: cleanText(row.name),
+    description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
+    image: row.image || PLACEHOLDER_IMAGE,
+    seller: cleanText(row.seller),
+    email: row.sellerEmail?.trim() || '',
+    category: row.category,
+    status: row.status as ProductStatus,
+    submittedOn: row.submittedAt,
+  };
+}
 
 function truncateWords(text: string, maxWords: number = 4): string {
   if (!text) return '';
@@ -88,20 +113,6 @@ function truncateWords(text: string, maxWords: number = 4): string {
 function cleanText(text: string): string {
   if (!text) return '';
   return text.replace(/[\x00-\x1F\x7F-\x9F\u2018-\u201F\u00B4\u0060\u25A1\uFFFD\u0092]/g, "'").replace(/&#39;|&apos;|&rsquo;|&#8217;|&#x2019;/gi, "'");
-}
-
-function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): ApprovalProduct {
-  return {
-    id: row.id,
-    name: cleanText(row.name),
-    description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
-    image: resolveMediaUrl(row.image) || PLACEHOLDER_IMAGE,
-    seller: cleanText(row.seller),
-    email: '',
-    category: row.category,
-    status: row.status as ProductStatus,
-    submittedOn: row.submittedAt,
-  };
 }
 
 const STATUS_CONFIG: Record<
@@ -133,7 +144,7 @@ function useBreakpoint() {
 // ─── Shared UI ─────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: ProductStatus }) {
-  const cfg = STATUS_CONFIG[status];
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   return (
     <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
       <Text style={[styles.statusBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
@@ -820,9 +831,7 @@ export default function ProductApprovalScreen() {
       // Fetch sellers from backend
       const sellersPage = await fetchSellers();
       setSellers(sellersPage.items);
-      const sellerNames = sellersPage.items.map(seller =>
-        seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown'
-      );
+      const sellerNames = sellersPage.items.map((seller) => sellerDisplayName(seller));
       setSellerOptions(["All Sellers", ...sellerNames]);
 
       // Categories (parentId is NOT NULL) and subcategories will be updated based on main category selection
@@ -838,16 +847,13 @@ export default function ProductApprovalScreen() {
       const apiStatus = filterStatusForApi(activeFilter);
       let sellerId: number | undefined;
       if (selectedSeller !== "All Sellers") {
-        const foundSeller = sellers.find(seller => {
-          const name = seller.storeName || `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.email || 'Unknown';
-          return name === selectedSeller;
-        });
+        const foundSeller = sellers.find((seller) => sellerDisplayName(seller) === selectedSeller);
         if (foundSeller) {
           sellerId = foundSeller.id;
         }
       }
 
-      const [page, apiStats] = await Promise.all([
+      const [productsResult, statsResult] = await Promise.allSettled([
         fetchProducts({
           status: apiStatus,
           search: debouncedSearch.trim() || undefined,
@@ -857,22 +863,34 @@ export default function ProductApprovalScreen() {
         }),
         fetchProductStats(),
       ]);
-      const mappedProducts = page.items.map((p: ProductListRow) =>
+
+      if (productsResult.status === "rejected") {
+        throw productsResult.reason;
+      }
+
+      const page = productsResult.value;
+      const mappedProducts = (page.items ?? []).map((p: ProductListRow) =>
         toApprovalProduct(mapProductListToApprovalRow(p)),
       );
       setProducts(mappedProducts);
-      setTotalProducts(page.totalElements);
-      setTotalPages(page.totalPages);
+      setTotalProducts(page.totalElements ?? mappedProducts.length);
+      setTotalPages(page.totalPages ?? 0);
       if (currentPage > page.totalPages && page.totalPages > 0) {
         setCurrentPage(page.totalPages);
       }
-      setStats({
-        pending: Number(apiStats.pending ?? 0),
-        review: Number(apiStats.underReview ?? 0),
-        approved: Number(apiStats.approved ?? apiStats.active ?? 0),
-        rejected: Number(apiStats.rejected ?? 0),
-        all: Number(apiStats.total ?? 0),
-      });
+
+      if (statsResult.status === "fulfilled") {
+        const apiStats = statsResult.value;
+        setStats({
+          pending: Number(apiStats.pending ?? 0),
+          review: Number(apiStats.underReview ?? 0),
+          approved: Number(apiStats.approved ?? apiStats.active ?? 0),
+          rejected: Number(apiStats.rejected ?? 0),
+          all: Number(apiStats.total ?? 0),
+        });
+      } else {
+        console.warn("Product stats unavailable:", statsResult.reason);
+      }
 
       // Extract unique categories from products
       const uniqueCategories = new Set<string>(["All Categories"]);
@@ -886,7 +904,7 @@ export default function ProductApprovalScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, currentPage, debouncedSearch, selectedSeller]);
+  }, [activeFilter, currentPage, debouncedSearch, selectedSeller, sellers]);
 
   useEffect(() => {
     loadData();

@@ -2,6 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { Department as ApiDepartment } from "@/lib/api/types";
+import { formatDate } from "@/lib/format";
 import {
     createDepartment,
     deleteDepartment,
@@ -99,7 +100,7 @@ function mapApiDepartment(d: ApiDepartment): Department {
         name: d.name ?? "",
         description: d.description ?? "",
         jobs: Number(d.jobCount ?? 0),
-        createdAt: "—",
+        createdAt: formatDate(d.createdAt),
         status: d.active !== false ? "Active" : "Inactive",
     };
 }
@@ -1335,7 +1336,7 @@ const s = StyleSheet.create({
     safe: {
         flex: 1,
         height: "100%",
-        backgroundColor: T.bg,
+        backgroundColor: "#FFFFFF",
         paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
 

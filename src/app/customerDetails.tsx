@@ -8,10 +8,12 @@
 import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
-import { fetchCustomerDetail } from "@/services/customerApi";
+import {
+  downloadCustomerOrderHistoryCsv,
+  downloadCustomerOrderHistoryPdf,
+  fetchCustomerDetail,
+} from "@/services/customerApi";
 import { Feather } from "@expo/vector-icons";
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -127,7 +129,7 @@ function mapApiCustomerDetail(data: Record<string, unknown>): Customer {
 
   const orderHistory: Order[] = Array.isArray(data.orders)
     ? (data.orders as Record<string, unknown>[]).map((o) => ({
-        orderId: Number(o.id ?? 0),
+        orderId: Number(o.id ?? o.orderId ?? 0),
         orderNumber: String(o.orderNumber ?? o.id ?? "—"),
         date: formatDate(String(o.createdAt ?? "")),
         items: Number(o.itemCount ?? 0),
@@ -182,8 +184,95 @@ function mapOrderStatus(status: string): Order["status"] {
 }
 
 function openOrderDetails(router: ReturnType<typeof useRouter>, orderId: number) {
-  if (!orderId) return;
-  router.push({ pathname: "/orderDetails", params: { orderId: String(orderId) } });
+  const id = Number(orderId);
+  if (!id || Number.isNaN(id)) return;
+  router.push(`/orderDetails?orderId=${id}`);
+}
+
+function exportOrderHistoryFallback(customer: Customer, isMobileView: boolean) {
+  if (!isMobileView) {
+    let csvContent = "Customer Name,Customer ID,Status,Orders,Total Spent,Last Order\n";
+    csvContent += `"${customer.name}","${customer.id}","${customer.status}","${customer.orders}","${customer.totalSpent}","${customer.lastOrder ?? "N/A"}"\n\n`;
+    csvContent += "Order #,Date,Items,Amount,Payment,Status\n";
+    (customer.orderHistory || []).forEach((o) => {
+      csvContent += `"${o.orderNumber}","${o.date}","${o.items}","${o.amount}","${o.payment}","${o.status}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Customer_${customer.id}_Export.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  const rows = (customer.orderHistory || [])
+    .map(
+      (o) => `
+      <tr>
+        <td>${o.orderNumber}</td>
+        <td>${o.date}</td>
+        <td>${o.items}</td>
+        <td>₹${o.amount}</td>
+        <td>${o.payment}</td>
+        <td>${o.status}</td>
+      </tr>`
+    )
+    .join("");
+
+  const htmlContent = `
+    <html>
+      <head>
+        <style>
+          body { font-family: Helvetica, Arial, sans-serif; padding: 20px; }
+          h1 { color: #151D4F; margin-bottom: 5px; }
+          .info-box { background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e5e7eb; }
+          .info-box p { margin: 5px 0; font-size: 14px; color: #374151; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+          th, td { border: 1px solid #e5e7eb; padding: 12px 10px; text-align: left; color: #374151; }
+          th { background-color: #f3f4f6; font-weight: bold; }
+          tr:nth-child(even) { background-color: #fafafa; }
+        </style>
+      </head>
+      <body>
+        <h1>Customer Details</h1>
+        <div class="info-box">
+          <p><strong>Customer Name:</strong> ${customer.name}</p>
+          <p><strong>Customer ID:</strong> ${customer.id}</p>
+          <p><strong>Status:</strong> ${customer.status}</p>
+          <p><strong>Orders:</strong> ${customer.orders}</p>
+          <p><strong>Total Spent:</strong> ₹${customer.totalSpent}</p>
+          <p><strong>Last Order:</strong> ${customer.lastOrder ?? "N/A"}</p>
+        </div>
+        <h2 style="color: #151D4F; margin-top: 30px;">Order History</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Date</th>
+              <th>Items</th>
+              <th>Amount</th>
+              <th>Payment</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  import("expo-print")
+    .then(({ printToFileAsync }) => printToFileAsync({ html: htmlContent }))
+    .then(({ uri }) => import("expo-sharing").then((Sharing) => Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      UTI: "com.adobe.pdf",
+    })))
+    .catch((err) => console.error("Fallback PDF export failed:", err));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -781,84 +870,18 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
   const handleDownload = async () => {
     try {
-      if (Platform.OS === 'web') {
-        let csvContent = "Customer Name,Customer ID,Status,Orders,Total Spent,Last Order\n";
-        csvContent += `"${c.name}","${c.id}","${c.status}","${c.orders}","${c.totalSpent}","${c.lastOrder ?? 'N/A'}"\n\n`;
-        
-        csvContent += "Order #,Date,Items,Amount,Payment,Status\n";
-        (c.orderHistory || []).forEach(o => {
-          csvContent += `"${o.orderNumber}","${o.date}","${o.items}","${o.amount}","${o.payment}","${o.status}"\n`;
-        });
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `Customer_${c.id}_Export.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (isMobile) {
+        await downloadCustomerOrderHistoryPdf(c.id, `Customer_${c.id}_Orders.pdf`);
       } else {
-        const htmlContent = `
-          <html>
-            <head>
-              <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; }
-                h1 { color: #151D4F; margin-bottom: 5px; }
-                .info-box { background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e5e7eb; }
-                .info-box p { margin: 5px 0; font-size: 14px; color: #374151; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-                th, td { border: 1px solid #e5e7eb; padding: 12px 10px; text-align: left; color: #374151; }
-                th { background-color: #f3f4f6; font-weight: bold; }
-                tr:nth-child(even) { background-color: #fafafa; }
-              </style>
-            </head>
-            <body>
-              <h1>Customer Details</h1>
-              <div class="info-box">
-                <p><strong>Customer Name:</strong> ${c.name}</p>
-                <p><strong>Customer ID:</strong> ${c.id}</p>
-                <p><strong>Status:</strong> ${c.status}</p>
-                <p><strong>Orders:</strong> ${c.orders}</p>
-                <p><strong>Total Spent:</strong> ₹${c.totalSpent}</p>
-                <p><strong>Last Order:</strong> ${c.lastOrder ?? 'N/A'}</p>
-              </div>
-              <h2 style="color: #151D4F; margin-top: 30px;">Order History</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Order #</th>
-                    <th>Date</th>
-                    <th>Items</th>
-                    <th>Amount</th>
-                    <th>Payment</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${(c.orderHistory || []).map(o => `
-                    <tr>
-                      <td>${o.orderNumber}</td>
-                      <td>${o.date}</td>
-                      <td>${o.items}</td>
-                      <td>₹${o.amount}</td>
-                      <td>${o.payment}</td>
-                      <td>${o.status}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </body>
-          </html>
-        `;
-        
-        const { uri } = await Print.printToFileAsync({ html: htmlContent });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-        }
+        await downloadCustomerOrderHistoryCsv(c.id, `Customer_${c.id}_Export.csv`);
       }
     } catch (err) {
-      console.error("Error generating file:", err);
+      console.error("Order history export failed:", err);
+      try {
+        exportOrderHistoryFallback(c, isMobile);
+      } catch (fallbackErr) {
+        console.error("Fallback export failed:", fallbackErr);
+      }
     }
   };
 

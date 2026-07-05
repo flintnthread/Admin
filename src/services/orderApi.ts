@@ -1,5 +1,6 @@
 import { adminApiRequest, adminApiFetch, AdminApiError } from "@/lib/api/client";
 import { resolveAdminApiBaseUrl } from "@/lib/api/config";
+import { getAdminToken } from "@/lib/api/session";
 import type { OrderSummary, PageResponse } from "@/lib/api/types";
 
 export async function fetchOrders(params?: {
@@ -86,11 +87,12 @@ export async function updateOrderGstStatus(id: number, gstStatus: string): Promi
 export async function updateOrderStatus(
   id: number,
   status: string,
-  note?: string
+  note?: string,
+  notifyCustomer?: boolean
 ): Promise<Record<string, unknown>> {
   return adminApiRequest(`/api/admin/orders/${id}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ status, note }),
+    body: JSON.stringify({ status, note, notifyCustomer: Boolean(notifyCustomer) }),
   });
 }
 
@@ -189,9 +191,14 @@ export type OrderInvoice = {
   };
 };
 
-export async function fetchOrderInvoice(id: number): Promise<OrderInvoice> {
-  return adminApiRequest(`/api/admin/orders/${id}/invoice`);
-}
+export type OrderShippingLabel = OrderInvoice & {
+  awbCode?: string;
+  courierName?: string;
+  trackingUrl?: string;
+  trackingId?: string;
+  weightKg?: number;
+  dimensionsCm?: { l?: number; w?: number; h?: number };
+};
 
 function parseContentDispositionFileName(header: string | null, fallback: string) {
   if (!header) return fallback;
@@ -217,29 +224,122 @@ function triggerBrowserFileDownload(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+async function downloadAdminBinaryFile(
+  path: string,
+  preferredFileName: string,
+  accept: string
+): Promise<void> {
+  if (typeof document !== "undefined") {
+    const res = await adminApiFetch(path, { headers: { Accept: accept } });
+    if (!res.ok) {
+      throw new AdminApiError(`Download failed (${res.status})`, res.status);
+    }
+    const blob = await res.blob();
+    const fileName = parseContentDispositionFileName(
+      res.headers.get("content-disposition"),
+      preferredFileName
+    );
+    triggerBrowserFileDownload(blob, fileName);
+    return;
+  }
+
+  const FileSystem = await import("expo-file-system/legacy");
+  const Sharing = await import("expo-sharing");
+  const token = getAdminToken();
+  if (!token) {
+    throw new AdminApiError("Not signed in. Please log in again.", 401);
+  }
+
+  const url = `${resolveAdminApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+  const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!directory) {
+    throw new AdminApiError("Unable to access local storage for download.");
+  }
+
+  const fileUri = `${directory}${preferredFileName}`;
+  const result = await FileSystem.downloadAsync(url, fileUri, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: accept,
+    },
+  });
+
+  if (result.status < 200 || result.status >= 300) {
+    throw new AdminApiError(`Download failed (${result.status})`, result.status);
+  }
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(result.uri, {
+      mimeType: accept,
+      dialogTitle: preferredFileName,
+      UTI: accept.includes("pdf") ? "com.adobe.pdf" : "public.comma-separated-values-text",
+    });
+    return;
+  }
+
+  throw new AdminApiError("Sharing is not available on this device.");
+}
+
+export async function downloadOrderExportCsv(
+  params?: {
+    status?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
+    search?: string;
+    sort?: string;
+  },
+  preferredFileName?: string
+): Promise<void> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.paymentStatus) q.set("paymentStatus", params.paymentStatus);
+  if (params?.paymentMethod) q.set("paymentMethod", params.paymentMethod);
+  if (params?.search) q.set("search", params.search);
+  if (params?.sort) q.set("sort", params.sort);
+  const qs = q.toString();
+  const path = `/api/admin/orders/export${qs ? `?${qs}` : ""}`;
+  const fileName = preferredFileName ?? `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+
+  if (typeof document !== "undefined") {
+    const csv = await fetchOrderExportCsv(params);
+    const blob = new Blob([csv.startsWith("\uFEFF") ? csv : `\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8;",
+    });
+    triggerBrowserFileDownload(blob, fileName);
+    return;
+  }
+
+  await downloadAdminBinaryFile(path, fileName, "text/csv");
+}
+
+export async function fetchOrderInvoice(id: number): Promise<OrderInvoice> {
+  return adminApiRequest(`/api/admin/orders/${id}/invoice`);
+}
+
+export async function fetchOrderShippingLabel(id: number): Promise<OrderShippingLabel> {
+  return adminApiRequest(`/api/admin/orders/${id}/shipping-label`);
+}
+
 export async function downloadOrderInvoicePdf(
   id: number,
   preferredFileName?: string
 ): Promise<void> {
-  const res = await adminApiFetch(`/api/admin/orders/${id}/invoice/pdf`, {
-    headers: { Accept: "application/pdf" },
-  });
-
-  if (!res.ok) {
-    let message = `Download failed (${res.status})`;
-    try {
-      const body = await res.json();
-      if (body?.message) message = body.message;
-    } catch {
-      // ignore
-    }
-    throw new AdminApiError(message, res.status);
-  }
-
-  const blob = await res.blob();
-  const fileName = parseContentDispositionFileName(
-    res.headers.get("content-disposition"),
-    preferredFileName ?? `invoice-${id}.pdf`
+  const fileName = preferredFileName ?? `invoice-${id}.pdf`;
+  await downloadAdminBinaryFile(
+    `/api/admin/orders/${id}/invoice/pdf`,
+    fileName,
+    "application/pdf"
   );
-  triggerBrowserFileDownload(blob, fileName);
+}
+
+export async function downloadOrderShippingLabelPdf(
+  id: number,
+  preferredFileName?: string
+): Promise<void> {
+  const fileName = preferredFileName ?? `shipping-label-${id}.pdf`;
+  await downloadAdminBinaryFile(
+    `/api/admin/orders/${id}/shipping-label/pdf`,
+    fileName,
+    "application/pdf"
+  );
 }

@@ -11,12 +11,20 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  createColor,
+  deleteColor,
+  fetchColors,
+  updateColor,
+  type CatalogColor,
+} from "@/services/colorApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -30,14 +38,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import { getApiErrorMessage } from "@/lib/api/client";
-import {
-  createColor,
-  deleteColor,
-  fetchColors,
-  updateColor,
-  type CatalogColor,
-} from "@/services/colorApi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap-like icon name map → Ionicons
@@ -389,7 +389,7 @@ const ColorCard = ({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const [overlayVisible, setOverlayVisible] = useState(false);
-  
+
   // Disable hover overlay on mobile to prevent double-tap issues
   const hoverProps = (IS_WEB && !isMobile)
     ? { onMouseEnter: () => setOverlayVisible(true), onMouseLeave: () => setOverlayVisible(false) }
@@ -421,7 +421,7 @@ const ColorCard = ({
         </View>
         <Text style={styles.gridCardCode}>{item.code}</Text>
         <View style={[styles.gridCardBar, { backgroundColor: item.code }]} />
-        
+
         {isMobile && (
           <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
             <TouchableOpacity style={styles.editBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>
@@ -613,63 +613,7 @@ const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pagination
-// ─────────────────────────────────────────────────────────────────────────────
-const Pagination = ({
-  total, page, pageSize, onChange,
-}: {
-  total: number; page: number; pageSize: number; onChange: (p: number) => void;
-}) => {
-  const totalPages = Math.ceil(total / pageSize);
-  if (totalPages <= 1) return null;
 
-  const pages: (number | "...")[] = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (page > 3) pages.push("...");
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
-    if (page < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-  }
-
-  return (
-    <View style={styles.pagination}>
-      <TouchableOpacity
-        style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
-        onPress={() => page > 1 && onChange(page - 1)}
-        disabled={page === 1}
-      >
-        <Ionicons name={BI.chevronLeft as any} size={16} color={page === 1 ? "#ccc" : "#555"} />
-      </TouchableOpacity>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 4, alignItems: "center" }}>
-        {pages.map((p, i) =>
-          p === "..." ? (
-            <Text key={`e-${i}`} style={{ color: "#888", paddingHorizontal: 4 }}>…</Text>
-          ) : (
-            <TouchableOpacity
-              key={p}
-              style={[styles.pageBtn, page === p && styles.pageBtnActive]}
-              onPress={() => onChange(p as number)}
-            >
-              <Text style={[styles.pageBtnText, page === p && styles.pageBtnTextActive]}>{p}</Text>
-            </TouchableOpacity>
-          )
-        )}
-      </ScrollView>
-      <TouchableOpacity
-        style={[styles.pageBtn, page === totalPages && styles.pageBtnDisabled]}
-        onPress={() => page < totalPages && onChange(page + 1)}
-        disabled={page === totalPages}
-      >
-        <Ionicons name={BI.chevronRight as any} size={16} color={page === totalPages ? "#ccc" : "#555"} />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Screen
@@ -862,19 +806,14 @@ export default function ColorsScreen() {
   const FooterSection = (
     <View style={{ paddingHorizontal: PADDING }}>
       {viewMode === "list" && <View style={styles.tableCardBottom} />}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Showing{" "}
-          {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
-          {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} colors
-        </Text>
-        <Pagination
-          total={filtered.length}
-          page={page}
-          pageSize={PAGE_SIZE}
-          onChange={(p) => setPage(p)}
-        />
-      </View>
+      <Pagination
+        currentPage={page}
+        totalPages={Math.ceil(filtered.length / PAGE_SIZE)}
+        totalItems={filtered.length}
+        itemsPerPage={PAGE_SIZE}
+        itemName="colors"
+        onPageChange={setPage}
+      />
       <Text style={styles.copyright}>2026 © Flintnthread India Pvt. Ltd.</Text>
     </View>
   );

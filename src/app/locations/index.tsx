@@ -971,7 +971,7 @@ function EntityModal({
 }: {
   visible: boolean; mode: ModalMode; onClose: () => void; tab: DetailTab;
   isMobile: boolean; initialRow: ListRow | null;
-  onSave: (d: { name: string; code: string; status: RowStatus }) => void;
+  onSave: (d: { name: string; code: string; status: RowStatus; parentId?: number }) => Promise<void>;
 }) {
   const meta = TAB_META[tab];
   const insets = useSafeAreaInsets();
@@ -980,19 +980,70 @@ function EntityModal({
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [parentOptions, setParentOptions] = useState<{ id: number; name: string }[]>([]);
+  const [parentId, setParentId] = useState<number | null>(null);
+  const [parentOpen, setParentOpen] = useState(false);
   const readOnly = mode === 'view';
   const showCode = tab === 'countries';
+  const needsParent = mode === 'add' && tab !== 'countries' && tab !== 'overview';
+  const parentLabel =
+    tab === 'states' ? 'Country' :
+      tab === 'cities' ? 'State' :
+        tab === 'areas' ? 'City' :
+          tab === 'pincodes' ? 'Area' : '';
 
   useEffect(() => {
-    if (visible) { setStatus(initialRow?.status ?? 'Active'); setName(initialRow?.name ?? ''); setCode(initialRow?.code ?? ''); setError(null); }
+    if (visible) {
+      setStatus(initialRow?.status ?? 'Active');
+      setName(initialRow?.name ?? '');
+      setCode(initialRow?.code ?? '');
+      setError(null);
+      setParentId(null);
+      setParentOpen(false);
+    }
   }, [visible, initialRow]);
 
-  const heading = mode === 'add' ? `Add ${meta.singular}` : mode === 'edit' ? `Edit ${meta.singular}` : `${meta.singular} Details`;
+  useEffect(() => {
+    if (!visible || !needsParent) {
+      setParentOptions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let options: { id: number; name: string }[] = [];
+        if (tab === 'states') {
+          options = (await fetchCountries()).map((row) => ({ id: row.id, name: String(row.name ?? row.id) }));
+        } else if (tab === 'cities') {
+          options = (await fetchStates()).map((row) => ({ id: row.id, name: String(row.name ?? row.id) }));
+        } else if (tab === 'areas') {
+          options = (await fetchCities()).map((row) => ({ id: row.id, name: String(row.name ?? row.id) }));
+        } else if (tab === 'pincodes') {
+          options = (await fetchAreas()).map((row) => ({ id: row.id, name: String(row.name ?? row.id) }));
+        }
+        if (!cancelled) {
+          setParentOptions(options);
+          if (options.length === 1) setParentId(options[0].id);
+        }
+      } catch (e) {
+        if (!cancelled) setError(getApiErrorMessage(e, `Failed to load ${parentLabel.toLowerCase()} list.`));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible, needsParent, tab, parentLabel]);
 
-  const handleSave = () => {
+  const heading = mode === 'add' ? `Add ${meta.singular}` : mode === 'edit' ? `Edit ${meta.singular}` : `${meta.singular} Details`;
+  const selectedParent = parentOptions.find((opt) => opt.id === parentId);
+
+  const handleSave = async () => {
     if (!name.trim()) { setError(`${meta.singular} name is required.`); return; }
     if (showCode && !code.trim()) { setError('Country code is required.'); return; }
-    onSave({ name: name.trim(), code: code.trim(), status });
+    if (needsParent && !parentId) { setError(`${parentLabel} is required.`); return; }
+    try {
+      await onSave({ name: name.trim(), code: code.trim(), status, parentId: parentId ?? undefined });
+    } catch (e: unknown) {
+      setError(getApiErrorMessage(e));
+    }
   };
 
   return (
@@ -1031,7 +1082,39 @@ function EntityModal({
                     placeholder="e.g. IN, US"
                     placeholderTextColor={LocationColors.textLight}
                     style={[s.fieldInput, readOnly && s.fieldInputRO]}
+                    autoCapitalize="characters"
+                    maxLength={2}
                   />
+                </>
+              )}
+
+              {needsParent && (
+                <>
+                  <ThemedText style={s.fieldLabel}>{parentLabel} {!readOnly && <ThemedText style={{ color: LocationColors.inactiveText }}>*</ThemedText>}</ThemedText>
+                  <Pressable
+                    style={[s.fieldInput, { justifyContent: 'center' }]}
+                    onPress={() => !readOnly && setParentOpen((open) => !open)}
+                    disabled={readOnly}
+                  >
+                    <ThemedText style={{ color: selectedParent ? LocationColors.text : LocationColors.textLight }}>
+                      {selectedParent?.name ?? `Select ${parentLabel.toLowerCase()}`}
+                    </ThemedText>
+                  </Pressable>
+                  {parentOpen && parentOptions.length > 0 && (
+                    <View style={[s.fieldInput, { padding: 0, maxHeight: 180 }]}>
+                      <ScrollView nestedScrollEnabled>
+                        {parentOptions.map((opt) => (
+                          <Pressable
+                            key={opt.id}
+                            style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: parentId === opt.id ? '#EFF6FF' : 'transparent' }}
+                            onPress={() => { setParentId(opt.id); setParentOpen(false); }}
+                          >
+                            <ThemedText>{opt.name}</ThemedText>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
                 </>
               )}
 
@@ -1246,28 +1329,46 @@ export default function LocationsScreen() {
   const openView = (row: ListRow) => { setActiveRow(row); setModalMode('view'); setModalVisible(true); };
   const closeModal = () => { setModalVisible(false); setActiveRow(null); };
 
-  const handleSave = async (data: { name: string; code: string; status: RowStatus }) => {
+  const handleSave = async (data: { name: string; code: string; status: RowStatus; parentId?: number }) => {
+    const active = data.status === 'Active';
     try {
       if (modalMode === 'edit' && activeRow) {
-        if (detailTab === 'countries') await updateCountry(activeRow.id, data.name);
-        else if (detailTab === 'states') await updateState(activeRow.id, data.name);
-        else if (detailTab === 'cities') await updateCity(activeRow.id, data.name);
-        else if (detailTab === 'areas') await updateArea(activeRow.id, data.name);
-        else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name);
-        setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, ...data } : r));
+        if (detailTab === 'countries') await updateCountry(activeRow.id, data.name, data.code, active);
+        else if (detailTab === 'states') await updateState(activeRow.id, data.name, active);
+        else if (detailTab === 'cities') await updateCity(activeRow.id, data.name, active);
+        else if (detailTab === 'areas') await updateArea(activeRow.id, data.name, active);
+        else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name, active);
+        setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, name: data.name, status: data.status, code: data.code } : r));
       } else {
         let newRow: LocationRow;
-        if (detailTab === 'countries') newRow = await createCountry(data.name);
-        else if (detailTab === 'states') newRow = await createState(0, data.name);
-        else if (detailTab === 'cities') newRow = await createCity(0, data.name);
-        else if (detailTab === 'areas') newRow = await createArea(0, data.name);
-        else return;
+        if (detailTab === 'countries') newRow = await createCountry(data.name, data.code, active);
+        else if (detailTab === 'states') {
+          if (!data.parentId) throw new Error('Country is required.');
+          newRow = await createState(data.parentId, data.name, active);
+        } else if (detailTab === 'cities') {
+          if (!data.parentId) throw new Error('State is required.');
+          newRow = await createCity(data.parentId, data.name, active);
+        } else if (detailTab === 'areas') {
+          if (!data.parentId) throw new Error('City is required.');
+          newRow = await createArea(data.parentId, data.name, active);
+        } else if (detailTab === 'pincodes') {
+          if (!data.parentId) throw new Error('Area is required.');
+          newRow = await createPincode(data.parentId, data.name, active);
+        } else return;
         const theme = ROW_THEMES[newRow.id % ROW_THEMES.length];
-        setRows((prev) => [{ ...mapLocationRow(newRow, 0, detailTab), status: data.status, iconBg: theme.bg, iconColor: theme.color }, ...prev]);
+        setRows((prev) => [{
+          ...mapLocationRow(newRow, 0, detailTab),
+          status: data.status,
+          code: data.code || String(newRow.code ?? ''),
+          iconBg: theme.bg,
+          iconColor: theme.color,
+        }, ...prev]);
       }
       closeModal();
-    } catch (e) {
+      await loadRows();
+    } catch (e: unknown) {
       console.warn(getApiErrorMessage(e));
+      throw new Error(getApiErrorMessage(e));
     }
   };
 

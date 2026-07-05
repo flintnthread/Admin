@@ -286,6 +286,7 @@ export type Department = {
   color?: string;
   active?: boolean;
   jobCount?: number;
+  createdAt?: string;
 };
 
 export type JobOpening = {
