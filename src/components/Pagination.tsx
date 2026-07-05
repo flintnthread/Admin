@@ -213,6 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     paddingVertical: 12,
     paddingHorizontal: 0,
+    marginBottom: 12,
   },
   container: {
     backgroundColor: "#ffffff",
@@ -284,6 +285,7 @@ const mobileStyles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     paddingVertical: 10,
     paddingHorizontal: 12,
+    marginBottom: 24,
   },
   card: {
     backgroundColor: "#ffffff",
