@@ -1,4 +1,6 @@
-import { adminApiRequest } from "@/lib/api/client";
+import { adminApiFetch, adminApiRequest, AdminApiError } from "@/lib/api/client";
+import { resolveAdminApiBaseUrl } from "@/lib/api/config";
+import { getAdminToken } from "@/lib/api/session";
 import type { CustomerSummary, PageResponse } from "@/lib/api/types";
 
 export async function fetchCustomers(search?: string, page = 0, size = 20): Promise<PageResponse<CustomerSummary>> {
@@ -19,6 +21,121 @@ export async function fetchCustomerDetail(id: number): Promise<Record<string, un
 
 export async function fetchCustomerAnalytics(id: number): Promise<Record<string, unknown>> {
   return adminApiRequest(`/api/admin/customers/${id}/analytics`);
+}
+
+function parseContentDispositionFileName(header: string | null, fallback: string): string {
+  if (!header) return fallback;
+  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(header);
+  if (!match?.[1]) return fallback;
+  try {
+    return decodeURIComponent(match[1].replace(/"/g, "").trim());
+  } catch {
+    return match[1].replace(/"/g, "").trim() || fallback;
+  }
+}
+
+function triggerBrowserFileDownload(blob: Blob, fileName: string) {
+  if (typeof document === "undefined") return;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function getCustomerOrderHistoryCsvUrl(id: number): string {
+  return `${resolveAdminApiBaseUrl()}/api/admin/customers/${id}/orders/export`;
+}
+
+export async function fetchCustomerOrderHistoryCsv(id: number): Promise<string> {
+  const response = await adminApiFetch(`/api/admin/customers/${id}/orders/export`, {
+    headers: { Accept: "text/csv" },
+  });
+  if (!response.ok) {
+    throw new AdminApiError("Failed to export customer order history.", response.status);
+  }
+  return response.text();
+}
+
+export async function downloadCustomerOrderHistoryCsv(id: number, preferredFileName?: string): Promise<void> {
+  const response = await adminApiFetch(`/api/admin/customers/${id}/orders/export`, {
+    headers: { Accept: "text/csv" },
+  });
+  if (!response.ok) {
+    throw new AdminApiError("Failed to export customer order history.", response.status);
+  }
+  const csv = await response.text();
+  const blob = new Blob([csv.startsWith("\uFEFF") ? csv : "\uFEFF" + csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const fileName = parseContentDispositionFileName(
+    response.headers.get("content-disposition"),
+    preferredFileName ?? `customer_${id}_orders.csv`
+  );
+  triggerBrowserFileDownload(blob, fileName);
+}
+
+export async function downloadCustomerOrderHistoryPdf(
+  id: number,
+  preferredFileName?: string
+): Promise<void> {
+  const fileName = preferredFileName ?? `customer_${id}_orders.pdf`;
+
+  if (typeof document !== "undefined") {
+    const response = await adminApiFetch(`/api/admin/customers/${id}/orders/export/pdf`, {
+      headers: { Accept: "application/pdf" },
+    });
+    if (!response.ok) {
+      throw new AdminApiError("Failed to download customer order history PDF.", response.status);
+    }
+    const blob = await response.blob();
+    const resolvedName = parseContentDispositionFileName(
+      response.headers.get("content-disposition"),
+      fileName
+    );
+    triggerBrowserFileDownload(blob, resolvedName);
+    return;
+  }
+
+  const FileSystem = await import("expo-file-system/legacy");
+  const Sharing = await import("expo-sharing");
+  const token = getAdminToken();
+  if (!token) {
+    throw new AdminApiError("Not signed in. Please log in again.", 401);
+  }
+
+  const url = `${resolveAdminApiBaseUrl()}/api/admin/customers/${id}/orders/export/pdf`;
+  const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!directory) {
+    throw new AdminApiError("Unable to access local storage for PDF download.");
+  }
+
+  const fileUri = `${directory}${fileName}`;
+  const result = await FileSystem.downloadAsync(url, fileUri, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/pdf",
+    },
+  });
+
+  if (result.status < 200 || result.status >= 300) {
+    throw new AdminApiError("Failed to download customer order history PDF.", result.status);
+  }
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(result.uri, {
+      mimeType: "application/pdf",
+      dialogTitle: fileName,
+      UTI: "com.adobe.pdf",
+    });
+    return;
+  }
+
+  throw new AdminApiError("Sharing is not available on this device.");
 }
 
 // ── Analytics UI types (matches customerAnalytics.tsx) ──────────────────────
@@ -211,11 +328,12 @@ export function mapApiAnalyticsToUi(raw: Record<string, unknown>): CustomerAnaly
   const recentOrders: AnalyticsRecentOrder[] = Array.isArray(raw.recentOrders)
     ? raw.recentOrders.map((item) => {
         const row = item as Record<string, unknown>;
-        const id = str(row.id);
+        const id = str(row.id ?? row.orderId);
+        const productName = str(row.productName ?? row.product_name);
         return {
           id,
           orderNumber: str(row.orderNumber, id),
-          productName: str(row.productName, "—"),
+          productName: productName || "—",
           date: str(row.date),
           amount: num(row.amount),
           status: orderStatus(row.status),

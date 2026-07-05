@@ -489,6 +489,12 @@ type RecentOrder = {
   status: "Delivered" | "Processing" | "Cancelled" | "Returned" | "Replacement";
   payment: string;
 };
+
+function openOrderDetails(router: ReturnType<typeof useRouter>, orderId: string | number) {
+  const id = Number(orderId);
+  if (!id || Number.isNaN(id)) return;
+  router.push(`/orderDetails?orderId=${id}`);
+}
 type SectionId =
   | "overview"
   | "analytics"
@@ -3574,22 +3580,17 @@ export default function CustomerAnalyticsScreen() {
                           <TouchableOpacity
                             activeOpacity={0.7}
                             style={{ flex: 1.6 }}
-                            onPress={() =>
-                              router.push({
-                                pathname: "/orderDetails",
-                                params: { orderId: o.id },
-                              })
-                            }
+                            onPress={() => openOrderDetails(router, o.id)}
                           >
                             <Text style={s.orderIdText} numberOfLines={1}>
                               {o.orderNumber}
                             </Text>
                           </TouchableOpacity>
                           <Text
-                            style={[s.orderTableCell, { flex: 2.2 }]}
-                            numberOfLines={1}
+                            style={[s.orderTableCell, { flex: 2.2, color: text, fontWeight: "600" }]}
+                            numberOfLines={2}
                           >
-                            {o.productName}
+                            {o.productName || "—"}
                           </Text>
                           <Text style={s.orderTableCell}>{o.date}</Text>
                           <Text
@@ -3608,12 +3609,7 @@ export default function CustomerAnalyticsScreen() {
                             <TouchableOpacity
                               style={s.eyeBtn}
                               activeOpacity={0.8}
-                              onPress={() =>
-                                router.push({
-                                  pathname: "/orderDetails",
-                                  params: { orderId: o.id },
-                                })
-                              }
+                              onPress={() => openOrderDetails(router, o.id)}
                             >
                               <EyeIcon size={14} />
                             </TouchableOpacity>
@@ -3629,12 +3625,7 @@ export default function CustomerAnalyticsScreen() {
                         key={o.id}
                         activeOpacity={0.8}
                         style={s.orderMobileCard}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/orderDetails",
-                            params: { orderId: o.id },
-                          })
-                        }
+                        onPress={() => openOrderDetails(router, o.id)}
                       >
                         <View style={s.omTop}>
                           <Text style={s.omId} numberOfLines={1}>
@@ -3649,9 +3640,9 @@ export default function CustomerAnalyticsScreen() {
                               fontWeight: "600",
                               color: text,
                             }}
-                            numberOfLines={1}
+                            numberOfLines={2}
                           >
-                            {o.productName}
+                            {o.productName || "—"}
                           </Text>
                         </View>
                         <View style={s.omRow}>

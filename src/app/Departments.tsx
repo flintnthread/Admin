@@ -1,6 +1,7 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDate } from "@/lib/format";
 import type { Department as ApiDepartment } from "@/lib/api/types";
 import {
     createDepartment,
@@ -99,7 +100,7 @@ function mapApiDepartment(d: ApiDepartment): Department {
         name: d.name ?? "",
         description: d.description ?? "",
         jobs: Number(d.jobCount ?? 0),
-        createdAt: "—",
+        createdAt: formatDate(d.createdAt),
         status: d.active !== false ? "Active" : "Inactive",
     };
 }

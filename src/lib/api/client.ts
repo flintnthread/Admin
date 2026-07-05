@@ -98,6 +98,7 @@ export async function adminApiFetch(path: string, init?: RequestOptions): Promis
 }
 
 export async function adminApiRequest<T>(path: string, init?: RequestOptions): Promise<T> {
+  const auth = init?.auth !== false;
   const { url, headers } = await buildAdminRequest(path, init);
 
   let res: Response;
@@ -133,6 +134,9 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
 
   const contentType = res.headers.get("content-type") ?? "";
   const raw = await res.text();
+  if (!raw.trim()) {
+    return undefined as T;
+  }
   if (!contentType.includes("application/json") && raw.trimStart().startsWith("<")) {
     throw new AdminApiError(
       `Admin API returned HTML instead of JSON at ${url}. Expected JSON from https://flintnthread.online/api/admin/...`,

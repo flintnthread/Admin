@@ -89,6 +89,7 @@ type TrackingEvent = {
   time?: string;
   location?: string;
   description: string;
+  status?: OrderStatus;
 };
 
 type ApiOrderItem = {
@@ -154,6 +155,7 @@ type ShiprocketInfo = {
 
 type UIOrder = {
   id: string;
+  orderNumber: string;
   date: string;
   status: OrderStatus;
   paymentMethod: string;
@@ -380,6 +382,17 @@ function ProductThumb({ uri, size = 44 }: { uri?: string; size?: number }) {
   );
 }
 
+function formatOrderNumber(orderNumber?: string, id?: number): string {
+  if (orderNumber?.trim()) {
+    const raw = orderNumber.trim();
+    return raw.startsWith("#") ? raw : `#${raw}`;
+  }
+  if (id != null && !Number.isNaN(id)) {
+    return `#${id}`;
+  }
+  return "—";
+}
+
 function mapStatusHistoryEntry(entry: NonNullable<OrderDetail["statusHistory"]>[number]): StatusHistory {
   return {
     status: normalizeStatus(entry.status),
@@ -389,18 +402,48 @@ function mapStatusHistoryEntry(entry: NonNullable<OrderDetail["statusHistory"]>[
   };
 }
 
-function buildTrackingTimeline(history: StatusHistory[]): TrackingEvent[] {
-  return [...history].reverse().map((entry) => {
+function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): TrackingEvent[] {
+  const events: TrackingEvent[] = [...history].reverse().map((entry) => {
     const [datePart, timePart] = entry.date.includes(",")
       ? entry.date.split(",").map((part) => part.trim())
       : [entry.date, ""];
+    const note = entry.comment?.trim();
+    const description =
+      note && note.toLowerCase() !== entry.status.toLowerCase()
+        ? `${entry.status} — ${note}`
+        : entry.status;
     return {
       date: datePart,
       time: timePart,
       location: entry.by,
-      description: entry.comment || entry.status,
+      description,
+      status: entry.status,
     };
   });
+
+  const shipStatus = detail?.shiprocketStatus?.trim();
+  const shipSynced = detail?.shiprocketSyncedAt ?? detail?.shiprocketPushedAt;
+  if (shipStatus && shipStatus !== "—") {
+    const syncedLabel = formatDateTimeWithTime(shipSynced);
+    const [datePart, timePart] = syncedLabel.includes(",")
+      ? syncedLabel.split(",").map((part) => part.trim())
+      : [syncedLabel, ""];
+    const shipEvent: TrackingEvent = {
+      date: datePart,
+      time: timePart,
+      location: detail?.shiprocketCourierName?.trim() || "ShipRocket",
+      description: `Shipment: ${shipStatus}`,
+      status: "Processing",
+    };
+    const duplicate = events.some((event) =>
+      event.description.toLowerCase().includes(shipStatus.toLowerCase())
+    );
+    if (!duplicate) {
+      events.unshift(shipEvent);
+    }
+  }
+
+  return events;
 }
 
 function mapApiOrderToUi(detail: OrderDetail): UIOrder {
@@ -430,9 +473,8 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
   const paymentStatus = formatPaymentStatus(detail.paymentStatus);
 
   return {
-    id: detail.orderNumber
-      ? detail.orderNumber.replace(/^#/, "")
-      : String(detail.id ?? ""),
+    id: String(detail.id ?? ""),
+    orderNumber: formatOrderNumber(detail.orderNumber, detail.id),
     date: formatDateTimeWithTime(detail.createdAt),
     status: normalizeStatus(detail.orderStatus),
     paymentMethod: detail.paymentMethod ?? "—",
@@ -467,7 +509,7 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
       synced: formatDateTimeWithTime(detail.shiprocketSyncedAt ?? detail.shiprocketPushedAt),
       url: detail.shiprocketTrackingUrl,
     },
-    tracking: buildTrackingTimeline(history),
+    tracking: buildTrackingTimeline(history, detail),
     items,
     subtotal,
     shippingCost,
@@ -485,6 +527,7 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
 
 const INITIAL_ORDER: UIOrder = {
   id: "",
+  orderNumber: "—",
   date: "—",
   status: "Pending",
   paymentMethod: "—",
@@ -1002,7 +1045,8 @@ export default function OrderDetailScreen() {
   const [syncing, setSyncing] = useState(false);
   const px = isMobile ? 14 : isTablet ? 20 : 28;
 
-  const displayOrderId = orderId ?? order.id;
+  const displayOrderId = order.id || orderId || "—";
+  const displayOrderNumber = order.orderNumber || "—";
 
   const loadOrder = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -1040,14 +1084,19 @@ export default function OrderDetailScreen() {
   // Sync animation
   const syncSpinAnim = useRef(new Animated.Value(0)).current;
   const applyStatusUpdate = useCallback(
-    async (nextStatus: OrderStatus, comment?: string) => {
+    async (nextStatus: OrderStatus, comment?: string, notify = false) => {
       if (!orderId) return;
       const id = Number(orderId);
       if (Number.isNaN(id)) return;
 
       setStatusSaving(true);
       try {
-        const updated = await updateOrderStatus(id, uiStatusToBackend(nextStatus), comment);
+        const updated = await updateOrderStatus(
+          id,
+          uiStatusToBackend(nextStatus),
+          comment,
+          notify
+        );
         const uiOrder = mapApiOrderToUi(updated as OrderDetail);
         setOrder(uiOrder);
         setStatus(uiOrder.status);
@@ -1120,7 +1169,7 @@ export default function OrderDetailScreen() {
                 <Text style={[s.hTitle, { fontSize: isMobile ? 15 : 19 }]}>
                   Order Details
                 </Text>
-                <Text style={s.hSub}>#{order.id}</Text>
+                <Text style={s.hSub}>{displayOrderNumber}</Text>
               </View>
             </View>
           </View>
@@ -1166,7 +1215,7 @@ export default function OrderDetailScreen() {
                 {/* Order ID */}
                 <View style={[s.actionOrderId, isMobile && { flex: 1 }]}>
                   <Text style={s.actionOrderLbl}>Order</Text>
-                  <Text style={[s.actionOrderNum, isMobile && { fontSize: 13 }]} numberOfLines={1}>#{displayOrderId}</Text>
+                  <Text style={[s.actionOrderNum, isMobile && { fontSize: 13 }]} numberOfLines={1}>{displayOrderNumber}</Text>
                 </View>
 
                 {/* Buttons */}
@@ -1201,8 +1250,13 @@ export default function OrderDetailScreen() {
                 <View style={s.cardBody}>
                   <InfoRow
                     label="Order ID"
-                    value={`#${displayOrderId}`}
+                    value={displayOrderId}
                     valueStyle={{ color: C.primary, fontWeight: "700" }}
+                  />
+                  <InfoRow
+                    label="Order Number"
+                    value={displayOrderNumber}
+                    valueStyle={{ fontWeight: "600" }}
                   />
                   <InfoRow label="Order Date" value={order.date} />
                   <InfoRow
@@ -1397,7 +1451,7 @@ export default function OrderDetailScreen() {
                     </Text>
                   ) : (
                     order.tracking.map((ev, idx) => (
-                    <View key={idx} style={s.tlItem}>
+                    <View key={`${ev.date}-${ev.description}-${idx}`} style={s.tlItem}>
                       {/* Line */}
                       <View style={s.tlLeft}>
                         <View style={[s.tlDot, idx === 0 && s.tlDotActive]} />
@@ -1407,6 +1461,11 @@ export default function OrderDetailScreen() {
                       </View>
                       {/* Content */}
                       <View style={s.tlContent}>
+                        {ev.status ? (
+                          <View style={{ marginBottom: 6 }}>
+                            <StatusBadge status={ev.status} />
+                          </View>
+                        ) : null}
                         <Text style={s.tlDesc}>{ev.description}</Text>
                         <Text style={s.tlLocation}>{ev.location}</Text>
                         <Text style={s.tlDateTime}>
@@ -1786,7 +1845,11 @@ export default function OrderDetailScreen() {
                 style={[s.modalSaveBtn, statusSaving && { opacity: 0.7 }]}
                 onPress={async () => {
                   if (statusSaving) return;
-                  await applyStatusUpdate(newStatus, statusComment.trim() || undefined);
+                  await applyStatusUpdate(
+                    newStatus,
+                    statusComment.trim() || undefined,
+                    notifyCustomer
+                  );
                   setUpdateModalVisible(false);
                   setStatusComment("");
                   setNotifyCustomer(false);

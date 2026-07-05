@@ -75,9 +75,9 @@ export function mapPendingProfileToApprovalRow(
 }
 
 function mapProductStatus(status?: string): "pending" | "approved" | "rejected" | "review" {
-  const raw = (status ?? "pending").toLowerCase();
+  const raw = (status ?? "pending").toLowerCase().replace(/\s+/g, "_");
   if (raw === "active" || raw === "approved") return "approved";
-  if (raw === "rejected") return "rejected";
+  if (raw === "rejected" || raw === "inactive") return "rejected";
   if (raw === "under_review" || raw === "review") return "review";
   return "pending";
 }
@@ -117,7 +117,7 @@ export function mapProductListToApprovalRow(
     sku: p.sku ?? "—",
     seller: p.sellerName ?? `Seller #${p.sellerId ?? "—"}`,
     sellerEmail: p.sellerEmail ?? "",
-    status: mapProductStatus(p.status),
+    status: mapProductStatus(p.status ?? (p as { displayStatus?: string }).displayStatus),
     submittedAt: formatDate(p.createdAt),
     image: resolveMediaUrl(p.imageUrl),
     category: categoryLabel,

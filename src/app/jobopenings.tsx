@@ -75,9 +75,10 @@ interface Job {
 }
 
 function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
-    const statusRaw = (j.status ?? "active").toLowerCase();
+    const statusRaw = (j.status ?? "open").toLowerCase();
     const status: JobStatus =
-        statusRaw === "paused" || statusRaw === "inactive" ? "Paused" : statusRaw === "closed" ? "Closed" : "Active";
+        statusRaw === "paused" || statusRaw === "inactive" ? "Paused" :
+            statusRaw === "closed" ? "Closed" : "Active";
     const typeRaw = (j.employmentType ?? "full time").toLowerCase();
     const type: JobType =
         typeRaw.includes("part") ? "Part Time" :
@@ -1355,11 +1356,14 @@ const JobOpeningsScreen: React.FC = () => {
 
     const handleSave = async (updated: Job) => {
         try {
+            const apiStatus =
+                updated.status === "Paused" ? "paused" :
+                    updated.status === "Closed" ? "closed" : "open";
             const payload = {
                 title: updated.title,
                 location: updated.location,
                 employmentType: updated.type,
-                status: updated.status.toLowerCase(),
+                status: apiStatus,
                 departmentId: deptIdByName[updated.department],
                 description: updated.description,
                 requirements: updated.requirements,
@@ -1378,7 +1382,7 @@ const JobOpeningsScreen: React.FC = () => {
             setEditModalVisible(false);
             setEditingJob(null);
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
+            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e, "Failed to save job opening.") });
         }
     };
 
@@ -1390,7 +1394,7 @@ const JobOpeningsScreen: React.FC = () => {
             setAlertConfig({ visible: true, title: "Deleted!", message: "Job opening has been deleted." });
             setDeleteTarget(null);
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
+            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e, "Failed to delete job opening.") });
         }
     };
 
