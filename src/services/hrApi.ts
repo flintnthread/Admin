@@ -1,6 +1,18 @@
 import { adminApiRequest } from "@/lib/api/client";
 import type { Department, JobApplication, JobOpening, PageResponse } from "@/lib/api/types";
 
+function normalizePageResponse<T>(raw: unknown): PageResponse<T> {
+  const page = (raw ?? {}) as Record<string, unknown>;
+  const items = (page.items ?? page.content ?? []) as T[];
+  return {
+    items: Array.isArray(items) ? items : [],
+    totalElements: Number(page.totalElements ?? page.total ?? items.length ?? 0),
+    totalPages: Number(page.totalPages ?? 0),
+    page: Number(page.page ?? 0),
+    size: Number(page.size ?? items.length ?? 0),
+  };
+}
+
 export async function fetchDepartments(): Promise<Department[]> {
   return adminApiRequest("/api/admin/departments");
 }
@@ -38,7 +50,8 @@ export async function fetchJobApplications(jobId?: number, page = 0, size = 20):
   if (jobId != null) q.set("jobId", String(jobId));
   q.set("page", String(page));
   q.set("size", String(size));
-  return adminApiRequest(`/api/admin/job-applications?${q}`);
+  const raw = await adminApiRequest<unknown>(`/api/admin/job-applications?${q}`);
+  return normalizePageResponse<JobApplication>(raw);
 }
 
 export async function updateJobApplicationStatus(id: number, status: string): Promise<JobApplication> {

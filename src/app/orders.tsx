@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, fetchOrderExportCsv, type OrderInvoice, type OrderStats } from "@/services/orderApi";
+import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportCsv, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -361,24 +361,12 @@ async function downloadInvoiceFile(invoice: OrderInvoice) {
   const fileName = `${safeName}.pdf`;
 
   if (invoice.orderId) {
-    if (Platform.OS === "web") {
+    try {
       await downloadOrderInvoicePdf(invoice.orderId, fileName);
       return;
+    } catch (err) {
+      console.error("Invoice PDF download failed, using HTML fallback:", err);
     }
-
-    const html = buildInvoiceDownloadHtml(invoice);
-    const { uri } = await Print.printToFileAsync({ html });
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: "application/pdf",
-        dialogTitle: fileName,
-        UTI: "com.adobe.pdf",
-      });
-      return;
-    }
-
-    Alert.alert("Invoice saved", uri);
-    return;
   }
 
   if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -397,7 +385,9 @@ async function downloadInvoiceFile(invoice: OrderInvoice) {
   }
 
   const html = buildInvoiceDownloadHtml(invoice);
-  const { uri } = await Print.printToFileAsync({ html });
+  const { printToFileAsync } = await import("expo-print");
+  const { uri } = await printToFileAsync({ html });
+  const Sharing = await import("expo-sharing");
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: "application/pdf",
@@ -1798,74 +1788,133 @@ const ActionMenu = ({
 // per-item HSN/Qty/Price/CGST/SGST/IGST/Total + TOTAL row → RETURN ADDRESS →
 // footer GST line → auto-generated note → Powered by.
 const ShippingLabelModal = ({
-  order,
+  orderId,
   visible,
   onClose,
 }: {
-  order: Order | null;
+  orderId: number | null;
   visible: boolean;
   onClose: () => void;
 }) => {
   const { width } = useWindowDimensions();
   const sheetWidth = Math.min(width - 32, 520);
+  const [label, setLabel] = useState<OrderShippingLabel | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Deterministic bar pattern from order number — visual only, not scannable
-  // Must be declared before any conditional return (Rules of Hooks)
+  useEffect(() => {
+    if (!visible || !orderId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchOrderShippingLabel(orderId)
+      .then((data) => {
+        if (!cancelled) setLabel(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, "Failed to load shipping label."));
+          setLabel(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, orderId]);
+
   const bars = useMemo(() => {
-    if (!order) return [];
+    const seedSource = label?.orderNumber ?? String(orderId ?? "");
     let seed = 0;
-    for (const ch of order.orderNumber)
-      seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
+    for (const ch of seedSource) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
     return Array.from({ length: 34 }, () => {
       seed = (seed * 1103515245 + 12345) % 2147483648;
       return 35 + (seed % 65);
     });
-  }, [order]);
+  }, [label?.orderNumber, orderId]);
 
-  if (!order) return null;
-  const firstGroup = order.sellerGroups[0];
+  if (!visible) return null;
+
+  const firstGroup = label?.sellerGroups?.[0];
+  const shipping = label?.shipping;
   const trackingId =
-    (firstGroup?.trackingId ?? order.orderNumber.replace(/\D/g, "")) || "—";
-  const invoiceNum = `INV-${order.orderNumber.replace(/\D/g, "")}`;
-  const products = firstGroup?.products ?? [];
-  const isIntraState = !!order.isIntraState;
+    label?.awbCode ??
+    label?.trackingId ??
+    (label?.orderNumber ? label.orderNumber.replace(/\D/g, "") : "—");
+  const invoiceNum = label?.invoiceNumber ?? `INV-${trackingId}`;
+  const products = flattenInvoiceLineItems(label ?? { sellerGroups: [] });
+  const isIntraState = Boolean(label?.isIntraState);
+  const orderNumber = label?.orderNumber ?? "—";
+  const orderDate = formatInvoiceDate(label?.orderDate ?? label?.invoiceDate);
+  const paymentMethod = String(label?.payment?.method ?? "").toLowerCase();
+  const paymentIsCod = paymentMethod.includes("cod") || paymentMethod.includes("cash");
+  const grandTotalAmount = toNumber(label?.totals?.grandTotal);
 
   const handlePrint = () => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       window.print();
     } else {
-      Alert.alert("Print", `Sending ${order.orderNumber} label to printer`);
+      Alert.alert("Print", `Sending ${orderNumber} label to printer`);
     }
   };
 
-  // Per-item GST split — same logic as the invoice: IGST for inter-state,
-  // CGST+SGST for intra-state, derived from each product's own tax%.
+  const handleDownload = async () => {
+    if (!orderId || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadOrderShippingLabelPdf(
+        orderId,
+        `shipping-label-${orderId}.pdf`
+      );
+    } catch (err) {
+      Alert.alert("Download failed", getApiErrorMessage(err, "Could not download shipping label."));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const lineItems = products.map((p) => {
-    const unitPrice = p.price ?? 0;
-    const qty = p.qty ?? 1;
-    const taxPercent = p.taxPercent ?? 0;
-    const lineSubtotal = unitPrice * qty;
-    const taxAmount = (lineSubtotal * taxPercent) / 100;
+    const unitPrice = toNumber(p.unitPrice);
+    const qty = toNumber(p.qty, 1);
+    const taxPercent = toNumber(p.taxPercent);
+    const lineSubtotal = toNumber(p.lineSubtotal, unitPrice * qty);
+    const taxAmount = toNumber(p.taxAmount, (lineSubtotal * taxPercent) / 100);
     const cgst = isIntraState ? taxAmount / 2 : 0;
     const sgst = isIntraState ? taxAmount / 2 : 0;
     const igst = isIntraState ? 0 : taxAmount;
-    const lineTotal = lineSubtotal + taxAmount;
-    return { ...p, qty, unitPrice, taxPercent, cgst, sgst, igst, lineTotal };
+    const lineTotal = toNumber(p.lineTotal, lineSubtotal + taxAmount);
+    return {
+      ...p,
+      id: String(p.id ?? p.productId ?? p.name),
+      name: p.name ?? "Product",
+      qty,
+      unitPrice,
+      taxPercent,
+      cgst,
+      sgst,
+      igst,
+      lineTotal,
+    };
   });
 
   const totalCgst = lineItems.reduce((sum, li) => sum + li.cgst, 0);
   const totalSgst = lineItems.reduce((sum, li) => sum + li.sgst, 0);
   const totalIgst = lineItems.reduce((sum, li) => sum + li.igst, 0);
-  const grandTotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0);
+  const grandTotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0) || grandTotalAmount;
 
-  const dims = order.dimensionsCm;
+  const dims = label?.dimensionsCm;
   const dimensionsText = dims
-    ? `${dims.l.toFixed(1)}cm × ${dims.w.toFixed(1)}cm × ${dims.h.toFixed(1)}cm`
+    ? `${toNumber(dims.l).toFixed(1)}cm × ${toNumber(dims.w).toFixed(1)}cm × ${toNumber(dims.h).toFixed(1)}cm`
     : "—";
   const weightText =
-    typeof order.weightKg === "number" ? `${order.weightKg.toFixed(2)} kg` : "—";
+    typeof label?.weightKg === "number" && label.weightKg > 0
+      ? `${label.weightKg.toFixed(2)} kg`
+      : "—";
 
-  const sellerAddr = firstGroup?.seller.address;
+  const sellerAddr = firstGroup?.seller?.address;
   const sellerAddressLine = [
     sellerAddr?.line1,
     [sellerAddr?.city, sellerAddr?.state].filter(Boolean).join(", "),
@@ -1877,6 +1926,8 @@ const ShippingLabelModal = ({
   const gstFooterLabel = isIntraState
     ? `CGST+SGST: ${fmtCur(totalCgst + totalSgst)}`
     : `IGST: ${fmtCur(totalIgst)}`;
+
+  const customerAddress = [shipping?.line1, shipping?.line2].filter(Boolean).join(", ");
 
   return (
     <Modal
@@ -1901,6 +1952,20 @@ const ShippingLabelModal = ({
           contentContainerStyle={s.docScroll}
           showsVerticalScrollIndicator={false}
         >
+          {loading ? (
+            <View style={s.docLoadingWrap}>
+              <ActivityIndicator size="large" color={C.orange} />
+              <Text style={s.docLoadingText}>Loading shipping label…</Text>
+            </View>
+          ) : error ? (
+            <View style={s.docLoadingWrap}>
+              <Text style={s.docErrorText}>{error}</Text>
+            </View>
+          ) : !label ? (
+            <View style={s.docLoadingWrap}>
+              <Text style={s.docErrorText}>Shipping label not available.</Text>
+            </View>
+          ) : (
           <View style={[s.labelSheet, { width: sheetWidth }]}>
             {/* Brand header + title */}
             <View style={s.labelBrandHeader}>
@@ -1914,7 +1979,7 @@ const ShippingLabelModal = ({
 
             {/* Courier bar */}
             <View style={s.labelCourierBar}>
-              <Text style={s.labelCourierBarText}>Courier</Text>
+              <Text style={s.labelCourierBarText}>{label.courierName ?? "Courier"}</Text>
             </View>
 
             {/* AWB barcode + QR side-by-side */}
@@ -1929,38 +1994,42 @@ const ShippingLabelModal = ({
                 <Text style={s.labelAwbNumber}>{trackingId}</Text>
               </View>
               <View style={s.labelQrBox}>
-                <QrPlaceholderIcon size={62} />
+                {label.qrCode?.imageDataUrl ? (
+                  <Image
+                    source={{ uri: label.qrCode.imageDataUrl }}
+                    style={{ width: 62, height: 62 }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <QrPlaceholderIcon size={62} />
+                )}
               </View>
             </View>
 
             {/* Ship To */}
             <View style={s.labelSection}>
               <Text style={s.labelSectionLabel}>SHIP TO</Text>
-              <Text style={s.labelShipName}>{order.customer.name}</Text>
-              {order.customer.address && (
-                <Text style={s.labelShipAddress}>{order.customer.address}</Text>
-              )}
+              <Text style={s.labelShipName}>{shipping?.name ?? "—"}</Text>
+              {customerAddress ? (
+                <Text style={s.labelShipAddress}>{customerAddress}</Text>
+              ) : null}
               <Text style={s.labelShipAddress}>
-                {[order.customer.city, order.customer.state]
-                  .filter(Boolean)
-                  .join(", ")}
+                {[shipping?.city, shipping?.state].filter(Boolean).join(", ")}
               </Text>
-              {order.customer.pincode && (
+              {shipping?.pincode ? (
                 <Text style={s.labelShipAddress}>
                   <Text style={{ fontWeight: "800" }}>PIN: </Text>
-                  {order.customer.pincode}
-                  {order.customer.phone
-                    ? `  |  Ph: ${order.customer.phone}`
-                    : ""}
+                  {shipping.pincode}
+                  {shipping.phone ? `  |  Ph: ${shipping.phone}` : ""}
                 </Text>
-              )}
+              ) : null}
             </View>
 
             {/* Meta grid: Order #, Invoice, Date, Payment, Weight, Dimensions */}
             <View style={s.labelMetaList}>
               <View style={s.labelMetaRow}>
                 <Text style={s.labelMetaKList}>Order #:</Text>
-                <Text style={s.labelMetaVList}>{order.orderNumber}</Text>
+                <Text style={s.labelMetaVList}>{orderNumber}</Text>
               </View>
               <View style={s.labelMetaRow}>
                 <Text style={s.labelMetaKList}>Invoice:</Text>
@@ -1968,13 +2037,12 @@ const ShippingLabelModal = ({
               </View>
               <View style={s.labelMetaRow}>
                 <Text style={s.labelMetaKList}>Date:</Text>
-                <Text style={s.labelMetaVList}>{order.date}</Text>
+                <Text style={s.labelMetaVList}>{orderDate}</Text>
               </View>
               <View style={s.labelMetaRow}>
                 <Text style={s.labelMetaKList}>Payment:</Text>
                 <Text style={s.labelMetaVList}>
-                  {order.paymentType === "Cash on Delivery" ? "COD" : "Prepaid"}{" "}
-                  {fmtCur(grandTotal)}
+                  {paymentIsCod ? "COD" : "Prepaid"} {fmtCur(grandTotal)}
                 </Text>
               </View>
               <View style={s.labelMetaRow}>
@@ -2120,7 +2188,7 @@ const ShippingLabelModal = ({
             <View style={s.labelSection}>
               <Text style={s.labelSectionLabel}>RETURN ADDRESS</Text>
               <Text style={s.labelReturnName}>
-                {firstGroup?.seller.name?.toUpperCase() ?? "SELLER"}
+                {firstGroup?.seller?.name?.toUpperCase() ?? "SELLER"}
               </Text>
               <Text style={s.labelReturnAddr}>
                 {sellerAddressLine || "Registered seller address on file"}
@@ -2142,17 +2210,30 @@ const ShippingLabelModal = ({
               </Text>
             </View>
           </View>
+          )}
         </ScrollView>
 
-        {/* Exactly 2 buttons: Print, Close */}
+        {/* Print, Download, Close */}
         <View style={s.docActionBar}>
           <TouchableOpacity
-            style={s.docBtnPrint}
+            style={[s.docBtnPrint, (loading || !label) && { opacity: 0.6 }]}
             onPress={handlePrint}
             activeOpacity={0.85}
+            disabled={loading || !label}
           >
             <PrintIcon color={C.white} />
             <Text style={s.docBtnPrintText}>Print</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.docBtnDownload, (loading || !label || downloading) && { opacity: 0.6 }]}
+            onPress={() => void handleDownload()}
+            activeOpacity={0.85}
+            disabled={loading || !label || downloading}
+          >
+            <DownloadIcon color={C.white} size={15} />
+            <Text style={s.docBtnDownloadText}>
+              {downloading ? "Downloading…" : "Download"}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={s.docBtnClose}
@@ -3114,7 +3195,9 @@ export default function OrdersScreen() {
 
   const handleView = useCallback(
     (o: Order) => {
-      router.push({ pathname: "/orderDetails", params: { orderId: o.id } });
+      const id = Number(o.id);
+      if (!id || Number.isNaN(id)) return;
+      router.push(`/orderDetails?orderId=${id}`);
     },
     [router],
   );
@@ -3148,24 +3231,16 @@ export default function OrdersScreen() {
   const filtered = orders;
 
   const handleExportCSV = useCallback(async () => {
-    if (Platform.OS !== "web") {
-      Alert.alert("Export", "CSV export is currently supported on web only.");
-      return;
-    }
     try {
-      const csv = await fetchOrderExportCsv({
-        search: searchQuery || undefined,
-        status: mapStatusFilterToApi(statusFilter),
-        paymentMethod: mapPaymentFilterToApi(paymentFilter),
-        sort: sortOption,
-      });
-      const blob = new Blob([csv.startsWith("\uFEFF") ? csv : "\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadOrderExportCsv(
+        {
+          search: searchQuery || undefined,
+          status: mapStatusFilterToApi(statusFilter),
+          paymentMethod: mapPaymentFilterToApi(paymentFilter),
+          sort: sortOption,
+        },
+        `orders_${new Date().toISOString().slice(0, 10)}.csv`
+      );
     } catch (e) {
       Alert.alert("Export failed", e instanceof Error ? e.message : "Could not export orders.");
     }
@@ -3229,18 +3304,17 @@ export default function OrdersScreen() {
               paddingHorizontal: 16,
             }}
           >
-            <View
-              style={[
-                s.headerBlock,
-                {
-                  paddingTop: Platform.OS === "ios" ? 50 : 20,
-                },
-                isMobile && { paddingHorizontal: 16 }
-              ]}
-            >
               <View
-                style={[s.headerTop, { paddingHorizontal: isMobile ? 0 : 22 }]}
+              style={[
+                  s.headerBlock,
+                  {
+                    paddingTop: Platform.OS === "ios" ? (isMobile ? 40 : 50) : (isMobile ? 12 : 20),
+                    paddingBottom: isMobile ? 44 : 48,
+                  },
+                  isMobile && { paddingHorizontal: 16, paddingVertical: 16 }
+                ]}
               >
+              <View style={s.headerTop}>
                 <View style={s.headerLeft}>
                   <View style={s.headerIcon}>
                     <OrderBoxIcon color={C.white} />
@@ -3253,7 +3327,10 @@ export default function OrdersScreen() {
                     >
                       Orders Management
                     </Text>
-                    <Text style={s.headerSub} numberOfLines={1}>
+                    <Text 
+                      style={[s.headerSub, isMobile && { color: "rgba(255,255,255,0.8)", fontSize: 11 }]} 
+                      numberOfLines={isMobile ? 2 : 1}
+                    >
                       Manage and track all customer orders
                     </Text>
                   </View>
@@ -3273,7 +3350,6 @@ export default function OrdersScreen() {
               </View>
             </View>
 
-            {/* ── Overlapping stat cards ── */}
             <View
               style={[
                 s.statCardsWrap,
@@ -3281,26 +3357,38 @@ export default function OrdersScreen() {
                 isMobile && s.statCardsWrapMobile,
               ]}
             >
-              {statCards.map((stat, i) => (
-                <View key={i} style={[s.statCard, isMobile && { width: '48%', flex: undefined, minWidth: undefined, maxWidth: undefined }]}>
-                  <View
-                    style={[s.statIconBox, { backgroundColor: stat.iconBg }]}
-                  >
-                    {stat.icon}
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text
-                      style={[s.statValue, { color: stat.valueColor }]}
-                      numberOfLines={1}
-                    >
-                      {stat.value}
-                    </Text>
+              {statCards.map((stat, i) => {
+                if (isMobile) {
+                  return (
+                    <View key={i} style={s.statCardCompact}>
+                      <View style={[s.statCardIconBoxCompact, { backgroundColor: stat.iconBg }]}>
+                        {React.cloneElement(stat.icon as React.ReactElement<{ size: number }>, { size: 14 })}
+                      </View>
+                      <Text style={[s.statCardValueCompact, { color: stat.valueColor }]} numberOfLines={1}>
+                        {stat.value}
+                      </Text>
+                      <Text style={s.statCardLabelCompact} numberOfLines={1}>
+                        {stat.label}
+                      </Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View key={i} style={s.statCard}>
+                    <View style={s.statCardTop}>
+                      <View style={[s.statIconBox, { backgroundColor: stat.iconBg }]}>
+                        {stat.icon}
+                      </View>
+                      <Text style={[s.statValue, { color: stat.valueColor }]} numberOfLines={1}>
+                        {stat.value}
+                      </Text>
+                    </View>
                     <Text style={s.statLabel} numberOfLines={1}>
                       {stat.label}
                     </Text>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
 
@@ -3368,9 +3456,9 @@ export default function OrdersScreen() {
               />
             </View>
 
-            <View style={s.toolbarRight}>
+            <View style={[s.toolbarRight, isMobile && { width: '100%' }]}>
               <TouchableOpacity
-                style={s.paymentDrop}
+                style={[s.paymentDrop, isMobile && { flex: 1, justifyContent: "center" }]}
                 onPress={() => setPaymentVisible(true)}
                 activeOpacity={0.8}
               >
@@ -3381,7 +3469,7 @@ export default function OrdersScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={s.sortBtn}
+                style={[s.sortBtn, isMobile && { flex: 1, justifyContent: "center" }]}
                 onPress={() => setSortVisible(true)}
                 activeOpacity={0.8}
               >
@@ -3392,11 +3480,12 @@ export default function OrdersScreen() {
                 <ChevronDownIcon color={C.navy} />
               </TouchableOpacity>
 
-              <View style={s.viewToggle}>
+              <View style={[s.viewToggle, isMobile && { flex: 1, justifyContent: "center" }]}>
                 <TouchableOpacity
                   style={[
                     s.viewToggleBtn,
                     viewMode === "grid" && s.viewToggleBtnActive,
+                    isMobile && { flex: 1 }
                   ]}
                   onPress={() => setViewMode("grid")}
                   activeOpacity={0.8}
@@ -3407,6 +3496,7 @@ export default function OrdersScreen() {
                   style={[
                     s.viewToggleBtn,
                     viewMode === "list" && s.viewToggleBtnActive,
+                    isMobile && { flex: 1 }
                   ]}
                   onPress={() => setViewMode("list")}
                   activeOpacity={0.8}
@@ -3558,7 +3648,7 @@ export default function OrdersScreen() {
       )}
 
       <ShippingLabelModal
-        order={docModal === "label" ? docOrder : null}
+        orderId={docModal === "label" && docOrder ? Number(docOrder.id) : null}
         visible={docModal === "label"}
         onClose={handleCloseDoc}
       />
@@ -3579,7 +3669,7 @@ const s = StyleSheet.create({
   // ── Header — floating rounded card (all 4 corners) ──────────────────────────
   headerBlock: {
     backgroundColor: C.navyDeep,
-    paddingHorizontal: 32,
+    paddingHorizontal: 22,
     paddingVertical: 28,
     paddingBottom: 68,
     borderRadius: 22,
@@ -3596,12 +3686,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 11, flex: 1 },
   headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: C.orange,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -3629,19 +3719,17 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     gap: 8,
-    marginTop: -42,
+    marginTop: -32,
     marginBottom: 4,
   },
-  statCardsWrapMobile: { flexWrap: "wrap", gap: 8, marginTop: -26, justifyContent: "space-between" },
+  statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26, justifyContent: "center" },
   statCard: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
     minWidth: 130,
     maxWidth: 240,
     backgroundColor: C.card,
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: C.navyDeep,
@@ -3649,15 +3737,24 @@ const s = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
-    gap: 12,
+  },
+  statCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
   },
   statIconBox: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
+  statCardCompact: { flex: 1, alignItems: "center", backgroundColor: C.card, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 2, borderWidth: 1, borderColor: C.border, shadowColor: C.navyDeep, shadowOpacity: 0.06, shadowOffset: { width: 0, height: 3 }, shadowRadius: 6, elevation: 3, gap: 4 },
+  statCardIconBoxCompact: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  statCardValueCompact: { fontSize: 14, fontWeight: "800" },
+  statCardLabelCompact: { fontSize: 9, fontWeight: "600", color: C.textLight, textAlign: "center" },
   statValue: {
     fontSize: 18,
     fontWeight: "800",

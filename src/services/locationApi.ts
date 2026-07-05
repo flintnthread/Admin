@@ -11,6 +11,7 @@ export type LocationRow = {
   stateName?: string;
   cityId?: number;
   cityName?: string;
+  areaId?: number;
   parentId?: number;
   parentName?: string;
   active?: boolean;
@@ -63,103 +64,127 @@ export async function fetchLocationCounts(): Promise<LocationCounts> {
   return adminApiRequest("/api/admin/locations/counts");
 }
 
-// CRUD operations
-export async function createCountry(name: string): Promise<LocationRow> {
+export async function createCountry(
+  name: string,
+  code: string,
+  active = true
+): Promise<LocationRow> {
   return adminApiRequest("/api/admin/locations/countries", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, code, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function createState(countryId: number, name: string): Promise<LocationRow> {
+export async function createState(
+  countryId: number,
+  name: string,
+  active = true
+): Promise<LocationRow> {
   return adminApiRequest("/api/admin/locations/states", {
     method: "POST",
-    body: JSON.stringify({ countryId, name }),
+    body: JSON.stringify({ countryId, name, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function createCity(stateId: number, name: string): Promise<LocationRow> {
+export async function createCity(
+  stateId: number,
+  name: string,
+  active = true
+): Promise<LocationRow> {
   return adminApiRequest("/api/admin/locations/cities", {
     method: "POST",
-    body: JSON.stringify({ stateId, name }),
+    body: JSON.stringify({ stateId, name, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function createArea(cityId: number, name: string): Promise<LocationRow> {
+export async function createArea(
+  cityId: number,
+  name: string,
+  active = true
+): Promise<LocationRow> {
   return adminApiRequest("/api/admin/locations/areas", {
     method: "POST",
-    body: JSON.stringify({ cityId, name }),
+    body: JSON.stringify({ cityId, name, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function createPincode(areaId: number, pincode: string): Promise<LocationRow> {
+export async function createPincode(
+  areaId: number,
+  pincode: string,
+  active = true
+): Promise<LocationRow> {
   return adminApiRequest("/api/admin/locations/pincodes", {
     method: "POST",
-    body: JSON.stringify({ areaId, pincode }),
+    body: JSON.stringify({ areaId, pincode, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function updateCountry(id: number, name: string): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/countries/${id}`, {
+export async function updateCountry(
+  id: number,
+  name: string,
+  code: string,
+  active = true
+): Promise<void> {
+  await adminApiRequest(`/api/admin/locations/countries/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, code, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function updateState(id: number, name: string): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/states/${id}`, {
+export async function updateState(id: number, name: string, active = true): Promise<void> {
+  await adminApiRequest(`/api/admin/locations/states/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function updateCity(id: number, name: string): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/cities/${id}`, {
+export async function updateCity(id: number, name: string, active = true): Promise<void> {
+  await adminApiRequest(`/api/admin/locations/cities/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function updateArea(id: number, name: string): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/areas/${id}`, {
+export async function updateArea(id: number, name: string, active = true): Promise<void> {
+  await adminApiRequest(`/api/admin/locations/areas/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
-export async function updatePincode(id: number, pincode: string): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/pincodes/${id}`, {
+export async function updatePincode(id: number, pincode: string, active = true): Promise<void> {
+  await adminApiRequest(`/api/admin/locations/pincodes/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ pincode }),
+    body: JSON.stringify({ pincode, active, status: active ? "Active" : "Inactive" }),
   });
 }
 
 export async function deleteCountry(id: number): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/countries/${id}`, {
+  await adminApiRequest(`/api/admin/locations/countries/${id}`, {
     method: "DELETE",
   });
 }
 
 export async function deleteState(id: number): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/states/${id}`, {
+  await adminApiRequest(`/api/admin/locations/states/${id}`, {
     method: "DELETE",
   });
 }
 
 export async function deleteCity(id: number): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/cities/${id}`, {
+  await adminApiRequest(`/api/admin/locations/cities/${id}`, {
     method: "DELETE",
   });
 }
 
 export async function deleteArea(id: number): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/areas/${id}`, {
+  await adminApiRequest(`/api/admin/locations/areas/${id}`, {
     method: "DELETE",
   });
 }
 
 export async function deletePincode(id: number): Promise<void> {
-  return adminApiRequest(`/api/admin/locations/pincodes/${id}`, {
+  await adminApiRequest(`/api/admin/locations/pincodes/${id}`, {
     method: "DELETE",
   });
 }

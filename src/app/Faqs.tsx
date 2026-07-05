@@ -461,10 +461,12 @@ const FaqQuestionsScreen: React.FC = () => {
         try {
             setLoadError(null);
             const rows = await fetchFaqCategories();
-            const mapped = rows.map((r, i) => {
-                const cat = mapFaqCategoryRow(r, i);
-                return { id: cat.id, name: cat.name, icon: cat.icon, color: cat.color, slug: cat.slug };
-            });
+            const mapped = rows
+                .map((r, i) => {
+                    const cat = mapFaqCategoryRow(r, i);
+                    return { id: cat.id, name: cat.name, icon: cat.icon, color: cat.color, slug: cat.slug, status: cat.status };
+                })
+                .filter((cat) => cat.status === "Active");
             setCategories(mapped);
             if (mapped.length > 0) {
                 setSelectedCatId((prev) => (prev && mapped.some((c) => c.id === prev) ? prev : mapped[0].id));
@@ -598,29 +600,31 @@ const FaqQuestionsScreen: React.FC = () => {
                         {/* CATEGORY TABS */}
                         <View style={st.catSection}>
                             <Text style={st.sectionLabel}>SELECT CATEGORY</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={st.catScrollContent}>
-                                {categories.map(cat => {
-                                    const catQCount = questions.filter(q => q.categoryId === cat.id).length;
-                                    const isSelected = cat.id === selectedCatId;
-                                    
-                                    return (
-                                        <TouchableOpacity key={cat.id}
-                                            style={[st.catBtn,
-                                            { borderColor: isSelected ? NAVY : PRIMARY },
-                                            isSelected && { backgroundColor: NAVY }]}
-                                            onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}>
-                                            <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
-                                                <Feather name={getSafeIcon(cat) as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
-                                            </View>
-                                            <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
-                                            <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
-                                                <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : PRIMARY }]}>{catQCount}</Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </ScrollView>
+                            <View style={{ flex: 1 }}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={st.catScrollContent}>
+                                    {categories.map(cat => {
+                                        const catQCount = questions.filter(q => q.categoryId === cat.id).length;
+                                        const isSelected = cat.id === selectedCatId;
+
+                                        return (
+                                            <TouchableOpacity key={cat.id}
+                                                style={[st.catBtn,
+                                                { borderColor: isSelected ? NAVY : PRIMARY },
+                                                isSelected && { backgroundColor: NAVY }]}
+                                                onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}>
+                                                <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
+                                                    <Feather name={getSafeIcon(cat) as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
+                                                </View>
+                                                <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
+                                                <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
+                                                    <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : PRIMARY }]}>{catQCount}</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
                         </View>
 
                         {/* â”€â”€ SELECTED CATEGORY HERO â”€â”€ */}

@@ -101,8 +101,12 @@ function mapApplication(a: import('@/lib/api/types').JobApplication, index: numb
     status,
     avatar: initialsFromName(a.name),
     avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
-    experience: a.email ?? '—',
-    location: a.phone ?? '—',
+    experience: '—',
+    email: a.email ?? '—',
+    phone: a.phone ?? '—',
+    resumePath: a.resumePath ?? '',
+    coverLetter: a.coverLetter ?? '',
+    location: '—',
   };
 }
 
@@ -193,12 +197,12 @@ function ApplicationCard({
             <Text style={styles.metaChipText}>{item.department}</Text>
           </View>
           <View style={styles.metaChip}>
-            <BI name="geo-alt-fill" size={10} color={C.sub} />
-            <Text style={styles.metaChipText}>{item.location}</Text>
+            <BI name="envelope-fill" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.email}</Text>
           </View>
           <View style={styles.metaChip}>
-            <BI name="envelope-fill" size={10} color={C.sub} />
-            <Text style={styles.metaChipText}>{item.experience}</Text>
+            <BI name="telephone-fill" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.phone}</Text>
           </View>
         </View>
       </View>

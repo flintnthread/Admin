@@ -1,6 +1,18 @@
 import { adminApiRequest } from "@/lib/api/client";
 import type { PageResponse, ProductSummary } from "@/lib/api/types";
 
+function normalizePageResponse<T>(raw: unknown): PageResponse<T> {
+  const page = (raw ?? {}) as Record<string, unknown>;
+  const items = (page.items ?? page.content ?? []) as T[];
+  return {
+    items: Array.isArray(items) ? items : [],
+    totalElements: Number(page.totalElements ?? page.total ?? items.length ?? 0),
+    totalPages: Number(page.totalPages ?? 0),
+    page: Number(page.page ?? 0),
+    size: Number(page.size ?? items.length ?? 0),
+  };
+}
+
 export type ProductListRow = ProductSummary & {
   categoryName?: string;
   mainCategoryName?: string;
@@ -23,6 +35,8 @@ export type SellerRow = {
   storeName?: string;
   firstName?: string;
   lastName?: string;
+  fullName?: string;
+  businessName?: string;
   email?: string;
   status?: string;
 };
@@ -49,7 +63,8 @@ export async function fetchProducts(params?: {
   if (params?.subcategoryId != null) q.set("subcategoryId", String(params.subcategoryId));
   q.set("page", String(params?.page ?? 0));
   q.set("size", String(params?.size ?? 100));
-  return adminApiRequest(`/api/admin/products?${q}`);
+  const raw = await adminApiRequest<unknown>(`/api/admin/products?${q}`);
+  return normalizePageResponse<ProductListRow>(raw);
 }
 
 /** Products added through the admin catalog (not seller listings). */
@@ -67,7 +82,8 @@ export async function fetchProductCatalog(): Promise<{ categories: { id: number;
 }
 
 export async function fetchPendingProducts(page = 0, size = 20): Promise<PageResponse<ProductSummary>> {
-  return adminApiRequest(`/api/admin/products/pending?page=${page}&size=${size}`);
+  const raw = await adminApiRequest<unknown>(`/api/admin/products/pending?page=${page}&size=${size}`);
+  return normalizePageResponse<ProductSummary>(raw);
 }
 
 export async function fetchProductStats(): Promise<Record<string, number>> {
@@ -83,7 +99,8 @@ export async function fetchSellers(search?: string): Promise<PageResponse<Seller
   if (search) q.set("search", search);
   q.set("page", "0");
   q.set("size", "500");
-  return adminApiRequest(`/api/admin/sellers/approved?${q}`);
+  const raw = await adminApiRequest<unknown>(`/api/admin/sellers/approved?${q}`);
+  return normalizePageResponse<SellerRow>(raw);
 }
 
 export async function approveProduct(id: number, note?: string): Promise<void> {
