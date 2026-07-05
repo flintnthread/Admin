@@ -74,7 +74,7 @@ const STATUS_TO_API: Record<string, string> = {
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  brand: "#C85D1A",
+  brand: "#ef7b1a",
   brandDark: "#151D4F",
   brandLight: "#F0A060",
   brandFaint: "#FDF3EC",
@@ -338,6 +338,18 @@ const ChevronDownIcon = ({ size = 16, color = C.textSecondary }: { size?: number
   </Svg>
 );
 
+const CheckCircleIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path fill={color} d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+  </Svg>
+);
+
+const AlertIcon = ({ size = 16, color = C.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Path fill={color} d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+  </Svg>
+);
+
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
@@ -346,21 +358,37 @@ interface StatCardProps {
   count: number;
   color: string;
   bgColor: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
-const StatCard = ({ label, sublabel, count, color, bgColor, icon, compact }: StatCardProps & { compact?: boolean }) => (
-  <View style={[styles.statCard, compact && styles.statCardMobile]}>
-    <View style={[styles.statCardTop, compact && styles.statCardTopMobile]}>
-      <View style={[styles.statIconChip, { backgroundColor: bgColor }, compact && styles.statIconChipMobile]}>
-        <Text style={[styles.statIconText, { color }, compact && styles.statIconTextMobile]}>{icon}</Text>
+const StatCard = ({ label, sublabel, count, color, bgColor, icon, compact }: StatCardProps & { compact?: boolean }) => {
+  if (compact) {
+    return (
+      <View style={styles.statCardCompact}>
+        <View style={[styles.statCardIconBoxCompact, { backgroundColor: bgColor }]}>{icon}</View>
+        <Text style={[styles.statCardValueCompact, { color }]} numberOfLines={1}>
+          {count}
+        </Text>
+        <Text style={styles.statCardLabelCompact} numberOfLines={1}>
+          {label}
+        </Text>
       </View>
-      <Text style={[styles.statCount, { color }, compact && styles.statCountMobile]}>{count}</Text>
+    );
+  }
+  return (
+    <View style={styles.statCard}>
+      <View style={[styles.statIconChip, { backgroundColor: bgColor }]}>
+        {icon}
+      </View>
+      <Text style={[styles.statCount, { color }]} numberOfLines={1}>
+        {count}
+      </Text>
+      <Text style={styles.statLabel} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
-    <Text style={[styles.statLabel, compact && styles.statLabelMobile]}>{label}</Text>
-    <Text style={[styles.statSublabel, compact && styles.statSublabelMobile]}>{sublabel}</Text>
-  </View>
-);
+  );
+};
 
 
 // ─── Ticket List Item ─────────────────────────────────────────────────────────
@@ -431,6 +459,8 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
   const [replyText, setReplyText] = useState("");
   const isClosed = ticket.status === "Closed" || ticket.status === "Resolved";
   const hasMessages = ticket.messages && ticket.messages.length > 0;
+  
+  const isMobile = !!onClose;
 
   const handleSend = () => {
     const t = replyText.trim();
@@ -442,54 +472,58 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
   return (
     <View style={styles.chatPanel}>
       {/* Detail Header */}
-      <View style={styles.chatHeader}>
+      <View style={[styles.chatHeader, isMobile && styles.chatHeaderMobile]}>
         {onClose && (
-          <TouchableOpacity onPress={onClose} style={styles.chatBackBtn}>
-            <Text style={styles.chatBackIcon}>←</Text>
+          <TouchableOpacity onPress={onClose} style={[styles.chatBackBtn, isMobile && styles.chatBackBtnMobile]}>
+            {isMobile ? (
+              <Ionicons name="chevron-back" size={24} color={C.textPrimary} />
+            ) : (
+              <Text style={styles.chatBackIcon}>←</Text>
+            )}
           </TouchableOpacity>
         )}
-        <View style={styles.chatHeaderInfo}>
-          <Text style={styles.chatHeaderTitle} numberOfLines={1}>
+        <View style={[styles.chatHeaderInfo, isMobile && styles.chatHeaderInfoMobile]}>
+          <Text style={[styles.chatHeaderTitle, isMobile && styles.chatHeaderTitleMobile]} numberOfLines={1}>
             {ticket.description}
           </Text>
-          <View style={styles.chatHeaderMeta}>
+          <View style={[styles.chatHeaderMeta, isMobile && styles.chatHeaderMetaMobile]}>
             <View style={styles.chatHeaderMetaItem}>
-              <FileTextIcon size={14} color="rgba(255,255,255,0.85)" />
-              <Text style={styles.chatHeaderMetaText}>{ticket.ticketCode}</Text>
+              <FileTextIcon size={14} color={isMobile ? C.textSecondary : "rgba(255,255,255,0.85)"} />
+              <Text style={[styles.chatHeaderMetaText, isMobile && styles.chatHeaderMetaTextMobile]}>{ticket.ticketCode}</Text>
             </View>
             <View style={styles.chatHeaderMetaItem}>
-              <CircleUserIcon size={14} color="rgba(255,255,255,0.85)" />
-              <Text style={styles.chatHeaderMetaText}>{ticket.sellerName}</Text>
+              <CircleUserIcon size={14} color={isMobile ? C.textSecondary : "rgba(255,255,255,0.85)"} />
+              <Text style={[styles.chatHeaderMetaText, isMobile && styles.chatHeaderMetaTextMobile]}>{ticket.sellerName}</Text>
             </View>
             <StatusBadge status={ticket.status} />
           </View>
-          <View style={styles.chatHeaderContact}>
+          <View style={[styles.chatHeaderContact, isMobile && styles.chatHeaderContactMobile]}>
             {!!ticket.email && (
               <View style={styles.chatContactItem}>
-                <EnvelopeIcon size={14} color="rgba(255,255,255,0.75)" />
-                <Text style={styles.chatContactText}>{ticket.email}</Text>
+                <EnvelopeIcon size={14} color={isMobile ? C.textSecondary : "rgba(255,255,255,0.75)"} />
+                <Text style={[styles.chatContactText, isMobile && styles.chatContactTextMobile]}>{ticket.email}</Text>
               </View>
             )}
             {!!ticket.phone && (
               <View style={styles.chatContactItem}>
-                <SmartphoneIcon size={14} color="rgba(255,255,255,0.75)" />
-                <Text style={styles.chatContactText}>{ticket.phone}</Text>
+                <SmartphoneIcon size={14} color={isMobile ? C.textSecondary : "rgba(255,255,255,0.75)"} />
+                <Text style={[styles.chatContactText, isMobile && styles.chatContactTextMobile]}>{ticket.phone}</Text>
               </View>
             )}
             {!!ticket.department && (
               <View style={styles.chatContactItem}>
-                <FolderIcon size={14} color="rgba(255,255,255,0.75)" />
-                <Text style={styles.chatContactText}>{ticket.department}</Text>
+                <FolderIcon size={14} color={isMobile ? C.textSecondary : "rgba(255,255,255,0.75)"} />
+                <Text style={[styles.chatContactText, isMobile && styles.chatContactTextMobile]}>{ticket.department}</Text>
               </View>
             )}
           </View>
         </View>
         {isClosed && (
           <TouchableOpacity
-            style={styles.reopenBtn}
+            style={[styles.reopenBtn, isMobile && styles.reopenBtnMobile]}
             onPress={() => onReopen(ticket.id)}
           >
-            <Text style={styles.reopenBtnText}>↺ Reopen</Text>
+            <Text style={[styles.reopenBtnText, isMobile && styles.reopenBtnTextMobile]}>↺ Reopen</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -711,7 +745,7 @@ export default function SupportTicketManagement() {
       count: stats.total,
       color: C.brand,
       bgColor: C.brandFaint,
-      icon: "⊞",
+      icon: <FolderIcon size={!isDesktop ? 14 : 18} color={C.brand} />,
     },
     {
       label: "Open",
@@ -719,7 +753,7 @@ export default function SupportTicketManagement() {
       count: stats.open,
       color: C.open.text,
       bgColor: C.open.bg,
-      icon: "●",
+      icon: <EnvelopeIcon size={!isDesktop ? 14 : 18} color={C.open.text} />,
     },
     {
       label: "In Progress",
@@ -727,7 +761,7 @@ export default function SupportTicketManagement() {
       count: stats.inProgress,
       color: C.inProgress.text,
       bgColor: C.inProgress.bg,
-      icon: "◐",
+      icon: <ClockIcon size={!isDesktop ? 14 : 18} color={C.inProgress.text} />,
     },
     {
       label: "Waiting",
@@ -735,7 +769,7 @@ export default function SupportTicketManagement() {
       count: stats.waiting,
       color: C.waitingAdmin.text,
       bgColor: C.waitingAdmin.bg,
-      icon: "◷",
+      icon: <ChatIcon size={!isDesktop ? 14 : 18} color={C.waitingAdmin.text} />,
     },
     {
       label: "Resolved",
@@ -743,7 +777,7 @@ export default function SupportTicketManagement() {
       count: stats.resolved,
       color: C.resolved.text,
       bgColor: C.resolved.bg,
-      icon: "✓",
+      icon: <CheckCircleIcon size={!isDesktop ? 14 : 18} color={C.resolved.text} />,
     },
     {
       label: "Urgent",
@@ -751,7 +785,7 @@ export default function SupportTicketManagement() {
       count: stats.urgent,
       color: C.urgent.text,
       bgColor: C.urgent.bg,
-      icon: "!",
+      icon: <AlertIcon size={!isDesktop ? 14 : 18} color={C.urgent.text} />,
     },
   ];
 
@@ -767,12 +801,12 @@ export default function SupportTicketManagement() {
           <View style={styles.headerOuter}>
             <View style={[styles.headerPanel, !isDesktop && styles.headerPanelMobile]}>
               <View style={[styles.headerTitleRow, !isDesktop && styles.headerTitleRowMobile]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.menuBtn}>
-                  <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
+                <View style={styles.hIcon}>
+                  <Ionicons name="ticket" size={21} color="#FFFFFF" />
+                </View>
                 <View style={styles.headerTitleTextWrap}>
                   <Text style={[styles.headerTitle, !isDesktop && styles.headerTitleMobile]}>Support Tickets</Text>
-                  <Text style={styles.headerSubtitle}>Admin Panel · Manage all support requests</Text>
+                  <Text style={styles.headerSubtitle}>Manage all support requests</Text>
                 </View>
                 <TouchableOpacity style={[styles.headerAvatar, !isDesktop && styles.headerAvatarMobile]}>
                   <Text style={[styles.headerAvatarText, !isDesktop && styles.headerAvatarTextMobile]}>A</Text>
@@ -783,31 +817,43 @@ export default function SupportTicketManagement() {
               <View style={[styles.headerCardSpacer, !isDesktop && styles.headerCardSpacerMobile]} />
             </View>
 
-            {/* Stat cards: horizontally scrollable, overlapping the bottom edge of the dark panel */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              {...(!isDesktop && {
-                decelerationRate: "fast",
-                snapToInterval: 140,
-                snapToAlignment: "start",
-              })}
-              style={[styles.statsScroll, !isDesktop && styles.statsScrollMobile]}
-              contentContainerStyle={[styles.statsRow, !isDesktop && styles.statsRowMobile]}
-            >
-              {statCards.map((card) => (
-                <StatCard
-                  key={card.label}
-                  label={card.label}
-                  sublabel={card.sublabel}
-                  count={card.count}
-                  color={card.color}
-                  bgColor={card.bgColor}
-                  icon={card.icon}
-                  compact={!isDesktop}
-                />
-              ))}
-            </ScrollView>
+            {/* Stat cards: overlapping the bottom edge of the dark panel */}
+            {!isDesktop ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.statsScrollMobile}
+                contentContainerStyle={styles.statsRowMobile}
+              >
+                {statCards.map((card) => (
+                  <StatCard
+                    key={card.label}
+                    label={card.label}
+                    sublabel={card.sublabel}
+                    count={card.count}
+                    color={card.color}
+                    bgColor={card.bgColor}
+                    icon={card.icon}
+                    compact={true}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.statsWrapDesktop}>
+                {statCards.map((card) => (
+                  <StatCard
+                    key={card.label}
+                    label={card.label}
+                    sublabel={card.sublabel}
+                    count={card.count}
+                    color={card.color}
+                    bgColor={card.bgColor}
+                    icon={card.icon}
+                    compact={false}
+                  />
+                ))}
+              </View>
+            )}
           </View>
 
           {loadError ? (
@@ -986,6 +1032,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: C.brandDark,
   },
+  modalSafe: {
+    flex: 1,
+    backgroundColor: C.surface,
+  },
 
   // Header
   headerOuter: {
@@ -1023,6 +1073,14 @@ const styles = StyleSheet.create({
   },
   headerCardSpacerMobile: {
     height: 40,
+  },
+  hIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    backgroundColor: C.brand,
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuBtn: {
     gap: 4,
@@ -1090,108 +1148,93 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // Stats — overlap the bottom edge of the dark header panel (desktop defaults)
-  statsScroll: {
-    marginTop: -46,
-  },
-  // Mobile override
-  statsScrollMobile: {
-    marginTop: -36,
-  },
-  statsRow: {
+  // Stats — overlap the bottom edge of the dark header panel
+  statsWrapDesktop: {
     flexDirection: "row",
-    justifyContent: "center",
-    flexGrow: 1,
-    gap: 12,
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: -30,
+    marginBottom: 16,
     paddingHorizontal: 16,
-    paddingBottom: 4,
   },
-  // Mobile override
+  statsScrollMobile: {
+    marginTop: -24,
+    marginBottom: 14,
+    paddingHorizontal: 10,
+  },
   statsRowMobile: {
-    justifyContent: undefined,
-    flexGrow: undefined,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-    paddingTop: 2,
+    flexDirection: "row",
+    gap: 7,
+    paddingRight: 10,
   },
   statCard: {
+    flexGrow: 1,
+    flexShrink: 1,
+    alignItems: "center",
     backgroundColor: C.surface,
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    width: 150,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  // Mobile override
-  statCardMobile: {
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    width: 128,
-    shadowOpacity: 0.07,
+    shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 8,
-    elevation: 4,
-  },
-  statCardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  statCardTopMobile: {
-    marginBottom: 6,
+    elevation: 3,
+    gap: 4,
   },
   statIconChip: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
-  statIconChipMobile: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-  },
-  statIconText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  statIconTextMobile: {
-    fontSize: 12,
-  },
   statCount: {
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  statCountMobile: {
-    fontSize: 24,
   },
   statLabel: {
-    fontSize: 13,
-    color: C.textPrimary,
-    fontWeight: "700",
-  },
-  statLabelMobile: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  statSublabel: {
-    fontSize: 11,
-    color: C.textMuted,
-    marginTop: 2,
-  },
-  statSublabelMobile: {
     fontSize: 10,
-    marginTop: 1,
+    fontWeight: "600",
+    color: C.textSecondary,
+    textAlign: "center",
+  },
+
+  // Mobile override (compact mode)
+  statCardCompact: {
+    width: 82,
+    alignItems: "center",
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+    gap: 4,
+  },
+  statCardIconBoxCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statCardValueCompact: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  statCardLabelCompact: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: C.textSecondary,
+    textAlign: "center",
   },
 
   // Filters — desktop: single row; mobile: stacked
@@ -1582,9 +1625,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
   },
+  chatHeaderMobile: {
+    backgroundColor: C.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
   chatBackBtn: {
     padding: 4,
     marginTop: 2,
+  },
+  chatBackBtnMobile: {
+    marginTop: -2,
+    marginLeft: -4,
   },
   chatBackIcon: {
     color: "#fff",
@@ -1595,11 +1647,19 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  chatHeaderInfoMobile: {
+    gap: 6,
+  },
   chatHeaderTitle: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
     lineHeight: 20,
+  },
+  chatHeaderTitleMobile: {
+    color: C.textPrimary,
+    fontSize: 16,
+    lineHeight: 22,
   },
   chatHeaderMeta: {
     flexDirection: "row",
@@ -1608,9 +1668,21 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 2,
   },
+  chatHeaderMetaMobile: {
+    gap: 8,
+  },
+  chatHeaderMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   chatHeaderMetaText: {
     color: "rgba(255,255,255,0.8)",
     fontSize: 11,
+  },
+  chatHeaderMetaTextMobile: {
+    color: C.textSecondary,
+    fontSize: 12,
   },
   chatHeaderContact: {
     flexDirection: "row",
@@ -1618,9 +1690,22 @@ const styles = StyleSheet.create({
     gap: 2,
     marginTop: 2,
   },
+  chatHeaderContactMobile: {
+    gap: 12,
+    marginTop: 4,
+  },
+  chatContactItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   chatContactText: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 11,
+  },
+  chatContactTextMobile: {
+    color: C.textSecondary,
+    fontSize: 12,
   },
   reopenBtn: {
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -1630,10 +1715,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
   },
+  reopenBtnMobile: {
+    backgroundColor: C.brandFaint,
+    borderColor: C.brand,
+  },
   reopenBtnText: {
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  reopenBtnTextMobile: {
+    color: C.brand,
   },
 
   // Messages
@@ -1790,29 +1882,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Modal
-  modalSafe: {
-    flex: 1,
-    backgroundColor: C.surface,
-  },
-
   // Alignment helpers for inline icons
   metaItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  chatHeaderMetaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginRight: 10,
-  },
-  chatContactItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginRight: 12,
   },
   messageMetaRow: {
     flexDirection: "row",
