@@ -1,24 +1,23 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { formatDate } from "@/lib/format";
-import type { JobOpening as ApiJob } from "@/lib/api/types";
-import { createJob, deleteJob, fetchDepartments, fetchJobs, updateJob } from "@/services/hrApi";
-import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    SafeAreaView,
-    StatusBar,
-    TextInput,
-    Modal,
-    Platform,
-    Animated,
-} from "react-native";
-import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import { getApiErrorMessage } from "@/lib/api/client";
+import type { JobOpening as ApiJob } from "@/lib/api/types";
+import { formatDate } from "@/lib/format";
+import { createJob, deleteJob, fetchDepartments, fetchJobs, updateJob } from "@/services/hrApi";
+import { Feather } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from "react-native";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -1031,7 +1030,8 @@ const em = StyleSheet.create({
         shadowRadius: 20,
         elevation: 10,
     },
-    header: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, 
+    header: {
+        marginHorizontal: 2, marginTop: 12, borderRadius: 22,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1418,7 +1418,7 @@ const JobOpeningsScreen: React.FC = () => {
                 keyboardShouldPersistTaps="handled"
             >
                 {/* ── PAGE HEADER ── */}
-                <View style={[s.pageHead, !isWeb && { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
+                <View style={[s.pageHead, !isWeb && { flexDirection: 'column', alignItems: 'stretch', padding: 16, paddingTop: 18, paddingBottom: 48, marginTop: 4 }]}>
                     {!isWeb ? (
                         <>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1533,16 +1533,33 @@ const JobOpeningsScreen: React.FC = () => {
                             onChange={setDeptFilter}
                         />
                     ) : (
-                        <TouchableOpacity
-                            style={s.filterSelect}
-                            onPress={() => setDeptDropdownOpen(true)}
-                        >
-                            <Feather name="grid" size={13} color={T.textHint} />
-                            <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
-                                {deptFilter}
-                            </Text>
-                            <Feather name="chevron-down" size={13} color={T.textHint} />
-                        </TouchableOpacity>
+                        <View style={{ flex: 1, position: "relative", zIndex: deptDropdownOpen ? 999 : 1, minWidth: 120 }}>
+                            <TouchableOpacity
+                                style={[s.filterSelect, { width: "100%" }]}
+                                onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
+                            >
+                                <Feather name="grid" size={13} color={T.textHint} />
+                                <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
+                                    {deptFilter}
+                                </Text>
+                                <Feather name="chevron-down" size={13} color={T.textHint} />
+                            </TouchableOpacity>
+                            {deptDropdownOpen && (
+                                <View style={[em.dropdown, { marginTop: 0 }]}>
+                                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                        {deptOptions.map((opt) => (
+                                            <TouchableOpacity
+                                                key={opt}
+                                                style={em.dropItem}
+                                                onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
+                                            >
+                                                <Text style={em.dropItemText}>{opt}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
                     )}
 
                     {/* Status filter */}
@@ -1553,16 +1570,33 @@ const JobOpeningsScreen: React.FC = () => {
                             onChange={(v) => setStatusFilter(v as any)}
                         />
                     ) : (
-                        <TouchableOpacity
-                            style={s.filterSelect}
-                            onPress={() => setStatusDropdownOpen(true)}
-                        >
-                            <Feather name="activity" size={13} color={T.textHint} />
-                            <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
-                                {statusFilter}
-                            </Text>
-                            <Feather name="chevron-down" size={13} color={T.textHint} />
-                        </TouchableOpacity>
+                        <View style={{ flex: 1, position: "relative", zIndex: statusDropdownOpen ? 999 : 1, minWidth: 120 }}>
+                            <TouchableOpacity
+                                style={[s.filterSelect, { width: "100%" }]}
+                                onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
+                            >
+                                <Feather name="activity" size={13} color={T.textHint} />
+                                <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
+                                    {statusFilter}
+                                </Text>
+                                <Feather name="chevron-down" size={13} color={T.textHint} />
+                            </TouchableOpacity>
+                            {statusDropdownOpen && (
+                                <View style={[em.dropdown, { marginTop: 0 }]}>
+                                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                        {STATUSES.map((opt) => (
+                                            <TouchableOpacity
+                                                key={opt}
+                                                style={em.dropItem}
+                                                onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
+                                            >
+                                                <Text style={em.dropItemText}>{opt}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
                     )}
 
                     <TouchableOpacity style={s.filterBtn}>
@@ -1607,7 +1641,7 @@ const JobOpeningsScreen: React.FC = () => {
                         {paginated.map(job => (
                             <View
                                 key={job.id}
-                                style={isWeb ? { width: "calc(33.33% - 11px)" as any } : { width: "48%" as any }}
+                                style={isWeb ? { width: "calc(33.33% - 11px)" as any } : { width: "100%" as any }}
                             >
                                 <JobCard job={job} onEdit={handleEdit} onDelete={() => setDeleteTarget(job)} />
                             </View>
@@ -1634,27 +1668,7 @@ const JobOpeningsScreen: React.FC = () => {
                 )}
             </ScrollView>
 
-            {/* ── MOBILE DROPDOWNS ── */}
-            {!isWeb && (
-                <>
-                    <DropdownModal
-                        visible={deptDropdownOpen}
-                        options={deptOptions}
-                        selected={deptFilter}
-                        onSelect={setDeptFilter}
-                        onClose={() => setDeptDropdownOpen(false)}
-                        title="Select Department"
-                    />
-                    <DropdownModal
-                        visible={statusDropdownOpen}
-                        options={STATUSES}
-                        selected={statusFilter}
-                        onSelect={(v) => setStatusFilter(v as any)}
-                        onClose={() => setStatusDropdownOpen(false)}
-                        title="Select Status"
-                    />
-                </>
-            )}
+
 
             {/* ── EDIT MODAL ── */}
             <EditJobModal
@@ -1815,7 +1829,7 @@ const s = StyleSheet.create({
     statsRow: {
         flexDirection: "row",
         gap: 8,
-        marginTop: -42,
+        marginTop: -32,
         zIndex: 10,
         maxWidth: 900,
         alignSelf: "center",
@@ -1829,14 +1843,15 @@ const s = StyleSheet.create({
     viewToggleInline: {
         flexDirection: "row",
         backgroundColor: T.card,
-        borderRadius: 11,
+        borderRadius: 10,
         borderWidth: 1.5,
         borderColor: T.border,
         overflow: "hidden",
+        height: 42,
     },
     viewToggleBtn: {
-        width: 40,
-        height: 40,
+        width: 42,
+        height: "100%",
         alignItems: "center",
         justifyContent: "center",
     },
@@ -1848,6 +1863,7 @@ const s = StyleSheet.create({
     searchRow: {
         flexDirection: "row",
         gap: 10,
+        alignItems: "center",
     },
     searchBox: {
         flex: 1,
@@ -1855,15 +1871,15 @@ const s = StyleSheet.create({
         alignItems: "center",
         gap: 9,
         backgroundColor: T.card,
-        borderRadius: 11,
-        paddingHorizontal: 13,
-        paddingVertical: 11,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        height: 42,
         borderWidth: 1.5,
         borderColor: T.border,
     },
     searchInput: {
-        flex: 
-        1,
+        flex:
+            1,
         fontSize: 13,
         color: T.textH,
         borderWidth: 0,

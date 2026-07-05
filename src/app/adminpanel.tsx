@@ -151,90 +151,74 @@ function StatusBadge({ status }: { status: Status }) {
 // ─── Select ───────────────────────────────────────────────────────────────────
 function Select<T extends string>({ label, value, options, onChange, hideValue }: { label?: string; value: T; options: readonly T[]; onChange: (value: T) => void; hideValue?: boolean }) {
   const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<any>(null);
-  const isMobileWeb = Platform.OS !== "web" && !IS_WEB_WIDE;
-  const isWeb = Platform.OS === "web";
+  const triggerRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    if (!open) return;
-
-    function onDocClick(event: MouseEvent) {
-      const el = wrapperRef.current as any;
-      if (!el) return;
-      if (el.contains && el.contains(event.target)) return;
-      setOpen(false);
+  const handlePress = () => {
+    if (!open && triggerRef.current) {
+      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const { width: screenWidth } = Dimensions.get("window");
+        const menuWidth = Math.min(width, screenWidth - 32);
+        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      });
     }
-
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+    setOpen(o => !o);
+  };
 
   return (
-    // @ts-ignore
-    <View
-      ref={wrapperRef}
-      style={{
-        marginBottom: 16,
-        position: "relative",
-        overflow: "visible",
-        zIndex: open && (isMobileWeb || isWeb) ? 1000 : undefined,
-        elevation: open && (isMobileWeb || isWeb) ? 20 : undefined,
-      }}
-    >
+    <View style={{ marginBottom: 16 }}>
       {label ? (
         <Text style={styles.label}>
           {label} <Text style={{ color: C.orange }}>*</Text>
         </Text>
       ) : null}
-      <TouchableOpacity style={[styles.selectBox, open && styles.selectBoxActive]} onPress={() => setOpen((prev) => !prev)}>
+      <TouchableOpacity
+        ref={triggerRef as any}
+        style={[styles.selectBox, open && styles.selectBoxActive]}
+        onPress={handlePress}
+      >
         <Text style={styles.selectText}>{value}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={C.subtext} />
       </TouchableOpacity>
-      {open && (
-        <ScrollView
-          nestedScrollEnabled={true}
-          style={[styles.dropdown, isMobileWeb ? { zIndex: 1001, elevation: 20 } : undefined]}
-          scrollEnabled={isMobileWeb}
-          showsVerticalScrollIndicator={true}
-        >
-          {options.map((option, idx) => (
-            <Pressable
-              key={option}
-              onPress={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-              style={({ hovered, pressed }: any) => [
-                styles.dropdownItem,
-                idx < options.length - 1 && styles.dropdownItemBorder,
-                (hovered || pressed) && styles.dropdownItemHovered,
-                option === value && styles.dropdownItemSelected,
-              ]}
-            >
-              {({ hovered, pressed }: any) => (
-                <Text
-                  style={[
-                    styles.dropdownText,
-                    option === value ? styles.dropdownTextSelected : (hovered || pressed) ? styles.dropdownTextSelected : null,
-                  ]}
-                >
-                  {option}
-                </Text>
-              )}
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+        {menuPosition && (
+          <View style={{ position: "absolute", top: menuPosition.top, left: menuPosition.left, width: menuPosition.width, zIndex: 9999 }}>
+            <View style={{ backgroundColor: C.white, borderRadius: 8, borderWidth: 1, borderColor: C.border, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8 }}>
+              <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={true} nestedScrollEnabled>
+                {options.map((option, idx) => (
+                  <Pressable
+                    key={option}
+                    onPress={() => {
+                      onChange(option);
+                      setOpen(false);
+                    }}
+                    style={({ hovered, pressed }: any) => [
+                      styles.dropdownItem,
+                      idx < options.length - 1 && styles.dropdownItemBorder,
+                      (hovered || pressed) && styles.dropdownItemHovered,
+                      option === value && styles.dropdownItemSelected,
+                    ]}
+                  >
+                    {({ hovered, pressed }: any) => (
+                      <Text
+                        style={[
+                          styles.dropdownText,
+                          option === value ? styles.dropdownTextSelected : (hovered || pressed) ? styles.dropdownTextSelected : null,
+                        ]}
+                      >
+                        {option}
+                      </Text>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+      </Modal>
     </View>
   );
 }
@@ -630,6 +614,7 @@ export default function AdminUsersScreen() {
                 <Icon name="people" size={26} color={C.white} />
               </View>
               <View style={{ flex: 1 }}>
+                <Text style={styles.headerCardTitle}>Admin Panel Users</Text>
                 <Text style={styles.headerCardSubtitle}>Manage system administrators, roles,{"\n"}permissions, and account statuses</Text>
               </View>
               <TouchableOpacity style={styles.mobileAddBtn} onPress={() => setAddVisible(true)}>

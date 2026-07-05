@@ -1,8 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { formatDate } from "@/lib/format";
 import type { Department as ApiDepartment } from "@/lib/api/types";
+import { formatDate } from "@/lib/format";
 import {
     createDepartment,
     deleteDepartment,
@@ -1336,7 +1336,7 @@ const s = StyleSheet.create({
     safe: {
         flex: 1,
         height: "100%",
-        backgroundColor: T.bg,
+        backgroundColor: "#FFFFFF",
         paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
 
