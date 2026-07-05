@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -112,6 +112,14 @@ export default function ApprovedSellersScreen() {
   const [showPendingModal, setShowPendingModal] = useState(false);
 
   const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
+  const webScrollRef = useRef<ScrollView>(null);
+
+  // Scroll to top when seller detail view opens on web
+  useEffect(() => {
+    if (selectedSellerId !== null && webScrollRef.current) {
+      webScrollRef.current.scrollTo({ y: 0, animated: false });
+    }
+  }, [selectedSellerId]);
   const [adminStatus, setAdminStatus] = useState<"Active" | "Blocked">("Active");
   const [adminKycStatus, setAdminKycStatus] = useState<string>("Pending Verification");
   const [kycRemarks, setKycRemarks] = useState("");
@@ -416,15 +424,19 @@ export default function ApprovedSellersScreen() {
       return (
         <View style={stylesMobile.container}>
           {/* Header */}
-          <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-            <TouchableOpacity 
-              style={stylesMobile.detailsHeaderBack}
-              onPress={() => setMobileShowAdminActions(false)}
-            >
-              <Feather name="arrow-left" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={[stylesMobile.detailsHeaderTitle, { color: "#FFFFFF" }]}>Admin Actions</Text>
-            <View style={{ width: 40 }} />
+          {/* Header */}
+          <View style={stylesMobile.detailsHeader}>
+            <View style={stylesMobile.detailsHeaderRow}>
+              <TouchableOpacity 
+                style={stylesMobile.detailsHeaderBack}
+                onPress={() => setMobileShowAdminActions(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Feather name="arrow-left" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={stylesMobile.detailsHeaderTitle}>Admin Actions</Text>
+            </View>
           </View>
 
           <ScrollView 
@@ -592,24 +604,28 @@ export default function ApprovedSellersScreen() {
         </View>
 
         {/* Header */}
-        <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-          <TouchableOpacity 
-            style={stylesMobile.detailsHeaderBack}
-            onPress={() => setSelectedSellerId(null)}
-          >
-            <Feather name="arrow-left" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <View style={stylesMobile.headerCenterContainerMobile}>
-            <Text style={stylesMobile.headerSellerNameMobile} numberOfLines={1}>{seller.name}</Text>
-            <Text style={stylesMobile.headerSellerIdMobile}>ID: FNT-SELLER-0000{seller.id}</Text>
-          </View>
-          <View style={stylesMobile.headerRightContainerMobile}>
-            <View style={[stylesMobile.headerStatusBadgeMobile, seller.status === "Active" ? stylesMobile.headerStatusActiveMobile : stylesMobile.headerStatusBlockedMobile]}>
-              <Text style={[stylesMobile.headerStatusBadgeTextMobile, { color: seller.status === "Active" ? "#10B981" : "#EF4444" }]}>
-                {seller.status}
-              </Text>
+        {/* Header */}
+        <View style={stylesMobile.detailsHeader}>
+          <View style={stylesMobile.detailsHeaderRow}>
+            <TouchableOpacity 
+              style={stylesMobile.detailsHeaderBack}
+              onPress={() => setSelectedSellerId(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <Feather name="arrow-left" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={stylesMobile.detailsHeaderTitle} numberOfLines={1}>{seller.name}</Text>
+            
+            <View style={stylesMobile.headerRightContainerMobile}>
+              <View style={[stylesMobile.headerStatusBadgeMobile, seller.status === "Active" ? stylesMobile.headerStatusActiveMobile : stylesMobile.headerStatusBlockedMobile]}>
+                <Text style={[stylesMobile.headerStatusBadgeTextMobile, { color: seller.status === "Active" ? "#10B981" : "#EF4444" }]}>
+                  {seller.status}
+                </Text>
+              </View>
             </View>
           </View>
+          <Text style={stylesMobile.detailsHeaderSub}>ID: FNT-SELLER-0000{seller.id}</Text>
         </View>
 
         <ScrollView 
@@ -771,7 +787,7 @@ export default function ApprovedSellersScreen() {
                   </View>
                   <TouchableOpacity
                     style={stylesMobile.docRedesignedViewBtn}
-                    onPress={() => setPreviewDoc({ name: docName, url: 'https://via.placeholder.com/800x600.png?text=' + encodeURIComponent(docName) })}
+                    onPress={() => setPreviewDoc({ name: docName, url: 'https://placehold.co/800x600.png?text=' + encodeURIComponent(docName) })}
                   >
                     <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
                     <Text style={stylesMobile.docRedesignedViewBtnText}>View</Text>
@@ -791,7 +807,7 @@ export default function ApprovedSellersScreen() {
                 )}
                 <TouchableOpacity
                   style={stylesMobile.businessProofViewBtnMobile}
-                  onPress={() => setPreviewDoc({ name: "Business Proof Documents", url: seller.avatar || 'https://via.placeholder.com/800x600.png?text=Business%20Proof' })}
+                  onPress={() => setPreviewDoc({ name: "Business Proof Documents", url: seller.avatar || 'https://placehold.co/800x600.png?text=Business%20Proof' })}
                 >
                   <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
                   <Text style={stylesMobile.businessProofViewBtnTextMobile}>View Doc</Text>
@@ -807,7 +823,7 @@ export default function ApprovedSellersScreen() {
                     <TouchableOpacity 
                       key={idx} 
                       style={stylesMobile.selfieThumbWrapperMobile}
-                      onPress={() => setPreviewDoc({ name: `Live Selfie ${idx}`, url: resolvedSelfieUrl || 'https://via.placeholder.com/800x600.png?text=Live%20Selfie%20' + idx })}
+                      onPress={() => setPreviewDoc({ name: `Live Selfie ${idx}`, url: resolvedSelfieUrl || 'https://placehold.co/800x600.png?text=Live%20Selfie%20' + idx })}
                     >
                       {resolvedSelfieUrl ? (
                         <Image source={{ uri: resolvedSelfieUrl }} style={stylesMobile.selfieMiniThumbMobile} />
@@ -1604,7 +1620,7 @@ export default function ApprovedSellersScreen() {
           {/* --- SCROLLABLE BODY --- */}
           <ScrollView 
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: 0 }}
             showsVerticalScrollIndicator={false}
           >
           {/* --- BREADCRUMB BANNER --- */}
@@ -2406,6 +2422,7 @@ export default function ApprovedSellersScreen() {
   return (
     <AdminLayout>
       <ScrollView
+        ref={webScrollRef}
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
@@ -2704,7 +2721,7 @@ export default function ApprovedSellersScreen() {
                             <Text style={styles.docLabel}>{docName}</Text>
                             <TouchableOpacity
                               style={styles.docViewBtn}
-                              onPress={() => setPreviewDoc({ name: docName, url: 'https://via.placeholder.com/800x600.png?text=' + encodeURIComponent(docName) })}
+                              onPress={() => setPreviewDoc({ name: docName, url: 'https://placehold.co/800x600.png?text=' + encodeURIComponent(docName) })}
                             >
                               <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
                               <Text style={styles.docViewBtnText}>View</Text>
@@ -3859,7 +3876,7 @@ const styles = StyleSheet.create({
   },
   scrollBodyContent: {
     padding: 24,
-    paddingBottom: 60,
+    paddingBottom: 0,
   },
   rowLayout: {
     flexDirection: "row",
@@ -6081,26 +6098,32 @@ const stylesMobile = StyleSheet.create({
     marginTop: 4,
   },
   detailsHeader: {
-    height: Platform.OS === 'ios' ? 96 : 80,
-    paddingTop: Platform.OS === 'ios' ? 44 : 28,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    backgroundColor: "#151D4F", // Deep navy blue
+    marginHorizontal: 2,
+    marginTop: 12,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 16 : 10,
+    paddingBottom: 24,
+  },
+  detailsHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    marginBottom: 4,
   },
   detailsHeaderBack: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    marginRight: 10,
   },
   detailsHeaderTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "700",
-    color: "#1E293B",
+    color: "#FFFFFF",
+    flex: 1,
+  },
+  detailsHeaderSub: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginLeft: 30,
   },
   detailsHeaderMore: {
     width: 40,
