@@ -1,4 +1,5 @@
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapBankPendingRow } from "@/lib/mappers";
 import { fetchBankStats, fetchBankVerifications, fetchPendingBankSellers, fetchSellers } from "@/services/sellerApi";
@@ -304,26 +305,7 @@ export default function BankApproval() {
   const endIndex = Math.min(startIndex + pageSize, totalEntries);
   const pagedSellers = filteredSellers.slice(startIndex, endIndex);
 
-  function gotoPage(n: number) {
-    const v = Math.max(1, Math.min(totalPages, n));
-    setCurrentPage(v);
-  }
 
-  function makePageList() {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-      return pages;
-    }
-    pages.push(1);
-    const left = Math.max(2, currentPage - 1);
-    const right = Math.min(totalPages - 1, currentPage + 1);
-    if (left > 2) pages.push("...");
-    for (let i = left; i <= right; i++) pages.push(i);
-    if (right < totalPages - 1) pages.push("...");
-    pages.push(totalPages);
-    return pages;
-  }
 
   return (
     <AdminLayout>
@@ -553,28 +535,14 @@ export default function BankApproval() {
                     </View>
                   </View>
                 ))}
-                <View style={styles.tableFooter}>
-                  <Text style={{ fontSize: 13, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</Text>
-                  <View style={{ flexDirection: "row", gap: 4 }}>
-                    <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}>
-                      <Text style={{ color: currentPage === 1 ? '#9CA3AF' : '#374151', fontWeight: '600' }}>←</Text>
-                    </TouchableOpacity>
-                    {makePageList().map((p, i) => (
-                      typeof p === 'number' ? (
-                        <TouchableOpacity key={i} style={[styles.pageBtn, p === currentPage && styles.pageBtnActive]} onPress={() => gotoPage(p as number)}>
-                          <Text style={{ color: p === currentPage ? '#FFF' : '#374151', fontWeight: '600' }}>{p}</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View key={i} style={[styles.pageBtn, { borderWidth: 0 }]}>
-                          <Text style={{ color: '#6B7280', fontWeight: '600' }}>{p}</Text>
-                        </View>
-                      )
-                    ))}
-                    <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}>
-                      <Text style={{ color: currentPage === totalPages ? '#9CA3AF' : '#374151', fontWeight: '600' }}>→</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalEntries}
+                  itemsPerPage={pageSize}
+                  itemName="entries"
+                  onPageChange={setCurrentPage}
+                />
               </View>
             )}
 
@@ -655,28 +623,14 @@ export default function BankApproval() {
               })}
 
               {/* Mobile Pagination */}
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-                <Text style={{ fontSize: 12, color: "#666" }}>Showing {startIndex + 1} to {endIndex} of {totalEntries} entries</Text>
-                <View style={{ flexDirection: "row", gap: 4 }}>
-                  <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage - 1)} disabled={currentPage === 1}>
-                    <Text style={{ color: currentPage === 1 ? '#9CA3AF' : '#374151', fontWeight: '600' }}>←</Text>
-                  </TouchableOpacity>
-                  {makePageList().map((p, i) => (
-                    typeof p === 'number' ? (
-                      <TouchableOpacity key={i} style={[styles.pageBtn, p === currentPage && styles.pageBtnActive]} onPress={() => gotoPage(p as number)}>
-                        <Text style={{ color: p === currentPage ? '#FFF' : '#374151', fontWeight: '600' }}>{p}</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View key={i} style={[styles.pageBtn, { borderWidth: 0 }]}>
-                        <Text style={{ color: '#6B7280', fontWeight: '600' }}>{p}</Text>
-                      </View>
-                    )
-                  ))}
-                  <TouchableOpacity style={styles.pageBtn} onPress={() => gotoPage(currentPage + 1)} disabled={currentPage === totalPages}>
-                    <Text style={{ color: currentPage === totalPages ? '#9CA3AF' : '#374151', fontWeight: '600' }}>→</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalEntries}
+                itemsPerPage={pageSize}
+                itemName="entries"
+                onPageChange={setCurrentPage}
+              />
             </View>
           </View>
         </View>

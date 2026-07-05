@@ -12,7 +12,7 @@
 //   Then replace the two import lines below accordingly.
 
 import AdminLayout from "@/components/admin-layout";
-import PaginationImport from "@/components/Pagination";
+import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -389,53 +389,7 @@ const ListRow: React.FC<{
   </View>
 );
 
-// ─────────────────────────────────────────────────────────────
-// PAGINATION
-// ─────────────────────────────────────────────────────────────
-const Pagination: React.FC<{
-  current: number;
-  total: number;
-  onChange: (p: number) => void;
-}> = ({ current, total, onChange }) => {
-  const maxVisible = 5;
-  let start = Math.max(1, current - 2);
-  let end = Math.min(total, start + maxVisible - 1);
-  if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
-  const pages: number[] = [];
-  for (let i = start; i <= end; i++) pages.push(i);
 
-  return (
-    <View style={S.paginationRow}>
-      {/* Bootstrap: chevron-left */}
-      <TouchableOpacity
-        style={[S.pageBtn, current === 1 && S.pageBtnDisabled]}
-        onPress={() => current > 1 && onChange(current - 1)}
-        disabled={current === 1}
-      >
-        <BI name="chevron-left" size={13} color={current === 1 ? "#bbb" : "#555"} />
-      </TouchableOpacity>
-
-      {pages.map(p => (
-        <TouchableOpacity
-          key={p}
-          style={[S.pageBtn, p === current && S.pageBtnActive]}
-          onPress={() => onChange(p)}
-        >
-          <Text style={[S.pageBtnText, p === current && { color: "#fff" }]}>{p}</Text>
-        </TouchableOpacity>
-      ))}
-
-      {/* Bootstrap: chevron-right */}
-      <TouchableOpacity
-        style={[S.pageBtn, current === total && S.pageBtnDisabled]}
-        onPress={() => current < total && onChange(current + 1)}
-        disabled={current === total}
-      >
-        <BI name="chevron-right" size={13} color={current === total ? "#bbb" : "#555"} />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────
 // MODAL WRAPPER
@@ -777,15 +731,14 @@ export default function SizesManagement() {
 
   // ── Footer shared between both views
   const Footer = (
-    <View style={[S.footerRow, { paddingHorizontal: PADDING }]}>
-      <Text style={S.footerText}>
-        Showing{" "}
-        {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–
-        {Math.min(safePage * PAGE_SIZE, filtered.length)}{" "}
-        of {filtered.length} sizes
-      </Text>
-      <Pagination current={safePage} total={totalPages} onChange={setPage} />
-    </View>
+    <Pagination
+      currentPage={safePage}
+      totalPages={totalPages}
+      totalItems={filtered.length}
+      itemsPerPage={PAGE_SIZE}
+      itemName="sizes"
+      onPageChange={setPage}
+    />
   );
 
   return (

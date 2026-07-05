@@ -375,21 +375,7 @@ function Dropdown({
   );
 }
 
-/* ─── Pagination Button ─────────────────────────────────────────────── */
-function PagBtn({ iconName, onPress, disabled, active }: {
-  iconName: keyof typeof Ionicons.glyphMap;
-  onPress: () => void; disabled?: boolean; active?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress} disabled={disabled}
-      style={[styles.pagBtn, active && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-    >
-      <Ionicons name={iconName} size={12}
-        color={disabled ? "#CBD5E1" : active ? "#fff" : "#374151"} />
-    </TouchableOpacity>
-  );
-}
+
 
 /* ─── DatePicker Component ───────────────────────────────────────────── */
 function DatePicker({ value, onChange, placeholder }: {
@@ -1221,12 +1207,7 @@ export default function SellersDashboard() {
     </View>
   ) : null;
 
-  const pageNums: (number | string)[] = (() => {
-    if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
-    if (safePage <= 3) return [1, 2, 3, "...", totalPages];
-    if (safePage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", safePage, "...", totalPages];
-  })();
+
 
   /* ────────────────────────────────────────────────────────────────────
      DESKTOP LAYOUT
@@ -1483,32 +1464,14 @@ export default function SellersDashboard() {
             </View>
 
             {/* Pagination */}
-            {totalSellers > 0 && (
-              <View style={styles.paginationRow}>
-                <Text style={styles.pageText}>
-                  Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
-                </Text>
-                <View style={{ flexDirection: "row", gap: 4 }}>
-                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                  {pageNums.map((p, i) =>
-                    p === "..." ? (
-                      <View key={"e" + i} style={styles.pagBtn}>
-                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        key={`n${p}`}
-                        onPress={() => setPage(p as number)}
-                        style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                </View>
-              </View>
-            )}
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalSellers}
+              itemsPerPage={perPage}
+              itemName="sellers"
+              onPageChange={setPage}
+            />
 
 
           </ScrollView>
@@ -1793,32 +1756,14 @@ export default function SellersDashboard() {
           </View>
 
           {/* Pagination */}
-          {totalSellers > 0 && (
-            <View style={styles.paginationRow}>
-              <Text style={styles.pageText}>
-                Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
-              </Text>
-              <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                {pageNums.map((p, i) =>
-                  p === "..." ? (
-                    <View key={"e" + i} style={styles.pagBtn}>
-                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      key={`n${p}`}
-                      onPress={() => setPage(p as number)}
-                      style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                    </TouchableOpacity>
-                  )
-                )}
-                <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-              </View>
-            </View>
-          )}
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            totalItems={totalSellers}
+            itemsPerPage={perPage}
+            itemName="sellers"
+            onPageChange={setPage}
+          />
 
 
         </ScrollView>
