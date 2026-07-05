@@ -2435,7 +2435,8 @@ export default function ApprovedSellersScreen() {
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
-      >       {selectedSellerId !== null ? (
+      >
+        {selectedSellerId !== null ? (
           (() => {
             const seller = sellers.find(s => s.id === selectedSellerId);
             const detail = sellerDetail;

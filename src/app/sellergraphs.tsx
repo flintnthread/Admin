@@ -11,6 +11,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate, initialsFromName } from "@/lib/format";
@@ -167,7 +168,7 @@ function StatusBadge({ status }: { status: string }) {
       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
       alignSelf: "flex-start",
     }}>
-      <Text style={{ fontSize: 11, fontWeight: "600", color: s.color }}>{status}</Text>
+      <Text style={{ fontSize: 11, fontWeight: "600", color: s.color }} numberOfLines={1}>{status}</Text>
     </View>
   );
 }
@@ -196,6 +197,7 @@ function SellerFilterDropdown({
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const { width: screenW } = Dimensions.get("window");
   const isDesktop = screenW >= 1024;
+  const [hovered, setHovered] = useState(false);
 
   const display = value == null
     ? "All Sellers"
@@ -212,11 +214,11 @@ function SellerFilterDropdown({
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
         const { width: screenWidth } = Dimensions.get("window");
         const menuWidth = Math.min(Math.max(width, 280), screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
-        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
     setOpen((o) => !o);
@@ -230,19 +232,17 @@ function SellerFilterDropdown({
 
   return (
     <View style={[{ minWidth: 160 }, style]}>
-      <Pressable
+      <TouchableOpacity
         ref={triggerRef as any}
         onPress={handlePress}
-        style={({ hovered }: any) => [
-          styles.dropdownTrigger,
-          hovered && { backgroundColor: "#FFF7ED" }
-        ]}
+        activeOpacity={0.8}
+        style={styles.dropdownTrigger}
       >
         <Text style={styles.dropdownText} numberOfLines={1}>{display}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
-      </Pressable>
+      </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => { setOpen(false); setSearch(""); }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => { setOpen(false); setSearch(""); }} />
         {menuPosition && (
           <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
@@ -310,24 +310,25 @@ function SellerFilterDropdown({
 
 /* ─── Dropdown ──────────────────────────────────────────────────────── */
 function Dropdown({
-  value, onChange, options, style,
+  value, onChange, options, style, placeholder, displayValue,
 }: {
   value: string; onChange: (v: string) => void;
-  options: string[]; style?: object;
+  options: string[]; style?: object; placeholder?: string; displayValue?: string;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const { width: screenW } = Dimensions.get("window");
   const isDesktop = screenW >= 1024;
+  const [hovered, setHovered] = useState(false);
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
         const { width: screenWidth } = Dimensions.get("window");
         const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
-        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
     setOpen(o => !o);
@@ -335,17 +336,15 @@ function Dropdown({
 
   return (
     <View style={[{ minWidth: 120 }, style]}>
-      <Pressable
+      <TouchableOpacity
         ref={triggerRef as any}
         onPress={handlePress}
-        style={({ hovered }: any) => [
-          styles.dropdownTrigger,
-          hovered && { backgroundColor: "#FFF7ED" }
-        ]}
+        activeOpacity={0.8}
+        style={styles.dropdownTrigger}
       >
-        <Text style={styles.dropdownText} numberOfLines={1}>{value}</Text>
+        <Text style={styles.dropdownText} numberOfLines={1}>{displayValue || value || placeholder || ""}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
-      </Pressable>
+      </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
@@ -376,21 +375,7 @@ function Dropdown({
   );
 }
 
-/* ─── Pagination Button ─────────────────────────────────────────────── */
-function PagBtn({ iconName, onPress, disabled, active }: {
-  iconName: keyof typeof Ionicons.glyphMap;
-  onPress: () => void; disabled?: boolean; active?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress} disabled={disabled}
-      style={[styles.pagBtn, active && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-    >
-      <Ionicons name={iconName} size={12}
-        color={disabled ? "#CBD5E1" : active ? "#fff" : "#374151"} />
-    </TouchableOpacity>
-  );
-}
+
 
 /* ─── DatePicker Component ───────────────────────────────────────────── */
 function DatePicker({ value, onChange, placeholder }: {
@@ -590,6 +575,13 @@ function DatePicker({ value, onChange, placeholder }: {
                 </View>
               </ScrollView>
             )}
+
+            <TouchableOpacity
+              onPress={() => setOpen(false)}
+              style={[styles.datePickerCloseBtn, { marginTop: 10 }]}
+            >
+              <Text style={styles.datePickerCloseBtnText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
@@ -963,7 +955,7 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
       idx % 2 === 0 ? { backgroundColor: "#fff" } : { backgroundColor: "#F8FAFC" },
     ]}>
       <TouchableOpacity onPress={handleRedirect} style={{ flex: 0.5 }}>
-          <Text style={[styles.tableCell, { fontWeight: "700", color: ORANGE }]}>#{item.id}</Text>
+        <Text style={[styles.tableCell, { fontWeight: "700", color: ORANGE }]}>#{item.id}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={handleRedirect} style={{ flex: 1.6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -977,7 +969,7 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
       </TouchableOpacity>
       <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>{item.business}</Text>
       <Text style={[styles.tableCell, { flex: 0.9 }]}>{item.onboard}</Text>
-      <View style={{ flex: 0.7, justifyContent: "center" }}>
+      <View style={{ flex: 1.0, justifyContent: "center" }}>
         <StatusBadge status={item.status} />
       </View>
       <View style={{ flex: 0.7, justifyContent: "center" }}>
@@ -1215,12 +1207,7 @@ export default function SellersDashboard() {
     </View>
   ) : null;
 
-  const pageNums: (number | string)[] = (() => {
-    if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
-    if (safePage <= 3) return [1, 2, 3, "...", totalPages];
-    if (safePage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", safePage, "...", totalPages];
-  })();
+
 
   /* ────────────────────────────────────────────────────────────────────
      DESKTOP LAYOUT
@@ -1243,7 +1230,7 @@ export default function SellersDashboard() {
                     <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <TouchableOpacity onPress={() => router.push("/sellers")} style={styles.backBtn}>
                   <Ionicons name="chevron-back" size={13} color="#475569" />
                   <Text style={styles.backBtnText}>Back</Text>
                 </TouchableOpacity>
@@ -1451,7 +1438,7 @@ export default function SellersDashboard() {
                   <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Seller</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Business</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Onboard</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Status</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Profile</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.65 }]}>KYC</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Shiprocket</Text>
@@ -1477,32 +1464,14 @@ export default function SellersDashboard() {
             </View>
 
             {/* Pagination */}
-            {totalSellers > 0 && (
-              <View style={styles.paginationRow}>
-                <Text style={styles.pageText}>
-                  Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
-                </Text>
-                <View style={{ flexDirection: "row", gap: 4 }}>
-                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                  {pageNums.map((p, i) =>
-                    p === "..." ? (
-                      <View key={"e" + i} style={styles.pagBtn}>
-                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        key={`n${p}`}
-                        onPress={() => setPage(p as number)}
-                        style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                </View>
-              </View>
-            )}
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalSellers}
+              itemsPerPage={perPage}
+              itemName="sellers"
+              onPageChange={setPage}
+            />
 
 
           </ScrollView>
@@ -1525,7 +1494,7 @@ export default function SellersDashboard() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header Container (Dark Blue) ── */}
-          <View style={[styles.headerContainer, { paddingHorizontal: 16 }]}>
+          <View style={[styles.headerContainer, { paddingHorizontal: 16, paddingBottom: 40 }]}>
             <View style={styles.pageHeader}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1533,7 +1502,7 @@ export default function SellersDashboard() {
                   <Text style={[styles.pageTitle, { flex: 1 }]} numberOfLines={2}>Sellers Graph / Analysis</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <TouchableOpacity onPress={() => router.push("/sellers")} style={styles.backBtn}>
                 <Ionicons name="chevron-back" size={13} color="#475569" />
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
@@ -1542,20 +1511,52 @@ export default function SellersDashboard() {
 
           {errorBanner}
 
-          {/* ── Stat Cards (mobile: 2-col grid) ── */}
-          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, marginHorizontal: 22 }]}>
-            {statCards.map(c => (
-              <View key={c.label} style={[styles.statCard]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                  <Text style={styles.statValue}>{c.value}</Text>
-                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+          {/* ── Stat Cards (mobile: horizontal scroll view with overlap) ── */}
+          <View style={{ marginTop: -26, zIndex: 10, marginBottom: 14 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: 12,
+                paddingHorizontal: 4,
+                paddingVertical: 6,
+              }}
+            >
+              {statCards.map((c, i) => (
+                <View
+                  style={[
+                    styles.statCard,
+                    {
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      gap: 6,
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      width: 135,
+                      flexGrow: 0,
+                      borderWidth: 1,
+                      borderColor: "#E8EDF5",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 6,
+                      elevation: 3,
+                    }
+                  ]}
+                  key={c.label}
+                >
+                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg, width: 30, height: 30, borderRadius: 15 }]}>
+                    <Ionicons name={c.iconName as any} size={14} color={c.iconColor} />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{c.label}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{c.value}</Text>
+                    {c.sub && <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{c.sub}</Text>}
+                  </View>
                 </View>
-                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                  <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
-                </View>
-              </View>
-            ))}
+              ))}
+            </ScrollView>
           </View>
 
           {/* ── Filters Card ── */}
@@ -1623,21 +1624,6 @@ export default function SellersDashboard() {
             </Text>
           </View>
 
-          {/* ── Stat Cards (mobile: 2-col grid) ── */}
-          <View style={[styles.statGrid, { marginBottom: 14 }]}>
-            {statCards.map(c => (
-              <View key={c.label} style={[styles.statCard]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                  <Text style={styles.statValue}>{c.value}</Text>
-                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
-                </View>
-                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                  <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
-                </View>
-              </View>
-            ))}
-          </View>
 
           {/* ── Chart Card ── */}
           <View style={[styles.card, { marginBottom: 14 }]}>
@@ -1710,13 +1696,16 @@ export default function SellersDashboard() {
               </View>
             </View>
 
-            <View style={{ marginBottom: 12 }}>
+            <View style={{ gap: 8, marginBottom: 12, zIndex: 20 }}>
+              {/* Search */}
               <View style={styles.searchRow}>
-                <Ionicons name="search-outline" size={15} color="#94A3B8" />
+                <TouchableOpacity onPress={doSearch}>
+                  <Ionicons name="search-outline" size={15} color={ORANGE} />
+                </TouchableOpacity>
                 <TextInput
                   value={search} onChangeText={setSearch} onSubmitEditing={doSearch}
                   returnKeyType="search"
-                  placeholder="Search name / email / mobile / business..."
+                  placeholder="Search sellers..."
                   placeholderTextColor="#94A3B8" style={styles.searchInput}
                 />
                 {search.length > 0 && (
@@ -1725,21 +1714,28 @@ export default function SellersDashboard() {
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
 
-            <View style={{ marginBottom: 12, zIndex: 20 }}>
-              <Text style={styles.filterLabelText}>Per page</Text>
-              <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
-            </View>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12, zIndex: 10 }}>
-              <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { flex: 1 }]}>
-                <Ionicons name="search" size={13} color="#fff" />
-                <Text style={styles.applyBtnText}>Search</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { flex: 1 }]}>
-                <Ionicons name="refresh" size={13} color="#475569" />
-                <Text style={styles.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                {/* Per page */}
+                <View style={{ flex: 1 }}>
+                  <Dropdown
+                    value={String(perPage)}
+                    displayValue={`Per Page: ${perPage}`}
+                    onChange={v => { setPerPage(Number(v)); setPage(1); }}
+                    options={PERPAGE_OPTIONS}
+                    style={{ minWidth: 0, flex: 1 }}
+                  />
+                </View>
+
+                {/* Reset */}
+                <TouchableOpacity
+                  onPress={doReset}
+                  style={[styles.resetBtn, { flex: 1, paddingVertical: 0, height: 38, justifyContent: "center" }]}
+                >
+                  <Ionicons name="refresh" size={13} color="#475569" />
+                  <Text style={styles.resetBtnText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {paginated.length === 0 ? (
@@ -1760,32 +1756,14 @@ export default function SellersDashboard() {
           </View>
 
           {/* Pagination */}
-          {totalSellers > 0 && (
-            <View style={styles.paginationRow}>
-              <Text style={styles.pageText}>
-                Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
-              </Text>
-              <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                {pageNums.map((p, i) =>
-                  p === "..." ? (
-                    <View key={"e" + i} style={styles.pagBtn}>
-                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      key={`n${p}`}
-                      onPress={() => setPage(p as number)}
-                      style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                    </TouchableOpacity>
-                  )
-                )}
-                <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-              </View>
-            </View>
-          )}
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            totalItems={totalSellers}
+            itemsPerPage={perPage}
+            itemName="sellers"
+            onPageChange={setPage}
+          />
 
 
         </ScrollView>
@@ -2039,7 +2017,7 @@ const styles = StyleSheet.create({
   datePickerWeekHeader: { flexDirection: "row", marginBottom: 8 },
   datePickerWeekDay: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600", color: "#64748B" },
   datePickerDays: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 },
-  datePickerDay: { width: "14.28%", aspectRatio: 1, justifyContent: "center", alignItems: "center", borderRadius: 8, marginBottom: 4 },
+  datePickerDay: { width: "14.28%", height: 32, justifyContent: "center", alignItems: "center", borderRadius: 8, marginBottom: 4 },
   datePickerDayEmpty: { backgroundColor: "transparent" },
   datePickerDaySelected: { backgroundColor: ORANGE },
   datePickerDayText: { fontSize: 13, color: "#374151" },

@@ -12,6 +12,7 @@
 //   Then replace the two import lines below accordingly.
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -162,8 +163,8 @@ const StatusDropdown = ({
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        setMenuPosition({ top: pageY + height, left: pageX, width });
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        setMenuPosition({ top: y + height, left: x, width });
       });
     }
     setOpen((o) => !o);
@@ -217,8 +218,9 @@ const StatusDropdown = ({
   }
 
   return (
-    <View style={S.dropdownWrapper} ref={triggerRef}>
+    <View style={S.dropdownWrapper}>
       <TouchableOpacity
+        ref={triggerRef as any}
         style={[S.dropdownBtn, open && S.dropdownBtnOpen]}
         onPress={handlePress}
         activeOpacity={0.85}
@@ -232,11 +234,11 @@ const StatusDropdown = ({
         />
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
         {menuPosition && (
           <View style={[S.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
-            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
+            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
               {STATUS_OPTIONS.map((opt) => {
                 const isSelected = value === opt;
                 return (
@@ -387,53 +389,7 @@ const ListRow: React.FC<{
   </View>
 );
 
-// ─────────────────────────────────────────────────────────────
-// PAGINATION
-// ─────────────────────────────────────────────────────────────
-const Pagination: React.FC<{
-  current: number;
-  total: number;
-  onChange: (p: number) => void;
-}> = ({ current, total, onChange }) => {
-  const maxVisible = 5;
-  let start = Math.max(1, current - 2);
-  let end = Math.min(total, start + maxVisible - 1);
-  if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
-  const pages: number[] = [];
-  for (let i = start; i <= end; i++) pages.push(i);
 
-  return (
-    <View style={S.paginationRow}>
-      {/* Bootstrap: chevron-left */}
-      <TouchableOpacity
-        style={[S.pageBtn, current === 1 && S.pageBtnDisabled]}
-        onPress={() => current > 1 && onChange(current - 1)}
-        disabled={current === 1}
-      >
-        <BI name="chevron-left" size={13} color={current === 1 ? "#bbb" : "#555"} />
-      </TouchableOpacity>
-
-      {pages.map(p => (
-        <TouchableOpacity
-          key={p}
-          style={[S.pageBtn, p === current && S.pageBtnActive]}
-          onPress={() => onChange(p)}
-        >
-          <Text style={[S.pageBtnText, p === current && { color: "#fff" }]}>{p}</Text>
-        </TouchableOpacity>
-      ))}
-
-      {/* Bootstrap: chevron-right */}
-      <TouchableOpacity
-        style={[S.pageBtn, current === total && S.pageBtnDisabled]}
-        onPress={() => current < total && onChange(current + 1)}
-        disabled={current === total}
-      >
-        <BI name="chevron-right" size={13} color={current === total ? "#bbb" : "#555"} />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────
 // MODAL WRAPPER
@@ -775,15 +731,14 @@ export default function SizesManagement() {
 
   // ── Footer shared between both views
   const Footer = (
-    <View style={[S.footerRow, { paddingHorizontal: PADDING }]}>
-      <Text style={S.footerText}>
-        Showing{" "}
-        {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–
-        {Math.min(safePage * PAGE_SIZE, filtered.length)}{" "}
-        of {filtered.length} sizes
-      </Text>
-      <Pagination current={safePage} total={totalPages} onChange={setPage} />
-    </View>
+    <Pagination
+      currentPage={safePage}
+      totalPages={totalPages}
+      totalItems={filtered.length}
+      itemsPerPage={PAGE_SIZE}
+      itemName="sizes"
+      onPageChange={setPage}
+    />
   );
 
   return (

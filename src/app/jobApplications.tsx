@@ -184,9 +184,82 @@ function ApplicationCard({
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
 
+  if (!isWeb) {
+    return (
+      <View style={[styles.appCard, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+        {/* Top Row: Avatar + Info (Name, Role) + Status */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+            <Avatar initials={item.avatar} color={item.avatarColor} size={46} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.appName} numberOfLines={1}>{item.name}</Text>
+              <Text style={styles.appRole} numberOfLines={1}>{item.role}</Text>
+            </View>
+          </View>
+          <View style={[styles.appRight, { zIndex: statusOpen ? 4000 : 1 }]}>
+            <View style={styles.statusPickerWrap}>
+              <TouchableOpacity
+                onPress={() => setStatusOpen((o) => !o)}
+                activeOpacity={0.8}
+                disabled={updating}
+              >
+                <StatusBadge status={updating ? 'Updating…' : item.status} />
+              </TouchableOpacity>
+              {statusOpen && (
+                <View style={styles.statusMenu}>
+                  {STATUS_UPDATE_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.statusMenuItem, item.status === opt && styles.statusMenuItemActive]}
+                      onPress={() => {
+                        setStatusOpen(false);
+                        if (opt !== item.status) onStatusChange(item.id, opt);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.statusMenuText,
+                          item.status === opt && { color: C.primary, fontWeight: '700' },
+                        ]}
+                      >
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Middle Row: Meta Chips */}
+        <View style={[styles.appMeta, { marginTop: 4, width: '100%' }]}>
+          <View style={styles.metaChip}>
+            <BI name="building" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.department}</Text>
+          </View>
+          <View style={styles.metaChip}>
+            <BI name="envelope-fill" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.email}</Text>
+          </View>
+          <View style={styles.metaChip}>
+            <BI name="telephone-fill" size={10} color={C.sub} />
+            <Text style={styles.metaChipText}>{item.phone}</Text>
+          </View>
+        </View>
+
+        {/* Bottom Row: Date */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2, width: '100%' }}>
+          <Text style={styles.appDate}>{item.applied}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Web Layout
   return (
-    <View style={[styles.appCard, isWeb && styles.appCardWeb]}>
-      <Avatar initials={item.avatar} color={item.avatarColor} size={isWeb ? 52 : 46} />
+    <View style={[styles.appCard, styles.appCardWeb]}>
+      <Avatar initials={item.avatar} color={item.avatarColor} size={52} />
 
       <View style={styles.appInfo}>
         <Text style={styles.appName} numberOfLines={1}>{item.name}</Text>
@@ -393,18 +466,24 @@ export default function JobApplicationsScreen() {
               </ScrollView>
             </View>
           ) : (
-            <View style={{ zIndex: 10, elevation: 10, marginTop: -32, paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              {STAT_CARDS.map(s => (
-                <View key={s.key} style={{ width: '48%' }}>
+            <View style={{ zIndex: 10, elevation: 10, marginTop: -28, width: '100%' }}>
+              <ScrollView
+                style={{ overflow: 'visible', width: '100%' }}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 8 }}
+              >
+                {STAT_CARDS.map(s => (
                   <StatCard
+                    key={s.key}
                     label={s.label}
                     count={counts[s.key] ?? 0}
                     color={s.color}
                     icon={s.icon}
                     isWeb={isWeb}
                   />
-                </View>
-              ))}
+                ))}
+              </ScrollView>
             </View>
           )}
 
@@ -606,9 +685,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  // statCardWeb: {
+  //   flex: 1,
+  //   minWidth: 0,
+  //},
   statCardWeb: {
-    flex: 1,
-    minWidth: 0,
+    flex: 0,
+    width: 143,      // Increase to 180 or 200 as needed
+    minWidth: 143,
   },
   statIcon: {
     width: 38,
@@ -754,6 +838,9 @@ const styles = StyleSheet.create({
   },
   appCardWeb: {
     marginHorizontal: 0,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    gap: 20,
   },
   avatar: {
     alignItems: 'center',
@@ -824,7 +911,7 @@ const styles = StyleSheet.create({
   },
   webGridItem: {
     flex: 1,
-    minWidth: 340,
+    minWidth: 400,
   },
 
   // Empty State
