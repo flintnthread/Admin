@@ -71,7 +71,7 @@ const iconColors = ["#8B5CF6", "#10B981", "#3B82F6", "#F97316", "#EC4899"];
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab, sellerId: sellerIdParam } = useLocalSearchParams<{ tab?: string; sellerId?: string }>();
   const showPending = tab === "pending";
   const { token, isLoading: authLoading } = useAuth();
   const { theme, toggleTheme, isDark } = useThemeContext();
@@ -2251,6 +2251,13 @@ export default function ApprovedSellersScreen() {
       setDetailError(null);
     }
   }, [selectedSellerId]);
+
+  useEffect(() => {
+    if (authLoading || !token || !sellerIdParam || showPending) return;
+    const id = Number(sellerIdParam);
+    if (!Number.isFinite(id) || id <= 0) return;
+    openSellerDetail(id);
+  }, [authLoading, token, sellerIdParam, showPending, openSellerDetail]);
 
   const reload = loadApprovedSellers;
   const setData = setSellers;

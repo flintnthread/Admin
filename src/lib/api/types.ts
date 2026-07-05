@@ -62,6 +62,7 @@ export type SellerSummary = {
   kycImageCount?: number;
   emailVerified?: boolean;
   mobileVerified?: boolean;
+  resendVerificationEligible?: boolean;
 };
 
 export type ProductSummary = {

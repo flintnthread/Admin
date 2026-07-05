@@ -96,6 +96,12 @@ const NAV_ITEMS = {
     ],
     standalone: [
       {
+        label: "Seller Management",
+        icon: "user-plus",
+        path: "/sellermanagement",
+        color: "#3B82F6",
+      },
+      {
         label: "Pending Sellers",
         icon: "user-plus",
         path: "/pendingsellers",
