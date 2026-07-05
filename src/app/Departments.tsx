@@ -71,6 +71,12 @@ const DEPT_ICONS: Record<string, FeatherName> = {
 const getColorKey = (name: string): ColorKey => DEPT_COLOR[name] || "orange";
 const getIcon = (name: string): FeatherName => DEPT_ICONS[name] || "folder";
 
+function releaseModalFocus() {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+    }
+}
+
 const STRIPE_COLOR: Record<ColorKey, string> = {
     orange: T.orange,
     navy: T.navy,
@@ -118,7 +124,7 @@ const ConfirmModal: React.FC<{
         visible={visible}
         transparent
         animationType="fade"
-        onRequestClose={onCancel}
+        onRequestClose={() => { releaseModalFocus(); onCancel(); }}
     >
         <View style={cm.overlay}>
             <View style={cm.box}>
@@ -257,14 +263,14 @@ const EditModal: React.FC<{
             visible={visible}
             transparent
             animationType={isWeb ? "fade" : "slide"}
-            onRequestClose={onCancel}
+            onRequestClose={() => { releaseModalFocus(); onCancel(); }}
         >
             <View style={[em.overlay, isWeb && em.overlayWeb]}>
                 <View style={[em.sheet, isWeb && em.sheetWeb]}>
                     {/* Header */}
                     <View style={em.header}>
                         <Text style={em.title}>{isAdd ? "Add Department" : "Edit Department"}</Text>
-                        <TouchableOpacity style={em.closeBtn} onPress={onCancel}>
+                        <TouchableOpacity style={em.closeBtn} onPress={() => { releaseModalFocus(); onCancel(); }}>
                             <Feather name="x" size={20} color="#fff" />
                         </TouchableOpacity>
                     </View>
@@ -322,7 +328,7 @@ const EditModal: React.FC<{
 
                     {/* Footer */}
                     <View style={em.footer}>
-                        <TouchableOpacity style={em.cancelBtn} onPress={onCancel}>
+                        <TouchableOpacity style={em.cancelBtn} onPress={() => { releaseModalFocus(); onCancel(); }}>
                             <Feather name="x" size={14} color="#fff" />
                             <Text style={em.cancelTxt}>Cancel</Text>
                         </TouchableOpacity>
@@ -336,6 +342,7 @@ const EditModal: React.FC<{
                                     return;
                                 }
                                 setNameError("");
+                                releaseModalFocus();
                                 if (dept) {
                                     onSave({ ...dept, name: trimName, description: trimDesc || dept.description, status });
                                 } else {
@@ -1038,8 +1045,20 @@ const DepartmentsScreen: React.FC = () => {
                         <View style={s.emptyIcon}>
                             <Feather name="inbox" size={30} color={T.textHint} />
                         </View>
-                        <Text style={s.emptyTitle}>No departments found</Text>
-                        <Text style={s.emptySub}>Try adjusting your search</Text>
+                        <Text style={s.emptyTitle}>
+                            {departments.length === 0 ? "No departments yet" : "No departments found"}
+                        </Text>
+                        <Text style={s.emptySub}>
+                            {departments.length === 0
+                                ? "Add your first department to organize job openings."
+                                : "Try adjusting your search or filters."}
+                        </Text>
+                        {departments.length === 0 ? (
+                            <TouchableOpacity style={[s.addBtn, { marginTop: 16 }]} onPress={() => setAddOpen(true)}>
+                                <Feather name="plus" size={14} color="#fff" />
+                                <Text style={s.addBtnTxt}>Add Department</Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                 ) : viewMode === "list" ? (
                     isWeb ? (
@@ -1142,24 +1161,24 @@ const DepartmentsScreen: React.FC = () => {
             <EditModal
                 visible={!!editTarget}
                 dept={editTarget}
-                onCancel={() => setEditTarget(null)}
+                onCancel={() => { releaseModalFocus(); setEditTarget(null); }}
                 onSave={handleSave}
             />
             <EditModal
                 visible={addOpen}
                 dept={null}
-                onCancel={() => setAddOpen(false)}
+                onCancel={() => { releaseModalFocus(); setAddOpen(false); }}
                 onSave={handleSave}
             />
             <ConfirmModal
                 visible={!!deleteTarget}
                 dept={deleteTarget}
-                onCancel={() => setDeleteTarget(null)}
+                onCancel={() => { releaseModalFocus(); setDeleteTarget(null); }}
                 onConfirm={handleDelete}
             />
 
             {/* ── SWEET ALERT ── */}
-            <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}>
+            <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => { releaseModalFocus(); setAlertConfig({ ...alertConfig, visible: false }); }}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
                     <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
                         <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: alertConfig.type === 'error' ? '#fee2e2' : '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
@@ -1167,7 +1186,7 @@ const DepartmentsScreen: React.FC = () => {
                         </View>
                         <Text style={{ fontSize: 20, fontWeight: '800', color: '#1f2937', marginBottom: 8, textAlign: 'center' }}>{alertConfig.title}</Text>
                         <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{alertConfig.message}</Text>
-                        <TouchableOpacity style={{ backgroundColor: alertConfig.type === 'error' ? '#ef4444' : T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
+                        <TouchableOpacity style={{ backgroundColor: alertConfig.type === 'error' ? '#ef4444' : T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => { releaseModalFocus(); setAlertConfig({ ...alertConfig, visible: false }); }}>
                             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>OK</Text>
                         </TouchableOpacity>
                     </View>

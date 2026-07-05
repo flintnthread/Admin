@@ -212,12 +212,33 @@ export function normalizeSellerGraphChart(raw: unknown): SellerGraphChartData {
   };
 }
 
-export async function blockSeller(id: number): Promise<void> {
-  await adminApiRequest(`/api/admin/sellers/${id}/block`, { method: "POST" });
+export async function blockSeller(id: number, reason?: string): Promise<void> {
+  await adminApiRequest(`/api/admin/sellers/${id}/block`, {
+    method: "POST",
+    body: JSON.stringify({ reason, note: reason }),
+  });
 }
 
 export async function unblockSeller(id: number): Promise<void> {
   await adminApiRequest(`/api/admin/sellers/${id}/unblock`, { method: "POST" });
+}
+
+export async function updateSellerStatus(
+  id: number,
+  payload: {
+    status: string;
+    kycVerificationStatus?: string;
+    kycRemarks?: string;
+  }
+): Promise<Record<string, unknown>> {
+  return adminApiRequest(`/api/admin/sellers/${id}/status`, {
+    method: "POST",
+    body: JSON.stringify({
+      status: payload.status,
+      kycVerificationStatus: payload.kycVerificationStatus,
+      kycRemarks: payload.kycRemarks,
+    }),
+  });
 }
 
 export async function fetchPendingBankSellers(page = 0, size = 20): Promise<PageResponse<SellerSummary>> {

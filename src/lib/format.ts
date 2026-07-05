@@ -28,7 +28,7 @@ export function maskAccount(account?: string | null): string {
   if (!account) return "—";
   const trimmed = account.trim();
   if (trimmed.length <= 4) return trimmed;
-  return `XXXX${trimmed.slice(-4)}`;
+  return `******${trimmed.slice(-4)}`;
 }
 
 export function initialsFromName(name?: string | null): string {
