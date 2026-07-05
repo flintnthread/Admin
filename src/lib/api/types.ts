@@ -97,6 +97,8 @@ export type OrderSummary = {
   trackingId?: string;
   weightKg?: number;
   dimensionsCm?: { l?: number; w?: number; h?: number };
+  hasInvoice?: boolean;
+  hasShippingLabel?: boolean;
   products?: OrderProductPreview[];
   sellers?: OrderSellerPreview[];
   sellerGroups?: OrderSellerGroupPreview[];
@@ -143,6 +145,8 @@ export type OrderSellerGroupPreview = {
     };
   };
   products?: OrderProductPreview[];
+  hasInvoice?: boolean;
+  hasShippingLabel?: boolean;
 };
 
 export type CustomerSummary = {
