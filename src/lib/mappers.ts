@@ -715,10 +715,19 @@ export function mapPendingProfileRow(s: PendingProfileSeller) {
 }
 
 export function mapSellerSupportTicket(t: SupportTicketSummary) {
-  const statusMap: Record<string, string> = {
+  type TicketStatusLike =
+    | "Open"
+    | "In Progress"
+    | "Waiting Admin"
+    | "Waiting Seller"
+    | "Resolved"
+    | "Closed";
+  const statusMap: Record<string, TicketStatusLike> = {
     open: "Open",
     in_progress: "In Progress",
     waiting: "Waiting Admin",
+    waiting_admin: "Waiting Admin",
+    waiting_seller: "Waiting Seller",
     closed: "Closed",
     resolved: "Resolved",
   };
@@ -730,15 +739,24 @@ export function mapSellerSupportTicket(t: SupportTicketSummary) {
     urgent: "Urgent",
     medium: "Medium",
   };
+  const statusKey = t.status?.toLowerCase() ?? "open";
+  const status =
+    (t.statusLabel as TicketStatusLike | undefined) ??
+    statusMap[statusKey] ??
+    "Open";
   return {
     id: String(t.id),
     ticketCode: t.ticketNumber ?? `TKT-${t.id}`,
     description: t.subject ?? "—",
     sellerName: t.sellerName ?? `Seller #${t.sellerId}`,
-    email: "",
-    phone: "",
+    email: t.sellerEmail ?? "",
+    phone: t.sellerPhone ?? "",
     department: t.category ?? "General",
-    status: statusMap[t.status?.toLowerCase() ?? ""] ?? "Open",
+    status,
+    statusClosed: Boolean(t.statusClosed),
+    canResolve: Boolean(t.canResolve),
+    canClose: Boolean(t.canClose),
+    canReopen: Boolean(t.canReopen),
     priority: priorityMap[t.priority?.toLowerCase() ?? ""] ?? "Medium",
     createdAt: formatDate(t.createdAt),
     messages: (t.messages ?? []).map((m, i) => ({
