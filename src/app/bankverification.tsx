@@ -283,26 +283,7 @@ function StatCard({
   );
 }
 
-/* ─── Pagination Button ─────────────────────────────────────────────── */
-function PagBtn({ iconName, onPress, disabled }: { iconName: string; onPress: () => void; disabled: boolean }) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-      style={{
-        width: 32, height: 32, borderRadius: 6,
-        borderWidth: 1, borderColor: BORDER,
-        backgroundColor: "#fff",
-        alignItems: "center", justifyContent: "center",
-        opacity: disabled ? 0.4 : 1,
-        zIndex: 10,
-      }}
-    >
-      <Ionicons name={iconName as any} size={13} color={disabled ? "#CBD5E1" : "#374151"} />
-    </TouchableOpacity>
-  );
-}
+
 
 /* ─── Verification Card (mobile row) ───────────────────────────────── */
 function VerificationCard({ item, onViewPress }: { item: Verification; onViewPress: (sellerId: number) => void }) {
@@ -487,12 +468,7 @@ export default function BankVerifications() {
 
   const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
 
-  const pageNums: (number | string)[] = (() => {
-    if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
-    if (safePage <= 3) return [1, 2, 3, "...", totalPages];
-    if (safePage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", safePage, "...", totalPages];
-  })();
+
 
   const STAT_CARDS = [
     { label: "TOTAL", value: counts.total, iconName: "list-outline", iconBg: "#EFF6FF", iconColor: "#3B82F6", spinning: false, filterVal: "All Status" },
@@ -702,51 +678,14 @@ export default function BankVerifications() {
                 }} />
 
                 {/* ── Pagination ── */}
-                {filtered.length > 0 && (
-                  <View style={{
-                    backgroundColor: "#fff", borderRadius: 14,
-                    borderWidth: 1, borderColor: BORDER,
-                    paddingHorizontal: isTablet ? 20 : 14,
-                    paddingVertical: 12,
-                    flexDirection: "row", alignItems: "center",
-                    justifyContent: "space-between", flexWrap: "wrap", gap: 8,
-                    marginTop: 10,
-                  }}>
-                    <Text style={{ fontSize: 12, color: "#64748B" }}>
-                      Page {safePage} of {totalPages}
-                    </Text>
-                    <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                      <PagBtn iconName="play-skip-back-outline" onPress={() => setPage(1)} disabled={safePage === 1} />
-                      <PagBtn iconName="chevron-back-outline" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                      {pageNums.map((p, i) =>
-                        p === "..." ? (
-                          <View key={"e" + i} style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
-                            <Text style={{ color: "#94A3B8", fontSize: 14 }}>…</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            key={p}
-                            onPress={() => setPage(p as number)}
-                            style={{
-                              width: 32, height: 32, borderRadius: 6,
-                              borderWidth: 1,
-                              borderColor: safePage === p ? "#1d324e" : BORDER,
-                              backgroundColor: safePage === p ? "#1d324e" : "#fff",
-                              alignItems: "center", justifyContent: "center",
-                            }}
-                          >
-                            <Text style={{
-                              fontSize: 13, fontWeight: "700",
-                              color: safePage === p ? "#fff" : "#374151",
-                            }}>{p}</Text>
-                          </TouchableOpacity>
-                        )
-                      )}
-                      <PagBtn iconName="chevron-forward-outline" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                      <PagBtn iconName="play-skip-forward-outline" onPress={() => setPage(totalPages)} disabled={safePage === totalPages} />
-                    </View>
-                  </View>
-                )}
+                <Pagination
+                  currentPage={safePage}
+                  totalPages={totalPages}
+                  totalItems={filtered.length}
+                  itemsPerPage={perPage}
+                  itemName="entries"
+                  onPageChange={setPage}
+                />
 
 
               </View>
@@ -939,48 +878,14 @@ export default function BankVerifications() {
                 ))}
 
                 {/* Table Footer */}
-                <View style={{
-                  flexDirection: "row",
-                  padding: 16,
-                  marginTop: 16,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: BORDER,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 3,
-                  elevation: 2,
-                  backgroundColor: "#fff",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}>
-                  <Text style={{ fontSize: 12, color: "#666" }}>
-                    Showing {(safePage - 1) * perPage + 1} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} entries
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 4 }}>
-                    <PagBtn iconName="chevron-back" onPress={() => setPage(safePage - 1)} disabled={safePage === 1} />
-                    {pageNums.map((p, i) => (
-                      typeof p === "number" ? (
-                        <TouchableOpacity
-                          key={i}
-                          onPress={() => setPage(p)}
-                          style={{
-                            width: 32, height: 32, borderRadius: 6,
-                            backgroundColor: p === safePage ? "#1d324e" : "#fff",
-                            borderWidth: 1, borderColor: BORDER,
-                            alignItems: "center", justifyContent: "center",
-                          }}
-                        >
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: p === safePage ? "#fff" : "#374151" }}>{p}</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <Text key={i} style={{ fontSize: 12, color: "#94A3B8", paddingHorizontal: 4 }}>{p}</Text>
-                      )
-                    ))}
-                    <PagBtn iconName="chevron-forward" onPress={() => setPage(safePage + 1)} disabled={safePage === totalPages} />
-                  </View>
-                </View>
+                <Pagination
+                  currentPage={safePage}
+                  totalPages={totalPages}
+                  totalItems={filtered.length}
+                  itemsPerPage={perPage}
+                  itemName="entries"
+                  onPageChange={setPage}
+                />
               </View>
             </View>
 
