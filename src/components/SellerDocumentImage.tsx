@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, ImageStyle, StyleProp } from "react-native";
+import {
+  Image,
+  ImageSourcePropType,
+  ImageStyle,
+  StyleProp,
+} from "react-native";
 import { buildSellerDocumentImageCandidates } from "@/lib/sellerDocuments";
 
-const PLACEHOLDER_SOURCE = require("@/assets/images/document-placeholder.png");
+const DOCUMENT_PLACEHOLDER = require("@/assets/images/document-placeholder.png") as ImageSourcePropType;
 
 type Props = {
   path?: string | null;
@@ -23,17 +28,17 @@ export default function SellerDocumentImage({
   );
 
   const [index, setIndex] = useState(0);
-  const [usePlaceholder, setUsePlaceholder] = useState(false);
+  const [usePlaceholder, setUsePlaceholder] = useState(candidates.length === 0);
 
   useEffect(() => {
     setIndex(0);
-    setUsePlaceholder(false);
+    setUsePlaceholder(candidates.length === 0);
   }, [candidates.join("|")]);
 
   if (usePlaceholder || candidates.length === 0) {
     return (
       <Image
-        source={PLACEHOLDER_SOURCE}
+        source={DOCUMENT_PLACEHOLDER}
         style={style}
         resizeMode={resizeMode}
       />
