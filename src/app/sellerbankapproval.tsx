@@ -1,7 +1,7 @@
 import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapBankPendingRow } from "@/lib/mappers";
-import { fetchBankStats, fetchPendingBankSellers } from "@/services/sellerApi";
+import { fetchBankStats, fetchBankVerifications, fetchPendingBankSellers, fetchSellers } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -24,84 +24,7 @@ type BankRow = Omit<ReturnType<typeof mapBankPendingRow>, "status" | "statusLabe
   statusLabel: string;
 };
 
-const MOCK_EXTRA_SELLERS: BankRow[] = [
-  {
-    id: "#S991",
-    sellerId: 991,
-    initials: "JD",
-    color: "#2196F3",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+91 9876543210",
-    business: "Doe Enterprises",
-    bank: "HDFC Bank",
-    branch: "Mumbai Main",
-    account: "••••••••5678",
-    ifsc: "HDFC0000123",
-    status: "approved",
-    statusLabel: "Approved",
-    requested: "10 Jun, 2026",
-    sellerConfirm: "10 Jun, 2026",
-    adminApprove: "11 Jun, 2026",
-  },
-  {
-    id: "#S992",
-    sellerId: 992,
-    initials: "AS",
-    color: "#4CAF50",
-    name: "Alice Smith",
-    email: "alice.smith@example.com",
-    phone: "+91 9998887776",
-    business: "Smith Garments",
-    bank: "ICICI Bank",
-    branch: "Delhi West",
-    account: "••••••••4321",
-    ifsc: "ICIC0000456",
-    status: "approved",
-    statusLabel: "Approved",
-    requested: "12 Jun, 2026",
-    sellerConfirm: "12 Jun, 2026",
-    adminApprove: "13 Jun, 2026",
-  },
-  {
-    id: "#S993",
-    sellerId: 993,
-    initials: "RB",
-    color: "#9C27B0",
-    name: "Robert Brown",
-    email: "robert.b@example.com",
-    phone: "+91 9123456789",
-    business: "Brown Trading Co.",
-    bank: "State Bank of India",
-    branch: "Bangalore Rural",
-    account: "••••••••9876",
-    ifsc: "SBIN0000789",
-    status: "not_requested",
-    statusLabel: "Not Requested",
-    requested: "—",
-    sellerConfirm: "—",
-    adminApprove: "—",
-  },
-  {
-    id: "#S994",
-    sellerId: 994,
-    initials: "EM",
-    color: "#E91E63",
-    name: "Emma Miller",
-    email: "emma.miller@example.com",
-    phone: "+91 8887776665",
-    business: "Emma Couture",
-    bank: "Axis Bank",
-    branch: "Chennai North",
-    account: "••••••••2468",
-    ifsc: "UTIB0000234",
-    status: "not_requested",
-    statusLabel: "Not Requested",
-    requested: "—",
-    sellerConfirm: "—",
-    adminApprove: "—",
-  }
-];
+
 
 const BLUE = "#2563EB";
 
@@ -291,14 +214,45 @@ export default function BankApproval() {
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
-      const [pendingRes] = await Promise.all([
+      const [pendingRes, verifiedRes, allSellersRes] = await Promise.all([
         fetchPendingBankSellers(0, 200),
+        fetchBankVerifications("verified", 0, 200),
+        fetchSellers({ page: 0, size: 200 }),
         fetchBankStats(),
       ]);
-      setSellers([...(pendingRes?.items ?? []).map(mapBankPendingRow), ...MOCK_EXTRA_SELLERS]);
+
+      // 1. Map pending sellers
+      const pendingSellers: BankRow[] = (pendingRes?.items ?? []).map(s => ({
+        ...mapBankPendingRow(s),
+        status: "pending" as const,
+        statusLabel: "Pending",
+      }));
+
+      // 2. Map verified/approved sellers
+      const approvedSellers: BankRow[] = (verifiedRes?.items ?? []).map(s => ({
+        ...mapBankPendingRow(s),
+        status: "approved" as const,
+        statusLabel: "Approved",
+      }));
+
+      // 3. Map not requested sellers
+      const existingIds = new Set([
+        ...pendingSellers.map(s => s.sellerId),
+        ...approvedSellers.map(s => s.sellerId),
+      ]);
+
+      const notRequestedSellers: BankRow[] = (allSellersRes?.items ?? [])
+        .filter(s => !existingIds.has(s.id) && !s.bankVerified && !(s.bankName || s.accountNumber || s.ifscCode))
+        .map(s => ({
+          ...mapBankPendingRow(s),
+          status: "not_requested" as const,
+          statusLabel: "Not Requested",
+        }));
+
+      setSellers([...pendingSellers, ...approvedSellers, ...notRequestedSellers]);
     } catch (e) {
       setLoadError(getApiErrorMessage(e));
-      setSellers([...MOCK_EXTRA_SELLERS]);
+      setSellers([]);
     }
   }, []);
 
@@ -552,7 +506,7 @@ export default function BankApproval() {
                   <Text style={[styles.tableHeaderCell, { flex: 0.4 }]}>ID</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Seller</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Business</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.6, paddingRight: 24 }]}>Status</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Bank</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Account</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Requested</Text>
@@ -571,20 +525,20 @@ export default function BankApproval() {
                       onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(s.sellerId) } })}
                       style={[styles.tableCell, { flex: 1.5, justifyContent: "center" }]}
                     >
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
                         <Avatar initials={s.initials} color={s.color} />
-                        <View>
-                          <Text style={{ fontWeight: "600", color: BLUE, fontSize: 12 }}>{s.name}</Text>
-                          <Text style={{ color: "#888", fontSize: 11 }}>{s.email}</Text>
-                          <Text style={{ color: "#888", fontSize: 11 }}>{s.phone}</Text>
+                        <View style={{ flex: 1, flexShrink: 1 }}>
+                          <Text style={{ fontWeight: "600", color: BLUE, fontSize: 12 }} numberOfLines={1}>{s.name}</Text>
+                          <Text style={{ color: "#888", fontSize: 11 }} numberOfLines={1}>{s.email}</Text>
+                          <Text style={{ color: "#888", fontSize: 11 }} numberOfLines={1}>{s.phone}</Text>
                         </View>
                       </View>
                     </TouchableOpacity>
-                    <Text style={[styles.tableCell, { fontWeight: "600", fontSize: 11, flex: 1.0 }]}>{s.business}</Text>
-                    <View style={[styles.tableCell, { flex: 0.6 }]}><StatusBadge status={s.status} label={s.statusLabel} /></View>
-                    <View style={[styles.tableCell, { flex: 1.0 }]}>
-                      <Text style={{ fontWeight: "600", fontSize: 12 }}>{s.bank}</Text>
-                      <Text style={{ color: "#888", fontSize: 10 }}>{s.branch}</Text>
+                    <Text style={[styles.tableCell, { fontWeight: "600", fontSize: 11, flex: 1.0, paddingRight: 8 }]} numberOfLines={2}>{s.business}</Text>
+                    <View style={[styles.tableCell, { flex: 0.6, paddingRight: 24 }]}><StatusBadge status={s.status} label={s.statusLabel} /></View>
+                    <View style={[styles.tableCell, { flex: 1.0, flexShrink: 1, paddingRight: 8 }]}>
+                      <Text style={{ fontWeight: "600", fontSize: 12 }} numberOfLines={1}>{s.bank}</Text>
+                      <Text style={{ color: "#888", fontSize: 10 }} numberOfLines={1}>{s.branch}</Text>
                     </View>
                     <View style={[styles.tableCell, { flex: 0.9 }]}>
                       <Text style={{ fontSize: 12 }}>{s.account}</Text>

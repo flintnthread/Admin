@@ -11,6 +11,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import PaginationImport from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import {
   createColor,

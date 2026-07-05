@@ -9,6 +9,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { SellerSummary } from "@/lib/api/types";
 import { initialsFromName, maskAccount } from "@/lib/format";
