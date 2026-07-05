@@ -114,6 +114,10 @@ export async function fetchApprovedSellerLocationStats(): Promise<{
   };
 }
 
+export async function resendSellerVerification(id: number): Promise<{ message: string }> {
+  return adminApiRequest(`/api/admin/sellers/${id}/resend-verification`, { method: "POST" });
+}
+
 export async function fetchSellers(params?: {
   status?: string;
   search?: string;

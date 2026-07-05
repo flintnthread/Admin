@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -134,6 +135,7 @@ const stepCardStyles = StyleSheet.create({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function BulkUpload() {
+  const router = useRouter();
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
     size?: number;
@@ -146,10 +148,15 @@ export default function BulkUpload() {
     type: "success",
   });
 
-  // ── Handlers (UI-only stubs — wire these up to your logic) ──────────────────
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleBack = () => {
-    // TODO: navigation.goBack() or window.history.back()
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.history.length <= 1) {
+      // No browser history to go back to — navigate to Products instead
+      router.push("/Products");
+    } else {
+      router.back();
+    }
   };
 
   const handleDownloadTemplate = () => {

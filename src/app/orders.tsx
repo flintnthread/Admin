@@ -133,6 +133,55 @@ export interface Order {
   dimensionsCm?: { l: number; w: number; h: number };
 }
 
+/** One list-table row per seller within an order. */
+interface OrderSellerRow {
+  order: Order;
+  sellerGroup: SellerGroup;
+  rowKey: string;
+  amount: number;
+}
+
+function computeSellerGroupAmount(group: SellerGroup, fallback: number): number {
+  const total = group.products.reduce((sum, product) => {
+    const price = typeof product.price === "number" ? product.price : 0;
+    const qty = product.qty ?? 1;
+    return sum + price * qty;
+  }, 0);
+  return total > 0 ? total : fallback;
+}
+
+function expandOrdersToSellerRows(orders: Order[]): OrderSellerRow[] {
+  return orders.flatMap((order) => {
+    if (order.sellerGroups.length === 0) {
+      return [
+        {
+          order,
+          sellerGroup: {
+            seller: { name: "—", email: "" },
+            products: [],
+            hasInvoice: false,
+            hasShippingLabel: false,
+          },
+          rowKey: order.id,
+          amount: order.amount,
+        },
+      ];
+    }
+
+    const fallbackEach =
+      order.sellerGroups.length > 0
+        ? order.amount / order.sellerGroups.length
+        : order.amount;
+
+    return order.sellerGroups.map((group, index) => ({
+      order,
+      sellerGroup: group,
+      rowKey: `${order.id}-${index}-${group.seller.name}`,
+      amount: computeSellerGroupAmount(group, fallbackEach),
+    }));
+  });
+}
+
 // ─── Status Config ────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<
   OrderStatus,
@@ -2876,16 +2925,20 @@ const GridOrderCard = ({
 
 // ─── List Table Row ───────────────────────────────────────────────────────────
 const ListTableRow = ({
-  order,
+  row,
   idx,
   onView,
   onGST,
 }: {
-  order: Order;
+  row: OrderSellerRow;
   idx: number;
   onView: (o: Order) => void;
   onGST: (id: string) => void;
-}) => (
+}) => {
+  const { order, sellerGroup, amount } = row;
+  const primary = sellerGroup.products[0];
+
+  return (
   <View style={[s.tRow, idx % 2 === 1 && s.tRowAlt]}>
     <View style={[s.tcell, s.colOrder]}>
       <View style={s.orderIdRow}>
@@ -2922,70 +2975,44 @@ const ListTableRow = ({
     </View>
 
     <View style={[s.tcell, s.colSeller]}>
-      {order.sellerGroups.length === 0 ? (
-        <Text style={s.tdMuted}>—</Text>
-      ) : (
-        order.sellerGroups.map((g, i) => (
-          <View
-            key={i}
-            style={[
-              i > 0 && {
-                marginTop: 8,
-                paddingTop: 8,
-                borderTopWidth: 1,
-                borderTopColor: C.border,
-              },
-            ]}
-          >
-            <Text style={s.tdSellerName} numberOfLines={1}>
-              {g.seller.name}
-            </Text>
-            {g.subOrderId && (
-              <Text style={s.tdMuted} numberOfLines={1}>
-                #{g.subOrderId}
-              </Text>
-            )}
-          </View>
-        ))
-      )}
+      <Text style={s.tdSellerName} numberOfLines={1}>
+        {sellerGroup.seller.name}
+      </Text>
+      {sellerGroup.subOrderId ? (
+        <Text style={s.tdMuted} numberOfLines={1}>
+          #{sellerGroup.subOrderId}
+        </Text>
+      ) : null}
     </View>
 
     <View style={[s.tcell, s.colProducts]}>
-      {order.sellerGroups.length === 0 ? (
+      {sellerGroup.products.length === 0 ? (
         <Text style={s.tdMuted}>—</Text>
       ) : (
-        order.sellerGroups.map((g, gi) => {
-          const primary = g.products[0];
-          return (
-            <View
-              key={gi}
-              style={[s.tableProductRow, gi > 0 && { marginTop: 8 }]}
-            >
-              {primary?.image ? (
-                <Image
-                  source={{ uri: primary.image }}
-                  style={s.tableThumb}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={s.tableThumbEmpty} />
-              )}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.tdProductName} numberOfLines={1}>
-                  {primary?.name || "—"}
-                </Text>
-                {g.products.length > 1 && (
-                  <Text style={s.tdMuted}>{g.products.length} Items</Text>
-                )}
-              </View>
-            </View>
-          );
-        })
+        <View style={s.tableProductRow}>
+          {primary?.image ? (
+            <Image
+              source={{ uri: primary.image }}
+              style={s.tableThumb}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={s.tableThumbEmpty} />
+          )}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.tdProductName} numberOfLines={1}>
+              {primary?.name || "—"}
+            </Text>
+            {sellerGroup.products.length > 1 ? (
+              <Text style={s.tdMuted}>{sellerGroup.products.length} Items</Text>
+            ) : null}
+          </View>
+        </View>
       )}
     </View>
 
     <View style={[s.tcell, s.colAmount]}>
-      <Text style={s.tdAmount}>{fmtCur(order.amount)}</Text>
+      <Text style={s.tdAmount}>{fmtCur(amount)}</Text>
       <Text style={s.tdPayment} numberOfLines={1}>
         {order.paymentType}
       </Text>
@@ -3000,19 +3027,17 @@ const ListTableRow = ({
     </View>
 
     <View style={[s.tcell, s.colDocs]}>
-      {order.sellerGroups.map((g, i) => (
-        <View key={i} style={[s.tableDocRow, i > 0 && { marginTop: 4 }]}>
-          <TouchableOpacity style={s.tableDocBtn} activeOpacity={0.75}>
-            <FileIcon color={C.navy} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.tableDocBtn, { borderColor: "#FED7AA" }]}
-            activeOpacity={0.75}
-          >
-            <TruckIcon color={C.orange} />
-          </TouchableOpacity>
-        </View>
-      ))}
+      <View style={s.tableDocRow}>
+        <TouchableOpacity style={s.tableDocBtn} activeOpacity={0.75}>
+          <FileIcon color={C.navy} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.tableDocBtn, { borderColor: "#FED7AA" }]}
+          activeOpacity={0.75}
+        >
+          <TruckIcon color={C.orange} />
+        </TouchableOpacity>
+      </View>
     </View>
 
     <View style={[s.tcell, s.colAction]}>
@@ -3028,7 +3053,8 @@ const ListTableRow = ({
       </View>
     </View>
   </View>
-);
+  );
+};
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 function buildPages(current: number, total: number): (number | "…")[] {
@@ -3229,6 +3255,10 @@ export default function OrdersScreen() {
   }, []);
 
   const filtered = orders;
+  const sellerRows = useMemo(
+    () => expandOrdersToSellerRows(filtered),
+    [filtered],
+  );
 
   const handleExportCSV = useCallback(async () => {
     try {
@@ -3578,10 +3608,10 @@ export default function OrdersScreen() {
                   ))}
                 </View>
 
-                {filtered.map((o, idx) => (
+                {sellerRows.map((row, idx) => (
                   <ListTableRow
-                    key={o.id}
-                    order={o}
+                    key={row.rowKey}
+                    row={row}
                     idx={idx}
                     onView={handleView}
                     onGST={handleGST}

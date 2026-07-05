@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -34,7 +34,8 @@ import {
   approveSellerProfile,
   rejectSellerProfile,
 } from "@/services/sellerApi";
-import { mapPendingProfileRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
+import { blurActiveElementOnWeb } from "@/lib/focus";
+import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
 import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatRupee, maskAccount } from "@/lib/format";
@@ -71,7 +72,7 @@ const iconColors = ["#8B5CF6", "#10B981", "#3B82F6", "#F97316", "#EC4899"];
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab, sellerId: sellerIdParam } = useLocalSearchParams<{ tab?: string; sellerId?: string }>();
   const showPending = tab === "pending";
   const { token, isLoading: authLoading } = useAuth();
   const { theme, toggleTheme, isDark } = useThemeContext();
@@ -92,6 +93,15 @@ export default function ApprovedSellersScreen() {
   const [showPendingModal, setShowPendingModal] = useState(false);
 
   const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
+  const webScrollRef = useRef<ScrollView>(null);
+
+  // Scroll to top when seller detail view opens on web
+  useEffect(() => {
+    if (selectedSellerId !== null && webScrollRef.current) {
+      webScrollRef.current.scrollTo({ y: 0, animated: false });
+    }
+  }, [selectedSellerId]);
+
   const [sellerDetail, setSellerDetail] = useState<SellerDetailView | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -383,8 +393,30 @@ export default function ApprovedSellersScreen() {
   };
 
   const renderMobileSellerDetails = () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
-    if (!seller) return null;
+    const seller = resolveSelectedSeller();
+    if (!seller) {
+      if (detailLoading) {
+        return (
+          <View style={[stylesMobile.container, { justifyContent: "center", alignItems: "center" }]}>
+            <ActivityIndicator size="large" color="#EA580C" />
+            <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+          </View>
+        );
+      }
+      if (detailError) {
+        return (
+          <View style={[stylesMobile.container, { justifyContent: "center", alignItems: "center", padding: 24 }]}>
+            <Text style={{ color: "#EF4444", marginBottom: 12, textAlign: "center" }}>{detailError}</Text>
+            {selectedSellerId != null && (
+              <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                <Text style={styles.updateStatusBtnText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      }
+      return null;
+    }
 
     // Helper to render label-value row
     const renderLabelValueRow = (label: string, value: any, isLast = false) => (
@@ -398,15 +430,19 @@ export default function ApprovedSellersScreen() {
       return (
         <View style={stylesMobile.container}>
           {/* Header */}
-          <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-            <TouchableOpacity 
-              style={stylesMobile.detailsHeaderBack}
-              onPress={() => setMobileShowAdminActions(false)}
-            >
-              <Feather name="arrow-left" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={[stylesMobile.detailsHeaderTitle, { color: "#FFFFFF" }]}>Admin Actions</Text>
-            <View style={{ width: 40 }} />
+          {/* Header */}
+          <View style={stylesMobile.detailsHeader}>
+            <View style={stylesMobile.detailsHeaderRow}>
+              <TouchableOpacity 
+                style={stylesMobile.detailsHeaderBack}
+                onPress={() => setMobileShowAdminActions(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Feather name="arrow-left" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={stylesMobile.detailsHeaderTitle}>Admin Actions</Text>
+            </View>
           </View>
 
           <ScrollView 
@@ -575,11 +611,13 @@ export default function ApprovedSellersScreen() {
 
         {/* Header */}
         <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={stylesMobile.detailsHeaderBack}
             onPress={() => setSelectedSellerId(null)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
           >
-            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+            <Feather name="arrow-left" size={20} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={stylesMobile.headerCenterContainerMobile}>
             <Text style={stylesMobile.headerSellerNameMobile} numberOfLines={1}>{seller.name}</Text>
@@ -593,6 +631,7 @@ export default function ApprovedSellersScreen() {
             </View>
           </View>
         </View>
+        <Text style={stylesMobile.detailsHeaderSub}>ID: FNT-SELLER-0000{seller.id}</Text>
 
         <ScrollView 
           style={{ flex: 1 }}
@@ -1347,7 +1386,7 @@ export default function ApprovedSellersScreen() {
   };
 
   const renderMobileEditModal = () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
+    const seller = resolveSelectedSeller();
     if (!seller) return null;
 
     return (
@@ -1579,7 +1618,7 @@ export default function ApprovedSellersScreen() {
           {/* --- SCROLLABLE BODY --- */}
           <ScrollView 
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: 0 }}
             showsVerticalScrollIndicator={false}
           >
           {/* --- BREADCRUMB BANNER --- */}
@@ -2212,6 +2251,7 @@ export default function ApprovedSellersScreen() {
   }, [token]);
 
   const openSellerDetail = useCallback((sellerId: number, listStatus?: Seller["status"]) => {
+    blurActiveElementOnWeb();
     setSelectedSellerId(sellerId);
     if (listStatus) {
       setAdminStatus(listStatus);
@@ -2219,6 +2259,16 @@ export default function ApprovedSellersScreen() {
     }
     void loadSellerDetail(sellerId);
   }, [loadSellerDetail]);
+
+  const resolveSelectedSeller = useCallback((): Seller | null => {
+    if (selectedSellerId == null) return null;
+    const fromList = sellers.find((s) => s.id === selectedSellerId);
+    if (fromList) return fromList;
+    if (sellerDetail?.id === selectedSellerId) {
+      return mapSellerDetailToApprovedRow(sellerDetail);
+    }
+    return null;
+  }, [selectedSellerId, sellers, sellerDetail]);
 
   const loadPendingSellers = useCallback(async () => {
     if (!token) return;
@@ -2251,6 +2301,13 @@ export default function ApprovedSellersScreen() {
       setDetailError(null);
     }
   }, [selectedSellerId]);
+
+  useEffect(() => {
+    if (authLoading || !token || !sellerIdParam || showPending) return;
+    const id = Number(sellerIdParam);
+    if (!Number.isFinite(id) || id <= 0) return;
+    openSellerDetail(id);
+  }, [authLoading, token, sellerIdParam, showPending, openSellerDetail]);
 
   const reload = loadApprovedSellers;
   const setData = setSellers;
@@ -2432,15 +2489,39 @@ export default function ApprovedSellersScreen() {
   return (
     <AdminLayout>
       <ScrollView
+        ref={webScrollRef}
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
       >
         {selectedSellerId !== null ? (
           (() => {
-            const seller = sellers.find(s => s.id === selectedSellerId);
+            const seller = resolveSelectedSeller();
             const detail = sellerDetail;
-            if (!seller) return null;
+
+            if (!seller) {
+              if (detailLoading) {
+                return (
+                  <View style={{ padding: 48, alignItems: "center" }}>
+                    <ActivityIndicator size="large" color="#EA580C" />
+                    <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+                  </View>
+                );
+              }
+              if (detailError) {
+                return (
+                  <View style={{ padding: 48, alignItems: "center" }}>
+                    <Text style={{ color: "#EF4444", marginBottom: 12 }}>{detailError}</Text>
+                    {selectedSellerId != null && (
+                      <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                        <Text style={styles.updateStatusBtnText}>Retry</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }
+              return null;
+            }
 
             const handleUpdateSellerStatus = async () => {
               if (!selectedSellerId) return;
@@ -3944,7 +4025,7 @@ const styles = StyleSheet.create({
   },
   scrollBodyContent: {
     padding: 24,
-    paddingBottom: 60,
+    paddingBottom: 0,
   },
   rowLayout: {
     flexDirection: "row",
@@ -6166,26 +6247,32 @@ const stylesMobile = StyleSheet.create({
     marginTop: 4,
   },
   detailsHeader: {
-    height: Platform.OS === 'ios' ? 96 : 80,
-    paddingTop: Platform.OS === 'ios' ? 44 : 28,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    backgroundColor: "#151D4F", // Deep navy blue
+    marginHorizontal: 2,
+    marginTop: 12,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 16 : 10,
+    paddingBottom: 24,
+  },
+  detailsHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    marginBottom: 4,
   },
   detailsHeaderBack: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    marginRight: 10,
   },
   detailsHeaderTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "700",
-    color: "#1E293B",
+    color: "#FFFFFF",
+    flex: 1,
+  },
+  detailsHeaderSub: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginLeft: 30,
   },
   detailsHeaderMore: {
     width: 40,

@@ -24,7 +24,7 @@ export default function SellerDocumentImage({
 }: Props) {
   const candidates = useMemo(
     () => buildSellerDocumentImageCandidates(path, url),
-    [path, url]
+    [path, url],
   );
 
   const [index, setIndex] = useState(0);
@@ -35,7 +35,7 @@ export default function SellerDocumentImage({
     setUsePlaceholder(candidates.length === 0);
   }, [candidates.join("|")]);
 
-  if (usePlaceholder) {
+  if (usePlaceholder || candidates.length === 0) {
     return (
       <Image
         source={DOCUMENT_PLACEHOLDER}

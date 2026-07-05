@@ -62,6 +62,7 @@ export type SellerSummary = {
   kycImageCount?: number;
   emailVerified?: boolean;
   mobileVerified?: boolean;
+  resendVerificationEligible?: boolean;
 };
 
 export type ProductSummary = {
@@ -222,12 +223,20 @@ export type SupportTicketSummary = {
   ticketNumber?: string;
   sellerId?: number;
   sellerName?: string;
+  sellerEmail?: string;
+  sellerPhone?: string;
   subject?: string;
   category?: string;
   priority?: string;
   status?: string;
+  statusLabel?: string;
+  statusClosed?: boolean;
+  canResolve?: boolean;
+  canClose?: boolean;
+  canReopen?: boolean;
   lastResponseBy?: string;
   lastResponseAt?: string;
+  closedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   messages?: SupportMessage[];
