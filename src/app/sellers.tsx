@@ -1083,7 +1083,7 @@ const SS = StyleSheet.create({
   viewLabel: { fontSize: 13, color: C.sub, fontWeight: '500', marginRight: 2 },
   vBtn: { width: 36, height: 36, borderRadius: 7, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center' },
   vBtnOn: { backgroundColor: C.primary, borderColor: C.primary },
-  content: { paddingVertical: 20, paddingBottom: 50 },
+  content: { paddingVertical: 20, paddingBottom: 0 },
   listBox: { backgroundColor: C.card, marginHorizontal: 20, borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, marginHorizontal: 20, marginTop: 16, backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2, gap: 12, flexWrap: 'wrap' },
   footTxt: { fontSize: 13, color: '#4B5563', fontWeight: '500' },

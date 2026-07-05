@@ -1268,21 +1268,31 @@ export default function ViewSeller() {
     <AdminLayout>
       <ScrollView style={styles.root} contentContainerStyle={styles.container}>
 
-        {/* ── Page Header — dark blue container ──────────────────────────── */}
+        {/* ── Page Header — dark blue container (matches approveseller) ── */}
         <View style={[styles.pageHeaderContainer, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <View style={[styles.pageHeader, { paddingHorizontal: isMobile ? 16 : 24 }]}>
-            <View style={styles.pageHeaderLeft}>
-              <BootstrapIcon name="person-circle" size={32} color={COLORS.white} />
-              <View style={{ marginLeft: 8 }}>
-                <Text style={styles.pageHeaderTitle}>Seller Details</Text>
+            <TouchableOpacity style={styles.pageHeaderBackBtn} onPress={() => router.push('/sellers')}>
+              <BootstrapIcon name="arrow-left" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+            <View style={styles.pageHeaderCenter}>
+              <Text style={styles.pageHeaderSellerName} numberOfLines={1}>{seller.fullName}</Text>
+              <Text style={styles.pageHeaderSellerId}>ID: {seller.sellerId}</Text>
+            </View>
+            <View style={styles.pageHeaderRight}>
+              <View style={[
+                styles.pageHeaderStatusBadge,
+                seller.status === 'Active' ? styles.pageHeaderStatusActive
+                  : seller.status === 'Pending' ? styles.pageHeaderStatusPending
+                  : styles.pageHeaderStatusInactive
+              ]}>
+                <Text style={[
+                  styles.pageHeaderStatusText,
+                  { color: seller.status === 'Active' ? '#10B981' : seller.status === 'Pending' ? '#F59E0B' : '#EF4444' }
+                ]}>
+                  {seller.status}
+                </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/sellers')}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <BootstrapIcon name="arrow-left" size={13} color={COLORS.white} />
-                <Text style={styles.backBtnText}>Back to Sellers</Text>
-              </View>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -1680,33 +1690,55 @@ const styles = StyleSheet.create({
   },
   pageHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
   },
-  pageHeaderLeft: {
-    flexDirection: 'row',
+  pageHeaderBackBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
   },
-  pageHeaderTitle: {
-    fontSize: 20,
+  pageHeaderCenter: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  pageHeaderSellerName: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,             // white on dark blue
   },
-  breadcrumb: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  pageHeaderSellerId: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
     marginTop: 2,
   },
-  breadcrumbItem: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)', // soft white
+  pageHeaderRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  breadcrumbSep: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
+  pageHeaderStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  pageHeaderStatusActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  pageHeaderStatusPending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  pageHeaderStatusInactive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  pageHeaderStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   backBtn: {
     backgroundColor: 'rgba(255,255,255,0.15)',
