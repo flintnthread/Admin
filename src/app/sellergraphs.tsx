@@ -14,6 +14,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { formatDate, initialsFromName } from "@/lib/format";
 import {
   fetchSellerAnalyticsChart,
@@ -39,6 +40,7 @@ import {
 } from "@/services/sellerApi";
 import { fetchProducts, type ProductListRow } from "@/services/productApi";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -238,6 +240,37 @@ function StatusBadge({ status }: { status: string }) {
       <Text style={{ fontSize: 11, fontWeight: "600", color: s.color }} numberOfLines={1}>{status}</Text>
     </View>
   );
+}
+
+function resolveProductImage(product: ProductListRow): string {
+  const row = product as Record<string, unknown>;
+  return resolveMediaUrl(
+    String(product.imageUrl ?? row.image ?? row.thumbnail ?? row.productImage ?? "")
+  );
+}
+
+function ProductImageCell({ uri }: { uri: string }) {
+  if (!uri) {
+    return (
+      <View style={styles.detailProductImagePlaceholder}>
+        <Ionicons name="image-outline" size={18} color="#94A3B8" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.detailProductImage}
+      contentFit="cover"
+      transition={150}
+    />
+  );
+}
+
+function mapDetailProductRow(product: ProductListRow): ProductListRow {
+  const imageUrl = resolveProductImage(product);
+  return imageUrl ? { ...product, imageUrl } : product;
 }
 
 /* ─── Seller label / filter dropdown ────────────────────────────────── */
@@ -1175,8 +1208,9 @@ function SellerGraphDetailPanel({
         </View>
         <View style={styles.detailTable}>
           <View style={styles.detailTableHeaderDark}>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.55 }]}>Image</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.45 }]}>ID</Text>
-            <Text style={[styles.detailTableHeadCellDark, { flex: 2 }]}>Product</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 1.85 }]}>Product</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.9 }]}>Category</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.9 }]}>Subcategory</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.8 }]}>Created</Text>
@@ -1192,10 +1226,13 @@ function SellerGraphDetailPanel({
                 key={String(product.id)}
                 style={[styles.detailTableRow, idx % 2 === 1 && styles.detailTableRowAlt]}
               >
+                <View style={{ flex: 0.55, justifyContent: "center" }}>
+                  <ProductImageCell uri={resolveProductImage(product)} />
+                </View>
                 <Text style={[styles.detailTableIdCell, { flex: 0.45 }]}>
                   {product.id}
                 </Text>
-                <Text style={[styles.detailTableCell, { flex: 2, fontWeight: "600" }]} numberOfLines={2}>
+                <Text style={[styles.detailTableCell, { flex: 1.85, fontWeight: "600" }]} numberOfLines={2}>
                   {product.name ?? "—"}
                 </Text>
                 <Text style={[styles.detailTableCell, { flex: 0.9 }]} numberOfLines={1}>
@@ -1732,7 +1769,7 @@ export default function SellersDashboard() {
       try {
         const response = await fetchProducts({ sellerId: selectedSeller.id, page: 0, size: 500 });
         if (!cancelled) {
-          setDetailProducts(response.items ?? []);
+          setDetailProducts((response.items ?? []).map(mapDetailProductRow));
         }
       } catch {
         if (!cancelled) {
@@ -2831,6 +2868,24 @@ const styles = StyleSheet.create({
   detailTableCell: { fontSize: 12, color: "#374151" },
   detailTableCellAccent: { fontSize: 12, color: "#7C3AED", fontWeight: "800" },
   detailTableIdCell: { fontSize: 12, fontWeight: "800", color: ORANGE },
+  detailProductImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  detailProductImagePlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   detailEmptyText: { fontSize: 13, color: "#94A3B8", padding: 18, textAlign: "center" },
 
   /* Modal */
