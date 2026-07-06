@@ -28,6 +28,7 @@ const NAV_ITEMS = {
 
 
     { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
+    { label: "Settings", icon: "settings", path: "/settings", color: "#64748B" },
     { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
 
   ],
