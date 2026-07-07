@@ -325,6 +325,7 @@ export default function AdminSidebar({
       style={[
         styles.sidebar,
         collapsed && styles.sidebarCollapsed,
+        !isLargeScreen && { flex: 1, height: undefined }, // Fix mobile drawer overflow
         { backgroundColor: colors.surface, borderRightColor: colors.border },
       ]}
     >

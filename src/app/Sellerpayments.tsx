@@ -18,6 +18,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from "react-native";
 
@@ -445,6 +446,15 @@ const ExportDropdown: React.FC<{
 const SellerPaymentsScreen: React.FC = () => {
     const { token, isLoading: authLoading } = useAuth();
     const isWeb = Platform.OS === "web";
+    const { width: windowWidth } = useWindowDimensions();
+    // The multi-column desktop layout (data table, inline filter bar, row-based
+    // stats/legend) only makes sense once there's enough horizontal room. Below
+    // 1024px — whether that's a phone, a tablet, or a browser window/devtools
+    // device-toolbar resized down on a laptop — we fall back to the same
+    // mobile-style stacked/card layout. This makes the page respond correctly
+    // to resizing instead of only reacting to Platform.OS.
+    const isWideWeb = isWeb && windowWidth >= 1024;
+    const isUltraWide = isWeb && windowWidth >= 1200;
     const [orders, setOrders] = useState<SellerOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -625,12 +635,12 @@ const SellerPaymentsScreen: React.FC = () => {
             {/* Stats Card */}
             <View style={[
                 styles.statsCardSingle,
-                !isWeb && { flexDirection: "column", gap: 16 },
-                isWeb && { justifyContent: "space-between" }
+                !isUltraWide && { flexDirection: "column", gap: 16 },
+                isUltraWide && { justifyContent: "space-between", flexDirection: "row", alignItems: "center" }
             ]}>
                 <View style={[
-                    { gap: isWeb ? 24 : 16, flex: isWeb ? 1 : undefined },
-                    isWeb ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
+                    { gap: isUltraWide ? 24 : 16, flex: isUltraWide ? 1 : undefined },
+                    isUltraWide ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
                 ]}>
                     {[
                         { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
@@ -639,7 +649,7 @@ const SellerPaymentsScreen: React.FC = () => {
                         { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
                     ].map((s, i) => (
                         <React.Fragment key={i}>
-                            <View style={[styles.statBlockSingle, !isWeb && { width: "47%" }]}>
+                            <View style={[styles.statBlockSingle, windowWidth < 600 && { width: "47%" }]}>
                                 <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
                                     <Feather name={s.icon as any} size={20} color="#ffffff" />
                                 </View>
@@ -648,15 +658,15 @@ const SellerPaymentsScreen: React.FC = () => {
                                     <Text style={styles.statLabelSingle} numberOfLines={1}>{s.label}</Text>
                                 </View>
                             </View>
-                            {i < 3 && isWeb && <View style={styles.statDividerSingle} />}
+                            {i < 3 && isUltraWide && <View style={styles.statDividerSingle} />}
                         </React.Fragment>
                     ))}
                 </View>
 
                 {/* Legend */}
-                <View style={{ flexDirection: isWeb ? "row" : "column", alignItems: isWeb ? "center" : "stretch", gap: isWeb ? 24 : 12, flexShrink: 0, paddingLeft: isWeb ? 12 : 0, marginTop: isWeb ? 0 : 16 }}>
-                    {isWeb && <View style={styles.statDividerSingle} />}
-                    <View style={{ gap: 6, justifyContent: "center", width: isWeb ? 300 : "100%" }}>
+                <View style={{ flexDirection: isUltraWide ? "row" : "column", alignItems: isUltraWide ? "center" : "stretch", gap: isUltraWide ? 24 : 12, flexShrink: 0, paddingLeft: isUltraWide ? 12 : 0, marginTop: isUltraWide ? 0 : 16 }}>
+                    {isUltraWide && <View style={styles.statDividerSingle} />}
+                    <View style={{ gap: 6, justifyContent: "center", width: isUltraWide ? 300 : "100%" }}>
                         <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                             <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
                                 <Text style={[styles.legendText, { textAlign: "center" }]}>Green (0-2d): {stats.greenCount}</Text>
@@ -692,10 +702,10 @@ const SellerPaymentsScreen: React.FC = () => {
                     <View style={[styles.webFilterSection, { zIndex: 999 }]}>
                         <View style={[
                             styles.webFilterBar,
-                            !isWeb && { flexDirection: "column", gap: 10 }
+                            !isUltraWide && { flexDirection: "column", gap: 10, alignItems: "stretch" }
                         ]}>
                             {/* Search */}
-                            <View style={[styles.webSearchInputWrapper, !isWeb && { width: "100%" }]}>
+                            <View style={[styles.webSearchInputWrapper, !isUltraWide && { width: "100%" }]}>
                                 <Feather name="search" size={14} color={PRIMARY} />
                                 <TextInput
                                     style={styles.webSearchInput}
@@ -714,10 +724,10 @@ const SellerPaymentsScreen: React.FC = () => {
                             {/* Mobile: row of filters */}
                             <View style={[
                                 { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
-                                !isWeb && { width: "100%" }
+                                !isUltraWide && { width: "100%" }
                             ]}>
                                 {/* Payment filter */}
-                                <View style={[{ position: "relative", zIndex: 1000 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ position: "relative", zIndex: 1000 }, windowWidth < 550 && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "payment" ? null : "payment")}
@@ -726,7 +736,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "payment" && (
-                                        <View style={[styles.webDropdownMenu, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
+                                        <View style={[styles.webDropdownMenu, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {(["All", "Pending", "Paid", "Cancelled"] as const).map(option => (
                                                 <TouchableOpacity
                                                     key={option}
@@ -743,7 +753,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Reminder filter */}
-                                <View style={[{ position: "relative", zIndex: 999 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ position: "relative", zIndex: 999 }, windowWidth < 550 && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "reminder" ? null : "reminder")}
@@ -756,7 +766,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "reminder" && (
-                                        <View style={[styles.webDropdownMenu, { width: 180 }, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
+                                        <View style={[styles.webDropdownMenu, { width: 180 }, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {[
                                                 { label: "All Buckets", value: "All" },
                                                 { label: "Green (0-2 days)", value: "green" },
@@ -778,7 +788,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Sort */}
-                                <View style={[{ position: "relative", zIndex: 998 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ position: "relative", zIndex: 998 }, windowWidth < 550 && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "priority" ? null : "priority")}
@@ -787,7 +797,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "priority" && (
-                                        <View style={[styles.webDropdownMenu, { width: 170 }, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
+                                        <View style={[styles.webDropdownMenu, { width: 170 }, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {["Priority (Red first)", "Date: Newest First", "Date: Oldest First"].map(option => (
                                                 <TouchableOpacity
                                                     key={option}
@@ -802,11 +812,11 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Export Buttons Container */}
-                                <View style={[{ flexDirection: "column", gap: 8 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ flexDirection: "column", gap: 8 }, windowWidth < 550 && { width: "100%" }]}>
                                     {/* Export row: button + >=4d side by side */}
                                     <View style={{ flexDirection: "row", gap: 8 }}>
                                         {/* Export All Dropdown trigger only (fixed width, not flex) */}
-                                        <ExportDropdown onExport={handleExport} isWeb={isWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
+                                        <ExportDropdown onExport={handleExport} isWeb={isWideWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
 
                                         {/* Export >=4d button */}
                                         <TouchableOpacity
@@ -832,7 +842,7 @@ const SellerPaymentsScreen: React.FC = () => {
                             <Feather name="inbox" size={44} color={TEXT_MUTED} />
                             <Text style={styles.emptyTitle}>No orders found</Text>
                         </View>
-                    ) : isWeb ? (
+                    ) : isWideWeb ? (
                         <View style={{ width: "100%" }}>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                 <View style={styles.tableContainer}>
@@ -969,7 +979,7 @@ const SellerPaymentsScreen: React.FC = () => {
                     order={payModalOrder}
                     onClose={() => setPayModalOrder(null)}
                     onConfirm={handleConfirmPay}
-                    isWeb={isWeb}
+                    isWeb={isWideWeb}
                 />
             </View>
         </AdminLayout>

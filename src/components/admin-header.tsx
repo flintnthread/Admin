@@ -87,7 +87,7 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
 
   return (
     <View style={[
-      styles.header, 
+      styles.header,
       { backgroundColor: colors.surface, borderBottomColor: colors.border }
     ]}>
       {/* Hamburger – shown on mobile only */}
@@ -273,17 +273,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: 38,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     maxWidth: 280,
     backgroundColor: "#F3F4F6",
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginRight: "auto",
+    marginRight: 8,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 13,
     color: "#1F2937",
     padding: 0,
@@ -295,7 +299,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 6,
+    flexShrink: 0,
   },
   actionBtn: {
     width: 36,

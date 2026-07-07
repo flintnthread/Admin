@@ -19,6 +19,7 @@ import {
     StatusBar,
     Alert,
     useWindowDimensions,
+    DimensionValue,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -275,6 +276,22 @@ const FaqCategoriesScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
     const { width } = useWindowDimensions();
     const isMobile = width < 480;
+    // Tablet / laptop-inspector range (roughly phone-landscape up to a small
+    // laptop window). Below this, the toolbar stacks and the search bar takes
+    // the full width instead of squeezing into one crowded row.
+    const isTablet = width < 900;
+    // Number of grid columns scales with the actual available width instead of
+    // a single fixed "web" breakpoint, so resizing the browser (or inspecting
+    // at any device width) reflows the cards instead of squashing them.
+    const gridColumns = isMobile ? 1 : width < 900 ? 2 : width < 1300 ? 3 : 4;
+    const gridItemWidthMap: Record<number, DimensionValue> = { 1: "100%", 2: "48%", 3: "31.5%", 4: "23%" };
+    // Stat-card columns for the top summary row. Driven off the same width
+    // reads as the content grid so the row can never grow wider than the
+    // header/card container beneath it at any breakpoint (mobile / tablet /
+    // 1024px laptop / large desktop all get an explicit column count instead
+    // of relying on flex-wrap to "guess" how many fit).
+    const statColumns = isMobile ? 2 : 4;
+    const statWidthMap: Record<number, DimensionValue> = { 2: "48%", 4: "23.5%" };
 
     const [categories, setCategories] = useState<FaqCategory[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -498,7 +515,14 @@ const FaqCategoriesScreen: React.FC = () => {
                     {!isMobile && (
                         <View style={st.statsRow}>
                             {stats.map((s, i) => (
-                                <View key={i} style={[st.statCard, { borderTopColor: s.color }]}>
+                                <View
+                                    key={i}
+                                    style={[
+                                        st.statCard,
+                                        { borderTopColor: s.color },
+                                        { width: statWidthMap[statColumns], flexGrow: 0, flexBasis: undefined, minWidth: 0 },
+                                    ]}
+                                >
                                     <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
                                         <Feather name={s.icon as any} size={22} color={s.color} />
                                     </View>
@@ -518,9 +542,10 @@ const FaqCategoriesScreen: React.FC = () => {
                         ) : null}
 
                         {/* ── TOOLBAR ── */}
-                        <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
-                            {/* Search */}
-                            <View style={[st.searchWrap, !isWeb && { width: "100%", flex: 0 }]}>
+                        <View style={[st.toolbar, isMobile && st.toolbarWrap]}>
+                            {/* Search - always its own full-width row below the breakpoint so it
+                                never has to compete with the filter chips / view toggle for space. */}
+                            <View style={[st.searchWrap, isMobile && st.searchWrapFull]}>
                                 <Feather name="search" size={14} color={PRIMARY} />
                                 <TextInput style={st.searchInput}
                                     placeholder="Search categories..."
@@ -540,32 +565,35 @@ const FaqCategoriesScreen: React.FC = () => {
                                 )}
                             </View>
 
-                            {/* Filter chips */}
-                            <View style={st.chips}>
-                                {(["All", "Active", "Inactive"] as const).map(f => (
-                                    <TouchableOpacity key={f}
-                                        style={[st.chip, statusFilter === f && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
-                                        onPress={() => {
-                                            setStatusFilter(f);
-                                            setCurrentPage(1);
-                                        }}>
-                                        <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+                            {/* Filter chips + grid/list toggle grouped together so the view
+                                toggle always sits beside the Active/Inactive chips, on the
+                                same row, instead of falling onto its own line. */}
+                            <View style={[st.filterViewRow, isMobile && st.filterViewRowFull]}>
+                                <View style={st.chips}>
+                                    {(["All", "Active", "Inactive"] as const).map(f => (
+                                        <TouchableOpacity key={f}
+                                            style={[st.chip, statusFilter === f && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}
+                                            onPress={() => {
+                                                setStatusFilter(f);
+                                                setCurrentPage(1);
+                                            }}>
+                                            <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
 
-                            {/* View toggle */}
-                            <View style={st.viewToggle}>
-                                <TouchableOpacity
-                                    style={[st.viewBtn, viewMode === "grid" && { backgroundColor: PRIMARY }]}
-                                    onPress={() => setViewMode("grid")}>
-                                    <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_MUTED} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[st.viewBtn, viewMode === "list" && { backgroundColor: PRIMARY }]}
-                                    onPress={() => setViewMode("list")}>
-                                    <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_MUTED} />
-                                </TouchableOpacity>
+                                <View style={st.viewToggle}>
+                                    <TouchableOpacity
+                                        style={[st.viewBtn, viewMode === "grid" && { backgroundColor: PRIMARY }]}
+                                        onPress={() => setViewMode("grid")}>
+                                        <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_MUTED} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[st.viewBtn, viewMode === "list" && { backgroundColor: PRIMARY }]}
+                                        onPress={() => setViewMode("list")}>
+                                        <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_MUTED} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
 
@@ -588,7 +616,14 @@ const FaqCategoriesScreen: React.FC = () => {
                         ) : viewMode === "grid" ? (
                             <View style={[st.grid, isWeb && st.gridWeb]}>
                                 {paginated.map(cat => (
-                                    <View key={cat.id} style={[st.gridItem, isWeb && st.gridItemWeb]}>
+                                    <View
+                                        key={cat.id}
+                                        style={[
+                                            st.gridItem,
+                                            isWeb && st.gridItemWeb,
+                                            isWeb && { width: gridItemWidthMap[gridColumns] }
+                                        ]}
+                                    >
                                         <GridCard
                                             cat={cat}
                                             onEdit={() => { setEditingCat(cat); setModalVisible(true); }}
@@ -658,8 +693,8 @@ const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
     // ── Web Header ──
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor:   "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
-    headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
+    headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 56, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },
@@ -672,7 +707,7 @@ const st = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor:  "#151D4F",
+        backgroundColor: "#151D4F",
         paddingHorizontal: 16,
         paddingTop: 14,
         paddingBottom: 44,
@@ -762,17 +797,28 @@ const st = StyleSheet.create({
     scrollContent: { padding: 16, gap: 14 },
 
     // ── Web Stat Cards ──
-    statsRow: { flexDirection: "row", gap: 12, marginBottom: 4, marginTop: -42, marginHorizontal: 16, zIndex: 10, maxWidth: 900, alignSelf: "center", width: "100%" },
-    statCard: { flex: 1, backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
+    // No fixed maxWidth here on purpose: the row's edges now match the
+    // header's edges (both only constrained by the shared marginHorizontal),
+    // so the cards can never visually spill past the header at tablet /
+    // 1024px widths. Column count + card width are driven explicitly by
+    // `statColumns` / `statWidthMap` above instead of relying on flex-wrap.
+    statsRow: { flexDirection: "row", flexWrap: "wrap" as any, rowGap: 12, columnGap: 12, marginBottom: 4, marginTop: -46, marginHorizontal: 16, zIndex: 10 },
+    statCard: { backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     statIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     statValue: { fontSize: 22, fontWeight: "800" },
     statLabel: { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", letterSpacing: 0.5 },
 
     // ── Toolbar ──
     toolbar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: BG_CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-    searchWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: PRIMARY + "55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
-    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, outlineStyle: "none" } as any,
-    chips: { flexDirection: "row", gap: 6 },
+    toolbarWrap: { flexWrap: "wrap" as any },
+    searchWrap: { flex: 1, minWidth: 160, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: PRIMARY + "55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
+    searchWrapFull: { flexBasis: "100%" as any, flex: 1, minWidth: 0 },
+    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, paddingVertical: 0 },
+    // Wraps the filter chips + grid/list toggle as a single row so the toggle
+    // always renders beside the chips (never on its own separate line).
+    filterViewRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+    filterViewRowFull: { width: "100%" },
+    chips: { flexDirection: "row", gap: 6, flexWrap: "wrap" as any },
     chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, backgroundColor: BG_PAGE },
     chipText: { fontSize: 12, fontWeight: "600", color: TEXT_BODY },
     viewToggle: { flexDirection: "row", backgroundColor: BG_PAGE, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
@@ -785,7 +831,7 @@ const st = StyleSheet.create({
     grid: { gap: 14 },
     gridWeb: { flexDirection: "row", flexWrap: "wrap" as any, gap: 16 },
     gridItem: { width: "100%" },
-    gridItemWeb: { width: "23%", minWidth: 240 },
+    gridItemWeb: { minWidth: 220 },
 
     // ── List ──
     listWrap: { backgroundColor: BG_CARD, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
