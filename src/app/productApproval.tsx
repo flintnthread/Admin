@@ -385,7 +385,7 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide, stats, onFilter, isMobile }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean }) {
+function PageHeader({ isWide, stats, onFilter, isMobile, isTablet }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean; isTablet?: boolean }) {
   return (
     <View>
       <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
@@ -398,8 +398,8 @@ function PageHeader({ isWide, stats, onFilter, isMobile }: { isWide: boolean; st
           </View>
         </View>
       </View>
-      {/* Mobile: stat cards overlapping the header bottom */}
-      {isMobile && stats && onFilter && (
+      {/* Mobile/Tablet: stat cards overlapping the header bottom */}
+      {(isMobile || isTablet) && stats && onFilter && (
         <View style={styles.mobileHeaderStats}>
           <StatsRow stats={stats} onFilter={onFilter} isWide={false} />
         </View>
@@ -983,13 +983,11 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} />
+        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} isTablet={isTablet} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
         <View style={styles.scrollContent}>
-
-          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}

@@ -419,7 +419,7 @@ type TabKey = (typeof TABS)[number]['key'];
 
 function useBreakpoint() {
   const { width } = useWindowDimensions();
-  return { width, isWide: width >= 1024 };
+  return { width, isWide: width >= 1024, isTablet: width >= 480 && width < 1024 };
 }
 
 function InfoRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
@@ -487,6 +487,10 @@ function VariantsTab({
               />
             </Pressable>
           </View>
+          <Pressable style={styles.variantAddBtn}>
+            <MaterialCommunityIcons name="plus" size={16} color="#FFF" />
+            <Text style={styles.variantAddText}>Add</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -495,10 +499,10 @@ function VariantsTab({
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.variantTable}>
               <View style={styles.variantTableHeader}>
-                <Text style={[styles.vth, styles.vcolColor]}>Color</Text>
                 <Text style={[styles.vth, styles.vcolSize]}>Size</Text>
                 <Text style={[styles.vth, styles.vcolSku]}>SKU</Text>
                 <Text style={[styles.vth, styles.vcolStock]}>Stock</Text>
+                <Text style={[styles.vth, styles.vcolMinQty]}>Min{'\n'}Qty</Text>
                 <Text style={[styles.vth, styles.vcolMrp]}>MRP{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
                 <Text style={[styles.vth, styles.vcolDisc]}>Discount{'\n'}<Text style={{ fontSize: 9 }}>(%)</Text></Text>
                 <Text style={[styles.vth, styles.vcolSell]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
@@ -537,11 +541,6 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
 
   return (
     <View style={styles.variantTableRow}>
-      <View style={[styles.vcolColor, styles.vcellColor]}>
-        <Image source={{ uri: v.image }} style={styles.vColorImg} contentFit="cover" />
-        <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
-        <Text style={styles.vColorName}>{v.colorName}</Text>
-      </View>
       <View style={styles.vcolSize}>
         <View style={styles.vSizePill}>
           <Text style={styles.vSizeText}>{v.size}</Text>
@@ -556,6 +555,9 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
         <View style={styles.vStockPill}>
           <Text style={styles.vStockText}>{v.stock} units</Text>
         </View>
+      </View>
+      <View style={styles.vcolMinQty}>
+        <Text style={styles.vcellText}>—</Text>
       </View>
       <View style={styles.vcolMrp}>
         <Text style={styles.vMrpText}>₹{v.mrp.toFixed(2)}</Text>
@@ -594,7 +596,6 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
     </View>
   );
 }
-
 
 function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact?: boolean }) {
   return (
@@ -1116,12 +1117,17 @@ export default function ProductDetailsScreen() {
                 <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
                 <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
-              <View>
-                <Text style={styles.headerTitle} numberOfLines={2}>
-                  Product Detail
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  Product Details
+                </Text>
+                <Text style={styles.headerSub} numberOfLines={1}>
+                  SKU: {product.sku} - Last updated: {product.lastUpdated || '17 May 2026'}
                 </Text>
               </View>
             </View>
+
+            {/* Desktop (isWide): filled Approve/Reject next to title */}
             {canReview && isWide ? (
               <View style={styles.headerActions}>
                 <Pressable
@@ -1142,30 +1148,33 @@ export default function ProductDetailsScreen() {
                 </Pressable>
               </View>
             ) : null}
+
+            {/* All non-wide (tablet + mobile): single row, same filled style as desktop. No duplicate bottom buttons. */}
+            {canReview && !isWide ? (
+              <View style={styles.mobileHeaderBtns}>
+                <Pressable
+                  style={[styles.approveActionBtn, styles.mobileActionBtnFlex, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => void handleApprove()}
+                >
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.approveActionText}>Approve</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.rejectActionBtn, styles.mobileActionBtnFlex, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => setShowRejectModal(true)}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.rejectActionText}>Reject</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
-          {canReview && !isWide ? (
-            <View style={styles.mobileHeaderActions}>
-              <Pressable
-                style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-                disabled={actionLoading}
-                onPress={() => void handleApprove()}
-              >
-                <Text style={styles.approveActionText}>Approve</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-                disabled={actionLoading}
-                onPress={() => setShowRejectModal(true)}
-              >
-                <Text style={styles.rejectActionText}>Reject</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          <View style={styles.scrollBody}>
-            {/* Hero card */}
-            <View style={styles.heroCard}>
+          <View style={[styles.scrollBody, !isWide && styles.scrollBodyMobile]}>
+            {/* Hero card: overlaps header bottom on mobile */}
+            <View style={[styles.heroCard, !isWide && styles.heroCardMobile]}>
               <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
                 {/* Gallery */}
                 <View style={[styles.galleryCol, !isWide && styles.galleryColMobile]}>
@@ -1173,7 +1182,7 @@ export default function ProductDetailsScreen() {
                     <Image
                       source={{ uri: product.gallery[activeImage] || product.image }}
                       style={[styles.mainImage, !isWide && styles.mainImageMobile]}
-                      contentFit="cover"
+                      contentFit="contain"
                     />
                     {product.discount > 0 ? (
                       <View style={styles.discountBadge}>
@@ -1185,7 +1194,7 @@ export default function ProductDetailsScreen() {
                       <Text style={styles.stockBadgeText}>{product.stock} units</Text>
                     </View>
                   </View>
-                  <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 10 }]}>
+                  <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 6, marginBottom: 2 }]}>
                     <Pressable
                       style={styles.thumbNav}
                       onPress={() => setActiveImage(prev => Math.max(0, prev - 1))}
@@ -1198,7 +1207,7 @@ export default function ProductDetailsScreen() {
                           <Image
                             source={{ uri }}
                             style={[styles.thumb, activeImage === index && styles.thumbActive]}
-                            contentFit="cover"
+                            contentFit="contain"
                             pointerEvents="none"
                           />
                         </Pressable>
@@ -1415,6 +1424,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     marginTop: 0,
     borderRadius: 22,
+    paddingBottom: 18,
+    flexDirection: 'column',
+    gap: 10,
+    alignItems: 'stretch',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   backBtn: {
@@ -1430,15 +1443,11 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#FFF', fontSize: 18, fontWeight: '800' },
   headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 10 },
-  mobileHeaderActions: {
+  mobileHeaderBtns: {
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: PALETTE.navy,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
   },
+  mobileActionBtnFlex: { flex: 1 },
   addVariantBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1522,15 +1531,18 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' } : {}),
   },
   heroLayout: { flexDirection: 'row', gap: 24, padding: 16 },
-  heroLayoutMobile: { flexDirection: 'column', padding: 0 },
+  heroLayoutMobile: { flexDirection: 'column', padding: 0, gap: 0 },
   galleryCol: { flex: 1, minWidth: 0 },
   galleryColMobile: { width: '100%' },
   infoCol: { flex: 1, minWidth: 0, gap: 10 },
   infoColMobile: { padding: 14, gap: 10 },
 
+  scrollBodyMobile: { paddingHorizontal: 0, paddingTop: 0 },
+  heroCardMobile: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0, borderTopWidth: 0 },
+
   mainImageWrap: { position: 'relative', overflow: 'hidden' },
   mainImage: { width: '100%', height: 280, backgroundColor: PALETTE.pageBg },
-  mainImageMobile: { height: 240, borderRadius: 0 },
+  mainImageMobile: { height: 300, borderRadius: 0 },
   discountBadge: {
     position: 'absolute',
     top: 12,
@@ -1569,10 +1581,10 @@ const styles = StyleSheet.create({
   thumb: { width: 56, height: 56, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
   thumbActive: { borderColor: PALETTE.purple },
 
-  infoTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  categoryPill: { backgroundColor: PALETTE.purpleLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  infoTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  categoryPill: { backgroundColor: PALETTE.purpleLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, flexShrink: 1 },
   categoryPillText: { color: PALETTE.purple, fontSize: 11, fontWeight: '600' },
-  stockStatus: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  stockStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
   stockDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PALETTE.red },
   stockStatusText: { color: PALETTE.red, fontSize: 12, fontWeight: '700' },
 
@@ -1603,7 +1615,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   returnLabel: { fontSize: 11, color: PALETTE.textMuted, fontWeight: '600' },
-  returnText: { fontSize: 12, color: PALETTE.green, fontWeight: '600', lineHeight: 18 },
+  returnText: { fontSize: 12, color: PALETTE.green, fontWeight: '600', lineHeight: 18, flexWrap: 'wrap', flexShrink: 1 },
 
   footerTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   footerTag: { backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
@@ -1733,6 +1745,7 @@ const styles = StyleSheet.create({
   vcolSize: { width: 64, alignItems: 'center', paddingHorizontal: 4 },
   vcolSku: { width: 120, paddingHorizontal: 8 },
   vcolStock: { width: 90, alignItems: 'center', paddingHorizontal: 4 },
+  vcolMinQty: { width: 70, alignItems: 'center', paddingHorizontal: 4 },
   vcolMrp: { width: 100, paddingHorizontal: 8 },
   vcolDisc: { width: 88, paddingHorizontal: 8 },
   vcolSell: { width: 110, paddingHorizontal: 8 },
