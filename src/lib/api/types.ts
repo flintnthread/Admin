@@ -40,6 +40,29 @@ export type SellerSummary = {
   totalRevenue?: number;
   totalOrders?: number;
   country?: string;
+  area?: string;
+  pincode?: string;
+  address?: string;
+  panNumber?: string;
+  gstNumber?: string;
+  hasGst?: boolean;
+  firstName?: string;
+  lastName?: string;
+  warehouseAddress?: string;
+  warehouseArea?: string;
+  warehouseCity?: string;
+  warehouseState?: string;
+  warehouseCountry?: string;
+  kycSubmittedAt?: string;
+  kycVerifiedAt?: string;
+  kycRemarks?: string;
+  adminRemarks?: string;
+  kycStatusLabel?: string;
+  kycVerificationStatus?: string;
+  kycImageCount?: number;
+  emailVerified?: boolean;
+  mobileVerified?: boolean;
+  resendVerificationEligible?: boolean;
 };
 
 export type ProductSummary = {
@@ -74,6 +97,8 @@ export type OrderSummary = {
   trackingId?: string;
   weightKg?: number;
   dimensionsCm?: { l?: number; w?: number; h?: number };
+  hasInvoice?: boolean;
+  hasShippingLabel?: boolean;
   products?: OrderProductPreview[];
   sellers?: OrderSellerPreview[];
   sellerGroups?: OrderSellerGroupPreview[];
@@ -120,6 +145,8 @@ export type OrderSellerGroupPreview = {
     };
   };
   products?: OrderProductPreview[];
+  hasInvoice?: boolean;
+  hasShippingLabel?: boolean;
 };
 
 export type CustomerSummary = {
@@ -200,12 +227,20 @@ export type SupportTicketSummary = {
   ticketNumber?: string;
   sellerId?: number;
   sellerName?: string;
+  sellerEmail?: string;
+  sellerPhone?: string;
   subject?: string;
   category?: string;
   priority?: string;
   status?: string;
+  statusLabel?: string;
+  statusClosed?: boolean;
+  canResolve?: boolean;
+  canClose?: boolean;
+  canReopen?: boolean;
   lastResponseBy?: string;
   lastResponseAt?: string;
+  closedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   messages?: SupportMessage[];
