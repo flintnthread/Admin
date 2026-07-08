@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Platform,
   SafeAreaView,
   Linking,
+  Share,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
@@ -26,46 +27,21 @@ import {
   fetchApprovedSellerLocationStats,
   blockSeller,
   unblockSeller,
+  fetchSellerDetail,
+  updateSellerStatus,
   fetchPendingProfileSellers,
   fetchPendingProfileDetail,
   approveSellerProfile,
   rejectSellerProfile,
 } from "@/services/sellerApi";
-import { mapPendingProfileRow, mapSellerToApprovedRow } from "@/lib/mappers";
+import { blurActiveElementOnWeb } from "@/lib/focus";
+import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
+import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { formatRupee } from "@/lib/format";
-import { resolveMediaUrl } from "@/lib/api/media";
+import { formatRupee, maskAccount } from "@/lib/format";
+import SellerDocumentImage from "@/components/SellerDocumentImage";
 
-type Seller = {
-  id: number;
-  name: string;
-  email: string;
-  avatar: string;
-  businessName: string;
-  businessType: string;
-  products: number;
-  walletBalance: number;
-  joinDate: string;
-  revenue: number;
-  state: string;
-  city: string;
-  status: "Active" | "Blocked";
-  mobile?: string;
-  bankName?: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  accountHolder?: string;
-  branchName?: string;
-  sellerUniqueId?: string;
-  referralCode?: string;
-  gstNumber?: string;
-  panNumber?: string;
-  country?: string;
-  totalOrders?: number;
-  profilePicPath?: string;
-  liveSelfiePath?: string;
-  profilePicUrl?: string;
-};
+type Seller = ApprovedSellerRow;
 
 
 // --- PENDING SELLER TYPES ---
@@ -85,13 +61,18 @@ type PendingSeller = {
   holderName?: string;
 };
 
+const ACCOUNT_STATUS_OPTIONS = ["Pending", "Active", "Rejected", "Inactive"] as const;
+const KYC_STATUS_OPTIONS = ["Pending Verification", "Verified", "Rejected"] as const;
+type AccountStatusOption = (typeof ACCOUNT_STATUS_OPTIONS)[number];
+type KycStatusOption = (typeof KYC_STATUS_OPTIONS)[number];
+
 const bgColors = ["#F5F3FF", "#ECFDF5", "#EFF6FF", "#FFF7ED", "#FDF2F8"];
 const iconColors = ["#8B5CF6", "#10B981", "#3B82F6", "#F97316", "#EC4899"];
 
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab, sellerId: sellerIdParam } = useLocalSearchParams<{ tab?: string; sellerId?: string }>();
   const showPending = tab === "pending";
   const { token, isLoading: authLoading } = useAuth();
   const { theme, toggleTheme, isDark } = useThemeContext();
@@ -112,8 +93,20 @@ export default function ApprovedSellersScreen() {
   const [showPendingModal, setShowPendingModal] = useState(false);
 
   const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
-  const [adminStatus, setAdminStatus] = useState<"Active" | "Blocked">("Active");
-  const [adminKycStatus, setAdminKycStatus] = useState<string>("Pending Verification");
+  const webScrollRef = useRef<ScrollView>(null);
+
+  // Scroll to top when seller detail view opens on web
+  useEffect(() => {
+    if (selectedSellerId !== null && webScrollRef.current) {
+      webScrollRef.current.scrollTo({ y: 0, animated: false });
+    }
+  }, [selectedSellerId]);
+
+  const [sellerDetail, setSellerDetail] = useState<SellerDetailView | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [adminStatus, setAdminStatus] = useState<AccountStatusOption>("Active");
+  const [adminKycStatus, setAdminKycStatus] = useState<KycStatusOption>("Pending Verification");
   const [kycRemarks, setKycRemarks] = useState("");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showKycDropdown, setShowKycDropdown] = useState(false);
@@ -133,6 +126,7 @@ export default function ApprovedSellersScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteSeller, setDeleteSeller] = useState<Seller | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
   // --- DOCUMENT PREVIEW STATE ---
   const [previewDoc, setPreviewDoc] = useState<{name: string, url: string} | null>(null);
 
@@ -185,8 +179,8 @@ export default function ApprovedSellersScreen() {
   const [showAllCitiesModal, setShowAllCitiesModal] = useState(false);
 
   const [mobileEditModalVisible, setMobileEditModalVisible] = useState(false);
-  const [mEditStatus, setMEditStatus] = useState<"Active" | "Blocked">("Active");
-  const [mEditKycStatus, setMEditKycStatus] = useState("Pending Verification");
+  const [mEditStatus, setMEditStatus] = useState<AccountStatusOption>("Active");
+  const [mEditKycStatus, setMEditKycStatus] = useState<KycStatusOption>("Pending Verification");
   const [mEditKycRemarks, setMEditKycRemarks] = useState("");
   const [mobileShowAdminActions, setMobileShowAdminActions] = useState(false);
   const [mEditAdminNotes, setMEditAdminNotes] = useState("");
@@ -379,18 +373,16 @@ export default function ApprovedSellersScreen() {
   };
 
   const handleSaveMobileEdit = async () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
-    if (!seller) return;
+    if (!selectedSellerId) return;
     try {
-      if (mEditStatus !== seller.status) {
-        if (mEditStatus === "Blocked") {
-          await blockSeller(seller.id);
-        } else {
-          await unblockSeller(seller.id);
-        }
-      }
-      setSellers((prev) => prev.map((s) => s.id === seller.id ? { 
-        ...s, 
+      await updateSellerStatus(selectedSellerId, {
+        status: mEditStatus,
+        kycVerificationStatus: mEditKycStatus,
+        kycRemarks: mEditKycRemarks,
+      });
+      await loadSellerDetail(selectedSellerId);
+      setSellers((prev) => prev.map((s) => s.id === selectedSellerId ? {
+        ...s,
         status: mEditStatus,
       } : s));
       showToast("Seller details updated successfully!", "success");
@@ -401,8 +393,30 @@ export default function ApprovedSellersScreen() {
   };
 
   const renderMobileSellerDetails = () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
-    if (!seller) return null;
+    const seller = resolveSelectedSeller();
+    if (!seller) {
+      if (detailLoading) {
+        return (
+          <View style={[stylesMobile.container, { justifyContent: "center", alignItems: "center" }]}>
+            <ActivityIndicator size="large" color="#EA580C" />
+            <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+          </View>
+        );
+      }
+      if (detailError) {
+        return (
+          <View style={[stylesMobile.container, { justifyContent: "center", alignItems: "center", padding: 24 }]}>
+            <Text style={{ color: "#EF4444", marginBottom: 12, textAlign: "center" }}>{detailError}</Text>
+            {selectedSellerId != null && (
+              <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                <Text style={styles.updateStatusBtnText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      }
+      return null;
+    }
 
     // Helper to render label-value row
     const renderLabelValueRow = (label: string, value: any, isLast = false) => (
@@ -416,15 +430,19 @@ export default function ApprovedSellersScreen() {
       return (
         <View style={stylesMobile.container}>
           {/* Header */}
-          <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-            <TouchableOpacity 
-              style={stylesMobile.detailsHeaderBack}
-              onPress={() => setMobileShowAdminActions(false)}
-            >
-              <Feather name="arrow-left" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={[stylesMobile.detailsHeaderTitle, { color: "#FFFFFF" }]}>Admin Actions</Text>
-            <View style={{ width: 40 }} />
+          {/* Header */}
+          <View style={stylesMobile.detailsHeader}>
+            <View style={stylesMobile.detailsHeaderRow}>
+              <TouchableOpacity 
+                style={stylesMobile.detailsHeaderBack}
+                onPress={() => setMobileShowAdminActions(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Feather name="arrow-left" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={stylesMobile.detailsHeaderTitle}>Admin Actions</Text>
+            </View>
           </View>
 
           <ScrollView 
@@ -436,20 +454,20 @@ export default function ApprovedSellersScreen() {
               {/* Update Status */}
               <Text style={stylesMobile.filterLabel}>Update Status</Text>
               <View style={stylesMobile.statusSelectRow}>
-                {["Active", "Blocked"].map((opt) => (
+                {ACCOUNT_STATUS_OPTIONS.map((opt) => (
                   <TouchableOpacity
                     key={opt}
                     style={[
                       stylesMobile.statusChip,
                       mEditStatus === opt && stylesMobile.statusChipActive,
-                      mEditStatus === opt && opt === "Blocked" && { backgroundColor: "#FEF2F2", borderColor: "#EF4444" }
+                      mEditStatus === opt && opt === "Inactive" && { backgroundColor: "#FEF2F2", borderColor: "#EF4444" }
                     ]}
-                    onPress={() => setMEditStatus(opt as any)}
+                    onPress={() => setMEditStatus(opt)}
                   >
                     <Text style={[
                       stylesMobile.statusChipText,
                       mEditStatus === opt && stylesMobile.statusChipTextActive,
-                      mEditStatus === opt && opt === "Blocked" && { color: "#EF4444" }
+                      mEditStatus === opt && opt === "Inactive" && { color: "#EF4444" }
                     ]}>
                       {opt}
                     </Text>
@@ -460,7 +478,7 @@ export default function ApprovedSellersScreen() {
               {/* KYC Verification Status */}
               <Text style={stylesMobile.filterLabel}>KYC Verification Status</Text>
               <View style={stylesMobile.kycChipsGrid}>
-                {["Pending Verification", "Active", "Rejected", "Inactive"].map((opt) => (
+                {KYC_STATUS_OPTIONS.map((opt) => (
                   <TouchableOpacity
                     key={opt}
                     style={[
@@ -593,15 +611,17 @@ export default function ApprovedSellersScreen() {
 
         {/* Header */}
         <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={stylesMobile.detailsHeaderBack}
             onPress={() => setSelectedSellerId(null)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
           >
-            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+            <Feather name="arrow-left" size={20} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={stylesMobile.headerCenterContainerMobile}>
             <Text style={stylesMobile.headerSellerNameMobile} numberOfLines={1}>{seller.name}</Text>
-            <Text style={stylesMobile.headerSellerIdMobile}>ID: FNT-SELLER-0000{seller.id}</Text>
+            <Text style={stylesMobile.headerSellerIdMobile}>ID: {sellerDetail?.sellerUniqueId ?? seller.sellerUniqueId ?? `Seller #${seller.id}`}</Text>
           </View>
           <View style={stylesMobile.headerRightContainerMobile}>
             <View style={[stylesMobile.headerStatusBadgeMobile, seller.status === "Active" ? stylesMobile.headerStatusActiveMobile : stylesMobile.headerStatusBlockedMobile]}>
@@ -611,6 +631,7 @@ export default function ApprovedSellersScreen() {
             </View>
           </View>
         </View>
+        <Text style={stylesMobile.detailsHeaderSub}>ID: FNT-SELLER-0000{seller.id}</Text>
 
         <ScrollView 
           style={{ flex: 1 }}
@@ -668,7 +689,7 @@ export default function ApprovedSellersScreen() {
 
             <TouchableOpacity 
               style={[stylesMobile.quickActionBtnMobile, { backgroundColor: "#ECFDF5", borderColor: "#D1FAE5", borderWidth: 1 }]}
-              onPress={() => Linking.openURL('tel:+918466066939')}
+              onPress={() => seller.mobile ? Linking.openURL(`tel:${seller.mobile}`) : undefined}
             >
               <View style={[stylesMobile.quickActionIconCircleMobile, { backgroundColor: "#D1FAE5" }]}>
                 <Feather name="phone" size={16} color="#10B981" />
@@ -684,11 +705,10 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.cardHeaderTitleMobile}>Personal Details</Text>
             </View>
             <View style={stylesMobile.cardBodyMobile}>
-              {renderLabelValueRow("Full Name", seller.name)}
-              {renderLabelValueRow("Email Address", seller.email)}
-              {renderLabelValueRow("Mobile Number", seller.mobile || "+91 98765 43210")}
-              {renderLabelValueRow("Gender", "Male")}
-              {renderLabelValueRow("Date of Birth", "15 Oct 1992", true)}
+              {renderLabelValueRow("Full Name", sellerDetail?.fullName ?? seller.name)}
+              {renderLabelValueRow("Email Address", sellerDetail?.email ?? seller.email)}
+              {renderLabelValueRow("Mobile Number", sellerDetail?.mobile ?? seller.mobile ?? "—")}
+              {renderLabelValueRow("Registered On", sellerDetail?.registeredOn ?? seller.joinDate, true)}
             </View>
           </View>
 
@@ -699,12 +719,12 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.cardHeaderTitleMobile}>Business Information</Text>
             </View>
             <View style={stylesMobile.cardBodyMobile}>
-              {renderLabelValueRow("Business Name", seller.businessName)}
-              {renderLabelValueRow("Business Type", seller.businessType)}
-              {renderLabelValueRow("GST Number", seller.gstNumber || "No")}
-              {renderLabelValueRow("PAN Number", seller.panNumber || "AJEP12353R")}
-              {renderLabelValueRow("Business Registration", seller.sellerUniqueId || `FNT-SELLER-0000${seller.id}`)}
-              {renderLabelValueRow("Years of Experience", "5 Years", true)}
+              {renderLabelValueRow("Business Name", sellerDetail?.businessName ?? seller.businessName)}
+              {renderLabelValueRow("Business Type", sellerDetail?.businessType ?? seller.businessType)}
+              {renderLabelValueRow("Seller Category", sellerDetail?.sellerCategory ?? "—")}
+              {renderLabelValueRow("GST", sellerDetail?.hasGst ?? "—")}
+              {renderLabelValueRow("PAN Number", sellerDetail?.panNumber ?? "—")}
+              {renderLabelValueRow("Unique Seller ID", sellerDetail?.sellerUniqueId ?? "—", true)}
             </View>
           </View>
 
@@ -715,11 +735,12 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.cardHeaderTitleMobile}>Address Information</Text>
             </View>
             <View style={stylesMobile.cardBodyMobile}>
-              {renderLabelValueRow("Address Line", "Shop no. 1, Dharmavaram Road, Kothacheruvu")}
-              {renderLabelValueRow("City", seller.city || "Sri Sathya Sai")}
-              {renderLabelValueRow("State", seller.state || "Andhra Pradesh")}
-              {renderLabelValueRow("Country", seller.country || "India")}
-              {renderLabelValueRow("Postal Code", "515133", true)}
+              {renderLabelValueRow("Address Line", sellerDetail?.address ?? "—")}
+              {renderLabelValueRow("City", sellerDetail?.city ?? seller.city ?? "—")}
+              {renderLabelValueRow("State", sellerDetail?.state ?? seller.state ?? "—")}
+              {renderLabelValueRow("Country", sellerDetail?.country ?? seller.country ?? "—")}
+              {renderLabelValueRow("Area", sellerDetail?.area ?? "—")}
+              {renderLabelValueRow("Postal Code", sellerDetail?.pincode ?? "—", true)}
             </View>
           </View>
 
@@ -730,10 +751,11 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.cardHeaderTitleMobile}>Bank Details</Text>
             </View>
             <View style={stylesMobile.cardBodyMobile}>
-              {renderLabelValueRow("Account Holder Name", seller.accountHolder || "IRTANUM")}
-              {renderLabelValueRow("Bank Name", seller.bankName || "Canara Bank")}
-              {renderLabelValueRow("Account Number", seller.accountNumber || "******4165")}
-              {renderLabelValueRow("IFSC Code", seller.ifscCode || "CNRB0013234", true)}
+              {renderLabelValueRow("Account Holder Name", sellerDetail?.accountHolder ?? seller.accountHolder ?? "—")}
+              {renderLabelValueRow("Bank Name", sellerDetail?.bankName ?? seller.bankName ?? "—")}
+              {renderLabelValueRow("Branch Name", sellerDetail?.branchName ?? seller.branchName ?? "—")}
+              {renderLabelValueRow("Account Number", sellerDetail?.maskedAccountNumber ?? maskAccount(seller.accountNumber))}
+              {renderLabelValueRow("IFSC Code", sellerDetail?.ifscCode ?? seller.ifscCode ?? "—", true)}
             </View>
           </View>
 
@@ -744,84 +766,76 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.cardHeaderTitleMobile}>Uploaded Documents</Text>
             </View>
             <View style={stylesMobile.cardBodyMobile}>
-              {[
-                "Aadhaar Front",
-                "Aadhaar Back",
-                "PAN Card",
-                "Cancelled Cheque",
-                "Business Proof",
-                "Bank Proof",
-              ].map((docName, idx) => (
-                <View key={docName} style={stylesMobile.documentRowRedesigned}>
-                  <View style={stylesMobile.documentLeftInfoMobile}>
-                    <View style={[stylesMobile.documentThumbBoxMobile, { backgroundColor: bgColors[idx % bgColors.length] }]}>
-                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (
-                        <Image source={{ uri: seller.avatar }} style={stylesMobile.documentMiniThumbMobile} />
-                      ) : (
-                        <Feather name="file-text" size={16} color={iconColors[idx % iconColors.length]} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={stylesMobile.docNameTitleMobile}>{docName}</Text>
-                      <View style={stylesMobile.docStatusBadgeMobile}>
-                        <Feather name="check" size={10} color="#10B981" style={{ marginRight: 4 }} />
-                        <Text style={stylesMobile.docStatusTextMobile}>Uploaded</Text>
+              {(sellerDetail?.documents ?? [])
+                .filter((doc) => !/live selfie/i.test(doc.name))
+                .map((doc, idx) => (
+                  <View key={`${doc.name}-${idx}`} style={stylesMobile.documentRowRedesigned}>
+                    <View style={stylesMobile.documentLeftInfoMobile}>
+                      <View style={[stylesMobile.documentThumbBoxMobile, { backgroundColor: bgColors[idx % bgColors.length] }]}>
+                        <SellerDocumentImage
+                          path={doc.path}
+                          url={doc.url}
+                          style={stylesMobile.documentMiniThumbMobile}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={stylesMobile.docNameTitleMobile}>{doc.name}</Text>
+                        <View style={stylesMobile.docStatusBadgeMobile}>
+                          <Feather
+                            name={doc.available ? "check" : "x"}
+                            size={10}
+                            color={doc.available ? "#10B981" : "#EF4444"}
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text style={stylesMobile.docStatusTextMobile}>
+                            {doc.available ? "Uploaded" : "Not uploaded"}
+                          </Text>
+                        </View>
                       </View>
                     </View>
+                    <TouchableOpacity
+                      style={stylesMobile.docRedesignedViewBtn}
+                      onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                    >
+                      <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={stylesMobile.docRedesignedViewBtnText}>View</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={stylesMobile.docRedesignedViewBtn}
-                    onPress={() => setPreviewDoc({ name: docName, url: 'https://via.placeholder.com/800x600.png?text=' + encodeURIComponent(docName) })}
-                  >
-                    <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
-                    <Text style={stylesMobile.docRedesignedViewBtnText}>View</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+                ))}
 
               {/* Business Proof Documents (Multiple) */}
               <Text style={stylesMobile.docSectionSubTitleMobile}>Business Proof Documents (Multiple)</Text>
               <View style={stylesMobile.businessProofContainerMobile}>
-                {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (
-                  <Image source={{ uri: seller.avatar }} style={stylesMobile.businessProofImgMobile} />
-                ) : (
-                  <View style={[stylesMobile.businessProofImgMobile, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Feather name="image" size={32} color="#94A3B8" />
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={stylesMobile.businessProofViewBtnMobile}
-                  onPress={() => setPreviewDoc({ name: "Business Proof Documents", url: seller.avatar || 'https://via.placeholder.com/800x600.png?text=Business%20Proof' })}
-                >
-                  <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={stylesMobile.businessProofViewBtnTextMobile}>View Doc</Text>
-                </TouchableOpacity>
+                {(sellerDetail?.businessProofDocuments ?? []).map((doc, idx) => (
+                  <TouchableOpacity
+                    key={`${doc.name}-${doc.url}-${idx}`}
+                    onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                  >
+                    <SellerDocumentImage
+                      path={doc.path}
+                      url={doc.url}
+                      style={stylesMobile.businessProofImgMobile}
+                    />
+                  </TouchableOpacity>
+                ))}
               </View>
 
               {/* Live Selfie Documents */}
               <Text style={stylesMobile.docSectionSubTitleMobile}>Live Selfie Documents</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={stylesMobile.selfieScrollMobile}>
-                {[1, 2, 3, 4, 5].map((idx) => {
-                  const resolvedSelfieUrl = seller.liveSelfiePath ? resolveMediaUrl(seller.liveSelfiePath) : (seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined' ? seller.avatar : '');
-                  return (
-                    <TouchableOpacity 
-                      key={idx} 
-                      style={stylesMobile.selfieThumbWrapperMobile}
-                      onPress={() => setPreviewDoc({ name: `Live Selfie ${idx}`, url: resolvedSelfieUrl || 'https://via.placeholder.com/800x600.png?text=Live%20Selfie%20' + idx })}
-                    >
-                      {resolvedSelfieUrl ? (
-                        <Image source={{ uri: resolvedSelfieUrl }} style={stylesMobile.selfieMiniThumbMobile} />
-                      ) : (
-                        <View style={[stylesMobile.selfieMiniThumbMobile, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
-                          <Feather name="camera" size={14} color="#94A3B8" />
-                        </View>
-                      )}
-                      <View style={stylesMobile.selfieBadgeMobile}>
-                        <Text style={stylesMobile.selfieBadgeTextMobile}>{idx}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                {(sellerDetail?.liveSelfieImages ?? []).map((doc, idx) => (
+                  <TouchableOpacity
+                    key={`${doc.name}-${doc.url}-${idx}`}
+                    style={stylesMobile.selfieThumbWrapperMobile}
+                    onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                  >
+                    <SellerDocumentImage
+                      path={doc.path}
+                      url={doc.url}
+                      style={stylesMobile.selfieMiniThumbMobile}
+                    />
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             </View>
           </View>
@@ -844,10 +858,10 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                  <Image 
-                    source={{ uri: previewDoc.url }} 
+                  <SellerDocumentImage
+                    url={previewDoc.url}
                     resizeMode="contain"
-                    style={{ width: '100%', height: '100%' }} 
+                    style={{ width: '100%', height: '100%' }}
                   />
                 </View>
               </View>
@@ -1372,7 +1386,7 @@ export default function ApprovedSellersScreen() {
   };
 
   const renderMobileEditModal = () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
+    const seller = resolveSelectedSeller();
     if (!seller) return null;
 
     return (
@@ -1407,20 +1421,20 @@ export default function ApprovedSellersScreen() {
               {/* Update Status */}
               <Text style={stylesMobile.filterLabel}>Update Status</Text>
               <View style={stylesMobile.statusSelectRow}>
-                {["Active", "Blocked"].map((opt) => (
+                {ACCOUNT_STATUS_OPTIONS.map((opt) => (
                   <TouchableOpacity
                     key={opt}
                     style={[
                       stylesMobile.statusChip,
                       mEditStatus === opt && stylesMobile.statusChipActive,
-                      mEditStatus === opt && opt === "Blocked" && { backgroundColor: "#FEF2F2", borderColor: "#EF4444" }
+                      mEditStatus === opt && opt === "Inactive" && { backgroundColor: "#FEF2F2", borderColor: "#EF4444" }
                     ]}
-                    onPress={() => setMEditStatus(opt as any)}
+                    onPress={() => setMEditStatus(opt)}
                   >
                     <Text style={[
                       stylesMobile.statusChipText,
                       mEditStatus === opt && stylesMobile.statusChipTextActive,
-                      mEditStatus === opt && opt === "Blocked" && { color: "#EF4444" }
+                      mEditStatus === opt && opt === "Inactive" && { color: "#EF4444" }
                     ]}>
                       {opt}
                     </Text>
@@ -1431,7 +1445,7 @@ export default function ApprovedSellersScreen() {
               {/* KYC Verification Status */}
               <Text style={stylesMobile.filterLabel}>KYC Verification Status</Text>
               <View style={stylesMobile.kycChipsGrid}>
-                {["Pending Verification", "Active", "Rejected", "Inactive"].map((opt) => (
+                {KYC_STATUS_OPTIONS.map((opt) => (
                   <TouchableOpacity
                     key={opt}
                     style={[
@@ -1604,7 +1618,7 @@ export default function ApprovedSellersScreen() {
           {/* --- SCROLLABLE BODY --- */}
           <ScrollView 
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: 0 }}
             showsVerticalScrollIndicator={false}
           >
           {/* --- BREADCRUMB BANNER --- */}
@@ -1623,11 +1637,16 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.actionOutlineBtnText}>Filter</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={stylesMobile.actionOutlineBtn}
-              onPress={handleExportCSV}
+              style={[stylesMobile.actionOutlineBtn, exportLoading && { opacity: 0.6 }]}
+              onPress={() => void handleExportCSV()}
+              disabled={exportLoading}
             >
-              <Feather name="download" size={16} color="#EA580C" />
-              <Text style={stylesMobile.actionOutlineBtnText}>Export CSV</Text>
+              {exportLoading ? (
+                <ActivityIndicator size="small" color="#EA580C" />
+              ) : (
+                <Feather name="download" size={16} color="#EA580C" />
+              )}
+              <Text style={stylesMobile.actionOutlineBtnText}>{exportLoading ? "Exporting..." : "Export CSV"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -1780,14 +1799,13 @@ export default function ApprovedSellersScreen() {
             {mobilePaginatedSellers.map((seller) => (
               <View 
                 key={seller.id} 
-                style={[stylesMobile.sellerCard, seller.status === "Blocked" && stylesMobile.sellerCardBlocked]}
+                style={[stylesMobile.sellerCard, seller.status === "Inactive" && stylesMobile.sellerCardBlocked]}
               >
                 <View style={stylesMobile.sellerCardHeader}>
                   <TouchableOpacity
                     style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
                     onPress={() => {
-                      setSelectedSellerId(seller.id);
-                      setAdminStatus(seller.status);
+                      openSellerDetail(seller.id, seller.status);
                     }}
                   >
                     {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (
@@ -1841,8 +1859,7 @@ export default function ApprovedSellersScreen() {
                   <TouchableOpacity
                     style={[stylesMobile.circleActionBtn, { backgroundColor: "#EFF6FF" }]}
                     onPress={() => {
-                      setSelectedSellerId(seller.id);
-                      setAdminStatus(seller.status);
+                      openSellerDetail(seller.id, seller.status);
                     }}
                   >
                     <Feather name="eye" size={15} color="#3B82F6" />
@@ -1859,7 +1876,7 @@ export default function ApprovedSellersScreen() {
                   <TouchableOpacity
                     style={[stylesMobile.circleActionBtn, { backgroundColor: "#ECFDF5" }]}
                     onPress={() => {
-                      Linking.openURL('tel:+918466066939');
+                      Linking.openURL(seller.mobile ? `tel:${seller.mobile}` : 'tel:');
                     }}
                   >
                     <Feather name="phone" size={15} color="#10B981" />
@@ -1936,10 +1953,10 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                  <Image 
-                    source={{ uri: previewDoc.url }} 
+                  <SellerDocumentImage
+                    url={previewDoc.url}
                     resizeMode="contain"
-                    style={{ width: '100%', height: '100%' }} 
+                    style={{ width: '100%', height: '100%' }}
                   />
                 </View>
               </View>
@@ -2211,6 +2228,48 @@ export default function ApprovedSellersScreen() {
     }
   }, [token]);
 
+  const loadSellerDetail = useCallback(async (sellerId: number) => {
+    if (!token) return;
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const raw = await fetchSellerDetail(sellerId);
+      const detail = mapSellerDetailView(raw);
+      setSellerDetail(detail);
+      setAdminStatus(detail.accountStatus);
+      setAdminKycStatus(detail.kycVerificationStatus as KycStatusOption);
+      setKycRemarks(detail.kycRemarks);
+      setMEditStatus(detail.accountStatus);
+      setMEditKycStatus(detail.kycVerificationStatus as KycStatusOption);
+      setMEditKycRemarks(detail.kycRemarks);
+    } catch (e) {
+      setSellerDetail(null);
+      setDetailError(getApiErrorMessage(e, "Failed to load seller details."));
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [token]);
+
+  const openSellerDetail = useCallback((sellerId: number, listStatus?: Seller["status"]) => {
+    blurActiveElementOnWeb();
+    setSelectedSellerId(sellerId);
+    if (listStatus) {
+      setAdminStatus(listStatus);
+      setMEditStatus(listStatus);
+    }
+    void loadSellerDetail(sellerId);
+  }, [loadSellerDetail]);
+
+  const resolveSelectedSeller = useCallback((): Seller | null => {
+    if (selectedSellerId == null) return null;
+    const fromList = sellers.find((s) => s.id === selectedSellerId);
+    if (fromList) return fromList;
+    if (sellerDetail?.id === selectedSellerId) {
+      return mapSellerDetailToApprovedRow(sellerDetail);
+    }
+    return null;
+  }, [selectedSellerId, sellers, sellerDetail]);
+
   const loadPendingSellers = useCallback(async () => {
     if (!token) return;
     setPendingLoading(true);
@@ -2235,6 +2294,20 @@ export default function ApprovedSellersScreen() {
     if (authLoading || !token || showPending) return;
     void loadApprovedSellers();
   }, [authLoading, token, showPending, loadApprovedSellers]);
+
+  useEffect(() => {
+    if (selectedSellerId == null) {
+      setSellerDetail(null);
+      setDetailError(null);
+    }
+  }, [selectedSellerId]);
+
+  useEffect(() => {
+    if (authLoading || !token || !sellerIdParam || showPending) return;
+    const id = Number(sellerIdParam);
+    if (!Number.isFinite(id) || id <= 0) return;
+    openSellerDetail(id);
+  }, [authLoading, token, sellerIdParam, showPending, openSellerDetail]);
 
   const reload = loadApprovedSellers;
   const setData = setSellers;
@@ -2335,17 +2408,24 @@ export default function ApprovedSellersScreen() {
 
   const handleConfirmDeactivate = async () => {
     if (!deactivateSeller) return;
+    if (!deactivateReason.trim()) {
+      showToast("Please provide a reason for deactivation.", "error");
+      return;
+    }
     try {
-      await blockSeller(deactivateSeller.id);
+      await blockSeller(deactivateSeller.id, deactivateReason.trim());
       setData((prev) =>
-        prev.map((s) => (s.id === deactivateSeller.id ? { ...s, status: "Blocked" } : s))
+        prev.map((s) => (s.id === deactivateSeller.id ? { ...s, status: "Inactive" } : s))
       );
+      if (selectedSellerId === deactivateSeller.id) {
+        await loadSellerDetail(deactivateSeller.id);
+      }
       setDeactivateModalVisible(false);
       setDeactivateSeller(null);
       setDeactivateReason("");
-      showToast("Seller successfully blocked!", "success");
+      showToast("Seller deactivated and notified by email.", "success");
     } catch (e) {
-      showToast(getApiErrorMessage(e, "Failed to block seller."), "error");
+      showToast(getApiErrorMessage(e, "Failed to deactivate seller."), "error");
     }
   };
 
@@ -2358,41 +2438,44 @@ export default function ApprovedSellersScreen() {
     showToast("Seller successfully deleted!", "success");
   };
 
-  const handleExportCSV = () => {
-    if (sellers.length === 0) {
-      Alert.alert("No Data", "There are no approved sellers to export.");
+  const handleExportCSV = async () => {
+    if (!token) {
+      showToast("Please log in to export sellers.", "error");
       return;
     }
+    setExportLoading(true);
+    try {
+      const items = await fetchApprovedSellers(500);
+      const exportRows = items.map(mapSellerToApprovedRow);
+      if (exportRows.length === 0) {
+        Alert.alert("No Data", "There are no approved sellers to export.");
+        return;
+      }
 
-    const headers = ["ID", "Name", "Business Name", "Email", "State", "City", "Status", "Products", "Wallet Balance", "Revenue", "Join Date"];
-    const rows = sellers.map(s => [
-      s.id,
-      `"${s.name.replace(/"/g, '""')}"`,
-      `"${s.businessName.replace(/"/g, '""')}"`,
-      `"${s.email.replace(/"/g, '""')}"`,
-      `"${s.state.replace(/"/g, '""')}"`,
-      `"${s.city.replace(/"/g, '""')}"`,
-      s.status,
-      s.products,
-      s.walletBalance,
-      s.revenue,
-      s.joinDate
-    ].join(","));
+      const csv = buildApprovedSellersCsv(exportRows);
+      const fileName = `approved_sellers_${new Date().toISOString().slice(0, 10)}.csv`;
 
-    const csv = [headers.join(","), ...rows].join("\n");
-
-    if (Platform.OS === "web") {
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "approved_sellers.csv";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (Platform.OS === "web") {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({
+          message: csv,
+          title: fileName,
+        });
+      }
       showToast("Sellers exported to CSV successfully!", "success");
-    } else {
-      Alert.alert("Export Successful", "CSV export is primarily supported on the web platform.");
+    } catch (e) {
+      showToast(getApiErrorMessage(e, "Failed to export sellers."), "error");
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -2406,18 +2489,84 @@ export default function ApprovedSellersScreen() {
   return (
     <AdminLayout>
       <ScrollView
+        ref={webScrollRef}
         style={styles.scrollBody}
         contentContainerStyle={styles.scrollBodyContent}
         showsVerticalScrollIndicator={false}
-      >       {selectedSellerId !== null ? (
+      >
+        {selectedSellerId !== null ? (
           (() => {
-            const seller = sellers.find(s => s.id === selectedSellerId);
-            if (!seller) return null;
+            const seller = resolveSelectedSeller();
+            const detail = sellerDetail;
 
-            const handleUpdateSellerStatus = () => {
-              setData((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: adminStatus } : s));
-              showToast(`Seller status updated to ${adminStatus}!`, "success");
+            if (!seller) {
+              if (detailLoading) {
+                return (
+                  <View style={{ padding: 48, alignItems: "center" }}>
+                    <ActivityIndicator size="large" color="#EA580C" />
+                    <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+                  </View>
+                );
+              }
+              if (detailError) {
+                return (
+                  <View style={{ padding: 48, alignItems: "center" }}>
+                    <Text style={{ color: "#EF4444", marginBottom: 12 }}>{detailError}</Text>
+                    {selectedSellerId != null && (
+                      <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                        <Text style={styles.updateStatusBtnText}>Retry</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }
+              return null;
+            }
+
+            const handleUpdateSellerStatus = async () => {
+              if (!selectedSellerId) return;
+              try {
+                await updateSellerStatus(selectedSellerId, {
+                  status: adminStatus,
+                  kycVerificationStatus: adminKycStatus,
+                  kycRemarks,
+                });
+                await loadSellerDetail(selectedSellerId);
+                setData((prev) => prev.map((s) => s.id === seller.id ? { ...s, status: adminStatus } : s));
+                showToast(`Seller status updated to ${adminStatus}!`, "success");
+              } catch (e) {
+                showToast(getApiErrorMessage(e, "Failed to update seller status."), "error");
+              }
             };
+
+            const profileImage = detail?.profilePicUrl || seller.avatar;
+            const kycStatusLabel = detail?.kycStatusLabel ?? "Not Completed";
+            const kycBarColor = sellerKycBadgeColor(kycStatusLabel);
+            const verificationBadge = detail?.kycVerificationBadge ?? "Pending";
+            const verificationColor = sellerKycBadgeColor(verificationBadge);
+            const verificationDocs = detail?.documents ?? [];
+            const liveSelfies = detail?.liveSelfieImages ?? [];
+            const businessProofDocs = detail?.businessProofDocuments ?? [];
+
+            if (detailLoading && !detail) {
+              return (
+                <View style={{ padding: 48, alignItems: "center" }}>
+                  <ActivityIndicator size="large" color="#EA580C" />
+                  <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+                </View>
+              );
+            }
+
+            if (detailError && !detail) {
+              return (
+                <View style={{ padding: 48, alignItems: "center" }}>
+                  <Text style={{ color: "#EF4444", marginBottom: 12 }}>{detailError}</Text>
+                  <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                    <Text style={styles.updateStatusBtnText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
 
             return (
               <View style={styles.detailsContainer}>
@@ -2432,18 +2581,18 @@ export default function ApprovedSellersScreen() {
                       <Text style={styles.headerBackBtnText}>Back</Text>
                     </TouchableOpacity>
                     <View style={styles.avatarWrapper}>
-                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.detailsAvatar} />) : (<View style={[styles.detailsAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={32} color="#9CA3AF" /></View>)}
+                      {(profileImage && typeof profileImage === 'string' && profileImage.trim() !== '' && profileImage !== 'null' && profileImage !== 'N/A' && profileImage !== 'undefined') ? (<Image source={{ uri: profileImage }} style={styles.detailsAvatar} />) : (<View style={[styles.detailsAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={32} color="#9CA3AF" /></View>)}
                       <View style={styles.statusDotActive} />
                     </View>
                     <View style={styles.detailsMeta}>
-                      <Text style={styles.detailsTitle}>{seller.name}</Text>
+                      <Text style={styles.detailsTitle}>{detail?.fullName ?? seller.name}</Text>
                       <View style={styles.detailsMetaRow}>
                         <Feather name="mail" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
                         <Text style={styles.detailsSubtext}>{seller.email}</Text>
                       </View>
                       <View style={styles.detailsMetaRow}>
                         <Feather name="calendar" size={14} color="#F3F4F6" style={{ marginRight: 6 }} />
-                        <Text style={styles.detailsSubtext}>Joined {seller.joinDate}</Text>
+                        <Text style={styles.detailsSubtext}>Joined {detail?.registeredOn ?? seller.joinDate}</Text>
                         <Feather name="briefcase" size={14} color="#F3F4F6" style={{ marginLeft: 12, marginRight: 6 }} />
                         <Text style={styles.detailsSubtext}>{seller.businessName}</Text>
                       </View>
@@ -2454,7 +2603,7 @@ export default function ApprovedSellersScreen() {
                     <View style={styles.currentStatusCard}>
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Feather name="check-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                        <Text style={styles.currentStatusVal}>{seller.status}</Text>
+                        <Text style={styles.currentStatusVal}>{detail?.accountStatus ?? seller.status}</Text>
                       </View>
                       <Text style={styles.currentStatusLabel}>Current Status</Text>
                     </View>
@@ -2464,8 +2613,8 @@ export default function ApprovedSellersScreen() {
                 {/* --- KYC VERIFICATION STATUS BAR --- */}
                 <View style={styles.kycBar}>
                   <Text style={styles.kycBarTitle}>KYC Verification Status</Text>
-                  <View style={styles.kycNotCompletedBadge}>
-                    <Text style={styles.kycNotCompletedText}>Not Completed</Text>
+                  <View style={[styles.kycNotCompletedBadge, { backgroundColor: kycBarColor }]}>
+                    <Text style={[styles.kycNotCompletedText, kycStatusLabel === "Submitted" || kycStatusLabel === "Pending Verification" ? { color: "#1F2937" } : { color: "#FFFFFF" }]}>{kycStatusLabel}</Text>
                   </View>
                 </View>
 
@@ -2477,8 +2626,8 @@ export default function ApprovedSellersScreen() {
                     </View>
                     <View style={styles.kycGridCardContent}>
                       <Text style={styles.kycGridCardLabel}>KYC STATUS</Text>
-                      <View style={[styles.kycBadge, { backgroundColor: "#EF4444" }]}>
-                        <Text style={styles.kycBadgeText}>Not Completed</Text>
+                      <View style={[styles.kycBadge, { backgroundColor: kycBarColor }]}>
+                        <Text style={[styles.kycBadgeText, kycStatusLabel === "Submitted" ? { color: "#1F2937" } : undefined]}>{kycStatusLabel}</Text>
                       </View>
                     </View>
                   </View>
@@ -2489,7 +2638,7 @@ export default function ApprovedSellersScreen() {
                     </View>
                     <View style={styles.kycGridCardContent}>
                       <Text style={styles.kycGridCardLabel}>SUBMITTED ON</Text>
-                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                      <Text style={styles.kycGridCardValue}>{detail?.kycSubmittedOn ?? "—"}</Text>
                     </View>
                   </View>
 
@@ -2500,7 +2649,7 @@ export default function ApprovedSellersScreen() {
                     <View style={styles.kycGridCardContent}>
                       <Text style={styles.kycGridCardLabel}>IMAGES CAPTURED</Text>
                       <View style={styles.kycGridCircleCount}>
-                        <Text style={styles.kycGridCircleCountText}>0</Text>
+                        <Text style={styles.kycGridCircleCountText}>{detail?.kycImageCount ?? 0}</Text>
                       </View>
                     </View>
                   </View>
@@ -2511,8 +2660,8 @@ export default function ApprovedSellersScreen() {
                     </View>
                     <View style={styles.kycGridCardContent}>
                       <Text style={styles.kycGridCardLabel}>VERIFICATION STATUS</Text>
-                      <View style={[styles.kycBadge, { backgroundColor: "#FBBF24" }]}>
-                        <Text style={[styles.kycBadgeText, { color: "#1F2937" }]}>Pending</Text>
+                      <View style={[styles.kycBadge, { backgroundColor: verificationColor }]}>
+                        <Text style={[styles.kycBadgeText, verificationBadge === "Pending" ? { color: "#1F2937" } : undefined]}>{verificationBadge}</Text>
                       </View>
                     </View>
                   </View>
@@ -2523,7 +2672,7 @@ export default function ApprovedSellersScreen() {
                     </View>
                     <View style={styles.kycGridCardContent}>
                       <Text style={styles.kycGridCardLabel}>VERIFIED BY</Text>
-                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                      <Text style={styles.kycGridCardValue}>{detail?.kycVerifiedBy ?? "—"}</Text>
                     </View>
                   </View>
 
@@ -2533,7 +2682,7 @@ export default function ApprovedSellersScreen() {
                     </View>
                     <View style={styles.kycGridCardContent}>
                       <Text style={styles.kycGridCardLabel}>VERIFIED ON</Text>
-                      <Text style={styles.kycGridCardValue}>N/A</Text>
+                      <Text style={styles.kycGridCardValue}>{detail?.kycVerifiedOn ?? "—"}</Text>
                     </View>
                   </View>
                 </View>
@@ -2553,121 +2702,121 @@ export default function ApprovedSellersScreen() {
                         <Text style={styles.infoSectionTitle}>Personal Details</Text>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>First Name</Text>
-                          <Text style={styles.infoValue}>{seller.name.split(" ")[0]}</Text>
+                          <Text style={styles.infoValue}>{detail?.firstName ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Last Name</Text>
-                          <Text style={styles.infoValue}>{seller.name.split(" ").slice(1).join(" ") || "Collection"}</Text>
+                          <Text style={styles.infoValue}>{detail?.lastName ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Email</Text>
-                          <Text style={styles.infoValue}>{seller.email}</Text>
+                          <Text style={styles.infoValue}>{detail?.email ?? seller.email}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Mobile</Text>
-                          <Text style={styles.infoValue}>+918466066939</Text>
+                          <Text style={styles.infoValue}>{detail?.mobile ?? seller.mobile ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Registered On</Text>
-                          <Text style={styles.infoValue}>{seller.joinDate}</Text>
+                          <Text style={styles.infoValue}>{detail?.registeredOn ?? seller.joinDate}</Text>
                         </View>
 
                         {/* Business Details */}
                         <Text style={styles.infoSectionTitle}>Business Details</Text>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Business Name</Text>
-                          <Text style={styles.infoValue}>{seller.businessName}</Text>
+                          <Text style={styles.infoValue}>{detail?.businessName ?? seller.businessName}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Seller Category</Text>
                           <View style={styles.b2cBadge}>
-                            <Text style={styles.b2cBadgeText}>B2C</Text>
+                            <Text style={styles.b2cBadgeText}>{detail?.sellerCategory ?? "—"}</Text>
                           </View>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Business Type</Text>
-                          <Text style={styles.infoValue}>{seller.businessType}</Text>
+                          <Text style={styles.infoValue}>{detail?.businessType ?? seller.businessType}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Address</Text>
-                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Sri Sathya Sai Dist, Andhra Pradesh, 515133.</Text>
+                          <Text style={styles.infoValue}>{detail?.address ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>GST</Text>
-                          <Text style={styles.infoValue}>No</Text>
+                          <Text style={styles.infoValue}>{detail?.hasGst ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>PAN Number</Text>
-                          <Text style={styles.infoValue}>AJEP12353R</Text>
+                          <Text style={styles.infoValue}>{detail?.panNumber ?? "—"}</Text>
                         </View>
 
                         {/* Bank Details */}
                         <Text style={styles.infoSectionTitle}>Bank Details</Text>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Bank Name</Text>
-                          <Text style={styles.infoValue}>Canara Bank</Text>
+                          <Text style={styles.infoValue}>{detail?.bankName ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Branch Name</Text>
-                          <Text style={styles.infoValue}>HINDUPUR TEACHERS COLONY</Text>
+                          <Text style={styles.infoValue}>{detail?.branchName ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Account Number</Text>
-                          <Text style={styles.infoValue}>******4165</Text>
+                          <Text style={styles.infoValue}>{detail?.maskedAccountNumber ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>IFSC Code</Text>
-                          <Text style={styles.infoValue}>CNRB0013234</Text>
+                          <Text style={styles.infoValue}>{detail?.ifscCode ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Account Holder</Text>
-                          <Text style={styles.infoValue}>IRTANUM</Text>
+                          <Text style={styles.infoValue}>{detail?.accountHolder ?? "—"}</Text>
                         </View>
 
                         {/* Location Details */}
                         <Text style={styles.infoSectionTitle}>Location Details</Text>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Country</Text>
-                          <Text style={styles.infoValue}>India</Text>
+                          <Text style={styles.infoValue}>{detail?.country ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>State</Text>
-                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
+                          <Text style={styles.infoValue}>{detail?.state ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>City</Text>
-                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
+                          <Text style={styles.infoValue}>{detail?.city ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Area</Text>
-                          <Text style={styles.infoValue}>Kothacheruvu</Text>
+                          <Text style={styles.infoValue}>{detail?.area ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Pincode</Text>
-                          <Text style={styles.infoValue}>515133</Text>
+                          <Text style={styles.infoValue}>{detail?.pincode ?? "—"}</Text>
                         </View>
 
                         {/* Warehouse Details */}
                         <Text style={styles.infoSectionTitle}>Warehouse Details</Text>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Warehouse Address</Text>
-                          <Text style={styles.infoValue}>Shop no. 1, Dharmavaram Road, Kothacheruvu, Near Indian oil petrol pump, Sri Sathya Sai Dist, Andhra Pradesh, 515133</Text>
+                          <Text style={styles.infoValue}>{detail?.warehouseAddress ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Country</Text>
-                          <Text style={styles.infoValue}>India</Text>
+                          <Text style={styles.infoValue}>{detail?.warehouseCountry ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>State</Text>
-                          <Text style={styles.infoValue}>Andhra Pradesh</Text>
+                          <Text style={styles.infoValue}>{detail?.warehouseState ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>City</Text>
-                          <Text style={styles.infoValue}>Sri Sathya Sai</Text>
+                          <Text style={styles.infoValue}>{detail?.warehouseCity ?? "—"}</Text>
                         </View>
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Area</Text>
-                          <Text style={styles.infoValue}>Kothacheruvu</Text>
+                          <Text style={styles.infoValue}>{detail?.warehouseArea ?? "—"}</Text>
                         </View>
                       </View>
                     </View>
@@ -2681,7 +2830,7 @@ export default function ApprovedSellersScreen() {
                         <Text style={styles.sidebarCardTitle}>Profile Picture</Text>
                       </View>
                       <View style={styles.sidebarCardBody}>
-                        {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sidebarProfileImg} />) : (<View style={[styles.sidebarProfileImg, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={80} color="#9CA3AF" /></View>)}
+                        {(profileImage && typeof profileImage === 'string' && profileImage.trim() !== '' && profileImage !== 'null' && profileImage !== 'N/A' && profileImage !== 'undefined') ? (<Image source={{ uri: profileImage }} style={styles.sidebarProfileImg} />) : (<View style={[styles.sidebarProfileImg, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={80} color="#9CA3AF" /></View>)}
                       </View>
                     </View>
 
@@ -2691,35 +2840,55 @@ export default function ApprovedSellersScreen() {
                         <Text style={styles.sidebarCardTitle}>Verification Documents</Text>
                       </View>
                       <View style={styles.sidebarCardBodyDocs}>
-                        {[
-                          "Aadhaar Front",
-                          "Aadhaar Back",
-                          "PAN Card",
-                          "Cancelled Cheque",
-                          "Business Proof",
-                          "Bank Proof",
-                        ].map((docName) => (
-                          <View key={docName} style={styles.docRow}>
-                            <Text style={styles.docLabel}>{docName}</Text>
-                            <TouchableOpacity
-                              style={styles.docViewBtn}
-                              onPress={() => setPreviewDoc({ name: docName, url: 'https://via.placeholder.com/800x600.png?text=' + encodeURIComponent(docName) })}
-                            >
-                              <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
-                              <Text style={styles.docViewBtnText}>View</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
+                        {verificationDocs
+                          .filter((doc) => !/live selfie/i.test(doc.name))
+                          .map((doc) => (
+                            <View key={doc.name} style={styles.docRow}>
+                              <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={styles.docLabel}>{doc.name}</Text>
+                                <Text style={{ fontSize: 11, color: doc.available ? "#10B981" : "#9CA3AF" }}>
+                                  {doc.available ? "Uploaded" : "Not uploaded"}
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                style={styles.docViewBtn}
+                                onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                              >
+                                <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                                <Text style={styles.docViewBtnText}>View</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ))}
 
                         <Text style={styles.docSectionSubTitle}>Business Proof Documents (Multiple)</Text>
                         <View style={styles.docThumbnailRow}>
-                          {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.docThumbnail} />) : (<View style={[styles.docThumbnail, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="image" size={40} color="#9CA3AF" /></View>)}
+                          {businessProofDocs.map((doc, idx) => (
+                            <TouchableOpacity
+                              key={`${doc.name}-${doc.url}-${idx}`}
+                              onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                            >
+                              <SellerDocumentImage
+                                path={doc.path}
+                                url={doc.url}
+                                style={styles.docThumbnail}
+                              />
+                            </TouchableOpacity>
+                          ))}
                         </View>
 
                         <Text style={styles.docSectionSubTitle}>Live Selfie Documents</Text>
                         <View style={styles.selfieThumbnailRow}>
-                          {[1, 2, 3, 4, 5].map((idx) => (
-                            (seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image key={idx} source={{ uri: seller.avatar }} style={styles.selfieThumbnail} />) : (<View key={idx} style={[styles.selfieThumbnail, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="camera" size={20} color="#9CA3AF" /></View>)
+                          {liveSelfies.map((doc, idx) => (
+                            <TouchableOpacity
+                              key={`${doc.name}-${doc.url}-${idx}`}
+                              onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                            >
+                              <SellerDocumentImage
+                                path={doc.path}
+                                url={doc.url}
+                                style={styles.selfieThumbnail}
+                              />
+                            </TouchableOpacity>
                           ))}
                         </View>
                       </View>
@@ -2753,12 +2922,12 @@ export default function ApprovedSellersScreen() {
                           </TouchableOpacity>
                           {showStatusDropdown && (
                             <View style={styles.selectMenu}>
-                              {["Active", "Blocked"].map((opt) => (
+                              {ACCOUNT_STATUS_OPTIONS.map((opt) => (
                                 <TouchableOpacity
                                   key={opt}
                                   style={styles.selectMenuItem}
                                   onPress={() => {
-                                    setAdminStatus(opt as any);
+                                    setAdminStatus(opt);
                                     setShowStatusDropdown(false);
                                   }}
                                 >
@@ -2784,7 +2953,7 @@ export default function ApprovedSellersScreen() {
                           </TouchableOpacity>
                           {showKycDropdown && (
                             <View style={styles.selectMenu}>
-                              {["Pending Verification", "Active", "Rejected", "Inactive"].map((opt) => (
+                              {KYC_STATUS_OPTIONS.map((opt) => (
                                 <TouchableOpacity
                                   key={opt}
                                   style={styles.selectMenuItem}
@@ -2806,10 +2975,12 @@ export default function ApprovedSellersScreen() {
                         <Text style={styles.formLabel}>Unique Seller ID (Auto-generated)</Text>
                         <TextInput
                           style={styles.formTextInputDisabled}
-                          value={`FNT-SELLER-0000${seller.id}`}
+                          value={detail?.sellerUniqueId ?? "—"}
                           editable={false}
                         />
-                        <Text style={styles.formCaption}>Unique ID: FNT-SELLER-0000{seller.id}</Text>
+                        {detail?.sellerUniqueId && detail.sellerUniqueId !== "—" ? (
+                          <Text style={styles.formCaption}>Unique ID: {detail.sellerUniqueId}</Text>
+                        ) : null}
                       </View>
 
                       {/* KYC Remarks */}
@@ -2831,7 +3002,7 @@ export default function ApprovedSellersScreen() {
                       <View style={[styles.rowLayout, { gap: 12 }]}>
                         <TouchableOpacity
                           style={styles.updateStatusBtn}
-                          onPress={handleUpdateSellerStatus}
+                          onPress={() => void handleUpdateSellerStatus()}
                         >
                           <Feather name="check" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
                           <Text style={styles.updateStatusBtnText}>Update Status</Text>
@@ -3088,9 +3259,17 @@ export default function ApprovedSellersScreen() {
                   <Text style={styles.applyBtnText}>Apply</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
-                  <Feather name="download" size={16} color="#FFFFFF" style={styles.btnIcon} />
-                  <Text style={styles.exportBtnText}>Export CSV</Text>
+                <TouchableOpacity
+                  style={[styles.exportBtn, exportLoading && { opacity: 0.7 }]}
+                  onPress={() => void handleExportCSV()}
+                  disabled={exportLoading}
+                >
+                  {exportLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" style={styles.btnIcon} />
+                  ) : (
+                    <Feather name="download" size={16} color="#FFFFFF" style={styles.btnIcon} />
+                  )}
+                  <Text style={styles.exportBtnText}>{exportLoading ? "Exporting..." : "Export CSV"}</Text>
                 </TouchableOpacity>
 
                 {/* Sort Dropdown */}
@@ -3215,14 +3394,11 @@ export default function ApprovedSellersScreen() {
                 </View>
 
                 {paginatedSellers.map((seller) => (
-                  <View key={seller.id} style={[styles.tableRow, seller.status === "Blocked" && styles.rowBlocked]}>
+                  <View key={seller.id} style={[styles.tableRow, seller.status === "Inactive" && styles.rowBlocked]}>
                     <TouchableOpacity
                       activeOpacity={0.7}
                       style={[styles.tableCell, { flex: 2.2, flexDirection: "row", alignItems: "center" }]}
-                      onPress={() => {
-                        setSelectedSellerId(seller.id);
-                        setAdminStatus(seller.status);
-                      }}
+                      onPress={() => openSellerDetail(seller.id, seller.status)}
                     >
                       {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
                       <View style={styles.sellerMeta}>
@@ -3243,10 +3419,7 @@ export default function ApprovedSellersScreen() {
                     <View style={[styles.tableCellActions, { flex: 1.6 }]}>
                       <TouchableOpacity
                         style={styles.actionEyeBtn}
-                        onPress={() => {
-                          setSelectedSellerId(seller.id);
-                          setAdminStatus(seller.status);
-                        }}
+                        onPress={() => openSellerDetail(seller.id, seller.status)}
                       >
                         <Ionicons name="eye" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -3260,7 +3433,7 @@ export default function ApprovedSellersScreen() {
                         <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[styles.actionBlockBtn, seller.status === "Blocked" && styles.actionBlockBtnActive]}
+                        style={[styles.actionBlockBtn, seller.status === "Inactive" && styles.actionBlockBtnActive]}
                         onPress={() => {
                           if (seller.status === "Active") {
                             setDeactivateSeller(seller);
@@ -3284,7 +3457,7 @@ export default function ApprovedSellersScreen() {
                         <Ionicons
                           name="close-circle"
                           size={15}
-                          color={seller.status === "Blocked" ? "#FFFFFF" : "#EF4444"}
+                          color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
                         />
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -3315,7 +3488,7 @@ export default function ApprovedSellersScreen() {
                     key={seller.id}
                     style={[
                       styles.gridCard,
-                      seller.status === "Blocked" && styles.rowBlocked,
+                      seller.status === "Inactive" && styles.rowBlocked,
                       isLargeScreen ? styles.gridCardLarge : styles.gridCardMobile,
                     ]}
                   >
@@ -3323,10 +3496,7 @@ export default function ApprovedSellersScreen() {
                       <TouchableOpacity
                         activeOpacity={0.7}
                         style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-                        onPress={() => {
-                          setSelectedSellerId(seller.id);
-                          setAdminStatus(seller.status);
-                        }}
+                        onPress={() => openSellerDetail(seller.id, seller.status)}
                       >
                         {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.cardAvatar} />) : (<View style={[styles.cardAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={20} color="#9CA3AF" /></View>)}
                         <View style={styles.cardTitleContainer}>
@@ -3334,9 +3504,9 @@ export default function ApprovedSellersScreen() {
                           <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>
                         </View>
                       </TouchableOpacity>
-                      <View style={[styles.statusBadge, seller.status === "Blocked" && styles.statusBadgeBlocked]}>
+                      <View style={[styles.statusBadge, seller.status === "Inactive" && styles.statusBadgeBlocked]}>
                         <Text style={styles.statusBadgeText}>
-                          {seller.status === "Blocked" ? "Blocked" : "Active"}
+                          {seller.status}
                         </Text>
                       </View>
                     </View>
@@ -3375,10 +3545,7 @@ export default function ApprovedSellersScreen() {
                     <View style={styles.cardActions}>
                       <TouchableOpacity
                         style={[styles.cardActionBtn, styles.actionEyeBtn]}
-                        onPress={() => {
-                          setSelectedSellerId(seller.id);
-                          setAdminStatus(seller.status);
-                        }}
+                        onPress={() => openSellerDetail(seller.id, seller.status)}
                       >
                         <Ionicons name="eye" size={15} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -3395,7 +3562,7 @@ export default function ApprovedSellersScreen() {
                         style={[
                           styles.cardActionBtn,
                           styles.actionBlockBtn,
-                          seller.status === "Blocked" && styles.actionBlockBtnActive,
+                          seller.status === "Inactive" && styles.actionBlockBtnActive,
                         ]}
                         onPress={() => {
                           if (seller.status === "Active") {
@@ -3420,7 +3587,7 @@ export default function ApprovedSellersScreen() {
                         <Ionicons
                           name="close-circle"
                           size={15}
-                          color={seller.status === "Blocked" ? "#FFFFFF" : "#EF4444"}
+                          color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
                         />
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -3816,10 +3983,10 @@ export default function ApprovedSellersScreen() {
                 </TouchableOpacity>
               </View>
               <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                <Image 
-                  source={{ uri: previewDoc.url }} 
+                <SellerDocumentImage
+                  url={previewDoc.url}
                   resizeMode="contain"
-                  style={{ width: '100%', height: '100%' }} 
+                  style={{ width: '100%', height: '100%' }}
                 />
               </View>
             </View>
@@ -3858,7 +4025,7 @@ const styles = StyleSheet.create({
   },
   scrollBodyContent: {
     padding: 24,
-    paddingBottom: 60,
+    paddingBottom: 0,
   },
   rowLayout: {
     flexDirection: "row",
@@ -6080,26 +6247,32 @@ const stylesMobile = StyleSheet.create({
     marginTop: 4,
   },
   detailsHeader: {
-    height: Platform.OS === 'ios' ? 96 : 80,
-    paddingTop: Platform.OS === 'ios' ? 44 : 28,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    backgroundColor: "#151D4F", // Deep navy blue
+    marginHorizontal: 2,
+    marginTop: 12,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 16 : 10,
+    paddingBottom: 24,
+  },
+  detailsHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    marginBottom: 4,
   },
   detailsHeaderBack: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    marginRight: 10,
   },
   detailsHeaderTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "700",
-    color: "#1E293B",
+    color: "#FFFFFF",
+    flex: 1,
+  },
+  detailsHeaderSub: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginLeft: 30,
   },
   detailsHeaderMore: {
     width: 40,

@@ -11,30 +11,38 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { formatDate, initialsFromName } from "@/lib/format";
+import { fetchProducts, type ProductListRow } from "@/services/productApi";
 import {
+  exportSellerProductsCsv,
   fetchSellerAnalyticsChart,
   fetchSellerAnalyticsInsights,
   fetchSellerAnalyticsSummary,
   fetchSellerAnalyticsYears,
+  fetchSellerDetail,
   fetchSellerGraphNames,
   fetchSellers,
   fetchSellersForGraph,
+  formatSellerDisplayName,
   normalizeSellerGraphChart,
   normalizeSellerGraphSummary,
+  pickSellerUniqueId,
+  readSellerUniqueIdRaw,
   type SellerGraphChartData,
   type SellerGraphInsight,
   type SellerGraphNameOption,
-  type SellerGraphRow,
+  type SellerGraphRow
 } from "@/services/sellerApi";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -43,6 +51,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 import Svg, {
@@ -56,17 +65,21 @@ import Svg, {
 /* ─── Theme ─────────────────────────────────────────────────────────── */
 const ORANGE = "#F97316";
 const DARK_NAV = "#1B2332";
+const DETAIL_NAVY = "#151D4F";
+const DETAIL_NAVY_LIGHT = "#1E3A5F";
 const BORDER = "#E8EDF5";
 const LIGHT_BG = "#F8FAFC";
 
 /* ─── Data ─────────────────────────────────────────────────────────── */
 type Seller = {
   id: number;
+  sellerUniqueId: string;
   name: string;
   email: string;
   phone: string;
   business: string;
   onboard: string;
+  onboardAt: string;
   status: string;
   profile: string;
   kyc: string;
@@ -80,6 +93,55 @@ type Seller = {
 
 const SELLER_COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4", "#F59E0B", "#EF4444", "#7C3AED", "#059669"];
 
+function sortSellersByOnboardNewestFirst(items: Seller[]): Seller[] {
+  return [...items].sort((a, b) => {
+    const aTime = Date.parse(a.onboardAt);
+    const bTime = Date.parse(b.onboardAt);
+    const aValid = Number.isFinite(aTime);
+    const bValid = Number.isFinite(bTime);
+    if (aValid && bValid && aTime !== bTime) return bTime - aTime;
+    if (aValid && !bValid) return -1;
+    if (!aValid && bValid) return 1;
+    return b.id - a.id;
+  });
+}
+
+function sellerPublicId(source: { sellerUniqueId?: string | null; id: number }): string {
+  return pickSellerUniqueId(source.id, source.sellerUniqueId);
+}
+
+function enrichSellerNameOptions(
+  options: SellerGraphNameOption[],
+  uniqueById: Map<number, string>
+): SellerGraphNameOption[] {
+  return options.map((opt) => {
+    const knownUniqueId = uniqueById.get(opt.id);
+    if (!knownUniqueId) return opt;
+    return { ...opt, sellerUniqueId: knownUniqueId };
+  });
+}
+
+function resolveSellerDropdownOption(
+  value: number,
+  displayOverride: SellerGraphNameOption | null | undefined,
+  options: SellerGraphNameOption[]
+): SellerGraphNameOption {
+  if (displayOverride?.id === value) return displayOverride;
+  const fromOptions = options.find((s) => s.id === value);
+  if (fromOptions) return fromOptions;
+  return {
+    id: value,
+    fullName: `Seller #${value}`,
+    sellerUniqueId: null,
+  };
+}
+
+function formatFilterTypeLabel(filterType: string, fromDate: string, toDate: string): string {
+  if (fromDate || toDate) return "Date range";
+  if (filterType === "Overall") return "Overall (all time)";
+  return filterType;
+}
+
 function mapSellerGraphRow(s: SellerGraphRow, index: number): Seller {
   const statusRaw = (s.status ?? "").toLowerCase();
   const status =
@@ -87,11 +149,13 @@ function mapSellerGraphRow(s: SellerGraphRow, index: number): Seller {
       statusRaw === "pending" ? "Pending" : "Awaiting Approval";
   return {
     id: s.id,
+    sellerUniqueId: sellerPublicId(s),
     name: s.fullName ?? "Seller",
     email: s.email ?? "",
     phone: s.mobile ?? "",
     business: s.businessName ?? "—",
     onboard: formatDate(s.createdAt),
+    onboardAt: String(s.createdAt ?? ""),
     status,
     profile: s.profile ?? "Incomplete",
     kyc: s.kyc ?? "Not done",
@@ -138,6 +202,10 @@ const STATUS_MAP: Record<string, { bg: string; color: string; border: string }> 
   "Provided": { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
   "Not Provided": { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" },
   "Not done": { bg: "#1F2937", color: "#F9FAFB", border: "#374151" },
+  "Yes": { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
+  "No": { bg: "#FEE2E2", color: "#7F1D1D", border: "#FCA5A5" },
+  active: { bg: "#D1FAE5", color: "#065F46", border: "#34D399" },
+  inactive: { bg: "#F3F4F6", color: "#374151", border: "#D1D5DB" },
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -167,56 +235,98 @@ function StatusBadge({ status }: { status: string }) {
       borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
       alignSelf: "flex-start",
     }}>
-      <Text style={{ fontSize: 11, fontWeight: "600", color: s.color }}>{status}</Text>
+      <Text style={{ fontSize: 11, fontWeight: "600", color: s.color }} numberOfLines={1}>{status}</Text>
     </View>
   );
 }
 
+function resolveProductImage(product: ProductListRow): string {
+  const row = product as Record<string, unknown>;
+  return resolveMediaUrl(
+    String(product.imageUrl ?? row.image ?? row.thumbnail ?? row.productImage ?? "")
+  );
+}
+
+function ProductImageCell({ uri }: { uri: string }) {
+  if (!uri) {
+    return (
+      <View style={styles.detailProductImagePlaceholder}>
+        <Ionicons name="image-outline" size={18} color="#94A3B8" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.detailProductImage}
+      contentFit="cover"
+      transition={150}
+    />
+  );
+}
+
+function mapDetailProductRow(product: ProductListRow): ProductListRow {
+  const imageUrl = resolveProductImage(product);
+  return imageUrl ? { ...product, imageUrl } : product;
+}
+
 /* ─── Seller label / filter dropdown ────────────────────────────────── */
-function formatSellerLabel(s: Pick<SellerGraphNameOption, "id" | "fullName" | "businessName">) {
-  const name = (s.fullName ?? "").trim() || `Seller #${s.id}`;
-  const business = (s.businessName ?? "").trim();
-  return business ? `${name} — ${business} (#${s.id})` : `${name} (#${s.id})`;
+function formatSellerLabel(
+  s: Pick<SellerGraphNameOption, "id" | "fullName" | "businessName" | "sellerUniqueId">
+) {
+  return formatSellerDisplayName(s);
 }
 
 function SellerFilterDropdown({
   value,
   onChange,
   options,
+  displayOverride,
   style,
 }: {
   value: number | null;
   onChange: (id: number | null) => void;
   options: SellerGraphNameOption[];
+  displayOverride?: SellerGraphNameOption | null;
   style?: object;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isDesktop = screenW >= 1024;
+  const [hovered, setHovered] = useState(false);
 
   const display = value == null
     ? "All Sellers"
-    : formatSellerLabel(options.find((s) => s.id === value) ?? { id: value, fullName: `Seller #${value}` });
+    : formatSellerLabel(resolveSellerDropdownOption(value, displayOverride, options));
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return options;
     return options.filter((s) => {
       const label = formatSellerLabel(s).toLowerCase();
-      return label.includes(q) || String(s.id).includes(q);
+      const fullName = (s.fullName ?? "").toLowerCase();
+      const business = (s.businessName ?? "").toLowerCase();
+      const uniqueId = sellerPublicId(s).toLowerCase();
+      return (
+        label.includes(q) ||
+        fullName.includes(q) ||
+        business.includes(q) ||
+        uniqueId.includes(q) ||
+        String(s.id).includes(q)
+      );
     });
   }, [options, search]);
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        const { width: screenWidth } = Dimensions.get("window");
-        const menuWidth = Math.min(Math.max(width, 280), screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
-        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        const menuWidth = Math.min(Math.max(width, 280), screenW - 32);
+        const adjustedLeft = Math.min(x, screenW - menuWidth - 16);
+        setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
     setOpen((o) => !o);
@@ -230,19 +340,17 @@ function SellerFilterDropdown({
 
   return (
     <View style={[{ minWidth: 160 }, style]}>
-      <Pressable
+      <TouchableOpacity
         ref={triggerRef as any}
         onPress={handlePress}
-        style={({ hovered }: any) => [
-          styles.dropdownTrigger,
-          hovered && { backgroundColor: "#FFF7ED" }
-        ]}
+        activeOpacity={0.8}
+        style={styles.dropdownTrigger}
       >
         <Text style={styles.dropdownText} numberOfLines={1}>{display}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
-      </Pressable>
+      </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => { setOpen(false); setSearch(""); }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => { setOpen(false); setSearch(""); }} />
         {menuPosition && (
           <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
@@ -310,24 +418,24 @@ function SellerFilterDropdown({
 
 /* ─── Dropdown ──────────────────────────────────────────────────────── */
 function Dropdown({
-  value, onChange, options, style,
+  value, onChange, options, style, placeholder, displayValue,
 }: {
   value: string; onChange: (v: string) => void;
-  options: string[]; style?: object;
+  options: string[]; style?: object; placeholder?: string; displayValue?: string;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isDesktop = screenW >= 1024;
+  const [hovered, setHovered] = useState(false);
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        const { width: screenWidth } = Dimensions.get("window");
-        const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
-        setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        const menuWidth = Math.min(width, screenW - 32);
+        const adjustedLeft = Math.min(x, screenW - menuWidth - 16);
+        setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
     setOpen(o => !o);
@@ -335,17 +443,15 @@ function Dropdown({
 
   return (
     <View style={[{ minWidth: 120 }, style]}>
-      <Pressable
+      <TouchableOpacity
         ref={triggerRef as any}
         onPress={handlePress}
-        style={({ hovered }: any) => [
-          styles.dropdownTrigger,
-          hovered && { backgroundColor: "#FFF7ED" }
-        ]}
+        activeOpacity={0.8}
+        style={styles.dropdownTrigger}
       >
-        <Text style={styles.dropdownText} numberOfLines={1}>{value}</Text>
+        <Text style={styles.dropdownText} numberOfLines={1}>{displayValue || value || placeholder || ""}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={12} color="#94A3B8" />
-      </Pressable>
+      </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
@@ -376,21 +482,7 @@ function Dropdown({
   );
 }
 
-/* ─── Pagination Button ─────────────────────────────────────────────── */
-function PagBtn({ iconName, onPress, disabled, active }: {
-  iconName: keyof typeof Ionicons.glyphMap;
-  onPress: () => void; disabled?: boolean; active?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress} disabled={disabled}
-      style={[styles.pagBtn, active && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-    >
-      <Ionicons name={iconName} size={12}
-        color={disabled ? "#CBD5E1" : active ? "#fff" : "#374151"} />
-    </TouchableOpacity>
-  );
-}
+
 
 /* ─── DatePicker Component ───────────────────────────────────────────── */
 function DatePicker({ value, onChange, placeholder }: {
@@ -402,7 +494,7 @@ function DatePicker({ value, onChange, placeholder }: {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isMobile = screenW < 768;
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -590,6 +682,13 @@ function DatePicker({ value, onChange, placeholder }: {
                 </View>
               </ScrollView>
             )}
+
+            <TouchableOpacity
+              onPress={() => setOpen(false)}
+              style={[styles.datePickerCloseBtn, { marginTop: 10 }]}
+            >
+              <Text style={styles.datePickerCloseBtnText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
@@ -796,97 +895,364 @@ function LegendSwatch({ series, active }: { series: typeof SERIES[0]; active: bo
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   SELLER MODAL
-═══════════════════════════════════════════════════════════════════════ */
-function SellerModal({ seller, onClose }: { seller: Seller | null; onClose: () => void }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
-  const { width: screenW } = Dimensions.get("window");
-  const isDesktop = screenW >= 1024;
+type CategoryBreakdownRow = {
+  category: string;
+  subcategory: string;
+  products: number;
+};
 
-  useEffect(() => {
-    if (seller) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 10, useNativeDriver: true }),
-      ]).start();
+function buildCategoryBreakdown(products: ProductListRow[]): CategoryBreakdownRow[] {
+  const map = new Map<string, CategoryBreakdownRow>();
+  for (const product of products) {
+    const category = String(product.categoryName ?? product.mainCategoryName ?? "—").trim() || "—";
+    const subcategory = String(product.subcategoryName ?? "—").trim() || "—";
+    const key = `${category}\0${subcategory}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.products += 1;
+    } else {
+      map.set(key, { category, subcategory, products: 1 });
     }
-  }, [seller]);
+  }
+  return Array.from(map.values()).sort((a, b) => b.products - a.products);
+}
 
-  if (!seller) return null;
+function sellerFromNameOption(option: SellerGraphNameOption, index: number): Seller {
+  return {
+    id: option.id,
+    sellerUniqueId: sellerPublicId(option),
+    name: option.fullName ?? `Seller #${option.id}`,
+    email: "",
+    phone: "",
+    business: option.businessName ?? "—",
+    onboard: "—",
+    onboardAt: "",
+    status: "Active",
+    profile: "Incomplete",
+    kyc: "Not done",
+    supplement: "Not Provided",
+    shiprocket: "Not Uploaded",
+    shipDate: null,
+    products: 0,
+    initials: initialsFromName(option.fullName),
+    color: SELLER_COLORS[index % SELLER_COLORS.length],
+  };
+}
 
-  const statusFields = [
-    { label: "Status", val: seller.status },
-    { label: "Profile", val: seller.profile },
-    { label: "KYC", val: seller.kyc },
-    { label: "Supplement", val: seller.supplement },
-    { label: "Shiprocket", val: seller.shiprocket },
-  ];
+/* ─── Analytics filter caption + export ─────────────────────────────── */
+function AnalyticsFilterCaption({
+  filterType,
+  filterYear,
+  fromDate,
+  toDate,
+  selectedSellerId,
+  sellerName,
+  sellerBusiness,
+  sellerUniqueId,
+  sellerOnboard,
+  exportingCsv,
+  onExportCsv,
+}: {
+  filterType: string;
+  filterYear: string;
+  fromDate: string;
+  toDate: string;
+  selectedSellerId: number | null;
+  sellerName: string;
+  sellerBusiness: string;
+  sellerUniqueId: string;
+  sellerOnboard: string;
+  exportingCsv: boolean;
+  onExportCsv: () => void;
+}) {
+  const filterLabel = formatFilterTypeLabel(filterType, fromDate, toDate);
+  const business = (sellerBusiness ?? "").trim();
+  const name = (sellerName ?? "").trim();
+  const uniqueId = (sellerUniqueId ?? "").trim();
+  const sellerLabel = business && business !== "—"
+    ? business
+    : name || uniqueId || "Selected seller";
 
   return (
-    <Modal visible={!!seller} transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View style={[
-          styles.modalSheet,
-          isDesktop && styles.modalSheetDesktop,
-          { transform: [{ translateY: slideAnim }] }
-        ]}>
-          <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-            <Ionicons name="close-circle" size={22} color="#475569" />
-          </TouchableOpacity>
-          <View style={[styles.modalHeader, { borderBottomColor: "#F1F5F9" }]}>
-            <Avatar initials={seller.initials} color={seller.color} size={50} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.modalSellerName}>{seller.name}</Text>
-              <Text style={styles.modalBusiness}>{seller.business}</Text>
+    <View style={styles.filterCaptionRow}>
+      <Text style={styles.filterCaption}>
+        Showing analytics for{" "}
+        <Text style={styles.filterCaptionStrong}>{filterLabel}</Text>
+        {selectedSellerId != null ? (
+          <>
+            {" · Seller: "}
+            <Text style={styles.filterCaptionStrong}>{sellerLabel}</Text>
+            {uniqueId ? ` (${uniqueId})` : ""}
+            {sellerOnboard ? ` (Joined ${sellerOnboard})` : ""}
+          </>
+        ) : (
+          <>
+            {" · All Sellers"}
+            {!fromDate && !toDate ? ` · ${filterYear}` : ""}
+          </>
+        )}
+        {fromDate ? ` · From: ${fromDate}` : ""}
+        {toDate ? ` · To: ${toDate}` : ""}
+      </Text>
+      {selectedSellerId != null ? (
+        <TouchableOpacity
+          onPress={onExportCsv}
+          disabled={exportingCsv}
+          style={styles.exportCsvBtn}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="download-outline" size={14} color={ORANGE} />
+          <Text style={styles.exportCsvLink}>
+            {exportingCsv ? "Exporting..." : "Export Seller CSV"}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SELLER GRAPH DETAIL (full-page analysis for one seller)
+═══════════════════════════════════════════════════════════════════════ */
+function SellerGraphDetailPanel({
+  seller,
+  emailVerified,
+  products,
+  loading,
+  onBack,
+  isDesktop,
+}: {
+  seller: Seller;
+  emailVerified?: boolean;
+  products: ProductListRow[];
+  loading: boolean;
+  onBack: () => void;
+  isDesktop?: boolean;
+}) {
+  const breakdown = useMemo(() => buildCategoryBreakdown(products), [products]);
+  const profileYes = seller.profile === "Complete";
+  const emailYes = emailVerified === true;
+
+  return (
+    <View style={styles.detailRoot}>
+      <LinearGradient
+        colors={[DETAIL_NAVY, DETAIL_NAVY_LIGHT]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.detailHero}
+      >
+        <TouchableOpacity onPress={onBack} style={styles.detailHeroBack}>
+          <Ionicons name="arrow-back" size={16} color="#fff" />
+          <Text style={styles.detailHeroBackText}>Back to seller list</Text>
+        </TouchableOpacity>
+
+        <View style={styles.detailHeroMain}>
+          <View style={styles.detailHeroIdentity}>
+            <Avatar initials={seller.initials} color={seller.color} size={isDesktop ? 64 : 54} />
+            <View style={styles.detailHeroTextCol}>
+              <Text style={styles.detailHeroBusiness} numberOfLines={2}>{seller.business}</Text>
+              <Text style={styles.detailHeroOwner} numberOfLines={1}>{seller.name}</Text>
+              <View style={styles.detailHeroMetaRow}>
+                <View style={styles.detailHeroIdPill}>
+                  <Text style={styles.detailHeroIdText}>{seller.sellerUniqueId}</Text>
+                </View>
+                <View style={styles.detailHeroOnboardPill}>
+                  <Ionicons name="calendar-outline" size={12} color="#FED7AA" />
+                  <Text style={styles.detailHeroOnboardText}>{seller.onboard}</Text>
+                </View>
+              </View>
             </View>
           </View>
-          <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionLabel}>
-              <Ionicons name="person" size={11} color={ORANGE} />{"  "}CONTACT
-            </Text>
-            {[
-              { iconName: "mail-outline" as keyof typeof Ionicons.glyphMap, label: "Email", val: seller.email },
-              { iconName: "call-outline" as keyof typeof Ionicons.glyphMap, label: "Phone", val: seller.phone },
-              { iconName: "calendar-outline" as keyof typeof Ionicons.glyphMap, label: "Onboarded", val: seller.onboard },
-            ].map(r => (
-              <View key={r.label} style={styles.contactRow}>
-                <Ionicons name={r.iconName} size={14} color="#94A3B8" style={{ width: 18 }} />
-                <Text style={styles.contactLabel}>{r.label}:</Text>
-                <Text style={styles.contactVal} numberOfLines={1}>{r.val}</Text>
-              </View>
-            ))}
-            <Text style={[styles.sectionLabel, { marginTop: 16 }]}>
-              <Ionicons name="shield-checkmark-outline" size={11} color={ORANGE} />{"  "}STATUS
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-              {statusFields.map(b => (
-                <View key={b.label}>
-                  <Text style={styles.badgeLabel}>{b.label}</Text>
-                  <StatusBadge status={b.val} />
+
+          <View style={[styles.detailQuickStats, isDesktop && styles.detailQuickStatsDesktop]}>
+            <View style={styles.detailQuickStat}>
+              <Text style={styles.detailQuickStatValue}>{seller.products}</Text>
+              <Text style={styles.detailQuickStatLabel}>Products</Text>
+            </View>
+            <View style={styles.detailQuickStatDivider} />
+            <View style={styles.detailQuickStat}>
+              <StatusBadge status={seller.status} />
+              <Text style={styles.detailQuickStatLabel}>Status</Text>
+            </View>
+            <View style={styles.detailQuickStatDivider} />
+            <View style={styles.detailQuickStat}>
+              <StatusBadge status={profileYes ? "Yes" : "No"} />
+              <Text style={styles.detailQuickStatLabel}>Profile</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <View style={{ flexDirection: isDesktop ? "row" : "column", gap: 14 }}>
+        <View style={[styles.detailPanelCard, styles.detailPanelOrange, { flex: 1 }]}>
+          <View style={styles.detailPanelHeader}>
+            <View style={[styles.detailPanelIcon, { backgroundColor: "#FFEDD5" }]}>
+              <Ionicons name="storefront-outline" size={18} color={ORANGE} />
+            </View>
+            <Text style={styles.detailPanelTitle}>Seller Details</Text>
+          </View>
+
+          <View style={styles.detailInfoGrid}>
+            <View style={styles.detailInfoTile}>
+              <Text style={styles.detailInfoLabel}>Business Name</Text>
+              <Text style={styles.detailInfoValue}>{seller.business}</Text>
+            </View>
+            <View style={styles.detailInfoTile}>
+              <Text style={styles.detailInfoLabel}>Owner Name</Text>
+              <Text style={styles.detailInfoValue}>{seller.name}</Text>
+            </View>
+            <View style={styles.detailInfoTile}>
+              <Text style={styles.detailInfoLabel}>Onboard date</Text>
+              <Text style={styles.detailInfoValue}>{seller.onboard}</Text>
+            </View>
+          </View>
+
+          <View style={styles.detailBadgeGrid}>
+            <View style={styles.detailBadgeItem}>
+              <Text style={styles.badgeLabel}>Status</Text>
+              <StatusBadge status={seller.status} />
+            </View>
+            <View style={styles.detailBadgeItem}>
+              <Text style={styles.badgeLabel}>Profile completed</Text>
+              <StatusBadge status={profileYes ? "Yes" : "No"} />
+            </View>
+            <View style={styles.detailBadgeItem}>
+              <Text style={styles.badgeLabel}>Email verified</Text>
+              <StatusBadge status={emailYes ? "Yes" : "No"} />
+            </View>
+            <View style={styles.detailBadgeItem}>
+              <Text style={styles.badgeLabel}>KYC</Text>
+              <StatusBadge status={seller.kyc === "Pending" ? "Not done" : seller.kyc} />
+            </View>
+            <View style={styles.detailBadgeItem}>
+              <Text style={styles.badgeLabel}>Shiprocket</Text>
+              {seller.shipDate ? (
+                <View>
+                  <StatusBadge status="Uploaded" />
+                  <Text style={styles.detailShipDate}>{seller.shipDate}</Text>
                 </View>
-              ))}
+              ) : (
+                <StatusBadge status={seller.shiprocket} />
+              )}
             </View>
-            <Text style={styles.sectionLabel}>
-              <Ionicons name="cube-outline" size={11} color={ORANGE} />{"  "}PRODUCTS
-            </Text>
-            <View style={styles.productsBox}>
-              <Text style={styles.productsCount}>{seller.products}</Text>
-              <Text style={styles.productsLabel}>Total Products Listed</Text>
+          </View>
+
+          <View style={styles.detailContactRow}>
+            <View style={styles.detailContactChip}>
+              <Ionicons name="mail-outline" size={14} color={ORANGE} />
+              <Text style={styles.detailContactText} numberOfLines={1}>{seller.email || "—"}</Text>
             </View>
-            {seller.shipDate && (
-              <View style={styles.shiprocketBox}>
-                <Ionicons name="cloud-done-outline" size={15} color="#10B981" />
-                <Text style={styles.shiprocketText}>Shiprocket uploaded: {seller.shipDate}</Text>
-              </View>
+            <View style={styles.detailContactChip}>
+              <Ionicons name="call-outline" size={14} color="#0D9488" />
+              <Text style={styles.detailContactText} numberOfLines={1}>{seller.phone || "—"}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.detailPanelCard, styles.detailPanelPurple, { flex: 1 }]}>
+          <View style={styles.detailPanelHeader}>
+            <View style={[styles.detailPanelIcon, { backgroundColor: "#EDE9FE" }]}>
+              <Ionicons name="grid-outline" size={18} color="#7C3AED" />
+            </View>
+            <Text style={styles.detailPanelTitle}>Category / Subcategory</Text>
+          </View>
+          <View style={styles.detailTable}>
+            <View style={styles.detailTableHeaderDark}>
+              <Text style={[styles.detailTableHeadCellDark, { flex: 1.2 }]}>Category</Text>
+              <Text style={[styles.detailTableHeadCellDark, { flex: 1.2 }]}>Subcategory</Text>
+              <Text style={[styles.detailTableHeadCellDark, { flex: 0.5, textAlign: "right" }]}>Products</Text>
+            </View>
+            {loading ? (
+              <Text style={styles.detailEmptyText}>Loading categories...</Text>
+            ) : breakdown.length === 0 ? (
+              <Text style={styles.detailEmptyText}>No products listed yet.</Text>
+            ) : (
+              breakdown.map((row, idx) => (
+                <View
+                  key={`${row.category}-${row.subcategory}`}
+                  style={[styles.detailTableRow, idx % 2 === 1 && styles.detailTableRowAlt]}
+                >
+                  <Text style={[styles.detailTableCell, { flex: 1.2 }]} numberOfLines={2}>{row.category}</Text>
+                  <Text style={[styles.detailTableCell, { flex: 1.2 }]} numberOfLines={2}>{row.subcategory}</Text>
+                  <Text style={[styles.detailTableCellAccent, { flex: 0.5, textAlign: "right" }]}>
+                    {row.products}
+                  </Text>
+                </View>
+              ))
             )}
-            <View style={{ height: 20 }} />
-          </ScrollView>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
+          </View>
+        </View>
+      </View>
+
+      <View style={[styles.detailPanelCard, styles.detailPanelProducts]}>
+        <View style={styles.detailProductsHeader}>
+          <View style={styles.detailPanelHeader}>
+            <View style={[styles.detailPanelIcon, { backgroundColor: "#DBEAFE" }]}>
+              <Ionicons name="cube-outline" size={18} color="#2563EB" />
+            </View>
+            <View>
+              <Text style={styles.detailPanelTitle}>Products</Text>
+              <Text style={styles.detailProductsSub}>
+                {loading ? "Loading products..." : `${products.length} product(s) for this seller`}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.detailProductsCountPill}>
+            <Text style={styles.detailProductsCountValue}>{seller.products}</Text>
+            <Text style={styles.detailProductsCountLabel}>listed</Text>
+          </View>
+        </View>
+        <View style={styles.detailTable}>
+          <View style={styles.detailTableHeaderDark}>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.55 }]}>Image</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.45 }]}>ID</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 1.85 }]}>Product</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.9 }]}>Category</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.9 }]}>Subcategory</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.8 }]}>Created</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.6 }]}>Status</Text>
+          </View>
+          {loading ? (
+            <Text style={styles.detailEmptyText}>Loading products...</Text>
+          ) : products.length === 0 ? (
+            <Text style={styles.detailEmptyText}>No products found for this seller.</Text>
+          ) : (
+            products.map((product, idx) => (
+              <View
+                key={String(product.id)}
+                style={[styles.detailTableRow, idx % 2 === 1 && styles.detailTableRowAlt]}
+              >
+                <View style={{ flex: 0.55, justifyContent: "center" }}>
+                  <ProductImageCell uri={resolveProductImage(product)} />
+                </View>
+                <Text style={[styles.detailTableIdCell, { flex: 0.45 }]}>
+                  {product.id}
+                </Text>
+                <Text style={[styles.detailTableCell, { flex: 1.85, fontWeight: "600" }]} numberOfLines={2}>
+                  {product.name ?? "—"}
+                </Text>
+                <Text style={[styles.detailTableCell, { flex: 0.9 }]} numberOfLines={1}>
+                  {product.categoryName ?? product.mainCategoryName ?? "—"}
+                </Text>
+                <Text style={[styles.detailTableCell, { flex: 0.9 }]} numberOfLines={1}>
+                  {product.subcategoryName ?? "—"}
+                </Text>
+                <Text style={[styles.detailTableCell, { flex: 0.8 }]}>
+                  {formatDate(product.createdAt)}
+                </Text>
+                <View style={{ flex: 0.6 }}>
+                  <StatusBadge
+                    status={String(product.status ?? product.displayStatus ?? "—").toLowerCase() === "active"
+                      ? "active"
+                      : String(product.status ?? product.displayStatus ?? "—")}
+                  />
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -900,17 +1266,21 @@ function SellerCard({ item, onView, isDesktop }: { item: Seller; onView: () => v
 
   return (
     <View style={[styles.sellerCard, isDesktop && styles.sellerCardDesktop]}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <TouchableOpacity onPress={handleRedirect} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+        <TouchableOpacity onPress={handleRedirect} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, flex: 1, minWidth: 0 }}>
           <Avatar initials={item.initials} color={item.color} size={46} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.sellerCardName}>{item.name}</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+              <Text style={[styles.sellerCardName, { flex: 1, minWidth: 120 }]}>{item.name}</Text>
+              <View style={styles.idBadge}>
+                <Text style={[styles.idBadgeText, { color: ORANGE }]} numberOfLines={1}>
+                  {item.sellerUniqueId}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.sellerCardSub} numberOfLines={1}>✉  {item.email}</Text>
             <Text style={styles.sellerCardSub}>📞 {item.phone}</Text>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleRedirect} style={styles.idBadge}>
-          <Text style={[styles.idBadgeText, { color: ORANGE }]}>#{item.id}</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.sellerMetaGrid}>
@@ -929,7 +1299,6 @@ function SellerCard({ item, onView, isDesktop }: { item: Seller; onView: () => v
         {[
           { label: "Status", val: item.status },
           { label: "Profile", val: item.profile },
-          { label: "KYC", val: item.kyc === "Pending" ? "Not done" : item.kyc },
           { label: "Supplement", val: item.supplement },
         ].map(b => (
           <View key={b.label}>
@@ -962,8 +1331,10 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
       styles.tableRow,
       idx % 2 === 0 ? { backgroundColor: "#fff" } : { backgroundColor: "#F8FAFC" },
     ]}>
-      <TouchableOpacity onPress={handleRedirect} style={{ flex: 0.5 }}>
-          <Text style={[styles.tableCell, { fontWeight: "700", color: ORANGE }]}>#{item.id}</Text>
+      <TouchableOpacity onPress={handleRedirect} style={{ flex: 0.85 }}>
+        <Text style={[styles.tableCell, { fontWeight: "700", color: ORANGE }]} numberOfLines={2}>
+          {item.sellerUniqueId}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={handleRedirect} style={{ flex: 1.6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -971,22 +1342,19 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 13, fontWeight: "700", color: DARK_NAV }} numberOfLines={1}>{item.name}</Text>
             <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>{item.email}</Text>
-            <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
+            <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>{item.phone}</Text>
           </View>
         </View>
       </TouchableOpacity>
-      <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>{item.business}</Text>
-      <Text style={[styles.tableCell, { flex: 0.9 }]}>{item.onboard}</Text>
-      <View style={{ flex: 0.7, justifyContent: "center" }}>
+      <View style={{ flex: 1.2 }}><Text style={styles.tableCell} numberOfLines={1}>{item.business}</Text></View>
+      <View style={{ flex: 0.9 }}><Text style={styles.tableCell} numberOfLines={1}>{item.onboard}</Text></View>
+      <View style={{ flex: 1.0, justifyContent: "center" }}>
         <StatusBadge status={item.status} />
       </View>
       <View style={{ flex: 0.7, justifyContent: "center" }}>
         <StatusBadge status={item.profile} />
       </View>
-      <View style={{ flex: 0.65, justifyContent: "center" }}>
-        <StatusBadge status={item.kyc === "Pending" ? "Not done" : item.kyc} />
-      </View>
-      <View style={{ flex: 0.9, justifyContent: "center" }}>
+      <View style={{ flex: 0.95, justifyContent: "center" }}>
         {item.shipDate ? (
           <View>
             <StatusBadge status="Uploaded" />
@@ -996,18 +1364,21 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
           <StatusBadge status="Not Uploaded" />
         )}
       </View>
-      <Text style={[styles.tableCell, { flex: 0.5, textAlign: "center", fontWeight: "700" }]}>{item.products}</Text>
+      <View style={{ flex: 0.5, alignItems: "center" }}><Text style={[styles.tableCell, { fontWeight: "700" }]} numberOfLines={1}>{item.products}</Text></View>
       <View style={{ flex: 0.6, alignItems: "flex-start" }}>
         <TouchableOpacity
           onPress={onView}
+          accessibilityLabel="View seller details"
           style={{
-            backgroundColor: DARK_NAV, borderRadius: 6,
-            paddingVertical: 6, paddingHorizontal: 12,
-            flexDirection: "row", alignItems: "center", gap: 4,
+            backgroundColor: DARK_NAV,
+            borderRadius: 6,
+            paddingVertical: 8,
+            paddingHorizontal: 8,
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          <Ionicons name="eye-outline" size={12} color="#fff" />
-          <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>View</Text>
+          <Ionicons name="eye-outline" size={14} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -1020,7 +1391,7 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
 export default function SellersDashboard() {
   const router = useRouter();
   const { token, isLoading: authLoading } = useAuth();
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isTablet = screenW >= 768;
   const isDesktop = screenW >= 1024;
 
@@ -1033,14 +1404,21 @@ export default function SellersDashboard() {
   const [toDate, setToDate] = useState("");
 
   const [chartWidth, setChartWidth] = useState(
-    isDesktop ? screenW - 64 : isTablet ? screenW - 48 : screenW - 28
+    isDesktop ? Math.floor((screenW - 96) * 0.65) : screenW - 64
   );
+
+  useEffect(() => {
+    setChartWidth(isDesktop ? Math.floor((screenW - 96) * 0.65) : screenW - 64);
+  }, [screenW, isDesktop]);
 
   const [search, setSearch] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
+  const [detailEmailVerified, setDetailEmailVerified] = useState<boolean | undefined>(undefined);
+  const [detailProducts, setDetailProducts] = useState<ProductListRow[]>([]);
+  const [detailProductsLoading, setDetailProductsLoading] = useState(false);
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [sellerNameOptions, setSellerNameOptions] = useState<SellerGraphNameOption[]>([]);
   const [summary, setSummary] = useState<Record<string, number>>({});
@@ -1050,12 +1428,45 @@ export default function SellersDashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
-  const selectedSellerLabel = useMemo(() => {
-    if (selectedSellerId == null) return "All Sellers";
-    const match = sellerNameOptions.find((s) => s.id === selectedSellerId);
-    return match ? formatSellerLabel(match) : `Seller #${selectedSellerId}`;
-  }, [selectedSellerId, sellerNameOptions]);
+  const selectedSellerMeta = useMemo(() => {
+    if (selectedSellerId == null) return null;
+    const fromList = sellers.find((s) => s.id === selectedSellerId);
+    const fromSelected = selectedSeller?.id === selectedSellerId ? selectedSeller : null;
+    const fromOptions = sellerNameOptions.find((s) => s.id === selectedSellerId);
+    const seller = fromList ?? fromSelected;
+    return {
+      business: seller?.business ?? fromOptions?.businessName ?? "",
+      name: seller?.name ?? fromOptions?.fullName ?? "",
+      onboard: seller?.onboard ?? "",
+      uniqueId: seller?.sellerUniqueId ?? sellerPublicId({
+        sellerUniqueId: fromOptions?.sellerUniqueId,
+        id: selectedSellerId,
+      }),
+    };
+  }, [selectedSellerId, sellers, selectedSeller, sellerNameOptions]);
+
+  const selectedSellerDisplayOption = useMemo((): SellerGraphNameOption | null => {
+    if (selectedSellerId == null || !selectedSellerMeta) return null;
+    return {
+      id: selectedSellerId,
+      fullName: selectedSellerMeta.name,
+      businessName: selectedSellerMeta.business,
+      sellerUniqueId: selectedSellerMeta.uniqueId,
+    };
+  }, [selectedSellerId, selectedSellerMeta]);
+
+  const enrichedSellerNameOptions = useMemo(() => {
+    const uniqueById = new Map<number, string>();
+    for (const seller of sellers) {
+      if (seller.sellerUniqueId) uniqueById.set(seller.id, seller.sellerUniqueId);
+    }
+    if (selectedSeller?.sellerUniqueId) {
+      uniqueById.set(selectedSeller.id, selectedSeller.sellerUniqueId);
+    }
+    return enrichSellerNameOptions(sellerNameOptions, uniqueById);
+  }, [sellerNameOptions, sellers, selectedSeller]);
 
   const graphFilters = useMemo(() => ({
     filterType,
@@ -1083,7 +1494,39 @@ export default function SellersDashboard() {
           size: perPage,
         });
       }
-      setSellers((sellerRes.items ?? []).map(mapSellerGraphRow));
+      setSellers(
+        sortSellersByOnboardNewestFirst(
+          (sellerRes.items ?? []).map((row, index) =>
+            mapSellerGraphRow(
+              {
+                ...row,
+                sellerUniqueId: pickSellerUniqueId(
+                  row.id,
+                  row.sellerUniqueId,
+                  (row as Record<string, unknown>).seller_unique_id as string | undefined
+                ),
+              },
+              index
+            )
+          )
+        )
+      );
+      setSellerNameOptions((prev) => {
+        const patches = new Map(
+          (sellerRes.items ?? []).map((row) => [
+            row.id,
+            pickSellerUniqueId(
+              row.id,
+              row.sellerUniqueId,
+              (row as Record<string, unknown>).seller_unique_id as string | undefined
+            ),
+          ])
+        );
+        if (patches.size === 0) return prev;
+        return prev.map((opt) =>
+          patches.has(opt.id) ? { ...opt, sellerUniqueId: patches.get(opt.id)! } : opt
+        );
+      });
       setTotalSellers(sellerRes.totalElements ?? 0);
       setTotalPages(Math.max(1, sellerRes.totalPages ?? 1));
     } catch (e) {
@@ -1104,6 +1547,11 @@ export default function SellersDashboard() {
             id: s.id,
             fullName: s.fullName ?? `Seller #${s.id}`,
             businessName: s.businessName ?? null,
+            sellerUniqueId: pickSellerUniqueId(
+              s.id,
+              s.sellerUniqueId,
+              (s as Record<string, unknown>).seller_unique_id as string | undefined
+            ),
           }))
         );
       } catch (e) {
@@ -1177,7 +1625,7 @@ export default function SellersDashboard() {
   const doSearch = () => { setSearchQ(search); setPage(1); };
   const doReset = () => { setSearch(""); setSearchQ(""); setPage(1); setPerPage(10); };
   const resetAnalyticsFilters = () => {
-    setSelectedSellerId(null);
+    closeSellerDetail();
     setFilterType("Monthly");
     setFilterYear(String(new Date().getFullYear()));
     setFromDate("");
@@ -1189,6 +1637,156 @@ export default function SellersDashboard() {
     void loadAnalytics();
     void loadSellerList();
   };
+
+  const downloadCsvFile = useCallback((csvContent: string, filename: string) => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = filename;
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+    setLoadError("CSV export is available on web only.");
+  }, []);
+
+  const handleExportSellerCsv = useCallback(async () => {
+    if (selectedSellerId == null) return;
+    setExportingCsv(true);
+    try {
+      const csv = await exportSellerProductsCsv(selectedSellerId);
+      const fileId = selectedSellerMeta?.uniqueId ?? `seller_${selectedSellerId}`;
+      downloadCsvFile(csv, `products_${fileId}.csv`);
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [downloadCsvFile, selectedSellerId, selectedSellerMeta?.uniqueId]);
+
+  const openSellerDetail = useCallback((seller: Seller) => {
+    setSelectedSeller(seller);
+    setSelectedSellerId(seller.id);
+    setDetailEmailVerified(undefined);
+    setPage(1);
+    setSellerNameOptions((prev) =>
+      prev.map((opt) =>
+        opt.id === seller.id ? { ...opt, sellerUniqueId: seller.sellerUniqueId } : opt
+      )
+    );
+    void fetchSellerDetail(seller.id)
+      .then((detail) => {
+        const uniqueId = pickSellerUniqueId(
+          seller.id,
+          seller.sellerUniqueId,
+          readSellerUniqueIdRaw(detail as Record<string, unknown>)
+        );
+        setDetailEmailVerified(Boolean(detail.emailVerified));
+        setSelectedSeller((prev) =>
+          prev?.id === seller.id ? { ...prev, sellerUniqueId: uniqueId } : prev
+        );
+        setSellerNameOptions((prev) =>
+          prev.map((opt) => (opt.id === seller.id ? { ...opt, sellerUniqueId: uniqueId } : opt))
+        );
+      })
+      .catch(() => {
+        setDetailEmailVerified(undefined);
+      });
+  }, []);
+
+  const closeSellerDetail = useCallback(() => {
+    setSelectedSeller(null);
+    setSelectedSellerId(null);
+    setDetailEmailVerified(undefined);
+    setDetailProducts([]);
+  }, []);
+
+  const handleSellerFilterChange = useCallback((id: number | null) => {
+    setPage(1);
+    setSelectedSellerId(id);
+    if (id == null) {
+      closeSellerDetail();
+      return;
+    }
+
+    const applySellerDetail = (detail: Awaited<ReturnType<typeof fetchSellerDetail>>) => {
+      const uniqueId = pickSellerUniqueId(id, readSellerUniqueIdRaw(detail as Record<string, unknown>));
+      setSelectedSeller((prev) => {
+        const base = prev?.id === id
+          ? prev
+          : sellerFromNameOption(
+            enrichedSellerNameOptions.find((s) => s.id === id) ?? {
+              id,
+              fullName: String(detail.fullName ?? `Seller #${id}`),
+              businessName: detail.businessName ?? null,
+              sellerUniqueId: uniqueId,
+            },
+            0
+          );
+        return {
+          ...base,
+          sellerUniqueId: uniqueId,
+          name: String(detail.fullName ?? base.name),
+          business: String(detail.businessName ?? base.business),
+          email: String(detail.email ?? base.email),
+          phone: String(detail.mobile ?? base.phone),
+          onboard: detail.createdAt ? formatDate(String(detail.createdAt)) : base.onboard,
+        };
+      });
+      setSellerNameOptions((prev) =>
+        prev.map((opt) => (opt.id === id ? { ...opt, sellerUniqueId: uniqueId } : opt))
+      );
+      setDetailEmailVerified(Boolean(detail.emailVerified));
+    };
+
+    const match = sellers.find((s) => s.id === id);
+    if (match) {
+      setSelectedSeller(match);
+    } else {
+      const optIndex = sellerNameOptions.findIndex((s) => s.id === id);
+      const opt = optIndex >= 0 ? sellerNameOptions[optIndex] : null;
+      if (opt) {
+        setSelectedSeller(sellerFromNameOption(opt, optIndex));
+      }
+    }
+
+    void fetchSellerDetail(id)
+      .then(applySellerDetail)
+      .catch(() => setDetailEmailVerified(undefined));
+  }, [closeSellerDetail, sellerNameOptions, sellers, enrichedSellerNameOptions]);
+
+  useEffect(() => {
+    if (!selectedSeller || !token || authLoading) {
+      setDetailProducts([]);
+      return;
+    }
+    let cancelled = false;
+    setDetailProductsLoading(true);
+    void (async () => {
+      try {
+        const response = await fetchProducts({ sellerId: selectedSeller.id, page: 0, size: 500 });
+        if (!cancelled) {
+          setDetailProducts((response.items ?? []).map(mapDetailProductRow));
+        }
+      } catch {
+        if (!cancelled) {
+          setDetailProducts([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setDetailProductsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, selectedSeller, token]);
 
   const statCards = useMemo(
     () => [
@@ -1215,12 +1813,7 @@ export default function SellersDashboard() {
     </View>
   ) : null;
 
-  const pageNums: (number | string)[] = (() => {
-    if (totalPages <= 5) return [...Array(totalPages)].map((_, i) => i + 1);
-    if (safePage <= 3) return [1, 2, 3, "...", totalPages];
-    if (safePage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", safePage, "...", totalPages];
-  })();
+
 
   /* ────────────────────────────────────────────────────────────────────
      DESKTOP LAYOUT
@@ -1243,7 +1836,7 @@ export default function SellersDashboard() {
                     <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <TouchableOpacity onPress={() => router.push("/sellers")} style={styles.backBtn}>
                   <Ionicons name="chevron-back" size={13} color="#475569" />
                   <Text style={styles.backBtnText}>Back</Text>
                 </TouchableOpacity>
@@ -1252,25 +1845,55 @@ export default function SellersDashboard() {
 
             {errorBanner}
 
-            {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, marginHorizontal: 22 }}>
-              {statCards.map(c => (
-                <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                    <Text style={styles.statValue}>{c.value}</Text>
-                    {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+            {/* ── DESKTOP: Stat Cards Row ── */}
+            {screenW >= 1250 ? (
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, marginHorizontal: 22 }}>
+                {statCards.map(c => (
+                  <View key={c.label} style={[styles.statCard, { flex: 1 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                      <Text style={styles.statValue}>{c.value}</Text>
+                      {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                    </View>
+                    <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                      <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                    </View>
                   </View>
-                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                    <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
-                  </View>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            ) : (
+              <View style={{ width: "100%", marginTop: -32, marginBottom: 14 }}>
+                <ScrollView
+                  {...({ className: "orange-scrollbar" } as any)}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  style={{ width: "100%" }}
+                  contentContainerStyle={{
+                    flexDirection: "row",
+                    paddingHorizontal: 22,
+                    paddingBottom: 8,
+                    gap: 12
+                  }}
+                >
+                  {statCards.map(c => (
+                    <View key={c.label} style={[styles.statCard, { width: 190, flexShrink: 0 }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                        <Text style={styles.statValue}>{c.value}</Text>
+                        {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                      </View>
+                      <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                        <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
-            {/* ── DESKTOP: All Filters in ONE Row ── */}
+            {/* ── DESKTOP: Filters Row ── */}
             <View style={[styles.card, { marginBottom: 14 }]}>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "nowrap" }}>
+              <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
                 {/* Seller */}
                 <View style={{ flex: 2, minWidth: 160 }}>
                   <View style={styles.filterLabel}>
@@ -1279,8 +1902,9 @@ export default function SellersDashboard() {
                   </View>
                   <SellerFilterDropdown
                     value={selectedSellerId}
-                    onChange={(id) => { setSelectedSellerId(id); setPage(1); }}
-                    options={sellerNameOptions}
+                    onChange={handleSellerFilterChange}
+                    options={enrichedSellerNameOptions}
+                    displayOverride={selectedSellerDisplayOption}
                   />
                 </View>
                 {/* Filter type */}
@@ -1331,11 +1955,19 @@ export default function SellersDashboard() {
                   <Text style={styles.applyBtnText}>Apply</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.filterCaption}>
-                Showing analytics for {filterType} · {selectedSellerLabel} · {filterYear}
-                {fromDate && ` · From: ${fromDate}`}
-                {toDate && ` · To: ${toDate}`}
-              </Text>
+              <AnalyticsFilterCaption
+                filterType={filterType}
+                filterYear={filterYear}
+                fromDate={fromDate}
+                toDate={toDate}
+                selectedSellerId={selectedSellerId}
+                sellerName={selectedSellerMeta?.name ?? selectedSeller?.name ?? ""}
+                sellerBusiness={selectedSellerMeta?.business ?? selectedSeller?.business ?? ""}
+                sellerUniqueId={selectedSellerMeta?.uniqueId ?? ""}
+                sellerOnboard={selectedSellerMeta?.onboard ?? selectedSeller?.onboard ?? ""}
+                exportingCsv={exportingCsv}
+                onExportCsv={() => void handleExportSellerCsv()}
+              />
             </View>
 
             {/* ── DESKTOP: Chart + Key Insights side by side ── */}
@@ -1396,118 +2028,118 @@ export default function SellersDashboard() {
               </View>
             </View>
 
-            {/* ── DESKTOP: Seller Table ── */}
-            <View style={[styles.card, { marginBottom: 14 }]}>
-              {/* List header */}
-              <View style={styles.listHeaderRow}>
-                <View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="people" size={16} color={ORANGE} />
-                    <Text style={styles.chartTitle}>Seller List</Text>
+            {selectedSeller ? (
+              <SellerGraphDetailPanel
+                seller={selectedSeller}
+                emailVerified={detailEmailVerified}
+                products={detailProducts}
+                loading={detailProductsLoading}
+                onBack={closeSellerDetail}
+                isDesktop
+              />
+            ) : null}
+
+            {!selectedSeller ? (
+              <View style={[styles.card, { marginBottom: 14 }]}>
+                {/* List header */}
+                <View style={styles.listHeaderRow}>
+                  <View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="people" size={16} color={ORANGE} />
+                      <Text style={styles.chartTitle}>Seller List</Text>
+                    </View>
+                    <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
                   </View>
-                  <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
-                </View>
-                <View style={styles.totalBadge}>
-                  <Ionicons name="person" size={11} color="#64748B" />
-                  <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
-                </View>
-              </View>
-
-              {/* Search row */}
-              <View style={{ flexDirection: "row", gap: 10, marginBottom: 14, alignItems: "center" }}>
-                <View style={[styles.searchRow, { flex: 1 }]}>
-                  <Ionicons name="search-outline" size={15} color="#94A3B8" />
-                  <TextInput
-                    value={search} onChangeText={setSearch}
-                    onSubmitEditing={doSearch} returnKeyType="search"
-                    placeholder="Search name / email / mobile / business..."
-                    placeholderTextColor="#94A3B8" style={styles.searchInput}
-                  />
-                  {search.length > 0 && (
-                    <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
-                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={{ minWidth: 100 }}>
-                  <Text style={[styles.filterLabelText, { marginBottom: 4 }]}>Per page</Text>
-                  <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
-                </View>
-                <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
-                  <Ionicons name="search" size={13} color="#fff" />
-                  <Text style={styles.applyBtnText}>Search</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
-                  <Ionicons name="refresh" size={13} color="#475569" />
-                  <Text style={styles.resetBtnText}>Reset</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Table */}
-              <View style={styles.tableContainer}>
-                {/* Table Header */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>ID</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Seller</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Business</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Onboard</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Status</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Profile</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.65 }]}>KYC</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Shiprocket</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>Products</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>Action</Text>
-                </View>
-
-                {/* Table Rows */}
-                {paginated.length === 0 ? (
-                  <View style={{ alignItems: "center", paddingVertical: 48 }}>
-                    <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
-                    <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
-                    <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
-                      <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
-                    </TouchableOpacity>
+                  <View style={styles.totalBadge}>
+                    <Ionicons name="person" size={11} color="#64748B" />
+                    <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
                   </View>
-                ) : (
-                  paginated.map((s, idx) => (
-                    <DesktopTableRow key={s.id} item={s} idx={idx} onView={() => setSelectedSeller(s)} />
-                  ))
-                )}
-              </View>
-            </View>
+                </View>
 
-            {/* Pagination */}
-            {totalSellers > 0 && (
-              <View style={styles.paginationRow}>
-                <Text style={styles.pageText}>
-                  Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
-                </Text>
-                <View style={{ flexDirection: "row", gap: 4 }}>
-                  <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                  {pageNums.map((p, i) =>
-                    p === "..." ? (
-                      <View key={"e" + i} style={styles.pagBtn}>
-                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
+                {/* Search row */}
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 14, alignItems: "center" }}>
+                  <View style={[styles.searchRow, { flex: 1 }]}>
+                    <Ionicons name="search-outline" size={15} color="#94A3B8" />
+                    <TextInput
+                      value={search} onChangeText={setSearch}
+                      onSubmitEditing={doSearch} returnKeyType="search"
+                      placeholder="Search name / email / mobile / business..."
+                      placeholderTextColor="#94A3B8" style={styles.searchInput}
+                    />
+                    {search.length > 0 && (
+                      <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
+                        <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={{ minWidth: 100 }}>
+                    <Text style={[styles.filterLabelText, { marginBottom: 4 }]}>Per page</Text>
+                    <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
+                  </View>
+                  <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
+                    <Ionicons name="search" size={13} color="#fff" />
+                    <Text style={styles.applyBtnText}>Search</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
+                    <Ionicons name="refresh" size={13} color="#475569" />
+                    <Text style={styles.resetBtnText}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Table */}
+                <ScrollView
+                  {...({ className: "orange-scrollbar" } as any)}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={true}
+                  style={{ width: "100%" }}
+                  contentContainerStyle={{ flexGrow: 1 }}
+                >
+                  <View style={[styles.tableContainer, { minWidth: 1100, width: "100%" }]}>
+                    {/* Table Header */}
+                    <View style={styles.tableHeader}>
+                      <View style={{ flex: 0.85 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Seller ID</Text></View>
+                      <View style={{ flex: 1.6 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Seller</Text></View>
+                      <View style={{ flex: 1.2 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Business</Text></View>
+                      <View style={{ flex: 0.9 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Onboard</Text></View>
+                      <View style={{ flex: 1.0 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Status</Text></View>
+                      <View style={{ flex: 0.7 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Profile</Text></View>
+                      <View style={{ flex: 0.95 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Shiprocket</Text></View>
+                      <View style={{ flex: 0.5, alignItems: "center" }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Products</Text></View>
+                      <View style={{ flex: 0.6 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Action</Text></View>
+                    </View>
+
+                    {/* Table Rows */}
+                    {paginated.length === 0 ? (
+                      <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                        <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
+                        <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
+                        <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
+                          <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
+                        </TouchableOpacity>
                       </View>
                     ) : (
-                      <TouchableOpacity
-                        key={`n${p}`}
-                        onPress={() => setPage(p as number)}
-                        style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
-                      </TouchableOpacity>
-                    )
-                  )}
-                  <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
-                </View>
+                      paginated.map((s, idx) => (
+                        <DesktopTableRow key={s.id} item={s} idx={idx} onView={() => openSellerDetail(s)} />
+                      ))
+                    )}
+                  </View>
+                </ScrollView>
               </View>
-            )}
+            ) : null}
+
+            {!selectedSeller ? (
+              <Pagination
+                currentPage={safePage}
+                totalPages={totalPages}
+                totalItems={totalSellers}
+                itemsPerPage={perPage}
+                itemName="sellers"
+                onPageChange={setPage}
+              />
+            ) : null}
 
 
           </ScrollView>
-
-          <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
         </View >
       </AdminLayout >
     );
@@ -1525,7 +2157,7 @@ export default function SellersDashboard() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header Container (Dark Blue) ── */}
-          <View style={[styles.headerContainer, { paddingHorizontal: 16 }]}>
+          <View style={[styles.headerContainer, { paddingHorizontal: 16, paddingBottom: 40 }]}>
             <View style={styles.pageHeader}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1533,7 +2165,7 @@ export default function SellersDashboard() {
                   <Text style={[styles.pageTitle, { flex: 1 }]} numberOfLines={2}>Sellers Graph / Analysis</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <TouchableOpacity onPress={() => router.push("/sellers")} style={styles.backBtn}>
                 <Ionicons name="chevron-back" size={13} color="#475569" />
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
@@ -1542,20 +2174,52 @@ export default function SellersDashboard() {
 
           {errorBanner}
 
-          {/* ── Stat Cards (mobile: 2-col grid) ── */}
-          <View style={[styles.statGrid, { marginBottom: 14, marginTop: -32, marginHorizontal: 22 }]}>
-            {statCards.map(c => (
-              <View key={c.label} style={[styles.statCard]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                  <Text style={styles.statValue}>{c.value}</Text>
-                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+          {/* ── Stat Cards (mobile: horizontal scroll view with overlap) ── */}
+          <View style={{ marginTop: -26, zIndex: 10, marginBottom: 14 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: 12,
+                paddingHorizontal: 4,
+                paddingVertical: 6,
+              }}
+            >
+              {statCards.map((c, i) => (
+                <View
+                  style={[
+                    styles.statCard,
+                    {
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      gap: 6,
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      width: 135,
+                      flexGrow: 0,
+                      borderWidth: 1,
+                      borderColor: "#E8EDF5",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 6,
+                      elevation: 3,
+                    }
+                  ]}
+                  key={c.label}
+                >
+                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg, width: 30, height: 30, borderRadius: 15 }]}>
+                    <Ionicons name={c.iconName as any} size={14} color={c.iconColor} />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{c.label}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{c.value}</Text>
+                    {c.sub && <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{c.sub}</Text>}
+                  </View>
                 </View>
-                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                  <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
-                </View>
-              </View>
-            ))}
+              ))}
+            </ScrollView>
           </View>
 
           {/* ── Filters Card ── */}
@@ -1566,8 +2230,9 @@ export default function SellersDashboard() {
             </View>
             <SellerFilterDropdown
               value={selectedSellerId}
-              onChange={(id) => { setSelectedSellerId(id); setPage(1); }}
-              options={sellerNameOptions}
+              onChange={handleSellerFilterChange}
+              options={enrichedSellerNameOptions}
+              displayOverride={selectedSellerDisplayOption}
               style={{ marginBottom: 12 }}
             />
 
@@ -1616,28 +2281,21 @@ export default function SellersDashboard() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.filterCaption}>
-              Showing analytics for {filterType} · {selectedSellerLabel} · {filterYear}
-              {fromDate && ` · From: ${fromDate}`}
-              {toDate && ` · To: ${toDate}`}
-            </Text>
+            <AnalyticsFilterCaption
+              filterType={filterType}
+              filterYear={filterYear}
+              fromDate={fromDate}
+              toDate={toDate}
+              selectedSellerId={selectedSellerId}
+              sellerName={selectedSellerMeta?.name ?? selectedSeller?.name ?? ""}
+              sellerBusiness={selectedSellerMeta?.business ?? selectedSeller?.business ?? ""}
+              sellerUniqueId={selectedSellerMeta?.uniqueId ?? ""}
+              sellerOnboard={selectedSellerMeta?.onboard ?? selectedSeller?.onboard ?? ""}
+              exportingCsv={exportingCsv}
+              onExportCsv={() => void handleExportSellerCsv()}
+            />
           </View>
 
-          {/* ── Stat Cards (mobile: 2-col grid) ── */}
-          <View style={[styles.statGrid, { marginBottom: 14 }]}>
-            {statCards.map(c => (
-              <View key={c.label} style={[styles.statCard]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                  <Text style={styles.statValue}>{c.value}</Text>
-                  {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
-                </View>
-                <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                  <Ionicons name={c.iconName as any} size={22} color={c.iconColor} />
-                </View>
-              </View>
-            ))}
-          </View>
 
           {/* ── Chart Card ── */}
           <View style={[styles.card, { marginBottom: 14 }]}>
@@ -1694,103 +2352,105 @@ export default function SellersDashboard() {
             ))}
           </View>
 
-          {/* ── Seller List (mobile cards) ── */}
-          <View style={styles.card}>
-            <View style={styles.listHeaderRow}>
-              <View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Ionicons name="people" size={16} color={ORANGE} />
-                  <Text style={styles.chartTitle}>Seller List</Text>
+          {selectedSeller ? (
+            <SellerGraphDetailPanel
+              seller={selectedSeller}
+              emailVerified={detailEmailVerified}
+              products={detailProducts}
+              loading={detailProductsLoading}
+              onBack={closeSellerDetail}
+            />
+          ) : null}
+
+          {!selectedSeller ? (
+            <View style={styles.card}>
+              <View style={styles.listHeaderRow}>
+                <View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="people" size={16} color={ORANGE} />
+                    <Text style={styles.chartTitle}>Seller List</Text>
+                  </View>
+                  <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
                 </View>
-                <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
+                <View style={styles.totalBadge}>
+                  <Ionicons name="person" size={11} color="#64748B" />
+                  <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
+                </View>
               </View>
-              <View style={styles.totalBadge}>
-                <Ionicons name="person" size={11} color="#64748B" />
-                <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
-              </View>
-            </View>
 
-            <View style={{ marginBottom: 12 }}>
-              <View style={styles.searchRow}>
-                <Ionicons name="search-outline" size={15} color="#94A3B8" />
-                <TextInput
-                  value={search} onChangeText={setSearch} onSubmitEditing={doSearch}
-                  returnKeyType="search"
-                  placeholder="Search name / email / mobile / business..."
-                  placeholderTextColor="#94A3B8" style={styles.searchInput}
-                />
-                {search.length > 0 && (
-                  <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
-                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+              <View style={{ gap: 8, marginBottom: 12, zIndex: 20 }}>
+                {/* Search */}
+                <View style={styles.searchRow}>
+                  <TouchableOpacity onPress={doSearch}>
+                    <Ionicons name="search-outline" size={15} color={ORANGE} />
                   </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            <View style={{ marginBottom: 12, zIndex: 20 }}>
-              <Text style={styles.filterLabelText}>Per page</Text>
-              <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
-            </View>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12, zIndex: 10 }}>
-              <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { flex: 1 }]}>
-                <Ionicons name="search" size={13} color="#fff" />
-                <Text style={styles.applyBtnText}>Search</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { flex: 1 }]}>
-                <Ionicons name="refresh" size={13} color="#475569" />
-                <Text style={styles.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
-            </View>
-
-            {paginated.length === 0 ? (
-              <View style={{ alignItems: "center", paddingVertical: 48 }}>
-                <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
-                <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
-                <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
-                  <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.sellerCardsContainer}>
-                {paginated.map(s => (
-                  <SellerCard key={s.id} item={s} onView={() => setSelectedSeller(s)} />
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Pagination */}
-          {totalSellers > 0 && (
-            <View style={styles.paginationRow}>
-              <Text style={styles.pageText}>
-                Showing {totalSellers === 0 ? 0 : (safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, totalSellers)} of {totalSellers} sellers
-              </Text>
-              <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                <PagBtn iconName="chevron-back" onPress={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} />
-                {pageNums.map((p, i) =>
-                  p === "..." ? (
-                    <View key={"e" + i} style={styles.pagBtn}>
-                      <Text style={{ color: "#94A3B8", fontSize: 12 }}>…</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      key={`n${p}`}
-                      onPress={() => setPage(p as number)}
-                      style={[styles.pagBtn, safePage === p && { backgroundColor: DARK_NAV, borderColor: DARK_NAV }]}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: safePage === p ? "#fff" : "#374151" }}>{p}</Text>
+                  <TextInput
+                    value={search} onChangeText={setSearch} onSubmitEditing={doSearch}
+                    returnKeyType="search"
+                    placeholder="Search sellers..."
+                    placeholderTextColor="#94A3B8" style={styles.searchInput}
+                  />
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
                     </TouchableOpacity>
-                  )
-                )}
-                <PagBtn iconName="chevron-forward" onPress={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} />
+                  )}
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                  {/* Per page */}
+                  <View style={{ flex: 1 }}>
+                    <Dropdown
+                      value={String(perPage)}
+                      displayValue={`Per Page: ${perPage}`}
+                      onChange={v => { setPerPage(Number(v)); setPage(1); }}
+                      options={PERPAGE_OPTIONS}
+                      style={{ minWidth: 0, flex: 1 }}
+                    />
+                  </View>
+
+                  {/* Reset */}
+                  <TouchableOpacity
+                    onPress={doReset}
+                    style={[styles.resetBtn, { flex: 1, paddingVertical: 0, height: 38, justifyContent: "center" }]}
+                  >
+                    <Ionicons name="refresh" size={13} color="#475569" />
+                    <Text style={styles.resetBtnText}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+
+              {paginated.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                  <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
+                  <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
+                  <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
+                    <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.sellerCardsContainer}>
+                  {paginated.map(s => (
+                    <SellerCard key={s.id} item={s} onView={() => openSellerDetail(s)} />
+                  ))}
+                </View>
+              )}
             </View>
-          )}
+          ) : null}
+
+          {!selectedSeller ? (
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalSellers}
+              itemsPerPage={perPage}
+              itemName="sellers"
+              onPageChange={setPage}
+            />
+          ) : null}
 
 
         </ScrollView>
-
-        <SellerModal seller={selectedSeller} onClose={() => setSelectedSeller(null)} />
       </View >
     </AdminLayout >
   );
@@ -1861,7 +2521,23 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
   },
   resetBtnText: { color: "#475569", fontWeight: "700", fontSize: 14 },
-  filterCaption: { fontSize: 11, color: "#94A3B8", marginTop: 10 },
+  filterCaption: { fontSize: 11, color: "#94A3B8", flex: 1 },
+  filterCaptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  filterCaptionStrong: { color: "#475569", fontWeight: "700" },
+  exportCsvBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 2,
+  },
+  exportCsvLink: { fontSize: 11, color: ORANGE, fontWeight: "700" },
 
   /* Stat Cards */
   statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
@@ -1934,7 +2610,7 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 12, paddingHorizontal: 14,
+    paddingVertical: 16, paddingHorizontal: 14,
     borderBottomWidth: 1, borderBottomColor: BORDER,
     alignItems: "center",
   },
@@ -2039,7 +2715,7 @@ const styles = StyleSheet.create({
   datePickerWeekHeader: { flexDirection: "row", marginBottom: 8 },
   datePickerWeekDay: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600", color: "#64748B" },
   datePickerDays: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 },
-  datePickerDay: { width: "14.28%", aspectRatio: 1, justifyContent: "center", alignItems: "center", borderRadius: 8, marginBottom: 4 },
+  datePickerDay: { width: "14.28%", height: 32, justifyContent: "center", alignItems: "center", borderRadius: 8, marginBottom: 4 },
   datePickerDayEmpty: { backgroundColor: "transparent" },
   datePickerDaySelected: { backgroundColor: ORANGE },
   datePickerDayText: { fontSize: 13, color: "#374151" },
@@ -2047,6 +2723,210 @@ const styles = StyleSheet.create({
   datePickerDayTextSelected: { color: "#fff", fontWeight: "700" },
   datePickerCloseBtn: { backgroundColor: ORANGE, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
   datePickerCloseBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+
+  detailBackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    marginBottom: 2,
+  },
+  detailBackText: { fontSize: 13, fontWeight: "700", color: ORANGE },
+  detailRoot: { gap: 14, marginBottom: 14 },
+  detailHero: {
+    borderRadius: 18,
+    padding: 18,
+    overflow: "hidden",
+    shadowColor: DETAIL_NAVY,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  detailHeroBack: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  detailHeroBackText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  detailHeroMain: { gap: 16 },
+  detailHeroIdentity: { flexDirection: "row", alignItems: "center", gap: 14 },
+  detailHeroTextCol: { flex: 1, minWidth: 0 },
+  detailHeroBusiness: { fontSize: 22, fontWeight: "800", color: "#fff", marginBottom: 4 },
+  detailHeroOwner: { fontSize: 14, color: "#CBD5E1", fontWeight: "600", marginBottom: 10 },
+  detailHeroMetaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  detailHeroIdPill: {
+    backgroundColor: "rgba(249,115,22,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(249,115,22,0.45)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  detailHeroIdText: { color: "#FED7AA", fontSize: 12, fontWeight: "800" },
+  detailHeroOnboardPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  detailHeroOnboardText: { color: "#E2E8F0", fontSize: 11, fontWeight: "600" },
+  detailQuickStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+  },
+  detailQuickStatsDesktop: { alignSelf: "flex-start", minWidth: 320 },
+  detailQuickStat: { flex: 1, alignItems: "center", gap: 6 },
+  detailQuickStatValue: { fontSize: 24, fontWeight: "800", color: "#fff" },
+  detailQuickStatLabel: { fontSize: 10, color: "#CBD5E1", fontWeight: "700", textTransform: "uppercase" },
+  detailQuickStatDivider: { width: 1, height: 36, backgroundColor: "rgba(255,255,255,0.14)" },
+  detailPanelCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  detailPanelOrange: { borderLeftWidth: 4, borderLeftColor: ORANGE, backgroundColor: "#FFFBF7" },
+  detailPanelPurple: { borderLeftWidth: 4, borderLeftColor: "#7C3AED", backgroundColor: "#FDFCFF" },
+  detailPanelProducts: { borderTopWidth: 4, borderTopColor: "#2563EB", backgroundColor: "#FAFCFF" },
+  detailPanelHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  detailPanelIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailPanelTitle: { fontSize: 16, fontWeight: "800", color: DARK_NAV },
+  detailInfoGrid: { gap: 10, marginBottom: 12 },
+  detailInfoTile: {
+    backgroundColor: "rgba(255,255,255,0.85)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    padding: 12,
+  },
+  detailCardTitle: { fontSize: 16, fontWeight: "800", color: DARK_NAV, marginBottom: 14 },
+  detailInfoRow: { marginBottom: 10 },
+  detailInfoLabel: { fontSize: 11, color: "#94A3B8", fontWeight: "700", marginBottom: 4, textTransform: "uppercase" },
+  detailInfoValue: { fontSize: 14, color: DARK_NAV, fontWeight: "700" },
+  detailBadgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 4, marginBottom: 12 },
+  detailBadgeItem: { minWidth: 110 },
+  detailShipDate: { fontSize: 10, color: "#94A3B8", marginTop: 4 },
+  detailContactRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  detailContactChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+    minWidth: 180,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  detailContactText: { flex: 1, fontSize: 12, color: "#334155", fontWeight: "600" },
+  detailProductsHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  detailProductsSub: { fontSize: 11, color: "#94A3B8", marginTop: 2 },
+  detailProductsCountPill: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    minWidth: 72,
+  },
+  detailProductsCountValue: { fontSize: 20, fontWeight: "800", color: "#2563EB" },
+  detailProductsCountLabel: { fontSize: 10, color: "#64748B", fontWeight: "700", textTransform: "uppercase" },
+  detailTable: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  detailTableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  detailTableHeaderDark: {
+    flexDirection: "row",
+    backgroundColor: DETAIL_NAVY,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  detailTableHeadCell: { fontSize: 11, fontWeight: "800", color: "#64748B", textTransform: "uppercase" },
+  detailTableHeadCellDark: { fontSize: 11, fontWeight: "800", color: "#E2E8F0", textTransform: "uppercase" },
+  detailTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    backgroundColor: "#fff",
+  },
+  detailTableRowAlt: { backgroundColor: "#F8FAFC" },
+  detailTableCell: { fontSize: 12, color: "#374151" },
+  detailTableCellAccent: { fontSize: 12, color: "#7C3AED", fontWeight: "800" },
+  detailTableIdCell: { fontSize: 12, fontWeight: "800", color: ORANGE },
+  detailProductImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  detailProductImagePlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailEmptyText: { fontSize: 13, color: "#94A3B8", padding: 18, textAlign: "center" },
 
   /* Modal */
   modalOverlay: {

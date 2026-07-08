@@ -12,6 +12,7 @@
 //   Then replace the two import lines below accordingly.
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -162,8 +163,8 @@ const StatusDropdown = ({
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
-      triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        setMenuPosition({ top: pageY + height, left: pageX, width });
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        setMenuPosition({ top: y + height, left: x, width });
       });
     }
     setOpen((o) => !o);
@@ -217,8 +218,9 @@ const StatusDropdown = ({
   }
 
   return (
-    <View style={S.dropdownWrapper} ref={triggerRef}>
+    <View style={S.dropdownWrapper}>
       <TouchableOpacity
+        ref={triggerRef as any}
         style={[S.dropdownBtn, open && S.dropdownBtnOpen]}
         onPress={handlePress}
         activeOpacity={0.85}
@@ -232,11 +234,11 @@ const StatusDropdown = ({
         />
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
         {menuPosition && (
           <View style={[S.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
-            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
+            <View style={[S.dropdownMenu, { borderColor: "#e07820", borderWidth: 1.5, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }]}>
               {STATUS_OPTIONS.map((opt) => {
                 const isSelected = value === opt;
                 return (
@@ -268,20 +270,18 @@ const GridCard: React.FC<{
   idx: number;
   onEdit: (s: SizeItem) => void;
   onDelete: (s: SizeItem) => void;
-  cardWidth: number;
+  cardWidth: number | string;
 }> = ({ item, idx, onEdit, onDelete, cardWidth }) => {
   const dims = useWindowDimensions();
   const isMobile = dims.width < 768;
-  const [showActions, setShowActions] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const colors = CARD_GRADIENTS[idx % CARD_GRADIENTS.length];
 
-  const visibleActions = showActions || isHovered;
+  const visibleActions = isHovered;
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => !isMobile && setShowActions(p => !p)}
       onMouseEnter={() => !isMobile && setIsHovered(true)}
       onMouseLeave={() => !isMobile && setIsHovered(false)}
       style={[S.gridCard, { width: cardWidth }]}
@@ -296,14 +296,14 @@ const GridCard: React.FC<{
           <View style={S.gridCardActions}>
             <TouchableOpacity
               style={S.cardActionBtn}
-              onPress={() => { setShowActions(false); setIsHovered(false); onEdit(item); }}
+              onPress={() => { setIsHovered(false); onEdit(item); }}
             >
               {/* Bootstrap: pencil-square */}
               <BI name="pencil-square" size={17} color="#444" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[S.cardActionBtn, { marginLeft: 10 }]}
-              onPress={() => { setShowActions(false); setIsHovered(false); onDelete(item); }}
+              onPress={() => { setIsHovered(false); onDelete(item); }}
             >
               {/* Bootstrap: trash3 */}
               <BI name="trash3" size={17} color="#e53935" />
@@ -387,53 +387,7 @@ const ListRow: React.FC<{
   </View>
 );
 
-// ─────────────────────────────────────────────────────────────
-// PAGINATION
-// ─────────────────────────────────────────────────────────────
-const Pagination: React.FC<{
-  current: number;
-  total: number;
-  onChange: (p: number) => void;
-}> = ({ current, total, onChange }) => {
-  const maxVisible = 5;
-  let start = Math.max(1, current - 2);
-  let end = Math.min(total, start + maxVisible - 1);
-  if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
-  const pages: number[] = [];
-  for (let i = start; i <= end; i++) pages.push(i);
 
-  return (
-    <View style={S.paginationRow}>
-      {/* Bootstrap: chevron-left */}
-      <TouchableOpacity
-        style={[S.pageBtn, current === 1 && S.pageBtnDisabled]}
-        onPress={() => current > 1 && onChange(current - 1)}
-        disabled={current === 1}
-      >
-        <BI name="chevron-left" size={13} color={current === 1 ? "#bbb" : "#555"} />
-      </TouchableOpacity>
-
-      {pages.map(p => (
-        <TouchableOpacity
-          key={p}
-          style={[S.pageBtn, p === current && S.pageBtnActive]}
-          onPress={() => onChange(p)}
-        >
-          <Text style={[S.pageBtnText, p === current && { color: "#fff" }]}>{p}</Text>
-        </TouchableOpacity>
-      ))}
-
-      {/* Bootstrap: chevron-right */}
-      <TouchableOpacity
-        style={[S.pageBtn, current === total && S.pageBtnDisabled]}
-        onPress={() => current < total && onChange(current + 1)}
-        disabled={current === total}
-      >
-        <BI name="chevron-right" size={13} color={current === total ? "#bbb" : "#555"} />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────
 // MODAL WRAPPER
@@ -698,6 +652,7 @@ export default function SizesManagement() {
   const [containerWidth, setContainerWidth] = useState(width);
 
   const cardWidth = Math.max(0, (containerWidth - PADDING * 2 - GAP * (numCols - 1)) / numCols);
+  const cardWidthPct = `${(100 / numCols).toFixed(4)}%` as any;
 
   const filtered = useMemo(
     () => sizes.filter(s =>
@@ -775,15 +730,14 @@ export default function SizesManagement() {
 
   // ── Footer shared between both views
   const Footer = (
-    <View style={[S.footerRow, { paddingHorizontal: PADDING }]}>
-      <Text style={S.footerText}>
-        Showing{" "}
-        {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–
-        {Math.min(safePage * PAGE_SIZE, filtered.length)}{" "}
-        of {filtered.length} sizes
-      </Text>
-      <Pagination current={safePage} total={totalPages} onChange={setPage} />
-    </View>
+    <Pagination
+      currentPage={safePage}
+      totalPages={totalPages}
+      totalItems={filtered.length}
+      itemsPerPage={PAGE_SIZE}
+      itemName="sizes"
+      onPageChange={setPage}
+    />
   );
 
   return (
@@ -793,22 +747,56 @@ export default function SizesManagement() {
           <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
           {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}
-          <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
-            <View style={S.headerIconBox}>
-              <BI name="grid-3x3" size={18} color="#fff" />
+          {width < 450 ? (
+            <View style={[
+              S.webPageHeader,
+              S.webPageHeaderMobile,
+              { flexDirection: "column", alignItems: "stretch", gap: 10 }
+            ]}>
+              {/* Row 1: Icon & Title on Left & Add Button on Right */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <View style={[S.headerIconBox, { width: 28, height: 28, marginRight: 0, flexShrink: 0 }]}>
+                    <BI name="grid-3x3" size={12} color="#fff" />
+                  </View>
+                  <Text style={[S.webPageTitle, { fontSize: width < 360 ? 17 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1}>
+                    Sizes Management
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[S.addBtn, S.addBtnMobile, { paddingVertical: 6, paddingHorizontal: 10, marginLeft: 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]}
+                  onPress={() => setModal({ type: "add" })}
+                >
+                  <BI name="plus-lg" size={12} color="#fff" />
+                  <Text style={[S.addBtnText, { fontSize: 12, marginLeft: 4 }]}>Add Size</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Subtitle Row */}
+              <Text style={S.webPageSubtitle}>
+                Manage catalog size variants and status settings
+              </Text>
             </View>
-            <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
-              <Text style={S.webPageTitle}>Sizes Management</Text>
-              {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+          ) : (
+            <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: isMobile ? 8 : 16 }}>
+                <View style={[S.headerIconBox, { width: 34, height: 34, marginRight: 10 }]}>
+                  <BI name="grid-3x3" size={15} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.webPageTitle}>Sizes Management</Text>
+                  {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[S.addBtn, isMobile && S.addBtnMobile]}
+                onPress={() => setModal({ type: "add" })}
+              >
+                <BI name="plus-lg" size={15} color="#fff" />
+                <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[S.addBtn, isMobile && S.addBtnMobile]}
-              onPress={() => setModal({ type: "add" })}
-            >
-              <BI name="plus-lg" size={15} color="#fff" />
-              <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
-            </TouchableOpacity>
-          </View>
+          )}
 
           {/* ── CONTROL BAR ── */}
           {loadError ? (
@@ -872,43 +860,53 @@ export default function SizesManagement() {
               marginHorizontal: -GAP / 2
             }}>
               {paginated.map((item, index) => (
-                <View key={item.id} style={{ paddingHorizontal: GAP / 2, paddingBottom: GAP }}>
+                <View
+                  key={item.id}
+                  style={{
+                    width: cardWidthPct,
+                    paddingHorizontal: GAP / 2,
+                    paddingBottom: GAP
+                  }}
+                >
                   <GridCard
                     item={item}
                     idx={(safePage - 1) * PAGE_SIZE + index}
                     onEdit={s => setModal({ type: "edit", size: s })}
                     onDelete={s => setModal({ type: "delete", size: s })}
-                    cardWidth={cardWidth}
+                    cardWidth="100%"
                   />
                 </View>
               ))}
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ width: Math.max(containerWidth, 800) }}>
-                <View style={{ paddingHorizontal: PADDING, paddingTop: 12 }}>
-                  <View style={S.listHeader}>
-                    <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                    <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
-                    <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+            <View style={{ width: "100%" }}>
+              {/* @ts-ignore */}
+              <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
+                <View style={{ width: Math.max(containerWidth, 800) }}>
+                  <View style={{ paddingHorizontal: PADDING, paddingTop: 12 }}>
+                    <View style={S.listHeader}>
+                      <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
+                      <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
+                      <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+                    </View>
+                  </View>
+                  <View style={{ paddingHorizontal: PADDING, paddingBottom: 24 }}>
+                    {paginated.map((item, index) => (
+                      <ListRow
+                        key={item.id}
+                        item={item}
+                        idx={index}
+                        onEdit={s => setModal({ type: "edit", size: s })}
+                        onDelete={s => setModal({ type: "delete", size: s })}
+                      />
+                    ))}
                   </View>
                 </View>
-                <View style={{ paddingHorizontal: PADDING, paddingBottom: 24 }}>
-                  {paginated.map((item, index) => (
-                    <ListRow
-                      key={item.id}
-                      item={item}
-                      idx={index}
-                      onEdit={s => setModal({ type: "edit", size: s })}
-                      onDelete={s => setModal({ type: "delete", size: s })}
-                    />
-                  ))}
-                </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           )}
 
           {Footer}

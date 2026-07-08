@@ -28,6 +28,7 @@ const NAV_ITEMS = {
 
 
     { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
+    { label: "Settings", icon: "settings", path: "/settings", color: "#64748B" },
     { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
 
   ],
@@ -95,6 +96,12 @@ const NAV_ITEMS = {
       },
     ],
     standalone: [
+      {
+        label: "Seller Management",
+        icon: "user-plus",
+        path: "/sellermanagement",
+        color: "#3B82F6",
+      },
       {
         label: "Pending Sellers",
         icon: "user-plus",
@@ -318,6 +325,7 @@ export default function AdminSidebar({
       style={[
         styles.sidebar,
         collapsed && styles.sidebarCollapsed,
+        !isLargeScreen && { flex: 1, height: undefined }, // Fix mobile drawer overflow
         { backgroundColor: colors.surface, borderRightColor: colors.border },
       ]}
     >

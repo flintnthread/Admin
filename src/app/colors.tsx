@@ -11,12 +11,20 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  createColor,
+  deleteColor,
+  fetchColors,
+  updateColor,
+  type CatalogColor,
+} from "@/services/colorApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -30,14 +38,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import { getApiErrorMessage } from "@/lib/api/client";
-import {
-  createColor,
-  deleteColor,
-  fetchColors,
-  updateColor,
-  type CatalogColor,
-} from "@/services/colorApi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap-like icon name map → Ionicons
@@ -389,7 +389,7 @@ const ColorCard = ({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const [overlayVisible, setOverlayVisible] = useState(false);
-  
+
   // Disable hover overlay on mobile to prevent double-tap issues
   const hoverProps = (IS_WEB && !isMobile)
     ? { onMouseEnter: () => setOverlayVisible(true), onMouseLeave: () => setOverlayVisible(false) }
@@ -421,7 +421,7 @@ const ColorCard = ({
         </View>
         <Text style={styles.gridCardCode}>{item.code}</Text>
         <View style={[styles.gridCardBar, { backgroundColor: item.code }]} />
-        
+
         {isMobile && (
           <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
             <TouchableOpacity style={styles.editBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>
@@ -613,63 +613,7 @@ const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pagination
-// ─────────────────────────────────────────────────────────────────────────────
-const Pagination = ({
-  total, page, pageSize, onChange,
-}: {
-  total: number; page: number; pageSize: number; onChange: (p: number) => void;
-}) => {
-  const totalPages = Math.ceil(total / pageSize);
-  if (totalPages <= 1) return null;
 
-  const pages: (number | "...")[] = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (page > 3) pages.push("...");
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
-    if (page < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-  }
-
-  return (
-    <View style={styles.pagination}>
-      <TouchableOpacity
-        style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
-        onPress={() => page > 1 && onChange(page - 1)}
-        disabled={page === 1}
-      >
-        <Ionicons name={BI.chevronLeft as any} size={16} color={page === 1 ? "#ccc" : "#555"} />
-      </TouchableOpacity>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 4, alignItems: "center" }}>
-        {pages.map((p, i) =>
-          p === "..." ? (
-            <Text key={`e-${i}`} style={{ color: "#888", paddingHorizontal: 4 }}>…</Text>
-          ) : (
-            <TouchableOpacity
-              key={p}
-              style={[styles.pageBtn, page === p && styles.pageBtnActive]}
-              onPress={() => onChange(p as number)}
-            >
-              <Text style={[styles.pageBtnText, page === p && styles.pageBtnTextActive]}>{p}</Text>
-            </TouchableOpacity>
-          )
-        )}
-      </ScrollView>
-      <TouchableOpacity
-        style={[styles.pageBtn, page === totalPages && styles.pageBtnDisabled]}
-        onPress={() => page < totalPages && onChange(page + 1)}
-        disabled={page === totalPages}
-      >
-        <Ionicons name={BI.chevronRight as any} size={16} color={page === totalPages ? "#ccc" : "#555"} />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Screen
@@ -796,85 +740,123 @@ export default function ColorsScreen() {
   ), [pageItems.length, viewMode, containerWidth, width]);
 
   // ── Shared header + toolbar + footer sections ──────────────────────────────
-  const HeaderSection = (
-    <>
-      <View style={styles.webPageHeader}>
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-          <View style={styles.headerIconBox}>
-            <Ionicons name={BI.palette as any} size={22} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.webPageTitle}>Colors Management</Text>
-            <Text style={styles.webPageSubtitle}>Manage catalog color variants and status settings</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
-          <Ionicons name={BI.plus as any} size={18} color="#fff" />
-          {width >= BP.sm && <Text style={styles.addBtnText}>Add New Color</Text>}
-        </TouchableOpacity>
-      </View>
+  const HeaderSection = (() => {
+    const isMobileHeader = width < 450;
+    const isMobileSmall = width < 360;
+    return (
+      <>
+        <View style={[
+          styles.webPageHeader,
+          isMobileHeader && {
+            flexDirection: "column",
+            alignItems: "stretch",
+            paddingHorizontal: 14,
+            paddingVertical: 14,
+            marginHorizontal: 8,
+            marginTop: 8,
+            borderRadius: 12,
+            gap: 10
+          }
+        ]}>
+          {isMobileHeader ? (
+            <View style={{ flexDirection: "column", gap: 10 }}>
+              {/* Row 1: Icon & Title on Left & Add Button on Right */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <View style={[styles.headerIconBox, { width: 34, height: 34, marginRight: 0, flexShrink: 0 }]}>
+                    <Ionicons name={BI.palette as any} size={18} color="#fff" />
+                  </View>
+                  <Text style={[styles.webPageTitle, { fontSize: isMobileSmall ? 17 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1}>
+                    Colors Management
+                  </Text>
+                </View>
+                <TouchableOpacity style={[styles.addBtn, { paddingVertical: 6, paddingHorizontal: 10, marginLeft: 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]} onPress={() => setAddOpen(true)}>
+                  <Ionicons name={BI.plus as any} size={14} color="#fff" style={{ marginRight: 4 }} />
+                  <Text style={[styles.addBtnText, { fontSize: 12 }]}>Add Color</Text>
+                </TouchableOpacity>
+              </View>
 
-      <View style={{ paddingHorizontal: PADDING, marginTop: 24 }}>
-        {loadError ? (
-          <Text style={{ color: "#dc2626", marginBottom: 8 }}>{loadError}</Text>
-        ) : null}
-        {loading ? (
-          <View style={{ paddingVertical: 24, alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#D4690A" />
-          </View>
-        ) : null}
-        {/* Toolbar */}
-        <View style={styles.toolbar}>
-          <View style={styles.searchBox}>
-            <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
-            <TextInput
-              value={search}
-              onChangeText={handleSearch}
-              placeholder="Search colors..."
-              placeholderTextColor="#bbb"
-              style={styles.searchInput}
-            />
-            {!!search && (
-              <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+              {/* Subtitle Row */}
+              <Text style={styles.webPageSubtitle}>
+                Manage catalog color variants and status settings
+              </Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+                <View style={styles.headerIconBox}>
+                  <Ionicons name={BI.palette as any} size={22} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.webPageTitle}>Colors Management</Text>
+                  <Text style={styles.webPageSubtitle}>Manage catalog color variants and status settings</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
+                <Ionicons name={BI.plus as any} size={18} color="#fff" />
+                <Text style={styles.addBtnText}>Add New Color</Text>
               </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.viewToggle}>
-            <TouchableOpacity
-              style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
-              onPress={() => setViewMode("grid")}
-            >
-              <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
-              onPress={() => setViewMode("list")}
-            >
-              <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
-            </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={{ paddingHorizontal: PADDING, marginTop: 24 }}>
+          {loadError ? (
+            <Text style={{ color: "#dc2626", marginBottom: 8 }}>{loadError}</Text>
+          ) : null}
+          {loading ? (
+            <View style={{ paddingVertical: 24, alignItems: "center" }}>
+              <ActivityIndicator size="large" color="#D4690A" />
+            </View>
+          ) : null}
+          {/* Toolbar */}
+          <View style={styles.toolbar}>
+            <View style={styles.searchBox}>
+              <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
+              <TextInput
+                value={search}
+                onChangeText={handleSearch}
+                placeholder="Search colors..."
+                placeholderTextColor="#bbb"
+                style={styles.searchInput}
+              />
+              {!!search && (
+                <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.viewToggle}>
+              <TouchableOpacity
+                style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
+                onPress={() => setViewMode("grid")}
+              >
+                <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
+                onPress={() => setViewMode("list")}
+              >
+                <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </>
-  );
+      </>
+    );
+  })();
 
   const FooterSection = (
     <View style={{ paddingHorizontal: PADDING }}>
       {viewMode === "list" && <View style={styles.tableCardBottom} />}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Showing{" "}
-          {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
-          {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} colors
-        </Text>
-        <Pagination
-          total={filtered.length}
-          page={page}
-          pageSize={PAGE_SIZE}
-          onChange={(p) => setPage(p)}
-        />
-      </View>
+      <Pagination
+        currentPage={page}
+        totalPages={Math.ceil(filtered.length / PAGE_SIZE)}
+        totalItems={filtered.length}
+        itemsPerPage={PAGE_SIZE}
+        itemName="colors"
+        onPageChange={setPage}
+      />
       <Text style={styles.copyright}>2026 © Flintnthread India Pvt. Ltd.</Text>
     </View>
   );
@@ -904,30 +886,33 @@ export default function ColorsScreen() {
               gap={GAP}
             />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ width: Math.max(containerWidth, 950) }}>
-                <View style={{ paddingHorizontal: PADDING }}>
-                  <View style={styles.tableCard}>
-                    <ListHeader screenWidth={Math.max(containerWidth, 950)} />
+            <View style={{ width: "100%" }}>
+              {/* @ts-ignore */}
+              <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
+                <View style={{ width: Math.max(containerWidth, 950) }}>
+                  <View style={{ paddingHorizontal: PADDING }}>
+                    <View style={styles.tableCard}>
+                      <ListHeader screenWidth={Math.max(containerWidth, 950)} />
+                    </View>
+                  </View>
+                  <View style={{ paddingHorizontal: PADDING }}>
+                    <View style={styles.tableCardRows}>
+                      {pageItems.map((item, index) => (
+                        <ListRow
+                          key={item.id}
+                          item={item}
+                          isLast={index === pageItems.length - 1}
+                          isEven={index % 2 === 0}
+                          screenWidth={Math.max(containerWidth, 950)}
+                          onEdit={() => setEditTarget(item)}
+                          onDelete={() => setDeleteTarget(item)}
+                        />
+                      ))}
+                    </View>
                   </View>
                 </View>
-                <View style={{ paddingHorizontal: PADDING }}>
-                  <View style={styles.tableCardRows}>
-                    {pageItems.map((item, index) => (
-                      <ListRow
-                        key={item.id}
-                        item={item}
-                        isLast={index === pageItems.length - 1}
-                        isEven={index % 2 === 0}
-                        screenWidth={Math.max(containerWidth, 950)}
-                        onEdit={() => setEditTarget(item)}
-                        onDelete={() => setDeleteTarget(item)}
-                      />
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           )}
 
           {FooterSection}

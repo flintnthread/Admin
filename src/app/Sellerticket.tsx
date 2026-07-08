@@ -6,6 +6,7 @@ import { mapSellerSupportTicket } from "@/lib/mappers";
 import {
   fetchSupportTicket,
   fetchSupportTickets,
+  fetchSupportTicketStats,
   replySupportTicket,
   updateSupportTicketStatus,
 } from "@/services/supportApi";
@@ -57,6 +58,10 @@ interface Ticket {
   phone: string;
   department: string;
   status: TicketStatus;
+  statusClosed: boolean;
+  canResolve: boolean;
+  canClose: boolean;
+  canReopen: boolean;
   priority: TicketPriority;
   createdAt: string;
   messages: Message[];
@@ -65,9 +70,9 @@ interface Ticket {
 const STATUS_TO_API: Record<string, string> = {
   Open: "open",
   "In Progress": "in_progress",
-  "Waiting Admin": "waiting",
-  "Waiting Seller": "waiting",
-  Resolved: "closed",
+  "Waiting Admin": "waiting_admin",
+  "Waiting Seller": "waiting_seller",
+  Resolved: "resolved",
   Closed: "closed",
 };
 
@@ -451,13 +456,21 @@ const TicketItem = ({ ticket, selected, onPress, compact }: TicketItemProps & { 
 interface ChatPanelProps {
   ticket: Ticket;
   onClose?: () => void;
+  onResolve: (id: string) => void;
+  onCloseTicket: (id: string) => void;
   onReopen: (id: string) => void;
   onSend: (id: string, text: string) => void;
 }
 
-const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
+const ChatPanel = ({
+  ticket,
+  onClose,
+  onResolve,
+  onCloseTicket,
+  onReopen,
+  onSend,
+}: ChatPanelProps) => {
   const [replyText, setReplyText] = useState("");
-  const isClosed = ticket.status === "Closed" || ticket.status === "Resolved";
   const hasMessages = ticket.messages && ticket.messages.length > 0;
   
   const isMobile = !!onClose;
@@ -518,7 +531,29 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
             )}
           </View>
         </View>
-        {isClosed && (
+        {(ticket.canResolve || ticket.canClose) && (
+          <View style={styles.chatHeaderActions}>
+            {ticket.canResolve && (
+              <TouchableOpacity
+                style={[styles.resolveBtn, isMobile && styles.resolveBtnMobile]}
+                onPress={() => onResolve(ticket.id)}
+              >
+                <CheckCircleIcon size={14} color="#FFFFFF" />
+                <Text style={styles.resolveBtnText}>Resolve</Text>
+              </TouchableOpacity>
+            )}
+            {ticket.canClose && (
+              <TouchableOpacity
+                style={[styles.closeTicketBtn, isMobile && styles.closeTicketBtnMobile]}
+                onPress={() => onCloseTicket(ticket.id)}
+              >
+                <CloseIcon size={14} color="#FFFFFF" />
+                <Text style={styles.closeTicketBtnText}>Close</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {ticket.canReopen && (
           <TouchableOpacity
             style={[styles.reopenBtn, isMobile && styles.reopenBtnMobile]}
             onPress={() => onReopen(ticket.id)}
@@ -583,7 +618,7 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
           </View>
         ))}
 
-        {isClosed && (
+        {ticket.statusClosed && (
           <View style={styles.closedNotice}>
             <LockIcon size={32} color={C.textMuted} />
             <Text style={styles.closedNoticeText}>This ticket is {ticket.status.toLowerCase()}</Text>
@@ -592,7 +627,7 @@ const ChatPanel = ({ ticket, onClose, onReopen, onSend }: ChatPanelProps) => {
       </ScrollView>
 
       {/* Reply Box */}
-      {!isClosed && (
+      {!ticket.statusClosed && (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={80}
@@ -633,6 +668,30 @@ export default function SupportTicketManagement() {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [priorityFilter, setPriorityFilter] = useState("All Priorities");
   const [searchText, setSearchText] = useState("");
+  const [stats, setStats] = useState({
+    total: 0,
+    open: 0,
+    inProgress: 0,
+    closed: 0,
+    resolved: 0,
+    urgent: 0,
+  });
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await fetchSupportTicketStats();
+      setStats({
+        total: Number(data.total ?? 0),
+        open: Number(data.open ?? 0),
+        inProgress: Number(data.inProgress ?? 0),
+        closed: Number(data.closed ?? 0),
+        resolved: Number(data.resolved ?? 0),
+        urgent: Number(data.urgent ?? 0),
+      });
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e));
+    }
+  }, []);
 
   const loadTickets = useCallback(async () => {
     try {
@@ -655,6 +714,10 @@ export default function SupportTicketManagement() {
     void loadTickets();
   }, [loadTickets]);
 
+  useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
+
   const statusOptions = [
     "All Status",
     "Open",
@@ -666,18 +729,6 @@ export default function SupportTicketManagement() {
   ];
 
   const priorityOptions = ["All Priorities", "Urgent", "High", "Medium", "Low"];
-
-  // Stats
-  const stats = {
-    total: tickets.length,
-    open: tickets.filter((t) => t.status === "Open").length,
-    inProgress: tickets.filter((t) => t.status === "In Progress").length,
-    waiting: tickets.filter(
-      (t) => t.status === "Waiting Admin" || t.status === "Waiting Seller"
-    ).length,
-    resolved: tickets.filter((t) => t.status === "Resolved").length,
-    urgent: tickets.filter((t) => t.priority === "Urgent").length,
-  };
 
   // Filtered tickets
   const filteredTickets = tickets.filter((t) => {
@@ -719,24 +770,51 @@ export default function SupportTicketManagement() {
         await updateSupportTicketStatus(Number(id), "open");
         await refreshTicket(id);
         await loadTickets();
+        await loadStats();
       } catch (e) {
         setLoadError(getApiErrorMessage(e));
       }
     })();
-  }, [loadTickets, refreshTicket]);
+  }, [loadStats, loadTickets, refreshTicket]);
+
+  const handleResolve = useCallback((id: string) => {
+    void (async () => {
+      try {
+        await updateSupportTicketStatus(Number(id), "resolved");
+        await refreshTicket(id);
+        await loadTickets();
+        await loadStats();
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
+  }, [loadStats, loadTickets, refreshTicket]);
+
+  const handleCloseTicket = useCallback((id: string) => {
+    void (async () => {
+      try {
+        await updateSupportTicketStatus(Number(id), "closed");
+        await refreshTicket(id);
+        await loadTickets();
+        await loadStats();
+      } catch (e) {
+        setLoadError(getApiErrorMessage(e));
+      }
+    })();
+  }, [loadStats, loadTickets, refreshTicket]);
 
   const handleSend = useCallback((id: string, text: string) => {
     void (async () => {
       try {
         await replySupportTicket(Number(id), text);
-        await updateSupportTicketStatus(Number(id), "in_progress");
         await refreshTicket(id);
         await loadTickets();
+        await loadStats();
       } catch (e) {
         setLoadError(getApiErrorMessage(e));
       }
     })();
-  }, [loadTickets, refreshTicket]);
+  }, [loadStats, loadTickets, refreshTicket]);
 
   const statCards = [
     {
@@ -764,12 +842,12 @@ export default function SupportTicketManagement() {
       icon: <ClockIcon size={!isDesktop ? 14 : 18} color={C.inProgress.text} />,
     },
     {
-      label: "Waiting",
-      sublabel: "Pending reply",
-      count: stats.waiting,
-      color: C.waitingAdmin.text,
-      bgColor: C.waitingAdmin.bg,
-      icon: <ChatIcon size={!isDesktop ? 14 : 18} color={C.waitingAdmin.text} />,
+      label: "Closed",
+      sublabel: "No further action",
+      count: stats.closed,
+      color: C.closed.text,
+      bgColor: C.closed.bg,
+      icon: <LockIcon size={!isDesktop ? 14 : 18} color={C.closed.text} />,
     },
     {
       label: "Resolved",
@@ -960,6 +1038,8 @@ export default function SupportTicketManagement() {
                 {selectedTicket ? (
                   <ChatPanel
                     ticket={selectedTicket}
+                    onResolve={handleResolve}
+                    onCloseTicket={handleCloseTicket}
                     onReopen={handleReopen}
                     onSend={handleSend}
                   />
@@ -1014,6 +1094,8 @@ export default function SupportTicketManagement() {
               <ChatPanel
                 ticket={selectedTicket}
                 onClose={() => setSelectedTicket(null)}
+                onResolve={handleResolve}
+                onCloseTicket={handleCloseTicket}
                 onReopen={handleReopen}
                 onSend={handleSend}
               />
@@ -1706,6 +1788,45 @@ const styles = StyleSheet.create({
   chatContactTextMobile: {
     color: C.textSecondary,
     fontSize: 12,
+  },
+  chatHeaderActions: {
+    flexDirection: "column",
+    gap: 8,
+    alignSelf: "flex-start",
+  },
+  resolveBtn: {
+    backgroundColor: "#16A34A",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  resolveBtnMobile: {
+    backgroundColor: "#16A34A",
+  },
+  resolveBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  closeTicketBtn: {
+    backgroundColor: "#DC2626",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  closeTicketBtnMobile: {
+    backgroundColor: "#DC2626",
+  },
+  closeTicketBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
   },
   reopenBtn: {
     backgroundColor: "rgba(255,255,255,0.2)",
