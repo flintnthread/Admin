@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportCsv, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
+import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportExcel, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -3230,16 +3230,16 @@ export default function OrdersScreen() {
 
   const filtered = orders;
 
-  const handleExportCSV = useCallback(async () => {
+  const handleExportExcel = useCallback(async () => {
     try {
-      await downloadOrderExportCsv(
+      await downloadOrderExportExcel(
         {
           search: searchQuery || undefined,
           status: mapStatusFilterToApi(statusFilter),
           paymentMethod: mapPaymentFilterToApi(paymentFilter),
           sort: sortOption,
         },
-        `orders_${new Date().toISOString().slice(0, 10)}.csv`
+        `orders_${new Date().toISOString().slice(0, 10)}.xlsx`
       );
     } catch (e) {
       Alert.alert("Export failed", e instanceof Error ? e.message : "Could not export orders.");
@@ -3338,12 +3338,12 @@ export default function OrdersScreen() {
                 <View style={s.headerActions}>
                   <TouchableOpacity
                     style={s.exportBtn}
-                    onPress={handleExportCSV}
+                    onPress={handleExportExcel}
                     activeOpacity={0.85}
                   >
                     <ExportIcon />
                     {!isMobile && (
-                      <Text style={s.exportBtnText}>Export CSV</Text>
+                      <Text style={s.exportBtnText}>Export</Text>
                     )}
                   </TouchableOpacity>
                 </View>
