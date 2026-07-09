@@ -154,7 +154,26 @@ function TopProductThumb({ uri, size = 40 }: { uri: string; size?: number }) {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { width: screenW } = useWindowDimensions();
+  const { width: rnWidth } = useWindowDimensions();
+  const [screenW, setScreenW] = useState<number>(rnWidth);
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      setScreenW(window.innerWidth);
+      const handleResize = () => {
+        setScreenW(window.innerWidth);
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      setScreenW(rnWidth);
+    }
+  }, [rnWidth]);
+
   const isLargeScreen = screenW >= 1024;
   const isTablet = screenW >= 768 && screenW < 1024;
   const isMobile = screenW < 768;
@@ -162,7 +181,7 @@ export default function DashboardScreen() {
   const { theme } = useThemeContext();
   const isDark = theme === "dark";
   const C = useMemo(() => getPalette(isDark), [isDark]);
-  const styles = useMemo(() => getStyles(isDark), [isDark]);
+  const styles = useMemo(() => getStyles(isDark, screenW), [isDark, screenW]);
 
   const { token, isLoading: authLoading } = useAuth();
 
@@ -1129,7 +1148,7 @@ export default function DashboardScreen() {
                   <Text style={styles.headerTitle}>Flint & Thread Dashboard</Text>
                   {/* <Text style={styles.headerSubtext}>SaaS Enterprise Administrative Overview</Text> */}
                 </View>
-                <View style={styles.tabButtons}>
+                <View style={styles.tabButtonsMobileGrid}>
                   {[
                     { key: "overview", label: "Overview", icon: "th-large", color: C.active, bg: C.activeBg },
                     { key: "sales", label: "Sales & Payments", icon: "bar-chart", color: C.primary, bg: C.primaryLight },
@@ -1142,7 +1161,7 @@ export default function DashboardScreen() {
                         key={tab.key}
                         onPress={() => handleTabPress(tab.key as any)}
                         style={[
-                          styles.tabButton,
+                          styles.tabButtonMobileGridItem,
                           isActive && { backgroundColor: tab.bg }
                         ]}
                       >
@@ -1152,6 +1171,7 @@ export default function DashboardScreen() {
                             styles.tabButtonText,
                             isActive && { color: tab.color, fontWeight: "700" }
                           ]}
+                          numberOfLines={1}
                         >
                           {tab.label}
                         </Text>
@@ -1190,7 +1210,9 @@ export default function DashboardScreen() {
                       onPress={card.action}
                       style={({ hovered }) => [
                         styles.kpiCard,
-                        isMobile && { minWidth: "47%", flex: 0, width: "47%" },
+                        screenW < 480
+                          ? { minWidth: "100%", flex: 0, width: "100%" }
+                          : (isMobile ? { minWidth: "47%", flex: 0, width: "47%" } : null),
                         {
                           borderLeftWidth: 4,
                           borderLeftColor: card.color,
@@ -2665,7 +2687,7 @@ export default function DashboardScreen() {
   );
 }
 
-const getStyles = (isDark: boolean) => {
+const getStyles = (isDark: boolean, screenW: number) => {
   const C = getPalette(isDark);
   return StyleSheet.create({
     sectionHeaderCard: {
@@ -2714,7 +2736,7 @@ const getStyles = (isDark: boolean) => {
     },
     scrollContent: {
       paddingBottom: 40,
-      paddingHorizontal: 24,
+      paddingHorizontal: screenW < 480 ? 10 : (screenW < 768 ? 16 : 24),
     },
     container: {
       alignSelf: "center",
@@ -2727,14 +2749,13 @@ const getStyles = (isDark: boolean) => {
     headerCard: {
       backgroundColor: "#1d324e",
       borderRadius: 16,
-      padding: 20,
+      padding: screenW < 480 ? 12 : 20,
       borderWidth: 1,
       borderColor: "#2a4365",
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: screenW < 1024 ? "column" : "row",
+      alignItems: screenW < 1024 ? "stretch" : "center",
       justifyContent: "space-between",
-      alignItems: "center",
-      gap: 16,
+      gap: 12,
       shadowColor: "#000",
       shadowOpacity: 0.02,
       shadowOffset: { width: 0, height: 2 },
@@ -2770,7 +2791,7 @@ const getStyles = (isDark: boolean) => {
       borderColor: C.border,
     },
     headerTitle: {
-      fontSize: 22,
+      fontSize: screenW < 375 ? 18 : (screenW < 480 ? 20 : 22),
       fontWeight: "800",
       color: "#FFFFFF",
     },
@@ -2787,6 +2808,16 @@ const getStyles = (isDark: boolean) => {
       padding: 4,
       borderRadius: 10,
     },
+    tabButtonsMobileGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      backgroundColor: C.greyBg,
+      padding: 4,
+      borderRadius: 10,
+      width: "100%",
+      marginTop: 8,
+    },
     tabButton: {
       flexDirection: "row",
       alignItems: "center",
@@ -2795,11 +2826,22 @@ const getStyles = (isDark: boolean) => {
       paddingVertical: 8,
       borderRadius: 8,
     },
+    tabButtonMobileGridItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      borderRadius: 8,
+      flexBasis: "48%",
+      flexGrow: 1,
+    },
     tabButtonActive: {
       backgroundColor: C.primary,
     },
     tabButtonText: {
-      fontSize: 12,
+      fontSize: screenW < 360 ? 10 : 12,
       fontWeight: "600",
       color: C.sub,
     },
@@ -2821,7 +2863,7 @@ const getStyles = (isDark: boolean) => {
     },
     kpiCard: {
       flex: 1,
-      minWidth: 220,
+      minWidth: screenW < 480 ? "100%" : 220,
       backgroundColor: C.surface,
       borderRadius: 16,
       padding: 18,
@@ -2863,7 +2905,7 @@ const getStyles = (isDark: boolean) => {
       justifyContent: "center",
     },
     kpiCardValue: {
-      fontSize: 22,
+      fontSize: screenW < 375 ? 18 : (screenW < 480 ? 20 : 22),
       fontWeight: "800",
       color: C.text,
     },
