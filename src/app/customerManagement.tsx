@@ -680,54 +680,54 @@ export default function CustomerManagementScreen() {
         />
       </View>
 
-      {/* ══ TOOLBAR (Fixed) ═════════════════════════════════════════════════════ */}
-      <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px, marginTop: 10, marginBottom: 4 }}>
-        <View style={s.toolbar}>
-          {/* Search */}
-          <View style={s.searchBox}>
-            <SearchIcon />
-            <TextInput
-              style={[s.searchInput, { fontSize: isMobile ? 12 : 14 }]}
-              placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
-              placeholderTextColor={C.sub}
-              value={search}
-              onChangeText={(text) => {
-                setSearch(text);
-                setPage(1);
-              }}
-              numberOfLines={1}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch("")} style={{ padding: 4 }}>
-                <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Grid / List toggle */}
-          <View style={s.toggle}>
-            {(["grid", "list"] as const).map((mode) => (
-              <TouchableOpacity
-                key={mode}
-                style={[s.toggleBtn, view === mode && s.toggleActive]}
-                onPress={() => setView(mode)}
-                activeOpacity={0.8}
-              >
-                {mode === "grid"
-                  ? <GridIcon color={view === "grid" ? "#fff" : C.sub} size={16} />
-                  : <ListIcon color={view === "list" ? "#fff" : C.sub} size={16} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </View>
-
       <ScrollView
         style={s.scroll}
         contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
+          
+          {/* ══ TOOLBAR (Scrollable) ═════════════════════════════════════════════════════ */}
+          <View style={{ marginTop: 10, marginBottom: 4 }}>
+            <View style={s.toolbar}>
+              {/* Search */}
+              <View style={s.searchBox}>
+                <SearchIcon />
+                <TextInput
+                  style={[s.searchInput, { fontSize: isMobile ? 12 : 14 }]}
+                  placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
+                  placeholderTextColor={C.sub}
+                  value={search}
+                  onChangeText={(text) => {
+                    setSearch(text);
+                    setPage(1);
+                  }}
+                  numberOfLines={1}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearch("")} style={{ padding: 4 }}>
+                    <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Grid / List toggle */}
+              <View style={s.toggle}>
+                {(["grid", "list"] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[s.toggleBtn, view === mode && s.toggleActive]}
+                    onPress={() => setView(mode)}
+                    activeOpacity={0.8}
+                  >
+                    {mode === "grid"
+                      ? <GridIcon color={view === "grid" ? "#fff" : C.sub} size={16} />
+                      : <ListIcon color={view === "list" ? "#fff" : C.sub} size={16} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
 
           {loading ? (
             <View style={s.stateBox}>
