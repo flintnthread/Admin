@@ -2891,13 +2891,14 @@ export default function CustomerAnalyticsScreen() {
                   style={[
                     s.avatar,
                     { backgroundColor: avatarColor(customerName) },
+                    !isWide && { width: 44, height: 44, borderRadius: 22 }
                   ]}
                 >
-                  <Text style={s.avatarTxt}>{initials}</Text>
+                  <Text style={[s.avatarTxt, !isWide && { fontSize: 18 }]}>{initials}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={s.nameRow}>
-                    <Text style={s.headerName} numberOfLines={1}>
+                    <Text style={[s.headerName, !isWide && { fontSize: 17 }]} numberOfLines={1}>
                       {customerName}
                     </Text>
                   </View>
@@ -2958,7 +2959,7 @@ export default function CustomerAnalyticsScreen() {
                   </Text>
                 </View>
                 <View style={s.quickActions}>
-                  {Platform.OS !== "web" && (
+                  {Platform.OS !== "web" && isWide && (
                     <TouchableOpacity
                       style={s.quickBtn}
                       activeOpacity={0.8}

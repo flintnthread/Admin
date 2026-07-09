@@ -1,21 +1,18 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
-import * as ImagePicker from "expo-image-picker";
-import React, { useState, useEffect, useCallback } from "react";
-import Swal from "sweetalert2";
+import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
+import { getApiErrorMessage } from "@/lib/api/client";
 import {
-  fetchMainCategories,
-  fetchSubcategories,
-  fetchCategoryCounts,
   createMainCategory,
   createSubcategory,
-  updateCategory,
   deleteCategory,
-  type CategoryRow,
-  type CategoryCounts,
+  fetchMainCategories,
+  fetchSubcategories,
+  updateCategory,
+  type CategoryRow
 } from "@/services/categoryApi";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -30,6 +27,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
+import Swal from "sweetalert2";
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 
@@ -1667,7 +1665,7 @@ export default function MainCategories() {
             <View style={styles.pageIconWrap}>
               <LayersIcon color="#FFFFFF" />
             </View>
-            <View>
+            <View style={{ flex: 1, flexShrink: 1 }}>
               <Text style={styles.pageTitle}>Categories</Text>
               <Text style={styles.pageSubtitle}>
                 Manage main categories and sub-categories
@@ -1686,74 +1684,137 @@ export default function MainCategories() {
         ) : null}
 
         {/* ── Toolbar ── */}
-        <View style={styles.toolbar}>
-          {/* Search */}
-          <View style={styles.searchBox}>
-            <SearchIcon />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search categories..."
-              placeholderTextColor="#9CA3AF"
-              value={search}
-              onChangeText={(t) => {
-                setSearch(t);
-                setCurrentPage(1);
-              }}
-            />
-          </View>
-
-          {/* Right side controls */}
-          <View style={styles.toolbarRight}>
-            {/* View Toggle */}
-            <View style={styles.viewToggle}>
-              <TouchableOpacity
-                style={[
-                  styles.viewToggleBtn,
-                  viewMode === "grid" && styles.viewToggleBtnActive,
-                ]}
-                onPress={() => setViewMode("grid")}
-              >
-                <GridIcon active={viewMode === "grid"} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.viewToggleBtn,
-                  viewMode === "list" && styles.viewToggleBtnActive,
-                ]}
-                onPress={() => setViewMode("list")}
-              >
-                <ListIcon active={viewMode === "list"} />
-              </TouchableOpacity>
+        {!isWeb ? (
+          <View style={{ gap: 10, marginBottom: 16 }}>
+            {/* Row 1: Search & View Toggle */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={[styles.searchBox, { flex: 1, minWidth: 0 }]}>
+                <SearchIcon />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search categories..."
+                  placeholderTextColor="#9CA3AF"
+                  value={search}
+                  onChangeText={(t) => {
+                    setSearch(t);
+                    setCurrentPage(1);
+                  }}
+                />
+              </View>
+              <View style={styles.viewToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "grid" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("grid")}
+                >
+                  <GridIcon active={viewMode === "grid"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "list" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("list")}
+                >
+                  <ListIcon active={viewMode === "list"} />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Add Buttons */}
-            <TouchableOpacity
-              style={styles.addMainBtn}
-              onPress={() => {
-                setEditCat(null);
-                setMainCatModalOpen(true);
-              }}
-            >
-              <PlusIcon />
-              <Text style={styles.addMainBtnText}>
-                {isWeb ? "Add Main Category" : "Main Cat"}
-              </Text>
-            </TouchableOpacity>
+            {/* Row 2: Add Buttons */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.addMainBtn, { flex: 1, justifyContent: "center" }]}
+                onPress={() => {
+                  setEditCat(null);
+                  setMainCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addMainBtnText}>Main Cat</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.addCatBtn}
-              onPress={() => {
-                setEditCat(null);
-                setCatModalOpen(true);
-              }}
-            >
-              <PlusIcon />
-              <Text style={styles.addCatBtnText}>
-                {isWeb ? "Add Category" : "Category"}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.addCatBtn, { flex: 1, justifyContent: "center" }]}
+                onPress={() => {
+                  setEditCat(null);
+                  setCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addCatBtnText}>Category</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        ) : (
+          /* Desktop Toolbar */
+          <View style={styles.toolbar}>
+            {/* Search */}
+            <View style={styles.searchBox}>
+              <SearchIcon />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search categories..."
+                placeholderTextColor="#9CA3AF"
+                value={search}
+                onChangeText={(t) => {
+                  setSearch(t);
+                  setCurrentPage(1);
+                }}
+              />
+            </View>
+
+            {/* Right side controls */}
+            <View style={styles.toolbarRight}>
+              {/* View Toggle */}
+              <View style={styles.viewToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "grid" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("grid")}
+                >
+                  <GridIcon active={viewMode === "grid"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "list" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("list")}
+                >
+                  <ListIcon active={viewMode === "list"} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Add Buttons */}
+              <TouchableOpacity
+                style={styles.addMainBtn}
+                onPress={() => {
+                  setEditCat(null);
+                  setMainCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addMainBtnText}>Add Main Category</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.addCatBtn}
+                onPress={() => {
+                  setEditCat(null);
+                  setCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addCatBtnText}>Add Category</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* ── Content ── */}
         {viewMode === "grid" ? (
@@ -1765,7 +1826,11 @@ export default function MainCategories() {
               <View
                 key={cat.id}
                 style={
-                  isWeb ? styles.gridCardWrapper : styles.gridCardWrapperMobile
+                  width >= 1024
+                    ? { flexBasis: "31%", flexGrow: 1, flexShrink: 1, minWidth: 200, maxWidth: "33%" }
+                    : width >= 768
+                      ? { flexBasis: "47%", flexGrow: 1, flexShrink: 1, minWidth: 240, maxWidth: "49%" }
+                      : styles.gridCardWrapperMobile
                 }
               >
                 <GridCard
@@ -1777,11 +1842,13 @@ export default function MainCategories() {
             ))}
           </View>
         ) : isWeb ? (
-          <ListTable
-            categories={paginated}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }} contentContainerStyle={{ minWidth: "100%" }}>
+            <ListTable
+              categories={paginated}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          </ScrollView>
         ) : (
           // Mobile list view: card-based, no horizontal scrolling
           <View style={styles.mobileCardList}>
@@ -2205,6 +2272,7 @@ const styles = StyleSheet.create({
     borderColor: C.border,
     overflow: "hidden",
     width: "100%",
+    minWidth: 900,
   },
   tableHeader: {
     flexDirection: "row",

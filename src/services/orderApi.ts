@@ -299,7 +299,7 @@ export async function downloadOrderExportExcel(
   
   const csv = await fetchOrderExportCsv(params);
   
-  const XLSX = await import("xlsx");
+  const XLSX = require("xlsx");
   const workbook = XLSX.read(csv, { type: "string" });
   const fileName = preferredFileName ?? `orders_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
