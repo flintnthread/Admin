@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -23,6 +23,7 @@ type Props = {
 };
 
 export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
+  const { width } = useWindowDimensions();
   const { theme, toggleTheme } = useThemeContext();
   const colors = useTheme();
   const isDark = theme === "dark";
