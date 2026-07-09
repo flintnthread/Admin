@@ -34,7 +34,8 @@ import {
   approveSellerProfile,
   rejectSellerProfile,
 } from "@/services/sellerApi";
-import { mapPendingProfileRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
+import { blurActiveElementOnWeb } from "@/lib/focus";
+import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
 import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatRupee, maskAccount } from "@/lib/format";
@@ -71,7 +72,7 @@ const iconColors = ["#8B5CF6", "#10B981", "#3B82F6", "#F97316", "#EC4899"];
 export default function ApprovedSellersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 1024;
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab, sellerId: sellerIdParam } = useLocalSearchParams<{ tab?: string; sellerId?: string }>();
   const showPending = tab === "pending";
   const { token, isLoading: authLoading } = useAuth();
   const { theme, toggleTheme, isDark } = useThemeContext();
@@ -392,8 +393,30 @@ export default function ApprovedSellersScreen() {
   };
 
   const renderMobileSellerDetails = () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
-    if (!seller) return null;
+    const seller = resolveSelectedSeller();
+    if (!seller) {
+      if (detailLoading) {
+        return (
+          <View style={[stylesMobile.container, { justifyContent: "center", alignItems: "center" }]}>
+            <ActivityIndicator size="large" color="#EA580C" />
+            <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+          </View>
+        );
+      }
+      if (detailError) {
+        return (
+          <View style={[stylesMobile.container, { justifyContent: "center", alignItems: "center", padding: 24 }]}>
+            <Text style={{ color: "#EF4444", marginBottom: 12, textAlign: "center" }}>{detailError}</Text>
+            {selectedSellerId != null && (
+              <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                <Text style={styles.updateStatusBtnText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      }
+      return null;
+    }
 
     // Helper to render label-value row
     const renderLabelValueRow = (label: string, value: any, isLast = false) => (
@@ -1363,7 +1386,7 @@ export default function ApprovedSellersScreen() {
   };
 
   const renderMobileEditModal = () => {
-    const seller = sellers.find(s => s.id === selectedSellerId);
+    const seller = resolveSelectedSeller();
     if (!seller) return null;
 
     return (
@@ -2228,6 +2251,7 @@ export default function ApprovedSellersScreen() {
   }, [token]);
 
   const openSellerDetail = useCallback((sellerId: number, listStatus?: Seller["status"]) => {
+    blurActiveElementOnWeb();
     setSelectedSellerId(sellerId);
     if (listStatus) {
       setAdminStatus(listStatus);
@@ -2235,6 +2259,16 @@ export default function ApprovedSellersScreen() {
     }
     void loadSellerDetail(sellerId);
   }, [loadSellerDetail]);
+
+  const resolveSelectedSeller = useCallback((): Seller | null => {
+    if (selectedSellerId == null) return null;
+    const fromList = sellers.find((s) => s.id === selectedSellerId);
+    if (fromList) return fromList;
+    if (sellerDetail?.id === selectedSellerId) {
+      return mapSellerDetailToApprovedRow(sellerDetail);
+    }
+    return null;
+  }, [selectedSellerId, sellers, sellerDetail]);
 
   const loadPendingSellers = useCallback(async () => {
     if (!token) return;
@@ -2267,6 +2301,13 @@ export default function ApprovedSellersScreen() {
       setDetailError(null);
     }
   }, [selectedSellerId]);
+
+  useEffect(() => {
+    if (authLoading || !token || !sellerIdParam || showPending) return;
+    const id = Number(sellerIdParam);
+    if (!Number.isFinite(id) || id <= 0) return;
+    openSellerDetail(id);
+  }, [authLoading, token, sellerIdParam, showPending, openSellerDetail]);
 
   const reload = loadApprovedSellers;
   const setData = setSellers;
@@ -2455,9 +2496,32 @@ export default function ApprovedSellersScreen() {
       >
         {selectedSellerId !== null ? (
           (() => {
-            const seller = sellers.find(s => s.id === selectedSellerId);
+            const seller = resolveSelectedSeller();
             const detail = sellerDetail;
-            if (!seller) return null;
+
+            if (!seller) {
+              if (detailLoading) {
+                return (
+                  <View style={{ padding: 48, alignItems: "center" }}>
+                    <ActivityIndicator size="large" color="#EA580C" />
+                    <Text style={{ marginTop: 12, color: "#6B7280" }}>Loading seller details...</Text>
+                  </View>
+                );
+              }
+              if (detailError) {
+                return (
+                  <View style={{ padding: 48, alignItems: "center" }}>
+                    <Text style={{ color: "#EF4444", marginBottom: 12 }}>{detailError}</Text>
+                    {selectedSellerId != null && (
+                      <TouchableOpacity style={styles.updateStatusBtn} onPress={() => void loadSellerDetail(selectedSellerId)}>
+                        <Text style={styles.updateStatusBtnText}>Retry</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }
+              return null;
+            }
 
             const handleUpdateSellerStatus = async () => {
               if (!selectedSellerId) return;

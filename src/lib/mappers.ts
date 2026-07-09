@@ -11,7 +11,7 @@ import type {
   SupportTicketSummary,
 } from "@/lib/api/types";
 import type { PendingProfileSeller } from "@/services/sellerApi";
-import { resolveMediaUrl, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from "@/lib/api/media";
+import { resolveMediaUrl, resolveAdminMediaUrl, buildMediaUrlCandidates, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from "@/lib/api/media";
 import {
   mapBusinessProofDocuments,
   mapLiveSelfieDocuments,
@@ -328,6 +328,59 @@ export function mapSellerToApprovedRow(s: SellerSummary): ApprovedSellerRow {
   };
 }
 
+export function mapSellerDetailToApprovedRow(detail: SellerDetailView): ApprovedSellerRow {
+  return {
+    id: detail.id,
+    name: detail.fullName,
+    email: detail.email,
+    avatar: detail.profilePicUrl,
+    businessName: detail.businessName,
+    businessType: detail.businessType,
+    sellerCategory: detail.sellerCategory,
+    products: 0,
+    walletBalance: 0,
+    joinDate: detail.registeredOn,
+    revenue: 0,
+    state: detail.state,
+    city: detail.city,
+    status: detail.accountStatus,
+    firstName: detail.firstName,
+    lastName: detail.lastName,
+    mobile: detail.mobile,
+    bankName: detail.bankName,
+    accountNumber: detail.accountNumber,
+    ifscCode: detail.ifscCode,
+    accountHolder: detail.accountHolder,
+    branchName: detail.branchName,
+    sellerUniqueId: detail.sellerUniqueId,
+    referralCode: "",
+    gstNumber: detail.hasGst,
+    gstNumberRaw: detail.gstNumber,
+    panNumber: detail.panNumber,
+    country: detail.country,
+    area: detail.area,
+    pincode: detail.pincode,
+    address: detail.address,
+    warehouseAddress: detail.warehouseAddress,
+    warehouseArea: detail.warehouseArea,
+    warehouseCity: detail.warehouseCity,
+    warehouseState: detail.warehouseState,
+    warehouseCountry: detail.warehouseCountry,
+    kycStatusLabel: detail.kycStatusLabel,
+    kycVerificationStatus: detail.kycVerificationStatus,
+    kycSubmittedOn: detail.kycSubmittedOn,
+    kycVerifiedOn: detail.kycVerifiedOn,
+    kycImageCount: detail.kycImageCount,
+    kycRemarks: detail.kycRemarks,
+    adminRemarks: "",
+    totalOrders: 0,
+    bankVerified: false,
+    emailVerified: false,
+    mobileVerified: false,
+    profilePicUrl: detail.profilePicUrl,
+  };
+}
+
 export function mapPendingProfileToApprovalRow(
   s: PendingProfileSeller,
   detail?: Record<string, unknown> | null
@@ -382,19 +435,24 @@ export function mapProductListToApprovalRow(
     price?: number;
   },
 ) {
+  const raw = p as Record<string, unknown>;
   const categoryLabel = [p.mainCategoryName, p.categoryName, p.subcategoryName]
     .filter(Boolean)
     .join(" › ") || p.categoryName || "—";
+  const imagePath = String(p.imageUrl ?? raw.imagePath ?? raw.image_path ?? "");
+  const imageCandidates = buildMediaUrlCandidates(imagePath, imagePath);
+  const sku = String(p.sku ?? raw.variantSku ?? "").trim();
 
   return {
     id: String(p.id),
     name: p.name ?? "Product",
-    sku: p.sku ?? "—",
+    sku: sku || "—",
     seller: p.sellerName ?? `Seller #${p.sellerId ?? "—"}`,
     sellerEmail: p.sellerEmail ?? "",
     status: mapProductStatus(p.status ?? (p as { displayStatus?: string }).displayStatus),
     submittedAt: formatDate(p.createdAt),
-    image: resolveMediaUrl(p.imageUrl),
+    image: imageCandidates[0] ?? resolveMediaUrl(imagePath) ?? resolveAdminMediaUrl(imagePath),
+    imageCandidates,
     category: categoryLabel,
     price: p.price != null ? formatRupee(p.price) : "—",
   };
@@ -662,10 +720,19 @@ export function mapPendingProfileRow(s: PendingProfileSeller) {
 }
 
 export function mapSellerSupportTicket(t: SupportTicketSummary) {
-  const statusMap: Record<string, string> = {
+  type TicketStatusLike =
+    | "Open"
+    | "In Progress"
+    | "Waiting Admin"
+    | "Waiting Seller"
+    | "Resolved"
+    | "Closed";
+  const statusMap: Record<string, TicketStatusLike> = {
     open: "Open",
     in_progress: "In Progress",
     waiting: "Waiting Admin",
+    waiting_admin: "Waiting Admin",
+    waiting_seller: "Waiting Seller",
     closed: "Closed",
     resolved: "Resolved",
   };
@@ -677,15 +744,24 @@ export function mapSellerSupportTicket(t: SupportTicketSummary) {
     urgent: "Urgent",
     medium: "Medium",
   };
+  const statusKey = t.status?.toLowerCase() ?? "open";
+  const status =
+    (t.statusLabel as TicketStatusLike | undefined) ??
+    statusMap[statusKey] ??
+    "Open";
   return {
     id: String(t.id),
     ticketCode: t.ticketNumber ?? `TKT-${t.id}`,
     description: t.subject ?? "—",
     sellerName: t.sellerName ?? `Seller #${t.sellerId}`,
-    email: "",
-    phone: "",
+    email: t.sellerEmail ?? "",
+    phone: t.sellerPhone ?? "",
     department: t.category ?? "General",
-    status: statusMap[t.status?.toLowerCase() ?? ""] ?? "Open",
+    status,
+    statusClosed: Boolean(t.statusClosed),
+    canResolve: Boolean(t.canResolve),
+    canClose: Boolean(t.canClose),
+    canReopen: Boolean(t.canReopen),
     priority: priorityMap[t.priority?.toLowerCase() ?? ""] ?? "Medium",
     createdAt: formatDate(t.createdAt),
     messages: (t.messages ?? []).map((m, i) => ({

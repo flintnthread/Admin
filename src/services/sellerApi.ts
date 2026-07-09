@@ -1,6 +1,87 @@
 import { adminApiRequest } from "@/lib/api/client";
 import type { PageResponse, SellerSummary } from "@/lib/api/types";
 
+/** Canonical seller code — matches seller-service `SellerUniqueIdService`. */
+export function formatSellerUniqueId(sellerId: number): string {
+  const id = Math.max(0, Math.floor(Number(sellerId)));
+  return `FNT-SELLER-${String(id).padStart(6, "0")}`;
+}
+
+export function readSellerUniqueIdRaw(row: Record<string, unknown>): string {
+  const raw = row.sellerUniqueId ?? row.seller_unique_id ?? row.sellerUniqueID;
+  return raw != null ? String(raw).trim() : "";
+}
+
+export function pickSellerUniqueId(
+  sellerId: number,
+  ...candidates: (string | null | undefined)[]
+): string {
+  for (const candidate of candidates) {
+    const trimmed = String(candidate ?? "").trim();
+    if (trimmed) return trimmed;
+  }
+  return formatSellerUniqueId(sellerId);
+}
+
+export function resolveSellerUniqueId(
+  sellerId: number,
+  raw?: string | null
+): string {
+  const trimmed = String(raw ?? "").trim();
+  if (trimmed) return trimmed;
+  return formatSellerUniqueId(sellerId);
+}
+
+/** Primary seller label: business (or owner name) + unique ID — matches analytics caption. */
+export function formatSellerDisplayName(
+  s: Pick<{ id: number; fullName?: string | null; businessName?: string | null; sellerUniqueId?: string | null }, "id" | "fullName" | "businessName" | "sellerUniqueId">
+): string {
+  const business = String(s.businessName ?? "").trim();
+  const name = String(s.fullName ?? "").trim() || `Seller #${s.id}`;
+  const uniqueId = pickSellerUniqueId(s.id, s.sellerUniqueId);
+  const primary = business && business !== "—" ? business : name;
+  return `${primary} (${uniqueId})`;
+}
+
+function csvCell(value: unknown): string {
+  const str = value == null ? "" : String(value);
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+function csvPhone(value: unknown): string {
+  const phone = value == null ? "" : String(value).trim();
+  if (!phone) return csvCell("");
+  // Leading tab keeps Excel from converting long numbers to scientific notation.
+  return csvCell(`\t${phone}`);
+}
+
+function csvRow(values: unknown[]): string {
+  return values.map(csvCell).join(",");
+}
+
+function csvSellerDataRow(values: unknown[]): string {
+  return values
+    .map((value, index) => (index === 5 ? csvPhone(value) : csvCell(value)))
+    .join(",");
+}
+
+function resolveKycExportLabel(seller: Record<string, unknown>): string {
+  if (seller.kycVerified === true) return "Complete";
+  if (seller.kycCompleted === true) return "Pending";
+  return "Not done";
+}
+
+function resolveProfileExportLabel(seller: Record<string, unknown>): string {
+  return seller.profileCompleted === true ? "Complete" : "Incomplete";
+}
+
+function formatExportDate(value: unknown): string {
+  if (!value) return "";
+  const d = new Date(String(value));
+  if (!Number.isFinite(d.getTime())) return String(value);
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export async function fetchApprovedSellers(size = 500): Promise<SellerSummary[]> {
   const page = await adminApiRequest<PageResponse<SellerSummary>>(
     `/api/admin/sellers/approved?page=0&size=${size}`
@@ -31,6 +112,10 @@ export async function fetchApprovedSellerLocationStats(): Promise<{
     stateCounts: parseRows("stateCounts"),
     cityCounts: parseRows("cityCounts"),
   };
+}
+
+export async function resendSellerVerification(id: number): Promise<{ message: string }> {
+  return adminApiRequest(`/api/admin/sellers/${id}/resend-verification`, { method: "POST" });
 }
 
 export async function fetchSellers(params?: {
@@ -85,6 +170,7 @@ export type SellerGraphNameOption = {
   id: number;
   fullName: string;
   businessName?: string | null;
+  sellerUniqueId?: string | null;
 };
 
 function buildGraphQuery(filters?: SellerGraphFilters): string {
@@ -124,6 +210,7 @@ export async function fetchSellerGraphNames(): Promise<SellerGraphNameOption[]> 
         id,
         fullName: String(r.fullName ?? `Seller #${id}`),
         businessName: r.businessName != null ? String(r.businessName) : null,
+        sellerUniqueId: readSellerUniqueIdRaw(r) || null,
       };
     })
     .filter((row): row is SellerGraphNameOption => row != null);
@@ -332,28 +419,84 @@ export async function rejectSellerProfile(id: number, reason: string): Promise<v
 }
 
 export async function exportSellerProductsCsv(sellerId: number): Promise<string> {
-  // Fetch products for this seller using the product API
   const q = new URLSearchParams();
-  q.set('page', '0');
-  q.set('size', '1000');
-  q.set('sellerId', String(sellerId));
-  const response = await adminApiRequest<{ items: unknown[] }>(
-    `/api/admin/products?${q}`
-  );
-  const products = response.items || [];
+  q.set("page", "0");
+  q.set("size", "1000");
+  q.set("sellerId", String(sellerId));
 
-  // Generate CSV
-  const headers = ['ID', 'Name', 'Status', 'Price', 'Stock', 'Created At'];
-  const rows = products.map((p: any) => [
-    p.id || '',
-    `"${(p.name || '').replace(/"/g, '""')}"`,
-    p.status || '',
-    p.price || 0,
-    p.stock || 0,
-    p.createdAt || '',
+  const [seller, response] = await Promise.all([
+    fetchSellerDetail(sellerId),
+    adminApiRequest<{ items: unknown[] }>(`/api/admin/products?${q}`),
   ]);
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  return csv;
+  const products = response.items || [];
+  const sellerRow = seller as Record<string, unknown>;
+
+  const sellerUniqueId = pickSellerUniqueId(sellerId, readSellerUniqueIdRaw(sellerRow));
+  const sellerHeaders = [
+    "Seller Unique ID",
+    "Seller Name",
+    "Business Name",
+    "Seller Status",
+    "Email",
+    "Phone",
+    "Onboard Date",
+    "Profile",
+    "KYC",
+    "Bank Verification",
+    "City",
+    "State",
+    "Category",
+    "Total Products",
+  ];
+  const sellerValues: unknown[] = [
+    sellerUniqueId,
+    String(sellerRow.fullName ?? ""),
+    String(sellerRow.businessName ?? ""),
+    String(sellerRow.status ?? ""),
+    String(sellerRow.email ?? ""),
+    sellerRow.mobile ?? sellerRow.phone ?? "",
+    formatExportDate(sellerRow.createdAt),
+    resolveProfileExportLabel(sellerRow),
+    resolveKycExportLabel(sellerRow),
+    sellerRow.bankVerified === true ? "Verified" : "Not Verified",
+    String(sellerRow.city ?? ""),
+    String(sellerRow.state ?? ""),
+    String(sellerRow.sellerCategory ?? ""),
+    String(sellerRow.productCount ?? products.length),
+  ];
+
+  const productHeaders = [
+    "product id",
+    "Product Name",
+    "Product Status",
+    "Price",
+    "Stock",
+    "Created At",
+  ];
+
+  const sellerDataRow = csvSellerDataRow(sellerValues);
+
+  const productRows = products.map((product) => {
+    const p = product as Record<string, unknown>;
+    return csvRow([
+      p.id ?? "",
+      p.name ?? "",
+      p.status ?? "",
+      p.price ?? 0,
+      p.stock ?? 0,
+      p.createdAt ?? "",
+    ]);
+  });
+
+  const sectionGap = Array.from({ length: 7 }, () => "");
+
+  return [
+    csvRow(sellerHeaders),
+    sellerDataRow,
+    ...sectionGap,
+    csvRow(productHeaders),
+    ...productRows,
+  ].join("\n");
 }
 
 export async function exportSellerOrdersCsv(sellerId: number): Promise<string> {

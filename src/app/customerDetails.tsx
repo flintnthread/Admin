@@ -9,7 +9,7 @@ import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import {
-  downloadCustomerOrderHistoryCsv,
+  downloadCustomerOrderHistoryExcel,
   downloadCustomerOrderHistoryPdf,
   fetchCustomerDetail,
 } from "@/services/customerApi";
@@ -69,7 +69,7 @@ type MonthlyData = { month: string; amount: number };
 const C = {
   bg:            "#FFFFFF",
   surface:       "#FFFFFF",
-  cardBg:        "#FFF8F4",
+  cardBg:        "#FFFFFF",
   primary:       "#ef7b1a",
   primaryLight:  "#FFF0EA",
   navy:          "#151D4F",
@@ -100,7 +100,17 @@ function rupeeShort(n: number) {
   return "₹" + n;
 }
 function useLayout(w: number) {
-  return { isMobile: w < 480, isTablet: w >= 480 && w < 1024, isDesktop: w >= 1024, cols: w < 768 ? 1 : w < 1280 ? 2 : 3 };
+  return {
+    isXs: w < 375,            // e.g., 320
+    isSm: w >= 375 && w < 425,
+    isMd: w >= 425 && w < 768,
+    isMobile: w < 768,
+    isTablet: w >= 768 && w < 1024,
+    isDesktop: w >= 1024 && w < 1440,
+    isLargeDesktop: w >= 1440,
+    isWide: w >= 768,
+    cols: w < 768 ? 1 : w < 1280 ? 2 : 3,
+  };
 }
 
 // Builds a compact page-number list with ellipses for large page counts,
@@ -189,90 +199,45 @@ function openOrderDetails(router: ReturnType<typeof useRouter>, orderId: number)
   router.push(`/orderDetails?orderId=${id}`);
 }
 
-function exportOrderHistoryFallback(customer: Customer, isMobileView: boolean) {
-  if (!isMobileView) {
-    let csvContent = "Customer Name,Customer ID,Status,Orders,Total Spent,Last Order\n";
-    csvContent += `"${customer.name}","${customer.id}","${customer.status}","${customer.orders}","${customer.totalSpent}","${customer.lastOrder ?? "N/A"}"\n\n`;
-    csvContent += "Order #,Date,Items,Amount,Payment,Status\n";
-    (customer.orderHistory || []).forEach((o) => {
-      csvContent += `"${o.orderNumber}","${o.date}","${o.items}","${o.amount}","${o.payment}","${o.status}"\n`;
-    });
+async function exportOrderHistoryFallback(customer: Customer, isMobileView: boolean) {
+  let csvContent = "Customer Name,Customer ID,Status,Orders,Total Spent,Last Order\n";
+  csvContent += `"${customer.name}","${customer.id}","${customer.status}","${customer.orders}","${customer.totalSpent}","${customer.lastOrder ?? "N/A"}"\n\n`;
+  csvContent += "Order #,Date,Items,Amount,Payment,Status\n";
+  (customer.orderHistory || []).forEach((o) => {
+    csvContent += `"${o.orderNumber}","${o.date}","${o.items}","${o.amount}","${o.payment}","${o.status}"\n`;
+  });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Customer_${customer.id}_Export.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(csvContent, { type: "string" });
+  const fileName = `Customer_${customer.id}_Export.xlsx`;
+
+  if (typeof document !== "undefined" && typeof navigator !== "undefined" && navigator.product !== "ReactNative") {
+    XLSX.writeFile(workbook, fileName);
     return;
   }
 
-  const rows = (customer.orderHistory || [])
-    .map(
-      (o) => `
-      <tr>
-        <td>${o.orderNumber}</td>
-        <td>${o.date}</td>
-        <td>${o.items}</td>
-        <td>₹${o.amount}</td>
-        <td>${o.payment}</td>
-        <td>${o.status}</td>
-      </tr>`
-    )
-    .join("");
+  const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+  const FileSystem = await import("expo-file-system/legacy");
+  const Sharing = await import("expo-sharing");
 
-  const htmlContent = `
-    <html>
-      <head>
-        <style>
-          body { font-family: Helvetica, Arial, sans-serif; padding: 20px; }
-          h1 { color: #151D4F; margin-bottom: 5px; }
-          .info-box { background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e5e7eb; }
-          .info-box p { margin: 5px 0; font-size: 14px; color: #374151; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-          th, td { border: 1px solid #e5e7eb; padding: 12px 10px; text-align: left; color: #374151; }
-          th { background-color: #f3f4f6; font-weight: bold; }
-          tr:nth-child(even) { background-color: #fafafa; }
-        </style>
-      </head>
-      <body>
-        <h1>Customer Details</h1>
-        <div class="info-box">
-          <p><strong>Customer Name:</strong> ${customer.name}</p>
-          <p><strong>Customer ID:</strong> ${customer.id}</p>
-          <p><strong>Status:</strong> ${customer.status}</p>
-          <p><strong>Orders:</strong> ${customer.orders}</p>
-          <p><strong>Total Spent:</strong> ₹${customer.totalSpent}</p>
-          <p><strong>Last Order:</strong> ${customer.lastOrder ?? "N/A"}</p>
-        </div>
-        <h2 style="color: #151D4F; margin-top: 30px;">Order History</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Order #</th>
-              <th>Date</th>
-              <th>Items</th>
-              <th>Amount</th>
-              <th>Payment</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </body>
-    </html>
-  `;
+  const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!directory) {
+    console.error("Unable to access local storage for download.");
+    return;
+  }
+  
+  const fileUri = `${directory}${fileName}`;
+  await FileSystem.writeAsStringAsync(fileUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 
-  import("expo-print")
-    .then(({ printToFileAsync }) => printToFileAsync({ html: htmlContent }))
-    .then(({ uri }) => import("expo-sharing").then((Sharing) => Sharing.shareAsync(uri, {
-      mimeType: "application/pdf",
-      UTI: "com.adobe.pdf",
-    })))
-    .catch((err) => console.error("Fallback PDF export failed:", err));
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      dialogTitle: fileName,
+      UTI: "com.microsoft.excel.xls",
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -311,15 +276,15 @@ const ChevronRightIcon = ({ size = 14, color = C.text }: IP) => <Svg width={size
 // ─────────────────────────────────────────────────────────────────────────────
 // CARD WRAPPER
 // ─────────────────────────────────────────────────────────────────────────────
-function Card({ children, style }: { children: React.ReactNode; style?: object }) {
-  return <View style={[s.card, style]}>{children}</View>;
+function Card({ children, style, themed }: { children: React.ReactNode; style?: object; themed?: boolean }) {
+  return <View style={[s.card, themed && s.themedCard, style]}>{children}</View>;
 }
-function CardHeader({ icon, title, right, isMobile }: { icon: React.ReactNode; title: string; right?: React.ReactNode; isMobile?: boolean }) {
+function CardHeader({ icon, title, right, isMobile, themed, navyHeader }: { icon: React.ReactNode; title: string; right?: React.ReactNode; isMobile?: boolean; themed?: boolean; navyHeader?: boolean }) {
   return (
-    <View style={[s.cardHeader, isMobile && { flexDirection: "column", alignItems: "flex-start" }]}>
+    <View style={[s.cardHeader, themed && s.themedCardHeader, navyHeader && s.navyCardHeader, isMobile && { flexDirection: "column", alignItems: "flex-start" }]}>
       <View style={s.cardHeaderLeft}>
-        <View style={s.cardIconBox}>{icon}</View>
-        <Text style={s.cardTitle}>{title}</Text>
+        <View style={[s.cardIconBox, themed && s.themedCardIconBox, navyHeader && s.navyCardIconBox]}>{icon}</View>
+        <Text style={[s.cardTitle, themed && s.themedCardTitle, navyHeader && s.navyCardTitle]}>{title}</Text>
       </View>
       {right && <View style={isMobile ? { width: "100%", marginTop: 10 } : {}}>{right}</View>}
     </View>
@@ -348,8 +313,8 @@ function StatusPill({ status }: { status: "Active" | "Inactive" }) {
 }
 function OrderStatusPill({ status }: { status: Order["status"] }) {
   const map: Record<Order["status"], { bg: string; color: string }> = {
-    Ordered:     { bg: "#EFF6FF",       color: "#3B82F6" },
-    Processing:  { bg: "#FEF9C3",       color: "#CA8A04" },
+    Ordered:     { bg: C.primaryLight,  color: C.primary },
+    Processing:  { bg: "#E0E7FF",       color: C.navy    },
     Delivered:   { bg: C.activeLight,   color: C.green   },
     Cancelled:   { bg: C.inactiveLight, color: C.red     },
     Returned:    { bg: "#F3E8FF",       color: "#8B5CF6" },
@@ -398,7 +363,8 @@ function MiniStatCard({
     );
   }
 
-  const flexBasis = isTablet ? "30%" : "15%";
+  // Allow cards to flex evenly without wrapping into a second row on tablet
+  const flexBasis = "15%";
 
   return (
     <View style={[s.statCard, { flexBasis }]}>
@@ -789,7 +755,7 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { width }                               = useWindowDimensions();
-  const { isMobile, isTablet, isDesktop, cols } = useLayout(width);
+  const { isMobile, isTablet, isDesktop, cols, isWide } = useLayout(width);
 
   const [customer, setCustomer] = useState<Customer | null>(customerProp ?? null);
   const [loading, setLoading] = useState(Boolean(id) && !customerProp);
@@ -870,15 +836,11 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
   const handleDownload = async () => {
     try {
-      if (isMobile) {
-        await downloadCustomerOrderHistoryPdf(c.id, `Customer_${c.id}_Orders.pdf`);
-      } else {
-        await downloadCustomerOrderHistoryCsv(c.id, `Customer_${c.id}_Export.csv`);
-      }
+      await downloadCustomerOrderHistoryExcel(c.id, `Customer_${c.id}_Export.xlsx`);
     } catch (err) {
       console.error("Order history export failed:", err);
       try {
-        exportOrderHistoryFallback(c, isMobile);
+        await exportOrderHistoryFallback(c, isMobile);
       } catch (fallbackErr) {
         console.error("Fallback export failed:", fallbackErr);
       }
@@ -923,8 +885,6 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
     return `${diff} day${diff !== 1 ? "s" : ""}`;
   })();
 
-  const isWide = width >= 768;
-
   const OrderHistoryActions = (
     <View style={s.orderActions}>
       <TouchableOpacity 
@@ -932,7 +892,7 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
         activeOpacity={0.8}
         onPress={handleDownload}
       >
-        <BackupIcon size={13} /><Text style={s.orderActionTxt}>{isMobile ? "Download" : "Export CSV"}</Text>
+        <BackupIcon size={13} /><Text style={s.orderActionTxt}>Export</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[s.orderActionBtn, { backgroundColor: C.primary }]}
@@ -1143,19 +1103,25 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
           {/* Contact + Address */}
           <View style={[s.row, !isWide && { flexDirection: "column" }]}>
-            <Card style={{ flex: 1 }}>
-              <CardHeader icon={<InfoIcon />} title="Contact Information" />
-              <View style={s.cardBody}>
+            <Card themed style={isWide ? s.col6 : s.col12}>
+              <View style={[s.cardBodyCompact, { paddingTop: 18 }]}>
+                <View style={s.cardInlineTitleWrap}>
+                  <InfoIcon color={C.navy} />
+                  <Text style={s.cardInlineTitle}>Contact Information</Text>
+                </View>
                 <InfoRow icon={<EnvelopeIcon />} label="Email"         value={c.email} />
                 <InfoRow icon={<PhoneIcon />}    label="Phone"         value={c.phone} />
-                <InfoRow icon={<CalendarIcon />} label="Registered On" value={c.registeredOn ?? "N/A"} />
+                <InfoRow icon={<CalendarIcon />} label="Registered"    value={c.registeredOn ?? "N/A"} />
                 <InfoRow icon={<MemberIcon />}   label="Member For"    value={memberDays} />
                 <InfoRow icon={<LoginIcon />}    label="Last Login"    value={c.lastLogin ?? "Never"} />
               </View>
             </Card>
-            <Card style={{ flex: 1 }}>
-              <CardHeader icon={<MapPinIcon />} title="Customer Addresses" />
-              <View style={[s.cardBody, { gap: 16 }]}>
+            <Card themed style={isWide ? s.col6 : s.col12}>
+              <View style={[s.cardBodyCompact, { paddingTop: 18 }]}>
+                <View style={s.cardInlineTitleWrap}>
+                  <MapPinIcon color={C.navy} />
+                  <Text style={s.cardInlineTitle}>Customer Addresses</Text>
+                </View>
                 <AddressBlock title="Billing Address"  addr={c.billingAddress} />
                 <View style={s.addrDivider} />
                 <AddressBlock title="Shipping Address" addr={c.shippingAddress} />
@@ -1165,9 +1131,12 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
           {/* Spending + Chart */}
           <View style={[s.row, !isWide && { flexDirection: "column" }]}>
-            <Card style={{ flex: 1 }}>
-              <CardHeader icon={<WalletIcon />} title="Spending Statistics" />
-              <View style={s.cardBody}>
+            <Card themed style={isWide ? s.col6 : s.col12}>
+              <View style={[s.cardBody, { paddingTop: 18 }]}>
+                <View style={s.cardInlineTitleWrap}>
+                  <WalletIcon color={C.navy} />
+                  <Text style={s.cardInlineTitle}>Spending Statistics</Text>
+                </View>
                 <View style={s.spendChipRow}>
                   <View style={s.spendChip}>
                     <CartIcon size={15} color={C.primary} />
@@ -1197,9 +1166,12 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
             </Card>
 
             {/* ── Dynamic Chart Card ─────────────────────────────────────── */}
-            <Card style={{ flex: 1 }}>
-              <CardHeader icon={<BarChartIcon />} title="Monthly Spending Analysis" />
-              <View style={[s.cardBody, { paddingBottom: 14 }]}>
+            <Card themed style={isWide ? s.col6 : s.col12}>
+              <View style={[s.cardBody, { paddingBottom: 14, flex: 1, paddingTop: 18 }]}>
+                <View style={s.cardInlineTitleWrap}>
+                  <BarChartIcon color={C.navy} />
+                  <Text style={s.cardInlineTitle}>Monthly Spending Analysis</Text>
+                </View>
                 {monthlyData.length > 0
                   ? <SpendingChart data={monthlyData} />
                   : <Text style={s.noData}>No spending data available</Text>
@@ -1210,7 +1182,7 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
           {/* Order History */}
           <Card>
-            <CardHeader icon={<BagIcon />} title="Order History" right={OrderHistoryActions} isMobile={isMobile} />
+            <CardHeader navyHeader icon={<BagIcon color="#FFFFFF" />} title="Order History" right={OrderHistoryActions} isMobile={isMobile} />
             <View style={s.cardBody}>
               {c.orderHistory && c.orderHistory.length > 0 ? (
                 <>
@@ -1367,7 +1339,20 @@ const s = StyleSheet.create({
   cardIconBox:    { width: 32, height: 32, borderRadius: 9, backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center" },
   cardTitle:      { fontSize: 15, fontWeight: "700", color: C.text },
   cardBody:       { padding: 18, gap: 10 },
+  cardBodyCompact:{ padding: 14, gap: 6 },
   row:            { flexDirection: "row", gap: 16 },
+  col12:          { width: "100%", backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, overflow: "hidden" },
+  col6:           { flexBasis: "48%", flexGrow: 1, flexShrink: 1, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.05, shadowOffset: { width: 0, height: 3 }, shadowRadius: 8, elevation: 3, overflow: "hidden" },
+
+  themedCard:           { borderColor: C.primary, borderWidth: 1 },
+  themedCardHeader:     { backgroundColor: "#F9FAFB", borderBottomColor: C.border },
+  themedCardTitle:      { color: C.navy },
+  themedCardIconBox:    { backgroundColor: "rgba(21,29,79,0.08)" },
+  navyCardHeader:       { backgroundColor: C.navy, borderBottomColor: C.navy },
+  navyCardTitle:        { color: "#FFFFFF" },
+  navyCardIconBox:      { backgroundColor: "rgba(255,255,255,0.15)" },
+  cardInlineTitleWrap:  { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  cardInlineTitle:      { fontSize: 16, fontWeight: "700", color: C.navy },
 
   avatar:    { alignItems: "center", justifyContent: "center" },
   avatarTxt: { color: "#fff", fontWeight: "700" },
@@ -1389,16 +1374,16 @@ const s = StyleSheet.create({
   profileStatDiv: { width: 1, height: 36, backgroundColor: C.border },
 
   infoRow:     { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F5F0EA" },
-  infoIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center" },
-  infoText:    { flex: 1 },
+  infoIconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: C.primaryLight, alignItems: "center", justifyContent: "center" },
+  infoText:    { flex: 1, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 4 },
   infoLabel:   { fontSize: 12, color: C.sub },
-  infoValue:   { fontSize: 13, fontWeight: "600", color: C.text, marginTop: 1 },
+  infoValue:   { fontSize: 13, fontWeight: "600", color: C.text, textAlign: "right" },
 
-  addrBlock:   { gap: 8 },
-  addrTitle:   { fontSize: 13, fontWeight: "700", color: C.text },
-  addrBody:    { backgroundColor: C.cardBg, borderRadius: 10, padding: 12 },
-  addrLine:    { fontSize: 13, color: C.sub, lineHeight: 20 },
-  addrEmpty:   { fontSize: 13, color: C.sub, fontStyle: "italic" },
+  addrBlock:   { gap: 4 },
+  addrTitle:   { fontSize: 12, fontWeight: "700", color: C.text },
+  addrBody:    { backgroundColor: C.cardBg, borderRadius: 8, padding: 10 },
+  addrLine:    { fontSize: 12, color: C.sub, lineHeight: 18 },
+  addrEmpty:   { fontSize: 12, color: C.sub, fontStyle: "italic" },
   addrDivider: { height: 1, backgroundColor: C.border },
 
   spendChipRow: { flexDirection: "row", gap: 10, marginBottom: 6 },

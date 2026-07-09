@@ -61,7 +61,7 @@ export async function fetchCustomerOrderHistoryCsv(id: number): Promise<string> 
   return response.text();
 }
 
-export async function downloadCustomerOrderHistoryCsv(id: number, preferredFileName?: string): Promise<void> {
+export async function downloadCustomerOrderHistoryExcel(id: number, preferredFileName?: string): Promise<void> {
   const response = await adminApiFetch(`/api/admin/customers/${id}/orders/export`, {
     headers: { Accept: "text/csv" },
   });
@@ -69,14 +69,37 @@ export async function downloadCustomerOrderHistoryCsv(id: number, preferredFileN
     throw new AdminApiError("Failed to export customer order history.", response.status);
   }
   const csv = await response.text();
-  const blob = new Blob([csv.startsWith("\uFEFF") ? csv : "\uFEFF" + csv], {
-    type: "text/csv;charset=utf-8;",
+  
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(csv, { type: "string" });
+  const fileName = preferredFileName ?? `customer_${id}_orders.xlsx`;
+
+  if (typeof document !== "undefined" && typeof navigator !== "undefined" && navigator.product !== "ReactNative") {
+    XLSX.writeFile(workbook, fileName);
+    return;
+  }
+
+  const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+  const FileSystem = await import("expo-file-system/legacy");
+  const Sharing = await import("expo-sharing");
+
+  const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!directory) throw new AdminApiError("Unable to access local storage for download.");
+  
+  const fileUri = `${directory}${fileName}`;
+  await FileSystem.writeAsStringAsync(fileUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
   });
-  const fileName = parseContentDispositionFileName(
-    response.headers.get("content-disposition"),
-    preferredFileName ?? `customer_${id}_orders.csv`
-  );
-  triggerBrowserFileDownload(blob, fileName);
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      dialogTitle: fileName,
+      UTI: "com.microsoft.excel.xls",
+    });
+  } else {
+    throw new AdminApiError("Sharing is not available on this device.");
+  }
 }
 
 export async function downloadCustomerOrderHistoryPdf(

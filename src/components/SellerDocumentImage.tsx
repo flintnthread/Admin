@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, ImageStyle, StyleProp } from "react-native";
+import {
+  Image,
+  ImageSourcePropType,
+  ImageStyle,
+  StyleProp,
+} from "react-native";
 import { buildSellerDocumentImageCandidates } from "@/lib/sellerDocuments";
 
-const BUNDLED_PLACEHOLDER = Image.resolveAssetSource(
-  require("@/assets/images/document-placeholder.png"),
-).uri;
+const DOCUMENT_PLACEHOLDER = require("@/assets/images/document-placeholder.png") as ImageSourcePropType;
 
 type Props = {
   path?: string | null;
@@ -19,19 +22,28 @@ export default function SellerDocumentImage({
   style,
   resizeMode = "cover",
 }: Props) {
-  const candidates = useMemo(() => {
-    const list = buildSellerDocumentImageCandidates(path, url);
-    if (BUNDLED_PLACEHOLDER && !list.includes(BUNDLED_PLACEHOLDER)) {
-      list.push(BUNDLED_PLACEHOLDER);
-    }
-    return list;
-  }, [path, url]);
+  const candidates = useMemo(
+    () => buildSellerDocumentImageCandidates(path, url),
+    [path, url],
+  );
 
   const [index, setIndex] = useState(0);
+  const [usePlaceholder, setUsePlaceholder] = useState(candidates.length === 0);
 
   useEffect(() => {
     setIndex(0);
+    setUsePlaceholder(candidates.length === 0);
   }, [candidates.join("|")]);
+
+  if (usePlaceholder || candidates.length === 0) {
+    return (
+      <Image
+        source={DOCUMENT_PLACEHOLDER}
+        style={style}
+        resizeMode={resizeMode}
+      />
+    );
+  }
 
   return (
     <Image
@@ -39,7 +51,11 @@ export default function SellerDocumentImage({
       style={style}
       resizeMode={resizeMode}
       onError={() => {
-        if (index < candidates.length - 1) setIndex((i) => i + 1);
+        if (index < candidates.length - 1) {
+          setIndex((i) => i + 1);
+        } else {
+          setUsePlaceholder(true);
+        }
       }}
     />
   );

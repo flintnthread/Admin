@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportCsv, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
+import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportExcel, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -67,7 +67,7 @@ type OrderStatus =
   | "Shipped"
   | "Returned"
   | "Replacement";
-type GSTStatus = "Filed" | "Not Filed";
+type GSTStatus = "Pending" | "Filed";
 type ViewMode = "grid" | "list";
 type SortOption = "newest" | "oldest" | "amount_high" | "amount_low";
 type DocModalType = "invoice" | "label" | null;
@@ -125,12 +125,63 @@ export interface Order {
   paymentType: PaymentType;
   status: OrderStatus;
   gstStatus: GSTStatus;
+  hasInvoice: boolean;
+  hasShippingLabel: boolean;
   // True when buyer & seller are in the same state → CGST+SGST split.
   // False (default) → inter-state → IGST.
   isIntraState?: boolean;
   // Shipping-label specific physical details (optional, falls back gracefully)
   weightKg?: number;
   dimensionsCm?: { l: number; w: number; h: number };
+}
+
+/** One list-table row per seller within an order. */
+interface OrderSellerRow {
+  order: Order;
+  sellerGroup: SellerGroup;
+  rowKey: string;
+  amount: number;
+}
+
+function computeSellerGroupAmount(group: SellerGroup, fallback: number): number {
+  const total = group.products.reduce((sum, product) => {
+    const price = typeof product.price === "number" ? product.price : 0;
+    const qty = product.qty ?? 1;
+    return sum + price * qty;
+  }, 0);
+  return total > 0 ? total : fallback;
+}
+
+function expandOrdersToSellerRows(orders: Order[]): OrderSellerRow[] {
+  return orders.flatMap((order) => {
+    if (order.sellerGroups.length === 0) {
+      return [
+        {
+          order,
+          sellerGroup: {
+            seller: { name: "—", email: "" },
+            products: [],
+            hasInvoice: order.hasInvoice,
+            hasShippingLabel: order.hasShippingLabel,
+          },
+          rowKey: order.id,
+          amount: order.amount,
+        },
+      ];
+    }
+
+    const fallbackEach =
+      order.sellerGroups.length > 0
+        ? order.amount / order.sellerGroups.length
+        : order.amount;
+
+    return order.sellerGroups.map((group, index) => ({
+      order,
+      sellerGroup: group,
+      rowKey: `${order.id}-${index}-${group.seller.name}`,
+      amount: computeSellerGroupAmount(group, fallbackEach),
+    }));
+  });
 }
 
 // ─── Status Config ────────────────────────────────────────────────────────────
@@ -422,6 +473,10 @@ function mapStatusFilterToApi(filter: string): string | undefined {
   return map[filter] ?? filter.toLowerCase();
 }
 
+function mapGstStatusFromApi(value?: string | null): GSTStatus {
+  return String(value ?? "").trim().toLowerCase() === "filed" ? "Filed" : "Pending";
+}
+
 function mapPaymentFilterToApi(filter: string): string | undefined {
   if (filter === "All Payments") return undefined;
   const map: Record<string, string> = {
@@ -473,8 +528,8 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
           qty: item.qty ?? item.quantity ?? 1,
         })),
         trackingId: raw.trackingId ?? raw.shiprocketAwbCode ?? undefined,
-        hasInvoice: true,
-        hasShippingLabel: Boolean(raw.shiprocketAwbCode ?? raw.trackingId),
+        hasInvoice: Boolean(group.hasInvoice),
+        hasShippingLabel: Boolean(group.hasShippingLabel),
       };
     });
   }
@@ -509,10 +564,8 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
         products: [],
         subOrderId: item.subOrderId ?? item.suborderId ?? undefined,
         trackingId: item.trackingId ?? item.trackingNumber ?? undefined,
-        hasInvoice: Boolean(item.invoiceUrl ?? item.hasInvoice),
-        hasShippingLabel: Boolean(
-          item.shippingLabelUrl ?? item.hasShippingLabel,
-        ),
+        hasInvoice: Boolean(raw.hasInvoice),
+        hasShippingLabel: Boolean(raw.hasShippingLabel),
       });
     }
 
@@ -829,7 +882,9 @@ function toUiOrder(
         (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase()
       ] ?? "Cash on Delivery",
     status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
-    gstStatus: row.gstStatus?.toLowerCase() === "filed" ? "Filed" : "Not Filed",
+    gstStatus: mapGstStatusFromApi(raw.gstStatus ?? row.gstStatus),
+    hasInvoice: Boolean(raw.hasInvoice),
+    hasShippingLabel: Boolean(raw.hasShippingLabel),
     isIntraState,
     weightKg:
       typeof raw.weightKg === "number" && raw.weightKg > 0
@@ -1414,30 +1469,45 @@ const StatusBadge = ({ status }: { status: OrderStatus }) => {
 // ─── GST Badge ────────────────────────────────────────────────────────────────
 const GSTBadge = ({
   status,
-  onMark,
+  onMarkFiled,
+  onMarkPending,
 }: {
   status: GSTStatus;
-  onMark: () => void;
+  onMarkFiled: () => void;
+  onMarkPending: () => void;
 }) => {
   const filed = status === "Filed";
-  const pill = (
-    <View style={[s.gstBadge, filed ? s.gstBadgeFiled : s.gstBadgePending]}>
-      <View
-        style={[s.gstDot, { backgroundColor: filed ? C.green : C.yellow }]}
-      />
-      <Text
-        style={[s.gstBadgeText, { color: filed ? "#15803D" : "#B45309" }]}
-        numberOfLines={1}
-      >
-        {filed ? "GST Filed" : "GST Pending"}
-      </Text>
-    </View>
-  );
-  if (filed) return pill;
   return (
-    <TouchableOpacity onPress={onMark} activeOpacity={0.75}>
-      {pill}
-    </TouchableOpacity>
+    <View style={s.gstColumn}>
+      <View style={[s.gstBadge, filed ? s.gstBadgeFiled : s.gstBadgePending]}>
+        <View
+          style={[s.gstDot, { backgroundColor: filed ? C.green : C.yellow }]}
+        />
+        <Text
+          style={[s.gstBadgeText, { color: filed ? "#15803D" : "#B45309" }]}
+          numberOfLines={1}
+        >
+          {filed ? "GST Filed" : "GST Pending"}
+        </Text>
+      </View>
+      {filed ? (
+        <TouchableOpacity
+          style={s.gstMarkPendingBtn}
+          onPress={onMarkPending}
+          activeOpacity={0.75}
+        >
+          <Text style={s.gstMarkPendingBtnText}>Mark Pending</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={s.gstMarkBtn}
+          onPress={onMarkFiled}
+          activeOpacity={0.75}
+        >
+          <Text style={s.gstMarkBtnText}>Mark Filed</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 
@@ -1650,7 +1720,7 @@ const ActionMenu = ({
   visible: boolean;
   onClose: () => void;
   onView: (o: Order) => void;
-  onGST: (id: string) => void;
+  onGST: (id: string, status: GSTStatus) => void;
   onOpenDoc: (o: Order, type: "invoice" | "label") => void;
   isWeb: boolean;
 }) => {
@@ -1681,6 +1751,7 @@ const ActionMenu = ({
         onOpenDoc(order, "invoice");
         onClose();
       },
+      hidden: !order.hasInvoice,
     },
     {
       label: "Generate Shipping Label",
@@ -1690,6 +1761,7 @@ const ActionMenu = ({
         onOpenDoc(order, "label");
         onClose();
       },
+      hidden: !order.hasShippingLabel,
     },
     ...(order.gstStatus !== "Filed"
       ? [
@@ -1697,12 +1769,21 @@ const ActionMenu = ({
             label: "Mark GST Filed",
             icon: <CheckIcon color={C.orange} />,
             onPress: () => {
-              onGST(order.id);
+              onGST(order.id, "Filed");
               onClose();
             },
           },
         ]
-      : []),
+      : [
+          {
+            label: "Mark GST Pending",
+            icon: <CalendarIcon color={C.yellow} size={16} />,
+            onPress: () => {
+              onGST(order.id, "Pending");
+              onClose();
+            },
+          },
+        ]),
   ];
 
   const menu = (
@@ -1721,7 +1802,7 @@ const ActionMenu = ({
         </TouchableOpacity>
       </View>
 
-      {actions.map((a, i) => (
+      {actions.filter((a) => !a.hidden).map((a, i) => (
         <TouchableOpacity
           key={i}
           style={s.actionItem}
@@ -2795,7 +2876,7 @@ const GridOrderCard = ({
 }: {
   order: Order;
   onView: (o: Order) => void;
-  onGST: (id: string) => void;
+  onGST: (id: string, status: GSTStatus) => void;
   onMore: (o: Order) => void;
   isWeb: boolean;
 }) => {
@@ -2860,7 +2941,11 @@ const GridOrderCard = ({
       </View>
 
       <View style={s.cardFooter}>
-        <GSTBadge status={order.gstStatus} onMark={() => onGST(order.id)} />
+        <GSTBadge
+          status={order.gstStatus}
+          onMarkFiled={() => onGST(order.id, "Filed")}
+          onMarkPending={() => onGST(order.id, "Pending")}
+        />
         <TouchableOpacity
           style={s.ctaRow}
           onPress={() => onView(order)}
@@ -2876,16 +2961,22 @@ const GridOrderCard = ({
 
 // ─── List Table Row ───────────────────────────────────────────────────────────
 const ListTableRow = ({
-  order,
+  row,
   idx,
   onView,
   onGST,
+  onOpenDoc,
 }: {
-  order: Order;
+  row: OrderSellerRow;
   idx: number;
   onView: (o: Order) => void;
-  onGST: (id: string) => void;
-}) => (
+  onGST: (id: string, status: GSTStatus) => void;
+  onOpenDoc: (o: Order, type: "invoice" | "label") => void;
+}) => {
+  const { order, sellerGroup, amount } = row;
+  const primary = sellerGroup.products[0];
+
+  return (
   <View style={[s.tRow, idx % 2 === 1 && s.tRowAlt]}>
     <View style={[s.tcell, s.colOrder]}>
       <View style={s.orderIdRow}>
@@ -2922,70 +3013,44 @@ const ListTableRow = ({
     </View>
 
     <View style={[s.tcell, s.colSeller]}>
-      {order.sellerGroups.length === 0 ? (
-        <Text style={s.tdMuted}>—</Text>
-      ) : (
-        order.sellerGroups.map((g, i) => (
-          <View
-            key={i}
-            style={[
-              i > 0 && {
-                marginTop: 8,
-                paddingTop: 8,
-                borderTopWidth: 1,
-                borderTopColor: C.border,
-              },
-            ]}
-          >
-            <Text style={s.tdSellerName} numberOfLines={1}>
-              {g.seller.name}
-            </Text>
-            {g.subOrderId && (
-              <Text style={s.tdMuted} numberOfLines={1}>
-                #{g.subOrderId}
-              </Text>
-            )}
-          </View>
-        ))
-      )}
+      <Text style={s.tdSellerName} numberOfLines={1}>
+        {sellerGroup.seller.name}
+      </Text>
+      {sellerGroup.subOrderId ? (
+        <Text style={s.tdMuted} numberOfLines={1}>
+          #{sellerGroup.subOrderId}
+        </Text>
+      ) : null}
     </View>
 
     <View style={[s.tcell, s.colProducts]}>
-      {order.sellerGroups.length === 0 ? (
+      {sellerGroup.products.length === 0 ? (
         <Text style={s.tdMuted}>—</Text>
       ) : (
-        order.sellerGroups.map((g, gi) => {
-          const primary = g.products[0];
-          return (
-            <View
-              key={gi}
-              style={[s.tableProductRow, gi > 0 && { marginTop: 8 }]}
-            >
-              {primary?.image ? (
-                <Image
-                  source={{ uri: primary.image }}
-                  style={s.tableThumb}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={s.tableThumbEmpty} />
-              )}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.tdProductName} numberOfLines={1}>
-                  {primary?.name || "—"}
-                </Text>
-                {g.products.length > 1 && (
-                  <Text style={s.tdMuted}>{g.products.length} Items</Text>
-                )}
-              </View>
-            </View>
-          );
-        })
+        <View style={s.tableProductRow}>
+          {primary?.image ? (
+            <Image
+              source={{ uri: primary.image }}
+              style={s.tableThumb}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={s.tableThumbEmpty} />
+          )}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.tdProductName} numberOfLines={1}>
+              {primary?.name || "—"}
+            </Text>
+            {sellerGroup.products.length > 1 ? (
+              <Text style={s.tdMuted}>{sellerGroup.products.length} Items</Text>
+            ) : null}
+          </View>
+        </View>
       )}
     </View>
 
     <View style={[s.tcell, s.colAmount]}>
-      <Text style={s.tdAmount}>{fmtCur(order.amount)}</Text>
+      <Text style={s.tdAmount}>{fmtCur(amount)}</Text>
       <Text style={s.tdPayment} numberOfLines={1}>
         {order.paymentType}
       </Text>
@@ -2996,23 +3061,36 @@ const ListTableRow = ({
     </View>
 
     <View style={[s.tcell, s.colGst]}>
-      <GSTBadge status={order.gstStatus} onMark={() => onGST(order.id)} />
+      <GSTBadge
+        status={order.gstStatus}
+        onMarkFiled={() => onGST(order.id, "Filed")}
+        onMarkPending={() => onGST(order.id, "Pending")}
+      />
     </View>
 
     <View style={[s.tcell, s.colDocs]}>
-      {order.sellerGroups.map((g, i) => (
-        <View key={i} style={[s.tableDocRow, i > 0 && { marginTop: 4 }]}>
-          <TouchableOpacity style={s.tableDocBtn} activeOpacity={0.75}>
-            <FileIcon color={C.navy} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.tableDocBtn, { borderColor: "#FED7AA" }]}
-            activeOpacity={0.75}
-          >
-            <TruckIcon color={C.orange} />
-          </TouchableOpacity>
-        </View>
-      ))}
+      <View style={s.tableDocRow}>
+        <TouchableOpacity
+          style={[s.tableDocBtn, !sellerGroup.hasInvoice && s.tableDocBtnDisabled]}
+          onPress={() => onOpenDoc(order, "invoice")}
+          activeOpacity={0.75}
+          disabled={!sellerGroup.hasInvoice}
+        >
+          <FileIcon color={C.navy} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            s.tableDocBtn,
+            { borderColor: "#FED7AA" },
+            !sellerGroup.hasShippingLabel && s.tableDocBtnDisabled,
+          ]}
+          onPress={() => onOpenDoc(order, "label")}
+          activeOpacity={0.75}
+          disabled={!sellerGroup.hasShippingLabel}
+        >
+          <TruckIcon color={C.orange} />
+        </TouchableOpacity>
+      </View>
     </View>
 
     <View style={[s.tcell, s.colAction]}>
@@ -3028,7 +3106,8 @@ const ListTableRow = ({
       </View>
     </View>
   </View>
-);
+  );
+};
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 function buildPages(current: number, total: number): (number | "…")[] {
@@ -3202,11 +3281,12 @@ export default function OrdersScreen() {
     [router],
   );
 
-  const handleGST = useCallback(async (id: string) => {
+  const handleGST = useCallback(async (id: string, status: GSTStatus) => {
     try {
-      await updateOrderGstStatus(Number(id), "Filed");
+      const apiStatus = status === "Filed" ? "Filed" : "Pending";
+      await updateOrderGstStatus(Number(id), apiStatus);
       setOrders((prev) =>
-        prev.map((o) => (o.id === id ? { ...o, gstStatus: "Filed" } : o)),
+        prev.map((o) => (o.id === id ? { ...o, gstStatus: status } : o)),
       );
     } catch (err) {
       const msg = getApiErrorMessage(err, "Failed to update GST status.");
@@ -3229,17 +3309,21 @@ export default function OrdersScreen() {
   }, []);
 
   const filtered = orders;
+  const sellerRows = useMemo(
+    () => expandOrdersToSellerRows(filtered),
+    [filtered],
+  );
 
-  const handleExportCSV = useCallback(async () => {
+  const handleExportExcel = useCallback(async () => {
     try {
-      await downloadOrderExportCsv(
+      await downloadOrderExportExcel(
         {
           search: searchQuery || undefined,
           status: mapStatusFilterToApi(statusFilter),
           paymentMethod: mapPaymentFilterToApi(paymentFilter),
           sort: sortOption,
         },
-        `orders_${new Date().toISOString().slice(0, 10)}.csv`
+        `orders_${new Date().toISOString().slice(0, 10)}.xlsx`
       );
     } catch (e) {
       Alert.alert("Export failed", e instanceof Error ? e.message : "Could not export orders.");
@@ -3338,12 +3422,12 @@ export default function OrdersScreen() {
                 <View style={s.headerActions}>
                   <TouchableOpacity
                     style={s.exportBtn}
-                    onPress={handleExportCSV}
+                    onPress={handleExportExcel}
                     activeOpacity={0.85}
                   >
                     <ExportIcon />
                     {!isMobile && (
-                      <Text style={s.exportBtnText}>Export CSV</Text>
+                      <Text style={s.exportBtnText}>Export</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -3578,13 +3662,14 @@ export default function OrdersScreen() {
                   ))}
                 </View>
 
-                {filtered.map((o, idx) => (
+                {sellerRows.map((row, idx) => (
                   <ListTableRow
-                    key={o.id}
-                    order={o}
+                    key={row.rowKey}
+                    row={row}
                     idx={idx}
                     onView={handleView}
                     onGST={handleGST}
+                    onOpenDoc={handleOpenDoc}
                   />
                 ))}
               </View>
@@ -4759,7 +4844,39 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
-    alignSelf: "flex-start",
+    alignSelf: "center",
+  },
+  gstColumn: {
+    alignItems: "center",
+    gap: 6,
+  },
+  gstMarkBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.green,
+    backgroundColor: C.white,
+    alignSelf: "center",
+  },
+  gstMarkBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#15803D",
+  },
+  gstMarkPendingBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.yellow,
+    backgroundColor: C.white,
+    alignSelf: "center",
+  },
+  gstMarkPendingBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#B45309",
   },
   gstBadgeFiled: { backgroundColor: C.greenPale },
   gstBadgePending: { backgroundColor: C.yellowPale },
@@ -4881,6 +4998,9 @@ const s = StyleSheet.create({
     backgroundColor: C.card,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tableDocBtnDisabled: {
+    opacity: 0.35,
   },
   tableActions: { flexDirection: "row", gap: 6, alignItems: "center" },
   viewBtnSm: {

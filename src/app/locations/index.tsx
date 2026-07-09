@@ -217,7 +217,7 @@ function HeroHeader({
 
       {/* Stat cards */}
       {isMobile ? (
-        // ── Mobile: 2-column grid, Pincodes full width ──
+        // ── Mobile / small-tablet: 2-column grid, Pincodes full width ──
         <View style={s.statCardsMobileGrid}>
           {stats.slice(0, 4).map((p, i) => (
             <View key={i} style={s.statCardMobile}>
@@ -246,7 +246,7 @@ function HeroHeader({
           </View>
         </View>
       ) : (
-        // ── Web: original horizontal row ──
+        // ── Tablet / Web: horizontal wrapping row ──
         <View style={s.statCardsRow}>
           {stats.map((p, i) => (
             <View key={i} style={s.statCard}>
@@ -715,10 +715,24 @@ function EntityCard({
         </View>
       )}
 
-      <Pressable onPress={() => onView(row)} style={s.entityCardViewBtn}>
-        <MaterialIcons name="visibility" size={14} color="#fff" />
-        <ThemedText style={s.entityCardViewBtnText}>View</ThemedText>
-      </Pressable>
+      {/* View / Edit / Delete actions */}
+      <View style={s.entityCardActions}>
+        <Pressable
+          onPress={() => onView(row)}
+          style={[s.entityActionBtn, s.entityActionBtnView]}>
+          <MaterialIcons name="visibility" size={15} color={LocationColors.accentStrong} />
+        </Pressable>
+        <Pressable
+          onPress={() => onEdit(row)}
+          style={[s.entityActionBtn, s.entityActionBtnEdit]}>
+          <MaterialIcons name="edit" size={15} color="#2563EB" />
+        </Pressable>
+        <Pressable
+          onPress={() => onDelete(row)}
+          style={[s.entityActionBtn, s.entityActionBtnDel]}>
+          <MaterialIcons name="delete" size={15} color={LocationColors.inactiveText} />
+        </Pressable>
+      </View>
     </Pressable>
   );
 }
@@ -1196,8 +1210,17 @@ function ConfirmDelete({ row, singular, onCancel, onConfirm }: { row: ListRow | 
 
 export default function LocationsScreen() {
   const { width } = useWindowDimensions();
-  const isWeb = Platform.OS === 'web';
-  const isMobile = !isWeb;
+
+  // ── Responsive breakpoints ──────────────────────────────────────────────
+  // Previously this screen decided "mobile vs web" purely from Platform.OS,
+  // so on web the layout stayed in "desktop mode" even at very small browser
+  // widths (and native devices always stayed in "mobile mode" even on large
+  // tablets). That's why things looked broken between phone size and 1024px.
+  // Now the layout responds to the actual viewport width instead, on every
+  // platform, so resizing a web browser (or opening on a tablet) reflows
+  // correctly all the way from mobile widths up through ~1024px and beyond.
+  const isMobile = width < 768;                 // stacked / compact layout
+  const gridColumns = width < 640 ? 1 : width < 1024 ? 2 : 3; // grid card columns
 
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [query, setQuery] = useState('');
@@ -1223,7 +1246,6 @@ export default function LocationsScreen() {
   const [locationCounts, setLocationCounts] = useState<LocationCounts | null>(null);
 
   const meta = TAB_META[detailTab];
-  const gridColumns = isWeb ? (width < 960 ? 2 : 3) : 1;
 
   const loadRows = useCallback(async () => {
     try {
@@ -1457,10 +1479,10 @@ export default function LocationsScreen() {
 
             {viewMode === 'grid' ? (
               <GridView rows={paginatedRows} columns={gridColumns} tab={detailTab} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
-            ) : isWeb ? (
-              <ListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
-            ) : (
+            ) : isMobile ? (
               <MobileListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            ) : (
+              <ListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             )}
 
             <Pagination
@@ -1515,7 +1537,7 @@ const s = StyleSheet.create({
   heroHeading: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', lineHeight: 28 },
   heroSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 3 },
 
-  // ── Web stat cards row ──
+  // ── Web / tablet stat cards row ──
   statCardsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1532,6 +1554,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     minWidth: 180,
+    flexGrow: 1,
+    flexBasis: 180,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1549,7 +1573,7 @@ const s = StyleSheet.create({
   statCardValue: { fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 8 },
   statCardLabel: { color: '#6B7280', fontSize: 11, marginTop: 2, fontWeight: '500' },
 
-  // ── Mobile stat cards grid (2-col + full-width Pincodes) ──
+  // ── Mobile / small-tablet stat cards grid (2-col + full-width Pincodes) ──
   statCardsMobileGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1692,11 +1716,11 @@ const s = StyleSheet.create({
   drillSub: { fontSize: 12, color: LocationColors.textMuted, marginTop: 3 },
   resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: LocationColors.accentLight, borderRadius: 8 },
   resetBtnText: { fontSize: 12, color: LocationColors.accentStrong, fontWeight: '600' },
-  selectorsRow: { flexDirection: 'row', gap: 12 },
+  selectorsRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   selectorsRowMobile: { flexDirection: 'column', gap: 10 },
   breadcrumbRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: LocationColors.accentLight, borderRadius: 8 },
   breadcrumbText: { fontSize: 13, color: LocationColors.accentStrong, fontWeight: '600' },
-  chartArea: { flexDirection: 'row', alignItems: 'flex-start', gap: 24, paddingTop: 8 },
+  chartArea: { flexDirection: 'row', alignItems: 'flex-start', gap: 24, paddingTop: 8, flexWrap: 'wrap' },
   chartAreaMobile: { flexDirection: 'column', alignItems: 'center', gap: 16 },
   drillLoading: { alignItems: 'center', gap: 10, paddingVertical: 32 },
   drillLoadingText: { color: LocationColors.textMuted, fontSize: 13 },
@@ -1704,7 +1728,7 @@ const s = StyleSheet.create({
   drillEmptyText: { color: LocationColors.textMuted, textAlign: 'center', fontSize: 13 },
 
   // Donut
-  donutWrap: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  donutWrap: { flexDirection: 'row', alignItems: 'center', gap: 24, flexWrap: 'wrap' },
   donutLegend: { gap: 10 },
   donutLegendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   donutDot: { width: 10, height: 10, borderRadius: 5 },
@@ -1712,17 +1736,17 @@ const s = StyleSheet.create({
   donutLegendVal: { fontSize: 14, fontWeight: '700' },
 
   // Pincodes
-  pincodeArea: { flex: 1 },
+  pincodeArea: { flex: 1, minWidth: 180 },
   pincodeAreaTitle: { fontSize: 13, fontWeight: '700', color: LocationColors.text, marginBottom: 10 },
   pincodeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pincodeChip: { backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   pincodeChipText: { fontSize: 12, color: LocationColors.textSecondary, fontWeight: '500' },
 
   // ── Toolbar ──
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  toolbarMobile: { flexDirection: 'row', gap: 8 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' },
+  toolbarMobile: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
+    flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: LocationColors.cardBg, borderWidth: 1, borderColor: LocationColors.border,
     borderRadius: 12, paddingHorizontal: 14, height: 44,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
@@ -1773,6 +1797,20 @@ const s = StyleSheet.create({
     borderRadius: 10, paddingVertical: 10,
   },
   entityCardViewBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+
+  // Entity card — view / edit / delete action row (grid view)
+  entityCardActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  entityActionBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  entityActionBtnView: { borderColor: LocationColors.accentBorder, backgroundColor: LocationColors.accentLight },
+  entityActionBtnEdit: { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
+  entityActionBtnDel: { borderColor: LocationColors.inactiveBorder, backgroundColor: LocationColors.inactiveBg },
 
   // ── Table ──
   tableCard: {
@@ -1834,7 +1872,7 @@ const s = StyleSheet.create({
   pageNumTextActive: { color: '#fff' },
 
   // ── Select ──
-  selectWrap: { flex: 1, minWidth: 0 },
+  selectWrap: { flex: 1, minWidth: 160 },
   selectLabel: { fontSize: 12, fontWeight: '600', color: LocationColors.textSecondary, marginBottom: 6 },
   selectBox: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
