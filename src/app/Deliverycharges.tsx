@@ -918,6 +918,9 @@ const DeliveryChargesScreen: React.FC = () => {
   const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
+  const isDesktopWeb = isWeb && width >= 1024;
+  const isTabletMobile = width >= 600 && width < 1024;
+  const isSmallPhone = width < 380;
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [slabs, setSlabs] = useState<WeightSlab[]>([]);
   const [editingSlabId, setEditingSlabId] = useState<number | null>(null);
@@ -1056,7 +1059,7 @@ const DeliveryChargesScreen: React.FC = () => {
   };
 
   // ── MOBILE LAYOUT ──
-  if (!isWeb) {
+  if (!isDesktopWeb) {
     return (
       <AdminLayout>
         <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
@@ -1068,18 +1071,18 @@ const DeliveryChargesScreen: React.FC = () => {
             contentContainerStyle={{ paddingBottom: 32 }}
           >
             {/* Mobile Header */}
-            <View style={styles.mobileHeader}>
-              <View>
-                <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
-                <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
+            <View style={[styles.mobileHeader, isSmallPhone && { paddingHorizontal: 14, paddingTop: 12 }]}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={[styles.mobileHeaderTitle, isSmallPhone && { fontSize: 18 }]} numberOfLines={1}>Delivery Charges</Text>
+                <Text style={styles.mobileHeaderSub} numberOfLines={1}>Manage weight slabs and charges</Text>
               </View>
               <TouchableOpacity
-                style={styles.mobileAddBtn}
+                style={[styles.mobileAddBtn, isSmallPhone && { paddingHorizontal: 10, paddingVertical: 8 }]}
                 activeOpacity={0.85}
                 onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
               >
                 <Feather name="plus" size={14} color="#1E2B6B" />
-                <Text style={styles.mobileAddBtnTxt}>Add New</Text>
+                <Text style={[styles.mobileAddBtnTxt, isSmallPhone && { fontSize: 12 }]}>Add New</Text>
               </TouchableOpacity>
             </View>
 
@@ -1153,17 +1156,18 @@ const DeliveryChargesScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               ) : viewMode === "grid" ? (
-                <View style={{ gap: 14 }}>
+                <View style={isTabletMobile ? { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginHorizontal: -7 } : { gap: 14 }}>
                   {filteredSlabs
                     .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
                     .map((item) => (
-                      <SlabCard
-                        key={item.id}
-                        slab={item}
-                        onActivate={handleActivate}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
+                      <View key={item.id} style={isTabletMobile ? { width: "48%", marginHorizontal: 7, marginBottom: 14 } : {}}>
+                        <SlabCard
+                          slab={item}
+                          onActivate={handleActivate}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      </View>
                     ))}
                 </View>
               ) : (
