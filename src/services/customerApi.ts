@@ -2,6 +2,8 @@ import { adminApiFetch, adminApiRequest, AdminApiError } from "@/lib/api/client"
 import { resolveAdminApiBaseUrl } from "@/lib/api/config";
 import { getAdminToken } from "@/lib/api/session";
 import type { CustomerSummary, PageResponse } from "@/lib/api/types";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 export async function fetchCustomers(search?: string, page = 0, size = 20): Promise<PageResponse<CustomerSummary>> {
   const q = new URLSearchParams();
@@ -70,7 +72,7 @@ export async function downloadCustomerOrderHistoryExcel(id: number, preferredFil
   }
   const csv = await response.text();
   
-  const XLSX = await import("xlsx");
+  const XLSX = require("xlsx");
   const workbook = XLSX.read(csv, { type: "string" });
   const fileName = preferredFileName ?? `customer_${id}_orders.xlsx`;
 
@@ -80,8 +82,6 @@ export async function downloadCustomerOrderHistoryExcel(id: number, preferredFil
   }
 
   const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
-  const FileSystem = await import("expo-file-system/legacy");
-  const Sharing = await import("expo-sharing");
 
   const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!directory) throw new AdminApiError("Unable to access local storage for download.");
@@ -124,8 +124,6 @@ export async function downloadCustomerOrderHistoryPdf(
     return;
   }
 
-  const FileSystem = await import("expo-file-system/legacy");
-  const Sharing = await import("expo-sharing");
   const token = getAdminToken();
   if (!token) {
     throw new AdminApiError("Not signed in. Please log in again.", 401);
