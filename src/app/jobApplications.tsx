@@ -159,13 +159,13 @@ function Avatar({ initials, color, size = 44 }: { initials: string, color: strin
 
 function StatCard({ label, count, color, icon, isWeb }: { label: string, count: number | string, color: string, icon: string, isWeb: boolean }) {
   return (
-    <View style={[styles.statCard, isWeb && styles.statCardWeb, { borderTopColor: color }]}>
+    <View style={[styles.statCard, { borderTopColor: color }]}>
       <View style={[styles.statIcon, { backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center' }]}>
         <BI name={icon} size={16} color={color} />
       </View>
-      <View>
-        <Text style={[styles.statCount, { color }]}>{count}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.statCount, { color }]} numberOfLines={1}>{count}</Text>
+        <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
       </View>
     </View>
   );
@@ -444,48 +444,37 @@ export default function JobApplicationsScreen() {
             </View>
           </View>
 
-          {/* ── Stat Cards ── */}
-          {isWeb ? (
-            <View style={{ width: '100%', alignItems: 'center', zIndex: 10, elevation: 10, marginTop: -42 }}>
-              <ScrollView
-                style={{ overflow: 'visible', maxWidth: '100%' }}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.statRowWeb}
-              >
-                {STAT_CARDS.map(s => (
+          {/* ── Stat Cards Grid (Responsive, All Visible & Scrollable on Overflow) ── */}
+          <View style={{ marginTop: isWeb ? -42 : -28, zIndex: 10, marginBottom: 14 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: width >= 1200 ? 28 : width >= 1000 ? 18 : 12,
+                paddingHorizontal: 16,
+                paddingVertical: 6,
+              }}
+            >
+              {STAT_CARDS.map(s => (
+                <View
+                  key={s.key}
+                  style={[
+                    styles.statCardWrapper,
+                    { width: 143 }
+                  ]}
+                >
                   <StatCard
-                    key={s.key}
                     label={s.label}
                     count={counts[s.key] ?? 0}
                     color={s.color}
                     icon={s.icon}
                     isWeb={isWeb}
                   />
-                ))}
-              </ScrollView>
-            </View>
-          ) : (
-            <View style={{ zIndex: 10, elevation: 10, marginTop: -28, width: '100%' }}>
-              <ScrollView
-                style={{ overflow: 'visible', width: '100%' }}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 8 }}
-              >
-                {STAT_CARDS.map(s => (
-                  <StatCard
-                    key={s.key}
-                    label={s.label}
-                    count={counts[s.key] ?? 0}
-                    color={s.color}
-                    icon={s.icon}
-                    isWeb={isWeb}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-          )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* ── Filters ── */}
           <View style={[styles.filterRow, isWeb && styles.filterRowWeb, !isWeb && { marginTop: 16 }]}>
@@ -510,6 +499,7 @@ export default function JobApplicationsScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ gap: 8, paddingRight: 16, alignItems: 'center' }}
                 style={{ overflow: 'visible', zIndex: 2000, elevation: 2000 }}
+                {...(Platform.OS === 'web' ? { className: "smooth-scroll-x" } : {})}
               >
                 <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
                 <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
@@ -523,7 +513,13 @@ export default function JobApplicationsScreen() {
                 </TouchableOpacity>
               </ScrollView>
             ) : (
-              <View style={[styles.filterDropdowns, styles.filterDropdownsWeb]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.filterDropdowns, styles.filterDropdownsWeb]}
+                style={{ overflow: 'visible', zIndex: 2000, elevation: 2000 }}
+                {...(Platform.OS === 'web' ? { className: "smooth-scroll-x" } : {})}
+              >
                 <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
                 <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
                 <TouchableOpacity
@@ -534,7 +530,7 @@ export default function JobApplicationsScreen() {
                   <BI name="arrow-counterclockwise" size={13} color={C.primary} />
                   <Text style={styles.resetBtnText}>Reset</Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
             )}
           </View>
 
@@ -654,27 +650,18 @@ const styles = StyleSheet.create({
 
   // Stat Cards
   statRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    gap: 10,
+    paddingHorizontal: 16,
     flexDirection: 'row',
-    alignSelf: 'center',
+    gap: 12,
+    paddingBottom: 8,
   },
-  statRowWeb: {
-    paddingHorizontal: 28,
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    maxWidth: 1000,
-    alignSelf: 'center',
-    flexGrow: 1,
-    gap: 16,
-    justifyContent: 'center',
+  statCardWrapper: {
+    flexGrow: 0,
   },
   statCard: {
     backgroundColor: C.white,
     borderRadius: 14,
     padding: 14,
-    minWidth: 120,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -684,15 +671,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
-  },
-  // statCardWeb: {
-  //   flex: 1,
-  //   minWidth: 0,
-  //},
-  statCardWeb: {
-    flex: 0,
-    width: 143,      // Increase to 180 or 200 as needed
-    minWidth: 143,
+    width: '100%',
   },
   statIcon: {
     width: 38,
@@ -702,9 +681,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statCount: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '900',
-    lineHeight: 30,
+    lineHeight: 26,
   },
   statLabel: {
     fontSize: 11,
