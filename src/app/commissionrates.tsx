@@ -53,17 +53,26 @@ const CommissionRatesScreen: React.FC = () => {
     };
   }, []);
 
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
+    visible: false,
+    message: "",
+    type: "success",
+  });
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast((t) => ({ ...t, visible: false }));
+    }, 3000);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
       await updateCommissionRates(b2cCommission, b2bCommission);
-      const msg = "Commission rates saved successfully!";
-      if (isWeb) window.alert(msg);
-      else Alert.alert("Success", msg);
+      showToast("Commission rates saved successfully!", "success");
     } catch (e) {
-      const msg = getApiErrorMessage(e);
-      if (isWeb) window.alert(msg);
-      else Alert.alert("Error", msg);
+      showToast(getApiErrorMessage(e), "error");
     } finally {
       setSaving(false);
     }
@@ -141,6 +150,18 @@ const CommissionRatesScreen: React.FC = () => {
           {MainContent}
         </View>
       </View>
+      {toast.visible && (
+        <View style={styles.toastContainer} pointerEvents="none">
+          <View style={[styles.toast, toast.type === "success" ? styles.toastSuccess : styles.toastError]}>
+            <Feather
+              name={toast.type === "success" ? "check-circle" : "alert-circle"}
+              size={16}
+              color="#FFFFFF"
+            />
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </View>
+        </View>
+      )}
     </AdminLayout>
   );
 };
@@ -284,6 +305,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#DC2626",
     marginBottom: 16,
+  },
+  toastContainer: {
+    position: "absolute",
+    top: Platform.OS === "web" ? 24 : 50,
+    left: Platform.OS === "web" ? undefined : 20,
+    right: Platform.OS === "web" ? 24 : 20,
+    alignItems: Platform.OS === "web" ? "flex-end" : "center",
+    zIndex: 9999,
+  },
+  toast: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 260,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  toastSuccess: {
+    backgroundColor: "#10B981",
+  },
+  toastError: {
+    backgroundColor: "#EF4444",
+  },
+  toastText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });
 
