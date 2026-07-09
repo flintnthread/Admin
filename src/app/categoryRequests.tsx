@@ -415,10 +415,6 @@ export default function CategoryRequests() {
           const count = getFilterCount(f);
           const isActive = filter === f;
           
-          // Only show divider if neither this tab nor the next tab is active, and it's not the last tab
-          const isNextActive = i < FILTERS.length - 1 && filter === FILTERS[i + 1];
-          const showDivider = !isActive && !isNextActive && i !== FILTERS.length - 1;
-
           return (
             <React.Fragment key={f}>
               <TouchableOpacity
@@ -437,7 +433,6 @@ export default function CategoryRequests() {
                   </Text>
                 </View>
               </TouchableOpacity>
-              {showDivider && <View style={styles.filterDividerWeb} />}
             </React.Fragment>
           );
         })}
@@ -505,7 +500,7 @@ export default function CategoryRequests() {
         </View>
 
         {/* ── Stats Cards ── */}
-        {isLaptop ? (
+        {isWeb ? (
           // Web: desktop-style full-width stat cards (icon+value row, label below)
           <View style={styles.statsRowWeb}>
             {[
@@ -568,8 +563,8 @@ export default function CategoryRequests() {
             />
           </View>
           
-          {isLaptop ? (
-            <View style={[styles.filterRowWeb, isTablet && { flex: 1.2, marginLeft: 10, flexWrap: 'wrap' }]}>
+          {isWeb ? (
+            <View style={[styles.filterRowWeb, isTablet && { flex: 1.2, marginLeft: 10 }]}>
               {filterTabsWeb}
             </View>
           ) : (
@@ -583,41 +578,45 @@ export default function CategoryRequests() {
           )}
         </View>
 
-        {/* ── Web Table / Mobile Cards ── */}
+        {/* ── Laptop Table / Mobile+Tablet Cards ── */}
         {isLaptop ? (
           <View style={styles.tableWrapper}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: 1000, width: '100%' }}>
+              <View style={{ minWidth: 900 }}>
                 {/* Table Header */}
                 <View style={styles.tableHeader}>
-                  <Text style={[styles.th, { minWidth: 80, flex: 0.6 }]}>ID</Text>
-                  <Text style={[styles.th, { minWidth: 120, flex: 1 }]}>Category</Text>
-                  <Text style={[styles.th, { minWidth: 160, flex: 1.4 }]}>Seller</Text>
-                  <Text style={[styles.th, { minWidth: 200, flex: 2 }]}>Description</Text>
-                  <Text style={[styles.th, { minWidth: 160, flex: 1.5 }]}>Reason</Text>
-                  <Text style={[styles.th, { minWidth: 100, flex: 0.8 }]}>Status</Text>
-                  <Text style={[styles.th, { minWidth: 110, flex: 0.9 }]}>Submitted</Text>
-                  <Text style={[styles.th, { minWidth: 80, flex: 0.6, textAlign: 'center' }]}>Actions</Text>
+                  <Text style={[styles.th, { width: 90 }]}>ID</Text>
+                  <Text style={[styles.th, { width: 130 }]}>CATEGORY</Text>
+                  <Text style={[styles.th, { width: 180 }]}>SELLER</Text>
+                  <Text style={[styles.th, { width: 220 }]}>DESCRIPTION</Text>
+                  <Text style={[styles.th, { width: 160 }]}>REASON</Text>
+                  <Text style={[styles.th, { width: 110 }]}>STATUS</Text>
+                  <Text style={[styles.th, { width: 110 }]}>SUBMITTED</Text>
+                  <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>ACTIONS</Text>
                 </View>
 
                 {/* Table Rows */}
                 {paginated.map((req, idx) => (
                   <View key={req.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
-                    <Text style={[styles.td, { minWidth: 80, flex: 0.6 }, styles.tdId]}>{req.id}</Text>
-                    <View style={{ minWidth: 120, flex: 1, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                      <Text style={styles.tdCategoryName}>{req.categoryName}</Text>
+                    <Text style={[styles.td, { width: 90 }, styles.tdId]} numberOfLines={1}>{req.id}</Text>
+                    <View style={{ width: 130, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                      <Text style={styles.tdCategoryName} numberOfLines={1}>{req.categoryName}</Text>
                     </View>
-                    <View style={{ minWidth: 160, flex: 1.4, paddingVertical: 14, paddingHorizontal: 12 }}>
-                      <Text style={styles.tdSellerName}>{req.sellerName}</Text>
+                    <View style={{ width: 180, paddingVertical: 14, paddingHorizontal: 12 }}>
+                      <Text style={styles.tdSellerName} numberOfLines={1}>{req.sellerName}</Text>
                       <Text style={styles.tdSellerEmail} numberOfLines={1}>{req.sellerEmail}</Text>
                     </View>
-                    <Text style={[styles.td, { minWidth: 200, flex: 2 }]} numberOfLines={2}>{req.description}</Text>
-                    <Text style={[styles.td, { minWidth: 160, flex: 1.5 }]} numberOfLines={2}>{req.reason}</Text>
-                    <View style={{ minWidth: 100, flex: 0.8, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <View style={{ width: 220, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.description}</Text>
+                    </View>
+                    <View style={{ width: 160, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.reason}</Text>
+                    </View>
+                    <View style={{ width: 110, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
                       <StatusBadge status={req.status} />
                     </View>
-                    <Text style={[styles.td, { minWidth: 110, flex: 0.9 }, styles.tdMuted]}>{req.submitted}</Text>
-                    <View style={{ minWidth: 80, flex: 0.6, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={[styles.td, { width: 110 }, styles.tdMuted]} numberOfLines={1}>{req.submitted}</Text>
+                    <View style={{ width: 90, alignItems: 'center', justifyContent: 'center' }}>
                       <TouchableOpacity
                         style={styles.viewBtn}
                         onPress={() => setSelectedRequest(req)}
@@ -638,10 +637,10 @@ export default function CategoryRequests() {
             </ScrollView>
           </View>
         ) : (
-          /* Mobile Cards */
-          <View style={[styles.cardList, !isLaptop && styles.cardListMobile, isTablet && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }]}>
+          /* Mobile + Tablet Cards */
+          <View style={[styles.cardList, styles.cardListMobile, isTablet && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }]}>
             {paginated.map((req) => (
-              <View key={req.id} style={[styles.card, !isLaptop && styles.cardMobile, isTablet && { width: '48.5%' }]}>
+              <View key={req.id} style={[styles.card, styles.cardMobile, isTablet && { width: '48.5%' }]}>
                 <View style={styles.cardTop}>
                   <View style={styles.cardTopLeft}>
                     <Text style={styles.cardId}>{req.id}</Text>
@@ -653,11 +652,11 @@ export default function CategoryRequests() {
                   <StatusBadge status={req.status} />
                 </View>
 
-                <Text style={[styles.cardDesc, !isLaptop && styles.cardDescMobile]} numberOfLines={2}>{req.description}</Text>
+                <Text style={[styles.cardDesc, styles.cardDescMobile]} numberOfLines={2}>{req.description}</Text>
 
-                <View style={[styles.cardDivider, !isLaptop && styles.cardDividerMobile]} />
+                <View style={[styles.cardDivider, styles.cardDividerMobile]} />
 
-                <View style={[styles.cardMeta, !isLaptop && styles.cardMetaMobile]}>
+                <View style={[styles.cardMeta, styles.cardMetaMobile]}>
                   <View style={styles.cardMetaRow}>
                     <Text style={styles.cardMetaLabel}>Seller</Text>
                     <Text style={styles.cardMetaValue}>{req.sellerName}</Text>
@@ -669,7 +668,7 @@ export default function CategoryRequests() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.cardViewBtn, !isLaptop && styles.cardViewBtnMobile]}
+                  style={[styles.cardViewBtn, styles.cardViewBtnMobile]}
                   onPress={() => setSelectedRequest(req)}
                 >
                   <EyeIcon />
@@ -1139,8 +1138,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     alignItems: 'center',
-    paddingBottom: 16,
-    marginBottom: 8,
   },
   tableRowAlt: {
     backgroundColor: '#FAFAFA',

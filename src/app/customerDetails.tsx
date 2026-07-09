@@ -14,6 +14,8 @@ import {
   fetchCustomerDetail,
 } from "@/services/customerApi";
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -207,7 +209,7 @@ async function exportOrderHistoryFallback(customer: Customer, isMobileView: bool
     csvContent += `"${o.orderNumber}","${o.date}","${o.items}","${o.amount}","${o.payment}","${o.status}"\n`;
   });
 
-  const XLSX = await import("xlsx");
+  const XLSX = require("xlsx");
   const workbook = XLSX.read(csvContent, { type: "string" });
   const fileName = `Customer_${customer.id}_Export.xlsx`;
 
@@ -217,8 +219,6 @@ async function exportOrderHistoryFallback(customer: Customer, isMobileView: bool
   }
 
   const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
-  const FileSystem = await import("expo-file-system/legacy");
-  const Sharing = await import("expo-sharing");
 
   const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!directory) {
