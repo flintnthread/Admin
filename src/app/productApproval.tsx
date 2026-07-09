@@ -271,7 +271,7 @@ function FilterDropdown({
   );
 }
 
-function ActionButtons({ inline, productId }: { inline?: boolean; productId?: string }) {
+function ActionButtons({ inline, productId, status }: { inline?: boolean; productId?: string; status?: ProductStatus }) {
   const openDetails = () => {
     if (productId) router.push(`/productDetails?id=${productId}`);
   };
@@ -288,15 +288,28 @@ function ActionButtons({ inline, productId }: { inline?: boolean; productId?: st
         <MaterialCommunityIcons name="eye-outline" size={inline ? 12 : 14} color={PALETTE.orange} />
         <Text style={[styles.viewDetailsText, inline && styles.actionTextInline]}>View Details</Text>
       </Pressable>
-      <Pressable
-        style={({ pressed }) => [
-          styles.activateBtn,
-          inline && styles.activateBtnInline,
-          pressed && styles.pressed,
-        ]}>
-        <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
-        <Text style={[styles.activateText, inline && styles.actionTextInline]}>Activate</Text>
-      </Pressable>
+      {status === 'pending' && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.activateBtn,
+            inline && styles.activateBtnInline,
+            pressed && styles.pressed,
+          ]}>
+          <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>Activate</Text>
+        </Pressable>
+      )}
+      {status === 'approved' && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.deactivateBtn,
+            inline && styles.activateBtnInline,
+            pressed && styles.pressed,
+          ]}>
+          <MaterialCommunityIcons name="close-circle-outline" size={inline ? 12 : 14} color="#FFF" />
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>Deactivate</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -706,7 +719,7 @@ function ProductCard({ product }: { product: Product }) {
             </Text>
           </View>
         </View>
-        <ActionButtons inline productId={product.id} />
+        <ActionButtons inline productId={product.id} status={product.status} />
       </View>
     </View>
   );
@@ -727,9 +740,8 @@ function ProductTable({
 
   return (
     <View style={styles.tableCard}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
             <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
             <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
             <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
@@ -772,12 +784,11 @@ function ProductTable({
               <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
 
               <View style={styles.tableColActions}>
-                <ActionButtons inline productId={product.id} />
+                <ActionButtons inline productId={product.id} status={product.status} />
               </View>
             </View>
           ))}
         </View>
-      </ScrollView>
     </View>
   );
 }
@@ -1730,6 +1741,16 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  deactivateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: PALETTE.red,
+    alignSelf: 'flex-start',
   },
   viewDetailsBtnInline: {
     paddingHorizontal: 8,

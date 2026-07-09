@@ -444,36 +444,68 @@ export default function JobApplicationsScreen() {
             </View>
           </View>
 
-          {/* ── Stat Cards Grid (Responsive, All Visible & Scrollable on Overflow) ── */}
+          {/* ── Stat Cards ── */}
           <View style={{ marginTop: isWeb ? -42 : -28, zIndex: 10, marginBottom: 14 }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                flexDirection: "row",
-                gap: width >= 1200 ? 28 : width >= 1000 ? 18 : 12,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-              }}
-            >
-              {STAT_CARDS.map(s => (
-                <View
-                  key={s.key}
-                  style={[
-                    styles.statCardWrapper,
-                    { width: 143 }
-                  ]}
-                >
-                  <StatCard
-                    label={s.label}
-                    count={counts[s.key] ?? 0}
-                    color={s.color}
-                    icon={s.icon}
-                    isWeb={isWeb}
-                  />
-                </View>
-              ))}
-            </ScrollView>
+            {isWeb ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ width: "100%", maxWidth: 900, alignSelf: "center" }}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  gap: 8,
+                  flexGrow: 1,
+                  justifyContent: "center"
+                }}
+              >
+                {STAT_CARDS.map(s => (
+                  <View
+                    key={s.key}
+                    style={[
+                      styles.statCardWrapper,
+                      { width: 143 }
+                    ]}
+                  >
+                    <StatCard
+                      label={s.label}
+                      count={counts[s.key] ?? 0}
+                      color={s.color}
+                      icon={s.icon}
+                      isWeb={isWeb}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  gap: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 6,
+                }}
+              >
+                {STAT_CARDS.map(s => (
+                  <View
+                    key={s.key}
+                    style={[
+                      styles.statCardWrapper,
+                      { width: 143 }
+                    ]}
+                  >
+                    <StatCard
+                      label={s.label}
+                      count={counts[s.key] ?? 0}
+                      color={s.color}
+                      icon={s.icon}
+                      isWeb={isWeb}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
 
           {/* ── Filters ── */}

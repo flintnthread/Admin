@@ -21,6 +21,7 @@ import {
     useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 
@@ -503,9 +504,10 @@ const FaqQuestionsScreen: React.FC = () => {
     const isMobile = layout === "mobile";
     const isDesktopLayout = layout !== "mobile";
 
+    const { categoryId: initialCategoryId } = useLocalSearchParams();
     const [categories, setCategories] = useState<FaqCategory[]>([]);
     const [questions, setQuestions] = useState<FaqQuestion[]>([]);
-    const [selectedCatId, setSelectedCatId] = useState<number>(0);
+    const [selectedCatId, setSelectedCatId] = useState<number>(initialCategoryId ? Number(initialCategoryId) : 0);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
