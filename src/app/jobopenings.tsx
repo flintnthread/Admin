@@ -1435,7 +1435,7 @@ const JobOpeningsScreen: React.FC = () => {
     const totalApps = jobs.reduce((s, j) => s + j.applications, 0);
     const urgentCount = jobs.filter(j => j.urgent).length;
 
-    const Container = isWeb ? View : SafeAreaView;
+    const Container = View;
 
     const MainContent = (
         <Container style={s.safe}>
@@ -1445,115 +1445,148 @@ const JobOpeningsScreen: React.FC = () => {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 12, marginTop: -20 }]}
+                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 0, marginTop: 0 }]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* ── PAGE HEADER ── */}
-                <View style={[
-                    s.pageHead,
-                    isMobileScreen && {
-                        paddingHorizontal: 16,
-                        paddingVertical: 18,
-                        paddingBottom: 36,
-                        borderRadius: 16,
-                    }
-                ]}>
-                    <View style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        width: "100%",
-                        gap: 10,
-                    }}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[
-                                s.pageTitle,
-                                isMobileScreen && { fontSize: 22, lineHeight: 26 },
-                                isSmallMobile && { fontSize: 20, lineHeight: 24 }
-                            ]}>Open Positions</Text>
-                            {!isSmallMobile && (
-                                <Text style={s.pageSub}>Manage and track all active job listings</Text>
-                            )}
+                {/* ── PAGE HEADER (Mobile) ── */}
+                {isMobileScreen ? (
+                    <>
+                        {/* Curved dark header card with icon + title + add button */}
+                        <View style={s.mobileHeader}>
+                            <View style={s.mobileHeaderLeft}>
+                                <View style={s.mobileHeaderIcon}>
+                                    <Feather name="briefcase" size={22} color="#fff" />
+                                </View>
+                                <View>
+                                    <Text style={s.mobileHeaderTitle}>Open Positions</Text>
+                                    {!isSmallMobile && (
+                                        <Text style={s.mobileHeaderSub}>Manage all job listings</Text>
+                                    )}
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={s.mobileAddBtn}
+                                onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
+                                activeOpacity={0.85}
+                            >
+                                <Feather name="plus" size={16} color="#fff" />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            style={[
-                                s.addBtn,
-                                isMobileScreen && { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }
-                            ]}
-                            onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
-                            activeOpacity={0.85}
-                        >
-                            <Feather name="plus" size={14} color="#fff" />
-                            <Text style={[
-                                s.addBtnTxt,
-                                isMobileScreen && { fontSize: 12 }
-                            ]}>
-                                {isSmallMobile ? "Add" : "Add New Job"}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
 
-                {/* ── STATS ── */}
-                <View style={{ marginTop: isWeb ? -42 : -40, zIndex: 10, marginBottom: isMobileScreen ? 0 : 14 }}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{
-                            flexDirection: "row",
-                            gap: width >= 1200 ? 28 : width >= 1000 ? 18 : 12,
-                            paddingHorizontal: 16,
-                            paddingVertical: 6,
-                            paddingBottom: isMobileScreen ? 6 : 20,
-                        }}
-                    >
-                        <View style={{ width: 143 }}>
+                        {/* Stat cards: 2 per row grid overlapping the header */}
+                        <View style={s.mobileStatsGrid}>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.orange }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.orangeLight }]}>
+                                        <Feather name="briefcase" size={18} color={T.orange} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.orange }]}>{totalJobs}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Total Jobs</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.green }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.greenBg }]}>
+                                        <Feather name="check-circle" size={18} color={T.green} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.green }]}>{activeCount}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Active</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.navy }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.navyLight }]}>
+                                        <Feather name="file-text" size={18} color={T.navy} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.navy }]}>{totalApps}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Applications</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.red }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.redBg }]}>
+                                        <Feather name="zap" size={18} color={T.red} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.red }]}>{urgentCount}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Urgent</Text>
+                            </View>
+                        </View>
+                    </>
+                ) : (
+                    <>
+                        {/* ── PAGE HEADER (Web) ── */}
+                        <View style={s.pageHead}>
+                            <View style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                width: "100%",
+                                gap: 10,
+                            }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.pageTitle}>Open Positions</Text>
+                                    <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={s.addBtn}
+                                    onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
+                                    activeOpacity={0.85}
+                                >
+                                    <Feather name="plus" size={14} color="#fff" />
+                                    <Text style={s.addBtnTxt}>Add New Job</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* ── STATS (Web — centered row) ── */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={s.statsRow}
+                            contentContainerStyle={{
+                                flexDirection: "row",
+                                gap: 8,
+                                flexGrow: 1,
+                                justifyContent: "center"
+                            }}
+                        >
                             <StatPill
                                 icon="briefcase"
                                 value={totalJobs}
                                 label="Total Jobs"
                                 iconBg={T.orangeLight}
                                 iconFg={T.orange}
-                                isMobile={isMobileScreen}
                             />
-                        </View>
-                        <View style={{ width: 143 }}>
                             <StatPill
                                 icon="check-circle"
                                 value={activeCount}
                                 label="Active"
                                 iconBg={T.greenBg}
                                 iconFg={T.green}
-                                isMobile={isMobileScreen}
                             />
-                        </View>
-                        <View style={{ width: 143 }}>
                             <StatPill
                                 icon="file-text"
                                 value={totalApps}
                                 label="Applications"
                                 iconBg={T.navyLight}
                                 iconFg={T.navy}
-                                isMobile={isMobileScreen}
                             />
-                        </View>
-                        <View style={{ width: 143 }}>
                             <StatPill
                                 icon="zap"
                                 value={urgentCount}
                                 label="Urgent"
                                 iconBg={T.redBg}
                                 iconFg={T.red}
-                                isMobile={isMobileScreen}
                             />
-                        </View>
-                    </ScrollView>
-                </View>
+                        </ScrollView>
+                    </>
+                )}
 
                 {/* ── SEARCH + FILTERS ── */}
                 {isMobileScreen ? (
-                    <View style={{ gap: 10 }}>
+                    <View style={{ gap: 10, paddingHorizontal: 16 }}>
                         <View style={s.searchRow}>
                             <View style={s.searchBox}>
                                 <Feather name="search" size={15} color="#000000" />
@@ -1768,7 +1801,7 @@ const JobOpeningsScreen: React.FC = () => {
                 )}
 
                 {/* ── COUNT LINE ── */}
-                <Text style={s.countLine}>
+                <Text style={[s.countLine, isMobileScreen && { paddingHorizontal: 16 }]}>
                     <Text style={{ color: T.orange, fontWeight: "700" }}>{filtered.length}</Text>
                     {" "}of {jobs.length} positions
                 </Text>
@@ -1798,6 +1831,7 @@ const JobOpeningsScreen: React.FC = () => {
                         flexDirection: "row",
                         flexWrap: "wrap",
                         gap: isMobileScreen ? 12 : 16,
+                        ...(isMobileScreen ? { paddingHorizontal: 16 } : {}),
                     }}>
                         {paginated.map(job => (
                             <View
@@ -1809,7 +1843,7 @@ const JobOpeningsScreen: React.FC = () => {
                         ))}
                     </View>
                 ) : (
-                    <View style={{ gap: 8 }}>
+                    <View style={{ gap: 8, ...(isMobileScreen ? { paddingHorizontal: 16 } : {}) }}>
                         {paginated.map(job => (
                             <JobRow key={job.id} job={job} />
                         ))}
@@ -1877,7 +1911,6 @@ const s = StyleSheet.create({
         flex: 1,
         height: "100%",
         backgroundColor: T.bg,
-        paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
 
     // TopBar
@@ -1986,15 +2019,125 @@ const s = StyleSheet.create({
         letterSpacing: -0.2,
     },
 
-    // Stats
-    statsRow: {
+    // Mobile-specific header (curved card with icon + title + add button)
+    mobileHeader: {
         flexDirection: "row",
-        gap: 8,
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: "#151D4F",
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 46,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 22,
+        shadowColor: "#151D4F",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    mobileHeaderLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        flex: 1,
+    },
+    mobileHeaderIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: T.orange,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: T.orange,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    mobileHeaderTitle: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: "#FFFFFF",
+        letterSpacing: -0.3,
+    },
+    mobileHeaderSub: {
+        fontSize: 12,
+        color: "#D1D5DB",
+        marginTop: 2,
+    },
+    mobileAddBtn: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        backgroundColor: T.orange,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: T.orange,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+
+    // Mobile stat cards grid (2 per row, overlapping the header)
+    mobileStatsGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap" as any,
+        justifyContent: "space-between",
+        rowGap: 12,
+        marginTop: -32,
+        marginHorizontal: 16,
+        zIndex: 10,
+        marginBottom: 4,
+    },
+    mobileStatCard: {
+        backgroundColor: T.card,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderTopWidth: 3,
+        borderColor: T.border,
+        padding: 14,
+        width: "48%",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    mobileStatTopRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+    },
+    mobileStatIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    mobileStatValue: {
+        fontSize: 22,
+        fontWeight: "800",
+        letterSpacing: -0.4,
+    },
+    mobileStatLabel: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: T.textHint,
+    },
+
+    // Stats (web)
+    statsRow: {
         marginTop: -32,
         zIndex: 10,
         maxWidth: 900,
         alignSelf: "center",
         width: "100%",
+        marginBottom: 14,
     },
     statsRowMobile: {
         flexWrap: "wrap" as any,

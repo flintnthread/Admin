@@ -629,7 +629,7 @@ const FaqCategoriesScreen: React.FC = () => {
                                             onEdit={() => { setEditingCat(cat); setModalVisible(true); }}
                                             onToggle={() => handleToggle(cat.id)}
                                             onDelete={() => handleDelete(cat.id)}
-                                            onNavigate={() => router.push("/Faqs")}
+                                            onNavigate={() => router.push({ pathname: "/Faqs", params: { categoryId: cat.id } })}
                                         />
                                     </View>
                                 ))}
@@ -650,7 +650,7 @@ const FaqCategoriesScreen: React.FC = () => {
                                                 onEdit={() => { setEditingCat(cat); setModalVisible(true); }}
                                                 onToggle={() => handleToggle(cat.id)}
                                                 onDelete={() => handleDelete(cat.id)}
-                                                onNavigate={() => router.push("/Faqs")} />
+                                                onNavigate={() => router.push({ pathname: "/Faqs", params: { categoryId: cat.id } })} />
                                         ))}
                                     </View>
                                 </ScrollView>
