@@ -721,7 +721,7 @@ const FaqQuestionsScreen: React.FC = () => {
                                     <View style={[statSt.catIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
                                         <Feather name={getSafeIcon(selectedCat) as any} size={20} color={selectedCat?.color ?? PRIMARY} />
                                     </View>
-                                    <Text style={statSt.heading} numberOfLines={1}>{selectedCat?.name ?? "—"}</Text>
+                                    <Text style={[statSt.heading, isWeb && { maxWidth: "none" as any }]} numberOfLines={isWeb ? undefined : 1}>{selectedCat?.name ?? "—"}</Text>
                                 </View>
                                 <View style={statSt.pillsWrap}>
                                     <StatPill icon="hash" label="Total" value={catQuestions.length} color={NAVY} />

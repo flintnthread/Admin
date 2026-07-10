@@ -6,6 +6,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
 import {
@@ -677,74 +678,6 @@ const ch = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 // PAGINATION BAR  (matches the customerManagement.tsx pattern)
 // ─────────────────────────────────────────────────────────────────────────────
-function PaginationBar({
-  page,
-  totalPages,
-  rangeStart,
-  rangeEnd,
-  total,
-  label,
-  onPrev,
-  onNext,
-  onPage,
-}: {
-  page: number;
-  totalPages: number;
-  rangeStart: number;
-  rangeEnd: number;
-  total: number;
-  label: string;
-  onPrev: () => void;
-  onNext: () => void;
-  onPage: (p: number) => void;
-}) {
-  const pageNumbers = getPageNumbers(page, totalPages);
-  return (
-    <View style={s.paginationBar}>
-      <Text style={s.paginationText}>
-        Showing {rangeStart}–{rangeEnd} of {total} {label}
-      </Text>
-      <View style={s.paginationControls}>
-        <TouchableOpacity
-          style={[s.pageBtn, page === 1 && s.pageBtnDisabled]}
-          onPress={onPrev}
-          disabled={page === 1}
-          activeOpacity={0.7}
-        >
-          <ChevronLeftIcon size={13} color={page === 1 ? C.sub : C.text} />
-        </TouchableOpacity>
-
-        {pageNumbers.map((p, idx) =>
-          p === "…" ? (
-            <View key={`ellipsis-${idx}`} style={s.pageEllipsis}>
-              <Text style={s.pageEllipsisTxt}>…</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              key={p}
-              style={[s.pageNumBtn, p === page && s.pageNumBtnActive]}
-              onPress={() => onPage(p)}
-              activeOpacity={0.7}
-            >
-              <Text style={[s.pageNumTxt, p === page && s.pageNumTxtActive]}>{p}</Text>
-            </TouchableOpacity>
-          )
-        )}
-
-        <TouchableOpacity
-          style={[s.pageBtn, page === totalPages && s.pageBtnDisabled]}
-          onPress={onNext}
-          disabled={page === totalPages}
-          activeOpacity={0.7}
-        >
-          <ChevronRightIcon size={13} color={page === totalPages ? C.sub : C.text} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 type Props = { customer?: Customer; onBack?: () => void };
@@ -1276,16 +1209,13 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
                     </View>
                   )}
 
-                  <PaginationBar
-                    page={safePage}
+                  <Pagination
+                    currentPage={safePage}
                     totalPages={totalOrderPages}
-                    rangeStart={rangeStart}
-                    rangeEnd={rangeEnd}
-                    total={totalOrderRecords}
-                    label="orders"
-                    onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    onNext={() => setCurrentPage((p) => Math.min(totalOrderPages, p + 1))}
-                    onPage={(p) => setCurrentPage(p)}
+                    totalItems={totalOrderRecords}
+                    itemsPerPage={ORDERS_PER_PAGE}
+                    itemName="orders"
+                    onPageChange={setCurrentPage}
                   />
                 </>
               ) : (
