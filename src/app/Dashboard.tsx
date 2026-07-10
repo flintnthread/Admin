@@ -2747,7 +2747,7 @@ const getStyles = (isDark: boolean, screenW: number) => {
 
     // Header styles
     headerCard: {
-      backgroundColor: "#1d324e",
+      backgroundColor: "#151D4F",
       borderRadius: 16,
       padding: screenW < 480 ? 12 : 20,
       borderWidth: 1,
