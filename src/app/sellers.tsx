@@ -814,11 +814,12 @@ export default function SellersScreen() {
     gridRows.push(paginated.slice(i, i + numColsNative));
   }
 
-  const Wrapper = isMobile ? ScrollView : View;
+  const isWeb = Platform.OS === 'web';
+  const Wrapper = (isMobile || isWeb) ? ScrollView : View;
 
   return (
     <AdminLayout>
-      <Wrapper style={SS.root} {...(isMobile ? { showsVerticalScrollIndicator: false } : {})}>
+      <Wrapper style={SS.root} {...((isMobile || isWeb) ? { showsVerticalScrollIndicator: false } : {})}>
         <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
         {/* ── Header Container (Dark Blue) ── */}
@@ -843,7 +844,7 @@ export default function SellersScreen() {
         </View>
 
         {/* ── Stat Cards Row ── */}
-        {Platform.OS === 'web' ? (
+        {width >= 1250 ? (
           <View style={SS.statGrid}>
             {[
               { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
@@ -866,10 +867,12 @@ export default function SellersScreen() {
             ))}
           </View>
         ) : (
-          <View style={{ marginTop: -32, zIndex: 10, marginBottom: 16 }}>
+          <View style={{ width: "100%", marginTop: -32, marginBottom: 16, overflow: "hidden" }}>
             <ScrollView
-              horizontal
+              {...({ className: "orange-scrollbar" } as any)}
+              horizontal={true}
               showsHorizontalScrollIndicator={false}
+              style={{ width: "100%" }}
               contentContainerStyle={{
                 flexDirection: "row",
                 gap: 12,
@@ -891,41 +894,20 @@ export default function SellersScreen() {
                   style={[
                     SS.statCard,
                     {
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      gap: 6,
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      width: 135,
-                      minWidth: 0,
-                      flex: 0,
-                      flexGrow: 0,
+                      width: 190,
+                      minWidth: 190,
                       flexShrink: 0,
-                      borderWidth: 1,
-                      borderColor: "#E5EAF2",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.05,
-                      shadowRadius: 6,
-                      elevation: 3,
+                      flex: 0,
                     }
                   ]}
                 >
-                  <View style={[SS.statIconBox, { backgroundColor: c.iconBg, width: 30, height: 30, borderRadius: 15 }]}>
-                    {React.cloneElement(c.icon, { size: 14 })}
+                  <View style={{ flex: 1 }}>
+                    <Text style={SS.statLabel}>{c.label.toUpperCase()}</Text>
+                    <Text style={SS.statValue}>{c.value}</Text>
+                    <Text style={SS.statSub}>{c.sub}</Text>
                   </View>
-                  <View>
-                    <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>
-                      {c.label}
-                    </Text>
-                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#1C1C2E", lineHeight: 15 }} numberOfLines={1}>
-                      {c.value}
-                    </Text>
-                    {c.sub && (
-                      <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>
-                        {c.sub}
-                      </Text>
-                    )}
+                  <View style={[SS.statIconBox, { backgroundColor: c.iconBg }]}>
+                    {c.icon}
                   </View>
                 </View>
               ))}
@@ -936,12 +918,12 @@ export default function SellersScreen() {
         {/* Toolbar */}
         <View style={[
           SS.toolbar,
-          isNarrow && Platform.OS === 'web' && { flexDirection: 'column', gap: 12, alignItems: 'stretch' },
-          Platform.OS !== 'web' && { paddingHorizontal: 16 }
+          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+          width < 600 && { paddingHorizontal: 12, gap: 8 }
         ]}>
           <View style={[
             SS.searchBox,
-            isNarrow && Platform.OS === 'web' ? { flex: 0, width: '100%', maxWidth: '100%' } : { flex: 1 }
+            { flex: 1 }
           ]}>
             <IconSearch size={16} color={C.muted} />
             <TextInput
@@ -960,9 +942,9 @@ export default function SellersScreen() {
 
           <View style={[
             SS.viewToggle,
-            Platform.OS !== 'web' && { marginLeft: 8 }
+            { marginLeft: width < 600 ? 8 : 14 }
           ]}>
-            {Platform.OS === 'web' && <Text style={SS.viewLabel}>View:</Text>}
+            {width >= 600 && <Text style={SS.viewLabel}>View:</Text>}
             <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
               <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
             </TouchableOpacity>
@@ -974,10 +956,10 @@ export default function SellersScreen() {
 
         {/* Content */}
         <ScrollView
-          style={isMobile ? { flex: 0 } : { flex: 1 }}
+          style={(isMobile || isWeb) ? { flex: 0 } : { flex: 1 }}
           contentContainerStyle={[SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined]}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={!isMobile}
+          scrollEnabled={isWeb ? false : !isMobile}
           keyboardShouldPersistTaps="handled"
         >
           {loading ? (
@@ -1022,9 +1004,9 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={isMobile && { width: '100%' }}>
-              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0, minWidth: 1060 }]}>
-                {(!isMobile || isMobile) && <ListHeader isTablet={isMobile ? false : isTablet} />}
+            <ScrollView horizontal={width < 1100} showsHorizontalScrollIndicator={false} style={width < 1100 && { width: '100%' }}>
+              <View style={[SS.listBox, width < 1100 && { marginHorizontal: 0, borderRadius: 0, minWidth: 1060 }]}>
+                {(!isMobile || isMobile) && <ListHeader isTablet={width < 1100 ? false : isTablet} />}
                 {paginated.length === 0 ? (
                   <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
                 ) : (
@@ -1033,7 +1015,7 @@ export default function SellersScreen() {
                       key={s.id}
                       seller={s}
                       even={idx % 2 === 0}
-                      isTablet={isMobile ? false : isTablet}
+                      isTablet={width < 1100 ? false : isTablet}
                       isMobile={false}
                       onView={() => doView(s)}
                       onToggleStatus={() => doToggle(s)}
