@@ -348,7 +348,7 @@ const SparklineChart: React.FC<{
   const yLabels = [0, 1, 2].filter(v => v <= maxVal + 0);
 
   // Calculate label thinning to avoid overlap on small screens
-  const approxLabelWidth = 36; // px
+  const approxLabelWidth = 44; // px
   const availablePerLabel = chartW / Math.max(1, data.length - 1);
   let step = Math.max(1, Math.ceil(approxLabelWidth / Math.max(1, availablePerLabel)));
 
@@ -468,7 +468,7 @@ const SparklineChart: React.FC<{
       )}
       {data.map((d, i) => {
         // Only render some labels to avoid overlap, unless rotateLabels is enabled
-        if (!rotateLabels && i % step !== 0 && i !== data.length - 1) return null;
+        if (!rotateLabels && i !== data.length - 1 && (i % step !== 0 || data.length - 1 - i < step)) return null;
         const labelContainerWidth = rotateLabels ? 56 : Math.max(60, Math.min(140, chartW / Math.max(1, data.length) - 4));
         const x = Math.min(
           Math.max(getX(i) - labelContainerWidth / 2, padding.left - labelContainerWidth / 2),
