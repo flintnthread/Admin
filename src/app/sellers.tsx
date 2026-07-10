@@ -11,6 +11,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from '@/components/Pagination';
 import SellerMediaImage from "@/components/SellerMediaImage";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
@@ -19,7 +20,6 @@ import { mapSellerListRow } from '@/lib/mappers';
 import { blockSeller, fetchSellerAnalyticsSummary, fetchSellers, normalizeSellerGraphSummary, unblockSeller } from '@/services/sellerApi';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import Pagination from '@/components/Pagination';
 import {
   ActivityIndicator,
   Image,
@@ -473,6 +473,13 @@ const GridCard = ({
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             <TouchableOpacity
               activeOpacity={0.7}
+              style={[GC.actionBtn, { backgroundColor: C.navy }]}
+              onPress={onView}
+            >
+              <IconEye size={15} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
               style={[GC.actionBtn, { backgroundColor: C.amber }]}
               onPress={onToggleStatus}
             >
@@ -807,11 +814,12 @@ export default function SellersScreen() {
     gridRows.push(paginated.slice(i, i + numColsNative));
   }
 
-  const Wrapper = isMobile ? ScrollView : View;
+  const isWeb = Platform.OS === 'web';
+  const Wrapper = (isMobile || isWeb) ? ScrollView : View;
 
   return (
     <AdminLayout>
-      <Wrapper style={SS.root} {...(isMobile ? { showsVerticalScrollIndicator: false } : {})}>
+      <Wrapper style={SS.root} {...((isMobile || isWeb) ? { showsVerticalScrollIndicator: false } : {})}>
         <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
         {/* ── Header Container (Dark Blue) ── */}
@@ -836,31 +844,87 @@ export default function SellersScreen() {
         </View>
 
         {/* ── Stat Cards Row ── */}
-        <View style={[SS.statGrid, Platform.OS !== 'web' && { paddingHorizontal: 0, marginHorizontal: 16, gap: 10 }]}>
-          {[
-            { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
-            { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
-            { label: "Approved Sellers", value: summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#16A34A" />, iconBg: "#DCFCE7", sub: "Approved profiles" },
-            { label: "Rejected Sellers", value: summary.rejected ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.approved ?? 0) - (summary.pending ?? summary.profileCompleted ?? 0)), icon: <IconCloseCircle size={16} color="#DC2626" />, iconBg: "#FEE2E2", sub: "Rejected profiles" },
-            { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
-            { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
-          ].map((c) => (
-            <View key={c.label} style={[SS.statCard, Platform.OS !== 'web' && { width: "48%", minWidth: 0, flex: 0, padding: 10 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={SS.statLabel}>{Platform.OS !== 'web' ? c.label : c.label.toUpperCase()}</Text>
-                <Text style={SS.statValue}>{c.value}</Text>
-                <Text style={SS.statSub}>{c.sub}</Text>
+        {width >= 1250 ? (
+          <View style={SS.statGrid}>
+            {[
+              { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
+              { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
+              { label: "Approved Sellers", value: summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#16A34A" />, iconBg: "#DCFCE7", sub: "Approved profiles" },
+              { label: "Rejected Sellers", value: summary.rejected ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.approved ?? 0) - (summary.pending ?? summary.profileCompleted ?? 0)), icon: <IconCloseCircle size={16} color="#DC2626" />, iconBg: "#FEE2E2", sub: "Rejected profiles" },
+              { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
+              { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
+            ].map((c) => (
+              <View key={c.label} style={SS.statCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={SS.statLabel}>{c.label.toUpperCase()}</Text>
+                  <Text style={SS.statValue}>{c.value}</Text>
+                  <Text style={SS.statSub}>{c.sub}</Text>
+                </View>
+                <View style={[SS.statIconBox, { backgroundColor: c.iconBg }]}>
+                  {c.icon}
+                </View>
               </View>
-              <View style={[SS.statIconBox, { backgroundColor: c.iconBg }]}>
-                {c.icon}
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        ) : (
+          <View style={{ width: "100%", marginTop: -32, marginBottom: 16, overflow: "hidden" }}>
+            <ScrollView
+              {...({ className: "orange-scrollbar" } as any)}
+              horizontal={true}
+              showsHorizontalScrollIndicator={false}
+              style={{ width: "100%" }}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: 12,
+                paddingLeft: 22,
+                paddingRight: 32,
+                paddingVertical: 6,
+              }}
+            >
+              {[
+                { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
+                { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
+                { label: "Approved Sellers", value: summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#16A34A" />, iconBg: "#DCFCE7", sub: "Approved profiles" },
+                { label: "Rejected Sellers", value: summary.rejected ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.approved ?? 0) - (summary.pending ?? summary.profileCompleted ?? 0)), icon: <IconCloseCircle size={16} color="#DC2626" />, iconBg: "#FEE2E2", sub: "Rejected profiles" },
+                { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
+                { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
+              ].map((c) => (
+                <View
+                  key={c.label}
+                  style={[
+                    SS.statCard,
+                    {
+                      width: 190,
+                      minWidth: 190,
+                      flexShrink: 0,
+                      flex: 0,
+                    }
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={SS.statLabel}>{c.label.toUpperCase()}</Text>
+                    <Text style={SS.statValue}>{c.value}</Text>
+                    <Text style={SS.statSub}>{c.sub}</Text>
+                  </View>
+                  <View style={[SS.statIconBox, { backgroundColor: c.iconBg }]}>
+                    {c.icon}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Toolbar */}
-        <View style={[SS.toolbar, isNarrow && { flexDirection: 'column', gap: 12, alignItems: 'stretch' }]}>
-          <View style={[SS.searchBox, isNarrow ? { flex: 0, width: '100%', maxWidth: '100%' } : { flex: 1 }]}>
+        <View style={[
+          SS.toolbar,
+          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+          width < 600 && { paddingHorizontal: 12, gap: 8 }
+        ]}>
+          <View style={[
+            SS.searchBox,
+            { flex: 1 }
+          ]}>
             <IconSearch size={16} color={C.muted} />
             <TextInput
               style={SS.searchInput}
@@ -876,8 +940,11 @@ export default function SellersScreen() {
             )}
           </View>
 
-          <View style={[SS.viewToggle, isNarrow && { marginLeft: 0, marginTop: 4, justifyContent: 'flex-start' }]}>
-            <Text style={SS.viewLabel}>View:</Text>
+          <View style={[
+            SS.viewToggle,
+            { marginLeft: width < 600 ? 8 : 14 }
+          ]}>
+            {width >= 600 && <Text style={SS.viewLabel}>View:</Text>}
             <TouchableOpacity style={[SS.vBtn, viewMode === 'grid' ? SS.vBtnOn : undefined]} onPress={() => setViewMode('grid')}>
               <IconGrid size={17} color={viewMode === 'grid' ? '#FFF' : C.sub} />
             </TouchableOpacity>
@@ -889,10 +956,10 @@ export default function SellersScreen() {
 
         {/* Content */}
         <ScrollView
-          style={isMobile ? { flex: 0 } : { flex: 1 }}
+          style={(isMobile || isWeb) ? { flex: 0 } : { flex: 1 }}
           contentContainerStyle={[SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined]}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={!isMobile}
+          scrollEnabled={isWeb ? false : !isMobile}
           keyboardShouldPersistTaps="handled"
         >
           {loading ? (
@@ -937,9 +1004,9 @@ export default function SellersScreen() {
               </View>
             )
           ) : (
-            <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={isMobile && { width: '100%' }}>
-              <View style={[SS.listBox, isMobile && { marginHorizontal: 0, borderRadius: 0, minWidth: 1060 }]}>
-                {(!isMobile || isMobile) && <ListHeader isTablet={isMobile ? false : isTablet} />}
+            <ScrollView horizontal={width < 1100} showsHorizontalScrollIndicator={false} style={width < 1100 && { width: '100%' }}>
+              <View style={[SS.listBox, width < 1100 && { marginHorizontal: 0, borderRadius: 0, minWidth: 1060 }]}>
+                {(!isMobile || isMobile) && <ListHeader isTablet={width < 1100 ? false : isTablet} />}
                 {paginated.length === 0 ? (
                   <View style={SS.empty}><Text style={SS.emptyTxt}>No sellers found for "{search}"</Text></View>
                 ) : (
@@ -948,7 +1015,7 @@ export default function SellersScreen() {
                       key={s.id}
                       seller={s}
                       even={idx % 2 === 0}
-                      isTablet={isMobile ? false : isTablet}
+                      isTablet={width < 1100 ? false : isTablet}
                       isMobile={false}
                       onView={() => doView(s)}
                       onToggleStatus={() => doToggle(s)}
