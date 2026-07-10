@@ -6,6 +6,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapCustomerRow } from "@/lib/mappers";
 import { fetchCustomers, fetchCustomerStats } from "@/services/customerApi";
@@ -612,6 +613,12 @@ export default function CustomerManagementScreen() {
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
+        showsVerticalScrollIndicator={false}
+      >
+
       {/* ══ HEADER (Fixed) ═══════════════════════ */}
       <View style={{ paddingHorizontal: 16 }}>
         <View
@@ -680,11 +687,7 @@ export default function CustomerManagementScreen() {
         />
       </View>
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
-        showsVerticalScrollIndicator={false}
-      >
+
         <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
           
           {/* ══ TOOLBAR (Scrollable) ═════════════════════════════════════════════════════ */}
@@ -807,47 +810,15 @@ export default function CustomerManagementScreen() {
           )}
 
           {/* ══ PAGINATION ══════════════════════════════════════════════════ */}
-          {!loading && !error && totalPages > 1 && (
-            <View style={[s.pgWrap, isMobile && s.pgWrapMobile]}>
-              <Text style={s.pgInfo}>
-                Showing {rangeStart}–{rangeEnd} of {total} customers
-              </Text>
-
-              <View style={s.pgControls}>
-                <TouchableOpacity
-                  style={[s.pgBtn, safePage === 1 && s.pgBtnDisabled]}
-                  onPress={() => safePage > 1 && setPage(safePage - 1)}
-                  activeOpacity={0.7}
-                  disabled={safePage === 1}
-                >
-                  <Svg width={13} height={13} viewBox="0 0 16 16">
-                    <Path fill={safePage === 1 ? C.border : C.sub} d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
-                  </Svg>
-                </TouchableOpacity>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[s.pgBtn, safePage === p && s.pgBtnActive]}
-                    onPress={() => setPage(p)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.pgBtnTxt, safePage === p && s.pgBtnTxtActive]}>{p}</Text>
-                  </TouchableOpacity>
-                ))}
-
-                <TouchableOpacity
-                  style={[s.pgBtn, safePage === totalPages && s.pgBtnDisabled]}
-                  onPress={() => safePage < totalPages && setPage(safePage + 1)}
-                  activeOpacity={0.7}
-                  disabled={safePage === totalPages}
-                >
-                  <Svg width={13} height={13} viewBox="0 0 16 16">
-                    <Path fill={safePage === totalPages ? C.border : C.sub} d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
-                  </Svg>
-                </TouchableOpacity>
-              </View>
-            </View>
+          {!loading && !error && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={total}
+              itemsPerPage={PAGE_SIZE}
+              itemName="customers"
+              onPageChange={setPage}
+            />
           )}
 
           <View style={{ height: 36 }} />

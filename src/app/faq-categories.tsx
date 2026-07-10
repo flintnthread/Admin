@@ -657,18 +657,16 @@ const FaqCategoriesScreen: React.FC = () => {
                             </View>
                         )}
 
-                        {/* ── PAGINATION (Centered on mobile) ── */}
+                        {/* ── PAGINATION ── */}
                         {filtered.length > 0 && (
-                            <View style={[st.paginationWrapper, isMobile && st.paginationWrapperMobile]}>
-                                <Pagination
-                                    currentPage={currentPage}
-                                    totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-                                    totalItems={filtered.length}
-                                    itemsPerPage={ITEMS_PER_PAGE}
-                                    itemName="categories"
-                                    onPageChange={setCurrentPage}
-                                />
-                            </View>
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                totalItems={filtered.length}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                                itemName="categories"
+                                onPageChange={setCurrentPage}
+                            />
                         )}
                     </View>
                 </ScrollView>

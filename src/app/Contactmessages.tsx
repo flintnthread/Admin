@@ -539,16 +539,16 @@ const ContactMessagesScreen: React.FC = () => {
               contentContainerStyle={mSt.pillRow}
             >
               {([
-                { label: "All",     count: messages.length,     filterVal: "All" as FilterType },
-                { label: "New",     count: contactStats.pending, filterVal: "Not Replied" as FilterType },
+                { label: "All", count: messages.length, filterVal: "All" as FilterType },
+                { label: "New", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
                 { label: "Replied", count: contactStats.replied, filterVal: "Replied" as FilterType },
                 { label: "Pending", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
               ]).map((f) => {
                 const activeMatch =
                   f.label === "All" ? filter === "All"
-                  : f.label === "Replied" ? filter === "Replied"
-                  : f.label === "New" ? filter === "Not Replied"
-                  : filter === "Not Replied" && f.label === "Pending";
+                    : f.label === "Replied" ? filter === "Replied"
+                      : f.label === "New" ? filter === "Not Replied"
+                        : filter === "Not Replied" && f.label === "Pending";
                 return (
                   <TouchableOpacity
                     key={f.label}
@@ -595,9 +595,9 @@ const ContactMessagesScreen: React.FC = () => {
               </View>
             )}
 
-            {/* ── Pagination (centered) ── */}
+            {/* ── Pagination ── */}
             {!loading && !loadError && filtered.length > 0 && (
-              <View style={mSt.paginationWrap}>
+              <View style={{ paddingHorizontal: 16 }}>
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
