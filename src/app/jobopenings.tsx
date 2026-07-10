@@ -1852,14 +1852,16 @@ const JobOpeningsScreen: React.FC = () => {
 
                 {/* ── PAGINATION CONTROLS ── */}
                 {filtered.length > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={filtered.length}
-                        itemsPerPage={ITEMS_PER_PAGE}
-                        itemName="job openings"
-                        onPageChange={setCurrentPage}
-                    />
+                    <View style={isMobileScreen ? { paddingHorizontal: 16 } : {}}>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={filtered.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            itemName="job openings"
+                            onPageChange={setCurrentPage}
+                        />
+                    </View>
                 )}
             </ScrollView>
 
