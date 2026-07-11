@@ -659,22 +659,22 @@ function buildShippingLabelDownloadHtml(label: any, logoSrc: string, trackingId:
         <div class="awb-caption">AWB NUMBER</div>
         <svg class="barcode-svg" viewBox="0 0 220 50" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
           ${(() => {
-            const seedSource = label?.orderNumber ?? String(trackingId);
-            let seed = 0;
-            for (const ch of seedSource) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
-            let x = 0;
-            const rects: string[] = [];
-            for (let i = 0; i < 60; i++) {
-              seed = (seed * 1103515245 + 12345) % 2147483648;
-              const h = 18 + (seed % 32);
-              const w = 1 + (seed % 3);
-              const gap = 1 + ((seed >> 2) % 2);
-              rects.push(`<rect x="${x}" y="${50 - h}" width="${w}" height="${h}" fill="#111827" />`);
-              x += w + gap;
-              if (x > 218) break;
-            }
-            return rects.join('');
-          })()}
+      const seedSource = label?.orderNumber ?? String(trackingId);
+      let seed = 0;
+      for (const ch of seedSource) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
+      let x = 0;
+      const rects: string[] = [];
+      for (let i = 0; i < 60; i++) {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        const h = 18 + (seed % 32);
+        const w = 1 + (seed % 3);
+        const gap = 1 + ((seed >> 2) % 2);
+        rects.push(`<rect x="${x}" y="${50 - h}" width="${w}" height="${h}" fill="#111827" />`);
+        x += w + gap;
+        if (x > 218) break;
+      }
+      return rects.join('');
+    })()}
         </svg>
         <div class="awb-number">${escapeHtml(trackingId)}</div>
       </div>
@@ -3878,14 +3878,14 @@ export default function OrdersScreen() {
 
           {/* ── Pagination ── */}
           {!loading && !error && totalPages > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={totalElements}
-                itemsPerPage={ORDERS_PAGE_SIZE}
-                itemName="orders"
-                onPageChange={setCurrentPage}
-              />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalElements}
+              itemsPerPage={ORDERS_PAGE_SIZE}
+              itemName="orders"
+              onPageChange={setCurrentPage}
+            />
           )}
 
           <View style={{ height: 24 }} />
