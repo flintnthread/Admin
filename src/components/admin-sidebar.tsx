@@ -28,8 +28,10 @@ const NAV_ITEMS = {
 
 
     { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
+
     { label: "Settings", icon: "settings", path: "/settings", color: "#64748B" },
     // { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
+
 
   ],
   "EMPLOYEE MANAGEMENT": [
@@ -227,11 +229,11 @@ const NAV_ITEMS = {
           color: "#EF4444",
         },
       ],
-    },
+    },  
     {
-      label: "Contact Messages",
+      label: "Message Center",
       icon: "mail",
-      path: "/Contactmessages",
+      path: "/message-center",
       color: "#3B82F6",
     },
     { label: "Logos", icon: "image", path: null, color: "#0EA5E9" },
