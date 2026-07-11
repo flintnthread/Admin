@@ -684,11 +684,11 @@ function buildMockAnalytics(customerId: string, name: string) {
     latestTicket:
       ticketsTotal > 0
         ? pick([
-            "Order delayed",
-            "Refund query",
-            "Wrong item received",
-            "Damaged on arrival",
-          ])
+          "Order delayed",
+          "Refund query",
+          "Wrong item received",
+          "Damaged on arrival",
+        ])
         : "No tickets raised",
   };
 
@@ -855,7 +855,7 @@ function getFilteredCategoricalData<T extends { label: string; value: number }>(
   timeframe: TimeFrame,
 ): T[] {
   if (timeframe === "All" || timeframe === "1Y") return baseData;
-  
+
   let factor = 1;
   if (timeframe === "6M") factor = 0.5;
   else if (timeframe === "90D") factor = 0.25;
@@ -941,15 +941,15 @@ function getFilteredData(
     const fromTime = timeframe.from.getTime();
     const toTime = timeframe.to.getTime();
     const filtered = baseData.filter(d => {
-       let dateStr = d.label;
-       if (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].includes(d.label)) {
-           dateStr = `${d.label} 1, ${new Date().getFullYear()}`;
-       }
-       const dTime = new Date(dateStr).getTime();
-       if (!isNaN(dTime)) {
-           return dTime >= fromTime && dTime <= toTime;
-       }
-       return true; 
+      let dateStr = d.label;
+      if (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].includes(d.label)) {
+        dateStr = `${d.label} 1, ${new Date().getFullYear()}`;
+      }
+      const dTime = new Date(dateStr).getTime();
+      if (!isNaN(dTime)) {
+        return dTime >= fromTime && dTime <= toTime;
+      }
+      return true;
     });
     return filtered.length > 0 ? filtered : baseData;
   }
@@ -1481,14 +1481,14 @@ function LineChartSvg({
   const pointerProps =
     Platform.OS === "web"
       ? {
-          onMouseMove: handleWebMove,
-          onMouseLeave: handleTouchEnd,
-        }
+        onMouseMove: handleWebMove,
+        onMouseLeave: handleTouchEnd,
+      }
       : {
-          onTouchStart: handleTouch,
-          onTouchMove: handleTouch,
-          onTouchEnd: handleTouchEnd,
-        };
+        onTouchStart: handleTouch,
+        onTouchMove: handleTouch,
+        onTouchEnd: handleTouchEnd,
+      };
 
   // Percentage change from previous period
   const pctChange = useMemo(() => {
@@ -1638,10 +1638,10 @@ function LineChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { 
-                flex: 1, 
+              {
+                flex: 1,
                 fontSize: width < 400 ? 8 : 10,
-                letterSpacing: width < 400 ? -0.5 : 0 
+                letterSpacing: width < 400 ? -0.5 : 0
               },
             ]}
             numberOfLines={1}
@@ -1735,14 +1735,14 @@ function BarChartSvg({
   const pointerProps =
     Platform.OS === "web"
       ? {
-          onMouseMove: handleWebMove,
-          onMouseLeave: handleTouchEnd,
-        }
+        onMouseMove: handleWebMove,
+        onMouseLeave: handleTouchEnd,
+      }
       : {
-          onTouchStart: handleTouch,
-          onTouchMove: handleTouch,
-          onTouchEnd: handleTouchEnd,
-        };
+        onTouchStart: handleTouch,
+        onTouchMove: handleTouch,
+        onTouchEnd: handleTouchEnd,
+      };
 
   return (
     <View
@@ -1827,10 +1827,10 @@ function BarChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { 
-                flex: 1, 
+              {
+                flex: 1,
                 fontSize: width < 400 ? 8 : 10,
-                letterSpacing: width < 400 ? -0.5 : 0 
+                letterSpacing: width < 400 ? -0.5 : 0
               },
             ]}
             numberOfLines={1}
@@ -2166,22 +2166,22 @@ const OrderStatusChip = React.memo(function OrderStatusChip({
 });
 
 const TIMELINE_ICON_CFG: Record<string, { icon: React.ReactNode; bg: string }> =
-  {
-    order: { icon: <BagIcon size={13} color={primary} />, bg: primaryLight },
-    payment: {
-      icon: <CreditCardIcon size={13} color={green} />,
-      bg: activeLight,
-    },
-    ticket: { icon: <TicketIcon size={13} color={blue} />, bg: blueLight },
-    review: { icon: <StarFillIcon size={13} />, bg: "#FEF9C3" },
-    coupon: { icon: <GiftIcon size={13} color={pink} />, bg: pinkLight },
-    replacement: {
-      icon: <SwapIcon size={13} color={purple} />,
-      bg: purpleLight,
-    },
-    address: { icon: <MapPinIcon size={13} color={teal} />, bg: tealLight },
-    return: { icon: <ReplyIcon size={13} color={red} />, bg: inactiveLight },
-  };
+{
+  order: { icon: <BagIcon size={13} color={primary} />, bg: primaryLight },
+  payment: {
+    icon: <CreditCardIcon size={13} color={green} />,
+    bg: activeLight,
+  },
+  ticket: { icon: <TicketIcon size={13} color={blue} />, bg: blueLight },
+  review: { icon: <StarFillIcon size={13} />, bg: "#FEF9C3" },
+  coupon: { icon: <GiftIcon size={13} color={pink} />, bg: pinkLight },
+  replacement: {
+    icon: <SwapIcon size={13} color={purple} />,
+    bg: purpleLight,
+  },
+  address: { icon: <MapPinIcon size={13} color={teal} />, bg: tealLight },
+  return: { icon: <ReplyIcon size={13} color={red} />, bg: inactiveLight },
+};
 
 const ACTION_ICON_CFG: Record<string, React.ReactNode> = {
   gift: <GiftIcon size={16} color="#fff" />,
@@ -2377,69 +2377,69 @@ const DateRangePickerModal = React.memo(function DateRangePickerModal({
             </TouchableOpacity>
           </View>
           <View style={[s.modalBody, { padding: 20 }]}>
-             <View style={{ gap: 16 }}>
-               <View>
-                 <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>From Date</Text>
-                 {Platform.OS === 'web' ? (
-                   <input 
-                     type="date" 
-                     style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
-                     value={from.toISOString().split('T')[0]}
-                     onChange={(e) => {
-                       const d = new Date(e.target.value);
-                       if (!isNaN(d.getTime())) setFrom(d);
-                     }}
-                   />
-                 ) : (
-                   <TouchableOpacity onPress={() => setShowFromPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
-                     <Text>{from.toISOString().split('T')[0]}</Text>
-                   </TouchableOpacity>
-                 )}
-                 {showFromPicker && Platform.OS !== 'web' && (
-                   <DateTimePicker
-                     value={from}
-                     mode="date"
-                     display="default"
-                     onChange={(e, d) => { setShowFromPicker(false); if(d) setFrom(d); }}
-                   />
-                 )}
-               </View>
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>From Date</Text>
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
+                    value={from.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value);
+                      if (!isNaN(d.getTime())) setFrom(d);
+                    }}
+                  />
+                ) : (
+                  <TouchableOpacity onPress={() => setShowFromPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
+                    <Text>{from.toISOString().split('T')[0]}</Text>
+                  </TouchableOpacity>
+                )}
+                {showFromPicker && Platform.OS !== 'web' && (
+                  <DateTimePicker
+                    value={from}
+                    mode="date"
+                    display="default"
+                    onChange={(e, d) => { setShowFromPicker(false); if (d) setFrom(d); }}
+                  />
+                )}
+              </View>
 
-               <View>
-                 <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>To Date</Text>
-                 {Platform.OS === 'web' ? (
-                   <input 
-                     type="date" 
-                     style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
-                     value={to.toISOString().split('T')[0]}
-                     onChange={(e) => {
-                       const d = new Date(e.target.value);
-                       if (!isNaN(d.getTime())) setTo(d);
-                     }}
-                   />
-                 ) : (
-                   <TouchableOpacity onPress={() => setShowToPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
-                     <Text>{to.toISOString().split('T')[0]}</Text>
-                   </TouchableOpacity>
-                 )}
-                 {showToPicker && Platform.OS !== 'web' && (
-                   <DateTimePicker
-                     value={to}
-                     mode="date"
-                     display="default"
-                     onChange={(e, d) => { setShowToPicker(false); if(d) setTo(d); }}
-                   />
-                 )}
-               </View>
+              <View>
+                <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>To Date</Text>
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
+                    value={to.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value);
+                      if (!isNaN(d.getTime())) setTo(d);
+                    }}
+                  />
+                ) : (
+                  <TouchableOpacity onPress={() => setShowToPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
+                    <Text>{to.toISOString().split('T')[0]}</Text>
+                  </TouchableOpacity>
+                )}
+                {showToPicker && Platform.OS !== 'web' && (
+                  <DateTimePicker
+                    value={to}
+                    mode="date"
+                    display="default"
+                    onChange={(e, d) => { setShowToPicker(false); if (d) setTo(d); }}
+                  />
+                )}
+              </View>
 
-               <TouchableOpacity 
-                 style={{ backgroundColor: isInvalid ? C.border : primary, padding: 12, borderRadius: 6, alignItems: 'center', marginTop: 10 }}
-                 onPress={handleApply}
-                 disabled={isInvalid}
-               >
-                 <Text style={{ color: isInvalid ? sub : '#fff', fontWeight: 'bold' }}>Apply Filter</Text>
-               </TouchableOpacity>
-             </View>
+              <TouchableOpacity
+                style={{ backgroundColor: isInvalid ? C.border : primary, padding: 12, borderRadius: 6, alignItems: 'center', marginTop: 10 }}
+                onPress={handleApply}
+                disabled={isInvalid}
+              >
+                <Text style={{ color: isInvalid ? sub : '#fff', fontWeight: 'bold' }}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -3827,14 +3827,14 @@ export default function CustomerAnalyticsScreen() {
           dateRangeModalTarget === "spend"
             ? "Spending Trend"
             : dateRangeModalTarget === "orders"
-            ? "Orders Placed"
-            : dateRangeModalTarget === "freq"
-            ? "Order Frequency"
-            : dateRangeModalTarget === "dist"
-            ? "Purchase Time Breakdown"
-            : dateRangeModalTarget === "category"
-            ? "Most Purchased Categories"
-            : "Custom Range"
+              ? "Orders Placed"
+              : dateRangeModalTarget === "freq"
+                ? "Order Frequency"
+                : dateRangeModalTarget === "dist"
+                  ? "Purchase Time Breakdown"
+                  : dateRangeModalTarget === "category"
+                    ? "Most Purchased Categories"
+                    : "Custom Range"
         }
         onApply={(from, to) => {
           if (!dateRangeModalTarget) return;
