@@ -77,7 +77,11 @@ export async function fetchAdminCatalogProducts(params?: {
   return fetchProducts({ ...params, adminOnly: true });
 }
 
-export async function fetchProductCatalog(): Promise<{ categories: { id: number; name: string; subcategories: { id: number; name: string }[] }[] }> {
+export async function fetchProductCatalog(): Promise<{
+  categories: { id: number; name: string; subcategories: { id: number; name: string }[] }[];
+  colors?: { id: number; name: string; code?: string }[];
+  sizes?: { id: number; name: string; code?: string }[];
+}> {
   return adminApiRequest("/api/admin/products/catalog");
 }
 
@@ -115,4 +119,108 @@ export async function rejectProduct(id: number, note?: string): Promise<void> {
     method: "POST",
     body: JSON.stringify({ note, reason: note }),
   });
+}
+
+export type CreateProductImagePayload = {
+  source: string;
+  primary?: boolean;
+  sortOrder?: number;
+  variantClientKey?: string;
+};
+
+export type CreateProductVariantPayload = {
+  clientKey?: string;
+  colorId?: number;
+  color: string;
+  sizeId?: number;
+  size: string;
+  sku?: string;
+  stock: number;
+  mrp: number;
+  sellingPrice: number;
+  discount?: number;
+  videoUrl?: string;
+  images?: CreateProductImagePayload[];
+};
+
+export type CreateProductPayload = {
+  categoryId?: number;
+  categoryName?: string;
+  subcategoryId?: number;
+  subcategoryName?: string;
+  name: string;
+  sku?: string;
+  hsnCode: string;
+  productMaterialType?: string;
+  gstPercentage?: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  productWeight: number;
+  fragile?: boolean;
+  shortDescription: string;
+  description: string;
+  features?: string;
+  returnPolicy: string;
+  specifications?: string;
+  sizeChartId?: number;
+  deliveryTimeMin?: number;
+  deliveryTimeMax?: number;
+  deliveryInfo?: string;
+  warrantyInfo?: string;
+  careInstructions?: string;
+  acceptCod?: boolean;
+  variants: CreateProductVariantPayload[];
+  images?: CreateProductImagePayload[];
+};
+
+export type CreateProductResult = {
+  productId: string;
+  status?: string;
+  variants: { clientKey: string; variantId: string }[];
+};
+
+type ApiCreateProductResponse = {
+  productId: number;
+  status?: string;
+  variants?: { clientKey?: string; variantId?: number }[];
+  message?: string;
+};
+
+export type UpdateProductPayload = CreateProductPayload & {
+  variants: (CreateProductVariantPayload & { id?: number; remove?: boolean })[];
+};
+
+function mapCreateResult(row: ApiCreateProductResponse): CreateProductResult {
+  return {
+    productId: String(row.productId),
+    status: row.status,
+    variants: (row.variants ?? []).map((v) => ({
+      clientKey: v.clientKey ?? "",
+      variantId: String(v.variantId ?? ""),
+    })),
+  };
+}
+
+export async function createProduct(payload: CreateProductPayload): Promise<CreateProductResult> {
+  const row = await adminApiRequest<ApiCreateProductResponse>("/api/admin/products", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return mapCreateResult(row);
+}
+
+export async function updateProduct(
+  productId: number | string,
+  payload: UpdateProductPayload
+): Promise<CreateProductResult> {
+  const row = await adminApiRequest<ApiCreateProductResponse>(`/api/admin/products/${productId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return mapCreateResult(row);
+}
+
+export async function deleteProduct(productId: number | string): Promise<void> {
+  await adminApiRequest(`/api/admin/products/${productId}`, { method: "DELETE" });
 }

@@ -57,6 +57,11 @@ type ApiVariant = {
   metroMetroDeliveryCharge?: number;
   totalPriceIntraCity?: number;
   totalPriceMetroMetro?: number;
+  priceWithCommission?: number;
+  highestDeliveryCharge?: number;
+  displayPrice?: number;
+  customerPrice?: number;
+  sellingPriceWithGst?: number;
   weight?: number;
 };
 
@@ -309,11 +314,32 @@ function mapApiProductDetail(data: Record<string, unknown>): {
       sellingPriceExclGst: sellingExcl,
       gstPercent: taxPct,
       gstAmount: taxAmt,
-      sellingPriceWithGst: sellingWith,
+      sellingPriceWithGst: toNum(v.sellingPriceWithGst, sellingWith),
       commissionPercent: toNum(v.commissionPercentage),
       commissionAmount: toNum(v.commissionAmount),
       intraCityDelivery: toNum(v.intraCityDeliveryCharge),
       metroDelivery: toNum(v.metroMetroDeliveryCharge),
+      priceWithCommission: toNum(
+        v.priceWithCommission,
+        toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount),
+      ),
+      highestDeliveryCharge: toNum(
+        v.highestDeliveryCharge,
+        Math.max(toNum(v.intraCityDeliveryCharge), toNum(v.metroMetroDeliveryCharge)),
+      ),
+      displayPrice: toNum(
+        v.displayPrice ?? v.customerPrice,
+        toNum(v.priceWithCommission, toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount))
+          + Math.max(toNum(v.intraCityDeliveryCharge), toNum(v.metroMetroDeliveryCharge)),
+      ),
+      totalPriceIntraCity: toNum(
+        v.totalPriceIntraCity,
+        toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount) + toNum(v.intraCityDeliveryCharge),
+      ),
+      totalPriceMetroMetro: toNum(
+        v.totalPriceMetroMetro ?? v.customerPrice,
+        toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount) + toNum(v.metroMetroDeliveryCharge),
+      ),
     };
   });
 
@@ -328,8 +354,9 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     ? 'Admin Catalog'
     : String(data.sellerName ?? `Seller #${data.sellerId ?? '—'}`);
   const discount = firstVariant?.discountPercent ?? 0;
-  const displayPrice = firstVariant?.sellingPriceWithGst ?? 0;
+  const displayPrice = firstVariant?.displayPrice ?? firstVariant?.sellingPriceWithGst ?? 0;
   const displayMrp = firstVariant?.mrp ?? displayPrice;
+  const commissionLabel = firstVariant?.commissionPercent ?? 0;
 
   const product: ProductDetail = {
     id: String(data.id ?? ''),
@@ -440,6 +467,7 @@ function VariantsTab({
 }) {
   const stats = getVariantStats(variants);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const commissionLabel = variants[0]?.commissionPercent ?? 0;
 
   return (
     <View style={styles.tabContent}>
@@ -456,10 +484,11 @@ function VariantsTab({
           </Text>
         </View>
         <View style={[styles.variantStatBox, isWide && styles.variantStatBoxLast]}>
-          <Text style={styles.variantStatLabel}>Avg. Selling Price</Text>
+          <Text style={styles.variantStatLabel}>Avg. Total Price</Text>
           <Text style={[styles.variantStatValue, { color: PALETTE.navy }]}>
             ₹{stats.avgSellingPrice.toFixed(2)}
           </Text>
+          <Text style={{ fontSize: 10, color: PALETTE.textMuted, marginTop: 2 }}>incl. GST + commission + delivery</Text>
         </View>
       </View>
 
@@ -508,7 +537,7 @@ function VariantsTab({
                 <Text style={[styles.vth, styles.vcolSell]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
                 <Text style={[styles.vth, styles.vcolGst]}>GST{'\n'}<Text style={{ fontSize: 9 }}>(%)</Text></Text>
                 <Text style={[styles.vth, styles.vcolSellGst]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(With GST)</Text></Text>
-                <Text style={[styles.vth, styles.vcolComm]}>Commission{'\n'}<Text style={{ fontSize: 9 }}>(15%)</Text></Text>
+                <Text style={[styles.vth, styles.vcolComm]}>Commission{'\n'}<Text style={{ fontSize: 9 }}>({commissionLabel}%)</Text></Text>
                 <Text style={[styles.vth, styles.vcolDel]}>Intra-{'\n'}City{'\n'}<Text style={{ fontSize: 9 }}>Delivery</Text></Text>
                 <Text style={[styles.vth, styles.vcolDel]}>Metro-{'\n'}Metro{'\n'}<Text style={{ fontSize: 9 }}>Delivery</Text></Text>
                 <View style={styles.vcolTotalIntraHeader}>
@@ -536,8 +565,8 @@ function VariantsTab({
 }
 
 function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
-  const intraCityTotal = v.sellingPriceWithGst + v.commissionAmount + v.intraCityDelivery;
-  const metroMetroTotal = v.sellingPriceWithGst + v.commissionAmount + v.metroDelivery;
+  const intraCityTotal = v.totalPriceIntraCity;
+  const metroMetroTotal = v.totalPriceMetroMetro;
 
   return (
     <View style={styles.variantTableRow}>
@@ -630,8 +659,8 @@ function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact
           <Text style={styles.vSellGstText}>₹{v.sellingPriceWithGst.toFixed(2)}</Text>
         </View>
         <View style={styles.variantPriceItem}>
-          <Text style={styles.variantPriceLabel}>Commission</Text>
-          <Text style={styles.vCommAmount}>+ ₹{v.commissionAmount.toFixed(2)}</Text>
+          <Text style={styles.variantPriceLabel}>Total Price</Text>
+          <Text style={styles.vSellGstText}>₹{v.displayPrice.toFixed(2)}</Text>
         </View>
       </View>
       <View style={styles.variantCardDelivery}>
@@ -1243,7 +1272,7 @@ export default function ProductDetailsScreen() {
 
                   <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
                   <Text style={styles.priceSub}>
-                    MRP Excl. GST ₹{product.mrp.toLocaleString('en-IN')} · GST {product.gst}%
+                    Selling + GST + {commissionLabel}% commission + highest delivery (₹{(firstVariant?.highestDeliveryCharge ?? 0).toLocaleString('en-IN')})
                   </Text>
 
                   <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>

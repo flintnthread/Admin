@@ -509,9 +509,17 @@ const ListRow = ({
   isLast: boolean; screenWidth: number; isEven: boolean;
 }) => {
   const { width } = useWindowDimensions();
-  const isMobile = width < 768;
+  const isNarrow = width < 1200;
   const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
+
+  const colIdStyle = isNarrow ? styles.colId : { flex: 0.9 };
+  const colNameStyle = isNarrow ? styles.colName : { flex: 2 };
+  const colPreviewStyle = isNarrow ? styles.colPreview : { flex: 1.6, alignItems: "center" };
+  const colCodeStyle = isNarrow ? styles.colCode : { flex: 1.6, paddingLeft: 16, paddingRight: 12 };
+  const colDateStyle = isNarrow ? styles.colDate : { flex: 1.7, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 };
+  const colStatusStyle = isNarrow ? styles.colStatus : { flex: 1.2, paddingHorizontal: 12 };
+  const colActionStyle = isNarrow ? styles.colAction : { flex: 1, flexDirection: "row", gap: 8, justifyContent: "flex-end" };
 
   return (
     <View style={[
@@ -521,37 +529,37 @@ const ListRow = ({
       IS_WEB ? ({ ":hover": { backgroundColor: "#fdf7f3" } } as any) : {},
     ]}>
       {showId && (
-        <View style={styles.colId}>
+        <View style={colIdStyle}>
           <Text style={styles.cellId}>{item.id}</Text>
         </View>
       )}
 
-      <View style={styles.colName}>
+      <View style={colNameStyle}>
         <Text style={styles.cellName} numberOfLines={1}>{item.name}</Text>
       </View>
 
-      <View style={styles.colPreview}>
+      <View style={colPreviewStyle}>
         <View style={[styles.swatchCell, { backgroundColor: item.code }]} />
       </View>
 
-      <View style={styles.colCode}>
+      <View style={colCodeStyle}>
         <View style={styles.codePill}>
           <Text style={styles.cellCode} numberOfLines={1}>{item.code}</Text>
         </View>
       </View>
 
       {showDate && (
-        <View style={styles.colDate}>
+        <View style={colDateStyle}>
           <Ionicons name={BI.calendar as any} size={13} color="#888" style={{ marginRight: 5 }} />
           <Text style={styles.cellDate}>{item.createdDate}</Text>
         </View>
       )}
 
-      <View style={styles.colStatus}>
+      <View style={colStatusStyle}>
         <StatusBadge status={item.status} />
       </View>
 
-      <View style={styles.colAction}>
+      <View style={colActionStyle}>
         <TouchableOpacity
           style={styles.editBtn}
           onPress={onEdit}
@@ -578,35 +586,43 @@ const ListRow = ({
 // ─────────────────────────────────────────────────────────────────────────────
 const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
   const { width } = useWindowDimensions();
-  const isMobile = width < 768;
+  const isNarrow = width < 1200;
   const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
+
+  const colIdStyle = isNarrow ? styles.colId : { flex: 0.9 };
+  const colNameStyle = isNarrow ? styles.colName : { flex: 2 };
+  const colPreviewStyle = isNarrow ? styles.colPreview : { flex: 1.6, alignItems: "center" };
+  const colCodeStyle = isNarrow ? styles.colCode : { flex: 1.6, paddingLeft: 16, paddingRight: 12 };
+  const colDateStyle = isNarrow ? styles.colDate : { flex: 1.7, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 };
+  const colStatusStyle = isNarrow ? styles.colStatus : { flex: 1.2, paddingHorizontal: 12 };
+  const colActionStyle = isNarrow ? styles.colAction : { flex: 1, flexDirection: "row", gap: 8, justifyContent: "flex-end" };
 
   return (
     <View style={styles.tableHeader}>
       {showId && (
-        <View style={styles.colId}>
+        <View style={colIdStyle}>
           <Text style={styles.headerCell}>ID</Text>
         </View>
       )}
-      <View style={styles.colName}>
+      <View style={colNameStyle}>
         <Text style={styles.headerCell}>COLOR NAME</Text>
       </View>
-      <View style={styles.colPreview}>
+      <View style={colPreviewStyle}>
         <Text style={[styles.headerCell, { textAlign: "center", width: "100%" }]}>COLOR PREVIEW</Text>
       </View>
-      <View style={styles.colCode}>
+      <View style={colCodeStyle}>
         <Text style={styles.headerCell}>COLOR CODE</Text>
       </View>
       {showDate && (
-        <View style={styles.colDate}>
+        <View style={colDateStyle}>
           <Text style={styles.headerCell}>CREATED DATE</Text>
         </View>
       )}
-      <View style={styles.colStatus}>
+      <View style={colStatusStyle}>
         <Text style={styles.headerCell}>STATUS</Text>
       </View>
-      <View style={styles.colAction}>
+      <View style={colActionStyle}>
         <Text style={[styles.headerCell, { textAlign: "right", width: "100%" }]}>ACTIONS</Text>
       </View>
     </View>
@@ -870,8 +886,8 @@ export default function ColorsScreen() {
 
   return (
     <AdminLayout>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, width: "100%" }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1, width: "100%" }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
           <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
 
           {HeaderSection}

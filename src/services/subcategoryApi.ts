@@ -119,25 +119,55 @@ export async function updateSubcategory(
   id: number,
   categoryId: number,
   subcategoryName: string,
-  subcategoryImage?: string,
-  mobileImage?: string,
+  subcategoryImage?: string | null,
+  mobileImage?: string | null,
   materialSlabs?: string,
   weightSlabs?: string,
   gstPercentage?: number,
   status?: boolean
-): Promise<void> {
+): Promise<SubcategoryRow> {
+  const body: Record<string, unknown> = {
+    categoryId,
+    subcategoryName,
+    materialSlabs,
+    weightSlabs,
+    gstPercentage,
+    status,
+  };
+  // Only send image fields when provided so existing DB images are preserved.
+  if (subcategoryImage != null && subcategoryImage !== "") {
+    body.subcategoryImage = subcategoryImage;
+  }
+  if (mobileImage != null && mobileImage !== "") {
+    body.mobileImage = mobileImage;
+  }
   return adminApiRequest(`/api/admin/subcategories/${id}`, {
     method: "PUT",
-    body: JSON.stringify({
-      categoryId,
-      subcategoryName,
-      subcategoryImage,
-      mobileImage,
-      materialSlabs,
-      weightSlabs,
-      gstPercentage,
-      status,
-    }),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function uploadSubcategoryImages(
+  id: number,
+  image?: Blob | File | null,
+  mobileImage?: Blob | File | null
+): Promise<SubcategoryRow> {
+  const form = new FormData();
+  if (image) {
+    const fileName =
+      image instanceof File && image.name ? image.name : "subcategory.jpg";
+    form.append("image", image, fileName);
+  }
+  if (mobileImage) {
+    const fileName =
+      mobileImage instanceof File && mobileImage.name
+        ? mobileImage.name
+        : "subcategory-mobile.jpg";
+    form.append("mobileImage", mobileImage, fileName);
+  }
+  return adminApiRequest(`/api/admin/subcategories/${id}/upload-images`, {
+    method: "POST",
+    body: form,
   });
 }
 

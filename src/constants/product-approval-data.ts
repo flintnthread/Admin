@@ -10,6 +10,7 @@ export type ApprovalProduct = {
   category: string;
   status: ProductStatus;
   submittedOn: string;
+  price?: string;
   isNew?: boolean;
 };
 
@@ -198,6 +199,11 @@ export type ProductVariant = {
   commissionAmount: number;
   intraCityDelivery: number;
   metroDelivery: number;
+  priceWithCommission: number;
+  highestDeliveryCharge: number;
+  displayPrice: number;
+  totalPriceIntraCity: number;
+  totalPriceMetroMetro: number;
 };
 
 const VARIANT_IMAGE =
@@ -226,6 +232,11 @@ export const PRODUCT_VARIANTS: ProductVariant[] = Array.from({ length: 15 }, (_,
     commissionAmount: 62.21,
     intraCityDelivery: 20,
     metroDelivery: 25,
+    priceWithCommission: sellingWith + 62.21,
+    highestDeliveryCharge: 25,
+    displayPrice: sellingWith + 62.21 + 25,
+    totalPriceIntraCity: sellingWith + 62.21 + 20,
+    totalPriceMetroMetro: sellingWith + 62.21 + 25,
   };
 });
 
@@ -341,7 +352,7 @@ export function getVariantStats(variants: ProductVariant[]) {
   const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
   const avgPrice =
     variants.length > 0
-      ? variants.reduce((sum, v) => sum + v.sellingPriceWithGst, 0) / variants.length
+      ? variants.reduce((sum, v) => sum + v.displayPrice, 0) / variants.length
       : 0;
   return {
     totalVariants: variants.length,
