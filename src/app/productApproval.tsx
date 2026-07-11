@@ -272,7 +272,7 @@ function FilterDropdown({
   );
 }
 
-function ActionButtons({ inline, productId }: { inline?: boolean; productId?: string }) {
+function ActionButtons({ inline, productId, status }: { inline?: boolean; productId?: string; status?: ProductStatus }) {
   const openDetails = () => {
     if (productId) router.push(`/productDetails?id=${productId}`);
   };
@@ -289,15 +289,28 @@ function ActionButtons({ inline, productId }: { inline?: boolean; productId?: st
         <MaterialCommunityIcons name="eye-outline" size={inline ? 12 : 14} color={PALETTE.orange} />
         <Text style={[styles.viewDetailsText, inline && styles.actionTextInline]}>View Details</Text>
       </Pressable>
-      <Pressable
-        style={({ pressed }) => [
-          styles.activateBtn,
-          inline && styles.activateBtnInline,
-          pressed && styles.pressed,
-        ]}>
-        <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
-        <Text style={[styles.activateText, inline && styles.actionTextInline]}>Activate</Text>
-      </Pressable>
+      {status === 'pending' && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.activateBtn,
+            inline && styles.activateBtnInline,
+            pressed && styles.pressed,
+          ]}>
+          <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>Activate</Text>
+        </Pressable>
+      )}
+      {status === 'approved' && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.deactivateBtn,
+            inline && styles.activateBtnInline,
+            pressed && styles.pressed,
+          ]}>
+          <MaterialCommunityIcons name="close-circle-outline" size={inline ? 12 : 14} color="#FFF" />
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>Deactivate</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -386,7 +399,7 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide, stats, onFilter, isMobile }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean }) {
+function PageHeader({ isWide, stats, onFilter, isMobile, isTablet }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean; isTablet?: boolean }) {
   return (
     <View>
       <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
@@ -399,8 +412,8 @@ function PageHeader({ isWide, stats, onFilter, isMobile }: { isWide: boolean; st
           </View>
         </View>
       </View>
-      {/* Mobile: stat cards overlapping the header bottom */}
-      {isMobile && stats && onFilter && (
+      {/* Mobile/Tablet: stat cards overlapping the header bottom */}
+      {(isMobile || isTablet) && stats && onFilter && (
         <View style={styles.mobileHeaderStats}>
           <StatsRow stats={stats} onFilter={onFilter} isWide={false} />
         </View>
@@ -710,7 +723,7 @@ function ProductCard({ product }: { product: Product }) {
             </Text>
           </View>
         </View>
-        <ActionButtons inline productId={product.id} />
+        <ActionButtons inline productId={product.id} status={product.status} />
       </View>
     </View>
   );
@@ -731,9 +744,8 @@ function ProductTable({
 
   return (
     <View style={styles.tableCard}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
             <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
             <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
             <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
@@ -779,12 +791,11 @@ function ProductTable({
               <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
 
               <View style={styles.tableColActions}>
-                <ActionButtons inline productId={product.id} />
+                <ActionButtons inline productId={product.id} status={product.status} />
               </View>
             </View>
           ))}
         </View>
-      </ScrollView>
     </View>
   );
 }
@@ -990,13 +1001,11 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} />
+        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} isTablet={isTablet} />
 
         {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
         <View style={styles.scrollContent}>
-
-          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}
@@ -1745,6 +1754,16 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  deactivateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: PALETTE.red,
+    alignSelf: 'flex-start',
   },
   viewDetailsBtnInline: {
     paddingHorizontal: 8,

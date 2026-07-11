@@ -509,9 +509,17 @@ const ListRow = ({
   isLast: boolean; screenWidth: number; isEven: boolean;
 }) => {
   const { width } = useWindowDimensions();
-  const isMobile = width < 768;
+  const isNarrow = width < 1200;
   const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
+
+  const colIdStyle = isNarrow ? styles.colId : { flex: 0.9 };
+  const colNameStyle = isNarrow ? styles.colName : { flex: 2 };
+  const colPreviewStyle = isNarrow ? styles.colPreview : { flex: 1.6, alignItems: "center" };
+  const colCodeStyle = isNarrow ? styles.colCode : { flex: 1.6, paddingLeft: 16, paddingRight: 12 };
+  const colDateStyle = isNarrow ? styles.colDate : { flex: 1.7, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 };
+  const colStatusStyle = isNarrow ? styles.colStatus : { flex: 1.2, paddingHorizontal: 12 };
+  const colActionStyle = isNarrow ? styles.colAction : { flex: 1, flexDirection: "row", gap: 8, justifyContent: "flex-end" };
 
   return (
     <View style={[
@@ -521,37 +529,37 @@ const ListRow = ({
       IS_WEB ? ({ ":hover": { backgroundColor: "#fdf7f3" } } as any) : {},
     ]}>
       {showId && (
-        <View style={styles.colId}>
+        <View style={colIdStyle}>
           <Text style={styles.cellId}>{item.id}</Text>
         </View>
       )}
 
-      <View style={styles.colName}>
+      <View style={colNameStyle}>
         <Text style={styles.cellName} numberOfLines={1}>{item.name}</Text>
       </View>
 
-      <View style={styles.colPreview}>
+      <View style={colPreviewStyle}>
         <View style={[styles.swatchCell, { backgroundColor: item.code }]} />
       </View>
 
-      <View style={styles.colCode}>
+      <View style={colCodeStyle}>
         <View style={styles.codePill}>
           <Text style={styles.cellCode} numberOfLines={1}>{item.code}</Text>
         </View>
       </View>
 
       {showDate && (
-        <View style={styles.colDate}>
+        <View style={colDateStyle}>
           <Ionicons name={BI.calendar as any} size={13} color="#888" style={{ marginRight: 5 }} />
           <Text style={styles.cellDate}>{item.createdDate}</Text>
         </View>
       )}
 
-      <View style={styles.colStatus}>
+      <View style={colStatusStyle}>
         <StatusBadge status={item.status} />
       </View>
 
-      <View style={styles.colAction}>
+      <View style={colActionStyle}>
         <TouchableOpacity
           style={styles.editBtn}
           onPress={onEdit}
@@ -578,35 +586,43 @@ const ListRow = ({
 // ─────────────────────────────────────────────────────────────────────────────
 const ListHeader = ({ screenWidth }: { screenWidth: number }) => {
   const { width } = useWindowDimensions();
-  const isMobile = width < 768;
+  const isNarrow = width < 1200;
   const showId = screenWidth >= BP.md;
   const showDate = screenWidth >= BP.md;
+
+  const colIdStyle = isNarrow ? styles.colId : { flex: 0.9 };
+  const colNameStyle = isNarrow ? styles.colName : { flex: 2 };
+  const colPreviewStyle = isNarrow ? styles.colPreview : { flex: 1.6, alignItems: "center" };
+  const colCodeStyle = isNarrow ? styles.colCode : { flex: 1.6, paddingLeft: 16, paddingRight: 12 };
+  const colDateStyle = isNarrow ? styles.colDate : { flex: 1.7, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 };
+  const colStatusStyle = isNarrow ? styles.colStatus : { flex: 1.2, paddingHorizontal: 12 };
+  const colActionStyle = isNarrow ? styles.colAction : { flex: 1, flexDirection: "row", gap: 8, justifyContent: "flex-end" };
 
   return (
     <View style={styles.tableHeader}>
       {showId && (
-        <View style={styles.colId}>
+        <View style={colIdStyle}>
           <Text style={styles.headerCell}>ID</Text>
         </View>
       )}
-      <View style={styles.colName}>
+      <View style={colNameStyle}>
         <Text style={styles.headerCell}>COLOR NAME</Text>
       </View>
-      <View style={styles.colPreview}>
+      <View style={colPreviewStyle}>
         <Text style={[styles.headerCell, { textAlign: "center", width: "100%" }]}>COLOR PREVIEW</Text>
       </View>
-      <View style={styles.colCode}>
+      <View style={colCodeStyle}>
         <Text style={styles.headerCell}>COLOR CODE</Text>
       </View>
       {showDate && (
-        <View style={styles.colDate}>
+        <View style={colDateStyle}>
           <Text style={styles.headerCell}>CREATED DATE</Text>
         </View>
       )}
-      <View style={styles.colStatus}>
+      <View style={colStatusStyle}>
         <Text style={styles.headerCell}>STATUS</Text>
       </View>
-      <View style={styles.colAction}>
+      <View style={colActionStyle}>
         <Text style={[styles.headerCell, { textAlign: "right", width: "100%" }]}>ACTIONS</Text>
       </View>
     </View>
@@ -740,68 +756,111 @@ export default function ColorsScreen() {
   ), [pageItems.length, viewMode, containerWidth, width]);
 
   // ── Shared header + toolbar + footer sections ──────────────────────────────
-  const HeaderSection = (
-    <>
-      <View style={styles.webPageHeader}>
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-          <View style={styles.headerIconBox}>
-            <Ionicons name={BI.palette as any} size={22} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.webPageTitle}>Colors Management</Text>
-            <Text style={styles.webPageSubtitle}>Manage catalog color variants and status settings</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
-          <Ionicons name={BI.plus as any} size={18} color="#fff" />
-          {width >= BP.sm && <Text style={styles.addBtnText}>Add New Color</Text>}
-        </TouchableOpacity>
-      </View>
+  const HeaderSection = (() => {
+    const isMobileHeader = width < 450;
+    const isMobileSmall = width < 360;
+    return (
+      <>
+        <View style={[
+          styles.webPageHeader,
+          isMobileHeader && {
+            flexDirection: "column",
+            alignItems: "stretch",
+            paddingHorizontal: 14,
+            paddingVertical: 14,
+            marginHorizontal: 8,
+            marginTop: 8,
+            borderRadius: 12,
+            gap: 10
+          }
+        ]}>
+          {isMobileHeader ? (
+            <View style={{ flexDirection: "column", gap: 10 }}>
+              {/* Row 1: Icon & Title on Left & Add Button on Right */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <View style={[styles.headerIconBox, { width: 34, height: 34, marginRight: 0, flexShrink: 0 }]}>
+                    <Ionicons name={BI.palette as any} size={18} color="#fff" />
+                  </View>
+                  <Text style={[styles.webPageTitle, { fontSize: isMobileSmall ? 17 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1}>
+                    Colors Management
+                  </Text>
+                </View>
+                <TouchableOpacity style={[styles.addBtn, { paddingVertical: 6, paddingHorizontal: 10, marginLeft: 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]} onPress={() => setAddOpen(true)}>
+                  <Ionicons name={BI.plus as any} size={14} color="#fff" style={{ marginRight: 4 }} />
+                  <Text style={[styles.addBtnText, { fontSize: 12 }]}>Add Color</Text>
+                </TouchableOpacity>
+              </View>
 
-      <View style={{ paddingHorizontal: PADDING, marginTop: 24 }}>
-        {loadError ? (
-          <Text style={{ color: "#dc2626", marginBottom: 8 }}>{loadError}</Text>
-        ) : null}
-        {loading ? (
-          <View style={{ paddingVertical: 24, alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#D4690A" />
-          </View>
-        ) : null}
-        {/* Toolbar */}
-        <View style={styles.toolbar}>
-          <View style={styles.searchBox}>
-            <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
-            <TextInput
-              value={search}
-              onChangeText={handleSearch}
-              placeholder="Search colors..."
-              placeholderTextColor="#bbb"
-              style={styles.searchInput}
-            />
-            {!!search && (
-              <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+              {/* Subtitle Row */}
+              <Text style={styles.webPageSubtitle}>
+                Manage catalog color variants and status settings
+              </Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
+                <View style={styles.headerIconBox}>
+                  <Ionicons name={BI.palette as any} size={22} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.webPageTitle}>Colors Management</Text>
+                  <Text style={styles.webPageSubtitle}>Manage catalog color variants and status settings</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
+                <Ionicons name={BI.plus as any} size={18} color="#fff" />
+                <Text style={styles.addBtnText}>Add New Color</Text>
               </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.viewToggle}>
-            <TouchableOpacity
-              style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
-              onPress={() => setViewMode("grid")}
-            >
-              <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
-              onPress={() => setViewMode("list")}
-            >
-              <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
-            </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={{ paddingHorizontal: PADDING, marginTop: 24 }}>
+          {loadError ? (
+            <Text style={{ color: "#dc2626", marginBottom: 8 }}>{loadError}</Text>
+          ) : null}
+          {loading ? (
+            <View style={{ paddingVertical: 24, alignItems: "center" }}>
+              <ActivityIndicator size="large" color="#D4690A" />
+            </View>
+          ) : null}
+          {/* Toolbar */}
+          <View style={styles.toolbar}>
+            <View style={styles.searchBox}>
+              <Ionicons name={BI.search as any} size={15} color="#bbb" style={{ marginRight: 6 }} />
+              <TextInput
+                value={search}
+                onChangeText={handleSearch}
+                placeholder="Search colors..."
+                placeholderTextColor="#bbb"
+                style={styles.searchInput}
+              />
+              {!!search && (
+                <TouchableOpacity onPress={() => handleSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name={BI.xCircle as any} size={17} color="#aaa" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.viewToggle}>
+              <TouchableOpacity
+                style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
+                onPress={() => setViewMode("grid")}
+              >
+                <Ionicons name={BI.grid as any} size={17} color={viewMode === "grid" ? "#fff" : "#666"} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
+                onPress={() => setViewMode("list")}
+              >
+                <Ionicons name={BI.list as any} size={19} color={viewMode === "list" ? "#fff" : "#666"} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </>
-  );
+      </>
+    );
+  })();
 
   const FooterSection = (
     <View style={{ paddingHorizontal: PADDING }}>
@@ -827,8 +886,8 @@ export default function ColorsScreen() {
 
   return (
     <AdminLayout>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={{ flex: 1 }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, width: "100%" }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1, width: "100%" }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
           <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
 
           {HeaderSection}
@@ -843,30 +902,33 @@ export default function ColorsScreen() {
               gap={GAP}
             />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ width: Math.max(containerWidth, 950) }}>
-                <View style={{ paddingHorizontal: PADDING }}>
-                  <View style={styles.tableCard}>
-                    <ListHeader screenWidth={Math.max(containerWidth, 950)} />
+            <View style={{ width: "100%" }}>
+              {/* @ts-ignore */}
+              <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
+                <View style={{ width: Math.max(containerWidth, 950) }}>
+                  <View style={{ paddingHorizontal: PADDING }}>
+                    <View style={styles.tableCard}>
+                      <ListHeader screenWidth={Math.max(containerWidth, 950)} />
+                    </View>
+                  </View>
+                  <View style={{ paddingHorizontal: PADDING }}>
+                    <View style={styles.tableCardRows}>
+                      {pageItems.map((item, index) => (
+                        <ListRow
+                          key={item.id}
+                          item={item}
+                          isLast={index === pageItems.length - 1}
+                          isEven={index % 2 === 0}
+                          screenWidth={Math.max(containerWidth, 950)}
+                          onEdit={() => setEditTarget(item)}
+                          onDelete={() => setDeleteTarget(item)}
+                        />
+                      ))}
+                    </View>
                   </View>
                 </View>
-                <View style={{ paddingHorizontal: PADDING }}>
-                  <View style={styles.tableCardRows}>
-                    {pageItems.map((item, index) => (
-                      <ListRow
-                        key={item.id}
-                        item={item}
-                        isLast={index === pageItems.length - 1}
-                        isEven={index % 2 === 0}
-                        screenWidth={Math.max(containerWidth, 950)}
-                        onEdit={() => setEditTarget(item)}
-                        onDelete={() => setDeleteTarget(item)}
-                      />
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           )}
 
           {FooterSection}

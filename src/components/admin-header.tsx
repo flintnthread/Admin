@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   Modal,
+
+  Platform,
+  useWindowDimensions,
+
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -87,7 +90,7 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
 
   return (
     <View style={[
-      styles.header, 
+      styles.header,
       { backgroundColor: colors.surface, borderBottomColor: colors.border }
     ]}>
       {/* Hamburger – shown on mobile only */}
@@ -129,12 +132,45 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
           <Feather name="settings" size={18} color={isDark ? "#FFFFFF" : "#374151"} />
         </TouchableOpacity>
 
-        {/* Avatar */}
-        <TouchableOpacity onPress={toggleProfile} style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : "FL"}
-          </Text>
-        </TouchableOpacity>
+        {/* Avatar + Profile Dropdown */}
+        <View style={{ position: "relative" }}>
+          <TouchableOpacity onPress={toggleProfile} style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : "FL"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Profile Dropdown — closes when mouse leaves the dropdown card */}
+          {profileOpen && (
+            <View
+              style={[styles.dropdownCard, { right: 0, width: 200, backgroundColor: colors.surface, borderColor: colors.border }]}
+              {...(Platform.OS === "web"
+                ? ({ onMouseLeave: () => setProfileOpen(false) } as object)
+                : {})}
+            >
+              <View style={[styles.dropdownHeader, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
+                <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
+                  {user?.fullName || "Flint Admin"}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
+                  {user?.email || "admin@flintandthread.com"}
+                </Text>
+              </View>
+              <View style={{ padding: 6 }}>
+                <TouchableOpacity onPress={handleProfileClick} style={styles.dropdownOption}>
+                  <Feather name="user" size={14} color={colors.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.dropdownOptionText, { color: colors.text }]}>My Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleLogoutClick} style={[styles.dropdownOption, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4, paddingTop: 8 }]}>
+                  <Feather name="log-out" size={14} color="#EF4444" style={{ marginRight: 8 }} />
+                  <Text style={[styles.dropdownOptionText, { color: "#EF4444" }]}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
+
       </View>
 
       {/* Notifications Dropdown */}
@@ -186,30 +222,6 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      )}
-
-      {/* Profile Dropdown */}
-      {profileOpen && (
-        <View style={[styles.dropdownCard, { right: 20, width: 200, backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.dropdownHeader, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
-            <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
-              {user?.fullName || "Flint Admin"}
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
-              {user?.email || "admin@flintandthread.com"}
-            </Text>
-          </View>
-          <View style={{ padding: 6 }}>
-            <TouchableOpacity onPress={handleProfileClick} style={styles.dropdownOption}>
-              <Feather name="user" size={14} color={colors.text} style={{ marginRight: 8 }} />
-              <Text style={[styles.dropdownOptionText, { color: colors.text }]}>My Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogoutClick} style={[styles.dropdownOption, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4, paddingTop: 8 }]}>
-              <Feather name="log-out" size={14} color="#EF4444" style={{ marginRight: 8 }} />
-              <Text style={[styles.dropdownOptionText, { color: "#EF4444" }]}>Logout</Text>
-            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -273,17 +285,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: 38,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     maxWidth: 280,
     backgroundColor: "#F3F4F6",
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginRight: "auto",
+    marginRight: 8,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 13,
     color: "#1F2937",
     padding: 0,
@@ -295,7 +311,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 6,
+    flexShrink: 0,
   },
   actionBtn: {
     width: 36,

@@ -16,6 +16,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from "react-native";
 
@@ -137,14 +138,26 @@ const StatPill: React.FC<{
     label: string;
     iconBg: string;
     iconFg: string;
-}> = ({ icon, value, label, iconBg, iconFg }) => (
-    <View style={sp.card}>
-        <View style={[sp.iconBox, { backgroundColor: iconBg }]}>
-            <Feather name={icon} size={15} color={iconFg} />
+    isMobile?: boolean;
+}> = ({ icon, value, label, iconBg, iconFg, isMobile }) => (
+    <View style={[
+        sp.card,
+        isMobile && {
+            padding: 8,
+            gap: 6,
+            alignItems: "center",
+        }
+    ]}>
+        <View style={[
+            sp.iconBox,
+            { backgroundColor: iconBg },
+            isMobile && { width: 28, height: 28, borderRadius: 8 }
+        ]}>
+            <Feather name={icon} size={isMobile ? 12 : 15} color={iconFg} />
         </View>
-        <View>
-            <Text style={sp.val}>{value}</Text>
-            <Text style={sp.lbl}>{label}</Text>
+        <View style={isMobile && { flex: 1 }}>
+            <Text style={[sp.val, isMobile && { fontSize: 15, lineHeight: 17 }]}>{value}</Text>
+            <Text style={[sp.lbl, isMobile && { fontSize: 8, letterSpacing: 0.2 }]} numberOfLines={1}>{label}</Text>
         </View>
     </View>
 );
@@ -601,7 +614,7 @@ const WebSelect: React.FC<{
                 height: "100%",
                 border: "none",
                 background: "transparent",
-                fontSize: 13,
+                fontSize: 15,
                 color: value.startsWith("All") ? T.textHint : T.textH,
                 outline: "none",
                 fontFamily: "inherit",
@@ -621,7 +634,7 @@ const WebSelect: React.FC<{
 
 const ws = StyleSheet.create({
     wrap: {
-        flex: 1,
+        width: "100%",
         height: 42,
         backgroundColor: T.card,
         borderRadius: 11,
@@ -646,18 +659,18 @@ const ViewToggle: React.FC<{
     view: "grid" | "list";
     onToggle: (v: "grid" | "list") => void;
 }> = ({ view, onToggle }) => (
-    <View style={vt.wrap}>
+    <View style={[vt.wrap, { height: 42, padding: 2 }]}>
         <TouchableOpacity
-            style={[vt.btn, view === "grid" && vt.active]}
+            style={[vt.btn, view === "grid" && vt.active, { width: 36, height: 36 }]}
             onPress={() => onToggle("grid")}
         >
-            <Feather name="grid" size={14} color={view === "grid" ? T.orange : T.textHint} />
+            <Feather name="grid" size={16} color={view === "grid" ? T.orange : T.textHint} />
         </TouchableOpacity>
         <TouchableOpacity
-            style={[vt.btn, view === "list" && vt.active]}
+            style={[vt.btn, view === "list" && vt.active, { width: 36, height: 36 }]}
             onPress={() => onToggle("list")}
         >
-            <Feather name="list" size={14} color={view === "list" ? T.orange : T.textHint} />
+            <Feather name="list" size={16} color={view === "list" ? T.orange : T.textHint} />
         </TouchableOpacity>
     </View>
 );
@@ -666,16 +679,18 @@ const vt = StyleSheet.create({
     wrap: {
         flexDirection: "row",
         backgroundColor: T.bg,
-        borderRadius: 9,
+        borderRadius: 11,
         borderWidth: 1,
         borderColor: T.border,
         padding: 3,
         gap: 2,
+        height: 54,
+        alignItems: "center",
     },
     btn: {
-        width: 30,
-        height: 30,
-        borderRadius: 7,
+        width: 46,
+        height: 46,
+        borderRadius: 9,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -1300,8 +1315,25 @@ const JobOpeningsScreen: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const { width } = useWindowDimensions();
+    const isMobileScreen = width < 768;
+    const isSmallMobile = width < 480;
+
     const isWeb = Platform.OS === "web";
     const departmentNames = deptOptions.filter((d) => d !== "All Departments");
+
+    let cardWidth: any = "100%";
+    if (isWeb) {
+        if (width >= 1024) {
+            cardWidth = "calc(33.33% - 11px)";
+        } else if (width >= 640) {
+            cardWidth = "calc(50% - 8px)";
+        } else {
+            cardWidth = "100%";
+        }
+    } else {
+        cardWidth = "100%";
+    }
 
     const filtered = jobs.filter(j => {
         const matchSearch =
@@ -1403,7 +1435,7 @@ const JobOpeningsScreen: React.FC = () => {
     const totalApps = jobs.reduce((s, j) => s + j.applications, 0);
     const urgentCount = jobs.filter(j => j.urgent).length;
 
-    const Container = isWeb ? View : SafeAreaView;
+    const Container = View;
 
     const MainContent = (
         <Container style={s.safe}>
@@ -1413,202 +1445,363 @@ const JobOpeningsScreen: React.FC = () => {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 12 }]}
+                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 0, marginTop: 0 }]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* ── PAGE HEADER ── */}
-                <View style={[s.pageHead, !isWeb && { flexDirection: 'column', alignItems: 'stretch', padding: 16, paddingTop: 18, paddingBottom: 48, marginTop: 4 }]}>
-                    {!isWeb ? (
-                        <>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                {/* ── PAGE HEADER (Mobile) ── */}
+                {isMobileScreen ? (
+                    <>
+                        {/* Curved dark header card with icon + title + add button */}
+                        <View style={s.mobileHeader}>
+                            <View style={s.mobileHeaderLeft}>
+                                <View style={s.mobileHeaderIcon}>
+                                    <Feather name="briefcase" size={22} color="#fff" />
+                                </View>
+                                <View>
+                                    <Text style={s.mobileHeaderTitle}>Open Positions</Text>
+                                    {!isSmallMobile && (
+                                        <Text style={s.mobileHeaderSub}>Manage all job listings</Text>
+                                    )}
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={s.mobileAddBtn}
+                                onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
+                                activeOpacity={0.85}
+                            >
+                                <Feather name="plus" size={16} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Stat cards: 2 per row grid overlapping the header */}
+                        <View style={s.mobileStatsGrid}>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.orange }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.orangeLight }]}>
+                                        <Feather name="briefcase" size={18} color={T.orange} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.orange }]}>{totalJobs}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Total Jobs</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.green }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.greenBg }]}>
+                                        <Feather name="check-circle" size={18} color={T.green} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.green }]}>{activeCount}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Active</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.navy }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.navyLight }]}>
+                                        <Feather name="file-text" size={18} color={T.navy} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.navy }]}>{totalApps}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Applications</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.red }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.redBg }]}>
+                                        <Feather name="zap" size={18} color={T.red} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.red }]}>{urgentCount}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Urgent</Text>
+                            </View>
+                        </View>
+                    </>
+                ) : (
+                    <>
+                        {/* ── PAGE HEADER (Web) ── */}
+                        <View style={s.pageHead}>
+                            <View style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                width: "100%",
+                                gap: 10,
+                            }}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={[s.pageTitle, { fontSize: 20 }]}>Open Positions</Text>
+                                    <Text style={s.pageTitle}>Open Positions</Text>
                                     <Text style={s.pageSub}>Manage and track all active job listings</Text>
                                 </View>
-                                <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => { setEditingJob(null); setEditModalVisible(true); }} activeOpacity={0.85}>
+                                <TouchableOpacity
+                                    style={s.addBtn}
+                                    onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
+                                    activeOpacity={0.85}
+                                >
                                     <Feather name="plus" size={14} color="#fff" />
-                                    <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
+                                    <Text style={s.addBtnTxt}>Add New Job</Text>
                                 </TouchableOpacity>
                             </View>
-                        </>
-                    ) : (
-                        <>
-                            <View style={s.pageHeadLeft}>
+                        </View>
 
-                                <Text style={s.pageTitle}>Open Positions</Text>
-                                <Text style={s.pageSub}>Manage and track all active job listings</Text>
-                            </View>
-                            <TouchableOpacity style={s.addBtn} onPress={() => { setEditingJob(null); setEditModalVisible(true); }} activeOpacity={0.85}>
-                                <Feather name="plus" size={15} color="#fff" />
-                                <Text style={s.addBtnTxt}>Add New Job</Text>
-                            </TouchableOpacity>
-                        </>
-                    )}
-                </View>
-
-                {/* ── STATS ── */}
-                <View style={[s.statsRow, !isWeb && s.statsRowMobile]}>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="briefcase"
-                            value={totalJobs}
-                            label="Total Jobs"
-                            iconBg={T.orangeLight}
-                            iconFg={T.orange}
-                        />
-                    </View>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="check-circle"
-                            value={activeCount}
-                            label="Active"
-                            iconBg={T.greenBg}
-                            iconFg={T.green}
-                        />
-                    </View>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="file-text"
-                            value={totalApps}
-                            label="Applications"
-                            iconBg={T.navyLight}
-                            iconFg={T.navy}
-                        />
-                    </View>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="zap"
-                            value={urgentCount}
-                            label="Urgent"
-                            iconBg={T.redBg}
-                            iconFg={T.red}
-                        />
-                    </View>
-                </View>
+                        {/* ── STATS (Web — centered row) ── */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={s.statsRow}
+                            contentContainerStyle={{
+                                flexDirection: "row",
+                                gap: 8,
+                                flexGrow: 1,
+                                justifyContent: "center"
+                            }}
+                        >
+                            <StatPill
+                                icon="briefcase"
+                                value={totalJobs}
+                                label="Total Jobs"
+                                iconBg={T.orangeLight}
+                                iconFg={T.orange}
+                            />
+                            <StatPill
+                                icon="check-circle"
+                                value={activeCount}
+                                label="Active"
+                                iconBg={T.greenBg}
+                                iconFg={T.green}
+                            />
+                            <StatPill
+                                icon="file-text"
+                                value={totalApps}
+                                label="Applications"
+                                iconBg={T.navyLight}
+                                iconFg={T.navy}
+                            />
+                            <StatPill
+                                icon="zap"
+                                value={urgentCount}
+                                label="Urgent"
+                                iconBg={T.redBg}
+                                iconFg={T.red}
+                            />
+                        </ScrollView>
+                    </>
+                )}
 
                 {/* ── SEARCH + FILTERS ── */}
-                <View style={s.searchRow}>
-                    <View style={s.searchBox}>
-                        <Feather name="search" size={15} color="#000000" />
-                        <TextInput
-                            style={[s.searchInput, { color: "#000000" }]}
-                            placeholder="Search jobs, departments, locations…"
-                            placeholderTextColor="#000000"
-                            value={search}
-                            onChangeText={setSearch}
-                        />
-                        {search.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearch("")}>
-                                <Feather name="x-circle" size={15} color="#000000" />
+                {isMobileScreen ? (
+                    <View style={{ gap: 10, paddingHorizontal: 16 }}>
+                        <View style={s.searchRow}>
+                            <View style={s.searchBox}>
+                                <Feather name="search" size={15} color="#000000" />
+                                <TextInput
+                                    style={[s.searchInput, { color: "#000000" }]}
+                                    placeholder="Search jobs, departments, locations…"
+                                    placeholderTextColor="#000000"
+                                    value={search}
+                                    onChangeText={setSearch}
+                                />
+                                {search.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearch("")}>
+                                        <Feather name="x-circle" size={15} color="#000000" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                        {/* Row 1: All Departments & All Status in one row */}
+                        <View style={{ flexDirection: "row", gap: 10, zIndex: 100 }}>
+                            {/* Department filter */}
+                            <View style={{ flex: 1, position: "relative", zIndex: deptDropdownOpen ? 999 : 1 }}>
+                                {isWeb ? (
+                                    <WebSelect
+                                        value={deptFilter}
+                                        options={deptOptions}
+                                        onChange={setDeptFilter}
+                                    />
+                                ) : (
+                                    <>
+                                        <TouchableOpacity
+                                            style={[s.filterSelect, { width: "100%", marginHorizontal: 0 }]}
+                                            onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
+                                        >
+                                            <Feather name="grid" size={13} color={T.textHint} />
+                                            <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
+                                                {deptFilter}
+                                            </Text>
+                                            <Feather name="chevron-down" size={13} color={T.textHint} />
+                                        </TouchableOpacity>
+                                        {deptDropdownOpen && (
+                                            <View style={[em.dropdown, { marginTop: 0 }]}>
+                                                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                    {deptOptions.map((opt) => (
+                                                        <TouchableOpacity
+                                                            key={opt}
+                                                            style={em.dropItem}
+                                                            onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
+                                                        >
+                                                            <Text style={em.dropItemText}>{opt}</Text>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </ScrollView>
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+                            </View>
+
+                            {/* Status filter */}
+                            <View style={{ flex: 1, position: "relative", zIndex: statusDropdownOpen ? 999 : 1 }}>
+                                {isWeb ? (
+                                    <WebSelect
+                                        value={statusFilter}
+                                        options={STATUSES}
+                                        onChange={(v) => setStatusFilter(v as any)}
+                                    />
+                                ) : (
+                                    <>
+                                        <TouchableOpacity
+                                            style={[s.filterSelect, { width: "100%", marginHorizontal: 0 }]}
+                                            onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
+                                        >
+                                            <Feather name="activity" size={13} color={T.textHint} />
+                                            <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
+                                                {statusFilter}
+                                            </Text>
+                                            <Feather name="chevron-down" size={13} color={T.textHint} />
+                                        </TouchableOpacity>
+                                        {statusDropdownOpen && (
+                                            <View style={[em.dropdown, { marginTop: 0 }]}>
+                                                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                    {STATUSES.map((opt) => (
+                                                        <TouchableOpacity
+                                                            key={opt}
+                                                            style={em.dropItem}
+                                                            onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
+                                                        >
+                                                            <Text style={em.dropItemText}>{opt}</Text>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </ScrollView>
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+                            </View>
+                        </View>
+
+                        {/* Row 2: Filter Button & List/Grid View in another row */}
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, zIndex: 10 }}>
+                            <TouchableOpacity style={[s.filterBtn, { flex: 1, justifyContent: "center" }]}>
+                                <Feather name="sliders" size={14} color={T.orange} />
+                                <Text style={s.filterBtnTxt}>Filter</Text>
                             </TouchableOpacity>
-                        )}
+
+                            <ViewToggle view={viewMode} onToggle={setViewMode} />
+                        </View>
                     </View>
-                    {!isWeb && (
-                        <View style={s.viewToggleInline}>
-                            <TouchableOpacity
-                                style={[s.viewToggleBtn, viewMode === "grid" && s.viewToggleBtnActive]}
-                                onPress={() => setViewMode("grid")}
-                                activeOpacity={0.8}
-                            >
-                                <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : T.textHint} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[s.viewToggleBtn, viewMode === "list" && s.viewToggleBtnActive]}
-                                onPress={() => setViewMode("list")}
-                                activeOpacity={0.8}
-                            >
-                                <Feather name="list" size={15} color={viewMode === "list" ? T.orange : T.textHint} />
-                            </TouchableOpacity>
+                ) : (
+                    <View style={s.filterRow}>
+                        {/* Search on desktop shares the row with filters */}
+                        <View style={s.searchBox}>
+                            <Feather name="search" size={15} color="#000000" />
+                            <TextInput
+                                style={[s.searchInput, { color: "#000000" }]}
+                                placeholder="Search jobs, departments, locations…"
+                                placeholderTextColor="#000000"
+                                value={search}
+                                onChangeText={setSearch}
+                            />
+                            {search.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearch("")}>
+                                    <Feather name="x-circle" size={15} color="#000000" />
+                                </TouchableOpacity>
+                            )}
                         </View>
-                    )}
-                </View>
-
-                <View style={s.filterRow}>
-                    {/* Department filter */}
-                    {isWeb ? (
-                        <WebSelect
-                            value={deptFilter}
-                            options={deptOptions}
-                            onChange={setDeptFilter}
-                        />
-                    ) : (
-                        <View style={{ flex: 1, position: "relative", zIndex: deptDropdownOpen ? 999 : 1, minWidth: 120 }}>
-                            <TouchableOpacity
-                                style={[s.filterSelect, { width: "100%" }]}
-                                onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
-                            >
-                                <Feather name="grid" size={13} color={T.textHint} />
-                                <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
-                                    {deptFilter}
-                                </Text>
-                                <Feather name="chevron-down" size={13} color={T.textHint} />
-                            </TouchableOpacity>
-                            {deptDropdownOpen && (
-                                <View style={[em.dropdown, { marginTop: 0 }]}>
-                                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                                        {deptOptions.map((opt) => (
-                                            <TouchableOpacity
-                                                key={opt}
-                                                style={em.dropItem}
-                                                onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
-                                            >
-                                                <Text style={em.dropItemText}>{opt}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+                        {/* Department filter */}
+                        <View style={{ width: 140 }}>
+                            {isWeb ? (
+                                <WebSelect
+                                    value={deptFilter}
+                                    options={deptOptions}
+                                    onChange={setDeptFilter}
+                                />
+                            ) : (
+                                <View style={{ position: "relative", zIndex: deptDropdownOpen ? 999 : 1 }}>
+                                    <TouchableOpacity
+                                        style={[s.filterSelect, { width: "100%" }]}
+                                        onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
+                                    >
+                                        <Feather name="grid" size={13} color={T.textHint} />
+                                        <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
+                                            {deptFilter}
+                                        </Text>
+                                        <Feather name="chevron-down" size={13} color={T.textHint} />
+                                    </TouchableOpacity>
+                                    {deptDropdownOpen && (
+                                        <View style={[em.dropdown, { marginTop: 0 }]}>
+                                            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                {deptOptions.map((opt) => (
+                                                    <TouchableOpacity
+                                                        key={opt}
+                                                        style={em.dropItem}
+                                                        onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
+                                                    >
+                                                        <Text style={em.dropItemText}>{opt}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>
-                    )}
 
-                    {/* Status filter */}
-                    {isWeb ? (
-                        <WebSelect
-                            value={statusFilter}
-                            options={STATUSES}
-                            onChange={(v) => setStatusFilter(v as any)}
-                        />
-                    ) : (
-                        <View style={{ flex: 1, position: "relative", zIndex: statusDropdownOpen ? 999 : 1, minWidth: 120 }}>
-                            <TouchableOpacity
-                                style={[s.filterSelect, { width: "100%" }]}
-                                onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
-                            >
-                                <Feather name="activity" size={13} color={T.textHint} />
-                                <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
-                                    {statusFilter}
-                                </Text>
-                                <Feather name="chevron-down" size={13} color={T.textHint} />
-                            </TouchableOpacity>
-                            {statusDropdownOpen && (
-                                <View style={[em.dropdown, { marginTop: 0 }]}>
-                                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                                        {STATUSES.map((opt) => (
-                                            <TouchableOpacity
-                                                key={opt}
-                                                style={em.dropItem}
-                                                onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
-                                            >
-                                                <Text style={em.dropItemText}>{opt}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+                        {/* Status filter */}
+                        <View style={{ width: 140 }}>
+                            {isWeb ? (
+                                <WebSelect
+                                    value={statusFilter}
+                                    options={STATUSES}
+                                    onChange={(v) => setStatusFilter(v as any)}
+                                />
+                            ) : (
+                                <View style={{ position: "relative", zIndex: statusDropdownOpen ? 999 : 1 }}>
+                                    <TouchableOpacity
+                                        style={[s.filterSelect, { width: "100%" }]}
+                                        onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
+                                    >
+                                        <Feather name="activity" size={13} color={T.textHint} />
+                                        <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
+                                            {statusFilter}
+                                        </Text>
+                                        <Feather name="chevron-down" size={13} color={T.textHint} />
+                                    </TouchableOpacity>
+                                    {statusDropdownOpen && (
+                                        <View style={[em.dropdown, { marginTop: 0 }]}>
+                                            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                {STATUSES.map((opt) => (
+                                                    <TouchableOpacity
+                                                        key={opt}
+                                                        style={em.dropItem}
+                                                        onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
+                                                    >
+                                                        <Text style={em.dropItemText}>{opt}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>
-                    )}
 
-                    <TouchableOpacity style={s.filterBtn}>
-                        <Feather name="sliders" size={14} color={T.orange} />
-                        <Text style={s.filterBtnTxt}>Filter</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity style={s.filterBtn}>
+                            <Feather name="sliders" size={14} color={T.orange} />
+                            <Text style={s.filterBtnTxt}>Filter</Text>
+                        </TouchableOpacity>
 
-                    {isWeb && <ViewToggle view={viewMode} onToggle={setViewMode} />}
-                </View>
+                        <ViewToggle view={viewMode} onToggle={setViewMode} />
+                    </View>
+                )}
 
                 {/* ── COUNT LINE ── */}
-                <Text style={s.countLine}>
+                <Text style={[s.countLine, isMobileScreen && { paddingHorizontal: 16 }]}>
                     <Text style={{ color: T.orange, fontWeight: "700" }}>{filtered.length}</Text>
                     {" "}of {jobs.length} positions
                 </Text>
@@ -1634,21 +1827,23 @@ const JobOpeningsScreen: React.FC = () => {
                         <Text style={s.emptySub}>Try adjusting your search or filters</Text>
                     </View>
                 ) : viewMode === "grid" ? (
-                    <View style={isWeb
-                        ? { flexDirection: "row", flexWrap: "wrap", gap: 16 }
-                        : { flexDirection: "row", flexWrap: "wrap", gap: 12 }
-                    }>
+                    <View style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: isMobileScreen ? 12 : 16,
+                        ...(isMobileScreen ? { paddingHorizontal: 16 } : {}),
+                    }}>
                         {paginated.map(job => (
                             <View
                                 key={job.id}
-                                style={isWeb ? { width: "calc(33.33% - 11px)" as any } : { width: "100%" as any }}
+                                style={{ width: cardWidth }}
                             >
                                 <JobCard job={job} onEdit={handleEdit} onDelete={() => setDeleteTarget(job)} />
                             </View>
                         ))}
                     </View>
                 ) : (
-                    <View style={{ gap: 8 }}>
+                    <View style={{ gap: 8, ...(isMobileScreen ? { paddingHorizontal: 16 } : {}) }}>
                         {paginated.map(job => (
                             <JobRow key={job.id} job={job} />
                         ))}
@@ -1657,14 +1852,16 @@ const JobOpeningsScreen: React.FC = () => {
 
                 {/* ── PAGINATION CONTROLS ── */}
                 {filtered.length > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={filtered.length}
-                        itemsPerPage={ITEMS_PER_PAGE}
-                        itemName="job openings"
-                        onPageChange={setCurrentPage}
-                    />
+                    <View style={isMobileScreen ? { paddingHorizontal: 16 } : {}}>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={filtered.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            itemName="job openings"
+                            onPageChange={setCurrentPage}
+                        />
+                    </View>
                 )}
             </ScrollView>
 
@@ -1716,7 +1913,6 @@ const s = StyleSheet.create({
         flex: 1,
         height: "100%",
         backgroundColor: T.bg,
-        paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
 
     // TopBar
@@ -1825,15 +2021,125 @@ const s = StyleSheet.create({
         letterSpacing: -0.2,
     },
 
-    // Stats
-    statsRow: {
+    // Mobile-specific header (curved card with icon + title + add button)
+    mobileHeader: {
         flexDirection: "row",
-        gap: 8,
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: "#151D4F",
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 46,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 22,
+        shadowColor: "#151D4F",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    mobileHeaderLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        flex: 1,
+    },
+    mobileHeaderIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: T.orange,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: T.orange,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    mobileHeaderTitle: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: "#FFFFFF",
+        letterSpacing: -0.3,
+    },
+    mobileHeaderSub: {
+        fontSize: 12,
+        color: "#D1D5DB",
+        marginTop: 2,
+    },
+    mobileAddBtn: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        backgroundColor: T.orange,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: T.orange,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+
+    // Mobile stat cards grid (2 per row, overlapping the header)
+    mobileStatsGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap" as any,
+        justifyContent: "space-between",
+        rowGap: 12,
+        marginTop: -32,
+        marginHorizontal: 16,
+        zIndex: 10,
+        marginBottom: 4,
+    },
+    mobileStatCard: {
+        backgroundColor: T.card,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderTopWidth: 3,
+        borderColor: T.border,
+        padding: 14,
+        width: "48%",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    mobileStatTopRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+    },
+    mobileStatIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    mobileStatValue: {
+        fontSize: 22,
+        fontWeight: "800",
+        letterSpacing: -0.4,
+    },
+    mobileStatLabel: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: T.textHint,
+    },
+
+    // Stats (web)
+    statsRow: {
         marginTop: -32,
         zIndex: 10,
         maxWidth: 900,
         alignSelf: "center",
         width: "100%",
+        marginBottom: 14,
     },
     statsRowMobile: {
         flexWrap: "wrap" as any,
@@ -1876,11 +2182,13 @@ const s = StyleSheet.create({
         height: 42,
         borderWidth: 1.5,
         borderColor: T.border,
+        minWidth: 0,
+        overflow: "hidden",
     },
     searchInput: {
-        flex:
-            1,
-        fontSize: 13,
+        flex: 1,
+        minWidth: 0,
+        fontSize: 15,
         color: T.textH,
         borderWidth: 0,
         outline: "none" as any,
@@ -1894,7 +2202,7 @@ const s = StyleSheet.create({
         flexWrap: "wrap",
     },
     filterSelect: {
-        flex: 1,
+        width: 140,
         flexDirection: "row",
         alignItems: "center",
         gap: 7,
@@ -1903,28 +2211,28 @@ const s = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: T.border,
         paddingHorizontal: 12,
-        paddingVertical: 10,
-        minWidth: 120,
+        height: 54,
     },
     filterSelectTxt: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 15,
         color: T.textHint,
         fontWeight: "500",
     },
     filterBtn: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center",
         gap: 6,
         backgroundColor: T.orangeLight,
         paddingHorizontal: 14,
-        paddingVertical: 10,
+        height: 42,
         borderRadius: 11,
         borderWidth: 1,
         borderColor: T.orangeMid,
     },
     filterBtnTxt: {
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: "700",
         color: T.orange,
     },

@@ -462,7 +462,7 @@ interface ChatPanelProps {
   onSend: (id: string, text: string) => void;
 }
 
-const ChatPanel = ({
+const ChatPanelDesktop = ({
   ticket,
   onClose,
   onResolve,
@@ -484,7 +484,6 @@ const ChatPanel = ({
 
   return (
     <View style={styles.chatPanel}>
-      {/* Detail Header */}
       <View style={[styles.chatHeader, isMobile && styles.chatHeaderMobile]}>
         {onClose && (
           <TouchableOpacity onPress={onClose} style={[styles.chatBackBtn, isMobile && styles.chatBackBtnMobile]}>
@@ -563,7 +562,6 @@ const ChatPanel = ({
         )}
       </View>
 
-      {/* Messages */}
       <ScrollView
         style={styles.chatMessages}
         contentContainerStyle={styles.chatMessagesContent}
@@ -626,7 +624,6 @@ const ChatPanel = ({
         )}
       </ScrollView>
 
-      {/* Reply Box */}
       {!ticket.statusClosed && (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -654,6 +651,201 @@ const ChatPanel = ({
       )}
     </View>
   );
+};
+
+const ChatPanelMobile = ({
+  ticket,
+  onClose,
+  onResolve,
+  onCloseTicket,
+  onReopen,
+  onSend,
+}: ChatPanelProps) => {
+  const isDesktop = false;
+  const isMobile = true;
+  const [replyText, setReplyText] = useState("");
+  const [infoExpanded, setInfoExpanded] = useState(false);
+  const hasMessages = ticket.messages && ticket.messages.length > 0;
+
+  const handleSend = () => {
+    const t = replyText.trim();
+    if (!t) return;
+    onSend(ticket.id, t);
+    setReplyText("");
+  };
+
+  const SellerInfoContent = () => (
+    <View style={styles.sellerInfoContent}>
+      <Text style={styles.sellerInfoLabel}>SELLER</Text>
+      <Text style={styles.sellerInfoValueName}>{ticket.sellerName}</Text>
+      
+      <View style={styles.sellerInfoDivider} />
+
+      <Text style={styles.sellerInfoLabel}>CONTACT</Text>
+      <Text style={styles.sellerInfoValue}>{ticket.email || "N/A"}</Text>
+      <Text style={styles.sellerInfoValue}>{ticket.phone || "N/A"}</Text>
+      
+      <View style={styles.sellerInfoDivider} />
+
+      <Text style={styles.sellerInfoLabel}>TICKET DETAILS</Text>
+      <Text style={styles.sellerInfoValue}>ID: {ticket.ticketCode}</Text>
+      <Text style={styles.sellerInfoValue}>Category: {ticket.department || "General"}</Text>
+      <Text style={styles.sellerInfoValue}>Created: {ticket.createdAt || "N/A"}</Text>
+    </View>
+  );
+
+  return (
+    <View style={isDesktop ? styles.chatLayoutDesktop : styles.chatLayoutMobile}>
+      {isDesktop && (
+        <View style={styles.chatSidebar}>
+          <Text style={styles.chatSidebarTitle}>Seller Information</Text>
+          <SellerInfoContent />
+        </View>
+      )}
+
+      <View style={styles.chatMainContent}>
+        <View style={styles.chatHeaderCompact}>
+          <View style={styles.chatHeaderCompactLeft}>
+            {onClose && isMobile && (
+              <TouchableOpacity onPress={onClose} style={styles.chatBackBtnCompact}>
+                <Ionicons name="chevron-back" size={24} color={C.textPrimary} />
+              </TouchableOpacity>
+            )}
+            <View style={styles.chatHeaderCompactTitleBox}>
+              <Text style={styles.chatHeaderCompactTitle} numberOfLines={1}>
+                {ticket.description}
+              </Text>
+              <StatusBadge status={ticket.status} />
+            </View>
+          </View>
+          
+          <View style={styles.chatHeaderCompactRight}>
+            {ticket.canResolve && (
+              <TouchableOpacity style={styles.actionBtnResolve} onPress={() => onResolve(ticket.id)}>
+                <CheckCircleIcon size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            {ticket.canClose && (
+              <TouchableOpacity style={styles.actionBtnClose} onPress={() => onCloseTicket(ticket.id)}>
+                <CloseIcon size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            {ticket.canReopen && (
+              <TouchableOpacity style={styles.actionBtnReopen} onPress={() => onReopen(ticket.id)}>
+                <Text style={styles.actionBtnReopenText}>↺ Reopen</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {isMobile && (
+          <View style={styles.sellerInfoMobileWrap}>
+            <TouchableOpacity 
+              style={styles.sellerInfoMobileToggle} 
+              onPress={() => setInfoExpanded(!infoExpanded)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sellerInfoMobileToggleText}>Seller Information</Text>
+              <Ionicons 
+                name={infoExpanded ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color={C.brand} 
+              />
+            </TouchableOpacity>
+            {infoExpanded && (
+              <View style={styles.sellerInfoMobileBody}>
+                <SellerInfoContent />
+              </View>
+            )}
+          </View>
+        )}
+
+        <ScrollView
+          style={styles.chatMessagesArea}
+          contentContainerStyle={styles.chatMessagesContentArea}
+          showsVerticalScrollIndicator={false}
+        >
+          {!hasMessages && (
+            <View style={styles.emptyMessages}>
+              <ChatIcon size={36} color={C.textMuted} />
+              <Text style={styles.emptyMessagesText}>No messages yet</Text>
+            </View>
+          )}
+
+          {ticket.messages?.map((msg, index) => {
+            const isAdmin = msg.sender === "admin";
+            
+            let showDateSeparator = false;
+            let dateString = "";
+            if (index === 0) {
+              showDateSeparator = true;
+              dateString = msg.timestamp.split(" ")[0];
+            } else {
+              const prevDate = ticket.messages![index - 1].timestamp.split(" ")[0];
+              const currDate = msg.timestamp.split(" ")[0];
+              if (prevDate !== currDate) {
+                showDateSeparator = true;
+                dateString = currDate;
+              }
+            }
+
+            return (
+              <React.Fragment key={msg.id}>
+                {showDateSeparator && (
+                  <View style={styles.dateSeparator}>
+                    <Text style={styles.dateSeparatorText}>{dateString}</Text>
+                  </View>
+                )}
+                <View style={[styles.msgRow, isAdmin ? styles.msgRowRight : styles.msgRowLeft]}>
+                  <View style={[styles.msgBubble, isAdmin ? styles.msgBubbleAdmin : styles.msgBubbleSeller]}>
+                    <Text style={[styles.msgText, isAdmin && styles.msgTextAdmin]}>{msg.text}</Text>
+                  </View>
+                  <Text style={styles.msgMeta}>
+                    {msg.senderName} • {msg.timestamp.split(" ")[1] || msg.timestamp}
+                  </Text>
+                </View>
+              </React.Fragment>
+            );
+          })}
+          
+          {ticket.statusClosed && (
+            <View style={styles.closedNotice}>
+              <LockIcon size={24} color={C.textMuted} />
+              <Text style={styles.closedNoticeText}>This ticket is {ticket.status.toLowerCase()}</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {!ticket.statusClosed && (
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}>
+            <View style={styles.composerContainer}>
+              <TextInput
+                style={styles.composerInput}
+                placeholder="Reply to seller..."
+                placeholderTextColor={C.textMuted}
+                value={replyText}
+                onChangeText={setReplyText}
+                multiline
+                maxLength={2000}
+              />
+              <TouchableOpacity style={[styles.composerSendBtn, !replyText.trim() && styles.composerSendBtnDisabled]} onPress={handleSend} disabled={!replyText.trim()}>
+                <Text style={styles.composerSendBtnText}>Send</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const ChatPanel = (props: ChatPanelProps) => {
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
+  if (isDesktop) {
+    return <ChatPanelDesktop {...props} />;
+  }
+  return <ChatPanelMobile {...props} />;
 };
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -1552,7 +1744,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: C.brandDark,
   },
   // Mobile override — tighter
   panelHeaderMobile: {
@@ -1561,13 +1753,13 @@ const styles = StyleSheet.create({
   panelTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: C.textPrimary,
+    color: "#FFFFFF",
   },
   // Descriptive count label for mobile (instead of opaque orange badge)
   panelCountLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: C.textSecondary,
+    color: "#FFFFFF",
   },
   // Orange badge used on desktop list panel
   panelCount: {
@@ -1695,13 +1887,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Chat panel
+  // Original Desktop Chat panel styles
   chatPanel: {
     flex: 1,
     flexDirection: "column",
   },
   chatHeader: {
-    backgroundColor: C.brand,
+    backgroundColor: C.brandDark,
     padding: 16,
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1848,8 +2040,6 @@ const styles = StyleSheet.create({
   reopenBtnTextMobile: {
     color: C.brand,
   },
-
-  // Messages
   chatMessages: {
     flex: 1,
     backgroundColor: "#F9FAFB",
@@ -1857,20 +2047,6 @@ const styles = StyleSheet.create({
   chatMessagesContent: {
     padding: 16,
     gap: 12,
-  },
-  emptyMessages: {
-    alignItems: "center",
-    paddingVertical: 48,
-    gap: 8,
-  },
-  emptyMessagesIcon: {
-    fontSize: 36,
-    opacity: 0.5,
-  },
-  emptyMessagesText: {
-    fontSize: 13,
-    color: C.textMuted,
-    fontWeight: "500",
   },
   messageBubbleWrapper: {
     alignItems: "flex-start",
@@ -1893,7 +2069,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   messageBubbleAdmin: {
-    backgroundColor: C.brand,
+    backgroundColor: C.brandDark,
     borderTopRightRadius: 4,
   },
   messageText: {
@@ -1912,23 +2088,6 @@ const styles = StyleSheet.create({
   messageTimestampAdmin: {
     color: "rgba(255,255,255,0.65)",
   },
-
-  // Closed notice
-  closedNotice: {
-    alignItems: "center",
-    paddingVertical: 32,
-    gap: 8,
-  },
-  closedNoticeIcon: {
-    fontSize: 36,
-  },
-  closedNoticeText: {
-    fontSize: 13,
-    color: C.textMuted,
-    fontWeight: "500",
-  },
-
-  // Reply
   replyBox: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -1954,7 +2113,8 @@ const styles = StyleSheet.create({
   sendBtn: {
     backgroundColor: C.brand,
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    height: 40,
+    justifyContent: "center",
     borderRadius: 12,
     alignSelf: "flex-end",
   },
@@ -1965,6 +2125,288 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 13,
+  },
+  
+  // ─── CHAT PANEL (Mobile Redesign) ──────────────────────────────────────────────────────────
+  chatLayoutDesktop: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: C.surface,
+  },
+  chatLayoutMobile: {
+    flex: 1,
+    flexDirection: "column",
+    backgroundColor: "#F3F4F6",
+  },
+  chatSidebar: {
+    width: "28%",
+    minWidth: 260,
+    maxWidth: 320,
+    borderRightWidth: 1,
+    borderRightColor: C.border,
+    padding: 20,
+    backgroundColor: "#FAFAFA",
+  },
+  chatSidebarTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.textPrimary,
+    marginBottom: 16,
+  },
+  sellerInfoContent: {
+    gap: 2,
+  },
+  sellerInfoLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: C.brand,
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  sellerInfoValueName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 0,
+  },
+  sellerInfoValue: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+    marginBottom: 0,
+  },
+  sellerInfoDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    marginVertical: 8,
+  },
+  chatMainContent: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  chatHeaderCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    backgroundColor: C.surface,
+    zIndex: 2,
+  },
+  chatHeaderCompactLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+  },
+  chatBackBtnCompact: {
+    padding: 4,
+    marginLeft: -8,
+  },
+  chatHeaderCompactTitleBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  chatHeaderCompactTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.textPrimary,
+    flexShrink: 1,
+  },
+  chatHeaderCompactRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  actionBtnResolve: {
+    backgroundColor: "#16A34A",
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionBtnClose: {
+    backgroundColor: "#DC2626",
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionBtnReopen: {
+    backgroundColor: C.brandFaint,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.brand,
+  },
+  actionBtnReopenText: {
+    color: C.brand,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  sellerInfoMobileWrap: {
+    margin: 12,
+    marginBottom: 0,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: C.brandDark,
+    // Add subtle shadow for the floating card effect
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sellerInfoMobileToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: C.brandDark,
+  },
+  sellerInfoMobileToggleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  sellerInfoMobileBody: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    paddingTop: 0,
+  },
+  chatMessagesArea: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+  chatMessagesContentArea: {
+    padding: 20,
+    gap: 16,
+  },
+  dateSeparator: {
+    alignSelf: "center",
+    marginVertical: 8,
+  },
+  dateSeparatorText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#000000",
+  },
+  msgRow: {
+    maxWidth: "85%",
+    marginBottom: 8,
+  },
+  msgRowLeft: {
+    alignSelf: "flex-start",
+  },
+  msgRowRight: {
+    alignSelf: "flex-end",
+  },
+  msgBubble: {
+    padding: 14,
+    borderRadius: 16,
+  },
+  msgBubbleSeller: {
+    backgroundColor: "#FFFFFF",
+    borderBottomLeftRadius: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  msgBubbleAdmin: {
+    backgroundColor: C.brandDark,
+    borderBottomRightRadius: 4,
+  },
+  msgText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: C.textPrimary,
+  },
+  msgTextAdmin: {
+    color: "#FFFFFF",
+  },
+  msgMeta: {
+    fontSize: 11,
+    color: C.textSecondary,
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  composerContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    backgroundColor: C.surface,
+    gap: 10,
+  },
+  composerAttachBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  composerInput: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    fontSize: 14,
+    color: C.textPrimary,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  composerSendBtn: {
+    backgroundColor: C.brand,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  composerSendBtnDisabled: {
+    backgroundColor: C.border,
+  },
+  composerSendBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  emptyMessages: {
+    alignItems: "center",
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptyMessagesText: {
+    fontSize: 13,
+    color: C.textMuted,
+    fontWeight: "500",
+  },
+  closedNotice: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 8,
+  },
+  closedNoticeText: {
+    fontSize: 13,
+    color: C.textMuted,
+    fontWeight: "500",
   },
 
   // Empty states

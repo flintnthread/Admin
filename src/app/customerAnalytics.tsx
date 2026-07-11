@@ -1638,9 +1638,15 @@ function LineChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { flex: 1, textAlign: "center" },
+              { 
+                flex: 1, 
+                fontSize: width < 400 ? 8 : 10,
+                letterSpacing: width < 400 ? -0.5 : 0 
+              },
             ]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {d.label}
           </Text>
@@ -1821,9 +1827,15 @@ function BarChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { flex: 1, textAlign: "center" },
+              { 
+                flex: 1, 
+                fontSize: width < 400 ? 8 : 10,
+                letterSpacing: width < 400 ? -0.5 : 0 
+              },
             ]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {d.label}
           </Text>
@@ -2604,9 +2616,7 @@ export default function CustomerAnalyticsScreen() {
   const [drilldownTitle, setDrilldownTitle] = useState<string>("");
 
   // Grid responsiveness basis
-  const kpiBasis = basisForColumns(
-    isMobile ? 2 : isTablet ? 2 : width < 1200 ? 2 : 4,
-  );
+  const kpiBasis = basisForColumns(isMobile ? 2 : 4);
   const chartBasis = isMobile || width < 1200 ? 100 : 48.5;
   const behaviourBasis = basisForColumns(
     isMobile ? 1 : isTablet ? 2 : width < 1200 ? 2 : 4,
@@ -2881,13 +2891,14 @@ export default function CustomerAnalyticsScreen() {
                   style={[
                     s.avatar,
                     { backgroundColor: avatarColor(customerName) },
+                    !isWide && { width: 44, height: 44, borderRadius: 22 }
                   ]}
                 >
-                  <Text style={s.avatarTxt}>{initials}</Text>
+                  <Text style={[s.avatarTxt, !isWide && { fontSize: 18 }]}>{initials}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={s.nameRow}>
-                    <Text style={s.headerName} numberOfLines={1}>
+                    <Text style={[s.headerName, !isWide && { fontSize: 17 }]} numberOfLines={1}>
                       {customerName}
                     </Text>
                   </View>
@@ -2948,7 +2959,7 @@ export default function CustomerAnalyticsScreen() {
                   </Text>
                 </View>
                 <View style={s.quickActions}>
-                  {Platform.OS !== "web" && (
+                  {Platform.OS !== "web" && isWide && (
                     <TouchableOpacity
                       style={s.quickBtn}
                       activeOpacity={0.8}
@@ -4296,8 +4307,8 @@ const s = StyleSheet.create({
     marginTop: 3,
   },
 
-  axisRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
-  axisLabel: { fontSize: 10, color: sub, minWidth: 24 },
+  axisRow: { flexDirection: "row", alignItems: "center", marginTop: 6, justifyContent: "space-between" },
+  axisLabel: { fontSize: 10, color: sub, textAlign: "center" },
 
   ringCardBody: {
     flexDirection: "row",

@@ -314,14 +314,27 @@ const SparklineChart: React.FC<{
   tooltipIndex: number | null;
   onPointPress: (index: number | null) => void;
   tooltipLabel?: string;
-}> = ({ data, width, height, color, tooltipIndex, onPointPress, tooltipLabel = 'Products Listed' }) => {
+  period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+}> = ({ data, width, height, color, tooltipIndex, onPointPress, tooltipLabel = 'Products Listed', period = 'daily' }) => {
   const padding = { top: 20, bottom: 30, left: 36, right: 16 };
-  const chartW = width - padding.left - padding.right;
+  const chartW = Math.max(0, width - padding.left - padding.right);
   const chartH = height - padding.top - padding.bottom;
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 13, color: COLORS.textMuted }}>No data available</Text>
+      </View>
+    );
+  }
+
   const maxVal = Math.max(...data.map(d => d.value), 1);
   const minVal = 0;
 
-  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartW;
+  const getX = (i: number) => {
+    if (data.length <= 1) return padding.left;
+    return padding.left + (i / (data.length - 1)) * chartW;
+  };
   const getY = (v: number) =>
     padding.top + chartH - ((v - minVal) / (maxVal - minVal)) * chartH;
 
@@ -334,8 +347,32 @@ const SparklineChart: React.FC<{
 
   const yLabels = [0, 1, 2].filter(v => v <= maxVal + 0);
 
+  // Calculate label thinning to avoid overlap on small screens
+  const approxLabelWidth = 44; // px
+  const availablePerLabel = chartW / Math.max(1, data.length - 1);
+  let step = Math.max(1, Math.ceil(approxLabelWidth / Math.max(1, availablePerLabel)));
+
+  const isSmall = width <= 360;
+  // On very small screens show all labels but rotate and compact them for readability
+  const rotateLabels = isSmall;
+  if (rotateLabels) {
+    step = 1; // show every label but rotate/compact them
+  }
+
+  // On tablet and larger widths, always show all labels (no hiding) and allow slightly larger label space
+  const isLarge = width >= 768;
+  if (isLarge) {
+    step = 1;
+  }
+
+  const abbreviate = (lbl: string) => {
+    if (width < 380 && lbl.length > 6) return lbl.substring(0, 4) + '..';
+    return lbl;
+  };
+
+  // allow rotated labels to be visible inside container
   return (
-    <View style={{ width, height }}>
+    <View style={{ width, height, overflow: 'visible' }}>
       {yLabels.map(v => (
         <View
           key={v}
@@ -363,8 +400,8 @@ const SparklineChart: React.FC<{
           }}
         />
       ))}
-      <View style={{ position: 'absolute', top: 0, left: 0 }}>
-        <Svg width={width} height={height} style={{ overflow: 'visible' }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height }}>
+        <Svg width={width} height={height} style={{ overflow: 'hidden' }}>
           <Polygon
             points={fillPoints.map(p => `${p.x},${p.y}`).join(' ')}
             fill={color + '22'}
@@ -383,8 +420,8 @@ const SparklineChart: React.FC<{
           onPress={() => onPointPress(tooltipIndex === i ? null : i)}
           style={{
             position: 'absolute',
-            left: getX(i) - 10,
-            top: getY(d.value) - 10,
+            left: Math.min(Math.max(getX(i) - 10, 0), width - 20),
+            top: Math.min(Math.max(getY(d.value) - 10, 0), height - 24),
             width: 20,
             height: 20,
             borderRadius: 10,
@@ -405,11 +442,11 @@ const SparklineChart: React.FC<{
           />
         </TouchableOpacity>
       ))}
-      {tooltipIndex !== null && (
+      {tooltipIndex !== null && data[tooltipIndex] && (
         <View
           style={{
             position: 'absolute',
-            left: Math.min(Math.max(getX(tooltipIndex) - 60, 0), width - 130),
+            left: Math.min(Math.max(getX(tooltipIndex) - 60, 4), width - 130),
             top: getY(data[tooltipIndex].value) < 60 ? getY(data[tooltipIndex].value) + 15 : getY(data[tooltipIndex].value) - 52,
             backgroundColor: '#1A1A1A',
             borderRadius: 6,
@@ -429,20 +466,36 @@ const SparklineChart: React.FC<{
           </View>
         </View>
       )}
-      {data.map((d, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: getX(i) - 16,
-            top: padding.top + chartH + 4,
-            width: 32,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 8, color: COLORS.textMuted }}>{d.label}</Text>
-        </View>
-      ))}
+      {data.map((d, i) => {
+        // Only render some labels to avoid overlap, unless rotateLabels is enabled
+        if (!rotateLabels && i !== data.length - 1 && (i % step !== 0 || data.length - 1 - i < step)) return null;
+        const labelContainerWidth = rotateLabels ? 56 : Math.max(60, Math.min(140, chartW / Math.max(1, data.length) - 4));
+        const x = Math.min(
+          Math.max(getX(i) - labelContainerWidth / 2, padding.left - labelContainerWidth / 2),
+          width - labelContainerWidth - 4,
+        );
+        const labelTop = rotateLabels ? padding.top + chartH + 12 : padding.top + chartH + 4;
+        const labelFont = isLarge ? 11 : (rotateLabels ? Math.max(7, Math.round(width / 48)) : 9);
+        const labelStyle: any = rotateLabels
+          ? { fontSize: labelFont, color: COLORS.textMuted, transform: [{ rotate: '-45deg' }], textAlign: 'left' }
+          : { fontSize: labelFont, color: COLORS.textMuted, textAlign: 'center' };
+        return (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: Math.max(x, 2),
+              top: labelTop,
+              width: labelContainerWidth,
+              alignItems: rotateLabels ? 'flex-start' : 'center',
+            }}
+          >
+            <Text numberOfLines={isLarge ? 2 : 1} ellipsizeMode="tail" style={labelStyle}>
+              {isLarge ? String(d.label || '') : abbreviate(String(d.label || ''))}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -981,6 +1034,76 @@ function mapDetailToSellerData(
   };
 }
 
+function formatChartData(dataPoints: any[], period: 'daily' | 'weekly' | 'monthly' | 'yearly', forceDesktopLabels = false): ChartDataPoint[] {
+  if (!Array.isArray(dataPoints)) return [];
+
+  if (period === 'daily') {
+    const targetLabels = forceDesktopLabels
+      ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const sourceData = dataPoints.length >= 7 ? dataPoints.slice(-7) : dataPoints;
+    return targetLabels.map((label, idx) => {
+      const val = sourceData[idx]?.value ?? 0;
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  if (period === 'weekly') {
+    const targetLabels = forceDesktopLabels
+      ? Array.from({ length: 12 }, (_, i) => `Week ${i + 1}`)
+      : Array.from({ length: Math.max(dataPoints.length, 4) }, (_, i) => `Week ${i + 1}`);
+    return targetLabels.map((label, idx) => {
+      const val = dataPoints[idx]?.value ?? 0;
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  if (period === 'monthly') {
+    const targetLabels = forceDesktopLabels
+      ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dataMap = new Map();
+    dataPoints.forEach((d) => {
+      if (d && d.label) {
+        const cleanLabel = String(d.label).substring(0, 3);
+        dataMap.set(cleanLabel, d.value);
+      }
+    });
+    return targetLabels.map((label, idx) => {
+      let val: any;
+      if (forceDesktopLabels) {
+        const shortLabel = label.substring(0, 3);
+        val = dataMap.get(shortLabel);
+      } else {
+        val = dataMap.get(label);
+      }
+      if (val === undefined) {
+        val = dataPoints[idx]?.value ?? 0;
+      }
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  if (period === 'yearly') {
+    const targetLabels = ['2021', '2022', '2023', '2024', '2025', '2026'];
+    const dataMap = new Map();
+    dataPoints.forEach((d) => {
+      if (d && d.label) {
+        dataMap.set(String(d.label), d.value);
+      }
+    });
+    return targetLabels.map((label, idx) => {
+      let val = dataMap.get(label);
+      if (val === undefined) {
+        val = dataPoints[idx]?.value ?? 0;
+      }
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  return dataPoints;
+}
+
 export default function ViewSeller() {
   const params = useLocalSearchParams<{ sellerId?: string }>();
   const { token, isLoading: authLoading } = useAuth();
@@ -1216,31 +1339,34 @@ export default function ViewSeller() {
   const downloadCsv = (csvContent: string, filename: string) => {
     // Create a Blob with the CSV content
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    
+
     // Create a download link
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
-    
+
     // Append to document, click, and remove
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     // Clean up
     URL.revokeObjectURL(url);
   };
 
   const isMobile = width < 600;
   const isTablet = width >= 600 && width < 1024;
-  const chartWidth = width - (isMobile ? 32 : isTablet ? 48 : 64);
+  const isDesktopWide = width >= 1024;
+  const sidebarWidth = isDesktopWide ? 250 : 0;
+  const chartWidth = width - sidebarWidth - (isMobile ? 32 : isTablet ? 48 : 64);
 
   const currentChart = chartData[periodTab];
-  const currentData = currentChart
+  const rawData = currentChart
     ? chartToSeries(currentChart, analyticsTab === 'products' ? 'productsAdded' : 'registered')
     : (analyticsTab === 'products' ? seller.analyticsData[periodTab] : seller.ordersAnalyticsData[periodTab]);
+  const currentData = formatChartData(rawData, periodTab, isDesktopWide);
 
   const productSegments = [
     { value: seller.productStatusDistribution.active, color: COLORS.success, label: 'Active' },
@@ -1283,7 +1409,7 @@ export default function ViewSeller() {
                 styles.pageHeaderStatusBadge,
                 seller.status === 'Active' ? styles.pageHeaderStatusActive
                   : seller.status === 'Pending' ? styles.pageHeaderStatusPending
-                  : styles.pageHeaderStatusInactive
+                    : styles.pageHeaderStatusInactive
               ]}>
                 <Text style={[
                   styles.pageHeaderStatusText,
@@ -1306,57 +1432,78 @@ export default function ViewSeller() {
         <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <SectionHeader icon="bar-chart-line" title="Analytics Dashboard" />
 
-          <View style={styles.tabRow}>
+          <View style={[styles.tabRow, isMobile && { justifyContent: 'center' }]}>
             <TouchableOpacity
-              style={[styles.tab, analyticsTab === 'products' && styles.tabActive]}
+              style={[styles.tab, analyticsTab === 'products' && styles.tabActive, isMobile && styles.tabMobile]}
               onPress={() => { setAnalyticsTab('products'); setTooltipIndex(null); }}
             >
               <BootstrapIcon name="box-seam" size={14} color={analyticsTab === 'products' ? COLORS.primary : COLORS.textSecondary} />
-              <Text style={[styles.tabText, analyticsTab === 'products' && styles.tabTextActive, { marginLeft: 5 }]}>
+              <Text style={[styles.tabText, analyticsTab === 'products' && styles.tabTextActive, isMobile && styles.tabTextMobile, { marginLeft: 5 }]}>
                 Products Analytics
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.tab, analyticsTab === 'orders' && styles.tabActive]}
+              style={[styles.tab, analyticsTab === 'orders' && styles.tabActive, isMobile && styles.tabMobile]}
               onPress={() => { setAnalyticsTab('orders'); setTooltipIndex(null); }}
             >
               <BootstrapIcon name="cart3" size={14} color={analyticsTab === 'orders' ? COLORS.primary : COLORS.textSecondary} />
-              <Text style={[styles.tabText, analyticsTab === 'orders' && styles.tabTextActive, { marginLeft: 5 }]}>
+              <Text style={[styles.tabText, analyticsTab === 'orders' && styles.tabTextActive, isMobile && styles.tabTextMobile, { marginLeft: 5 }]}>
                 Orders Analytics
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.periodRow}>
-            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
-              <TouchableOpacity
-                key={p}
-                style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
-                onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
-              >
-                <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {isMobile ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.periodRow, { paddingHorizontal: 12 }]}
+            >
+              {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
+                  onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
+                >
+                  <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.periodRow}>
+              {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
+                  onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
+                >
+                  <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-          <View style={styles.legendRow}>
+          <View style={[styles.legendRow, isMobile && { justifyContent: 'center' }]}>
             <View style={[styles.legendDot, { backgroundColor: COLORS.primaryLight }]} />
-            <Text style={styles.legendText}>
+            <Text style={[styles.legendText, isMobile && { textAlign: 'center' }]}>
               {analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
             </Text>
           </View>
 
           <View style={{ marginTop: 8, zIndex: 10 }}>
             <SparklineChart
-              data={currentData}
+              data={formatChartData(currentData, periodTab)}
               width={chartWidth}
               height={isMobile ? 180 : 220}
               color={COLORS.primaryLight}
               tooltipIndex={tooltipIndex}
               onPointPress={setTooltipIndex}
               tooltipLabel={analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
+              period={periodTab}
             />
           </View>
         </View>
@@ -1403,7 +1550,10 @@ export default function ViewSeller() {
                   {productSegments.map(s => (
                     <View key={s.label} style={styles.statLegendRow}>
                       <Text style={styles.statLegendLabel}>{s.label}</Text>
-                      <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[styles.statLegendLabel, { fontWeight: '600', color: COLORS.text }]}>{s.value}</Text>
+                        <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -1426,7 +1576,10 @@ export default function ViewSeller() {
                   {orderSegments.map(s => (
                     <View key={s.label} style={styles.statLegendRow}>
                       <Text style={styles.statLegendLabel}>{s.label}</Text>
-                      <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[styles.statLegendLabel, { fontWeight: '600', color: COLORS.text }]}>{s.value}</Text>
+                        <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -1800,6 +1953,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
+  tabMobile: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 88,
+    marginHorizontal: 6,
+  },
   tabActive: {
     borderBottomColor: COLORS.primary,
   },
@@ -1807,6 +1966,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
     fontWeight: '500',
+  },
+  tabTextMobile: {
+    fontSize: 12,
   },
   tabTextActive: {
     color: COLORS.primary,

@@ -1605,8 +1605,8 @@ export default function Subcategories() {
               <LayersIcon color="#FFF" />
             </View>
             <View style={{ flex: 1, flexShrink: 1 }}>
-              <Text style={[S.pageTitle, !isWeb && { fontSize: 17 }]} numberOfLines={1}>Subcategories</Text>
-              <Text style={[S.pageSub, !isWeb && { fontSize: 11 }]} numberOfLines={1}>Manage product subcategories</Text>
+              <Text style={[S.pageTitle, !isWeb && { fontSize: 17 }]}>Subcategories</Text>
+              <Text style={[S.pageSub, !isWeb && { fontSize: 11 }]}>Manage product subcategories</Text>
             </View>
           </View>
           <TouchableOpacity style={[S.exportBtn, !isWeb && { paddingHorizontal: 12, paddingVertical: 10, gap: 0 }]} onPress={handleExport}>
@@ -1640,7 +1640,7 @@ export default function Subcategories() {
               }}
             />
           </View>
-          <View style={[S.toolbarRight, !isWeb && { width: "100%", justifyContent: "space-between" }]}>
+          <View style={[S.toolbarRight, !isWeb && { width: "100%", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: !isWeb ? 1 : undefined, marginRight: !isWeb ? 8 : 0 }}>
               {/* View Toggle */}
               <View style={S.viewToggle}>
@@ -1672,7 +1672,7 @@ export default function Subcategories() {
             </View>
             {/* Add Button */}
             <TouchableOpacity
-              style={S.addBtn}
+              style={[S.addBtn, !isWeb && { paddingHorizontal: 10, gap: 4 }]}
               onPress={() => setModalOpen(true)}
             >
               <PlusIcon />
@@ -1694,7 +1694,13 @@ export default function Subcategories() {
             {paginated.map((item) => (
               <View
                 key={item.id}
-                style={isWeb ? S.gridCardWrapper : S.gridCardWrapperMobile}
+                style={
+                  width >= 1024
+                    ? { flexBasis: "31%", flexGrow: 1, flexShrink: 1, minWidth: 200, maxWidth: "33%" }
+                    : width >= 768
+                    ? { flexBasis: "47%", flexGrow: 1, flexShrink: 1, minWidth: 240, maxWidth: "49%" }
+                    : S.gridCardWrapperMobile
+                }
               >
                 <GridCard
                   item={item}
@@ -1705,7 +1711,9 @@ export default function Subcategories() {
             ))}
           </View>
         ) : isWeb ? (
-          <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }} contentContainerStyle={{ minWidth: "100%" }}>
+            <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+          </ScrollView>
         ) : (
           // Mobile list view: responsive card layout, no horizontal scroll
           <View style={S.mlList}>
@@ -1965,6 +1973,7 @@ const S = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     width: "100%",
+    minWidth: 920,
     overflow: "hidden",
   },
   tHead: {

@@ -539,16 +539,16 @@ const ContactMessagesScreen: React.FC = () => {
               contentContainerStyle={mSt.pillRow}
             >
               {([
-                { label: "All",     count: messages.length,     filterVal: "All" as FilterType },
-                { label: "New",     count: contactStats.pending, filterVal: "Not Replied" as FilterType },
+                { label: "All", count: messages.length, filterVal: "All" as FilterType },
+                { label: "New", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
                 { label: "Replied", count: contactStats.replied, filterVal: "Replied" as FilterType },
                 { label: "Pending", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
               ]).map((f) => {
                 const activeMatch =
                   f.label === "All" ? filter === "All"
-                  : f.label === "Replied" ? filter === "Replied"
-                  : f.label === "New" ? filter === "Not Replied"
-                  : filter === "Not Replied" && f.label === "Pending";
+                    : f.label === "Replied" ? filter === "Replied"
+                      : f.label === "New" ? filter === "Not Replied"
+                        : filter === "Not Replied" && f.label === "Pending";
                 return (
                   <TouchableOpacity
                     key={f.label}
@@ -595,9 +595,9 @@ const ContactMessagesScreen: React.FC = () => {
               </View>
             )}
 
-            {/* ── Pagination (centered) ── */}
+            {/* ── Pagination ── */}
             {!loading && !loadError && filtered.length > 0 && (
-              <View style={mSt.paginationWrap}>
+              <View style={{ paddingHorizontal: 16 }}>
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -617,9 +617,16 @@ const ContactMessagesScreen: React.FC = () => {
     );
   }
 
-  // ── Web / Tablet Layout (unchanged) ───────────────────────────────────────
+  // ── Web / Tablet Layout ─────────────────────────────────────────────────────
+  // Whole screen now scrolls as a single ScrollView (header + stats + toolbar +
+  // cards/table + pagination all inside it), and the white rounded wrapper
+  // container has been removed so content sits directly on the page background.
   const MainContent = (
-    <View style={[styles.mainContentContainer, isWeb && styles.webMainContentContainer]}>
+    <ScrollView
+      style={styles.mainContentContainer}
+      contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80 }}
+      showsVerticalScrollIndicator={false}
+    >
       {/* ── Header ── */}
       <View style={[styles.header, isWeb && styles.webHeader, !isWeb && { borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
         <View style={styles.headerTextContainer}>
@@ -637,11 +644,7 @@ const ContactMessagesScreen: React.FC = () => {
         <StatsHeader stats={contactStats} />
       </View>
 
-      <ScrollView
-        style={styles.listContent}
-        contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.listContent}>
         {/* ── Web Toolbar ── */}
         {isWeb && (
           <View style={styles.webToolbar}>
@@ -729,8 +732,8 @@ const ContactMessagesScreen: React.FC = () => {
             )}
           </>
         )}
-      </ScrollView>
-    </View>
+      </View>
+    </ScrollView>
   );
 
   return (
@@ -1050,19 +1053,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8FAFC",
   },
-  webMainContentContainer: {
-    backgroundColor: "#FFFFFF",
-    marginTop: 22,
-    marginHorizontal: 18,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
-  },
 
   // ── Header ──
   header: {
@@ -1278,7 +1268,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   cardGridItem: {
-    flexBasis: "32%",
+    flexBasis: "31%",
     maxWidth: 360,
     marginHorizontal: 0,
   },

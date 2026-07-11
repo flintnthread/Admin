@@ -19,6 +19,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapPayoutDetailToSpdOrder } from "@/lib/mappers";
 import { fetchPayoutDetail, generatePayoutInvoice, markPayoutPaid } from "@/services/payoutApi";
+import { FLINT_THREAD_LOGO_BASE64 } from "@/constants/logoBase64";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const PRIMARY = "#ef7b1a";
@@ -144,12 +145,178 @@ const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", 
 function numToWords(n: number): string {
     if (n === 0) return "Zero";
     if (n < 20) return ONES[n];
-    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? " " + ONES[n % 10] : "");
-    if (n < 1000) return ONES[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + numToWords(n % 100) : "");
-    if (n < 100000) return numToWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + numToWords(n % 1000) : "");
-    if (n < 10000000) return numToWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 ? " " + numToWords(n % 100000) : "");
-    return numToWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 ? " " + numToWords(n % 10000000) : "");
+    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + ONES[n % 10] : "");
+    if (n < 1000) return ONES[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " and " + numToWords(n % 100) : "");
+    if (n < 100000) return numToWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 !== 0 ? " " + numToWords(n % 1000) : "");
+    if (n < 10000000) return numToWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 !== 0 ? " " + numToWords(n % 100000) : "");
+    return numToWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 !== 0 ? " " + numToWords(n % 10000000) : "");
 }
+
+const escapeHtml = (unsafe?: string | number | null) => {
+    if (unsafe == null) return "";
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
+
+const buildPayoutInvoiceHtml = (
+    order: SellerOrder,
+    invoiceNo: string,
+    generatedAt: string,
+    orderRef: string,
+    lineItems: PayoutLineItem[],
+    sellerEarning: number,
+    customerPaidNum: number,
+    gstAmount: number,
+    deliveryCharge: number,
+    commissionAmount: number,
+    commissionRate: number,
+    company: { name1: string; name2: string; addressLine: string; website: string; gstin: string; supportEmail: string; supportPhone: string; legalName: string; year: number },
+    fmtAmt: (n: number) => string,
+    amountInWords: (n: number) => string
+) => {
+    const itemsHtml = lineItems.map((item) => `
+        <tr>
+            <td style="font-weight:700; color:#1a0f08;">${escapeHtml(item.productName || "Product")}</td>
+            <td style="text-align:center;">${escapeHtml(item.hsn || "-")}</td>
+            <td style="text-align:center;">${escapeHtml(item.sku || "-")}</td>
+            <td style="text-align:center;">${escapeHtml(item.qty ?? 1)}</td>
+            <td style="text-align:right;">${escapeHtml(fmtAmt(item.basePrice))}</td>
+            <td style="text-align:right; font-weight:800; color:#1a0f08;">${escapeHtml(fmtAmt(item.total))}</td>
+        </tr>
+    `).join("");
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <style>
+        body { font-family: sans-serif; color: #504f56; background: #fff; margin: 0; padding: 30px; line-height: 1.4; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .brand-title { font-size: 26px; font-weight: 800; color: #ef7b1a; letter-spacing: 1px; margin-bottom: 6px; }
+        .company-line { font-size: 13px; color: #9b8b7e; font-weight: 500; }
+        .seller-payment-title { font-size: 20px; font-weight: 800; color: #1a0f08; letter-spacing: 1px; text-align: right; margin-bottom: 8px; }
+        .meta-line { font-size: 13px; text-align: right; margin-bottom: 3px; }
+        .meta-label { font-weight: 700; color: #9b8b7e; }
+        .meta-value { font-weight: 800; color: #1a0f08; }
+        .divider { height: 2px; background: #ede5de; margin: 24px 0; }
+        .two-col { display: flex; gap: 24px; margin-bottom: 24px; }
+        .info-card { flex: 1; background: #faf7f5; padding: 20px; border-radius: 14px; border: 1px solid #ede5de; }
+        .info-card-title { font-size: 11px; font-weight: 800; color: #ef7b1a; letter-spacing: 0.8px; margin-bottom: 12px; }
+        .beneficiary-name { font-size: 16px; font-weight: 800; color: #1a0f08; margin-bottom: 6px; }
+        .beneficiary-addr { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+        .detail-row { display: flex; margin-bottom: 6px; font-size: 13px; }
+        .detail-label { width: 80px; font-weight: 700; color: #9b8b7e; }
+        .detail-value { font-weight: 700; color: #1a0f08; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        th { background: #faf7f5; padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 800; color: #9b8b7e; border-bottom: 2px solid #ede5de; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 14px; font-size: 13px; border-bottom: 1px solid #ede5de; }
+        .settlement-block { flex: 1; background: #fff; border: 1px solid #ede5de; border-radius: 14px; padding: 18px; }
+        .settle-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+        .net-row { display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed #ede5de; margin-top: 12px; padding-top: 14px; }
+        .net-label { font-size: 14px; font-weight: 800; color: #1a0f08; }
+        .net-value { font-size: 20px; font-weight: 800; color: #ef7b1a; }
+        .words-block { flex: 1; }
+        .words-label { font-size: 12px; font-weight: 700; color: #9b8b7e; margin-bottom: 4px; }
+        .words-value { font-size: 13px; font-weight: 700; color: #1a0f08; line-height: 1.5; font-style: italic; }
+        .terms-title { font-size: 13px; font-weight: 800; color: #1a0f08; margin-bottom: 6px; }
+        .terms-item { font-size: 12px; font-weight: 500; color: #504f56; margin-bottom: 4px; }
+        .footer { text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid #ede5de; font-size: 11px; color: #9b8b7e; }
+        .footer-bold { font-weight: 800; color: #1a0f08; margin-top: 4px; }
+        .footer-contact { font-weight: 700; color: #504f56; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <img src="${FLINT_THREAD_LOGO_BASE64}" alt="Flint & Thread" style="height:48px; max-width:200px; object-fit:contain; margin-bottom:6px; display:block;" />
+            <div class="company-line">${escapeHtml(company.legalName)}</div>
+            <div class="company-line">${escapeHtml(company.addressLine)}</div>
+            <div class="company-line">${escapeHtml(company.website)}</div>
+            <div class="company-line">GSTIN: ${escapeHtml(company.gstin)}</div>
+        </div>
+        <div>
+            <div class="seller-payment-title">SELLER PAYMENT</div>
+            <div class="meta-line"><span class="meta-label">Invoice No: </span><span class="meta-value">${escapeHtml(invoiceNo)}</span></div>
+            <div class="meta-line"><span class="meta-label">Date: </span><span class="meta-value">${escapeHtml(generatedAt.split(',')[0])}</span></div>
+            <div class="meta-line"><span class="meta-label">Order Ref: </span><span class="meta-value">${escapeHtml(orderRef)}</span></div>
+        </div>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="two-col">
+        <div class="info-card">
+            <div class="info-card-title">BENEFICIARY DETAILS</div>
+            <div class="beneficiary-name">${escapeHtml(order.sellerName)}</div>
+            <div class="beneficiary-addr">${escapeHtml([order.sellerAddressLine1, order.sellerAddressLine2, order.sellerCity, order.sellerState, order.sellerPincode].filter(Boolean).join(', ') || 'Address not provided')}</div>
+            <div class="beneficiary-addr">GSTIN: ${escapeHtml(order.sellerGstin || '—')}</div>
+            <div class="beneficiary-addr">Contact: ${escapeHtml(order.sellerPhone || '—')}</div>
+        </div>
+        <div class="info-card">
+            <div class="info-card-title">PAYOUT DETAILS</div>
+            <div class="detail-row"><div class="detail-label">Holder</div><div class="detail-value">${escapeHtml(order.bankAccountHolder || order.sellerName)}</div></div>
+            <div class="detail-row"><div class="detail-label">Bank</div><div class="detail-value">${escapeHtml(order.bankName || '—')}</div></div>
+            <div class="detail-row"><div class="detail-label">A/C No</div><div class="detail-value">${escapeHtml(order.bankAccountNumber || '—')}</div></div>
+            <div class="detail-row"><div class="detail-label">IFSC</div><div class="detail-value">${escapeHtml(order.bankIfsc || '—')}</div></div>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40%">Item Description</th>
+                <th style="text-align:center;">HSN</th>
+                <th style="text-align:center;">SKU</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;">Base Price</th>
+                <th style="text-align:right;">Total Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${itemsHtml}
+        </tbody>
+    </table>
+    
+    <div class="two-col">
+        <div class="words-block">
+            <div class="words-label">Amount Payable (in words):</div>
+            <div class="words-value">${escapeHtml(amountInWords(sellerEarning))}</div>
+            <div style="margin-top:20px;">
+                <div class="terms-title">Terms & Conditions</div>
+                <div class="terms-item">1. This is a system generated settlement advice.</div>
+                <div class="terms-item">2. Deductions include GST, Shipping & Commission fees.</div>
+                <div class="terms-item">3. For discrepancies, contact support immediately.</div>
+                <div class="terms-item">4. Payment has been processed and credited to seller wallet.</div>
+            </div>
+        </div>
+        <div class="settlement-block">
+            <div class="settle-row"><span style="color:#504f56">Total Order Value</span><span style="color:#1a0f08">${escapeHtml(fmtAmt(customerPaidNum))}</span></div>
+            <div class="settle-row"><span style="color:#504f56">Less GST</span><span style="color:#b91c1c">- ${escapeHtml(fmtAmt(gstAmount))}</span></div>
+            <div class="settle-row"><span style="color:#504f56">Less Shipping</span><span style="color:#b91c1c">- ${escapeHtml(fmtAmt(deliveryCharge))}</span></div>
+            <div class="settle-row"><span style="color:#504f56">Less Commission (${commissionRate.toFixed(1)}%)</span><span style="color:#b91c1c">- ${escapeHtml(fmtAmt(commissionAmount))}</span></div>
+            <div class="net-row">
+                <span class="net-label">NET SETTLEMENT:</span>
+                <span class="net-value">${escapeHtml(fmtAmt(sellerEarning))}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <div>This is an automatically generated invoice and does not require a signature or stamp.</div>
+        <div class="footer-bold">This invoice has been electronically generated by our system and is valid for all accounting and record-keeping purposes.</div>
+        <div style="margin-top:12px;">For any queries or assistance regarding this payment, please contact:</div>
+        <div class="footer-contact">Email: ${escapeHtml(company.supportEmail)}  |  Phone: ${escapeHtml(company.supportPhone)}</div>
+        <div style="margin-top:12px;">© ${escapeHtml(company.year)} ${escapeHtml(company.legalName)}. All Rights Reserved.</div>
+    </div>
+</body>
+</html>`;
+};
+
 
 const amountInWords = (amount: number) => {
     const rupees = Math.floor(amount);
@@ -825,26 +992,72 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
     const commissionRate = order.commissionRateNum ?? 15;
     const sellerEarning = order.finalPayableNum ?? +(customerPaidNum - gstAmount - deliveryCharge - commissionAmount).toFixed(2);
 
-    const handlePrint = () => {
-        if (Platform.OS === "web") {
-            if (!invoiceVisible) setInvoiceVisible(true);
-            const styleId = "invoice-print-style";
-            let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
-            if (!styleTag) {
-                styleTag = document.createElement("style");
-                styleTag.id = styleId;
-                document.head.appendChild(styleTag);
-            }
-            styleTag.innerHTML = `
-                @media print {
-                    body * { visibility: hidden !important; }
-                    #invoice-print-area, #invoice-print-area * { visibility: visible !important; }
-                    #invoice-print-area { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; margin: 0 !important; }
+    const handlePrint = async () => {
+        const orderRef = order.transactionRef || order.orderId;
+        const lineItems = order.items && order.items.length > 0
+            ? order.items
+            : [{ productName: "Settlement for Order", hsn: "9983", sku: "SETTLE", qty: 1, basePrice: sellerEarning, total: sellerEarning }];
+        
+        const safeName = (invoiceNo ?? `payout-${order.id}`).replace(/[^\w.-]+/g, "_");
+        const fileName = `${safeName}.pdf`;
+
+        const html = buildPayoutInvoiceHtml(
+            order, invoiceNo || `PAY-${order.id}`, invoiceGeneratedAt, orderRef,
+            lineItems, sellerEarning, customerPaidNum, gstAmount, deliveryCharge, commissionAmount, commissionRate, COMPANY,
+            fmtAmt, amountInWords
+        );
+
+        if (Platform.OS === "web" && typeof document !== "undefined") {
+            // Open invoice HTML in a hidden iframe and trigger browser print dialog
+            // so the user can save it as PDF using the browser's built-in PDF printer.
+            const iframe = document.createElement("iframe");
+            iframe.style.position = "fixed";
+            iframe.style.top = "-10000px";
+            iframe.style.left = "-10000px";
+            iframe.style.width = "1px";
+            iframe.style.height = "1px";
+            iframe.style.opacity = "0";
+            document.body.appendChild(iframe);
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (iframeDoc) {
+                iframeDoc.open();
+                iframeDoc.write(html);
+                iframeDoc.close();
+                // Wait for resources to load then print
+                const printFrame = () => {
+                    try {
+                        iframe.contentWindow?.focus();
+                        iframe.contentWindow?.print();
+                    } finally {
+                        window.setTimeout(() => {
+                            document.body.removeChild(iframe);
+                        }, 2000);
+                    }
+                };
+                if (iframe.contentDocument?.readyState === "complete") {
+                    printFrame();
+                } else {
+                    iframe.onload = printFrame;
                 }
-            `;
-            setTimeout(() => window.print(), 50);
+            }
         } else {
-            Alert.alert("Print", "Sending invoice to printer…");
+            try {
+                const { printToFileAsync } = await import("expo-print");
+                const { uri } = await printToFileAsync({ html });
+                const Sharing = await import("expo-sharing");
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: "application/pdf",
+                        dialogTitle: fileName,
+                        UTI: "com.adobe.pdf",
+                    });
+                } else {
+                    Alert.alert("Invoice saved", uri);
+                }
+            } catch (err) {
+                console.error(err);
+                Alert.alert("Error", "Failed to generate invoice PDF");
+            }
         }
     };
 

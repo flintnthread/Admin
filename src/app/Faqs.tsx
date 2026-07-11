@@ -18,14 +18,14 @@ import {
     Platform,
     Modal,
     StatusBar,
-    Animated,
     useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 
-// â”€â”€â”€ THEME â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── THEME ──────────────────────────────────────────────────────────────────
 const PRIMARY = "#ef7b1a";
 const PRIMARY_LIGHT = "#fff4eb";
 const NAVY = "#1e3a5f";
@@ -45,7 +45,18 @@ const TEXT_HEAD = "#1a2b4a";
 const TEXT_BODY = "#4a5568";
 const TEXT_MUTED = "#a0aec0";
 
-// â”€â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── RESPONSIVE BREAKPOINTS ─────────────────────────────────────────────────
+// mobile   : < 640
+// tablet   : 640 – 899
+// desktop  : >= 900 (up to and beyond 1024)
+type Breakpoint = "mobile" | "tablet" | "desktop";
+const getBreakpoint = (width: number): Breakpoint => {
+    if (width < 640) return "mobile";
+    if (width < 900) return "tablet";
+    return "desktop";
+};
+
+// ─── TYPES ──────────────────────────────────────────────────────────────────
 interface FaqCategory {
     id: number;
     name: string;
@@ -70,7 +81,7 @@ interface FaqQuestion {
 const getSafeIcon = (category?: FaqCategory | null): string => {
     if (!category) return "help-circle";
     const name = (category.name || "").toLowerCase();
-    
+
     if (name.includes("order") || name.includes("shipping") || name.includes("delivery")) return "truck";
     if (name.includes("payment") || name.includes("wallet") || name.includes("card") || name.includes("bank")) return "credit-card";
     if (name.includes("return") || name.includes("refund") || name.includes("exchange")) return "refresh-ccw";
@@ -86,7 +97,7 @@ const getSafeIcon = (category?: FaqCategory | null): string => {
     return category.icon && category.icon !== "help-circle" ? category.icon : defaults[(category.id || 0) % defaults.length];
 };
 
-// â”€â”€â”€ VIEW QUESTION MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── VIEW QUESTION MODAL ────────────────────────────────────────────────────
 const ViewModal: React.FC<{
     visible: boolean;
     question: FaqQuestion | null;
@@ -155,7 +166,7 @@ const ViewModal: React.FC<{
     );
 };
 
-// â”€â”€â”€ ADD / EDIT QUESTION MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ADD / EDIT QUESTION MODAL ──────────────────────────────────────────────
 const QuestionModal: React.FC<{
     visible: boolean;
     editing: FaqQuestion | null;
@@ -269,7 +280,7 @@ const QuestionModal: React.FC<{
     );
 };
 
-// â”€â”€â”€ DELETE CONFIRM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── DELETE CONFIRM MODAL ───────────────────────────────────────────────────
 const DeleteModal: React.FC<{
     visible: boolean;
     question: FaqQuestion | null;
@@ -313,137 +324,190 @@ const DeleteModal: React.FC<{
     );
 };
 
-// â”€â”€â”€ QUESTION TABLE ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const QuestionRow: React.FC<{
+// ─── CATEGORY RAIL ITEM (sidebar on tablet/desktop, chip strip on mobile) ───
+const CategoryRailItem: React.FC<{
+    cat: FaqCategory;
+    count: number;
+    activeCount: number;
+    selected: boolean;
+    layout: Breakpoint;
+    onPress: () => void;
+}> = ({ cat, count, activeCount, selected, layout, onPress }) => {
+    const ratio = count > 0 ? activeCount / count : 0;
+    if (layout === "mobile") {
+        return (
+            <TouchableOpacity
+                style={[railSt.chip, { borderColor: selected ? cat.color : BORDER }, selected && { backgroundColor: cat.color + "12" }]}
+                onPress={onPress}>
+                <View style={[railSt.chipIcon, { backgroundColor: cat.color + "20" }]}>
+                    <Feather name={getSafeIcon(cat) as any} size={13} color={cat.color} />
+                </View>
+                <Text style={[railSt.chipText, selected && { color: cat.color }]} numberOfLines={1}>{cat.name}</Text>
+                <View style={[railSt.chipCount, { backgroundColor: cat.color + "20" }]}>
+                    <Text style={[railSt.chipCountText, { color: cat.color }]}>{count}</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    }
+    return (
+        <TouchableOpacity
+            style={[railSt.item, selected && { backgroundColor: cat.color + "10", borderLeftColor: cat.color }]}
+            onPress={onPress}>
+            <View style={[railSt.itemIcon, { backgroundColor: cat.color + "18" }]}>
+                <Feather name={getSafeIcon(cat) as any} size={15} color={cat.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+                <Text style={[railSt.itemName, selected && { color: cat.color }]} numberOfLines={1}>{cat.name}</Text>
+                <View style={railSt.itemBarTrack}>
+                    <View style={[railSt.itemBarFill, { width: `${Math.round(ratio * 100)}%`, backgroundColor: cat.color }]} />
+                </View>
+            </View>
+            <Text style={[railSt.itemCount, selected && { color: cat.color }]}>{count}</Text>
+        </TouchableOpacity>
+    );
+};
+
+// ─── STAT PILL ───────────────────────────────────────────────────────────
+const StatPill: React.FC<{ icon: string; label: string; value: number; color: string }> = ({ icon, label, value, color }) => (
+    <View style={statSt.pill}>
+        <View style={[statSt.pillIcon, { backgroundColor: color + "18" }]}>
+            <Feather name={icon as any} size={15} color={color} />
+        </View>
+        <View>
+            <Text style={statSt.pillValue}>{value}</Text>
+            <Text style={statSt.pillLabel}>{label}</Text>
+        </View>
+    </View>
+);
+
+// ─── ACCORDION QUESTION CARD (list mode) ───────────────────────────────────
+const QuestionAccordionCard: React.FC<{
     q: FaqQuestion;
     cat: FaqCategory | undefined;
     index: number;
+    expanded: boolean;
+    onToggleExpand: () => void;
     onToggleSeller: () => void;
     onView: () => void;
     onEdit: () => void;
     onDelete: () => void;
-}> = ({ q, cat, index, onToggleSeller, onView, onEdit, onDelete }) => {
+}> = ({ q, cat, index, expanded, onToggleExpand, onToggleSeller, onView, onEdit, onDelete }) => {
     const isActive = q.status === "Active";
-    const accentColor = cat?.color ?? PRIMARY;
+    const accent = cat?.color ?? PRIMARY;
     return (
-        <View style={[qSt.row, index % 2 === 0 && qSt.rowAlt]}>
-            {/* ID */}
-            <View style={qSt.cellId}>
-                <Text style={qSt.idText}>{q.id}</Text>
-            </View>
-            {/* Category */}
-            <View style={qSt.cellCat}>
-                {cat?.icon && <Feather name={cat.icon as any} size={14} color={accentColor} style={{ marginRight: 6 }} />}
-                <Text style={[qSt.catText, { color: accentColor }]} numberOfLines={2}>{cat?.name ?? "—"}</Text>
-            </View>
-            {/* Question */}
-            <View style={qSt.cellQuestion}>
-                <Text style={qSt.questionText} numberOfLines={2}>{q.question}</Text>
-            </View>
-            {/* Sort Order */}
-            <View style={qSt.cellOrder}>
-                <Text style={qSt.orderText}>{q.order}</Text>
-            </View>
-            {/* Status */}
-            <View style={qSt.cellStatus}>
-                <View style={[qSt.statusBadge, { backgroundColor: isActive ? "#e6faf5" : "#fde8e8", borderColor: isActive ? ACCENT_TEAL : ACCENT_RED }]}>
-                    <Text style={[qSt.statusBadgeTxt, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{q.status}</Text>
+        <View style={[accSt.card, expanded && { borderColor: accent }]}>
+            <TouchableOpacity style={accSt.head} onPress={onToggleExpand} activeOpacity={0.75}>
+                <View style={[accSt.badge, { backgroundColor: accent + "18" }]}>
+                    <Text style={[accSt.badgeText, { color: accent }]}>{String(index).padStart(2, "0")}</Text>
                 </View>
-            </View>
-            {/* Seller Toggle */}
-            <View style={qSt.cellSeller}>
-                <TouchableOpacity
-                    style={[qSt.toggle, q.isForSeller && { backgroundColor: ACCENT_TEAL }]}
-                    onPress={onToggleSeller}
-                    activeOpacity={0.8}>
-                    <View style={[qSt.toggleThumb, q.isForSeller && qSt.toggleThumbOn]} />
-                </TouchableOpacity>
-            </View>
-            {/* Created Date */}
-            <View style={qSt.cellDate}>
-                <Text style={qSt.dateText}>{q.createdAt}</Text>
-            </View>
-            {/* Actions */}
-            <View style={qSt.cellAction}>
-                <TouchableOpacity style={[qSt.actionBtn, { backgroundColor: "#1e293b" }]} onPress={onView}>
-                    <Feather name="eye" size={13} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity style={[qSt.actionBtn, { backgroundColor: "#1e293b" }]} onPress={onEdit}>
-                    <Feather name="edit-2" size={13} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity style={[qSt.actionBtn, { backgroundColor: ACCENT_RED }]} onPress={onDelete}>
-                    <Feather name="trash-2" size={13} color="#fff" />
-                </TouchableOpacity>
-            </View>
+                <View style={accSt.headMid}>
+                    <Text style={accSt.question} numberOfLines={expanded ? undefined : 1}>{q.question}</Text>
+                    <View style={accSt.metaRow}>
+                        <View style={[accSt.statusDot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
+                        <Text style={accSt.metaText}>{q.status}</Text>
+                        <Text style={accSt.metaDivider}>•</Text>
+                        <Text style={accSt.metaText}>Order {q.order}</Text>
+                        {q.isForSeller ? (
+                            <>
+                                <Text style={accSt.metaDivider}>•</Text>
+                                <Text style={[accSt.metaText, { color: PRIMARY, fontWeight: "700" }]}>Seller</Text>
+                            </>
+                        ) : null}
+                    </View>
+                </View>
+                <Feather name={expanded ? "chevron-up" : "chevron-down"} size={18} color={TEXT_MUTED} />
+            </TouchableOpacity>
+
+            {expanded && (
+                <View style={accSt.body}>
+                    <Text style={accSt.answer}>{q.answer}</Text>
+                    <View style={accSt.footerRow}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                            <Text style={accSt.dateText}>{q.createdAt}</Text>
+                            <TouchableOpacity
+                                style={[accSt.toggle, q.isForSeller && { backgroundColor: ACCENT_TEAL }]}
+                                onPress={onToggleSeller}
+                                activeOpacity={0.8}>
+                                <View style={[accSt.toggleThumb, q.isForSeller && accSt.toggleThumbOn]} />
+                            </TouchableOpacity>
+                            <Text style={accSt.toggleLabel}>For seller</Text>
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                            <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: ACCENT_SKY + "15", borderColor: ACCENT_SKY + "40" }]} onPress={onView}>
+                                <Feather name="eye" size={13} color={ACCENT_SKY} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: accent + "15", borderColor: accent + "40" }]} onPress={onEdit}>
+                                <Feather name="edit-2" size={13} color={accent} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: ACCENT_RED + "15", borderColor: ACCENT_RED + "40" }]} onPress={onDelete}>
+                                <Feather name="trash-2" size={13} color={ACCENT_RED} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            )}
         </View>
     );
 };
 
-// â”€â”€â”€ QUESTION GRID CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const QuestionGridCard: React.FC<{
+// ─── TILE QUESTION CARD (grid mode) ─────────────────────────────────────────
+const QuestionTileCard: React.FC<{
     q: FaqQuestion;
     cat: FaqCategory | undefined;
     index: number;
+    widthPct: string;
     onView: () => void;
     onEdit: () => void;
     onDelete: () => void;
-}> = ({ q, cat, index, onView, onEdit, onDelete }) => {
+}> = ({ q, cat, index, widthPct, onView, onEdit, onDelete }) => {
     const isActive = q.status === "Active";
-    const accentColor = cat?.color ?? PRIMARY;
+    const accent = cat?.color ?? PRIMARY;
     return (
-        <View style={[gSt.card, { borderTopColor: accentColor }]}>
-            <View style={gSt.cardHeader}>
-                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    <View style={[gSt.indexBadge, { backgroundColor: accentColor + "18" }]}>
-                        <Text style={[gSt.indexText, { color: accentColor }]}>Q{index}</Text>
-                    </View>
-                    {cat?.icon && (
-                        <View style={[gSt.iconBadge, { backgroundColor: accentColor + "18" }]}>
-                            <Feather name={cat.icon as any} size={12} color={accentColor} />
-                        </View>
-                    )}
-                </View>
-                <View style={[gSt.statusPill, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
-                    <View style={[gSt.statusDot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
-                    <Text style={[gSt.statusTxt, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{q.status}</Text>
+        <View style={[tileSt.card, { width: widthPct as any, borderTopColor: accent }]}>
+            <View style={tileSt.topRow}>
+                <Text style={[tileSt.index, { color: accent }]}>Q{index}</Text>
+                <View style={[tileSt.statusChip, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
+                    <Text style={[tileSt.statusChipText, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{q.status}</Text>
                 </View>
             </View>
-            <Text style={gSt.questionText} numberOfLines={3}>{q.question}</Text>
-            <Text style={gSt.answerText} numberOfLines={2}>{q.answer}</Text>
-            {q.isForSeller && (
-                <View style={gSt.sellerBadge}>
-                    <Feather name="briefcase" size={10} color={PRIMARY} />
-                    <Text style={gSt.sellerBadgeTxt}>Seller</Text>
-                </View>
-            )}
-            <View style={gSt.divider} />
-            <View style={gSt.cardFooter}>
-                <Text style={gSt.dateText}>{q.createdAt}</Text>
-                <View style={gSt.actions}>
-                    <TouchableOpacity style={[gSt.actionBtn, { backgroundColor: ACCENT_SKY + "15", borderColor: ACCENT_SKY + "40" }]} onPress={onView}>
-                        <Feather name="eye" size={13} color={ACCENT_SKY} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[gSt.actionBtn, { backgroundColor: PRIMARY + "15", borderColor: PRIMARY + "40" }]} onPress={onEdit}>
-                        <Feather name="edit-2" size={13} color={PRIMARY} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[gSt.actionBtn, { backgroundColor: ACCENT_RED + "15", borderColor: ACCENT_RED + "40" }]} onPress={onDelete}>
-                        <Feather name="trash-2" size={13} color={ACCENT_RED} />
-                    </TouchableOpacity>
-                </View>
+            <Text style={tileSt.question} numberOfLines={3}>{q.question}</Text>
+            <Text style={tileSt.answer} numberOfLines={3}>{q.answer}</Text>
+            <View style={tileSt.bottomRow}>
+                <Text style={tileSt.dateText}>{q.createdAt}</Text>
+                {q.isForSeller && (
+                    <View style={tileSt.sellerTag}>
+                        <Feather name="briefcase" size={9} color={PRIMARY} />
+                        <Text style={tileSt.sellerTagText}>Seller</Text>
+                    </View>
+                )}
+            </View>
+            <View style={tileSt.actions}>
+                <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: ACCENT_SKY + "15" }]} onPress={onView}>
+                    <Feather name="eye" size={13} color={ACCENT_SKY} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: accent + "15" }]} onPress={onEdit}>
+                    <Feather name="edit-2" size={13} color={accent} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: ACCENT_RED + "15" }]} onPress={onDelete}>
+                    <Feather name="trash-2" size={13} color={ACCENT_RED} />
+                </TouchableOpacity>
             </View>
         </View>
     );
 };
 
-// â”€â”€â”€ MAIN SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
 const FaqQuestionsScreen: React.FC = () => {
     const isWeb = Platform.OS === "web";
     const { width } = useWindowDimensions();
-    const isMobile = width < 480;
+    const layout = getBreakpoint(width);
+    const isMobile = layout === "mobile";
+    const isDesktopLayout = layout !== "mobile";
 
+    const { categoryId: initialCategoryId } = useLocalSearchParams();
     const [categories, setCategories] = useState<FaqCategory[]>([]);
     const [questions, setQuestions] = useState<FaqQuestion[]>([]);
-    const [selectedCatId, setSelectedCatId] = useState<number>(0);
+    const [selectedCatId, setSelectedCatId] = useState<number>(initialCategoryId ? Number(initialCategoryId) : 0);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
@@ -563,6 +627,10 @@ const FaqQuestionsScreen: React.FC = () => {
     // Stats for selected category
     const catQuestions = questions.filter(q => q.categoryId === selectedCatId);
     const activeCount = catQuestions.filter(q => q.status === "Active").length;
+    const inactiveCount = catQuestions.length - activeCount;
+
+    // Grid tile width per breakpoint
+    const tileWidthPct = layout === "mobile" ? "100%" : layout === "tablet" ? "48%" : "31.5%";
 
     return (
         <AdminLayout>
@@ -570,136 +638,184 @@ const FaqQuestionsScreen: React.FC = () => {
                 <StatusBar barStyle="light-content" backgroundColor={NAVY} />
 
                 <ScrollView style={st.scroll} showsVerticalScrollIndicator={false}>
-                    {/* ——— PAGE HEADER ——— */}
+                    {/* ——— PAGE HEADER (unchanged) ——— */}
                     <View style={[
                         st.header,
                         isWeb ? st.headerWeb : st.headerMobile,
-                        { backgroundColor: NAVY, borderBottomColor: NAVY }
+                        { backgroundColor: "#151D4F", borderBottomColor: "#151D4F" }
                     ]}>
                         <View style={st.headerLeft}>
                             <View style={[st.headerIcon, { backgroundColor: PRIMARY }]}>
-                                <Feather name="help-circle" size={22} color="#fff" />
+                                <Feather name="help-circle" size={isMobile ? 18 : 22} color="#fff" />
                             </View>
-                            <View>
-                                <Text style={[st.headerTitle, { color: "#fff" }]}>FAQ Questions</Text>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={[st.headerTitle, { color: "#fff", fontSize: isMobile ? 16 : 20 }]} numberOfLines={1}>FAQ Questions</Text>
+                                {!isMobile && <Text style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, marginTop: 2 }}>Manage frequently asked questions</Text>}
                             </View>
                         </View>
-                        <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY }]}
+                        <TouchableOpacity style={[st.addBtn, { backgroundColor: PRIMARY, flexShrink: 0 }]}
                             onPress={() => { setEditModal(null); setAddModal(true); }}>
                             <Feather name="plus" size={14} color="#fff" />
-                            <Text style={st.addBtnText}>Add </Text>
+                            <Text style={st.addBtnText}>{isMobile ? "Add" : "Add"}</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <View style={[st.scrollContent, !isWeb && { paddingBottom: 120 }]}>
+                    {/* ——— BODY: new sidebar + main layout ——— */}
+                    <View style={[st.body, !isMobile && st.bodyRow, !isWeb && { paddingBottom: 120 }]}>
 
                         {loadError ? (
-                            <Text style={{ color: ACCENT_RED, marginBottom: 12 }}>{loadError}</Text>
+                            <Text style={{ color: ACCENT_RED, marginHorizontal: 16, marginTop: 12 }}>{loadError}</Text>
                         ) : null}
 
-                        {/* CATEGORY TABS */}
-                        <View style={st.catSection}>
-                            <Text style={st.sectionLabel}>SELECT CATEGORY</Text>
-                            <View style={{ flex: 1 }}>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={st.catScrollContent}>
+                        {/* ── CATEGORY RAIL ── */}
+                        {isMobile ? (
+                            <View style={railSt.mobileWrap}>
+                                <Text style={st.sectionLabel}>CATEGORIES</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
                                     {categories.map(cat => {
                                         const catQCount = questions.filter(q => q.categoryId === cat.id).length;
-                                        const isSelected = cat.id === selectedCatId;
-
+                                        const catActiveCount = questions.filter(q => q.categoryId === cat.id && q.status === "Active").length;
                                         return (
-                                            <TouchableOpacity key={cat.id}
-                                                style={[st.catBtn,
-                                                { borderColor: isSelected ? NAVY : PRIMARY },
-                                                isSelected && { backgroundColor: NAVY }]}
-                                                onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}>
-                                                <View style={[st.catBtnIcon, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "18" }]}>
-                                                    <Feather name={getSafeIcon(cat) as any} size={14} color={isSelected ? "#fff" : PRIMARY} />
-                                                </View>
-                                                <Text style={[st.catBtnText, isSelected && { color: "#fff" }]} numberOfLines={1}>{cat.name}</Text>
-                                                <View style={[st.catBtnCount, { backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : PRIMARY + "20" }]}>
-                                                    <Text style={[st.catBtnCountText, { color: isSelected ? "#fff" : PRIMARY }]}>{catQCount}</Text>
-                                                </View>
-                                            </TouchableOpacity>
+                                            <CategoryRailItem
+                                                key={cat.id}
+                                                cat={cat}
+                                                count={catQCount}
+                                                activeCount={catActiveCount}
+                                                selected={cat.id === selectedCatId}
+                                                layout={layout}
+                                                onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}
+                                            />
                                         );
                                     })}
                                 </ScrollView>
                             </View>
-                        </View>
+                        ) : (
+                            <View style={[railSt.sidebar, layout === "tablet" && { width: 190 }]}>
+                                <Text style={st.sectionLabel}>CATEGORIES</Text>
+                                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+                                    {categories.map(cat => {
+                                        const catQCount = questions.filter(q => q.categoryId === cat.id).length;
+                                        const catActiveCount = questions.filter(q => q.categoryId === cat.id && q.status === "Active").length;
+                                        return (
+                                            <CategoryRailItem
+                                                key={cat.id}
+                                                cat={cat}
+                                                count={catQCount}
+                                                activeCount={catActiveCount}
+                                                selected={cat.id === selectedCatId}
+                                                layout={layout}
+                                                onPress={() => { setSelectedCatId(cat.id); setSearch(""); setStatusFilter("All"); setExpandedIds(new Set()); setCurrentPage(1); }}
+                                            />
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        )}
 
-                        {/* â”€â”€ SELECTED CATEGORY HERO â”€â”€ */}
-                        <View style={[st.heroCard, { borderLeftColor: selectedCat?.color ?? PRIMARY }]}>
-                            <View style={st.heroLeft}>
-                                <View style={[st.heroIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
-                                    <Feather name={getSafeIcon(selectedCat) as any} size={28} color={selectedCat?.color ?? PRIMARY} />
-                                </View>
-                                <View>
-                                    <Text style={st.heroTitle}>{selectedCat?.name}</Text>
-                                    <Text style={st.heroSub}>{catQuestions.length} questions  Â·  {activeCount} active</Text>
-                                </View>
-                            </View>
-                            <View style={[st.heroBadge, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
-                                <Text style={[st.heroBadgeText, { color: selectedCat?.color ?? PRIMARY }]}>{catQuestions.length} FAQs</Text>
-                            </View>
-                        </View>
+                        {/* ── MAIN PANE ── */}
+                        <View style={st.mainPane}>
 
-                        <View style={[st.toolbar, !isWeb && { flexWrap: "wrap" as any }]}>
-                            <View style={[st.searchWrap, !isWeb && { width: "100%", flex: 0 }]}>
-                                <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
-                                <TextInput style={st.searchInput}
-                                    placeholder="Search questions..."
-                                    placeholderTextColor={TEXT_MUTED}
-                                    value={search}
-                                    onChangeText={(t) => {
-                                        setSearch(t);
-                                        setCurrentPage(1);
-                                    }} />
-                                {search.length > 0 && (
-                                    <TouchableOpacity onPress={() => {
-                                        setSearch("");
-                                        setCurrentPage(1);
-                                    }}>
-                                        <Feather name="x-circle" size={14} color={TEXT_MUTED} />
-                                    </TouchableOpacity>
-                                )}
+                            {/* Stats strip */}
+                            <View style={[statSt.row, isMobile && { flexWrap: "wrap" as any }]}>
+                                <View style={statSt.headingWrap}>
+                                    <View style={[statSt.catIcon, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "18" }]}>
+                                        <Feather name={getSafeIcon(selectedCat) as any} size={20} color={selectedCat?.color ?? PRIMARY} />
+                                    </View>
+                                    <Text style={[statSt.heading, isWeb && { maxWidth: "none" as any }]} numberOfLines={isWeb ? undefined : 1}>{selectedCat?.name ?? "—"}</Text>
+                                </View>
+                                <View style={statSt.pillsWrap}>
+                                    <StatPill icon="hash" label="Total" value={catQuestions.length} color={NAVY} />
+                                    <StatPill icon="check-circle" label="Active" value={activeCount} color={ACCENT_TEAL} />
+                                    <StatPill icon="pause-circle" label="Inactive" value={inactiveCount} color={ACCENT_RED} />
+                                </View>
                             </View>
-                            <View style={st.chips}>
-                                {(["All", "Active", "Inactive"] as const).map(f => (
-                                    <TouchableOpacity key={f}
-                                        style={[st.chip,
-                                        statusFilter === f && { backgroundColor: selectedCat?.color ?? PRIMARY, borderColor: selectedCat?.color ?? PRIMARY }]}
-                                        onPress={() => {
-                                            setStatusFilter(f);
-                                            setCurrentPage(1);
-                                        }}>
-                                        <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+
+                            {/* Toolbar */}
                             {isMobile ? (
-                                <View style={st.viewToggle}>
-                                    <TouchableOpacity
-                                        style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
-                                        onPress={() => setViewMode("list")}>
-                                        <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
-                                        onPress={() => setViewMode("grid")}>
-                                        <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
-                                    </TouchableOpacity>
+                                <View style={st.toolbarMobile}>
+                                    {/* Search bar — full width on mobile, always on top */}
+                                    <View style={[st.searchWrap, { width: "100%", flex: 0 }]}>
+                                        <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
+                                        <TextInput style={st.searchInput}
+                                            placeholder="Search questions..."
+                                            placeholderTextColor={TEXT_MUTED}
+                                            value={search}
+                                            onChangeText={(t) => {
+                                                setSearch(t);
+                                                setCurrentPage(1);
+                                            }} />
+                                        {search.length > 0 && (
+                                            <TouchableOpacity onPress={() => {
+                                                setSearch("");
+                                                setCurrentPage(1);
+                                            }}>
+                                                <Feather name="x-circle" size={14} color={TEXT_MUTED} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                    {/* Filter chips + view toggle — below search on mobile */}
+                                    <View style={st.toolbarSecondRow}>
+                                        <View style={st.chips}>
+                                            {(["All", "Active", "Inactive"] as const).map(f => (
+                                                <TouchableOpacity key={f}
+                                                    style={[st.chip,
+                                                    statusFilter === f && { backgroundColor: selectedCat?.color ?? PRIMARY, borderColor: selectedCat?.color ?? PRIMARY }]}
+                                                    onPress={() => {
+                                                        setStatusFilter(f);
+                                                        setCurrentPage(1);
+                                                    }}>
+                                                    <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                        <View style={st.viewToggle}>
+                                            <TouchableOpacity
+                                                style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
+                                                onPress={() => setViewMode("list")}>
+                                                <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
+                                                onPress={() => setViewMode("grid")}>
+                                                <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
                                 </View>
                             ) : (
-                                <>
-                                    <TouchableOpacity style={st.expandAllBtn}
-                                        onPress={() => {
-                                            if (expandedIds.size === filtered.length) setExpandedIds(new Set());
-                                            else setExpandedIds(new Set(filtered.map(q => q.id)));
-                                        }}>
-                                        <Feather name={expandedIds.size === filtered.length ? "minimize-2" : "maximize-2"} size={13} color={TEXT_BODY} />
-                                        <Text style={st.expandAllTxt}>{expandedIds.size === filtered.length ? "Collapse" : "Expand"} All</Text>
-                                    </TouchableOpacity>
-
+                                <View style={st.toolbar}>
+                                    <View style={st.searchWrap}>
+                                        <Feather name="search" size={14} color={selectedCat?.color ?? PRIMARY} />
+                                        <TextInput style={st.searchInput}
+                                            placeholder="Search questions..."
+                                            placeholderTextColor={TEXT_MUTED}
+                                            value={search}
+                                            onChangeText={(t) => {
+                                                setSearch(t);
+                                                setCurrentPage(1);
+                                            }} />
+                                        {search.length > 0 && (
+                                            <TouchableOpacity onPress={() => {
+                                                setSearch("");
+                                                setCurrentPage(1);
+                                            }}>
+                                                <Feather name="x-circle" size={14} color={TEXT_MUTED} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                    <View style={st.chips}>
+                                        {(["All", "Active", "Inactive"] as const).map(f => (
+                                            <TouchableOpacity key={f}
+                                                style={[st.chip,
+                                                statusFilter === f && { backgroundColor: selectedCat?.color ?? PRIMARY, borderColor: selectedCat?.color ?? PRIMARY }]}
+                                                onPress={() => {
+                                                    setStatusFilter(f);
+                                                    setCurrentPage(1);
+                                                }}>
+                                                <Text style={[st.chipText, statusFilter === f && { color: "#fff" }]}>{f}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
                                     <View style={st.viewToggle}>
                                         <TouchableOpacity
                                             style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
@@ -712,118 +828,77 @@ const FaqQuestionsScreen: React.FC = () => {
                                             <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
                                         </TouchableOpacity>
                                     </View>
-                                </>
-                            )}
-                        </View>
-
-                        {/* â”€â”€ RESULT COUNT â”€â”€ */}
-                        <Text style={st.resultCount}>
-                            Showing <Text style={{ color: selectedCat?.color ?? PRIMARY, fontWeight: "700" }}>{filtered.length}</Text> questions
-                        </Text>
-
-                        {/* â”€â”€ QUESTIONS LIST / GRID â”€â”€ */}
-                        {filtered.length === 0 ? (
-                            <View style={st.empty}>
-                                <View style={[st.emptyIconWrap, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "15" }]}>
-                                    <Feather name="inbox" size={36} color={selectedCat?.color ?? TEXT_MUTED} />
                                 </View>
-                                <Text style={st.emptyTitle}>No questions found</Text>
-                                <Text style={st.emptySubtitle}>Try adjusting your search or add a new question</Text>
-                                <TouchableOpacity style={[st.emptyAddBtn, { backgroundColor: selectedCat?.color ?? PRIMARY }]}
-                                    onPress={() => { setEditModal(null); setAddModal(true); }}>
-                                    <Feather name="plus" size={14} color="#fff" />
-                                    <Text style={st.emptyAddTxt}>Add </Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : viewMode === "grid" ? (
-                            <View style={st.gridContainer}>
-                                {paginated.map((q, idx) => (
-                                    <View key={q.id} style={[st.gridItem, !isWeb && { width: "100%" as any }]}>
-                                        <QuestionGridCard
+                            )}
+
+                            {/* Result count */}
+                            <Text style={st.resultCount}>
+                                Showing <Text style={{ color: selectedCat?.color ?? PRIMARY, fontWeight: "700" }}>{filtered.length}</Text> questions
+                            </Text>
+
+                            {/* Content */}
+                            {filtered.length === 0 ? (
+                                <View style={st.empty}>
+                                    <View style={[st.emptyIconWrap, { backgroundColor: (selectedCat?.color ?? PRIMARY) + "15" }]}>
+                                        <Feather name="inbox" size={36} color={selectedCat?.color ?? TEXT_MUTED} />
+                                    </View>
+                                    <Text style={st.emptyTitle}>No questions found</Text>
+                                    <Text style={st.emptySubtitle}>Try adjusting your search or add a new question</Text>
+                                    <TouchableOpacity style={[st.emptyAddBtn, { backgroundColor: selectedCat?.color ?? PRIMARY }]}
+                                        onPress={() => { setEditModal(null); setAddModal(true); }}>
+                                        <Feather name="plus" size={14} color="#fff" />
+                                        <Text style={st.emptyAddTxt}>Add </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : viewMode === "grid" ? (
+                                <View style={st.gridContainer}>
+                                    {paginated.map((q, idx) => (
+                                        <QuestionTileCard
+                                            key={q.id}
                                             q={q}
                                             cat={selectedCat}
-                                            index={idx + 1}
+                                            index={(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                                            widthPct={tileWidthPct}
                                             onView={() => setViewModal(q)}
                                             onEdit={() => { setEditModal(q); setAddModal(true); }}
                                             onDelete={() => setDeleteModal(q)}
                                         />
-                                    </View>
-                                ))}
-                            </View>
-                        ) : (
-                            <View style={st.tableWrap}>
-                                {isWeb ? (
-                                    <View style={{ width: "100%" }}>
-                                        {/* Table header */}
-                                        <View style={qSt.headerRow}>
-                                            <Text style={[qSt.headerCell, { width: 60 }]}>ID</Text>
-                                            <Text style={[qSt.headerCell, { width: 200 }]}>Category</Text>
-                                            <Text style={[qSt.headerCell, { flex: 1 }]}>Question</Text>
-                                            <Text style={[qSt.headerCell, { width: 80 }]}>Sort Order</Text>
-                                            <Text style={[qSt.headerCell, { width: 100 }]}>Status</Text>
-                                            <Text style={[qSt.headerCell, { width: 70 }]}>Seller</Text>
-                                            <Text style={[qSt.headerCell, { width: 110 }]}>Created Date</Text>
-                                            <Text style={[qSt.headerCell, { width: 110 }]}>Action</Text>
-                                        </View>
-                                        {paginated.map((q, idx) => (
-                                            <QuestionRow
-                                                key={q.id}
-                                                q={q}
-                                                cat={selectedCat}
-                                                index={idx}
-                                                onToggleSeller={() => setQuestions(prev => prev.map(x => x.id === q.id ? { ...x, isForSeller: !x.isForSeller } : x))}
-                                                onView={() => setViewModal(q)}
-                                                onEdit={() => { setEditModal(q); setAddModal(true); }}
-                                                onDelete={() => setDeleteModal(q)}
-                                            />
-                                        ))}
-                                    </View>
-                                ) : (
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                        <View style={{ minWidth: 900 }}>
-                                            {/* Table header */}
-                                            <View style={qSt.headerRow}>
-                                                <Text style={[qSt.headerCell, { width: 60 }]}>ID</Text>
-                                                <Text style={[qSt.headerCell, { width: 200 }]}>Category</Text>
-                                                <Text style={[qSt.headerCell, { flex: 1 }]}>Question</Text>
-                                                <Text style={[qSt.headerCell, { width: 80 }]}>Sort Order</Text>
-                                                <Text style={[qSt.headerCell, { width: 100 }]}>Status</Text>
-                                                <Text style={[qSt.headerCell, { width: 70 }]}>Seller</Text>
-                                                <Text style={[qSt.headerCell, { width: 110 }]}>Created Date</Text>
-                                                <Text style={[qSt.headerCell, { width: 110 }]}>Action</Text>
-                                            </View>
-                                            {paginated.map((q, idx) => (
-                                                <QuestionRow
-                                                    key={q.id}
-                                                    q={q}
-                                                    cat={selectedCat}
-                                                    index={idx}
-                                                    onToggleSeller={() => setQuestions(prev => prev.map(x => x.id === q.id ? { ...x, isForSeller: !x.isForSeller } : x))}
-                                                    onView={() => setViewModal(q)}
-                                                    onEdit={() => { setEditModal(q); setAddModal(true); }}
-                                                    onDelete={() => setDeleteModal(q)}
-                                                />
-                                            ))}
-                                        </View>
-                                    </ScrollView>
-                                )}
-                            </View>
-                        )}
+                                    ))}
+                                </View>
+                            ) : (
+                                <View style={{ gap: 10 }}>
+                                    {paginated.map((q, idx) => (
+                                        <QuestionAccordionCard
+                                            key={q.id}
+                                            q={q}
+                                            cat={selectedCat}
+                                            index={(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                                            expanded={expandedIds.has(q.id)}
+                                            onToggleExpand={() => toggleExpand(q.id)}
+                                            onToggleSeller={() => setQuestions(prev => prev.map(x => x.id === q.id ? { ...x, isForSeller: !x.isForSeller } : x))}
+                                            onView={() => setViewModal(q)}
+                                            onEdit={() => { setEditModal(q); setAddModal(true); }}
+                                            onDelete={() => setDeleteModal(q)}
+                                        />
+                                    ))}
+                                </View>
+                            )}
 
-                        {filtered.length > 0 && (
-                            <Pagination
-                                currentPage={currentPage}
-                                totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-                                totalItems={filtered.length}
-                                itemsPerPage={ITEMS_PER_PAGE}
-                                itemName="questions"
-                                onPageChange={setCurrentPage}
-                            />
-                        )}
+                            {filtered.length > 0 && (
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                    totalItems={filtered.length}
+                                    itemsPerPage={ITEMS_PER_PAGE}
+                                    itemName="questions"
+                                    onPageChange={setCurrentPage}
+                                />
+                            )}
+                        </View>
                     </View>
                 </ScrollView>
 
-                {/* â”€â”€ MODALS â”€â”€ */}
+                {/* ── MODALS ── */}
                 <ViewModal
                     visible={!!viewModal}
                     question={viewModal}
@@ -854,80 +929,63 @@ const FaqQuestionsScreen: React.FC = () => {
 
 export default FaqQuestionsScreen;
 
-// â”€â”€â”€ MAIN STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── MAIN STYLES ─────────────────────────────────────────────────────────────
 const st = StyleSheet.create({
     root: { flex: 1, height: "100%", backgroundColor: BG_PAGE },
 
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-    headerWeb: { marginHorizontal: 2, marginTop: 12, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 48, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
+    headerWeb: { marginHorizontal: 18, marginTop: 22, borderRadius: 18, paddingHorizontal: 28, paddingVertical: 18, paddingBottom: 36, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 18, elevation: 10 },
     headerMobile: {
-        marginHorizontal: 16,
+        marginHorizontal: 14,
         marginTop: 16,
-        borderRadius: 22,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        elevation: 6,
     },
-    headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
-    headerIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
+    headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0, marginRight: 10 },
+    headerIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4, flexShrink: 0 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT_HEAD, letterSpacing: -0.3 },
     headerBreadcrumb: { fontSize: 12, color: TEXT_BODY, marginTop: 2 },
-    addBtn: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    addBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3 },
     addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
     scroll: { flex: 1 },
-    scrollContent: { padding: 16, gap: 14 },
 
-    // Category tabs
-    catSection: { backgroundColor: BG_CARD, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: BORDER },
-    sectionLabel: { fontSize: 10, fontWeight: "800", color: TEXT_MUTED, letterSpacing: 0.8, marginBottom: 12 },
-    catScrollContent: { gap: 8, paddingRight: 4 },
-    catBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 24, borderWidth: 1.5, backgroundColor: BG_PAGE, maxWidth: 220 },
-    catBtnIcon: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-    catBtnText: { fontSize: 13, fontWeight: "700", color: TEXT_HEAD, flexShrink: 1 },
-    catBtnCount: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-    catBtnCountText: { fontSize: 11, fontWeight: "800" },
+    // New body: sidebar + main
+    body: { padding: 14, gap: 12 },
+    bodyRow: { flexDirection: "row", alignItems: "flex-start" },
 
-    // Hero card
-    heroCard: { backgroundColor: BG_CARD, borderRadius: 14, padding: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: BORDER, borderLeftWidth: 5, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-    heroLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
-    heroIcon: { width: 56, height: 56, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-    heroTitle: { fontSize: 17, fontWeight: "800", color: TEXT_HEAD, marginBottom: 4 },
-    heroSub: { fontSize: 12, color: TEXT_MUTED, fontWeight: "500" },
-    heroBadge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-    heroBadgeText: { fontSize: 13, fontWeight: "800" },
+    sectionLabel: { fontSize: 10, fontWeight: "800", color: PRIMARY, letterSpacing: 1.2, marginBottom: 10, textTransform: "uppercase" as any },
+
+    mainPane: { flex: 1, gap: 12, minWidth: 0 },
 
     // Toolbar
-    toolbar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: BG_CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
-    searchWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
+    toolbar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: BG_CARD, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+    toolbarMobile: { flexDirection: "column", gap: 10, backgroundColor: BG_CARD, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+    toolbarSecondRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+    searchWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: BORDER, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
     searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, outlineStyle: "none" } as any,
     chips: { flexDirection: "row", gap: 6 },
-    chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, backgroundColor: BG_PAGE },
-    chipText: { fontSize: 12, fontWeight: "600", color: TEXT_BODY },
-    expandAllBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: BORDER, backgroundColor: BG_PAGE },
-    expandAllTxt: { fontSize: 12, fontWeight: "600", color: TEXT_BODY },
+    chip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, backgroundColor: BG_PAGE },
+    chipText: { fontSize: 12, fontWeight: "700", color: TEXT_BODY },
 
-    resultCount: { fontSize: 12, color: TEXT_MUTED, fontWeight: "500" },
-
-    // Questions list
-    questionsList: { gap: 10 },
-    tableWrap: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
+    resultCount: { fontSize: 12, color: TEXT_MUTED, fontWeight: "600", paddingHorizontal: 2 },
 
     // Grid container
     gridContainer: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-    gridItem: { width: "48%" as any, minWidth: 260 },
 
     // View toggle
-    viewToggle: { flexDirection: "row", borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
+    viewToggle: { flexDirection: "row", borderRadius: 10, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
     viewToggleBtn: { padding: 8, backgroundColor: BG_PAGE },
     viewToggleBtnActive: { backgroundColor: PRIMARY },
 
     // Empty
-    empty: { alignItems: "center", paddingVertical: 60, gap: 12 },
+    empty: { alignItems: "center", paddingVertical: 60, gap: 12, backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER },
     emptyIconWrap: { width: 80, height: 80, borderRadius: 24, alignItems: "center", justifyContent: "center" },
     emptyTitle: { fontSize: 16, fontWeight: "700", color: TEXT_HEAD },
     emptySubtitle: { fontSize: 13, color: TEXT_MUTED },
@@ -935,68 +993,81 @@ const st = StyleSheet.create({
     emptyAddTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
 });
 
-// â”€â”€â”€ QUESTION GRID CARD STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const gSt = StyleSheet.create({
-    card: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, borderTopWidth: 3, padding: 14, flex: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, gap: 8 },
-    cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    indexBadge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    iconBadge: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-    indexText: { fontSize: 11, fontWeight: "800" },
-    statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-    statusDot: { width: 6, height: 6, borderRadius: 3 },
-    statusTxt: { fontSize: 11, fontWeight: "700" },
-    questionText: { fontSize: 13, fontWeight: "700", color: TEXT_HEAD, lineHeight: 18 },
-    answerText: { fontSize: 12, color: TEXT_BODY, lineHeight: 17 },
-    sellerBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: PRIMARY + "18", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start" as any },
-    sellerBadgeTxt: { fontSize: 11, fontWeight: "700", color: PRIMARY },
-    divider: { height: 1, backgroundColor: BORDER },
-    cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+// ─── CATEGORY RAIL STYLES ────────────────────────────────────────────────────
+const railSt = StyleSheet.create({
+    mobileWrap: { backgroundColor: BG_CARD, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+    sidebar: { width: 240, backgroundColor: BG_CARD, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+
+    // mobile chip
+    chip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 22, borderWidth: 1.5, backgroundColor: BG_PAGE, maxWidth: 210 },
+    chipIcon: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    chipText: { fontSize: 12, fontWeight: "700", color: TEXT_HEAD, flexShrink: 1 },
+    chipCount: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
+    chipCountText: { fontSize: 11, fontWeight: "800" },
+
+    // desktop/tablet vertical item
+    item: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 10, borderRadius: 10, borderLeftWidth: 3, borderLeftColor: "transparent", marginBottom: 4 },
+    itemIcon: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+    itemName: { fontSize: 13, fontWeight: "700", color: TEXT_HEAD, marginBottom: 5 },
+    itemBarTrack: { height: 4, borderRadius: 2, backgroundColor: BORDER, overflow: "hidden" },
+    itemBarFill: { height: 4, borderRadius: 2 },
+    itemCount: { fontSize: 12, fontWeight: "800", color: TEXT_MUTED },
+});
+
+// ─── STAT PILL STYLES ─────────────────────────────────────────────────────────
+const statSt = StyleSheet.create({
+    row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: BG_CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+    headingWrap: { flexDirection: "row", alignItems: "center", gap: 10, minWidth: 0 },
+    catIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+    heading: { fontSize: 16, fontWeight: "800", color: TEXT_HEAD, maxWidth: 160 },
+    pillsWrap: { flexDirection: "row", gap: 8, flexWrap: "wrap" as any },
+    pill: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: BG_PAGE, borderWidth: 1, borderColor: BORDER },
+    pillIcon: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    pillValue: { fontSize: 15, fontWeight: "800", color: TEXT_HEAD, lineHeight: 17 },
+    pillLabel: { fontSize: 10, fontWeight: "700", color: TEXT_MUTED, letterSpacing: 0.3 },
+});
+
+// ─── ACCORDION CARD STYLES ────────────────────────────────────────────────────
+const accSt = StyleSheet.create({
+    card: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+    head: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
+    badge: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    badgeText: { fontSize: 12, fontWeight: "800" },
+    headMid: { flex: 1, minWidth: 0 },
+    question: { fontSize: 14, fontWeight: "700", color: TEXT_HEAD, lineHeight: 19 },
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 5 },
+    statusDot: { width: 7, height: 7, borderRadius: 4 },
+    metaText: { fontSize: 11, color: TEXT_MUTED, fontWeight: "600" },
+    metaDivider: { fontSize: 11, color: TEXT_MUTED },
+    body: { paddingHorizontal: 14, paddingBottom: 14, gap: 12, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 12, backgroundColor: "#fafbfc" },
+    answer: { fontSize: 13, color: TEXT_BODY, lineHeight: 21 },
+    footerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as any, gap: 10 },
     dateText: { fontSize: 11, color: TEXT_MUTED },
-    actions: { flexDirection: "row", gap: 6 },
-    actionBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-});
-
-// â”€â”€â”€ QUESTION ROW STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const qSt = StyleSheet.create({
-    // Table header
-    headerRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fef3e7", paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
-    headerCell: { fontSize: 11, fontWeight: "800", color: TEXT_BODY, textTransform: "uppercase", letterSpacing: 0.4 },
-
-    // Table rows
-    row: { flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
-    rowAlt: { backgroundColor: "#fafbfc" },
-
-    // Cells
-    cellId: { width: 60, paddingRight: 24 },
-    cellCat: { width: 200, paddingRight: 24, flexDirection: "row", alignItems: "center" },
-    cellQuestion: { flex: 1, paddingRight: 28 },
-    cellOrder: { width: 80, alignItems: "center", paddingRight: 24 },
-    cellStatus: { width: 100, paddingRight: 24 },
-    cellSeller: { width: 70, alignItems: "center", paddingRight: 24 },
-    cellDate: { width: 110, paddingRight: 24 },
-    cellAction: { width: 110, flexDirection: "row", gap: 6 },
-
-    // Cell text
-    idText: { fontSize: 13, fontWeight: "600", color: TEXT_MUTED },
-    catText: { fontSize: 13, fontWeight: "700" },
-    questionText: { fontSize: 13, color: TEXT_BODY, lineHeight: 18 },
-    orderText: { fontSize: 13, color: TEXT_HEAD, fontWeight: "600" },
-    dateText: { fontSize: 12, color: TEXT_MUTED },
-
-    // Status badge
-    statusBadge: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start" as any },
-    statusBadgeTxt: { fontSize: 12, fontWeight: "700" },
-
-    // Seller toggle
-    toggle: { width: 38, height: 22, borderRadius: 11, backgroundColor: "#cbd5e1", justifyContent: "center", paddingHorizontal: 2 },
-    toggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 2, elevation: 2 },
+    toggle: { width: 34, height: 20, borderRadius: 10, backgroundColor: "#cbd5e1", justifyContent: "center", paddingHorizontal: 2 },
+    toggleThumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#fff" },
     toggleThumbOn: { alignSelf: "flex-end" as any },
-
-    // Action buttons
-    actionBtn: { width: 28, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+    toggleLabel: { fontSize: 11, color: TEXT_MUTED, fontWeight: "600" },
+    actionBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });
 
-// â”€â”€â”€ MODAL STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── TILE CARD STYLES ─────────────────────────────────────────────────────────
+const tileSt = StyleSheet.create({
+    card: { backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, borderTopWidth: 3, padding: 14, gap: 8 },
+    topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    index: { fontSize: 12, fontWeight: "800" },
+    statusChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+    statusChipText: { fontSize: 11, fontWeight: "700" },
+    question: { fontSize: 13, fontWeight: "700", color: TEXT_HEAD, lineHeight: 18 },
+    answer: { fontSize: 12, color: TEXT_BODY, lineHeight: 17 },
+    bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    dateText: { fontSize: 11, color: TEXT_MUTED },
+    sellerTag: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: PRIMARY + "18", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+    sellerTagText: { fontSize: 10, fontWeight: "700", color: PRIMARY },
+    actions: { flexDirection: "row", gap: 6, marginTop: 4 },
+    actionBtn: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+});
+
+// ─── MODAL STYLES ─────────────────────────────────────────────────────────────
 const mSt = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center" },
     sheet: { backgroundColor: BG_CARD, borderRadius: 20, overflow: "hidden", width: "92%", maxWidth: 520, maxHeight: "90%" as any, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },

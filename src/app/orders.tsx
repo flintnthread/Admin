@@ -1,8 +1,10 @@
+import Pagination from "@/components/Pagination";
+import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportCsv, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
+import { fetchOrders, fetchOrderStats, fetchOrderInvoice, downloadOrderInvoicePdf, updateOrderGstStatus, downloadOrderExportExcel, fetchOrderShippingLabel, downloadOrderShippingLabelPdf, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -23,9 +25,68 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
-import AdminLayout from "../components/admin-layout";
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const LOGO_PNG = require("../../assets/images/flint-thread-logo.png");
+
+/** Converts the logo PNG asset to a base64 data URI so it embeds in standalone HTML. */
+async function fetchLogoDataUrl(): Promise<string> {
+  let uri = "";
+  if (typeof LOGO_PNG === "string") {
+    uri = LOGO_PNG;
+  } else {
+    try {
+      const asset = Image.resolveAssetSource(LOGO_PNG);
+      uri = asset?.uri || (LOGO_PNG as any)?.uri || "";
+    } catch {
+      uri = (LOGO_PNG as any)?.uri || "";
+    }
+  }
+
+  if (!uri) return "";
+
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return uri;
+  }
+
+  try {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.warn("fetchLogoDataUrl fallback to uri", err);
+    return uri; // Fallback to raw uri if fetch fails
+  }
+}
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
+
+function printHtmlOnWeb(html: string) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "absolute";
+  iframe.style.width = "0px";
+  iframe.style.height = "0px";
+  iframe.style.border = "none";
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
+  }, 500);
+}
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -261,7 +322,7 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
-function buildInvoiceDownloadHtml(invoice: OrderInvoice) {
+function buildInvoiceDownloadHtml(invoice: OrderInvoice, logoSrc = "") {
   const company = invoice.company;
   const billing = invoice.billing;
   const shippingAddr = invoice.shipping;
@@ -271,139 +332,419 @@ function buildInvoiceDownloadHtml(invoice: OrderInvoice) {
   const lineItems = flattenInvoiceLineItems(invoice);
   const subtotal = toNumber(invoice.totals?.subtotal);
   const totalTax = toNumber(invoice.totals?.tax);
-  const shipping = toNumber(invoice.totals?.shipping);
+  const shippingCost = toNumber(invoice.totals?.shipping);
+  const discount = toNumber(invoice.totals?.discount);
+  const wallet = toNumber(invoice.totals?.walletDeduction);
+  const referral = toNumber(invoice.totals?.referralDiscount);
   const grandTotal = toNumber(invoice.totals?.grandTotal);
   const isIntraState = Boolean(invoice.isIntraState);
   const cgst = toNumber(invoice.gstBreakdown?.cgst);
   const sgst = toNumber(invoice.gstBreakdown?.sgst);
   const igst = toNumber(invoice.gstBreakdown?.igst);
   const qrImg = invoice.qrCode?.imageDataUrl ?? "";
+  const isPaid = Boolean(invoice.payment?.paid);
 
+  // Seller address lines
+  const sellerAddressLines = [
+    sellerAddress?.line1,
+    [sellerAddress?.city, sellerAddress?.state].filter(Boolean).join(", "),
+    sellerAddress?.pincode ? `PIN: ${sellerAddress.pincode}` : undefined,
+  ].filter(Boolean);
+
+  // Logo (embedded as base64 PNG, or empty string if not available)
+  const resolvedLogoSrc = logoSrc;
+
+  // Tax rate label
+  const taxRateLabel = subtotal > 0 ? ((totalTax / subtotal) * 100).toFixed(2) : "0.00";
+
+  // Build item rows
   const itemRows = lineItems
     .map(
-      (item) => `
-      <tr>
-        <td>${escapeHtml(item.name ?? "—")}</td>
+      (item, idx) => `
+      <tr style="background:${idx % 2 === 1 ? "#f8fafc" : "#ffffff"}">
+        <td>
+          <div style="font-weight:600;font-size:13px;color:#1e293b">${escapeHtml(item.name ?? "—")}</div>
+          ${(item.color || item.size) ? `<div style="font-size:11px;color:#6b7280">${[item.color ? `Color: ${item.color}` : null, item.size ? `Size: ${item.size}` : null].filter(Boolean).join("  ")}</div>` : ""}
+        </td>
         <td style="text-align:center">${escapeHtml(item.hsnCode ?? "—")}</td>
         <td style="text-align:right">${item.qty ?? 0}</td>
         <td style="text-align:right">${fmtCur(toNumber(item.unitPrice))}</td>
         <td style="text-align:right">${toNumber(item.taxPercent)}%</td>
         <td style="text-align:right">${fmtCur(toNumber(item.taxAmount))}</td>
-        <td style="text-align:right">${fmtCur(toNumber(item.lineTotal))}</td>
+        <td style="text-align:right;font-weight:800">${fmtCur(toNumber(item.lineTotal))}</td>
       </tr>`
     )
     .join("");
 
-  return `
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
-          h1 { color: #1E2B6B; margin: 0 0 4px; }
-          .meta { color: #6B7280; font-size: 13px; margin-bottom: 18px; }
-          .grid { display: flex; gap: 24px; margin-bottom: 20px; }
-          .col { flex: 1; }
-          .label { font-size: 11px; font-weight: 700; color: #F97316; letter-spacing: 0.5px; }
-          .name { font-weight: 700; margin: 4px 0; }
-          .muted { color: #6B7280; font-size: 13px; line-height: 1.5; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
-          th, td { border-bottom: 1px solid #E5E7EB; padding: 8px 6px; vertical-align: top; }
-          th { background: #FFF7ED; text-align: left; }
-          .totals { margin-top: 18px; width: 320px; margin-left: auto; }
-          .totals div { display: flex; justify-content: space-between; padding: 6px 0; }
-          .grand { font-size: 16px; font-weight: 800; border-top: 2px solid #1E2B6B; margin-top: 8px; padding-top: 8px; }
-          .qr { width: 88px; height: 88px; }
-        </style>
-      </head>
-      <body>
-        <div style="display:flex; justify-content:space-between; gap:20px;">
-          <div>
-            <h1>INVOICE</h1>
-            <div class="meta">${escapeHtml(invoice.invoiceNumber ?? "")}</div>
-            <div class="meta">Order: ${escapeHtml(invoice.orderNumber ?? "")}</div>
-            <div class="meta">Date: ${escapeHtml(formatInvoiceDate(invoice.invoiceDate ?? invoice.orderDate))}</div>
-            <div class="muted" style="margin-top:12px;">
-              <strong>${escapeHtml(company?.name ?? "")}</strong><br/>
-              ${escapeHtml(company?.country ?? "")}<br/>
-              Phone: ${escapeHtml(company?.phone ?? "")}<br/>
-              Email: ${escapeHtml(company?.email ?? "")}<br/>
-              GSTIN: ${escapeHtml(company?.gstin ?? "")}
-            </div>
-          </div>
-          ${qrImg ? `<img class="qr" src="${qrImg}" alt="Order QR" />` : ""}
-        </div>
+  // Build optional totals rows
+  const discountRow = discount > 0 ? `<tr><td>Discount</td><td style="text-align:right">- ${fmtCur(discount)}</td></tr>` : "";
+  const walletRow = wallet > 0 ? `<tr><td>Wallet</td><td style="text-align:right">- ${fmtCur(wallet)}</td></tr>` : "";
+  const referralRow = referral > 0 ? `<tr><td>Referral</td><td style="text-align:right">- ${fmtCur(referral)}</td></tr>` : "";
 
-        <div class="grid">
-          <div class="col">
-            <div class="label">SOLD BY</div>
-            <div class="name">${escapeHtml(seller?.name ?? "Seller")}</div>
-            <div class="muted">
-              ${escapeHtml(sellerAddress?.line1 ?? "")}<br/>
-              ${escapeHtml([sellerAddress?.city, sellerAddress?.state].filter(Boolean).join(", "))}
-              ${sellerAddress?.pincode ? ` - ${escapeHtml(sellerAddress.pincode)}` : ""}<br/>
-              ${seller?.phone ? `Phone: ${escapeHtml(seller.phone)}<br/>` : ""}
-              ${seller?.email ? `Email: ${escapeHtml(seller.email)}<br/>` : ""}
-              ${seller?.gstin ? `GSTIN: ${escapeHtml(seller.gstin)}` : ""}
-            </div>
-          </div>
-        </div>
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Invoice ${escapeHtml(invoice.invoiceNumber ?? "")}</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Arial, Helvetica, sans-serif; color: #111827; padding: 32px; font-size: 13px; line-height: 1.5; }
+      /* ── Header ── */
+      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 2px solid #1e2b6b; padding-bottom: 16px; }
+      .brand-col { display: flex; flex-direction: column; gap: 8px; }
+      .logo { max-height: 60px; max-width: 200px; object-fit: contain; }
+      .sender-name { font-size: 13px; font-weight: 700; color: #1e2b6b; }
+      .sender-line { font-size: 12px; color: #6b7280; }
+      .meta-col { text-align: right; }
+      .inv-title { font-size: 28px; font-weight: 800; color: #1e2b6b; letter-spacing: 2px; }
+      .inv-num { font-size: 14px; font-weight: 700; color: #1e2b6b; margin-top: 4px; }
+      .inv-meta { font-size: 12px; color: #6b7280; }
+      .qr-img { width: 72px; height: 72px; margin-top: 8px; }
+      .qr-caption { font-size: 10px; color: #9ca3af; text-align: center; margin-top: 2px; }
+      /* ── Sections ── */
+      .section { margin-bottom: 16px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
+      .section-label-navy { font-size: 10px; font-weight: 700; color: #1e2b6b; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+      .section-label-orange { font-size: 10px; font-weight: 700; color: #f97316; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+      .bold-name { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+      .muted-line { font-size: 12px; color: #6b7280; }
+      /* ── Bill / Ship ── */
+      .bs-grid { display: flex; gap: 16px; margin-bottom: 16px; }
+      .bs-col { flex: 1; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
+      /* ── Items table ── */
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
+      thead tr { background: #1e2b6b; }
+      thead th { color: #ffffff; padding: 10px 8px; text-align: left; font-weight: 700; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; }
+      tbody tr td { border-bottom: 1px solid #e5e7eb; padding: 8px; vertical-align: top; }
+      /* ── Totals ── */
+      .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+      .totals-box { width: 320px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+      .totals-box table { margin: 0; }
+      .totals-box tbody tr td { padding: 8px 12px; }
+      .totals-box tbody tr:last-child td { font-size: 15px; font-weight: 800; color: #1e2b6b; border-top: 2px solid #1e2b6b; border-bottom: none; }
+      /* ── GST block ── */
+      .gst-block { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px; }
+      .gst-title { font-size: 13px; font-weight: 700; color: #1e2b6b; margin-bottom: 8px; }
+      .gst-note { font-size: 11px; color: #6b7280; margin-top: 6px; }
+      /* ── Payment ── */
+      .pay-block { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px; }
+      .pay-title { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+      .pay-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+      .pay-badge-paid { background: #d1fae5; color: #065f46; }
+      .pay-badge-pending { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+      /* ── Thank you ── */
+      .thanks-block { text-align: center; padding: 16px; border-top: 1px solid #e5e7eb; margin-top: 8px; }
+      .thanks-title { font-size: 16px; font-weight: 700; color: #1e2b6b; margin-bottom: 4px; }
+      .thanks-line { font-size: 12px; color: #6b7280; }
+      .thanks-contact { font-size: 12px; color: #f97316; font-weight: 600; }
+      .footer-note { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 12px; }
+      @media print { body { padding: 16px; } }
+    </style>
+  </head>
+  <body>
 
-        <div class="grid">
-          <div class="col">
-            <div class="label">BILL TO</div>
-            <div class="name">${escapeHtml(billing?.name ?? "—")}</div>
-            <div class="muted">
-              ${escapeHtml(billing?.address ?? billing?.line1 ?? "")}<br/>
-              ${escapeHtml([billing?.city, billing?.state].filter(Boolean).join(", "))}
-              ${billing?.pincode ? ` - ${escapeHtml(billing.pincode)}` : ""}<br/>
-              Phone: ${escapeHtml(billing?.phone ?? "—")}<br/>
-              Email: ${escapeHtml(billing?.email ?? "—")}
-            </div>
-          </div>
-          <div class="col">
-            <div class="label">SHIP TO</div>
-            <div class="name">${escapeHtml(shippingAddr?.name ?? "—")}</div>
-            <div class="muted">
-              ${escapeHtml(shippingAddr?.address ?? shippingAddr?.line1 ?? "")}<br/>
-              ${escapeHtml([shippingAddr?.city, shippingAddr?.state].filter(Boolean).join(", "))}
-              ${shippingAddr?.pincode ? ` - ${escapeHtml(shippingAddr.pincode)}` : ""}<br/>
-              Phone: ${escapeHtml(shippingAddr?.phone ?? "—")}<br/>
-              Email: ${escapeHtml(shippingAddr?.email ?? "—")}
-            </div>
-          </div>
+    <!-- ── Header ── -->
+    <div class="header">
+      <div class="brand-col">
+        <img class="logo" src="${resolvedLogoSrc}" alt="${escapeHtml(company?.name ?? "Flint &amp; Thread")}" />
+        <div>
+          <div class="sender-name">${escapeHtml(company?.name ?? "Flint &amp; Thread (India) Pvt. Ltd.")}</div>
+          <div class="sender-line">${escapeHtml(company?.country ?? "India")}</div>
+          ${company?.phone ? `<div class="sender-line">Phone: ${escapeHtml(company.phone)}</div>` : ""}
+          ${company?.email ? `<div class="sender-line">Email: ${escapeHtml(company.email)}</div>` : ""}
+          ${company?.gstin ? `<div class="sender-line">GSTIN: ${escapeHtml(company.gstin)}</div>` : ""}
         </div>
+      </div>
+      <div class="meta-col">
+        <div class="inv-title">INVOICE</div>
+        <div class="inv-num">${escapeHtml(invoice.invoiceNumber ?? "")}</div>
+        <div class="inv-meta">Order: ${escapeHtml(invoice.orderNumber ?? "")}</div>
+        <div class="inv-meta">Date: ${escapeHtml(formatInvoiceDate(invoice.invoiceDate ?? invoice.orderDate))}</div>
+        ${qrImg ? `<div style="margin-top:8px"><img class="qr-img" src="${qrImg}" alt="Order QR" /><div class="qr-caption">Scan for order details</div></div>` : ""}
+      </div>
+    </div>
 
+    <!-- ── Sold By ── -->
+    <div class="section">
+      <div class="section-label-navy">SOLD BY</div>
+      <div class="bold-name">${escapeHtml((seller?.name ?? "UNKNOWN SELLER").toUpperCase())}</div>
+      ${sellerAddressLines.map((l) => `<div class="muted-line">${escapeHtml(l as string)}</div>`).join("")}
+      ${seller?.phone ? `<div class="muted-line">Phone: ${escapeHtml(seller.phone)}</div>` : ""}
+      ${seller?.email ? `<div class="muted-line">Email: ${escapeHtml(seller.email)}</div>` : ""}
+      ${seller?.gstin ? `<div class="muted-line">GSTIN: ${escapeHtml(seller.gstin)}</div>` : ""}
+    </div>
+
+    <!-- ── Bill / Ship ── -->
+    <div class="bs-grid">
+      <div class="bs-col">
+        <div class="section-label-orange">BILL TO</div>
+        <div class="bold-name">${escapeHtml(billing?.name ?? "—")}</div>
+        ${billing?.address ? `<div class="muted-line">${escapeHtml(billing.address)}</div>` : ""}
+        ${billing?.line1 ? `<div class="muted-line">${escapeHtml(billing.line1)}</div>` : ""}
+        ${billing?.line2 ? `<div class="muted-line">${escapeHtml(billing.line2)}</div>` : ""}
+        ${(billing?.city || billing?.state) ? `<div class="muted-line">${escapeHtml([billing?.city, billing?.state].filter(Boolean).join(", "))}${billing?.pincode ? ` - ${escapeHtml(billing.pincode)}` : ""}</div>` : ""}
+        ${billing?.phone ? `<div class="muted-line">Phone: ${escapeHtml(billing.phone)}</div>` : ""}
+        <div class="muted-line">Email: ${escapeHtml(billing?.email ?? "—")}</div>
+      </div>
+      <div class="bs-col">
+        <div class="section-label-orange">SHIP TO</div>
+        <div class="bold-name">${escapeHtml(shippingAddr?.name ?? "—")}</div>
+        ${shippingAddr?.address ? `<div class="muted-line">${escapeHtml(shippingAddr.address)}</div>` : ""}
+        ${shippingAddr?.line1 ? `<div class="muted-line">${escapeHtml(shippingAddr.line1)}</div>` : ""}
+        ${shippingAddr?.line2 ? `<div class="muted-line">${escapeHtml(shippingAddr.line2)}</div>` : ""}
+        ${(shippingAddr?.city || shippingAddr?.state) ? `<div class="muted-line">${escapeHtml([shippingAddr?.city, shippingAddr?.state].filter(Boolean).join(", "))}${shippingAddr?.pincode ? ` - ${escapeHtml(shippingAddr.pincode)}` : ""}</div>` : ""}
+        ${shippingAddr?.phone ? `<div class="muted-line">Phone: ${escapeHtml(shippingAddr.phone)}</div>` : ""}
+        <div class="muted-line">Email: ${escapeHtml(shippingAddr?.email ?? "—")}</div>
+      </div>
+    </div>
+
+    <!-- ── Items table ── -->
+    <table>
+      <thead>
+        <tr>
+          <th>Item Description</th>
+          <th style="text-align:center">HSN Code</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Unit Price</th>
+          <th style="text-align:right">Tax %</th>
+          <th style="text-align:right">Tax Amt</th>
+          <th style="text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+
+    <!-- ── Totals ── -->
+    <div class="totals-wrap">
+      <div class="totals-box">
         <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>HSN</th>
-              <th style="text-align:right">Qty</th>
-              <th style="text-align:right">Unit Price</th>
-              <th style="text-align:right">Tax %</th>
-              <th style="text-align:right">Tax Amt</th>
-              <th style="text-align:right">Total</th>
-            </tr>
-          </thead>
-          <tbody>${itemRows}</tbody>
+          <tbody>
+            <tr><td>Subtotal (Before Tax)</td><td style="text-align:right">${fmtCur(subtotal)}</td></tr>
+            <tr><td>${isIntraState ? "CGST + SGST" : "IGST"} @ ${taxRateLabel}%</td><td style="text-align:right">${fmtCur(totalTax)}</td></tr>
+            <tr><td>Shipping Charges</td><td style="text-align:right;${shippingCost === 0 ? "color:#16a34a;font-weight:800" : ""}">${shippingCost === 0 ? "FREE" : fmtCur(shippingCost)}</td></tr>
+            ${discountRow}${walletRow}${referralRow}
+            <tr><td>Grand Total</td><td style="text-align:right">${fmtCur(grandTotal)}</td></tr>
+          </tbody>
         </table>
+      </div>
+    </div>
 
-        <div class="totals">
-          <div><span>Subtotal</span><span>${fmtCur(subtotal)}</span></div>
-          <div><span>${isIntraState ? "CGST + SGST" : "IGST"}</span><span>${fmtCur(totalTax)}</span></div>
-          <div><span>Shipping</span><span>${shipping === 0 ? "FREE" : fmtCur(shipping)}</span></div>
-          <div class="grand"><span>Grand Total</span><span>${fmtCur(grandTotal)}</span></div>
-        </div>
+    <!-- ── GST Breakdown ── -->
+    <div class="gst-block">
+      <div class="gst-title">GST Breakdown Summary</div>
+      <div style="display:flex;gap:24px">
+        <span>Total CGST: <strong>${fmtCur(cgst)}</strong></span>
+        <span>Total SGST: <strong>${fmtCur(sgst)}</strong></span>
+        <span>Total IGST: <strong>${fmtCur(igst)}</strong></span>
+        <span>Total GST: <strong>${fmtCur(totalTax)}</strong></span>
+      </div>
+      <div class="gst-note">${isIntraState ? "*Intra-state transaction - CGST + SGST applicable" : "*Inter-state transaction - IGST applicable"}</div>
+    </div>
 
-        <div class="muted" style="margin-top:18px;">
-          CGST: ${fmtCur(cgst)} | SGST: ${fmtCur(sgst)} | IGST: ${fmtCur(igst)}<br/>
-          Payment: ${escapeHtml(invoice.payment?.method ?? "—")} |
-          Status: ${escapeHtml(invoice.payment?.status ?? "—")}
-        </div>
-      </body>
-    </html>
-  `;
+    <!-- ── Payment ── -->
+    <div class="pay-block">
+      <div class="pay-title">Payment Information:</div>
+      <div>Payment Method: ${escapeHtml(invoice.payment?.method ?? "—")}</div>
+      <div>Payment Status: <span class="pay-badge ${isPaid ? "pay-badge-paid" : "pay-badge-pending"}">${isPaid ? "PAID" : escapeHtml((invoice.payment?.status ?? "PENDING").toUpperCase())}</span></div>
+      ${invoice.gstNumber ? `<div>Customer GSTIN: ${escapeHtml(invoice.gstNumber)}</div>` : ""}
+    </div>
+
+    <!-- ── Thank you ── -->
+    <div class="thanks-block">
+      <div class="thanks-title">Thank you for your business!</div>
+      <div class="thanks-line">If you have any questions about this invoice, please contact us at</div>
+      <div class="thanks-contact">${escapeHtml(company?.email ?? "support@flintnthread.in")}</div>
+    </div>
+
+    <div class="footer-note">This is a system-generated invoice and does not require a signature.</div>
+
+  </body>
+</html>`;
+}
+
+function buildShippingLabelDownloadHtml(label: any, logoSrc: string, trackingId: string, orderNumber: string, orderDate: string, paymentIsCod: boolean, grandTotal: number, lineItems: any[], weightText: string, dimensionsText: string, sellerAddressLine: string, gstFooterLabel: string, customerAddress: string) {
+  const seller = label?.sellerGroups?.[0]?.seller;
+  const shipping = label?.shipping;
+  const courierName = label?.courierName ?? "Courier";
+  const qrImg = label?.qrCode?.imageDataUrl ?? "";
+  const invoiceNum = label?.invoiceNumber ?? `INV-${trackingId}`;
+
+  const itemRows = lineItems
+    .map(
+      (li) => `
+      <tr>
+        <td>
+          <div class="bold-name">${escapeHtml(li.name)}</div>
+        </td>
+        <td style="text-align:center">${escapeHtml(li.hsnCode ?? "—")}</td>
+        <td style="text-align:right">${li.qty}</td>
+        <td style="text-align:right">${fmtCur(li.unitPrice)}</td>
+        <td style="text-align:right">${li.cgst > 0 ? fmtCur(li.cgst) : "-"}</td>
+        <td style="text-align:right">${li.sgst > 0 ? fmtCur(li.sgst) : "-"}</td>
+        <td style="text-align:right">${li.igst > 0 ? `${li.taxPercent}%<br/>${fmtCur(li.igst)}` : "-"}</td>
+        <td style="text-align:right;font-weight:800">${fmtCur(li.lineTotal)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const totalCgst = lineItems.reduce((sum, li) => sum + li.cgst, 0);
+  const totalSgst = lineItems.reduce((sum, li) => sum + li.sgst, 0);
+  const totalIgst = lineItems.reduce((sum, li) => sum + li.igst, 0);
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Shipping Label ${escapeHtml(trackingId)}</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Arial, Helvetica, sans-serif; color: #111827; padding: 32px; font-size: 13px; line-height: 1.5; max-width: 800px; margin: 0 auto; }
+      /* ── Brand Header ── */
+      .brand-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e2b6b; padding-bottom: 12px; margin-bottom: 16px; }
+      .logo { max-height: 48px; max-width: 180px; object-fit: contain; }
+      .title { font-size: 22px; font-weight: 800; color: #1e2b6b; letter-spacing: 1px; }
+      /* ── Courier Bar ── */
+      .courier-bar { background: #1e2b6b; color: #ffffff; text-align: center; font-weight: 700; padding: 6px; font-size: 14px; margin-bottom: 16px; letter-spacing: 1px; text-transform: uppercase; }
+      /* ── AWB Area ── */
+      .awb-area { display: flex; justify-content: space-between; align-items: stretch; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+      .awb-left { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid #e5e7eb; padding-right: 16px; }
+      .awb-caption { font-size: 12px; font-weight: 700; color: #6b7280; letter-spacing: 1px; margin-bottom: 8px; }
+      .awb-number { font-size: 20px; font-weight: 800; letter-spacing: 2px; margin-top: 8px; color: #111827; }
+      .barcode-svg { display: block; width: 220px; height: 50px; margin: 8px 0; }
+      .qr-box { padding-left: 16px; display: flex; align-items: center; justify-content: center; }
+      .qr-img { width: 80px; height: 80px; }
+      /* ── Ship To ── */
+      .section { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+      .section-label { font-size: 11px; font-weight: 700; color: #f97316; letter-spacing: 1px; margin-bottom: 6px; }
+      .bold-name { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+      .muted-line { font-size: 12px; color: #6b7280; }
+      /* ── Meta Grid ── */
+      .meta-grid { display: flex; flex-wrap: wrap; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+      .meta-item { width: 50%; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; display: flex; }
+      .meta-item:nth-child(odd) { border-right: 1px solid #e5e7eb; }
+      .meta-item:nth-last-child(-n+2) { border-bottom: none; }
+      .meta-key { font-size: 12px; color: #6b7280; width: 80px; }
+      .meta-val { font-size: 12px; font-weight: 600; color: #111827; flex: 1; }
+      /* ── Table ── */
+      .table-title { background: #f8fafc; border: 1px solid #e5e7eb; border-bottom: none; padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1px; border-radius: 8px 8px 0 0; }
+      table { width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; margin-bottom: 16px; font-size: 12px; }
+      thead tr { background: #1e2b6b; }
+      thead th { color: #ffffff; padding: 8px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+      tbody tr td { border-bottom: 1px solid #e5e7eb; padding: 8px; vertical-align: top; }
+      .totals-row td { padding: 10px 8px; border-bottom: none; background: #f8fafc; font-weight: 600; }
+      /* ── Return Address ── */
+      .return-name { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 2px; }
+      /* ── Footer ── */
+      .footer { border-top: 2px dashed #cbd5e1; padding-top: 12px; text-align: center; }
+      .footer-gst { font-size: 12px; font-weight: 700; color: #1e2b6b; margin-bottom: 4px; }
+      .footer-auto { font-size: 10px; font-weight: 700; color: #9ca3af; letter-spacing: 1px; margin-bottom: 4px; }
+      .footer-powered { font-size: 11px; color: #64748b; }
+      .footer-powered strong { color: #1e2b6b; font-weight: 800; }
+      @media print { body { padding: 16px; } }
+    </style>
+  </head>
+  <body>
+
+    <!-- ── Brand Header ── -->
+    <div class="brand-header">
+      <img class="logo" src="${logoSrc}" alt="Logo" />
+      <div class="title">SHIPPING LABEL</div>
+    </div>
+
+    <!-- ── Courier Bar ── -->
+    <div class="courier-bar">${escapeHtml(courierName)}</div>
+
+    <!-- ── AWB Area ── -->
+    <div class="awb-area">
+      <div class="awb-left">
+        <div class="awb-caption">AWB NUMBER</div>
+        <svg class="barcode-svg" viewBox="0 0 220 50" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          ${(() => {
+            const seedSource = label?.orderNumber ?? String(trackingId);
+            let seed = 0;
+            for (const ch of seedSource) seed = (seed * 31 + ch.charCodeAt(0)) % 9973;
+            let x = 0;
+            const rects: string[] = [];
+            for (let i = 0; i < 60; i++) {
+              seed = (seed * 1103515245 + 12345) % 2147483648;
+              const h = 18 + (seed % 32);
+              const w = 1 + (seed % 3);
+              const gap = 1 + ((seed >> 2) % 2);
+              rects.push(`<rect x="${x}" y="${50 - h}" width="${w}" height="${h}" fill="#111827" />`);
+              x += w + gap;
+              if (x > 218) break;
+            }
+            return rects.join('');
+          })()}
+        </svg>
+        <div class="awb-number">${escapeHtml(trackingId)}</div>
+      </div>
+      <div class="qr-box">
+        ${qrImg ? `<img class="qr-img" src="${qrImg}" alt="QR Code" />` : ""}
+      </div>
+    </div>
+
+    <!-- ── Ship To ── -->
+    <div class="section">
+      <div class="section-label">SHIP TO</div>
+      <div class="bold-name">${escapeHtml(shipping?.name ?? "—")}</div>
+      ${customerAddress ? `<div class="muted-line">${escapeHtml(customerAddress)}</div>` : ""}
+      <div class="muted-line">${escapeHtml([shipping?.city, shipping?.state].filter(Boolean).join(", "))}</div>
+      ${shipping?.pincode ? `<div class="muted-line"><strong style="color:#111827">PIN: </strong>${escapeHtml(shipping.pincode)}${shipping.phone ? `  |  Ph: ${escapeHtml(shipping.phone)}` : ""}</div>` : ""}
+    </div>
+
+    <!-- ── Meta Grid ── -->
+    <div class="meta-grid">
+      <div class="meta-item"><div class="meta-key">Order #:</div><div class="meta-val">${escapeHtml(orderNumber)}</div></div>
+      <div class="meta-item"><div class="meta-key">Invoice:</div><div class="meta-val">${escapeHtml(invoiceNum)}</div></div>
+      <div class="meta-item"><div class="meta-key">Date:</div><div class="meta-val">${escapeHtml(orderDate)}</div></div>
+      <div class="meta-item"><div class="meta-key">Payment:</div><div class="meta-val">${paymentIsCod ? "COD" : "Prepaid"} ${fmtCur(grandTotal)}</div></div>
+      <div class="meta-item"><div class="meta-key">Weight:</div><div class="meta-val">${escapeHtml(weightText)}</div></div>
+      <div class="meta-item"><div class="meta-key">Dimensions:</div><div class="meta-val">${escapeHtml(dimensionsText)}</div></div>
+    </div>
+
+    <!-- ── Table ── -->
+    <div class="table-title">PRODUCT DETAILS</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th style="text-align:center">HSN</th>
+          <th style="text-align:right">Q</th>
+          <th style="text-align:right">Price</th>
+          <th style="text-align:right">CGST</th>
+          <th style="text-align:right">SGST</th>
+          <th style="text-align:right">IGST</th>
+          <th style="text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+        <tr class="totals-row">
+          <td colspan="4" style="text-align:right">TOTAL:</td>
+          <td style="text-align:right">${fmtCur(totalCgst)}</td>
+          <td style="text-align:right">${fmtCur(totalSgst)}</td>
+          <td style="text-align:right">${fmtCur(totalIgst)}</td>
+          <td style="text-align:right;color:#f97316;font-weight:800">${fmtCur(grandTotal)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── Return Address ── -->
+    <div class="section">
+      <div class="section-label">RETURN ADDRESS</div>
+      <div class="return-name">${escapeHtml(seller?.name?.toUpperCase() ?? "SELLER")}</div>
+      <div class="muted-line">${escapeHtml(sellerAddressLine || "Registered seller address on file")}${seller?.phone ? `  |  Ph: ${escapeHtml(seller.phone)}` : ""}</div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <div class="footer">
+      <div class="footer-gst">GST: ${escapeHtml(gstFooterLabel)}</div>
+      <div class="footer-auto">AUTO-GENERATED LABEL · NO SIGNATURE REQUIRED</div>
+      <div class="footer-powered">Powered By <strong>Flint &amp; Thread</strong></div>
+    </div>
+
+  </body>
+</html>`;
 }
 
 async function downloadInvoiceFile(invoice: OrderInvoice) {
@@ -421,7 +762,8 @@ async function downloadInvoiceFile(invoice: OrderInvoice) {
   }
 
   if (Platform.OS === "web" && typeof document !== "undefined") {
-    const html = buildInvoiceDownloadHtml(invoice);
+    const logoDataUrl = await fetchLogoDataUrl();
+    const html = buildInvoiceDownloadHtml(invoice, logoDataUrl);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -435,7 +777,8 @@ async function downloadInvoiceFile(invoice: OrderInvoice) {
     return;
   }
 
-  const html = buildInvoiceDownloadHtml(invoice);
+  const logoDataUrl = await fetchLogoDataUrl();
+  const html = buildInvoiceDownloadHtml(invoice, logoDataUrl);
   const { printToFileAsync } = await import("expo-print");
   const { uri } = await printToFileAsync({ html });
   const Sharing = await import("expo-sharing");
@@ -499,14 +842,14 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
           email: group.seller?.email ?? addr?.email ?? "",
           address: addr
             ? {
-                line1: addr.line1,
-                city: addr.city,
-                state: addr.state,
-                pincode: addr.pincode,
-                phone: addr.phone ?? group.seller?.phone,
-                email: addr.email ?? group.seller?.email,
-                gstin: addr.gstin ?? group.seller?.gstin,
-              }
+              line1: addr.line1,
+              city: addr.city,
+              state: addr.state,
+              pincode: addr.pincode,
+              phone: addr.phone ?? group.seller?.phone,
+              email: addr.email ?? group.seller?.email,
+              gstin: addr.gstin ?? group.seller?.gstin,
+            }
             : undefined,
         },
         products: (group.products ?? []).map((item, pi) => ({
@@ -572,8 +915,8 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
     bySeller.get(key)!.products.push({
       id: String(
         item.id ??
-          item.productId ??
-          `${key}-${bySeller.get(key)!.products.length}`,
+        item.productId ??
+        `${key}-${bySeller.get(key)!.products.length}`,
       ),
       name: item.productName ?? item.name ?? "",
       image:
@@ -852,16 +1195,16 @@ function toUiOrder(
     orderNumber,
     date: validDate
       ? createdAt!.toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
       : row.date,
     time: validDate
       ? createdAt!.toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
+        hour: "2-digit",
+        minute: "2-digit",
+      })
       : "",
     customer: {
       name: row.customer,
@@ -879,7 +1222,7 @@ function toUiOrder(
         : Number(raw.totalAmount ?? 0),
     paymentType:
       paymentMap[
-        (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase()
+      (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase()
       ] ?? "Cash on Delivery",
     status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
     gstStatus: mapGstStatusFromApi(raw.gstStatus ?? row.gstStatus),
@@ -892,10 +1235,10 @@ function toUiOrder(
         : undefined,
     dimensionsCm: raw.dimensionsCm
       ? {
-          l: Number(raw.dimensionsCm.l ?? 0),
-          w: Number(raw.dimensionsCm.w ?? 0),
-          h: Number(raw.dimensionsCm.h ?? 0),
-        }
+        l: Number(raw.dimensionsCm.l ?? 0),
+        w: Number(raw.dimensionsCm.w ?? 0),
+        h: Number(raw.dimensionsCm.h ?? 0),
+      }
       : undefined,
   };
 }
@@ -1460,7 +1803,6 @@ const StatusBadge = ({ status }: { status: OrderStatus }) => {
   const c = STATUS_CFG[status];
   return (
     <View style={[s.badge, { backgroundColor: c.bg }]}>
-      <View style={[s.badgeDot, { backgroundColor: c.dot }]} />
       <Text style={[s.badgeText, { color: c.text }]}>{status}</Text>
     </View>
   );
@@ -1726,45 +2068,49 @@ const ActionMenu = ({
 }) => {
   if (!visible) return null;
 
-  const actions = [
-    {
-      label: "View Details",
-      icon: <EyeIcon color={C.navy} />,
-      onPress: () => {
-        onClose();
-        onView(order);
+  const actions: {
+    label: string;
+    icon: React.ReactNode;
+    onPress: () => void;
+    sub?: string;
+    hidden?: boolean;
+  }[] = [
+      {
+        label: "View Details",
+        icon: <EyeIcon color={C.navy} />,
+        onPress: () => {
+          onClose();
+          onView(order);
+        },
       },
-    },
-    {
-      label: "Copy Order ID",
-      icon: <CopyIcon />,
-      onPress: () => {
-        copyToClipboard(order.orderNumber);
-        onClose();
+      {
+        label: "Copy Order ID",
+        icon: <CopyIcon />,
+        onPress: () => {
+          copyToClipboard(order.orderNumber);
+          onClose();
+        },
       },
-    },
-    {
-      label: "Generate Invoice",
-      sub: "Preview & print invoice",
-      icon: <InvoiceIcon />,
-      onPress: () => {
-        onOpenDoc(order, "invoice");
-        onClose();
+      {
+        label: "Generate Invoice",
+        sub: "Preview & print invoice",
+        icon: <InvoiceIcon />,
+        onPress: () => {
+          onOpenDoc(order, "invoice");
+          onClose();
+        },
       },
-      hidden: !order.hasInvoice,
-    },
-    {
-      label: "Generate Shipping Label",
-      sub: "Preview & print label",
-      icon: <TruckIcon />,
-      onPress: () => {
-        onOpenDoc(order, "label");
-        onClose();
+      {
+        label: "Generate Shipping Label",
+        sub: "Preview & print label",
+        icon: <TruckIcon />,
+        onPress: () => {
+          onOpenDoc(order, "label");
+          onClose();
+        },
       },
-      hidden: !order.hasShippingLabel,
-    },
-    ...(order.gstStatus !== "Filed"
-      ? [
+      ...(order.gstStatus !== "Filed"
+        ? [
           {
             label: "Mark GST Filed",
             icon: <CheckIcon color={C.orange} />,
@@ -1774,7 +2120,7 @@ const ActionMenu = ({
             },
           },
         ]
-      : [
+        : [
           {
             label: "Mark GST Pending",
             icon: <CalendarIcon color={C.yellow} size={16} />,
@@ -1784,7 +2130,7 @@ const ActionMenu = ({
             },
           },
         ]),
-  ];
+    ];
 
   const menu = (
     <View style={[s.actionMenu, isWeb && s.actionMenuWeb]}>
@@ -1934,9 +2280,15 @@ const ShippingLabelModal = ({
   const paymentIsCod = paymentMethod.includes("cod") || paymentMethod.includes("cash");
   const grandTotalAmount = toNumber(label?.totals?.grandTotal);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      window.print();
+      try {
+        const logoDataUrl = await fetchLogoDataUrl();
+        const html = buildShippingLabelDownloadHtml(label, logoDataUrl, trackingId, orderNumber, orderDate, paymentIsCod, grandTotal, lineItems, weightText, dimensionsText, sellerAddressLine, gstFooterLabel, customerAddress);
+        printHtmlOnWeb(html);
+      } catch (err) {
+        Alert.alert("Print failed", getApiErrorMessage(err, "Could not print shipping label."));
+      }
     } else {
       Alert.alert("Print", `Sending ${orderNumber} label to printer`);
     }
@@ -2047,254 +2399,189 @@ const ShippingLabelModal = ({
               <Text style={s.docErrorText}>Shipping label not available.</Text>
             </View>
           ) : (
-          <View style={[s.labelSheet, { width: sheetWidth }]}>
-            {/* Brand header + title */}
-            <View style={s.labelBrandHeader}>
-              <Image
-                source={require("../../assets/images/flint-thread-logo.png")}
-                style={s.labelBrandLogo}
-                resizeMode="contain"
-              />
-              <Text style={s.labelTitleText}>SHIPPING LABEL</Text>
-            </View>
+            <View style={[s.labelSheet, { width: sheetWidth }]}>
+              {/* Brand header + title */}
+              <View style={s.labelBrandHeader}>
+                <Image
+                  source={require("../../assets/images/flint-thread-logo.png")}
+                  style={s.labelBrandLogo}
+                  resizeMode="contain"
+                />
+                <Text style={s.labelTitleText}>SHIPPING LABEL</Text>
+              </View>
 
-            {/* Courier bar */}
-            <View style={s.labelCourierBar}>
-              <Text style={s.labelCourierBarText}>{label.courierName ?? "Courier"}</Text>
-            </View>
+              {/* Courier bar */}
+              <View style={s.labelCourierBar}>
+                <Text style={s.labelCourierBarText}>{label.courierName ?? "Courier"}</Text>
+              </View>
 
-            {/* AWB barcode + QR side-by-side */}
-            <View style={s.labelAwbArea}>
-              <View style={s.labelAwbLeft}>
-                <Text style={s.labelAwbCaption}>AWB NUMBER</Text>
-                <View style={s.barcodeRow}>
-                  {bars.map((h, i) => (
-                    <View key={i} style={[s.barcodeBar, { height: `${h}%` }]} />
-                  ))}
+              {/* AWB barcode + QR side-by-side */}
+              <View style={s.labelAwbArea}>
+                <View style={s.labelAwbLeft}>
+                  <Text style={s.labelAwbCaption}>AWB NUMBER</Text>
+                  <View style={s.barcodeRow}>
+                    {bars.map((h, i) => (
+                      <View key={i} style={[s.barcodeBar, { height: `${h}%` }]} />
+                    ))}
+                  </View>
+                  <Text style={s.labelAwbNumber}>{trackingId}</Text>
                 </View>
-                <Text style={s.labelAwbNumber}>{trackingId}</Text>
+                <View style={s.labelQrBox}>
+                  {label.qrCode?.imageDataUrl ? (
+                    <Image
+                      source={{ uri: label.qrCode.imageDataUrl }}
+                      style={{ width: 62, height: 62 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <QrPlaceholderIcon size={62} />
+                  )}
+                </View>
               </View>
-              <View style={s.labelQrBox}>
-                {label.qrCode?.imageDataUrl ? (
-                  <Image
-                    source={{ uri: label.qrCode.imageDataUrl }}
-                    style={{ width: 62, height: 62 }}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <QrPlaceholderIcon size={62} />
-                )}
-              </View>
-            </View>
 
-            {/* Ship To */}
-            <View style={s.labelSection}>
-              <Text style={s.labelSectionLabel}>SHIP TO</Text>
-              <Text style={s.labelShipName}>{shipping?.name ?? "—"}</Text>
-              {customerAddress ? (
-                <Text style={s.labelShipAddress}>{customerAddress}</Text>
-              ) : null}
-              <Text style={s.labelShipAddress}>
-                {[shipping?.city, shipping?.state].filter(Boolean).join(", ")}
-              </Text>
-              {shipping?.pincode ? (
+              {/* Ship To */}
+              <View style={s.labelSection}>
+                <Text style={s.labelSectionLabel}>SHIP TO</Text>
+                <Text style={s.labelShipName}>{shipping?.name ?? "—"}</Text>
+                {customerAddress ? (
+                  <Text style={s.labelShipAddress}>{customerAddress}</Text>
+                ) : null}
                 <Text style={s.labelShipAddress}>
-                  <Text style={{ fontWeight: "800" }}>PIN: </Text>
-                  {shipping.pincode}
-                  {shipping.phone ? `  |  Ph: ${shipping.phone}` : ""}
+                  {[shipping?.city, shipping?.state].filter(Boolean).join(", ")}
                 </Text>
-              ) : null}
-            </View>
+                {shipping?.pincode ? (
+                  <Text style={s.labelShipAddress}>
+                    <Text style={{ fontWeight: "800" }}>PIN: </Text>
+                    {shipping.pincode}
+                    {shipping.phone ? `  |  Ph: ${shipping.phone}` : ""}
+                  </Text>
+                ) : null}
+              </View>
 
-            {/* Meta grid: Order #, Invoice, Date, Payment, Weight, Dimensions */}
-            <View style={s.labelMetaList}>
-              <View style={s.labelMetaRow}>
-                <Text style={s.labelMetaKList}>Order #:</Text>
-                <Text style={s.labelMetaVList}>{orderNumber}</Text>
-              </View>
-              <View style={s.labelMetaRow}>
-                <Text style={s.labelMetaKList}>Invoice:</Text>
-                <Text style={s.labelMetaVList}>{invoiceNum}</Text>
-              </View>
-              <View style={s.labelMetaRow}>
-                <Text style={s.labelMetaKList}>Date:</Text>
-                <Text style={s.labelMetaVList}>{orderDate}</Text>
-              </View>
-              <View style={s.labelMetaRow}>
-                <Text style={s.labelMetaKList}>Payment:</Text>
-                <Text style={s.labelMetaVList}>
-                  {paymentIsCod ? "COD" : "Prepaid"} {fmtCur(grandTotal)}
-                </Text>
-              </View>
-              <View style={s.labelMetaRow}>
-                <Text style={s.labelMetaKList}>Weight:</Text>
-                <Text style={s.labelMetaVList}>{weightText}</Text>
-              </View>
-              <View style={s.labelMetaRow}>
-                <Text style={s.labelMetaKList}>Dimensions:</Text>
-                <Text style={s.labelMetaVList}>{dimensionsText}</Text>
-              </View>
-            </View>
-
-            {/* Product details table */}
-            <View style={s.labelSectionLabelBar}>
-              <Text style={s.labelSectionLabelBarText}>PRODUCT DETAILS</Text>
-            </View>
-            <View>
-              <View style={s.labelProductHead}>
-                <Text style={[s.labelProductHeadText, { flex: 2 }]}>Item</Text>
-                <Text
-                  style={[
-                    s.labelProductHeadText,
-                    s.labelProductHeadCenter,
-                    { flex: 0.8 },
-                  ]}
-                >
-                  HSN
-                </Text>
-                <Text
-                  style={[
-                    s.labelProductHeadText,
-                    s.labelProductHeadCenter,
-                    { flex: 0.4 },
-                  ]}
-                >
-                  Q
-                </Text>
-                <Text
-                  style={[s.labelProductHeadText, { flex: 0.8, textAlign: "right" }]}
-                >
-                  Price
-                </Text>
-                <Text
-                  style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}
-                >
-                  CGST
-                </Text>
-                <Text
-                  style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}
-                >
-                  SGST
-                </Text>
-                <Text
-                  style={[s.labelProductHeadText, { flex: 0.75, textAlign: "right" }]}
-                >
-                  IGST
-                </Text>
-                <Text
-                  style={[s.labelProductHeadText, { flex: 0.9, textAlign: "right" }]}
-                >
-                  Total
-                </Text>
-              </View>
-              {lineItems.map((li, i) => (
-                <View
-                  key={li.id}
-                  style={[
-                    s.labelProductRow,
-                    i === lineItems.length - 1 && { borderBottomWidth: 0 },
-                  ]}
-                >
-                  <Text
-                    style={[s.labelProductName, { flex: 2 }]}
-                    numberOfLines={2}
-                  >
-                    {li.name}
-                  </Text>
-                  <Text
-                    style={[
-                      s.labelProductNum,
-                      s.labelProductCenter,
-                      { flex: 0.8 },
-                    ]}
-                  >
-                    {li.hsnCode ?? "—"}
-                  </Text>
-                  <Text
-                    style={[
-                      s.labelProductNum,
-                      s.labelProductCenter,
-                      { flex: 0.4 },
-                    ]}
-                  >
-                    {li.qty}
-                  </Text>
-                  <Text style={[s.labelProductNum, { flex: 0.8 }]}>
-                    {fmtCur(li.unitPrice)}
-                  </Text>
-                  <Text style={[s.labelProductNum, { flex: 0.65 }]}>
-                    {li.cgst > 0 ? fmtCur(li.cgst) : "-"}
-                  </Text>
-                  <Text style={[s.labelProductNum, { flex: 0.65 }]}>
-                    {li.sgst > 0 ? fmtCur(li.sgst) : "-"}
-                  </Text>
-                  <Text style={[s.labelProductNum, { flex: 0.75 }]}>
-                    {li.igst > 0 ? (
-                      <>
-                        <Text>{li.taxPercent}%{"\n"}</Text>
-                        {fmtCur(li.igst)}
-                      </>
-                    ) : (
-                      "-"
-                    )}
-                  </Text>
-                  <Text style={[s.labelProductNum, { flex: 0.9, fontWeight: "800" }]}>
-                    {fmtCur(li.lineTotal)}
+              {/* Meta grid: Order #, Invoice, Date, Payment, Weight, Dimensions */}
+              <View style={s.labelMetaList}>
+                <View style={s.labelMetaRow}>
+                  <Text style={s.labelMetaKList}>Order #:</Text>
+                  <Text style={s.labelMetaVList}>{orderNumber}</Text>
+                </View>
+                <View style={s.labelMetaRow}>
+                  <Text style={s.labelMetaKList}>Invoice:</Text>
+                  <Text style={s.labelMetaVList}>{invoiceNum}</Text>
+                </View>
+                <View style={s.labelMetaRow}>
+                  <Text style={s.labelMetaKList}>Date:</Text>
+                  <Text style={s.labelMetaVList}>{orderDate}</Text>
+                </View>
+                <View style={s.labelMetaRow}>
+                  <Text style={s.labelMetaKList}>Payment:</Text>
+                  <Text style={s.labelMetaVList}>
+                    {paymentIsCod ? "COD" : "Prepaid"} {fmtCur(grandTotal)}
                   </Text>
                 </View>
-              ))}
-              <View style={s.labelTotalsRowFull}>
-                <Text style={[s.labelTotalsLabel, { flex: 3.2 }]}>TOTAL:</Text>
-                <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>
-                  {fmtCur(totalCgst)}
+                <View style={s.labelMetaRow}>
+                  <Text style={s.labelMetaKList}>Weight:</Text>
+                  <Text style={s.labelMetaVList}>{weightText}</Text>
+                </View>
+                <View style={s.labelMetaRow}>
+                  <Text style={s.labelMetaKList}>Dimensions:</Text>
+                  <Text style={s.labelMetaVList}>{dimensionsText}</Text>
+                </View>
+              </View>
+
+              {/* Product details table */}
+              <View style={s.labelSectionLabelBar}>
+                <Text style={s.labelSectionLabelBarText}>PRODUCT DETAILS</Text>
+              </View>
+              <View style={{ width: "100%", marginTop: 8 }}>
+                {/* Header */}
+                <View style={[s.labelProductHead, { flexDirection: "row" }]}>
+                  <Text style={[s.labelProductHeadText, { flex: 2 }]}>Item</Text>
+                  <Text style={[s.labelProductHeadText, s.labelProductHeadCenter, { flex: 0.8 }]}>HSN</Text>
+                  <Text style={[s.labelProductHeadText, s.labelProductHeadCenter, { flex: 0.4 }]}>Q</Text>
+                  <Text style={[s.labelProductHeadText, { flex: 0.8, textAlign: "right" }]}>Price</Text>
+                  <Text style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}>CGST</Text>
+                  <Text style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}>SGST</Text>
+                  <Text style={[s.labelProductHeadText, { flex: 0.75, textAlign: "right" }]}>IGST</Text>
+                  <Text style={[s.labelProductHeadText, { flex: 0.9, textAlign: "right" }]}>Total</Text>
+                </View>
+                {/* Rows */}
+                {lineItems.map((li, i) => (
+                  <View
+                    key={li.id}
+                    style={[
+                      s.labelProductRow,
+                      { flexDirection: "row" },
+                      i === lineItems.length - 1 && { borderBottomWidth: 0 },
+                    ]}
+                  >
+                    <Text style={[s.labelProductName, { flex: 2 }]} numberOfLines={2}>
+                      {li.name}
+                    </Text>
+                    <Text style={[s.labelProductNum, s.labelProductCenter, { flex: 0.8 }]}>
+                      {li.hsnCode ?? "—"}
+                    </Text>
+                    <Text style={[s.labelProductNum, s.labelProductCenter, { flex: 0.4 }]}>
+                      {li.qty}
+                    </Text>
+                    <Text style={[s.labelProductNum, { flex: 0.8, textAlign: "right" }]}>
+                      {fmtCur(li.unitPrice)}
+                    </Text>
+                    <Text style={[s.labelProductNum, { flex: 0.65, textAlign: "right" }]}>
+                      {li.cgst > 0 ? fmtCur(li.cgst) : "-"}
+                    </Text>
+                    <Text style={[s.labelProductNum, { flex: 0.65, textAlign: "right" }]}>
+                      {li.sgst > 0 ? fmtCur(li.sgst) : "-"}
+                    </Text>
+                    <Text style={[s.labelProductNum, { flex: 0.75, textAlign: "right" }]}>
+                      {li.igst > 0 ? `${li.taxPercent}%\n${fmtCur(li.igst)}` : "-"}
+                    </Text>
+                    <Text style={[s.labelProductNum, { flex: 0.9, textAlign: "right", fontWeight: "800" }]}>
+                      {fmtCur(li.lineTotal)}
+                    </Text>
+                  </View>
+                ))}
+                {/* Totals row */}
+                <View style={[s.labelTotalsRowFull, { flexDirection: "row" }]}>
+                  <Text style={[s.labelTotalsLabel, { flex: 4 }]}>TOTAL:</Text>
+                  <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>{fmtCur(totalCgst)}</Text>
+                  <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>{fmtCur(totalSgst)}</Text>
+                  <Text style={[s.labelTotalsValueCell, { flex: 0.75 }]}>{fmtCur(totalIgst)}</Text>
+                  <Text style={[s.labelTotalsValueCell, { flex: 0.9, color: C.orange, fontWeight: "800" }]}>
+                    {fmtCur(grandTotal)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Return address */}
+              <View style={s.labelSection}>
+                <Text style={s.labelSectionLabel}>RETURN ADDRESS</Text>
+                <Text style={s.labelReturnName}>
+                  {firstGroup?.seller?.name?.toUpperCase() ?? "SELLER"}
                 </Text>
-                <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>
-                  {fmtCur(totalSgst)}
+                <Text style={s.labelReturnAddr}>
+                  {sellerAddressLine || "Registered seller address on file"}
+                  {sellerAddr?.phone ? `  |  Ph: ${sellerAddr.phone}` : ""}
                 </Text>
-                <Text style={[s.labelTotalsValueCell, { flex: 0.75 }]}>
-                  {fmtCur(totalIgst)}
+              </View>
+
+              {/* Footer */}
+              <View style={s.labelFooterNote}>
+                <Text style={s.labelFooterGst}>GST: {gstFooterLabel}</Text>
+                <Text style={s.labelFooterAuto}>
+                  AUTO-GENERATED LABEL · NO SIGNATURE REQUIRED
                 </Text>
-                <Text
-                  style={[
-                    s.labelTotalsValueCell,
-                    { flex: 0.9, color: C.orange, fontWeight: "800" },
-                  ]}
-                >
-                  {fmtCur(grandTotal)}
+                <Text style={s.labelFooterPowered}>
+                  Powered By{" "}
+                  <Text style={{ color: C.navy, fontWeight: "800" }}>
+                    Flint & Thread
+                  </Text>
                 </Text>
               </View>
             </View>
-
-            {/* Return address */}
-            <View style={s.labelSection}>
-              <Text style={s.labelSectionLabel}>RETURN ADDRESS</Text>
-              <Text style={s.labelReturnName}>
-                {firstGroup?.seller?.name?.toUpperCase() ?? "SELLER"}
-              </Text>
-              <Text style={s.labelReturnAddr}>
-                {sellerAddressLine || "Registered seller address on file"}
-                {sellerAddr?.phone ? `  |  Ph: ${sellerAddr.phone}` : ""}
-              </Text>
-            </View>
-
-            {/* Footer */}
-            <View style={s.labelFooterNote}>
-              <Text style={s.labelFooterGst}>GST: {gstFooterLabel}</Text>
-              <Text style={s.labelFooterAuto}>
-                AUTO-GENERATED LABEL · NO SIGNATURE REQUIRED
-              </Text>
-              <Text style={s.labelFooterPowered}>
-                Powered By{" "}
-                <Text style={{ color: C.navy, fontWeight: "800" }}>
-                  Flint & Thread
-                </Text>
-              </Text>
-            </View>
-          </View>
           )}
         </ScrollView>
 
-        {/* Print, Download, Close */}
+        {/* Print, Download */}
         <View style={s.docActionBar}>
           <TouchableOpacity
             style={[s.docBtnPrint, (loading || !label) && { opacity: 0.6 }]}
@@ -2315,14 +2602,6 @@ const ShippingLabelModal = ({
             <Text style={s.docBtnDownloadText}>
               {downloading ? "Downloading…" : "Download"}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.docBtnClose}
-            onPress={onClose}
-            activeOpacity={0.85}
-          >
-            <CloseIcon color={C.navy} size={15} />
-            <Text style={s.docBtnCloseText}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -2376,9 +2655,15 @@ export const InvoiceModal = ({
 
   if (!visible) return null;
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
-      window.print();
+      try {
+        const logoDataUrl = await fetchLogoDataUrl();
+        const html = buildInvoiceDownloadHtml(invoice!, logoDataUrl);
+        printHtmlOnWeb(html);
+      } catch (err) {
+        Alert.alert("Print failed", getApiErrorMessage(err, "Could not print invoice."));
+      }
     } else {
       Alert.alert("Print", `Sending ${invoice?.invoiceNumber ?? "invoice"} to printer`);
     }
@@ -2454,332 +2739,332 @@ export const InvoiceModal = ({
             <Text style={s.docErrorText}>Invoice not available.</Text>
           </View>
         ) : (
-        <ScrollView
-          contentContainerStyle={s.docScroll}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={[s.invoiceSheet, { width: sheetWidth }]}>
-            {/* ── Top header: brand left, INVOICE meta + QR right ── */}
-            <View
-              style={[
-                s.invTopHeaderRow,
-                isNarrow && s.invTopHeaderRowNarrow,
-              ]}
-            >
-              <View style={s.invBrandCol}>
-                <Image
-                  source={require("../../assets/images/flint-thread-logo.png")}
-                  style={s.invBrandLogo}
-                  resizeMode="contain"
-                />
-
-                <View style={s.invSenderInfo}>
-                  <Text style={s.invSenderName}>
-                    {company?.name ?? "Flint & Thread (India) Pvt. Ltd."}
-                  </Text>
-                  <Text style={s.invSenderLine}>{company?.country ?? "India"}</Text>
-                  {company?.phone ? (
-                    <Text style={s.invSenderLine}>Phone: {company.phone}</Text>
-                  ) : null}
-                  {company?.email ? (
-                    <Text style={s.invSenderLine}>Email: {company.email}</Text>
-                  ) : null}
-                  {company?.gstin ? (
-                    <Text style={s.invSenderLine}>GSTIN: {company.gstin}</Text>
-                  ) : null}
-                </View>
-              </View>
-
+          <ScrollView
+            contentContainerStyle={s.docScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[s.invoiceSheet, { width: sheetWidth }]}>
+              {/* ── Top header: brand left, INVOICE meta + QR right ── */}
               <View
                 style={[
-                  s.invMetaColRight,
-                  isNarrow && s.invMetaColRightNarrow,
+                  s.invTopHeaderRow,
+                  isNarrow && s.invTopHeaderRowNarrow,
                 ]}
               >
-                <Text style={s.invTitle}>INVOICE</Text>
-                <Text style={s.invMetaLine}>{invoice.invoiceNumber}</Text>
-                <Text style={s.invMetaLineMuted}>
-                  Order: {invoice.orderNumber}
-                </Text>
-                <Text style={s.invMetaLineMuted}>
-                  Date: {formatInvoiceDate(invoice.invoiceDate ?? invoice.orderDate)}
-                </Text>
+                <View style={s.invBrandCol}>
+                  <Image
+                    source={require("../../assets/images/flint-thread-logo.png")}
+                    style={s.invBrandLogo}
+                    resizeMode="contain"
+                  />
 
-                <View style={s.invQrBox}>
-                  {invoice.qrCode?.imageDataUrl ? (
-                    <Image
-                      source={{ uri: invoice.qrCode.imageDataUrl }}
-                      style={{ width: 62, height: 62 }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <QrPlaceholderIcon size={62} />
-                  )}
-                </View>
-                <Text style={s.invQrCaption}>Scan for order details</Text>
-              </View>
-            </View>
-
-            {/* ── Sold By ── */}
-            <View style={s.invSection}>
-              <Text style={s.invSectionLabelNavy}>SOLD BY</Text>
-              <Text style={s.invBoldName}>
-                {(firstGroup?.seller?.name ?? "UNKNOWN SELLER").toUpperCase()}
-              </Text>
-              {sellerAddressLines.length > 0 ? (
-                sellerAddressLines.map((line, i) => (
-                  <Text key={i} style={s.invMutedLine}>
-                    {line}
-                  </Text>
-                ))
-              ) : (
-                <Text style={s.invMutedLine}>Seller details on file</Text>
-              )}
-              {firstGroup?.seller?.phone ? (
-                <Text style={s.invMutedLine}>Phone: {firstGroup.seller.phone}</Text>
-              ) : null}
-              {firstGroup?.seller?.email ? (
-                <Text style={s.invMutedLine}>Email: {firstGroup.seller.email}</Text>
-              ) : null}
-              {firstGroup?.seller?.gstin ? (
-                <Text style={s.invMutedLine}>GSTIN: {firstGroup.seller.gstin}</Text>
-              ) : null}
-            </View>
-
-            {/* ── Bill / Ship ── */}
-            <View style={s.invBsGrid}>
-              <View style={s.invBsCol}>
-                <Text style={s.invSectionLabelOrange}>BILL TO</Text>
-                <Text style={s.invBoldName}>{billing?.name || "—"}</Text>
-                {billing?.address ? (
-                  <Text style={s.invMutedLine}>{billing.address}</Text>
-                ) : null}
-                {billing?.line1 ? (
-                  <Text style={s.invMutedLine}>{billing.line1}</Text>
-                ) : null}
-                {billing?.line2 ? (
-                  <Text style={s.invMutedLine}>{billing.line2}</Text>
-                ) : null}
-                {(billing?.city || billing?.state) && (
-                  <Text style={s.invMutedLine}>
-                    {[billing?.city, billing?.state].filter(Boolean).join(", ")}
-                    {billing?.pincode ? ` - ${billing.pincode}` : ""}
-                  </Text>
-                )}
-                {billing?.phone ? (
-                  <Text style={s.invMutedLine}>Phone: {billing.phone}</Text>
-                ) : null}
-                <Text style={s.invMutedLine}>Email: {billing?.email || "—"}</Text>
-              </View>
-              <View style={s.invBsCol}>
-                <Text style={s.invSectionLabelOrange}>SHIP TO</Text>
-                <Text style={s.invBoldName}>{shippingAddr?.name || "—"}</Text>
-                {shippingAddr?.address ? (
-                  <Text style={s.invMutedLine}>{shippingAddr.address}</Text>
-                ) : null}
-                {shippingAddr?.line1 ? (
-                  <Text style={s.invMutedLine}>{shippingAddr.line1}</Text>
-                ) : null}
-                {shippingAddr?.line2 ? (
-                  <Text style={s.invMutedLine}>{shippingAddr.line2}</Text>
-                ) : null}
-                {(shippingAddr?.city || shippingAddr?.state) && (
-                  <Text style={s.invMutedLine}>
-                    {[shippingAddr?.city, shippingAddr?.state].filter(Boolean).join(", ")}
-                    {shippingAddr?.pincode ? ` - ${shippingAddr.pincode}` : ""}
-                  </Text>
-                )}
-                {shippingAddr?.phone ? (
-                  <Text style={s.invMutedLine}>Phone: {shippingAddr.phone}</Text>
-                ) : null}
-                <Text style={s.invMutedLine}>Email: {shippingAddr?.email || "—"}</Text>
-              </View>
-            </View>
-
-            {/* ── Items table ── */}
-            <View style={s.invTable}>
-              <View style={s.invTableHead}>
-                <Text style={[s.invTh, { flex: 2.2 }]}>Item Description</Text>
-                <Text style={[s.invTh, s.invThCenter, { flex: 1 }]}>HSN Code</Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 0.6 }]}>Qty</Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>Unit Price</Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 0.7 }]}>Tax %</Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>Tax Amount</Text>
-                <Text style={[s.invTh, s.invThRight, { flex: 1 }]}>Total</Text>
-              </View>
-              {lineItems.map((li, i) => (
-                <View
-                  key={`${li.id ?? i}-${li.name}`}
-                  style={[s.invTr, i % 2 === 1 && { backgroundColor: C.bg }]}
-                >
-                  <View style={{ flex: 2.2, flexDirection: "row", gap: 8, alignItems: "center" }}>
-                    {li.imageUrl ? (
-                      <Image
-                        source={{ uri: li.imageUrl }}
-                        style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: C.bg }}
-                        resizeMode="cover"
-                      />
+                  <View style={s.invSenderInfo}>
+                    <Text style={s.invSenderName}>
+                      {company?.name ?? "Flint & Thread (India) Pvt. Ltd."}
+                    </Text>
+                    <Text style={s.invSenderLine}>{company?.country ?? "India"}</Text>
+                    {company?.phone ? (
+                      <Text style={s.invSenderLine}>Phone: {company.phone}</Text>
                     ) : null}
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.invTdName} numberOfLines={2}>
-                        {li.name}
-                      </Text>
-                      {(li.color || li.size) && (
-                        <Text style={s.invTdVariant}>
-                          {[
-                            li.color ? `Color: ${li.color}` : null,
-                            li.size ? `Size: ${li.size}` : null,
-                          ]
-                            .filter(Boolean)
-                            .join("  ")}
-                        </Text>
-                      )}
-                    </View>
+                    {company?.email ? (
+                      <Text style={s.invSenderLine}>Email: {company.email}</Text>
+                    ) : null}
+                    {company?.gstin ? (
+                      <Text style={s.invSenderLine}>GSTIN: {company.gstin}</Text>
+                    ) : null}
                   </View>
-                  <Text style={[s.invTdNum, s.invTdCenter, { flex: 1 }]}>
-                    {li.hsnCode || "—"}
-                  </Text>
-                  <Text style={[s.invTdNum, { flex: 0.6 }]}>{li.qty ?? 0}</Text>
-                  <Text style={[s.invTdNum, { flex: 1 }]}>
-                    {fmtCur(toNumber(li.unitPrice))}
-                  </Text>
-                  <Text style={[s.invTdNum, { flex: 0.7 }]}>
-                    {toNumber(li.taxPercent)}%
-                  </Text>
-                  <Text style={[s.invTdNum, { flex: 1 }]}>
-                    {fmtCur(toNumber(li.taxAmount))}
-                  </Text>
-                  <Text style={[s.invTdNum, { flex: 1, fontWeight: "800" }]}>
-                    {fmtCur(toNumber(li.lineTotal))}
-                  </Text>
                 </View>
-              ))}
-            </View>
 
-            {/* ── Totals ── */}
-            <View style={s.invTotalsWrap}>
-              <View style={s.invTotalsBox}>
-                <View style={s.invTotalsLine}>
-                  <Text style={s.invTotalsLabel}>Subtotal (Before Tax)</Text>
-                  <Text style={s.invTotalsValue}>{fmtCur(subtotal)}</Text>
-                </View>
-                <View style={s.invTotalsLine}>
-                  <Text style={s.invTotalsLabel}>
-                    {isIntraState ? "CGST + SGST" : "IGST"} @{" "}
-                    {subtotal > 0 ? ((totalTax / subtotal) * 100).toFixed(2) : "0.00"}%
-                  </Text>
-                  <Text style={s.invTotalsValue}>{fmtCur(totalTax)}</Text>
-                </View>
-                <View style={s.invTotalsLine}>
-                  <Text style={s.invTotalsLabel}>Shipping Charges</Text>
-                  <Text
-                    style={[
-                      s.invTotalsValue,
-                      shipping === 0 && { color: C.green, fontWeight: "800" },
-                    ]}
-                  >
-                    {shipping === 0 ? "FREE" : fmtCur(shipping)}
-                  </Text>
-                </View>
-                {discount > 0 ? (
-                  <View style={s.invTotalsLine}>
-                    <Text style={s.invTotalsLabel}>Discount</Text>
-                    <Text style={s.invTotalsValue}>- {fmtCur(discount)}</Text>
-                  </View>
-                ) : null}
-                {wallet > 0 ? (
-                  <View style={s.invTotalsLine}>
-                    <Text style={s.invTotalsLabel}>Wallet</Text>
-                    <Text style={s.invTotalsValue}>- {fmtCur(wallet)}</Text>
-                  </View>
-                ) : null}
-                {referral > 0 ? (
-                  <View style={s.invTotalsLine}>
-                    <Text style={s.invTotalsLabel}>Referral</Text>
-                    <Text style={s.invTotalsValue}>- {fmtCur(referral)}</Text>
-                  </View>
-                ) : null}
-                <View style={s.invGrandLine}>
-                  <Text style={s.invGrandLabel}>Grand Total</Text>
-                  <Text style={s.invGrandValue}>{fmtCur(grandTotal)}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* ── GST Breakdown Summary ── */}
-            <View style={s.invGstBlock}>
-              <Text style={s.invGstTitle}>GST Breakdown Summary</Text>
-              <View style={s.invGstLine}>
-                <Text style={s.invGstK}>Total CGST:</Text>
-                <Text style={s.invGstV}>{fmtCur(cgst)}</Text>
-              </View>
-              <View style={s.invGstLine}>
-                <Text style={s.invGstK}>Total SGST:</Text>
-                <Text style={s.invGstV}>{fmtCur(sgst)}</Text>
-              </View>
-              <View style={s.invGstLine}>
-                <Text style={s.invGstK}>Total IGST:</Text>
-                <Text style={s.invGstV}>{fmtCur(igst)}</Text>
-              </View>
-              <View style={[s.invGstLine, s.invGstLineTotal]}>
-                <Text style={s.invGstKTotal}>Total GST:</Text>
-                <Text style={s.invGstVTotal}>{fmtCur(totalTax)}</Text>
-              </View>
-              <Text style={s.invGstNote}>
-                {isIntraState
-                  ? "*Intra-state transaction - CGST + SGST applicable"
-                  : "*Inter-state transaction - IGST applicable"}
-              </Text>
-            </View>
-
-            {/* ── Payment Information ── */}
-            <View style={s.invPaymentBlock}>
-              <Text style={s.invPaymentTitle}>Payment Information:</Text>
-              <Text style={s.invPaymentLine}>
-                Payment Method: {invoice.payment?.method || "—"}
-              </Text>
-              <View style={s.invPaymentStatusRow}>
-                <Text style={s.invPaymentLine}>Payment Status: </Text>
                 <View
                   style={[
-                    s.invPayChip,
-                    isPaid ? s.invPayChipPaid : s.invPayChipPending,
+                    s.invMetaColRight,
+                    isNarrow && s.invMetaColRightNarrow,
                   ]}
                 >
-                  <Text
-                    style={[
-                      s.invPayChipText,
-                      { color: isPaid ? C.green : C.orange },
-                    ]}
-                  >
-                    {isPaid ? "PAID" : (invoice.payment?.status || "PENDING").toUpperCase()}
+                  <Text style={s.invTitle}>INVOICE</Text>
+                  <Text style={s.invMetaLine}>{invoice.invoiceNumber}</Text>
+                  <Text style={s.invMetaLineMuted}>
+                    Order: {invoice.orderNumber}
                   </Text>
+                  <Text style={s.invMetaLineMuted}>
+                    Date: {formatInvoiceDate(invoice.invoiceDate ?? invoice.orderDate)}
+                  </Text>
+
+                  <View style={s.invQrBox}>
+                    {invoice.qrCode?.imageDataUrl ? (
+                      <Image
+                        source={{ uri: invoice.qrCode.imageDataUrl }}
+                        style={{ width: 62, height: 62 }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <QrPlaceholderIcon size={62} />
+                    )}
+                  </View>
+                  <Text style={s.invQrCaption}>Scan for order details</Text>
                 </View>
               </View>
-              {invoice.gstNumber ? (
-                <Text style={s.invPaymentLine}>Customer GSTIN: {invoice.gstNumber}</Text>
-              ) : null}
-            </View>
 
-            {/* ── Thank-you footer ── */}
-            <View style={s.invThankYouBlock}>
-              <Text style={s.invThankYouTitle}>Thank you for your business!</Text>
-              <Text style={s.invThankYouLine}>
-                If you have any questions about this invoice, please contact us at
-              </Text>
-              <Text style={s.invThankYouContact}>
-                {company?.email ?? "support@flintnthread.in"}
+              {/* ── Sold By ── */}
+              <View style={s.invSection}>
+                <Text style={s.invSectionLabelNavy}>SOLD BY</Text>
+                <Text style={s.invBoldName}>
+                  {(firstGroup?.seller?.name ?? "UNKNOWN SELLER").toUpperCase()}
+                </Text>
+                {sellerAddressLines.length > 0 ? (
+                  sellerAddressLines.map((line, i) => (
+                    <Text key={i} style={s.invMutedLine}>
+                      {line}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={s.invMutedLine}>Seller details on file</Text>
+                )}
+                {firstGroup?.seller?.phone ? (
+                  <Text style={s.invMutedLine}>Phone: {firstGroup.seller.phone}</Text>
+                ) : null}
+                {firstGroup?.seller?.email ? (
+                  <Text style={s.invMutedLine}>Email: {firstGroup.seller.email}</Text>
+                ) : null}
+                {firstGroup?.seller?.gstin ? (
+                  <Text style={s.invMutedLine}>GSTIN: {firstGroup.seller.gstin}</Text>
+                ) : null}
+              </View>
+
+              {/* ── Bill / Ship ── */}
+              <View style={s.invBsGrid}>
+                <View style={s.invBsCol}>
+                  <Text style={s.invSectionLabelOrange}>BILL TO</Text>
+                  <Text style={s.invBoldName}>{billing?.name || "—"}</Text>
+                  {billing?.address ? (
+                    <Text style={s.invMutedLine}>{billing.address}</Text>
+                  ) : null}
+                  {billing?.line1 ? (
+                    <Text style={s.invMutedLine}>{billing.line1}</Text>
+                  ) : null}
+                  {billing?.line2 ? (
+                    <Text style={s.invMutedLine}>{billing.line2}</Text>
+                  ) : null}
+                  {(billing?.city || billing?.state) && (
+                    <Text style={s.invMutedLine}>
+                      {[billing?.city, billing?.state].filter(Boolean).join(", ")}
+                      {billing?.pincode ? ` - ${billing.pincode}` : ""}
+                    </Text>
+                  )}
+                  {billing?.phone ? (
+                    <Text style={s.invMutedLine}>Phone: {billing.phone}</Text>
+                  ) : null}
+                  <Text style={s.invMutedLine}>Email: {billing?.email || "—"}</Text>
+                </View>
+                <View style={s.invBsCol}>
+                  <Text style={s.invSectionLabelOrange}>SHIP TO</Text>
+                  <Text style={s.invBoldName}>{shippingAddr?.name || "—"}</Text>
+                  {shippingAddr?.address ? (
+                    <Text style={s.invMutedLine}>{shippingAddr.address}</Text>
+                  ) : null}
+                  {shippingAddr?.line1 ? (
+                    <Text style={s.invMutedLine}>{shippingAddr.line1}</Text>
+                  ) : null}
+                  {shippingAddr?.line2 ? (
+                    <Text style={s.invMutedLine}>{shippingAddr.line2}</Text>
+                  ) : null}
+                  {(shippingAddr?.city || shippingAddr?.state) && (
+                    <Text style={s.invMutedLine}>
+                      {[shippingAddr?.city, shippingAddr?.state].filter(Boolean).join(", ")}
+                      {shippingAddr?.pincode ? ` - ${shippingAddr.pincode}` : ""}
+                    </Text>
+                  )}
+                  {shippingAddr?.phone ? (
+                    <Text style={s.invMutedLine}>Phone: {shippingAddr.phone}</Text>
+                  ) : null}
+                  <Text style={s.invMutedLine}>Email: {shippingAddr?.email || "—"}</Text>
+                </View>
+              </View>
+
+              {/* ── Items table ── */}
+              <View style={[s.invTable, { width: "100%" }]}>
+                <View style={[s.invTableHead, { flexDirection: "row" }]}>
+                  <Text style={[s.invTh, { flex: 2.2 }]}>Item Description</Text>
+                  <Text style={[s.invTh, { flex: 1, textAlign: "center" }]}>HSN Code</Text>
+                  <Text style={[s.invTh, { flex: 0.6, textAlign: "right" }]}>Qty</Text>
+                  <Text style={[s.invTh, { flex: 1, textAlign: "right" }]}>Unit Price</Text>
+                  <Text style={[s.invTh, { flex: 0.7, textAlign: "right" }]}>Tax %</Text>
+                  <Text style={[s.invTh, { flex: 1, textAlign: "right" }]}>Tax Amt</Text>
+                  <Text style={[s.invTh, { flex: 1, textAlign: "right" }]}>Total</Text>
+                </View>
+                {lineItems.map((li, i) => (
+                  <View
+                    key={`${li.id ?? i}-${li.name}`}
+                    style={[s.invTr, { flexDirection: "row" }, i % 2 === 1 && { backgroundColor: C.bg }]}
+                  >
+                    <View style={{ flex: 2.2, flexDirection: "row", gap: 6, alignItems: "center" }}>
+                      {li.imageUrl ? (
+                        <Image
+                          source={{ uri: li.imageUrl }}
+                          style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: C.bg }}
+                          resizeMode="cover"
+                        />
+                      ) : null}
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.invTdName} numberOfLines={2}>
+                          {li.name}
+                        </Text>
+                        {(li.color || li.size) && (
+                          <Text style={s.invTdVariant}>
+                            {[
+                              li.color ? `Color: ${li.color}` : null,
+                              li.size ? `Size: ${li.size}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join("  ")}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Text style={[s.invTdNum, { flex: 1, textAlign: "center" }]}>
+                      {li.hsnCode || "—"}
+                    </Text>
+                    <Text style={[s.invTdNum, { flex: 0.6, textAlign: "right" }]}>{li.qty ?? 0}</Text>
+                    <Text style={[s.invTdNum, { flex: 1, textAlign: "right" }]}>
+                      {fmtCur(toNumber(li.unitPrice))}
+                    </Text>
+                    <Text style={[s.invTdNum, { flex: 0.7, textAlign: "right" }]}>
+                      {toNumber(li.taxPercent)}%
+                    </Text>
+                    <Text style={[s.invTdNum, { flex: 1, textAlign: "right" }]}>
+                      {fmtCur(toNumber(li.taxAmount))}
+                    </Text>
+                    <Text style={[s.invTdNum, { flex: 1, textAlign: "right", fontWeight: "800" }]}>
+                      {fmtCur(toNumber(li.lineTotal))}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* ── Totals ── */}
+              <View style={s.invTotalsWrap}>
+                <View style={s.invTotalsBox}>
+                  <View style={s.invTotalsLine}>
+                    <Text style={s.invTotalsLabel}>Subtotal (Before Tax)</Text>
+                    <Text style={s.invTotalsValue}>{fmtCur(subtotal)}</Text>
+                  </View>
+                  <View style={s.invTotalsLine}>
+                    <Text style={s.invTotalsLabel}>
+                      {isIntraState ? "CGST + SGST" : "IGST"} @{" "}
+                      {subtotal > 0 ? ((totalTax / subtotal) * 100).toFixed(2) : "0.00"}%
+                    </Text>
+                    <Text style={s.invTotalsValue}>{fmtCur(totalTax)}</Text>
+                  </View>
+                  <View style={s.invTotalsLine}>
+                    <Text style={s.invTotalsLabel}>Shipping Charges</Text>
+                    <Text
+                      style={[
+                        s.invTotalsValue,
+                        shipping === 0 && { color: C.green, fontWeight: "800" },
+                      ]}
+                    >
+                      {shipping === 0 ? "FREE" : fmtCur(shipping)}
+                    </Text>
+                  </View>
+                  {discount > 0 ? (
+                    <View style={s.invTotalsLine}>
+                      <Text style={s.invTotalsLabel}>Discount</Text>
+                      <Text style={s.invTotalsValue}>- {fmtCur(discount)}</Text>
+                    </View>
+                  ) : null}
+                  {wallet > 0 ? (
+                    <View style={s.invTotalsLine}>
+                      <Text style={s.invTotalsLabel}>Wallet</Text>
+                      <Text style={s.invTotalsValue}>- {fmtCur(wallet)}</Text>
+                    </View>
+                  ) : null}
+                  {referral > 0 ? (
+                    <View style={s.invTotalsLine}>
+                      <Text style={s.invTotalsLabel}>Referral</Text>
+                      <Text style={s.invTotalsValue}>- {fmtCur(referral)}</Text>
+                    </View>
+                  ) : null}
+                  <View style={s.invGrandLine}>
+                    <Text style={s.invGrandLabel}>Grand Total</Text>
+                    <Text style={s.invGrandValue}>{fmtCur(grandTotal)}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* ── GST Breakdown Summary ── */}
+              <View style={s.invGstBlock}>
+                <Text style={s.invGstTitle}>GST Breakdown Summary</Text>
+                <View style={s.invGstLine}>
+                  <Text style={s.invGstK}>Total CGST:</Text>
+                  <Text style={s.invGstV}>{fmtCur(cgst)}</Text>
+                </View>
+                <View style={s.invGstLine}>
+                  <Text style={s.invGstK}>Total SGST:</Text>
+                  <Text style={s.invGstV}>{fmtCur(sgst)}</Text>
+                </View>
+                <View style={s.invGstLine}>
+                  <Text style={s.invGstK}>Total IGST:</Text>
+                  <Text style={s.invGstV}>{fmtCur(igst)}</Text>
+                </View>
+                <View style={[s.invGstLine, s.invGstLineTotal]}>
+                  <Text style={s.invGstKTotal}>Total GST:</Text>
+                  <Text style={s.invGstVTotal}>{fmtCur(totalTax)}</Text>
+                </View>
+                <Text style={s.invGstNote}>
+                  {isIntraState
+                    ? "*Intra-state transaction - CGST + SGST applicable"
+                    : "*Inter-state transaction - IGST applicable"}
+                </Text>
+              </View>
+
+              {/* ── Payment Information ── */}
+              <View style={s.invPaymentBlock}>
+                <Text style={s.invPaymentTitle}>Payment Information:</Text>
+                <Text style={s.invPaymentLine}>
+                  Payment Method: {invoice.payment?.method || "—"}
+                </Text>
+                <View style={s.invPaymentStatusRow}>
+                  <Text style={s.invPaymentLine}>Payment Status: </Text>
+                  <View
+                    style={[
+                      s.invPayChip,
+                      isPaid ? s.invPayChipPaid : s.invPayChipPending,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.invPayChipText,
+                        { color: isPaid ? C.green : C.orange },
+                      ]}
+                    >
+                      {isPaid ? "PAID" : (invoice.payment?.status || "PENDING").toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                {invoice.gstNumber ? (
+                  <Text style={s.invPaymentLine}>Customer GSTIN: {invoice.gstNumber}</Text>
+                ) : null}
+              </View>
+
+              {/* ── Thank-you footer ── */}
+              <View style={s.invThankYouBlock}>
+                <Text style={s.invThankYouTitle}>Thank you for your business!</Text>
+                <Text style={s.invThankYouLine}>
+                  If you have any questions about this invoice, please contact us at
+                </Text>
+                <Text style={s.invThankYouContact}>
+                  {company?.email ?? "support@flintnthread.in"}
+                </Text>
+              </View>
+
+              <Text style={s.invDocFooter}>
+                This is a system-generated invoice and does not require a signature.
               </Text>
             </View>
-
-            <Text style={s.invDocFooter}>
-              This is a system-generated invoice and does not require a signature.
-            </Text>
-          </View>
-        </ScrollView>
+          </ScrollView>
         )}
 
-        {/* Footer: Print, Download, Close */}
+        {/* Footer: Print, Download */}
         <View style={s.docActionBar}>
           <TouchableOpacity
             style={[s.docBtnPrint, (loading || !invoice) && { opacity: 0.6 }]}
@@ -2800,14 +3085,6 @@ export const InvoiceModal = ({
             <Text style={s.docBtnDownloadText}>
               {downloading ? "Downloading…" : "Download"}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.docBtnClose}
-            onPress={onClose}
-            activeOpacity={0.85}
-          >
-            <CloseIcon color={C.navy} size={15} />
-            <Text style={s.docBtnCloseText}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -2831,14 +3108,14 @@ const ProductSummary = ({
 
   const metaString = firstGroup
     ? [
-        firstGroup.seller.name,
-        `${itemCount} item${itemCount !== 1 ? "s" : ""}`,
-        isMultiSeller
-          ? `+${groups.length - 1} seller${groups.length > 2 ? "s" : ""}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
+      firstGroup.seller.name,
+      `${itemCount} item${itemCount !== 1 ? "s" : ""}`,
+      isMultiSeller
+        ? `+${groups.length - 1} seller${groups.length > 2 ? "s" : ""}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
     : "Seller details unavailable";
 
   return (
@@ -2977,216 +3254,139 @@ const ListTableRow = ({
   const primary = sellerGroup.products[0];
 
   return (
-  <View style={[s.tRow, idx % 2 === 1 && s.tRowAlt]}>
-    <View style={[s.tcell, s.colOrder]}>
-      <View style={s.orderIdRow}>
-        <Text style={s.tdOrderNum} numberOfLines={1}>
-          {order.orderNumber}
-        </Text>
-        <TouchableOpacity
-          onPress={() => copyToClipboard(order.orderNumber)}
-          activeOpacity={0.7}
-        >
-          <CopyIcon color={C.textLight} />
-        </TouchableOpacity>
-      </View>
-      <View style={s.metaRow}>
-        <CalendarIcon />
-        <Text style={s.metaText}> {order.date}</Text>
-      </View>
-    </View>
-
-    <View style={[s.tcell, s.colCustomer]}>
-      <View style={s.customerRowInner}>
-        <View style={s.avatarSm}>
-          <Text style={s.avatarSmText}>{getInitials(order.customer.name)}</Text>
+    <View style={[s.tRow, idx % 2 === 1 && s.tRowAlt]}>
+      <View style={[s.tcell, s.colOrder]}>
+        <View style={s.orderIdRow}>
+          <Text style={s.tdOrderNum} numberOfLines={1}>
+            {order.orderNumber}
+          </Text>
+          <TouchableOpacity
+            onPress={() => copyToClipboard(order.orderNumber)}
+            activeOpacity={0.7}
+          >
+            <CopyIcon color={C.textLight} />
+          </TouchableOpacity>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.tdName} numberOfLines={1}>
-            {order.customer.name}
-          </Text>
-          <Text style={s.tdEmail} numberOfLines={1}>
-            {order.customer.email}
-          </Text>
+        <View style={s.metaRow}>
+          <CalendarIcon />
+          <Text style={s.metaText}> {order.date}</Text>
         </View>
       </View>
-    </View>
 
-    <View style={[s.tcell, s.colSeller]}>
-      <Text style={s.tdSellerName} numberOfLines={1}>
-        {sellerGroup.seller.name}
-      </Text>
-      {sellerGroup.subOrderId ? (
-        <Text style={s.tdMuted} numberOfLines={1}>
-          #{sellerGroup.subOrderId}
-        </Text>
-      ) : null}
-    </View>
-
-    <View style={[s.tcell, s.colProducts]}>
-      {sellerGroup.products.length === 0 ? (
-        <Text style={s.tdMuted}>—</Text>
-      ) : (
-        <View style={s.tableProductRow}>
-          {primary?.image ? (
-            <Image
-              source={{ uri: primary.image }}
-              style={s.tableThumb}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={s.tableThumbEmpty} />
-          )}
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.tdProductName} numberOfLines={1}>
-              {primary?.name || "—"}
+      <View style={[s.tcell, s.colCustomer]}>
+        <View style={s.customerRowInner}>
+          <View style={s.avatarSm}>
+            <Text style={s.avatarSmText}>{getInitials(order.customer.name)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.tdName} numberOfLines={1}>
+              {order.customer.name}
             </Text>
-            {sellerGroup.products.length > 1 ? (
-              <Text style={s.tdMuted}>{sellerGroup.products.length} Items</Text>
-            ) : null}
+            <Text style={s.tdEmail} numberOfLines={1}>
+              {order.customer.email}
+            </Text>
           </View>
         </View>
-      )}
-    </View>
+      </View>
 
-    <View style={[s.tcell, s.colAmount]}>
-      <Text style={s.tdAmount}>{fmtCur(amount)}</Text>
-      <Text style={s.tdPayment} numberOfLines={1}>
-        {order.paymentType}
-      </Text>
-    </View>
+      <View style={[s.tcell, s.colSeller]}>
+        <Text style={s.tdSellerName} numberOfLines={1}>
+          {sellerGroup.seller.name}
+        </Text>
+        {sellerGroup.subOrderId ? (
+          <Text style={s.tdMuted} numberOfLines={1}>
+            #{sellerGroup.subOrderId}
+          </Text>
+        ) : null}
+      </View>
 
-    <View style={[s.tcell, s.colStatus]}>
-      <StatusBadge status={order.status} />
-    </View>
+      <View style={[s.tcell, s.colProducts]}>
+        {sellerGroup.products.length === 0 ? (
+          <Text style={s.tdMuted}>—</Text>
+        ) : (
+          <View style={s.tableProductRow}>
+            {primary?.image ? (
+              <Image
+                source={{ uri: primary.image }}
+                style={s.tableThumb}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={s.tableThumbEmpty} />
+            )}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={s.tdProductName} numberOfLines={1}>
+                {primary?.name || "—"}
+              </Text>
+              {sellerGroup.products.length > 1 ? (
+                <Text style={s.tdMuted}>{sellerGroup.products.length} Items</Text>
+              ) : null}
+            </View>
+          </View>
+        )}
+      </View>
 
-    <View style={[s.tcell, s.colGst]}>
-      <GSTBadge
-        status={order.gstStatus}
-        onMarkFiled={() => onGST(order.id, "Filed")}
-        onMarkPending={() => onGST(order.id, "Pending")}
-      />
-    </View>
+      <View style={[s.tcell, s.colAmount]}>
+        <Text style={s.tdAmount}>{fmtCur(amount)}</Text>
+        <Text style={s.tdPayment} numberOfLines={1}>
+          {order.paymentType}
+        </Text>
+      </View>
 
-    <View style={[s.tcell, s.colDocs]}>
-      <View style={s.tableDocRow}>
-        <TouchableOpacity
-          style={[s.tableDocBtn, !sellerGroup.hasInvoice && s.tableDocBtnDisabled]}
-          onPress={() => onOpenDoc(order, "invoice")}
-          activeOpacity={0.75}
-          disabled={!sellerGroup.hasInvoice}
-        >
-          <FileIcon color={C.navy} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            s.tableDocBtn,
-            { borderColor: "#FED7AA" },
-            !sellerGroup.hasShippingLabel && s.tableDocBtnDisabled,
-          ]}
-          onPress={() => onOpenDoc(order, "label")}
-          activeOpacity={0.75}
-          disabled={!sellerGroup.hasShippingLabel}
-        >
-          <TruckIcon color={C.orange} />
-        </TouchableOpacity>
+      <View style={[s.tcell, s.colStatus]}>
+        <StatusBadge status={order.status} />
+      </View>
+
+      <View style={[s.tcell, s.colGst]}>
+        <GSTBadge
+          status={order.gstStatus}
+          onMarkFiled={() => onGST(order.id, "Filed")}
+          onMarkPending={() => onGST(order.id, "Pending")}
+        />
+      </View>
+
+      <View style={[s.tcell, s.colDocs]}>
+        <View style={s.tableDocRow}>
+          <TouchableOpacity
+            style={[s.tableDocBtn, !sellerGroup.hasInvoice && s.tableDocBtnDisabled]}
+            onPress={() => onOpenDoc(order, "invoice")}
+            activeOpacity={0.75}
+            disabled={!sellerGroup.hasInvoice}
+          >
+            <FileIcon color={C.navy} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              s.tableDocBtn,
+              { borderColor: "#FED7AA" },
+              !sellerGroup.hasShippingLabel && s.tableDocBtnDisabled,
+            ]}
+            onPress={() => onOpenDoc(order, "label")}
+            activeOpacity={0.75}
+            disabled={!sellerGroup.hasShippingLabel}
+          >
+            <TruckIcon color={C.orange} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[s.tcell, s.colAction]}>
+        <View style={s.tableActions}>
+          <TouchableOpacity
+            style={s.viewBtnSm}
+            onPress={() => onView(order)}
+            activeOpacity={0.85}
+          >
+            <EyeIcon color={C.white} />
+            <Text style={s.viewBtnSmText}>View</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
-
-    <View style={[s.tcell, s.colAction]}>
-      <View style={s.tableActions}>
-        <TouchableOpacity
-          style={s.viewBtnSm}
-          onPress={() => onView(order)}
-          activeOpacity={0.85}
-        >
-          <EyeIcon color={C.white} />
-          <Text style={s.viewBtnSmText}>View</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
   );
 };
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
-function buildPages(current: number, total: number): (number | "…")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages: (number | "…")[] = [1];
-  if (current > 3) pages.push("…");
-  for (
-    let p = Math.max(2, current - 1);
-    p <= Math.min(total - 1, current + 1);
-    p++
-  )
-    pages.push(p);
-  if (current < total - 2) pages.push("…");
-  if (total > 1) pages.push(total);
-  return pages;
-}
-
-const PaginationBar = ({
-  page,
-  total,
-  rangeStart,
-  rangeEnd,
-  totalElements,
-  onPrev,
-  onNext,
-  onPage,
-}: {
-  page: number;
-  total: number;
-  rangeStart: number;
-  rangeEnd: number;
-  totalElements: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onPage: (p: number) => void;
-}) => (
-  <View style={s.pagination}>
-    <Text style={s.paginationInfo}>
-      Showing {rangeStart}–{rangeEnd} of {totalElements} orders
-    </Text>
-    {total > 1 && (
-      <View style={s.paginationControls}>
-        <TouchableOpacity
-          style={[s.pageBtn, page <= 1 && s.pageBtnOff]}
-          onPress={onPrev}
-          disabled={page <= 1}
-        >
-          <ChevronLeftIcon color={page <= 1 ? C.textLight : C.textMid} />
-        </TouchableOpacity>
-        {buildPages(page, total).map((num, i) =>
-          num === "…" ? (
-            <Text key={`e-${i}`} style={s.pageEllipsis}>
-              …
-            </Text>
-          ) : (
-            <TouchableOpacity
-              key={num}
-              style={[s.pageBtn, num === page && s.pageBtnActive]}
-              onPress={() => onPage(num as number)}
-            >
-              <Text
-                style={[s.pageBtnText, num === page && s.pageBtnTextActive]}
-              >
-                {num}
-              </Text>
-            </TouchableOpacity>
-          ),
-        )}
-        <TouchableOpacity
-          style={[s.pageBtn, page >= total && s.pageBtnOff]}
-          onPress={onNext}
-          disabled={page >= total}
-        >
-          <ChevronRightIcon color={page >= total ? C.textLight : C.textMid} />
-        </TouchableOpacity>
-      </View>
-    )}
-  </View>
-);
 
 // ─── Responsive grid helpers ──────────────────────────────────────────────────
 const GRID_GUTTER = 16;
@@ -3314,16 +3514,16 @@ export default function OrdersScreen() {
     [filtered],
   );
 
-  const handleExportCSV = useCallback(async () => {
+  const handleExportExcel = useCallback(async () => {
     try {
-      await downloadOrderExportCsv(
+      await downloadOrderExportExcel(
         {
           search: searchQuery || undefined,
           status: mapStatusFilterToApi(statusFilter),
           paymentMethod: mapPaymentFilterToApi(paymentFilter),
           sort: sortOption,
         },
-        `orders_${new Date().toISOString().slice(0, 10)}.csv`
+        `orders_${new Date().toISOString().slice(0, 10)}.xlsx`
       );
     } catch (e) {
       Alert.alert("Export failed", e instanceof Error ? e.message : "Could not export orders.");
@@ -3388,16 +3588,16 @@ export default function OrdersScreen() {
               paddingHorizontal: 16,
             }}
           >
-              <View
+            <View
               style={[
-                  s.headerBlock,
-                  {
-                    paddingTop: Platform.OS === "ios" ? (isMobile ? 40 : 50) : (isMobile ? 12 : 20),
-                    paddingBottom: isMobile ? 44 : 48,
-                  },
-                  isMobile && { paddingHorizontal: 16, paddingVertical: 16 }
-                ]}
-              >
+                s.headerBlock,
+                {
+                  paddingTop: Platform.OS === "ios" ? (isMobile ? 40 : 50) : (isMobile ? 12 : 20),
+                  paddingBottom: isMobile ? 44 : 48,
+                },
+                isMobile && { paddingHorizontal: 16, paddingVertical: 16 }
+              ]}
+            >
               <View style={s.headerTop}>
                 <View style={s.headerLeft}>
                   <View style={s.headerIcon}>
@@ -3411,8 +3611,8 @@ export default function OrdersScreen() {
                     >
                       Orders Management
                     </Text>
-                    <Text 
-                      style={[s.headerSub, isMobile && { color: "rgba(255,255,255,0.8)", fontSize: 11 }]} 
+                    <Text
+                      style={[s.headerSub, isMobile && { color: "rgba(255,255,255,0.8)", fontSize: 11 }]}
                       numberOfLines={isMobile ? 2 : 1}
                     >
                       Manage and track all customer orders
@@ -3422,12 +3622,12 @@ export default function OrdersScreen() {
                 <View style={s.headerActions}>
                   <TouchableOpacity
                     style={s.exportBtn}
-                    onPress={handleExportCSV}
+                    onPress={handleExportExcel}
                     activeOpacity={0.85}
                   >
                     <ExportIcon />
                     {!isMobile && (
-                      <Text style={s.exportBtnText}>Export CSV</Text>
+                      <Text style={s.exportBtnText}>Export</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -3484,43 +3684,43 @@ export default function OrdersScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={s.filterPillsRow}
               >
-              {STATUS_FILTERS.map((f) => (
-                <TouchableOpacity
-                  key={f}
-                  style={[
-                    s.filterPill,
-                    statusFilter === f && s.filterPillActive,
-                  ]}
-                  onPress={() => {
-                    setStatusFilter(f);
-                    setCurrentPage(1);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  {statusFilter === f && (
-                    <View
-                      style={[
-                        s.filterPillDot,
-                        {
-                          backgroundColor:
-                            f === "All"
-                              ? C.white
-                              : (STATUS_CFG[f as OrderStatus]?.dot ?? C.white),
-                        },
-                      ]}
-                    />
-                  )}
-                  <Text
+                {STATUS_FILTERS.map((f) => (
+                  <TouchableOpacity
+                    key={f}
                     style={[
-                      s.filterPillText,
-                      statusFilter === f && s.filterPillTextActive,
+                      s.filterPill,
+                      statusFilter === f && s.filterPillActive,
                     ]}
+                    onPress={() => {
+                      setStatusFilter(f);
+                      setCurrentPage(1);
+                    }}
+                    activeOpacity={0.75}
                   >
-                    {f}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+                    {statusFilter === f && (
+                      <View
+                        style={[
+                          s.filterPillDot,
+                          {
+                            backgroundColor:
+                              f === "All"
+                                ? C.white
+                                : (STATUS_CFG[f as OrderStatus]?.dot ?? C.white),
+                          },
+                        ]}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        s.filterPillText,
+                        statusFilter === f && s.filterPillTextActive,
+                      ]}
+                    >
+                      {f}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           </View>
 
@@ -3678,20 +3878,14 @@ export default function OrdersScreen() {
 
           {/* ── Pagination ── */}
           {!loading && !error && totalPages > 0 && (
-            <View style={{ paddingHorizontal: px }}>
-              <PaginationBar
-                page={currentPage}
-                total={totalPages}
-                rangeStart={rangeStart}
-                rangeEnd={rangeEnd}
-                totalElements={totalElements}
-                onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                onNext={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                onPage={setCurrentPage}
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalElements}
+                itemsPerPage={ORDERS_PAGE_SIZE}
+                itemName="orders"
+                onPageChange={setCurrentPage}
               />
-            </View>
           )}
 
           <View style={{ height: 24 }} />

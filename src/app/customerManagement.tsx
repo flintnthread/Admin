@@ -6,6 +6,7 @@
  */
 
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapCustomerRow } from "@/lib/mappers";
 import { fetchCustomers, fetchCustomerStats } from "@/services/customerApi";
@@ -612,6 +613,12 @@ export default function CustomerManagementScreen() {
     <AdminLayout>
       <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
+        showsVerticalScrollIndicator={false}
+      >
+
       {/* ══ HEADER (Fixed) ═══════════════════════ */}
       <View style={{ paddingHorizontal: 16 }}>
         <View
@@ -680,54 +687,50 @@ export default function CustomerManagementScreen() {
         />
       </View>
 
-      {/* ══ TOOLBAR (Fixed) ═════════════════════════════════════════════════════ */}
-      <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px, marginTop: 10, marginBottom: 4 }}>
-        <View style={s.toolbar}>
-          {/* Search */}
-          <View style={s.searchBox}>
-            <SearchIcon />
-            <TextInput
-              style={[s.searchInput, { fontSize: isMobile ? 12 : 14 }]}
-              placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
-              placeholderTextColor={C.sub}
-              value={search}
-              onChangeText={(text) => {
-                setSearch(text);
-                setPage(1);
-              }}
-              numberOfLines={1}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch("")} style={{ padding: 4 }}>
-                <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
 
-          {/* Grid / List toggle */}
-          <View style={s.toggle}>
-            {(["grid", "list"] as const).map((mode) => (
-              <TouchableOpacity
-                key={mode}
-                style={[s.toggleBtn, view === mode && s.toggleActive]}
-                onPress={() => setView(mode)}
-                activeOpacity={0.8}
-              >
-                {mode === "grid"
-                  ? <GridIcon color={view === "grid" ? "#fff" : C.sub} size={16} />
-                  : <ListIcon color={view === "list" ? "#fff" : C.sub} size={16} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </View>
-
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
-        showsVerticalScrollIndicator={false}
-      >
         <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
+          
+          {/* ══ TOOLBAR (Scrollable) ═════════════════════════════════════════════════════ */}
+          <View style={{ marginTop: 10, marginBottom: 4 }}>
+            <View style={s.toolbar}>
+              {/* Search */}
+              <View style={s.searchBox}>
+                <SearchIcon />
+                <TextInput
+                  style={[s.searchInput, { fontSize: isMobile ? 12 : 14 }]}
+                  placeholder={isMobile ? "Search…" : "Search by name, email or phone…"}
+                  placeholderTextColor={C.sub}
+                  value={search}
+                  onChangeText={(text) => {
+                    setSearch(text);
+                    setPage(1);
+                  }}
+                  numberOfLines={1}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearch("")} style={{ padding: 4 }}>
+                    <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Grid / List toggle */}
+              <View style={s.toggle}>
+                {(["grid", "list"] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[s.toggleBtn, view === mode && s.toggleActive]}
+                    onPress={() => setView(mode)}
+                    activeOpacity={0.8}
+                  >
+                    {mode === "grid"
+                      ? <GridIcon color={view === "grid" ? "#fff" : C.sub} size={16} />
+                      : <ListIcon color={view === "list" ? "#fff" : C.sub} size={16} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
 
           {loading ? (
             <View style={s.stateBox}>
@@ -807,47 +810,15 @@ export default function CustomerManagementScreen() {
           )}
 
           {/* ══ PAGINATION ══════════════════════════════════════════════════ */}
-          {!loading && !error && totalPages > 1 && (
-            <View style={[s.pgWrap, isMobile && s.pgWrapMobile]}>
-              <Text style={s.pgInfo}>
-                Showing {rangeStart}–{rangeEnd} of {total} customers
-              </Text>
-
-              <View style={s.pgControls}>
-                <TouchableOpacity
-                  style={[s.pgBtn, safePage === 1 && s.pgBtnDisabled]}
-                  onPress={() => safePage > 1 && setPage(safePage - 1)}
-                  activeOpacity={0.7}
-                  disabled={safePage === 1}
-                >
-                  <Svg width={13} height={13} viewBox="0 0 16 16">
-                    <Path fill={safePage === 1 ? C.border : C.sub} d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
-                  </Svg>
-                </TouchableOpacity>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[s.pgBtn, safePage === p && s.pgBtnActive]}
-                    onPress={() => setPage(p)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.pgBtnTxt, safePage === p && s.pgBtnTxtActive]}>{p}</Text>
-                  </TouchableOpacity>
-                ))}
-
-                <TouchableOpacity
-                  style={[s.pgBtn, safePage === totalPages && s.pgBtnDisabled]}
-                  onPress={() => safePage < totalPages && setPage(safePage + 1)}
-                  activeOpacity={0.7}
-                  disabled={safePage === totalPages}
-                >
-                  <Svg width={13} height={13} viewBox="0 0 16 16">
-                    <Path fill={safePage === totalPages ? C.border : C.sub} d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
-                  </Svg>
-                </TouchableOpacity>
-              </View>
-            </View>
+          {!loading && !error && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={total}
+              itemsPerPage={PAGE_SIZE}
+              itemName="customers"
+              onPageChange={setPage}
+            />
           )}
 
           <View style={{ height: 36 }} />

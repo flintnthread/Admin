@@ -14,8 +14,11 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { formatDate, initialsFromName } from "@/lib/format";
+import { fetchProducts, type ProductListRow } from "@/services/productApi";
 import {
+  exportSellerProductsCsv,
   fetchSellerAnalyticsChart,
   fetchSellerAnalyticsInsights,
   fetchSellerAnalyticsSummary,
@@ -24,26 +27,22 @@ import {
   fetchSellerGraphNames,
   fetchSellers,
   fetchSellersForGraph,
-  exportSellerProductsCsv,
   formatSellerDisplayName,
-  formatSellerUniqueId,
   normalizeSellerGraphChart,
   normalizeSellerGraphSummary,
   pickSellerUniqueId,
   readSellerUniqueIdRaw,
-  resolveSellerUniqueId,
   type SellerGraphChartData,
   type SellerGraphInsight,
   type SellerGraphNameOption,
-  type SellerGraphRow,
+  type SellerGraphRow
 } from "@/services/sellerApi";
-import { fetchProducts, type ProductListRow } from "@/services/productApi";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -52,6 +51,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 import Svg, {
@@ -240,6 +240,37 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function resolveProductImage(product: ProductListRow): string {
+  const row = product as Record<string, unknown>;
+  return resolveMediaUrl(
+    String(product.imageUrl ?? row.image ?? row.thumbnail ?? row.productImage ?? "")
+  );
+}
+
+function ProductImageCell({ uri }: { uri: string }) {
+  if (!uri) {
+    return (
+      <View style={styles.detailProductImagePlaceholder}>
+        <Ionicons name="image-outline" size={18} color="#94A3B8" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.detailProductImage}
+      contentFit="cover"
+      transition={150}
+    />
+  );
+}
+
+function mapDetailProductRow(product: ProductListRow): ProductListRow {
+  const imageUrl = resolveProductImage(product);
+  return imageUrl ? { ...product, imageUrl } : product;
+}
+
 /* ─── Seller label / filter dropdown ────────────────────────────────── */
 function formatSellerLabel(
   s: Pick<SellerGraphNameOption, "id" | "fullName" | "businessName" | "sellerUniqueId">
@@ -264,7 +295,7 @@ function SellerFilterDropdown({
   const [search, setSearch] = useState("");
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isDesktop = screenW >= 1024;
   const [hovered, setHovered] = useState(false);
 
@@ -293,9 +324,8 @@ function SellerFilterDropdown({
   const handlePress = () => {
     if (!open && triggerRef.current) {
       triggerRef.current.measureInWindow((x, y, width, height) => {
-        const { width: screenWidth } = Dimensions.get("window");
-        const menuWidth = Math.min(Math.max(width, 280), screenWidth - 32);
-        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        const menuWidth = Math.min(Math.max(width, 280), screenW - 32);
+        const adjustedLeft = Math.min(x, screenW - menuWidth - 16);
         setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
@@ -396,16 +426,15 @@ function Dropdown({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isDesktop = screenW >= 1024;
   const [hovered, setHovered] = useState(false);
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
       triggerRef.current.measureInWindow((x, y, width, height) => {
-        const { width: screenWidth } = Dimensions.get("window");
-        const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        const menuWidth = Math.min(width, screenW - 32);
+        const adjustedLeft = Math.min(x, screenW - menuWidth - 16);
         setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
@@ -465,7 +494,7 @@ function DatePicker({ value, onChange, placeholder }: {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isMobile = screenW < 768;
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -1175,8 +1204,9 @@ function SellerGraphDetailPanel({
         </View>
         <View style={styles.detailTable}>
           <View style={styles.detailTableHeaderDark}>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 0.55 }]}>Image</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.45 }]}>ID</Text>
-            <Text style={[styles.detailTableHeadCellDark, { flex: 2 }]}>Product</Text>
+            <Text style={[styles.detailTableHeadCellDark, { flex: 1.85 }]}>Product</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.9 }]}>Category</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.9 }]}>Subcategory</Text>
             <Text style={[styles.detailTableHeadCellDark, { flex: 0.8 }]}>Created</Text>
@@ -1192,10 +1222,13 @@ function SellerGraphDetailPanel({
                 key={String(product.id)}
                 style={[styles.detailTableRow, idx % 2 === 1 && styles.detailTableRowAlt]}
               >
+                <View style={{ flex: 0.55, justifyContent: "center" }}>
+                  <ProductImageCell uri={resolveProductImage(product)} />
+                </View>
                 <Text style={[styles.detailTableIdCell, { flex: 0.45 }]}>
                   {product.id}
                 </Text>
-                <Text style={[styles.detailTableCell, { flex: 2, fontWeight: "600" }]} numberOfLines={2}>
+                <Text style={[styles.detailTableCell, { flex: 1.85, fontWeight: "600" }]} numberOfLines={2}>
                   {product.name ?? "—"}
                 </Text>
                 <Text style={[styles.detailTableCell, { flex: 0.9 }]} numberOfLines={1}>
@@ -1233,19 +1266,21 @@ function SellerCard({ item, onView, isDesktop }: { item: Seller; onView: () => v
 
   return (
     <View style={[styles.sellerCard, isDesktop && styles.sellerCardDesktop]}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <TouchableOpacity onPress={handleRedirect} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+        <TouchableOpacity onPress={handleRedirect} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, flex: 1, minWidth: 0 }}>
           <Avatar initials={item.initials} color={item.color} size={46} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.sellerCardName}>{item.name}</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+              <Text style={[styles.sellerCardName, { flex: 1, minWidth: 120 }]}>{item.name}</Text>
+              <View style={styles.idBadge}>
+                <Text style={[styles.idBadgeText, { color: ORANGE }]} numberOfLines={1}>
+                  {item.sellerUniqueId}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.sellerCardSub} numberOfLines={1}>✉  {item.email}</Text>
             <Text style={styles.sellerCardSub}>📞 {item.phone}</Text>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleRedirect} style={styles.idBadge}>
-          <Text style={[styles.idBadgeText, { color: ORANGE }]} numberOfLines={1}>
-            {item.sellerUniqueId}
-          </Text>
         </TouchableOpacity>
       </View>
       <View style={styles.sellerMetaGrid}>
@@ -1307,12 +1342,12 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 13, fontWeight: "700", color: DARK_NAV }} numberOfLines={1}>{item.name}</Text>
             <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>{item.email}</Text>
-            <Text style={{ fontSize: 11, color: "#94A3B8" }}>{item.phone}</Text>
+            <Text style={{ fontSize: 11, color: "#94A3B8" }} numberOfLines={1}>{item.phone}</Text>
           </View>
         </View>
       </TouchableOpacity>
-      <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>{item.business}</Text>
-      <Text style={[styles.tableCell, { flex: 0.9 }]}>{item.onboard}</Text>
+      <View style={{ flex: 1.2 }}><Text style={styles.tableCell} numberOfLines={1}>{item.business}</Text></View>
+      <View style={{ flex: 0.9 }}><Text style={styles.tableCell} numberOfLines={1}>{item.onboard}</Text></View>
       <View style={{ flex: 1.0, justifyContent: "center" }}>
         <StatusBadge status={item.status} />
       </View>
@@ -1329,7 +1364,7 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
           <StatusBadge status="Not Uploaded" />
         )}
       </View>
-      <Text style={[styles.tableCell, { flex: 0.5, textAlign: "center", fontWeight: "700" }]}>{item.products}</Text>
+      <View style={{ flex: 0.5, alignItems: "center" }}><Text style={[styles.tableCell, { fontWeight: "700" }]} numberOfLines={1}>{item.products}</Text></View>
       <View style={{ flex: 0.6, alignItems: "flex-start" }}>
         <TouchableOpacity
           onPress={onView}
@@ -1356,7 +1391,7 @@ function DesktopTableRow({ item, idx, onView }: { item: Seller; idx: number; onV
 export default function SellersDashboard() {
   const router = useRouter();
   const { token, isLoading: authLoading } = useAuth();
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isTablet = screenW >= 768;
   const isDesktop = screenW >= 1024;
 
@@ -1369,8 +1404,12 @@ export default function SellersDashboard() {
   const [toDate, setToDate] = useState("");
 
   const [chartWidth, setChartWidth] = useState(
-    isDesktop ? screenW - 64 : isTablet ? screenW - 48 : screenW - 28
+    isDesktop ? Math.floor((screenW - 96) * 0.65) : screenW - 64
   );
+
+  useEffect(() => {
+    setChartWidth(isDesktop ? Math.floor((screenW - 96) * 0.65) : screenW - 64);
+  }, [screenW, isDesktop]);
 
   const [search, setSearch] = useState("");
   const [searchQ, setSearchQ] = useState("");
@@ -1732,7 +1771,7 @@ export default function SellersDashboard() {
       try {
         const response = await fetchProducts({ sellerId: selectedSeller.id, page: 0, size: 500 });
         if (!cancelled) {
-          setDetailProducts(response.items ?? []);
+          setDetailProducts((response.items ?? []).map(mapDetailProductRow));
         }
       } catch {
         if (!cancelled) {
@@ -1806,25 +1845,55 @@ export default function SellersDashboard() {
 
             {errorBanner}
 
-            {/* ── DESKTOP: All 6 Stat Cards in ONE Row ── */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, marginHorizontal: 22 }}>
-              {statCards.map(c => (
-                <View key={c.label} style={[styles.statCard, { flex: 1, width: undefined }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
-                    <Text style={styles.statValue}>{c.value}</Text>
-                    {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+            {/* ── DESKTOP: Stat Cards Row ── */}
+            {screenW >= 1250 ? (
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, marginTop: -32, marginHorizontal: 22 }}>
+                {statCards.map(c => (
+                  <View key={c.label} style={[styles.statCard, { flex: 1 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                      <Text style={styles.statValue}>{c.value}</Text>
+                      {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                    </View>
+                    <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                      <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                    </View>
                   </View>
-                  <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
-                    <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
-                  </View>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            ) : (
+              <View style={{ width: "100%", marginTop: -32, marginBottom: 14 }}>
+                <ScrollView
+                  {...({ className: "orange-scrollbar" } as any)}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={false}
+                  style={{ width: "100%" }}
+                  contentContainerStyle={{
+                    flexDirection: "row",
+                    paddingHorizontal: 22,
+                    paddingBottom: 8,
+                    gap: 12
+                  }}
+                >
+                  {statCards.map(c => (
+                    <View key={c.label} style={[styles.statCard, { width: 190, flexShrink: 0 }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.statLabel}>{c.label.toUpperCase()}</Text>
+                        <Text style={styles.statValue}>{c.value}</Text>
+                        {c.sub && <Text style={styles.statSub}>{c.sub}</Text>}
+                      </View>
+                      <View style={[styles.statIconBox, { backgroundColor: c.iconBg }]}>
+                        <Ionicons name={c.iconName as any} size={20} color={c.iconColor} />
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
-            {/* ── DESKTOP: All Filters in ONE Row ── */}
+            {/* ── DESKTOP: Filters Row ── */}
             <View style={[styles.card, { marginBottom: 14 }]}>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "nowrap" }}>
+              <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
                 {/* Seller */}
                 <View style={{ flex: 2, minWidth: 160 }}>
                   <View style={styles.filterLabel}>
@@ -1971,94 +2040,102 @@ export default function SellersDashboard() {
             ) : null}
 
             {!selectedSeller ? (
-            <View style={[styles.card, { marginBottom: 14 }]}>
-              {/* List header */}
-              <View style={styles.listHeaderRow}>
-                <View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="people" size={16} color={ORANGE} />
-                    <Text style={styles.chartTitle}>Seller List</Text>
+              <View style={[styles.card, { marginBottom: 14 }]}>
+                {/* List header */}
+                <View style={styles.listHeaderRow}>
+                  <View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="people" size={16} color={ORANGE} />
+                      <Text style={styles.chartTitle}>Seller List</Text>
+                    </View>
+                    <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
                   </View>
-                  <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
-                </View>
-                <View style={styles.totalBadge}>
-                  <Ionicons name="person" size={11} color="#64748B" />
-                  <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
-                </View>
-              </View>
-
-              {/* Search row */}
-              <View style={{ flexDirection: "row", gap: 10, marginBottom: 14, alignItems: "center" }}>
-                <View style={[styles.searchRow, { flex: 1 }]}>
-                  <Ionicons name="search-outline" size={15} color="#94A3B8" />
-                  <TextInput
-                    value={search} onChangeText={setSearch}
-                    onSubmitEditing={doSearch} returnKeyType="search"
-                    placeholder="Search name / email / mobile / business..."
-                    placeholderTextColor="#94A3B8" style={styles.searchInput}
-                  />
-                  {search.length > 0 && (
-                    <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
-                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={{ minWidth: 100 }}>
-                  <Text style={[styles.filterLabelText, { marginBottom: 4 }]}>Per page</Text>
-                  <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
-                </View>
-                <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
-                  <Ionicons name="search" size={13} color="#fff" />
-                  <Text style={styles.applyBtnText}>Search</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
-                  <Ionicons name="refresh" size={13} color="#475569" />
-                  <Text style={styles.resetBtnText}>Reset</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Table */}
-              <View style={styles.tableContainer}>
-                {/* Table Header */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.85 }]}>Seller ID</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Seller</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Business</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.9 }]}>Onboard</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Status</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.7 }]}>Profile</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.95 }]}>Shiprocket</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.5 }]}>Products</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>Action</Text>
-                </View>
-
-                {/* Table Rows */}
-                {paginated.length === 0 ? (
-                  <View style={{ alignItems: "center", paddingVertical: 48 }}>
-                    <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
-                    <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
-                    <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
-                      <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
-                    </TouchableOpacity>
+                  <View style={styles.totalBadge}>
+                    <Ionicons name="person" size={11} color="#64748B" />
+                    <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
                   </View>
-                ) : (
-                  paginated.map((s, idx) => (
-                    <DesktopTableRow key={s.id} item={s} idx={idx} onView={() => openSellerDetail(s)} />
-                  ))
-                )}
+                </View>
+
+                {/* Search row */}
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 14, alignItems: "center" }}>
+                  <View style={[styles.searchRow, { flex: 1 }]}>
+                    <Ionicons name="search-outline" size={15} color="#94A3B8" />
+                    <TextInput
+                      value={search} onChangeText={setSearch}
+                      onSubmitEditing={doSearch} returnKeyType="search"
+                      placeholder="Search name / email / mobile / business..."
+                      placeholderTextColor="#94A3B8" style={styles.searchInput}
+                    />
+                    {search.length > 0 && (
+                      <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
+                        <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={{ minWidth: 100 }}>
+                    <Text style={[styles.filterLabelText, { marginBottom: 4 }]}>Per page</Text>
+                    <Dropdown value={String(perPage)} onChange={v => { setPerPage(Number(v)); setPage(1); }} options={PERPAGE_OPTIONS} />
+                  </View>
+                  <TouchableOpacity onPress={doSearch} style={[styles.applyBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
+                    <Ionicons name="search" size={13} color="#fff" />
+                    <Text style={styles.applyBtnText}>Search</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={doReset} style={[styles.resetBtn, { paddingHorizontal: 20, height: 40, alignSelf: "flex-end", justifyContent: "center" }]}>
+                    <Ionicons name="refresh" size={13} color="#475569" />
+                    <Text style={styles.resetBtnText}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Table */}
+                <ScrollView
+                  {...({ className: "orange-scrollbar" } as any)}
+                  horizontal={true}
+                  showsHorizontalScrollIndicator={true}
+                  style={{ width: "100%" }}
+                  contentContainerStyle={{ flexGrow: 1 }}
+                >
+                  <View style={[styles.tableContainer, { minWidth: 1100, width: "100%" }]}>
+                    {/* Table Header */}
+                    <View style={styles.tableHeader}>
+                      <View style={{ flex: 0.85 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Seller ID</Text></View>
+                      <View style={{ flex: 1.6 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Seller</Text></View>
+                      <View style={{ flex: 1.2 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Business</Text></View>
+                      <View style={{ flex: 0.9 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Onboard</Text></View>
+                      <View style={{ flex: 1.0 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Status</Text></View>
+                      <View style={{ flex: 0.7 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Profile</Text></View>
+                      <View style={{ flex: 0.95 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Shiprocket</Text></View>
+                      <View style={{ flex: 0.5, alignItems: "center" }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Products</Text></View>
+                      <View style={{ flex: 0.6 }}><Text style={styles.tableHeaderCell} numberOfLines={1}>Action</Text></View>
+                    </View>
+
+                    {/* Table Rows */}
+                    {paginated.length === 0 ? (
+                      <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                        <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
+                        <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
+                        <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
+                          <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      paginated.map((s, idx) => (
+                        <DesktopTableRow key={s.id} item={s} idx={idx} onView={() => openSellerDetail(s)} />
+                      ))
+                    )}
+                  </View>
+                </ScrollView>
               </View>
-            </View>
             ) : null}
 
             {!selectedSeller ? (
-            <Pagination
-              currentPage={safePage}
-              totalPages={totalPages}
-              totalItems={totalSellers}
-              itemsPerPage={perPage}
-              itemName="sellers"
-              onPageChange={setPage}
-            />
+              <Pagination
+                currentPage={safePage}
+                totalPages={totalPages}
+                totalItems={totalSellers}
+                itemsPerPage={perPage}
+                itemName="sellers"
+                onPageChange={setPage}
+              />
             ) : null}
 
 
@@ -2286,90 +2363,90 @@ export default function SellersDashboard() {
           ) : null}
 
           {!selectedSeller ? (
-          <View style={styles.card}>
-            <View style={styles.listHeaderRow}>
-              <View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Ionicons name="people" size={16} color={ORANGE} />
-                  <Text style={styles.chartTitle}>Seller List</Text>
+            <View style={styles.card}>
+              <View style={styles.listHeaderRow}>
+                <View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="people" size={16} color={ORANGE} />
+                    <Text style={styles.chartTitle}>Seller List</Text>
+                  </View>
+                  <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
                 </View>
-                <Text style={styles.chartSubtitle}>Browse all sellers onboarded on our platform</Text>
+                <View style={styles.totalBadge}>
+                  <Ionicons name="person" size={11} color="#64748B" />
+                  <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
+                </View>
               </View>
-              <View style={styles.totalBadge}>
-                <Ionicons name="person" size={11} color="#64748B" />
-                <Text style={styles.totalBadgeText}>Total {totalSellers}</Text>
-              </View>
-            </View>
 
-            <View style={{ gap: 8, marginBottom: 12, zIndex: 20 }}>
-              {/* Search */}
-              <View style={styles.searchRow}>
-                <TouchableOpacity onPress={doSearch}>
-                  <Ionicons name="search-outline" size={15} color={ORANGE} />
-                </TouchableOpacity>
-                <TextInput
-                  value={search} onChangeText={setSearch} onSubmitEditing={doSearch}
-                  returnKeyType="search"
-                  placeholder="Search sellers..."
-                  placeholderTextColor="#94A3B8" style={styles.searchInput}
-                />
-                {search.length > 0 && (
-                  <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
-                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+              <View style={{ gap: 8, marginBottom: 12, zIndex: 20 }}>
+                {/* Search */}
+                <View style={styles.searchRow}>
+                  <TouchableOpacity onPress={doSearch}>
+                    <Ionicons name="search-outline" size={15} color={ORANGE} />
                   </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                {/* Per page */}
-                <View style={{ flex: 1 }}>
-                  <Dropdown
-                    value={String(perPage)}
-                    displayValue={`Per Page: ${perPage}`}
-                    onChange={v => { setPerPage(Number(v)); setPage(1); }}
-                    options={PERPAGE_OPTIONS}
-                    style={{ minWidth: 0, flex: 1 }}
+                  <TextInput
+                    value={search} onChangeText={setSearch} onSubmitEditing={doSearch}
+                    returnKeyType="search"
+                    placeholder="Search sellers..."
+                    placeholderTextColor="#94A3B8" style={styles.searchInput}
                   />
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => { setSearch(""); setSearchQ(""); setPage(1); }}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* Reset */}
-                <TouchableOpacity
-                  onPress={doReset}
-                  style={[styles.resetBtn, { flex: 1, paddingVertical: 0, height: 38, justifyContent: "center" }]}
-                >
-                  <Ionicons name="refresh" size={13} color="#475569" />
-                  <Text style={styles.resetBtnText}>Reset</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                  {/* Per page */}
+                  <View style={{ flex: 1 }}>
+                    <Dropdown
+                      value={String(perPage)}
+                      displayValue={`Per Page: ${perPage}`}
+                      onChange={v => { setPerPage(Number(v)); setPage(1); }}
+                      options={PERPAGE_OPTIONS}
+                      style={{ minWidth: 0, flex: 1 }}
+                    />
+                  </View>
 
-            {paginated.length === 0 ? (
-              <View style={{ alignItems: "center", paddingVertical: 48 }}>
-                <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
-                <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
-                <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
-                  <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
-                </TouchableOpacity>
+                  {/* Reset */}
+                  <TouchableOpacity
+                    onPress={doReset}
+                    style={[styles.resetBtn, { flex: 1, paddingVertical: 0, height: 38, justifyContent: "center" }]}
+                  >
+                    <Ionicons name="refresh" size={13} color="#475569" />
+                    <Text style={styles.resetBtnText}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            ) : (
-              <View style={styles.sellerCardsContainer}>
-                {paginated.map(s => (
-                  <SellerCard key={s.id} item={s} onView={() => openSellerDetail(s)} />
-                ))}
-              </View>
-            )}
-          </View>
+
+              {paginated.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                  <Ionicons name="archive-outline" size={36} color="#CBD5E1" />
+                  <Text style={{ fontSize: 14, color: "#94A3B8", marginTop: 10 }}>No sellers found</Text>
+                  <TouchableOpacity onPress={doReset} style={styles.clearBtn}>
+                    <Text style={{ fontSize: 12, color: ORANGE, fontWeight: "600" }}>Clear filters</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.sellerCardsContainer}>
+                  {paginated.map(s => (
+                    <SellerCard key={s.id} item={s} onView={() => openSellerDetail(s)} />
+                  ))}
+                </View>
+              )}
+            </View>
           ) : null}
 
           {!selectedSeller ? (
-          <Pagination
-            currentPage={safePage}
-            totalPages={totalPages}
-            totalItems={totalSellers}
-            itemsPerPage={perPage}
-            itemName="sellers"
-            onPageChange={setPage}
-          />
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              totalItems={totalSellers}
+              itemsPerPage={perPage}
+              itemName="sellers"
+              onPageChange={setPage}
+            />
           ) : null}
 
 
@@ -2533,7 +2610,7 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 12, paddingHorizontal: 14,
+    paddingVertical: 16, paddingHorizontal: 14,
     borderBottomWidth: 1, borderBottomColor: BORDER,
     alignItems: "center",
   },
@@ -2831,6 +2908,24 @@ const styles = StyleSheet.create({
   detailTableCell: { fontSize: 12, color: "#374151" },
   detailTableCellAccent: { fontSize: 12, color: "#7C3AED", fontWeight: "800" },
   detailTableIdCell: { fontSize: 12, fontWeight: "800", color: ORANGE },
+  detailProductImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  detailProductImagePlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   detailEmptyText: { fontSize: 13, color: "#94A3B8", padding: 18, textAlign: "center" },
 
   /* Modal */
