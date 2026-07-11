@@ -439,6 +439,14 @@ function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: 
   const colLastLogin = isNarrow ? 115 : 190;
   const colActions = isNarrow ? 75 : 90;
 
+  const colIdStyle = isNarrow ? { width: colId, flexShrink: 0 } : { flex: 0.5 };
+  const colNameStyle = isNarrow ? { width: colName, flexShrink: 0 } : { flex: 2 };
+  const colEmailStyle = isNarrow ? { flex: 1 } : { flex: 3.5 };
+  const colRoleStyle = isNarrow ? { width: colRole, flexShrink: 0 } : { flex: 1.4 };
+  const colStatusStyle = isNarrow ? { width: colStatus, flexShrink: 0 } : { flex: 1 };
+  const colLastLoginStyle = isNarrow ? { width: colLastLogin, flexShrink: 0 } : { flex: 1.9 };
+  const colActionsStyle = isNarrow ? { width: colActions, flexShrink: 0 } : { flex: 0.9 };
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [
       styles.tableRow,
@@ -447,26 +455,26 @@ function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: 
       selected && { backgroundColor: C.biscuit },
       pressed && { opacity: 0.85 },
     ]}>
-      <Text style={[styles.tableCell, { width: colId, color: C.subtext, fontSize: isNarrow ? 12 : 13, flexShrink: 0 }]}>{user.id}</Text>
-      <View style={[styles.tableCell, { width: colName, flexDirection: "row", alignItems: "center", gap: isNarrow ? 6 : 10, flexShrink: 0 }]}>
+      <Text style={[styles.tableCell, colIdStyle, { color: C.subtext, fontSize: isNarrow ? 12 : 13 }]}>{user.id}</Text>
+      <View style={[styles.tableCell, colNameStyle, { flexDirection: "row", alignItems: "center", gap: isNarrow ? 6 : 10 }]}>
         <Avatar name={user.name} size={isNarrow ? 28 : 36} colorIndex={index} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[styles.userName, isNarrow && { fontSize: 13 }]} numberOfLines={1}>{user.name}</Text>
           <Text style={[styles.userSub, { fontSize: isNarrow ? 10 : 11 }]} numberOfLines={1}>{user.username}</Text>
         </View>
       </View>
-      <Text style={[styles.tableCell, { flex: 1, color: C.subtext, fontSize: isNarrow ? 12 : 13 }]} numberOfLines={1}>{user.email}</Text>
-      <View style={[styles.tableCell, { width: colRole, flexShrink: 0 }]}>
+      <Text style={[styles.tableCell, colEmailStyle, { color: C.subtext, fontSize: isNarrow ? 12 : 13 }]} numberOfLines={1}>{user.email}</Text>
+      <View style={[styles.tableCell, colRoleStyle]}>
         <RoleBadge role={user.role} />
       </View>
-      <View style={[styles.tableCell, { width: colStatus, flexShrink: 0 }]}>
+      <View style={[styles.tableCell, colStatusStyle]}>
         <StatusBadge status={user.status} />
       </View>
-      <View style={[styles.tableCell, { width: colLastLogin, flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }]}>
+      <View style={[styles.tableCell, colLastLoginStyle, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
         <Icon name="time-outline" size={isNarrow ? 11 : 12} color={C.subtext} />
         <Text style={[styles.timeText, isNarrow && { fontSize: 10 }]} numberOfLines={1}>{user.lastLogin}</Text>
       </View>
-      <View style={[styles.tableCell, { width: colActions, flexDirection: "row", gap: isNarrow ? 6 : 8, flexShrink: 0 }]}>
+      <View style={[styles.tableCell, colActionsStyle, { flexDirection: "row", gap: isNarrow ? 6 : 8 }]}>
         <TouchableOpacity style={[styles.editBtn, isNarrow && { padding: 6 }]} onPress={() => onEdit(user)}>
           <Icon name="create-outline" size={isNarrow ? 14 : 16} color={C.white} />
         </TouchableOpacity>
@@ -801,13 +809,13 @@ export default function AdminUsersScreen() {
                   {/* Header */}
                   <View style={[styles.tableRow, styles.tableHeader, isNarrow && { paddingHorizontal: 8, paddingVertical: 10 }]}>
                     {[
-                      { label: "ID", w: colId },
-                      { label: "Name", w: colName },
-                      { label: "Email", flex: 1 },
-                      { label: "Role", w: colRole },
-                      { label: "Status", w: colStatus },
-                      { label: "Last Login", w: colLastLogin },
-                      { label: "Actions", w: colActions },
+                      { label: "ID", w: colId, flex: !isNarrow ? 0.5 : undefined },
+                      { label: "Name", w: colName, flex: !isNarrow ? 2 : undefined },
+                      { label: "Email", flex: !isNarrow ? 3.5 : 1 },
+                      { label: "Role", w: colRole, flex: !isNarrow ? 1.4 : undefined },
+                      { label: "Status", w: colStatus, flex: !isNarrow ? 1 : undefined },
+                      { label: "Last Login", w: colLastLogin, flex: !isNarrow ? 1.9 : undefined },
+                      { label: "Actions", w: colActions, flex: !isNarrow ? 0.9 : undefined },
                     ].map(h => (
                       <Text key={h.label} style={[
                         styles.tableHeadCell,
