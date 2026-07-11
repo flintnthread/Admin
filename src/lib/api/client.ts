@@ -68,8 +68,13 @@ async function buildAdminRequest(path: string, init?: RequestOptions): Promise<{
   };
 
   const hasBody = init?.body != null;
-  if (hasBody && !headers["Content-Type"]) {
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
+  if (hasBody && !isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
+  }
+  if (isFormData && headers["Content-Type"]) {
+    delete headers["Content-Type"];
   }
   if (auth && token) {
     headers.Authorization = `Bearer ${token}`;

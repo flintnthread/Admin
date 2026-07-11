@@ -9,7 +9,9 @@ import {
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
-import { fetchProductCatalog } from "@/services/productApi";
+import { buildCreateProductPayload } from "@/lib/product/buildCreateProductPayload";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { createProduct, fetchProductCatalog } from "@/services/productApi";
 
 const AppText = Text;
 
@@ -43,6 +45,8 @@ const useResponsive = () => {
 type ProductFormCatalog = {
     categories: Array<{ id: string; name: string; subcategories: Array<{ id: string; name: string }> }>;
     materials: Array<{ id: string; name: string }>;
+    colors: Array<{ id: number; name: string; code?: string }>;
+    sizes: Array<{ id: number; name: string; code: string }>;
 };
 
 type ImagePickerAsset = { uri: string; type?: string; width?: number; height?: number };
@@ -85,13 +89,16 @@ const ImagePicker = {
     },
 } as const;
 
-const buildCreateProductPayload = async (data: any) => data;
 const getHsnForMaterial = (_material: string) => "000000";
 const MATERIAL_TYPES: string[] = ["Cotton", "Polyester", "Silk", "Linen", "Wool", "Blend"];
 const uniquePickerOptions = (options: string[]) => Array.from(new Set(options));
 
 const fetchProductFormCatalog = async (): Promise<ProductFormCatalog> => {
-    const data = await fetchProductCatalog();
+    const data = await fetchProductCatalog() as {
+        categories?: Array<{ id: number; name: string; subcategories?: Array<{ id: number; name: string }> }>;
+        colors?: Array<{ id: number; name: string; code?: string }>;
+        sizes?: Array<{ id: number; name: string; code?: string }>;
+    };
     return {
         categories: (data.categories ?? []).map((c) => ({
             id: String(c.id),
@@ -102,19 +109,18 @@ const fetchProductFormCatalog = async (): Promise<ProductFormCatalog> => {
             })),
         })),
         materials: MATERIAL_TYPES.map((m, i) => ({ id: `m${i}`, name: m })),
+        colors: (data.colors ?? []).map((c) => ({
+            id: Number(c.id),
+            name: c.name,
+            code: c.code,
+        })),
+        sizes: (data.sizes ?? []).map((s) => ({
+            id: Number(s.id),
+            name: s.name,
+            code: s.code ?? s.name,
+        })),
     };
 };
-
-const createProduct = async (_payload: any): Promise<{ productId: string }> => ({
-    productId: "new-product-id",
-});
-
-class ApiError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "ApiError";
-    }
-}
 
 const applyDeliverySelection = (value: string, onChange: (field: string, value: any) => void) => {
     onChange("deliveryOption", value);
@@ -1983,11 +1989,19 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                     <View style={[at.row2, Platform.OS === 'web' && { zIndex: 20 }]}>
                         <View style={{ flex: 1 }}>
                             <Lbl text="Color" required />
-                            <Drop placeholder="Select color" value={v.color} onPress={() => setClrPick(v.id)} hasError={hasErr(v.id, "color")} options={colorOptions} onSelect={(val: string) => upVariant(v.id, "color", val)} />
+                            <Drop placeholder="Select color" value={v.color} onPress={() => setClrPick(v.id)} hasError={hasErr(v.id, "color")} options={colorOptions} onSelect={(val: string) => {
+                                const color = catalog?.colors?.find((c: { name: string }) => c.name === val);
+                                upVariant(v.id, "color", val);
+                                upVariant(v.id, "colorId", color?.id);
+                            }} />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Lbl text="Size" required />
-                            <Drop placeholder="Select size" value={v.size} onPress={() => setSzPick(v.id)} hasError={hasErr(v.id, "size")} options={sizeOptions} onSelect={(val: string) => upVariant(v.id, "size", val)} />
+                            <Drop placeholder="Select size" value={v.size} onPress={() => setSzPick(v.id)} hasError={hasErr(v.id, "size")} options={sizeOptions} onSelect={(val: string) => {
+                                const size = catalog?.sizes?.find((s: { name: string; code: string }) => s.name === val || `${s.name} (${s.code})` === val || s.code === val);
+                                upVariant(v.id, "size", size?.name ?? val);
+                                upVariant(v.id, "sizeId", size?.id);
+                            }} />
                         </View>
                     </View>
                     <View style={at.row2}>
@@ -2670,8 +2684,7 @@ const AddNewProduct: React.FC = () => {
                 });
             })
             .catch((err: unknown) => {
-                const msg = err instanceof ApiError ? err.message : "Failed to load catalog.";
-                showToast(msg, "error");
+                showToast(getApiErrorMessage(err, "Failed to load catalog."), "error");
             });
         return () => { cancelled = true; };
     }, [showToast]);
@@ -2772,8 +2785,7 @@ const AddNewProduct: React.FC = () => {
             setSweetAlertStage("success");
             showToast(`Product saved (ID ${result.productId})`, "success");
         } catch (err: unknown) {
-            const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to save product.";
-            showToast(msg, "error");
+            showToast(getApiErrorMessage(err, "Failed to save product."), "error");
             setSweetAlertVisible(false);
         } finally {
             setIsSaving(false);
