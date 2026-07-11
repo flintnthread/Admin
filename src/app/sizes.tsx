@@ -637,7 +637,12 @@ export default function SizesManagement() {
   const isTablet = width >= 600;
   const isDesktop = width >= 960;
 
-  const numCols = isDesktop ? 4 : isTablet ? 3 : 2;
+  const contentWidth = width - 16 * 2;
+  const numCols =
+    contentWidth >= 1248 ? 6 :
+      contentWidth >= 960 ? 5 :
+        contentWidth >= 700 ? 4 :
+          contentWidth >= 600 ? 3 : 2;
   const PADDING = 16;
   const GAP = 12;
 
@@ -742,8 +747,8 @@ export default function SizesManagement() {
 
   return (
     <AdminLayout>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={{ flex: 1, minHeight: Dimensions.get('window').height }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, width: "100%" }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1, width: "100%" }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
           <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
           {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}

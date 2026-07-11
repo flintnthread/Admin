@@ -338,7 +338,7 @@ export default function BankApproval() {
             styles.pageContent,
             {
               padding: pagePadding,
-              maxWidth: 1600,
+              maxWidth: width >= 1200 ? "100%" : 1600,
               width: "100%",
               alignSelf: "center",
             }
