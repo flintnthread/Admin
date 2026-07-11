@@ -817,6 +817,17 @@ export default function SellersScreen() {
   const isWeb = Platform.OS === 'web';
   const Wrapper = (isMobile || isWeb) ? ScrollView : View;
 
+  const ContentContainer = (isMobile || isWeb) ? View : ScrollView;
+  const contentContainerProps = (isMobile || isWeb)
+    ? { style: [SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined] }
+    : {
+      style: { flex: 1 },
+      contentContainerStyle: [SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined],
+      showsVerticalScrollIndicator: false,
+      scrollEnabled: !isMobile,
+      keyboardShouldPersistTaps: 'handled' as const
+    };
+
   return (
     <AdminLayout>
       <Wrapper style={SS.root} {...((isMobile || isWeb) ? { showsVerticalScrollIndicator: false } : {})}>
@@ -928,7 +939,7 @@ export default function SellersScreen() {
             <IconSearch size={16} color={C.muted} />
             <TextInput
               style={SS.searchInput}
-              placeholder="Search by name, business, email, mobile..."
+              placeholder={isMobile ? "Search by name, business, email..." : "Search by name, business, email, mobile..."}
               placeholderTextColor={C.muted}
               value={search}
               onChangeText={handleSearch}
@@ -955,13 +966,7 @@ export default function SellersScreen() {
         </View>
 
         {/* Content */}
-        <ScrollView
-          style={(isMobile || isWeb) ? { flex: 0 } : { flex: 1 }}
-          contentContainerStyle={[SS.content, viewMode === 'list' ? { paddingHorizontal: 0 } : undefined]}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={isWeb ? false : !isMobile}
-          keyboardShouldPersistTaps="handled"
-        >
+        <ContentContainer {...contentContainerProps}>
           {loading ? (
             <View style={SS.empty}>
               <ActivityIndicator size="small" color={C.primary} />
@@ -1038,7 +1043,7 @@ export default function SellersScreen() {
               onPageChange={setPage}
             />
           )}
-        </ScrollView>
+        </ContentContainer>
 
         {/* Modals */}
         <ViewModal seller={viewSeller} onClose={() => setViewSeller(null)} />
