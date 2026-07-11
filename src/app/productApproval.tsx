@@ -98,6 +98,7 @@ function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>):
     category: row.category,
     status: row.status as ProductStatus,
     submittedOn: row.submittedAt,
+    price: row.price,
   };
 }
 
@@ -685,6 +686,9 @@ function ProductCard({ product }: { product: Product }) {
           <Text style={styles.productDesc} numberOfLines={2}>
             {product.description}
           </Text>
+          {product.price ? (
+            <Text style={styles.productPrice}>{product.price}</Text>
+          ) : null}
         </View>
         <StatusBadge status={product.status} />
       </View>
@@ -733,6 +737,7 @@ function ProductTable({
             <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
             <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
             <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColPrice]}>Total Price</Text>
             <Text style={[styles.tableHeaderText, styles.tableColStatus]}>Status</Text>
             <Text style={[styles.tableHeaderText, styles.tableColDate]}>Submitted On</Text>
             <Text style={[styles.tableHeaderText, styles.tableColActions]}>Actions</Text>
@@ -764,6 +769,8 @@ function ProductTable({
               </View>
 
               <Text style={[styles.tableColCategory, styles.tableCellText]}>{product.category}</Text>
+
+              <Text style={[styles.tableColPrice, styles.tableCellText]}>{product.price ?? '—'}</Text>
 
               <View style={styles.tableColStatus}>
                 <StatusBadge status={product.status} />
@@ -1636,6 +1643,12 @@ const styles = StyleSheet.create({
     color: PALETTE.textSecondary,
     lineHeight: 17,
   },
+  productPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.brandOrange,
+    marginTop: 4,
+  },
   statusBadge: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -1801,6 +1814,11 @@ const styles = StyleSheet.create({
   tableColCategory: {
     flex: 1.4,
     minWidth: 220,
+    paddingRight: 16,
+  },
+  tableColPrice: {
+    flex: 0.9,
+    minWidth: 120,
     paddingRight: 16,
   },
   tableColStatus: {

@@ -16,7 +16,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { fetchProductDetail } from "@/services/productApi";
+import { buildUpdateProductPayload } from "@/lib/product/buildCreateProductPayload";
+import { fetchProductDetail, updateProduct } from "@/services/productApi";
 import {
   Alert,
   Animated,
@@ -104,18 +105,23 @@ const SIZE_CHART_COLS = ['Size','Chest/Bust','Waist','Hip','Length','Sleeve'];
 interface Variant {
   id: string;
   color: string;
+  colorId?: number;
   size: string;
+  sizeId?: number;
   sku: string;
   stock: string;
   mrp: string;
   sellingPrice: string;
   discount: string;
+  images?: string[];
 }
 interface BasicInfo {
   id: string;
   name: string;
   category: string;
+  categoryId?: string;
   subcategory: string;
+  subcategoryId?: string;
   materialType: string;
   hsnCode: string;
   shortDesc: string;
@@ -138,6 +144,7 @@ interface ProductImages {
 }
 interface ProductDetails {
   sizeChart: string;
+  sizeChartId?: number;
   returnPolicy: string;
   returnPolicyText: string;
   deliveryOption: string;
@@ -146,6 +153,7 @@ interface ProductDetails {
   deliveryInfo: string;
   warranty: string;
   careInstructions: string;
+  codEnabled?: boolean;
 }
 interface SizeChartRow {
   id: string; size: string; chest: string; waist: string;
@@ -1152,44 +1160,74 @@ export default function EditProduct() {
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [barW, setBarW] = useState(300);
 
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     const productId = Number(params.productId);
-    if (!productId || Number.isNaN(productId)) return;
+    if (!productId || Number.isNaN(productId)) {
+      setToasts((t) => [...t, { id: Date.now(), message: 'Missing product id.', type: 'error' }]);
+      return;
+    }
     void (async () => {
       try {
         const d = await fetchProductDetail(productId);
         const variants = Array.isArray(d.variants) ? d.variants as Record<string, unknown>[] : [];
-        const images = Array.isArray(d.images) ? d.images as { url?: string }[] : [];
+        const images = Array.isArray(d.images) ? d.images as { url?: string; isPrimary?: boolean }[] : [];
+        const primary = images.find((img) => img.isPrimary) ?? images[0];
+        const additional = images.filter((img) => img !== primary).map((img) => img.url ?? '').filter(Boolean);
         setState((s) => ({
           ...s,
+          isDirty: false,
           basic: {
             ...s.basic,
             id: String(d.id ?? productId),
             name: String(d.name ?? ''),
-            category: String(d.categoryName ?? s.basic.category),
-            subcategory: String(d.subcategoryName ?? s.basic.subcategory),
-            hsnCode: String(d.hsnCode ?? s.basic.hsnCode),
+            category: String(d.categoryName ?? ''),
+            categoryId: d.categoryId != null ? String(d.categoryId) : undefined,
+            subcategory: String(d.subcategoryName ?? ''),
+            subcategoryId: d.subcategoryId != null ? String(d.subcategoryId) : undefined,
+            materialType: String(d.productMaterialType ?? s.basic.materialType),
+            hsnCode: String(d.hsnCode ?? ''),
             shortDesc: String(d.shortDescription ?? ''),
             fullDesc: String(d.description ?? ''),
+            length: d.lengthCm != null ? String(d.lengthCm) : s.basic.length,
+            width: d.widthCm != null ? String(d.widthCm) : s.basic.width,
+            height: d.heightCm != null ? String(d.heightCm) : s.basic.height,
+            weight: d.productWeight != null ? String(d.productWeight) : s.basic.weight,
+            fragile: d.fragile === true ? 'Yes' : 'No',
           },
           variants: variants.map((v, i) => ({
             id: String(v.id ?? `v${i}`),
             color: String(v.color ?? ''),
+            colorId: v.colorId != null ? Number(v.colorId) : undefined,
             size: String(v.size ?? ''),
+            sizeId: v.sizeId != null ? Number(v.sizeId) : undefined,
             sku: String(v.sku ?? ''),
             stock: String(v.stock ?? '0'),
-            mrp: String(v.sellingPrice ?? ''),
-            sellingPrice: String(v.finalPrice ?? v.sellingPrice ?? ''),
-            discount: '0',
+            mrp: String(v.mrpExclGst ?? v.mrp ?? v.sellingPrice ?? ''),
+            sellingPrice: String(v.sellingPrice ?? ''),
+            discount: String(v.discountPercentage ?? v.discount ?? '0'),
+            images: Array.isArray(v.images)
+              ? (v.images as { url?: string }[]).map((img) => img.url ?? '').filter(Boolean)
+              : (typeof v.imageUrl === 'string' && v.imageUrl
+                  ? [v.imageUrl]
+                  : (typeof v.imageUri === 'string' && v.imageUri ? [v.imageUri] : [])),
           })),
           images: {
             ...s.images,
-            primaryImage: images[0]?.url ?? s.images.primaryImage,
-            additionalImages: images.slice(1).map((img) => img.url ?? '').filter(Boolean),
+            primaryImage: primary?.url ?? null,
+            additionalImages: additional,
           },
           details: {
             ...s.details,
             returnPolicyText: String(d.returnPolicy ?? s.details.returnPolicyText),
+            minDays: d.deliveryTimeMin != null ? String(d.deliveryTimeMin) : s.details.minDays,
+            maxDays: d.deliveryTimeMax != null ? String(d.deliveryTimeMax) : s.details.maxDays,
+            deliveryInfo: String(d.deliveryInfo ?? s.details.deliveryInfo),
+            warranty: String(d.warrantyInfo ?? s.details.warranty),
+            careInstructions: String(d.careInstructions ?? s.details.careInstructions),
+            codEnabled: d.acceptCod !== false,
+            sizeChartId: d.sizeChartId != null ? Number(d.sizeChartId) : undefined,
           },
         }));
       } catch (e) {
@@ -1239,13 +1277,58 @@ export default function EditProduct() {
     return errs;
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     const errs = validate();
-    if (errs.length > 0) { errs.slice(0, 2).forEach((e, i) => setTimeout(() => showToast(e, 'error'), i * 200)); return; }
-    setTimeout(() => {
-      setState(s => ({ ...s, isDirty: false }));
+    if (errs.length > 0) {
+      errs.slice(0, 2).forEach((e, i) => setTimeout(() => showToast(e, 'error'), i * 200));
+      return;
+    }
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const payload = await buildUpdateProductPayload({
+        basic: {
+          name: state.basic.name,
+          category: state.basic.category,
+          categoryId: state.basic.categoryId,
+          subcategory: state.basic.subcategory,
+          subcategoryId: state.basic.subcategoryId,
+          materialType: state.basic.materialType,
+          hsnCode: state.basic.hsnCode,
+          shortDesc: state.basic.shortDesc,
+          fullDesc: state.basic.fullDesc,
+          length: state.basic.length,
+          width: state.basic.width,
+          height: state.basic.height,
+          weight: state.basic.weight,
+          fragile: state.basic.fragile,
+        },
+        variants: state.variants,
+        images: state.images,
+        details: {
+          returnPolicy: state.details.returnPolicy,
+          returnPolicyText: state.details.returnPolicyText,
+          deliveryOption: state.details.deliveryOption,
+          minDays: state.details.minDays,
+          maxDays: state.details.maxDays,
+          deliveryInfo: state.details.deliveryInfo,
+          codEnabled: state.details.codEnabled !== false,
+          warranty: state.details.warranty,
+          careInstructions: state.details.careInstructions,
+          sizeChartId: state.details.sizeChartId,
+          features: state.features,
+          specifications: state.specs,
+        },
+      });
+      await updateProduct(state.basic.id, payload);
+      setState((s) => ({ ...s, isDirty: false }));
       setShowSuccess(true);
-    }, 400);
+      showToast('Product updated successfully.', 'success');
+    } catch (e) {
+      showToast(getApiErrorMessage(e, 'Failed to update product.'), 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const currentStep = STEP_CONFIG[state.step];
@@ -1269,9 +1352,11 @@ export default function EditProduct() {
       ) : (
         <TouchableOpacity
           style={[styles.btnSave, !state.isDirty && styles.btnSaveDim]}
-          onPress={state.isDirty ? handleUpdate : undefined}
+          onPress={state.isDirty && !isSaving ? () => { void handleUpdate(); } : undefined}
         >
-          <Text style={styles.btnSaveText}>{state.isDirty ? '💾 Update Product' : 'No Changes'}</Text>
+          <Text style={styles.btnSaveText}>
+            {isSaving ? 'Saving…' : state.isDirty ? 'Update Product' : 'No Changes'}
+          </Text>
         </TouchableOpacity>
       )}
     </View>

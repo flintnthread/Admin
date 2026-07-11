@@ -509,16 +509,24 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
 }) => {
     const isWeb = Platform.OS === "web";
     const fmtInv = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const lineItems = order.items?.length
+    const lineItems = (order.items?.length
         ? order.items
         : [{
-            productName: order.itemDescription || "Product",
-            hsn: order.hsn || "-",
-            sku: order.sku || "-",
+            productName: order.itemDescription || "",
+            hsn: order.hsn || "",
+            sku: order.sku || "",
             qty: order.qty ?? 1,
             basePrice: order.basePrice ?? customerPaidNum,
             total: order.totalAmount ?? customerPaidNum,
-        }];
+        }]
+    ).map((item) => ({
+        productName: String(item.productName ?? "").trim(),
+        hsn: String(item.hsn ?? "").trim(),
+        sku: String(item.sku ?? "").trim(),
+        qty: item.qty ?? 1,
+        basePrice: item.basePrice ?? 0,
+        total: item.total ?? 0,
+    }));
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -607,9 +615,9 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                 </View>
                                 {lineItems.map((item, idx) => (
                                     <View key={idx} style={[invStyles.tableRow, idx > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}>
-                                        <Text style={[invStyles.td, { flex: 3, fontWeight: "700", color: TEXT_HEAD }]}>{item.productName || "Product"}</Text>
-                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.hsn || "-"}</Text>
-                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.sku || "-"}</Text>
+                                        <Text style={[invStyles.td, { flex: 3, fontWeight: "700", color: TEXT_HEAD }]}>{item.productName}</Text>
+                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.hsn}</Text>
+                                        <Text style={[invStyles.td, invStyles.tCenter]}>{item.sku}</Text>
                                         <Text style={[invStyles.td, invStyles.tCenter]}>{item.qty ?? 1}</Text>
                                         <Text style={[invStyles.td, invStyles.tRight]}>{fmtInv(item.basePrice)}</Text>
                                         <Text style={[invStyles.td, invStyles.tRight, { fontWeight: "800", color: TEXT_HEAD }]}>{fmtInv(item.total)}</Text>

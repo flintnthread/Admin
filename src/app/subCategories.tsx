@@ -22,6 +22,7 @@ import {
   createSubcategory,
   updateSubcategory,
   deleteSubcategory,
+  uploadSubcategoryImages,
   parseMaterialSlabs,
   serializeMaterialSlabs,
   type SubcategoryRow,
@@ -642,6 +643,8 @@ const AddModal = ({
   const [childCategories, setChildCategories] = useState<CategoryRow[]>([]);
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | Blob | null>(null);
+  const [imageChanged, setImageChanged] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [status, setStatus] = useState("Active");
 
@@ -651,6 +654,8 @@ const AddModal = ({
     setChildCategories([]);
     setName("");
     setImage(null);
+    setImageFile(null);
+    setImageChanged(false);
     setMaterials([]);
     setStatus("Active");
   };
@@ -683,6 +688,8 @@ const AddModal = ({
             resolveCatalogMediaUrl(editData.subcategoryImage || editData.image || "", "subcategories") ||
             null
         );
+        setImageFile(null);
+        setImageChanged(false);
         setMaterials(editData.materials || []);
         setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
@@ -705,10 +712,12 @@ const AddModal = ({
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = "image/jpeg,image/png";
+      input.accept = "image/jpeg,image/png,image/webp";
       input.onchange = (e: any) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0] as File | undefined;
         if (file) {
+          setImageFile(file);
+          setImageChanged(true);
           const r = new FileReader();
           r.onload = (ev) => setImage(ev.target?.result as string);
           r.readAsDataURL(file);
@@ -720,7 +729,18 @@ const AddModal = ({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 1,
       });
-      if (!res.canceled) setImage(res.assets[0].uri);
+      if (!res.canceled) {
+        const asset = res.assets[0];
+        setImage(asset.uri);
+        setImageChanged(true);
+        try {
+          const response = await fetch(asset.uri);
+          const blob = await response.blob();
+          setImageFile(blob);
+        } catch {
+          setImageFile(null);
+        }
+      }
     }
   };
 
@@ -752,7 +772,10 @@ const AddModal = ({
       categoryId: parseInt(categoryId, 10),
       name,
       image,
-      mobileImage: null,
+      imageFile,
+      imageChanged,
+      // Keep existing mobile image unless a dedicated mobile picker is added.
+      mobileImage: undefined,
       materials,
       status,
     });
@@ -1380,34 +1403,61 @@ export default function Subcategories() {
       let successMsg = "";
       const statusValue = data.status === "Active";
       const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
+      const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
+      // Prefer multipart upload for new files. For data-URL fallback (no File), send image string.
+      const imagePayload =
+        !shouldUploadImage && typeof data.image === "string" && data.image.startsWith("data:image/")
+          ? data.image
+          : undefined;
 
       if (data.id) {
-        await updateSubcategory(
+        let saved = await updateSubcategory(
           data.id,
           data.categoryId,
           data.name,
-          data.image,
-          data.mobileImage,
+          imagePayload,
+          undefined,
           materialPayload,
           undefined,
           undefined,
           statusValue
         );
+        if (shouldUploadImage) {
+          saved = await uploadSubcategoryImages(data.id, data.imageFile);
+        }
+        const imageUrl = pickCategoryImageUrl(saved, "subcategories");
         setItems((prev) =>
-          prev.map((c) => (c.id === data.id ? { ...c, ...data, statusText: data.status } : c))
+          prev.map((c) =>
+            c.id === data.id
+              ? {
+                  ...c,
+                  ...data,
+                  subcategoryName: saved.subcategoryName,
+                  subcategoryImage: saved.subcategoryImage,
+                  mobileImage: saved.mobileImage,
+                  image: imageUrl || c.image,
+                  status: saved.status,
+                  statusText: saved.status ? "Active" : "Inactive",
+                  materials: data.materials,
+                }
+              : c
+          )
         );
         successMsg = "Subcategory updated successfully!";
       } else {
-        const newRow = await createSubcategory(
+        let newRow = await createSubcategory(
           data.categoryId,
           data.name,
-          data.image,
-          data.mobileImage,
+          imagePayload,
+          undefined,
           materialPayload,
           undefined,
           undefined,
           statusValue
         );
+        if (shouldUploadImage && newRow.id) {
+          newRow = await uploadSubcategoryImages(newRow.id, data.imageFile);
+        }
         const newCat: Subcategory = {
           id: newRow.id,
           categoryId: newRow.categoryId,
@@ -1421,9 +1471,10 @@ export default function Subcategories() {
           statusText: newRow.status ? "Active" : "Inactive",
           createdAt: newRow.createdAt,
           sellerId: newRow.sellerId,
-          // UI fields
+          mainCat: newRow.mainCat,
+          category: newRow.category,
           name: newRow.subcategoryName,
-          image: pickCategoryImageUrl(newRow, "subcategories") || data.image,
+          image: pickCategoryImageUrl(newRow, "subcategories") || undefined,
           created: newRow.createdAt ? new Date(newRow.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -1440,6 +1491,7 @@ export default function Subcategories() {
         successMsg = "Subcategory added successfully!";
       }
       setEditCat(null);
+      await loadSubcategories();
 
       if (Platform.OS === "web") {
         setTimeout(() => {
