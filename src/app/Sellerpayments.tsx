@@ -844,17 +844,17 @@ const SellerPaymentsScreen: React.FC = () => {
                         </View>
                     ) : isWideWeb ? (
                         <View style={{ width: "100%" }}>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
                                 <View style={styles.tableContainer}>
                                     <View style={styles.tableHeaderRow}>
-                                        <Text style={[styles.tableHeaderCell, { width: 140 }]}>Order</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 220 }]}>Seller</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 140 }]}>Customer Paid{"\n"}<Text style={{ fontSize: 9, textTransform: "none", fontWeight: "500" }}>(order+total_amount)</Text></Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 130 }]}>Delivery Date</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 110 }]}>Reminder</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 120 }]}>Payment Status</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 100 }]}>Wallet Balance</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 180 }]}>Actions</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Order</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>Seller</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Customer Paid{"\n"}<Text style={{ fontSize: 9, textTransform: "none", fontWeight: "500" }}>(order+total_amount)</Text></Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Delivery Date</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.1 }]}>Reminder</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Payment Status</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Wallet Balance</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>Actions</Text>
                                     </View>
                                     {filtered.map(order => {
                                         const payStyle = getPaymentStyle(order.paymentStatus);
@@ -865,7 +865,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         return (
                                             <View key={order.id} style={[styles.tableRow, { alignItems: "center" }]}>
                                                 {/* Order */}
-                                                <View style={{ width: 140 }}>
+                                                <View style={{ flex: 1.4 }}>
                                                     <Text style={{ fontWeight: "700", color: PRIMARY, fontSize: 13 }}>{order.orderId}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2, marginBottom: 4 }}>{order.orderDate}</Text>
                                                     <View style={{ backgroundColor: "#2dd4bf", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: "flex-start" }}>
@@ -873,40 +873,40 @@ const SellerPaymentsScreen: React.FC = () => {
                                                     </View>
                                                 </View>
                                                 {/* Seller */}
-                                                <View style={{ width: 220 }}>
+                                                <View style={{ flex: 2.2 }}>
                                                     <Text style={{ fontWeight: "700", color: TEXT_HEAD, fontSize: 13 }} numberOfLines={1}>{order.sellerName}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>{order.sellerEmail}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11 }}>{order.sellerPhone}</Text>
                                                 </View>
                                                 {/* Customer Paid */}
-                                                <View style={{ width: 140 }}>
+                                                <View style={{ flex: 1.4 }}>
                                                     <Text style={{ fontWeight: "700", color: DARK, fontSize: 14 }}>{order.customerPaid}</Text>
                                                 </View>
                                                 {/* Delivery Date */}
-                                                <View style={{ width: 130 }}>
+                                                <View style={{ flex: 1.3 }}>
                                                     <Text style={{ color: TEXT_HEAD, fontSize: 13 }}>{order.deliveryDate}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>{order.deliveryTime}</Text>
                                                 </View>
                                                 {/* Reminder */}
-                                                <View style={{ width: 110 }}>
+                                                <View style={{ flex: 1.1 }}>
                                                     <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: remBg, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4, alignSelf: "flex-start", gap: 4 }}>
                                                         <Feather name="clock" size={10} color="#fff" />
                                                         <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{order.reminderLabel}</Text>
                                                     </View>
                                                 </View>
                                                 {/* Payment Status */}
-                                                <View style={{ width: 120 }}>
+                                                <View style={{ flex: 1.2 }}>
                                                     <View style={[styles.statusBadge, { backgroundColor: payStyle.bg, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 6 }]}>
                                                         <Feather name="clock" size={10} color={payStyle.color} />
                                                         <Text style={[styles.statusText, { color: payStyle.color }]}>{order.paymentStatus}</Text>
                                                     </View>
                                                 </View>
                                                 {/* Wallet Balance */}
-                                                <View style={{ width: 100 }}>
+                                                <View style={{ flex: 1.0 }}>
                                                     <Text style={{ fontWeight: "700", color: TEXT_HEAD, fontSize: 13 }}>{order.walletBalance}</Text>
                                                 </View>
                                                 {/* Actions */}
-                                                <View style={{ width: 180, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                <View style={{ flex: 1.8, flexDirection: "row", alignItems: "center", gap: 6 }}>
                                                     <TouchableOpacity
                                                         style={[styles.actionBtn, { backgroundColor: "#10b981" }]}
                                                         onPress={() => void openPayModal(order.id)}
@@ -1384,6 +1384,7 @@ const styles = StyleSheet.create({
     // Table
     tableContainer: {
         minWidth: 1200,
+        width: "100%",
         backgroundColor: BG_CARD,
         borderRadius: 16,
         overflow: "hidden",
