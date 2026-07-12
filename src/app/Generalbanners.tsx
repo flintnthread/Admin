@@ -1,8 +1,11 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -15,7 +18,9 @@ import {
 } from "react-native";
 import {
   Calendar,
+  CheckCircle2,
   ChevronDown,
+  Circle,
   Filter,
   Image as ImageIcon,
   LayoutGrid,
@@ -25,6 +30,7 @@ import {
   Save,
   Search,
   Trash2,
+  Upload,
   X,
 } from "lucide-react-native";
 
@@ -46,6 +52,8 @@ const emptyForm = {
   textPosition: "Left",
   bannerSize: "Full Width",
   status: "Active",
+  desktopImage: "",
+  mobileImage: "",
 };
 
 const TEXT_POSITIONS = ["Left", "Center", "Right"];
@@ -100,13 +108,13 @@ const SweetAlert = ({ visible, type, bannerTitle, onConfirm, onCancel }: SweetAl
     ? isDelete
       ? "The banner has been successfully removed."
       : isEdit
-      ? `"${bannerTitle}" has been updated successfully.`
-      : `"${bannerTitle}" has been added to banners.`
+        ? `"${bannerTitle}" has been updated successfully.`
+        : `"${bannerTitle}" has been added to banners.`
     : isDelete
-    ? `Are you sure you want to delete "${bannerTitle}"? This action cannot be undone.`
-    : isEdit
-    ? `Save changes to "${bannerTitle}"?`
-    : "Are you sure you want to add this new banner?";
+      ? `Are you sure you want to delete "${bannerTitle}"? This action cannot be undone.`
+      : isEdit
+        ? `Save changes to "${bannerTitle}"?`
+        : "Are you sure you want to add this new banner?";
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onCancel}>
@@ -189,6 +197,24 @@ export default function BannerManagement() {
   const numCols = isWeb ? 3 : isTablet ? 2 : 1;
   const gridCardWidth = numCols === 3 ? "31.5%" : numCols === 2 ? "48%" : "100%";
 
+  async function pickImage(field: "desktopImage" | "mobileImage") {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please allow access to your photo library.");
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setForm((f) => ({ ...f, [field]: result.assets[0].uri }));
+    }
+  }
+
   function openAdd() {
     setEditingId(null);
     setForm(emptyForm);
@@ -206,6 +232,8 @@ export default function BannerManagement() {
       textPosition: banner.textPosition || "Left",
       bannerSize: banner.bannerSize || "Full Width",
       status: banner.status || "Active",
+      desktopImage: banner.desktopImage || "",
+      mobileImage: banner.mobileImage || "",
     });
     setModalVisible(true);
   }
@@ -290,35 +318,59 @@ export default function BannerManagement() {
         >
           {/* Header + overlapping stats */}
           <View style={styles.headerWrap}>
-            <View style={[styles.header, isTablet && styles.headerRow]}>
-              <View style={styles.headerLeft}>
-                <View style={styles.headerIcon}>
-                  <ImageIcon size={22} color="#fff" />
+            <View style={styles.header}>
+              {/* Title row — icon + text + Add button always aligned right */}
+              <View style={styles.headerRow}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.headerIcon}>
+                    <ImageIcon size={22} color="#fff" />
+                  </View>
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={styles.headerTitle}>Banners Management</Text>
+                    <Text style={styles.headerSubtitle}>Manage promotional banners across the storefront</Text>
+                  </View>
                 </View>
-                <View style={{ flexShrink: 1 }}>
-                  <Text style={styles.headerTitle}>Banners Management</Text>
-                  <Text style={styles.headerSubtitle}>Manage promotional banners across the storefront</Text>
-                </View>
+                <TouchableOpacity style={styles.btnPrimary} onPress={openAdd} activeOpacity={0.85}>
+                  <Plus size={16} color="#fff" />
+                  <Text style={styles.btnPrimaryText}>{isMobile ? "Add" : "Add Banner"}</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={[styles.btnPrimary, isTablet && { alignSelf: "center" }]} onPress={openAdd} activeOpacity={0.85}>
-                <Plus size={16} color="#fff" />
-                <Text style={styles.btnPrimaryText}>{isMobile ? "Add" : "Add Banner"}</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Stats — overlaps the bottom edge of the header */}
             <View style={styles.stats}>
               <View style={styles.statCard}>
-                <Text style={styles.statValue}>{banners.length}</Text>
-                <Text style={styles.statLabel}>Total Banners</Text>
+                <View style={styles.statCardInner}>
+                  <View style={[styles.statIconWrap, { backgroundColor: "#eff6ff" }]}>
+                    <LayoutGrid size={16} color="#3b82f6" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statValue}>{banners.length}</Text>
+                    <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>T-Banners</Text>
+                  </View>
+                </View>
               </View>
               <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#16a34a" }]}>{activeCount}</Text>
-                <Text style={styles.statLabel}>Active</Text>
+                <View style={styles.statCardInner}>
+                  <View style={[styles.statIconWrap, { backgroundColor: "#f0fdf4" }]}>
+                    <CheckCircle2 size={16} color="#16a34a" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.statValue, { color: "#16a34a" }]}>{activeCount}</Text>
+                    <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>Active</Text>
+                  </View>
+                </View>
               </View>
               <View style={styles.statCard}>
-                <Text style={[styles.statValue, { color: "#94a3b8" }]}>{inactiveCount}</Text>
-                <Text style={styles.statLabel}>Inactive</Text>
+                <View style={styles.statCardInner}>
+                  <View style={[styles.statIconWrap, { backgroundColor: "#f8fafc" }]}>
+                    <Circle size={16} color="#94a3b8" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.statValue, { color: "#94a3b8" }]}>{inactiveCount}</Text>
+                    <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>Inactive</Text>
+                  </View>
+                </View>
               </View>
             </View>
           </View>
@@ -350,8 +402,10 @@ export default function BannerManagement() {
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.filterBox} onPress={() => setPickerOpen("filter" as string)} activeOpacity={0.8}>
-              <Filter size={14} color="#6b7280" />
-              <Text style={styles.filterText}>{statusFilter}</Text>
+              {statusFilter === "All" && <Filter size={14} color="#6b7280" />}
+              {statusFilter === "Active" && <CheckCircle2 size={14} color="#16a34a" />}
+              {statusFilter === "Inactive" && <Circle size={14} color="#94a3b8" />}
+              <Text style={[styles.filterText, statusFilter === "Active" && { color: "#16a34a" }, statusFilter === "Inactive" && { color: "#94a3b8" }]}>{statusFilter}</Text>
               <ChevronDown size={14} color="#6b7280" />
             </TouchableOpacity>
           </View>
@@ -506,15 +560,45 @@ export default function BannerManagement() {
                     </Field>
                   </View>
                 </View>
-                <Field label="Desktop Image (2100x700)">
-                  <TouchableOpacity style={styles.fileBox}>
-                    <Text style={styles.fileText}>Choose File — No file chosen</Text>
+                <Field label="Desktop Image (2100×700)">
+                  <TouchableOpacity style={styles.fileBox} onPress={() => pickImage("desktopImage")} activeOpacity={0.75}>
+                    <View style={styles.fileInner}>
+                      <View style={styles.fileIconWrap}>
+                        <Upload size={14} color="#f97316" />
+                      </View>
+                      <Text style={styles.fileText} numberOfLines={1}>
+                        {form.desktopImage ? "Image selected" : "Choose File — No file chosen"}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
+                  {!!form.desktopImage && (
+                    <View style={styles.previewWrap}>
+                      <Image source={{ uri: form.desktopImage }} style={styles.previewImg} resizeMode="cover" />
+                      <TouchableOpacity style={styles.previewRemove} onPress={() => setForm((f) => ({ ...f, desktopImage: "" }))}>
+                        <X size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </Field>
-                <Field label="Mobile Image (940x600) — Optional">
-                  <TouchableOpacity style={styles.fileBox}>
-                    <Text style={styles.fileText}>Choose File — No file chosen</Text>
+                <Field label="Mobile Image (940×600) — Optional">
+                  <TouchableOpacity style={styles.fileBox} onPress={() => pickImage("mobileImage")} activeOpacity={0.75}>
+                    <View style={styles.fileInner}>
+                      <View style={styles.fileIconWrap}>
+                        <Upload size={14} color="#f97316" />
+                      </View>
+                      <Text style={styles.fileText} numberOfLines={1}>
+                        {form.mobileImage ? "Image selected" : "Choose File — No file chosen"}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
+                  {!!form.mobileImage && (
+                    <View style={styles.previewWrap}>
+                      <Image source={{ uri: form.mobileImage }} style={styles.previewImg} resizeMode="cover" />
+                      <TouchableOpacity style={styles.previewRemove} onPress={() => setForm((f) => ({ ...f, mobileImage: "" }))}>
+                        <X size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </Field>
                 <Field label="Status">
                   <TouchableOpacity style={styles.selectBox} onPress={() => setPickerOpen("status" as string)}>
@@ -547,7 +631,19 @@ export default function BannerManagement() {
                   else if (pickerOpen) setForm((f) => ({ ...f, [pickerOpen]: opt }));
                   setPickerOpen(null);
                 }}>
-                  <Text style={styles.optionText}>{opt}</Text>
+                  {pickerOpen === "filter" && (
+                    <View style={{ marginRight: 10 }}>
+                      {opt === "All" && <Filter size={16} color="#6b7280" />}
+                      {opt === "Active" && <CheckCircle2 size={16} color="#16a34a" />}
+                      {opt === "Inactive" && <Circle size={16} color="#94a3b8" />}
+                    </View>
+                  )}
+                  <Text style={[
+                    styles.optionText,
+                    pickerOpen === "filter" && opt === "Active" && { color: "#16a34a", fontWeight: "700" },
+                    pickerOpen === "filter" && opt === "Inactive" && { color: "#94a3b8" },
+                    pickerOpen === "filter" && opt === statusFilter && { fontWeight: "700" },
+                  ]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -580,37 +676,62 @@ const styles = StyleSheet.create({
   page: { flex: 1, width: "100%", backgroundColor: "#f4f5f7" },
   container: { padding: 20, paddingBottom: 60, width: "100%" },
 
-  // Wraps header + the stat cards
-  headerWrap: { marginBottom: 16 },
+  // Wraps header + stat cards
+  headerWrap: { position: "relative", marginBottom: 60 },
 
   header: {
-    backgroundColor: "#141b3c",
+    backgroundColor: "#151D4F",
     borderRadius: 16,
     padding: 18,
+    paddingBottom: 42,
     gap: 14,
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, flexShrink: 1 },
   headerIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#f97316", alignItems: "center", justifyContent: "center" },
   headerTitle: { color: "#fff", fontSize: 17, fontWeight: "700" },
   headerSubtitle: { color: "#b6bcdb", fontSize: 12, marginTop: 2 },
 
-  // Stats flow normally below the header
+  // Stat cards sit directly below the header in normal flow
   stats: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 14,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -48,
+    zIndex: 5,
+    justifyContent: "center",
   },
   statCard: {
     flex: 1,
+    maxWidth: 220,
     backgroundColor: "#fff",
     borderRadius: 12,
+
     borderWidth: 1,
     borderColor: "#ececf1",
-    padding: 14,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statCardInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  statIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   statValue: { fontSize: 20, fontWeight: "700", color: "#141b3c" },
-  statLabel: { fontSize: 11, color: "#8a8f9c", marginTop: 2 },
+  statLabel: { fontSize: 15, color: "#8a8f9c", marginTop: 2 },
 
   toolbar: { flexDirection: "row", gap: 8, marginTop: 14 },
   searchBox: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e4ea", borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 10 : 4 },
@@ -682,13 +803,18 @@ const styles = StyleSheet.create({
   selectBox: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: "#e2e4ea", borderRadius: 9, paddingHorizontal: 11, paddingVertical: 10 },
   selectText: { fontSize: 13, color: "#1f2430" },
   fileBox: { borderWidth: 1.5, borderStyle: "dashed", borderColor: "#d1d5db", borderRadius: 9, paddingHorizontal: 11, paddingVertical: 10 },
-  fileText: { fontSize: 11.5, color: "#9aa0ac" },
+  fileInner: { flexDirection: "row", alignItems: "center", gap: 8 },
+  fileIconWrap: { width: 26, height: 26, borderRadius: 6, backgroundColor: "#fff5f0", alignItems: "center", justifyContent: "center" },
+  fileText: { fontSize: 11.5, color: "#9aa0ac", flex: 1 },
+  previewWrap: { marginTop: 8, borderRadius: 8, overflow: "hidden", position: "relative" },
+  previewImg: { width: "100%", height: 90, borderRadius: 8 },
+  previewRemove: { position: "absolute", top: 6, right: 6, backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 999, padding: 4 },
   modalFooter: { flexDirection: "row", justifyContent: "flex-end", gap: 10, paddingHorizontal: 18, paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#f0f0f2" },
 
   // Option picker
   optionSheet: { backgroundColor: "#fff", borderRadius: 16, paddingVertical: 8, width: "85%", maxWidth: 360 },
   optionSheetWeb: { width: 280, alignSelf: "center" },
-  optionRow: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  optionRow: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f3f4f6", flexDirection: "row", alignItems: "center" },
   optionText: { fontSize: 14.5, color: "#1f2430" },
 });
 
