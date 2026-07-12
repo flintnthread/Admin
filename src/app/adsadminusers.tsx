@@ -554,7 +554,7 @@ const AdsAdminUsers: React.FC = () => {
                     <Pill text={item.status} bg={sc.bg} fg={sc.fg} />
                 </View>
                 <Text style={[styles.cell, styles.colLastLogin, { color: COLORS.sub, fontSize: 12 }]}>{item.lastLogin}</Text>
-                <View style={[styles.cell, styles.colAction, { flexDirection: 'row', gap: 8 }]}>
+                <View style={[styles.cell, styles.colAction, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
                     <TouchableOpacity style={styles.editBtn} onPress={() => openEditModal(item)}>
                         <PencilSquare width={14} height={14} fill="#fff" />
                     </TouchableOpacity>
@@ -900,7 +900,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     } as any,
     deleteBtn: {
-        backgroundColor: '#dc2626',
+        backgroundColor: '#ee5e5b', // soft red matching user mockup
         width: 34,
         height: 34,
         borderRadius: 8,
