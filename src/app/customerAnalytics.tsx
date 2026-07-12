@@ -19,7 +19,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import React, {
   useCallback,
   useEffect,
@@ -56,6 +55,18 @@ import Svg, {
   LinearGradient as SvgLinearGradient,
   Text as SvgText,
 } from "react-native-svg";
+
+// Native-only: top-level import breaks Expo web module load.
+const DateTimePicker =
+  Platform.OS === "web"
+    ? null
+    : // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@react-native-community/datetimepicker").default as React.ComponentType<{
+        value: Date;
+        mode?: string;
+        display?: string;
+        onChange?: (event: unknown, date?: Date) => void;
+      }>);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PALETTE
@@ -849,30 +860,12 @@ function buildMockAnalytics(customerId: string, name: string) {
     status: rng() < 0.85 ? "Active" : "Inactive",
   };
 }
-// Timeframe categorical filtering — lifetime aggregates from backend
+// Categorical charts are lifetime aggregates from the backend — no client-side scaling.
 function getFilteredCategoricalData<T extends { label: string; value: number }>(
   baseData: T[],
-  timeframe: TimeFrame,
+  _timeframe: TimeFrame,
 ): T[] {
-  if (timeframe === "All" || timeframe === "1Y") return baseData;
-
-  let factor = 1;
-  if (timeframe === "6M") factor = 0.5;
-  else if (timeframe === "90D") factor = 0.25;
-  else if (timeframe === "30D") factor = 0.08;
-  else if (timeframe === "7D") factor = 0.02;
-  else if (typeof timeframe === "object" && timeframe.from && timeframe.to) {
-    const days = (timeframe.to.getTime() - timeframe.from.getTime()) / (1000 * 3600 * 24);
-    factor = Math.max(0.01, Math.min(1, days / 365));
-  }
-
-  return baseData.map(d => {
-    // Deterministic jitter based on label length to make it look realistic
-    const jitter = 0.8 + ((d.label.length % 5) / 10);
-    let newVal = Math.round(d.value * factor * jitter);
-    if (d.value > 0 && newVal === 0) newVal = 1;
-    return { ...d, value: newVal } as T;
-  });
+  return baseData;
 }
 
 function sliceMonthlyData(
@@ -1124,6 +1117,13 @@ const BarList = React.memo(function BarList({
   onRowPress?: (row: ChartPoint) => void;
 }) {
   const max = Math.max(...data.map((d) => d.value), 1);
+  if (data.length === 0) {
+    return (
+      <View style={{ paddingVertical: 8 }}>
+        <Text style={{ color: sub, fontSize: 13 }}>No data</Text>
+      </View>
+    );
+  }
   return (
     <View style={{ gap: 10 }}>
       {data.map((d, i) => (
@@ -1672,7 +1672,7 @@ function BarChartSvg({
   const padY = 16;
 
   const max = Math.max(...data.map((d) => d.value), 1);
-  const slot = (width - padX * 2) / data.length;
+  const slot = data.length > 0 ? (width - padX * 2) / data.length : width - padX * 2;
   const barW = Math.max(6, slot * 0.6);
 
   const bars = useMemo(() => {
@@ -2155,12 +2155,15 @@ const ORDER_STATUS_CFG: Record<
 const OrderStatusChip = React.memo(function OrderStatusChip({
   status,
 }: {
-  status: RecentOrder["status"];
+  status: RecentOrder["status"] | string;
 }) {
-  const cfg = ORDER_STATUS_CFG[status];
+  const cfg = ORDER_STATUS_CFG[status as RecentOrder["status"]] ?? {
+    bg: "#F3F4F6",
+    color: "#374151",
+  };
   return (
     <View style={[s.statusChip, { backgroundColor: cfg.bg }]}>
-      <Text style={[s.statusChipTxt, { color: cfg.color }]}>{status}</Text>
+      <Text style={[s.statusChipTxt, { color: cfg.color }]}>{status || "—"}</Text>
     </View>
   );
 });
@@ -2395,12 +2398,12 @@ const DateRangePickerModal = React.memo(function DateRangePickerModal({
                     <Text>{from.toISOString().split('T')[0]}</Text>
                   </TouchableOpacity>
                 )}
-                {showFromPicker && Platform.OS !== 'web' && (
+                {showFromPicker && DateTimePicker && (
                   <DateTimePicker
                     value={from}
                     mode="date"
                     display="default"
-                    onChange={(e, d) => { setShowFromPicker(false); if (d) setFrom(d); }}
+                    onChange={(_e, d) => { setShowFromPicker(false); if (d) setFrom(d); }}
                   />
                 )}
               </View>
@@ -2422,12 +2425,12 @@ const DateRangePickerModal = React.memo(function DateRangePickerModal({
                     <Text>{to.toISOString().split('T')[0]}</Text>
                   </TouchableOpacity>
                 )}
-                {showToPicker && Platform.OS !== 'web' && (
+                {showToPicker && DateTimePicker && (
                   <DateTimePicker
                     value={to}
                     mode="date"
                     display="default"
-                    onChange={(e, d) => { setShowToPicker(false); if (d) setTo(d); }}
+                    onChange={(_e, d) => { setShowToPicker(false); if (d) setTo(d); }}
                   />
                 )}
               </View>
