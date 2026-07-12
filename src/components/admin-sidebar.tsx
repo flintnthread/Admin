@@ -5,12 +5,12 @@ import { router, usePathname } from "expo-router";
 import React from "react";
 import {
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Platform,
 } from "react-native";
 
 type Props = {
@@ -159,8 +159,8 @@ const NAV_ITEMS = {
       path: "/productApproval",
       color: "#22C55E",
     },
-    { label: "Add Sellers", icon: "user-plus", path: null, color: "#10B981" },
-    { label: "Ads Admin Users", icon: "user", path: null, color: "#14B8A6" },
+    { label: "Add Sellers", icon: "user-plus", path: "/add-seller", color: "#10B981" },
+    { label: "Ads Admin Users", icon: "user", path: "/adsadminusers", color: "#14B8A6" },
     {
       label: "Admin Panel Users",
       icon: "shield",
@@ -229,7 +229,7 @@ const NAV_ITEMS = {
           color: "#EF4444",
         },
       ],
-    },  
+    },
     {
       label: "Message Center",
       icon: "mail",
@@ -244,7 +244,7 @@ const NAV_ITEMS = {
       path: null,
       children: [
         { label: "Homepage Banners", icon: "home", path: "/Homepagebanners", color: "#14B8A6" },
-        { label: "Homepage Sections On/Off", icon: "toggle-left", path: null, color: "#14B8A6" },
+        { label: "Homepage Sections On/Off", icon: "toggle-left", path: "/homepage-Sections-Settings", color: "#14B8A6" },
         { label: "General Banners", icon: "image", path: "/Generalbanners", color: "#14B8A6" },
       ],
     },
