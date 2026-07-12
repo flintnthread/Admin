@@ -23,6 +23,7 @@ import {
 
 import * as DocumentPicker from "expo-document-picker";
 import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 
 // npm install lucide-react-native react-native-svg expo-document-picker
 
@@ -84,6 +85,14 @@ export default function LogoManagement() {
   const [pickingKey, setPickingKey] = React.useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = React.useState("October 12, 2025, 5:48 am");
   const [toast, setToast] = React.useState("");
+
+  // Pagination state (UI-only)
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 9;
+  const totalItems = LOGO_TYPES.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const pageStart = (currentPage - 1) * itemsPerPage;
+  const pageItems = LOGO_TYPES.slice(pageStart, pageStart + itemsPerPage);
 
   const hasPending = Object.values(pending).some(Boolean);
   const pendingCount = Object.values(pending).filter(Boolean).length;
@@ -210,7 +219,7 @@ export default function LogoManagement() {
 
           {/* Logo cards — preview + file meta + replace control combined per type */}
           <View style={styles.cardsGrid}>
-            {LOGO_TYPES.map((t) => {
+            {pageItems.map((t) => {
               const Icon = t.icon;
               const current = logos[t.key];
               const pendingFile = pending[t.key];
@@ -269,6 +278,17 @@ export default function LogoManagement() {
                 </View>
               );
             })}
+          </View>
+
+          {/* Pagination (placed inside scroll content, directly below the image cards) */}
+          <View style={{ paddingHorizontal: 6, marginTop: 8 }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(p) => setCurrentPage(p)}
+            />
           </View>
         </ScrollView>
 
