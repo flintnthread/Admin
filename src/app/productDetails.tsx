@@ -1101,6 +1101,8 @@ export default function ProductDetailsScreen() {
   }
 
   const contentMax = isWide ? Math.min(width, 1200) : width;
+  const firstVariant = variants[0];
+  const commissionLabel = firstVariant?.commissionPercent ?? 0;
 
   return (
     <AdminLayout>

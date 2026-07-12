@@ -1511,8 +1511,8 @@ export default function LocationsScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: LocationColors.pageBg },
-  content: { padding: 20, paddingBottom: 48, maxWidth: 1200, alignSelf: 'center', width: '100%' },
+  screen: { flex: 1, width: '100%', backgroundColor: LocationColors.pageBg },
+  content: { padding: 20, paddingBottom: 48, width: '100%', flexGrow: 1 },
   contentMobile: { padding: 14, paddingBottom: 32 },
 
   // ── Hero ──

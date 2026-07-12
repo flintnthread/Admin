@@ -4,13 +4,13 @@ import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import React from "react";
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    Platform,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = {
@@ -28,7 +28,10 @@ const NAV_ITEMS = {
 
 
     { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
-    { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
+
+    { label: "Settings", icon: "settings", path: "/settings", color: "#64748B" },
+    // { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
+
 
   ],
   "EMPLOYEE MANAGEMENT": [
@@ -156,8 +159,8 @@ const NAV_ITEMS = {
       path: "/productApproval",
       color: "#22C55E",
     },
-    { label: "Add Sellers", icon: "user-plus", path: null, color: "#10B981" },
-    { label: "Ads Admin Users", icon: "user", path: null, color: "#14B8A6" },
+    { label: "Add Sellers", icon: "user-plus", path: "/add-seller", color: "#10B981" },
+    { label: "Ads Admin Users", icon: "user", path: "/adsadminusers", color: "#14B8A6" },
     {
       label: "Admin Panel Users",
       icon: "shield",
@@ -226,7 +229,7 @@ const NAV_ITEMS = {
           color: "#EF4444",
         },
       ],
-    },  
+    },
     {
       label: "Message Center",
       icon: "mail",
@@ -240,7 +243,9 @@ const NAV_ITEMS = {
       color: "#06B6D4",
       path: null,
       children: [
-        { label: "Banner List", icon: "list", path: null, color: "#14B8A6" },
+        { label: "Homepage Banners", icon: "home", path: "/Homepagebanners", color: "#14B8A6" },
+        { label: "Homepage Sections On/Off", icon: "toggle-left", path: "/homepage-Sections-Settings", color: "#14B8A6" },
+        { label: "General Banners", icon: "image", path: "/Generalbanners", color: "#14B8A6" },
       ],
     },
     {
@@ -400,8 +405,8 @@ export default function AdminSidebar({
           ))}
         </View>
 
-        {/* EMPLOYEE MANAGEMENT */}
-        <View style={styles.section}>
+        {/* EMPLOYEE MANAGEMENT - Hidden per request */}
+        <View style={[styles.section, { display: 'none' }]}>
           {!collapsed && (
             <Text style={styles.sectionTitle}>EMPLOYEE MANAGEMENT</Text>
           )}
@@ -621,8 +626,8 @@ export default function AdminSidebar({
                   style={[
                     styles.menuItem,
                     !hasChildren &&
-                      isActive((item as any).path) &&
-                      styles.menuItemActive,
+                    isActive((item as any).path) &&
+                    styles.menuItemActive,
                     isExpanded && { backgroundColor: "#F5F3FF" },
                   ]}
                   onPress={() => {
@@ -648,8 +653,8 @@ export default function AdminSidebar({
                         style={[
                           styles.menuItemText,
                           !hasChildren &&
-                            isActive((item as any).path) &&
-                            styles.menuItemTextActive,
+                          isActive((item as any).path) &&
+                          styles.menuItemTextActive,
                         ]}
                       >
                         {item.label}
@@ -696,7 +701,7 @@ export default function AdminSidebar({
                             style={[
                               styles.subMenuItemText,
                               isActive(child.path) &&
-                                styles.subMenuItemTextActive,
+                              styles.subMenuItemTextActive,
                             ]}
                           >
                             {child.label}
@@ -726,8 +731,8 @@ export default function AdminSidebar({
                   style={[
                     styles.menuItem,
                     !hasChildren &&
-                      isActive((item as any).path) &&
-                      styles.menuItemActive,
+                    isActive((item as any).path) &&
+                    styles.menuItemActive,
                   ]}
                   onPress={() => {
                     if (hasChildren) {
@@ -752,8 +757,8 @@ export default function AdminSidebar({
                         style={[
                           styles.menuItemText,
                           !hasChildren &&
-                            isActive((item as any).path) &&
-                            styles.menuItemTextActive,
+                          isActive((item as any).path) &&
+                          styles.menuItemTextActive,
                           !isActive((item as any).path) && {
                             color: isDark ? "#D1D5DB" : "#4B5563",
                           },
@@ -803,7 +808,7 @@ export default function AdminSidebar({
                             style={[
                               styles.subMenuItemText,
                               isActive(child.path) &&
-                                styles.subMenuItemTextActive,
+                              styles.subMenuItemTextActive,
                               !isActive(child.path) && {
                                 color: isDark ? "#9CA3AF" : "#4B5563",
                               },

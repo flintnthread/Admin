@@ -19,7 +19,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import React, {
   useCallback,
   useEffect,
@@ -56,6 +55,18 @@ import Svg, {
   LinearGradient as SvgLinearGradient,
   Text as SvgText,
 } from "react-native-svg";
+
+// Native-only: top-level import breaks Expo web module load.
+const DateTimePicker =
+  Platform.OS === "web"
+    ? null
+    : // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("@react-native-community/datetimepicker").default as React.ComponentType<{
+        value: Date;
+        mode?: string;
+        display?: string;
+        onChange?: (event: unknown, date?: Date) => void;
+      }>);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PALETTE
@@ -684,11 +695,11 @@ function buildMockAnalytics(customerId: string, name: string) {
     latestTicket:
       ticketsTotal > 0
         ? pick([
-            "Order delayed",
-            "Refund query",
-            "Wrong item received",
-            "Damaged on arrival",
-          ])
+          "Order delayed",
+          "Refund query",
+          "Wrong item received",
+          "Damaged on arrival",
+        ])
         : "No tickets raised",
   };
 
@@ -849,30 +860,12 @@ function buildMockAnalytics(customerId: string, name: string) {
     status: rng() < 0.85 ? "Active" : "Inactive",
   };
 }
-// Timeframe categorical filtering — lifetime aggregates from backend
+// Categorical charts are lifetime aggregates from the backend — no client-side scaling.
 function getFilteredCategoricalData<T extends { label: string; value: number }>(
   baseData: T[],
-  timeframe: TimeFrame,
+  _timeframe: TimeFrame,
 ): T[] {
-  if (timeframe === "All" || timeframe === "1Y") return baseData;
-  
-  let factor = 1;
-  if (timeframe === "6M") factor = 0.5;
-  else if (timeframe === "90D") factor = 0.25;
-  else if (timeframe === "30D") factor = 0.08;
-  else if (timeframe === "7D") factor = 0.02;
-  else if (typeof timeframe === "object" && timeframe.from && timeframe.to) {
-    const days = (timeframe.to.getTime() - timeframe.from.getTime()) / (1000 * 3600 * 24);
-    factor = Math.max(0.01, Math.min(1, days / 365));
-  }
-
-  return baseData.map(d => {
-    // Deterministic jitter based on label length to make it look realistic
-    const jitter = 0.8 + ((d.label.length % 5) / 10);
-    let newVal = Math.round(d.value * factor * jitter);
-    if (d.value > 0 && newVal === 0) newVal = 1;
-    return { ...d, value: newVal } as T;
-  });
+  return baseData;
 }
 
 function sliceMonthlyData(
@@ -941,15 +934,15 @@ function getFilteredData(
     const fromTime = timeframe.from.getTime();
     const toTime = timeframe.to.getTime();
     const filtered = baseData.filter(d => {
-       let dateStr = d.label;
-       if (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].includes(d.label)) {
-           dateStr = `${d.label} 1, ${new Date().getFullYear()}`;
-       }
-       const dTime = new Date(dateStr).getTime();
-       if (!isNaN(dTime)) {
-           return dTime >= fromTime && dTime <= toTime;
-       }
-       return true; 
+      let dateStr = d.label;
+      if (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].includes(d.label)) {
+        dateStr = `${d.label} 1, ${new Date().getFullYear()}`;
+      }
+      const dTime = new Date(dateStr).getTime();
+      if (!isNaN(dTime)) {
+        return dTime >= fromTime && dTime <= toTime;
+      }
+      return true;
     });
     return filtered.length > 0 ? filtered : baseData;
   }
@@ -1124,6 +1117,13 @@ const BarList = React.memo(function BarList({
   onRowPress?: (row: ChartPoint) => void;
 }) {
   const max = Math.max(...data.map((d) => d.value), 1);
+  if (data.length === 0) {
+    return (
+      <View style={{ paddingVertical: 8 }}>
+        <Text style={{ color: sub, fontSize: 13 }}>No data</Text>
+      </View>
+    );
+  }
   return (
     <View style={{ gap: 10 }}>
       {data.map((d, i) => (
@@ -1481,14 +1481,14 @@ function LineChartSvg({
   const pointerProps =
     Platform.OS === "web"
       ? {
-          onMouseMove: handleWebMove,
-          onMouseLeave: handleTouchEnd,
-        }
+        onMouseMove: handleWebMove,
+        onMouseLeave: handleTouchEnd,
+      }
       : {
-          onTouchStart: handleTouch,
-          onTouchMove: handleTouch,
-          onTouchEnd: handleTouchEnd,
-        };
+        onTouchStart: handleTouch,
+        onTouchMove: handleTouch,
+        onTouchEnd: handleTouchEnd,
+      };
 
   // Percentage change from previous period
   const pctChange = useMemo(() => {
@@ -1638,10 +1638,10 @@ function LineChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { 
-                flex: 1, 
+              {
+                flex: 1,
                 fontSize: width < 400 ? 8 : 10,
-                letterSpacing: width < 400 ? -0.5 : 0 
+                letterSpacing: width < 400 ? -0.5 : 0
               },
             ]}
             numberOfLines={1}
@@ -1672,7 +1672,7 @@ function BarChartSvg({
   const padY = 16;
 
   const max = Math.max(...data.map((d) => d.value), 1);
-  const slot = (width - padX * 2) / data.length;
+  const slot = data.length > 0 ? (width - padX * 2) / data.length : width - padX * 2;
   const barW = Math.max(6, slot * 0.6);
 
   const bars = useMemo(() => {
@@ -1735,14 +1735,14 @@ function BarChartSvg({
   const pointerProps =
     Platform.OS === "web"
       ? {
-          onMouseMove: handleWebMove,
-          onMouseLeave: handleTouchEnd,
-        }
+        onMouseMove: handleWebMove,
+        onMouseLeave: handleTouchEnd,
+      }
       : {
-          onTouchStart: handleTouch,
-          onTouchMove: handleTouch,
-          onTouchEnd: handleTouchEnd,
-        };
+        onTouchStart: handleTouch,
+        onTouchMove: handleTouch,
+        onTouchEnd: handleTouchEnd,
+      };
 
   return (
     <View
@@ -1827,10 +1827,10 @@ function BarChartSvg({
             style={[
               s.axisLabel,
               activeIdx === i && { color, fontWeight: "700" },
-              { 
-                flex: 1, 
+              {
+                flex: 1,
                 fontSize: width < 400 ? 8 : 10,
-                letterSpacing: width < 400 ? -0.5 : 0 
+                letterSpacing: width < 400 ? -0.5 : 0
               },
             ]}
             numberOfLines={1}
@@ -2155,33 +2155,36 @@ const ORDER_STATUS_CFG: Record<
 const OrderStatusChip = React.memo(function OrderStatusChip({
   status,
 }: {
-  status: RecentOrder["status"];
+  status: RecentOrder["status"] | string;
 }) {
-  const cfg = ORDER_STATUS_CFG[status];
+  const cfg = ORDER_STATUS_CFG[status as RecentOrder["status"]] ?? {
+    bg: "#F3F4F6",
+    color: "#374151",
+  };
   return (
     <View style={[s.statusChip, { backgroundColor: cfg.bg }]}>
-      <Text style={[s.statusChipTxt, { color: cfg.color }]}>{status}</Text>
+      <Text style={[s.statusChipTxt, { color: cfg.color }]}>{status || "—"}</Text>
     </View>
   );
 });
 
 const TIMELINE_ICON_CFG: Record<string, { icon: React.ReactNode; bg: string }> =
-  {
-    order: { icon: <BagIcon size={13} color={primary} />, bg: primaryLight },
-    payment: {
-      icon: <CreditCardIcon size={13} color={green} />,
-      bg: activeLight,
-    },
-    ticket: { icon: <TicketIcon size={13} color={blue} />, bg: blueLight },
-    review: { icon: <StarFillIcon size={13} />, bg: "#FEF9C3" },
-    coupon: { icon: <GiftIcon size={13} color={pink} />, bg: pinkLight },
-    replacement: {
-      icon: <SwapIcon size={13} color={purple} />,
-      bg: purpleLight,
-    },
-    address: { icon: <MapPinIcon size={13} color={teal} />, bg: tealLight },
-    return: { icon: <ReplyIcon size={13} color={red} />, bg: inactiveLight },
-  };
+{
+  order: { icon: <BagIcon size={13} color={primary} />, bg: primaryLight },
+  payment: {
+    icon: <CreditCardIcon size={13} color={green} />,
+    bg: activeLight,
+  },
+  ticket: { icon: <TicketIcon size={13} color={blue} />, bg: blueLight },
+  review: { icon: <StarFillIcon size={13} />, bg: "#FEF9C3" },
+  coupon: { icon: <GiftIcon size={13} color={pink} />, bg: pinkLight },
+  replacement: {
+    icon: <SwapIcon size={13} color={purple} />,
+    bg: purpleLight,
+  },
+  address: { icon: <MapPinIcon size={13} color={teal} />, bg: tealLight },
+  return: { icon: <ReplyIcon size={13} color={red} />, bg: inactiveLight },
+};
 
 const ACTION_ICON_CFG: Record<string, React.ReactNode> = {
   gift: <GiftIcon size={16} color="#fff" />,
@@ -2377,69 +2380,69 @@ const DateRangePickerModal = React.memo(function DateRangePickerModal({
             </TouchableOpacity>
           </View>
           <View style={[s.modalBody, { padding: 20 }]}>
-             <View style={{ gap: 16 }}>
-               <View>
-                 <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>From Date</Text>
-                 {Platform.OS === 'web' ? (
-                   <input 
-                     type="date" 
-                     style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
-                     value={from.toISOString().split('T')[0]}
-                     onChange={(e) => {
-                       const d = new Date(e.target.value);
-                       if (!isNaN(d.getTime())) setFrom(d);
-                     }}
-                   />
-                 ) : (
-                   <TouchableOpacity onPress={() => setShowFromPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
-                     <Text>{from.toISOString().split('T')[0]}</Text>
-                   </TouchableOpacity>
-                 )}
-                 {showFromPicker && Platform.OS !== 'web' && (
-                   <DateTimePicker
-                     value={from}
-                     mode="date"
-                     display="default"
-                     onChange={(e, d) => { setShowFromPicker(false); if(d) setFrom(d); }}
-                   />
-                 )}
-               </View>
+            <View style={{ gap: 16 }}>
+              <View>
+                <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>From Date</Text>
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
+                    value={from.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value);
+                      if (!isNaN(d.getTime())) setFrom(d);
+                    }}
+                  />
+                ) : (
+                  <TouchableOpacity onPress={() => setShowFromPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
+                    <Text>{from.toISOString().split('T')[0]}</Text>
+                  </TouchableOpacity>
+                )}
+                {showFromPicker && DateTimePicker && (
+                  <DateTimePicker
+                    value={from}
+                    mode="date"
+                    display="default"
+                    onChange={(_e, d) => { setShowFromPicker(false); if (d) setFrom(d); }}
+                  />
+                )}
+              </View>
 
-               <View>
-                 <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>To Date</Text>
-                 {Platform.OS === 'web' ? (
-                   <input 
-                     type="date" 
-                     style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
-                     value={to.toISOString().split('T')[0]}
-                     onChange={(e) => {
-                       const d = new Date(e.target.value);
-                       if (!isNaN(d.getTime())) setTo(d);
-                     }}
-                   />
-                 ) : (
-                   <TouchableOpacity onPress={() => setShowToPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
-                     <Text>{to.toISOString().split('T')[0]}</Text>
-                   </TouchableOpacity>
-                 )}
-                 {showToPicker && Platform.OS !== 'web' && (
-                   <DateTimePicker
-                     value={to}
-                     mode="date"
-                     display="default"
-                     onChange={(e, d) => { setShowToPicker(false); if(d) setTo(d); }}
-                   />
-                 )}
-               </View>
+              <View>
+                <Text style={{ marginBottom: 8, fontWeight: "600", color: C.navy }}>To Date</Text>
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    style={{ padding: 8, border: `1px solid ${C.border}`, borderRadius: 6, width: '100%', outline: 'none' }}
+                    value={to.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value);
+                      if (!isNaN(d.getTime())) setTo(d);
+                    }}
+                  />
+                ) : (
+                  <TouchableOpacity onPress={() => setShowToPicker(true)} style={{ padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 6 }}>
+                    <Text>{to.toISOString().split('T')[0]}</Text>
+                  </TouchableOpacity>
+                )}
+                {showToPicker && DateTimePicker && (
+                  <DateTimePicker
+                    value={to}
+                    mode="date"
+                    display="default"
+                    onChange={(_e, d) => { setShowToPicker(false); if (d) setTo(d); }}
+                  />
+                )}
+              </View>
 
-               <TouchableOpacity 
-                 style={{ backgroundColor: isInvalid ? C.border : primary, padding: 12, borderRadius: 6, alignItems: 'center', marginTop: 10 }}
-                 onPress={handleApply}
-                 disabled={isInvalid}
-               >
-                 <Text style={{ color: isInvalid ? sub : '#fff', fontWeight: 'bold' }}>Apply Filter</Text>
-               </TouchableOpacity>
-             </View>
+              <TouchableOpacity
+                style={{ backgroundColor: isInvalid ? C.border : primary, padding: 12, borderRadius: 6, alignItems: 'center', marginTop: 10 }}
+                onPress={handleApply}
+                disabled={isInvalid}
+              >
+                <Text style={{ color: isInvalid ? sub : '#fff', fontWeight: 'bold' }}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -3827,14 +3830,14 @@ export default function CustomerAnalyticsScreen() {
           dateRangeModalTarget === "spend"
             ? "Spending Trend"
             : dateRangeModalTarget === "orders"
-            ? "Orders Placed"
-            : dateRangeModalTarget === "freq"
-            ? "Order Frequency"
-            : dateRangeModalTarget === "dist"
-            ? "Purchase Time Breakdown"
-            : dateRangeModalTarget === "category"
-            ? "Most Purchased Categories"
-            : "Custom Range"
+              ? "Orders Placed"
+              : dateRangeModalTarget === "freq"
+                ? "Order Frequency"
+                : dateRangeModalTarget === "dist"
+                  ? "Purchase Time Breakdown"
+                  : dateRangeModalTarget === "category"
+                    ? "Most Purchased Categories"
+                    : "Custom Range"
         }
         onApply={(from, to) => {
           if (!dateRangeModalTarget) return;
