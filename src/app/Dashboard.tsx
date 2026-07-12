@@ -2739,9 +2739,8 @@ const getStyles = (isDark: boolean, screenW: number) => {
       paddingHorizontal: screenW < 480 ? 10 : (screenW < 768 ? 16 : 24),
     },
     container: {
-      alignSelf: "center",
+      alignSelf: "stretch",
       width: "100%",
-      maxWidth: 1600,
       gap: 20,
     },
 
@@ -2761,9 +2760,8 @@ const getStyles = (isDark: boolean, screenW: number) => {
       shadowOffset: { width: 0, height: 2 },
       shadowRadius: 8,
       elevation: 2,
-      alignSelf: "center",
+      alignSelf: "stretch",
       width: "100%",
-      maxWidth: 1600,
     },
     headerCardMobile: {
       borderBottomLeftRadius: 24,
