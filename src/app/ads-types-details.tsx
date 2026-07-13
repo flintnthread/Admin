@@ -25,12 +25,14 @@
 
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useMemo, useState } from 'react';
 import {
     Alert,
     FlatList,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -39,26 +41,6 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native';
-import BarChartFill from 'react-native-bootstrap-icons/icons/bar-chart-fill';
-import BoxSeam from 'react-native-bootstrap-icons/icons/box-seam';
-import CheckCircleFill from 'react-native-bootstrap-icons/icons/check-circle-fill';
-import ChevronDown from 'react-native-bootstrap-icons/icons/chevron-down';
-import ChevronRight from 'react-native-bootstrap-icons/icons/chevron-right';
-import ChevronUp from 'react-native-bootstrap-icons/icons/chevron-up';
-import CodeSlash from 'react-native-bootstrap-icons/icons/code-slash';
-import ExclamationCircleFill from 'react-native-bootstrap-icons/icons/exclamation-circle-fill';
-import EyeFill from 'react-native-bootstrap-icons/icons/eye-fill';
-import GearFill from 'react-native-bootstrap-icons/icons/gear-fill';
-import HouseDoorFill from 'react-native-bootstrap-icons/icons/house-door-fill';
-import ImageFill from 'react-native-bootstrap-icons/icons/image-fill';
-import ListUl from 'react-native-bootstrap-icons/icons/list-ul';
-import PencilFill from 'react-native-bootstrap-icons/icons/pencil-fill';
-import PlayCircleFill from 'react-native-bootstrap-icons/icons/play-circle-fill';
-import PlusLg from 'react-native-bootstrap-icons/icons/plus-lg';
-import Save2Fill from 'react-native-bootstrap-icons/icons/save2-fill';
-import ShieldFillCheck from 'react-native-bootstrap-icons/icons/shield-fill-check';
-import TrashFill from 'react-native-bootstrap-icons/icons/trash-fill';
-import XLg from 'react-native-bootstrap-icons/icons/x-lg';
 
 // ---------------------------------------------------------------------------
 // Types & seed data
@@ -141,10 +123,10 @@ const SEED_AD_TYPES: AdType[] = [
     },
 ];
 
-const OVERVIEW_CARDS: { key: string; Icon: React.ComponentType<any>; color: string; bg: string }[] = [
-    { key: 'Banner Ads', Icon: ImageFill, color: '#EA580C', bg: '#FFF1E6' },
-    { key: 'Video Ads', Icon: PlayCircleFill, color: '#16A34A', bg: '#E9FBF0' },
-    { key: 'Native Ads', Icon: CodeSlash, color: '#CA8A04', bg: '#FEF9E7' },
+const OVERVIEW_CARDS = [
+    { key: 'Banner Ads', iconName: 'image' as const, color: '#EA580C', bg: '#FFF1E6' },
+    { key: 'Video Ads', iconName: 'play-circle' as const, color: '#16A34A', bg: '#E9FBF0' },
+    { key: 'Native Ads', iconName: 'code-slash' as const, color: '#CA8A04', bg: '#FEF9E7' },
 ];
 
 // Palette
@@ -183,13 +165,16 @@ function getBreakpoint(width: number): Bp {
 // ---------------------------------------------------------------------------
 const StatCard: React.FC<{
     label: string; value: number | string; sub: string;
-    bg: string; fg: string; Icon: React.ComponentType<any>; wide: boolean;
-}> = ({ label, value, sub, bg, fg, Icon, wide }) => (
-    <View style={[styles.statCard, { width: wide ? '23.5%' : '48%' }]}>
-        <View style={[styles.statIconWrap, { backgroundColor: fg }]}>
-            <Icon width={18} height={18} fill="#fff" />
+    bg: string; fg: string; iconName: any; wide: boolean;
+}> = ({ label, value, sub, bg, fg, iconName, wide }) => (
+    <View style={[styles.statCard, wide ? { width: '23.5%' } : { width: 148, minWidth: 148 }]}>
+        {/* Top row: icon left, count right */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+            <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
+                <Ionicons name={iconName} size={18} color={fg} />
+            </View>
+            <Text style={[styles.statValue, { color: fg }]}>{value}</Text>
         </View>
-        <Text style={styles.statValue}>{value}</Text>
         <Text style={styles.statLabel}>{label}</Text>
         <Text style={styles.statSub}>{sub}</Text>
     </View>
@@ -203,7 +188,7 @@ const Pill: React.FC<{ text: string; bg: string; fg: string }> = ({ text, bg, fg
 
 const SpecLine: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <View style={styles.specLine}>
-        <CheckCircleFill width={12} height={12} fill={COLORS.orange} style={{ marginTop: 2 }} />
+        <Ionicons name="checkmark-circle" size={12} color={COLORS.orange} style={{ marginTop: 2 }} />
         <Text style={styles.specLineText}>
             <Text style={{ fontWeight: '700' }}>{label}: </Text>
             {value}
@@ -265,7 +250,7 @@ const AdTypeFormModal: React.FC<{
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalHeaderText}>{isEdit ? 'Edit Ad Type' : 'Add New Ad Type'}</Text>
                         <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <XLg width={18} height={18} fill="#fff" />
+                            <Ionicons name="close" size={18} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
@@ -335,11 +320,11 @@ const AdTypeFormModal: React.FC<{
 
                     <View style={styles.modalFooter}>
                         <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                            <XLg width={13} height={13} fill="#fff" />
+                            <Ionicons name="close" size={13} color="#fff" />
                             <Text style={styles.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                            <Save2Fill width={13} height={13} fill="#fff" />
+                            <Ionicons name="save" size={13} color="#fff" />
                             <Text style={styles.submitBtnText}>{isEdit ? 'Update Ad Type' : 'Create Ad Type'}</Text>
                         </TouchableOpacity>
                     </View>
@@ -363,11 +348,11 @@ const ViewModal: React.FC<{ visible: boolean; item: AdType | null; onClose: () =
                 <View style={[styles.modalCard, { maxWidth: isPhone ? '100%' : 560 }]}>
                     <View style={styles.modalHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <EyeFill width={16} height={16} fill="#fff" />
+                            <Ionicons name="eye" size={16} color="#fff" />
                             <Text style={styles.modalHeaderText}>Ad Type Details</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <XLg width={18} height={18} fill="#fff" />
+                            <Ionicons name="close" size={18} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
@@ -395,7 +380,7 @@ const ViewModal: React.FC<{ visible: boolean; item: AdType | null; onClose: () =
 
                     <View style={styles.modalFooter}>
                         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                            <XLg width={13} height={13} fill="#fff" />
+                            <Ionicons name="close" size={13} color="#fff" />
                             <Text style={styles.cancelBtnText}>Close</Text>
                         </TouchableOpacity>
                     </View>
@@ -414,17 +399,17 @@ const DeleteModal: React.FC<{ visible: boolean; onCancel: () => void; onConfirm:
             <View style={[styles.modalCard, { maxWidth: 420 }]}>
                 <View style={styles.modalHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <TrashFill width={16} height={16} fill="#fff" />
+                        <Ionicons name="trash" size={16} color="#fff" />
                         <Text style={styles.modalHeaderText}>Delete Ad Type</Text>
                     </View>
                     <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <XLg width={18} height={18} fill="#fff" />
+                        <Ionicons name="close" size={18} color="#fff" />
                     </TouchableOpacity>
                 </View>
 
                 <View style={[styles.modalBody, { alignItems: 'center', paddingTop: 26 }]}>
                     <View style={styles.trashCircle}>
-                        <TrashFill width={26} height={26} fill={COLORS.orange} />
+                        <Ionicons name="trash" size={26} color={COLORS.orange} />
                     </View>
                     <Text style={styles.confirmTitle}>Are you sure you want to delete this ad type?</Text>
                     <Text style={styles.confirmSub}>This action cannot be undone!</Text>
@@ -432,11 +417,11 @@ const DeleteModal: React.FC<{ visible: boolean; onCancel: () => void; onConfirm:
 
                 <View style={styles.modalFooter}>
                     <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                        <XLg width={13} height={13} fill="#fff" />
+                        <Ionicons name="close" size={13} color="#fff" />
                         <Text style={styles.cancelBtnText}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteConfirmBtn} onPress={onConfirm}>
-                        <TrashFill width={13} height={13} fill="#fff" />
+                        <Ionicons name="trash" size={13} color="#fff" />
                         <Text style={styles.submitBtnText}>Delete Ad Type</Text>
                     </TouchableOpacity>
                 </View>
@@ -525,25 +510,25 @@ const AdsTypesDetails: React.FC = () => {
     // ---- Renderers ---------------------------------------------------------
     const renderTableRow = ({ item }: { item: AdType }) => (
         <View style={styles.tableRow}>
-            <Text style={[styles.cell, { width: 44, color: COLORS.sub }]}>{item.id}</Text>
-            <Text style={[styles.cell, { width: 130, fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
-            <View style={[styles.cell, { width: 120 }]}>
+            <Text style={[styles.cell, { flex: 0.5, color: COLORS.sub }]}>{item.id}</Text>
+            <Text style={[styles.cell, { flex: 1.8, fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
+            <View style={[styles.cell, { flex: 1.5 }]}>
                 <Pill text={item.category} bg={COLORS.blueBg} fg={COLORS.blueText} />
             </View>
-            <Text style={[styles.cell, { width: 260, color: COLORS.sub }]} numberOfLines={2}>{item.description}</Text>
-            <View style={[styles.cell, { width: 90 }]}>
+            <Text style={[styles.cell, { flex: 3, color: COLORS.sub }]} numberOfLines={2}>{item.description}</Text>
+            <View style={[styles.cell, { flex: 1.2 }]}>
                 <Pill text={item.status} bg={item.status === 'Active' ? COLORS.greenBg : COLORS.redBg} fg={item.status === 'Active' ? COLORS.greenText : COLORS.redText} />
             </View>
-            <Text style={[styles.cell, { width: 100, color: COLORS.sub, fontSize: 12 }]}>{item.created}</Text>
-            <View style={[styles.cell, { width: 120, flexDirection: 'row', gap: 6 }]}>
+            <Text style={[styles.cell, { flex: 1.2, color: COLORS.sub, fontSize: 12 }]}>{item.created}</Text>
+            <View style={[styles.cell, { flex: 1.5, flexDirection: 'row', gap: 6 }]}>
                 <TouchableOpacity style={styles.viewBtn} onPress={() => setViewItem(item)}>
-                    <EyeFill width={13} height={13} fill="#fff" />
+                    <Ionicons name="eye" size={13} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                    <PencilFill width={13} height={13} fill="#fff" />
+                    <Ionicons name="pencil" size={13} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item.id)}>
-                    <TrashFill width={13} height={13} fill="#fff" />
+                    <Ionicons name="trash" size={13} color="#fff" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -559,13 +544,13 @@ const AdsTypesDetails: React.FC = () => {
             <Text style={styles.mobileCardDesc} numberOfLines={2}>{item.description}</Text>
             <View style={styles.mobileCardActions}>
                 <TouchableOpacity style={styles.viewBtn} onPress={() => setViewItem(item)}>
-                    <EyeFill width={13} height={13} fill="#fff" />
+                    <Ionicons name="eye" size={13} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                    <PencilFill width={13} height={13} fill="#fff" />
+                    <Ionicons name="pencil" size={13} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item.id)}>
-                    <TrashFill width={13} height={13} fill="#fff" />
+                    <Ionicons name="trash" size={13} color="#fff" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -577,43 +562,54 @@ const AdsTypesDetails: React.FC = () => {
                 {/* ---------- Header: title + Add button in ONE #1D324E container ---------- */}
                 <View style={[styles.headerContainer, isPhone && { flexDirection: 'column', alignItems: 'flex-start', gap: 14 }]}>
                     <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <GearFill width={isPhone ? 18 : 22} height={isPhone ? 18 : 22} fill="#fff" />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            {/* Settings icon inside orange box */}
+                            <View style={styles.headerIconBox}>
+                                <Ionicons name="settings" size={isPhone ? 16 : 18} color="#fff" />
+                            </View>
                             <Text style={[styles.title, isPhone && { fontSize: 19 }]}>Ads Types & Details Management</Text>
-                        </View>
-                        <View style={styles.breadcrumbRow}>
-                            <HouseDoorFill width={11} height={11} fill={COLORS.orange} />
-                            <Text style={styles.breadcrumbActive}> Dashboard</Text>
-                            <ChevronRight width={9} height={9} fill="#94A3B8" style={{ marginHorizontal: 4 }} />
-                            <Text style={styles.breadcrumbActive}>Ads</Text>
-                            <ChevronRight width={9} height={9} fill="#94A3B8" style={{ marginHorizontal: 4 }} />
-                            <Text style={styles.breadcrumbCurrent}>Ads Types & Details</Text>
                         </View>
                     </View>
 
                     <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'stretch', justifyContent: 'center' }]} onPress={openAdd}>
-                        <PlusLg width={14} height={14} fill="#fff" />
+                        <Ionicons name="add" size={16} color="#fff" />
                         <Text style={styles.addBtnText}>Add New Ad Type</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* ---------- Stat cards ---------- */}
-                <View style={styles.statsRow}>
-                    <StatCard label="Total Ad Types" value={stats.total} sub="All active ad types" bg="#F5F3FF" fg="#7C3AED" Icon={BoxSeam} wide={statsWide} />
-                    <StatCard label="Active Ad Types" value={stats.active} sub="Currently active" bg="#E9FBF0" fg="#16A34A" Icon={ShieldFillCheck} wide={statsWide} />
-                    <StatCard label="Total Ads" value={stats.totalAds} sub="Across all types" bg="#E0F2FE" fg="#0284C7" Icon={BarChartFill} wide={statsWide} />
-                    <StatCard label="Urgent Review" value={stats.urgent} sub="Require attention" bg="#FEE2E2" fg="#DC2626" Icon={ExclamationCircleFill} wide={statsWide} />
-                </View>
+                {isPhone ? (
+                    /* Mobile 320–425px: horizontal scroll so all 4 cards fit in one row */
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.statsRowScroll}
+                        style={styles.statsRowScrollWrap}
+                    >
+                        <StatCard label="Total Ad Types" value={stats.total} sub="All active ad types" bg="#F5F3FF" fg="#7C3AED" iconName="cube" wide={false} />
+                        <StatCard label="Active Ad Types" value={stats.active} sub="Currently active" bg="#E9FBF0" fg="#16A34A" iconName="shield-checkmark" wide={false} />
+                        <StatCard label="Total Ads" value={stats.totalAds} sub="Across all types" bg="#E0F2FE" fg="#0284C7" iconName="bar-chart" wide={false} />
+                        <StatCard label="Urgent Review" value={stats.urgent} sub="Require attention" bg="#FEE2E2" fg="#DC2626" iconName="alert-circle" wide={false} />
+                    </ScrollView>
+                ) : (
+                    /* Tablet 768px+: standard flex-wrap row */
+                    <View style={styles.statsRow}>
+                        <StatCard label="Total Ad Types" value={stats.total} sub="All active ad types" bg="#F5F3FF" fg="#7C3AED" iconName="cube" wide={statsWide} />
+                        <StatCard label="Active Ad Types" value={stats.active} sub="Currently active" bg="#E9FBF0" fg="#16A34A" iconName="shield-checkmark" wide={statsWide} />
+                        <StatCard label="Total Ads" value={stats.totalAds} sub="Across all types" bg="#E0F2FE" fg="#0284C7" iconName="bar-chart" wide={statsWide} />
+                        <StatCard label="Urgent Review" value={stats.urgent} sub="Require attention" bg="#FEE2E2" fg="#DC2626" iconName="alert-circle" wide={statsWide} />
+                    </View>
+                )}
 
                 {/* ---------- Specifications overview ---------- */}
                 <View style={styles.sectionBanner}>
-                    <ListUl width={14} height={14} fill="#fff" />
+                    <Ionicons name="list" size={14} color="#fff" />
                     <Text style={styles.sectionBannerText}>Ad Types & Specifications Overview</Text>
                 </View>
 
                 <View style={styles.overviewCard}>
                     {isPhone ? (
-                        overviewData.map(({ key, Icon, color, bg, item }) => {
+                        overviewData.map(({ key, iconName, color, bg, item }) => {
                             const open = expandedOverview === key;
                             return (
                                 <View key={key} style={styles.accordionItem}>
@@ -623,7 +619,7 @@ const AdsTypesDetails: React.FC = () => {
                                     >
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                                             <View style={[styles.overviewIconWrap, { backgroundColor: bg }]}>
-                                                <Icon width={16} height={16} fill={color} />
+                                                <Ionicons name={iconName} size={16} color={color} />
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.overviewTitle}>{key}</Text>
@@ -631,9 +627,9 @@ const AdsTypesDetails: React.FC = () => {
                                             </View>
                                         </View>
                                         {open ? (
-                                            <ChevronUp width={14} height={14} fill={COLORS.sub} />
+                                            <Ionicons name="chevron-up" size={14} color={COLORS.sub} />
                                         ) : (
-                                            <ChevronDown width={14} height={14} fill={COLORS.sub} />
+                                            <Ionicons name="chevron-down" size={14} color={COLORS.sub} />
                                         )}
                                     </TouchableOpacity>
                                     {open && (
@@ -648,10 +644,10 @@ const AdsTypesDetails: React.FC = () => {
                         })
                     ) : (
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-                            {overviewData.map(({ key, Icon, color, bg, item }) => (
+                            {overviewData.map(({ key, iconName, color, bg, item }) => (
                                 <View key={key} style={[styles.overviewFullCard, { width: overviewCols === 3 ? '31.8%' : overviewCols === 2 ? '48%' : '100%' }]}>
                                     <View style={[styles.overviewIconCircle, { backgroundColor: color }]}>
-                                        <Icon width={20} height={20} fill="#fff" />
+                                        <Ionicons name={iconName} size={20} color="#fff" />
                                     </View>
                                     <Text style={styles.overviewCardTitle}>{key}</Text>
                                     <Text style={styles.overviewCardDesc}>{item!.description}</Text>
@@ -668,7 +664,7 @@ const AdsTypesDetails: React.FC = () => {
 
                 {/* ---------- Management table ---------- */}
                 <View style={styles.sectionBanner}>
-                    <ListUl width={14} height={14} fill="#fff" />
+                    <Ionicons name="list" size={14} color="#fff" />
                     <Text style={styles.sectionBannerText}>Ad Types & Details Management</Text>
                 </View>
 
@@ -682,25 +678,23 @@ const AdsTypesDetails: React.FC = () => {
                             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
                         />
                     ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={isTablet}>
-                            <View>
-                                <View style={styles.tableHeader}>
-                                    <Text style={[styles.headCell, { width: 44 }]}>ID</Text>
-                                    <Text style={[styles.headCell, { width: 130 }]}>Name</Text>
-                                    <Text style={[styles.headCell, { width: 120 }]}>Category</Text>
-                                    <Text style={[styles.headCell, { width: 260 }]}>Description</Text>
-                                    <Text style={[styles.headCell, { width: 90 }]}>Status</Text>
-                                    <Text style={[styles.headCell, { width: 100 }]}>Created</Text>
-                                    <Text style={[styles.headCell, { width: 120 }]}>Action</Text>
-                                </View>
-                                <FlatList
-                                    data={paginatedItems}
-                                    keyExtractor={(i) => String(i.id)}
-                                    renderItem={renderTableRow}
-                                    scrollEnabled={false}
-                                />
+                        <View style={{ flex: 1 }}>
+                            <View style={styles.tableHeader}>
+                                <Text style={[styles.headCell, { flex: 0.5 }]}>ID</Text>
+                                <Text style={[styles.headCell, { flex: 1.8 }]}>Name</Text>
+                                <Text style={[styles.headCell, { flex: 1.5 }]}>Category</Text>
+                                <Text style={[styles.headCell, { flex: 3 }]}>Description</Text>
+                                <Text style={[styles.headCell, { flex: 1.2 }]}>Status</Text>
+                                <Text style={[styles.headCell, { flex: 1.2 }]}>Created</Text>
+                                <Text style={[styles.headCell, { flex: 1.5 }]}>Action</Text>
                             </View>
-                        </ScrollView>
+                            <FlatList
+                                data={paginatedItems}
+                                keyExtractor={(i) => String(i.id)}
+                                renderItem={renderTableRow}
+                                scrollEnabled={false}
+                            />
+                        </View>
                     )}
                 </View>
 
@@ -743,9 +737,15 @@ const styles = StyleSheet.create({
 
     headerContainer: {
         backgroundColor: COLORS.header, borderRadius: 14, padding: 18,
+        paddingBottom: 40,
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16,
     },
     title: { fontSize: 22, fontWeight: '800', color: '#fff' },
+    headerIconBox: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: COLORS.orange,
+        alignItems: 'center', justifyContent: 'center',
+    },
     breadcrumbRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap' },
     breadcrumbActive: { color: COLORS.orange, fontSize: 12.5, fontWeight: '600' },
     breadcrumbCurrent: { color: '#CBD5E1', fontSize: 12.5 },
@@ -756,14 +756,30 @@ const styles = StyleSheet.create({
     },
     addBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-    statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: '2%', marginBottom: 16, rowGap: 12 },
+    /* Tablet+ row (flex-wrap) */
+    statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: '2%', marginBottom: 16, rowGap: 12, marginTop: -46, marginHorizontal: 8 },
+    /* Mobile horizontal scroll wrapper */
+    statsRowScrollWrap: { marginTop: -46, marginBottom: 16 },
+    statsRowScroll: { flexDirection: 'row', gap: 10, paddingHorizontal: 8, paddingBottom: 4 },
     statCard: {
-        backgroundColor: COLORS.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: COLORS.border,
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    statIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-    statValue: { fontSize: 22, fontWeight: '800', color: COLORS.ink },
-    statLabel: { fontSize: 12.5, fontWeight: '700', color: COLORS.ink, marginTop: 2 },
-    statSub: { fontSize: 11, color: COLORS.sub, marginTop: 2 },
+    statIconWrap: {
+        width: 40, height: 40, borderRadius: 10,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    statValue: { fontSize: 24, fontWeight: '800', color: COLORS.ink },
+    statLabel: { fontSize: 13, fontWeight: '700', color: COLORS.ink, marginTop: 2 },
+    statSub: { fontSize: 11, color: COLORS.sub, marginTop: 3 },
 
     sectionBanner: {
         flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.orange,
@@ -791,9 +807,9 @@ const styles = StyleSheet.create({
     specLineText: { fontSize: 12, color: COLORS.ink, flexShrink: 1 },
 
     dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
-    tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: COLORS.border, paddingBottom: 10, marginBottom: 4 },
-    headCell: { fontSize: 12, fontWeight: '700', color: COLORS.sub, paddingHorizontal: 4 },
-    tableRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F2F4' },
+    tableHeader: { flexDirection: 'row', backgroundColor: '#1D324E', paddingVertical: 10, paddingHorizontal: 4, borderRadius: 8, marginBottom: 4 },
+    headCell: { fontSize: 12, fontWeight: '700', color: '#fff', paddingHorizontal: 4 },
+    tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F2F4' },
     cell: { paddingHorizontal: 4, fontSize: 13, color: COLORS.ink },
 
     pill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, alignSelf: 'flex-start' },
@@ -828,7 +844,17 @@ const styles = StyleSheet.create({
     },
     textarea: { height: 84, paddingTop: 10, textAlignVertical: 'top' },
     pickerWrap: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, overflow: 'hidden' },
-    picker: { height: 44, color: COLORS.ink },
+    picker: {
+        height: 44,
+        color: COLORS.ink,
+        borderWidth: 0,
+        backgroundColor: 'transparent',
+        ...Platform.select({
+            web: {
+                outlineStyle: 'none',
+            } as any
+        })
+    },
 
     viewRow: { flexDirection: 'row', gap: 20, marginBottom: 4 },
     viewCol: { flex: 1 },

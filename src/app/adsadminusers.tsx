@@ -18,6 +18,7 @@
  */
 
 import AdminLayout from '@/components/admin-layout';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useMemo, useState } from 'react';
 import {
@@ -39,7 +40,6 @@ import Pagination from '@/components/Pagination';
 import CalendarWeek from 'react-native-bootstrap-icons/icons/calendar-week';
 import Grid3x3GapFill from 'react-native-bootstrap-icons/icons/grid-3x3-gap-fill';
 import ListUl from 'react-native-bootstrap-icons/icons/list-ul';
-import PencilSquare from 'react-native-bootstrap-icons/icons/pencil-square';
 import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import PersonCheckFill from 'react-native-bootstrap-icons/icons/person-check-fill';
 import PersonXFill from 'react-native-bootstrap-icons/icons/person-x-fill';
@@ -182,10 +182,10 @@ const UserGridCard: React.FC<{
                 {showOverlay && (
                     <View style={styles.gridOverlay}>
                         <TouchableOpacity style={styles.editBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>
-                            <PencilSquare width={14} height={14} fill="#fff" />
+                            <Ionicons name="pencil" size={13} color="#fff" />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.deleteBtn} onPress={(e) => { (e as any).stopPropagation?.(); onDelete(); }}>
-                            <Trash width={14} height={14} fill="#fff" />
+                            <Ionicons name="trash" size={13} color="#fff" />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -218,10 +218,10 @@ const UserGridCard: React.FC<{
                 {isMobile && (
                     <View style={styles.gridMobileActions}>
                         <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-                            <PencilSquare width={14} height={14} fill="#fff" />
+                            <Ionicons name="pencil" size={13} color="#fff" />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
-                            <Trash width={14} height={14} fill="#fff" />
+                            <Ionicons name="trash" size={13} color="#fff" />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -231,7 +231,7 @@ const UserGridCard: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
-// Custom Delete Confirmation Modal
+// Delete Modal
 // ---------------------------------------------------------------------------
 const DeleteModal: React.FC<{
     visible: boolean;
@@ -244,33 +244,37 @@ const DeleteModal: React.FC<{
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
-                <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-                <View style={[styles.deleteModalCard, { maxWidth: 380 }]}>
-                    <View style={styles.deleteModalHeader}>
-                        <Text style={styles.deleteModalTitle}>Confirm Delete</Text>
-                        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                            <XLg width={16} height={16} fill="#fff" />
+                <View style={[styles.modalCard, { maxWidth: 420 }]}>
+                    <View style={styles.modalHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Trash width={16} height={16} fill="#fff" />
+                            <Text style={styles.modalHeaderText}>Delete User</Text>
+                        </View>
+                        <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <XLg width={18} height={18} fill="#fff" />
                         </TouchableOpacity>
                     </View>
-                    <View style={{ padding: 28, alignItems: 'center' }}>
-                        <View style={styles.deleteIconCircle}>
-                            <Trash width={36} height={36} fill="#DD6F10" />
+
+                    <View style={[styles.modalBody, { alignItems: 'center', paddingTop: 26 }]}>
+                        <View style={styles.trashCircle}>
+                            <Trash width={26} height={26} fill={COLORS.orange} />
                         </View>
-                        <Text style={styles.deleteTitle}>Are you sure?</Text>
-                        <Text style={styles.deleteSubtitle}>
-                            You won't be able to revert this action. This will permanently delete the user{' '}
+                        <Text style={styles.confirmTitle}>Are you sure you want to delete this user?</Text>
+                        <Text style={styles.confirmSub}>
+                            This action cannot be undone! This will permanently delete the user{' '}
                             <Text style={{ fontWeight: '700' }}>{user.fullName.toLowerCase()}</Text>.
                         </Text>
-                        <View style={styles.deleteModalButtons}>
-                            <TouchableOpacity style={styles.deleteCancelBtn} onPress={onClose}>
-                                <XLg width={13} height={13} fill="#fff" />
-                                <Text style={styles.deleteCancelBtnText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.deleteConfirmBtn} onPress={onConfirm}>
-                                <Trash width={13} height={13} fill="#fff" />
-                                <Text style={styles.deleteConfirmBtnText}>Delete</Text>
-                            </TouchableOpacity>
-                        </View>
+                    </View>
+
+                    <View style={styles.modalFooter}>
+                        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                            <XLg width={13} height={13} fill="#fff" />
+                            <Text style={styles.cancelBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteConfirmBtn} onPress={onConfirm}>
+                            <Trash width={13} height={13} fill="#fff" />
+                            <Text style={styles.submitBtnText}>Delete User</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>
@@ -403,7 +407,7 @@ const UserFormModal: React.FC<{
 
                     <View style={styles.modalFooter}>
                         <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                            <XLg width={14} height={14} fill={COLORS.ink} />
+                            <XLg width={14} height={14} fill="#fff" />
                             <Text style={styles.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
@@ -539,7 +543,7 @@ const AdsAdminUsers: React.FC = () => {
         return (
             <View style={styles.tableRow}>
                 <Text style={[styles.cell, styles.colId]}>{item.id}</Text>
-                <View style={[styles.cell, styles.colName, { flexDirection: 'row', alignItems: 'center' }]}>
+                <View style={[styles.colName, { flexDirection: 'row', alignItems: 'center' }]}>
                     <View style={styles.avatar}>
                         <Text style={styles.avatarText}>{item.fullName.charAt(0)}</Text>
                     </View>
@@ -547,19 +551,19 @@ const AdsAdminUsers: React.FC = () => {
                 </View>
                 <Text style={[styles.cell, styles.colUsername]} numberOfLines={1}>{item.username}</Text>
                 <Text style={[styles.cell, styles.colEmail, { color: COLORS.sub }]} numberOfLines={1}>{item.email}</Text>
-                <View style={[styles.cell, styles.colRole]}>
+                <View style={[styles.colRole]}>
                     <Pill text={item.role} bg={rc.bg} fg={rc.fg} />
                 </View>
-                <View style={[styles.cell, styles.colStatus]}>
+                <View style={[styles.colStatus]}>
                     <Pill text={item.status} bg={sc.bg} fg={sc.fg} />
                 </View>
                 <Text style={[styles.cell, styles.colLastLogin, { color: COLORS.sub, fontSize: 12 }]}>{item.lastLogin}</Text>
-                <View style={[styles.cell, styles.colAction, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                <View style={[styles.colAction, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <TouchableOpacity style={styles.editBtn} onPress={() => openEditModal(item)}>
-                        <PencilSquare width={14} height={14} fill="#fff" />
+                        <Ionicons name="pencil" size={13} color="#fff" />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                        <Trash width={14} height={14} fill="#fff" />
+                        <Ionicons name="trash" size={13} color="#fff" />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -709,13 +713,13 @@ const AdsAdminUsers: React.FC = () => {
                                 <View style={[styles.tableWrapper, { width: width < 1024 ? 1000 : '100%' }]}>
                                     <View style={styles.tableHeader}>
                                         <Text style={[styles.headCell, styles.colId]}>ID</Text>
-                                        <Text style={[styles.headCell, styles.colName]}>Full Name</Text>
+                                        <View style={[styles.colName]}><Text style={styles.headCell}>Full Name</Text></View>
                                         <Text style={[styles.headCell, styles.colUsername]}>Username</Text>
                                         <Text style={[styles.headCell, styles.colEmail]}>Email</Text>
-                                        <Text style={[styles.headCell, styles.colRole]}>Role</Text>
-                                        <Text style={[styles.headCell, styles.colStatus]}>Status</Text>
+                                        <View style={[styles.colRole]}><Text style={styles.headCell}>Role</Text></View>
+                                        <View style={[styles.colStatus]}><Text style={styles.headCell}>Status</Text></View>
                                         <Text style={[styles.headCell, styles.colLastLogin]}>Last Login</Text>
-                                        <Text style={[styles.headCell, styles.colAction]}>Action</Text>
+                                        <View style={[styles.colAction]}><Text style={styles.headCell}>Action</Text></View>
                                     </View>
                                     <FlatList
                                         data={pageData}
@@ -843,14 +847,14 @@ const styles = StyleSheet.create({
         width: 1000,
         minWidth: '100%',
     },
-    colId: { width: 50, paddingHorizontal: 8 },
+    colId: { flex: 0.5, paddingHorizontal: 8 },
     colName: { flex: 2, paddingHorizontal: 8 },
     colUsername: { flex: 1.5, paddingHorizontal: 8 },
     colEmail: { flex: 2.5, paddingHorizontal: 8 },
     colRole: { flex: 1.2, paddingHorizontal: 8 },
     colStatus: { flex: 1.2, paddingHorizontal: 8 },
     colLastLogin: { flex: 2, paddingHorizontal: 8 },
-    colAction: { width: 110, paddingHorizontal: 8 },
+    colAction: { flex: 1.2, paddingHorizontal: 8 },
 
     tableCard: {
         backgroundColor: COLORS.card,
@@ -881,32 +885,17 @@ const styles = StyleSheet.create({
     cell: {
         fontSize: 13,
         color: COLORS.ink,
-        justifyContent: 'center',
     },
     cellNameText: { fontSize: 13, fontWeight: '600', color: COLORS.ink, flexShrink: 1 },
 
     avatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: COLORS.orange, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-    avatarText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+    avatarText: { color: '#fff', fontWeight: '800', fontSize: 13, textAlign: 'center', lineHeight: 30 },
 
     pill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, alignSelf: 'flex-start' },
     pillText: { fontSize: 11, fontWeight: '700' },
 
-    editBtn: {
-        backgroundColor: '#1d324e',
-        width: 34,
-        height: 34,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    } as any,
-    deleteBtn: {
-        backgroundColor: '#ee5e5b', // soft red matching user mockup
-        width: 34,
-        height: 34,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    } as any,
+    editBtn: { backgroundColor: COLORS.orange, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    deleteBtn: { backgroundColor: COLORS.danger, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 
     userCard: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -967,14 +956,24 @@ const styles = StyleSheet.create({
     },
     cancelBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16,
-        borderRadius: 10, backgroundColor: '#E5E7EB',
+        borderRadius: 10, backgroundColor: '#334155',
     },
-    cancelBtnText: { color: COLORS.ink, fontWeight: '700', fontSize: 13 },
+    cancelBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
     submitBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16,
         borderRadius: 10, backgroundColor: COLORS.orange,
     },
     submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    deleteConfirmBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16,
+        borderRadius: 10, backgroundColor: COLORS.danger,
+    },
+    trashCircle: {
+        width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFF1E6',
+        alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    },
+    confirmTitle: { fontSize: 15, fontWeight: '700', color: COLORS.ink, textAlign: 'center' },
+    confirmSub: { fontSize: 12.5, color: COLORS.sub, marginTop: 4, textAlign: 'center' },
 
     // Responsive Grid Card styles
     gridCard: {
@@ -1070,86 +1069,4 @@ const styles = StyleSheet.create({
         paddingTop: 10,
     } as any,
 
-    // Delete Modal styles (matching mockup)
-    deleteModalCard: {
-        width: '100%',
-        maxWidth: 380,
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 20 },
-        shadowOpacity: 0.15,
-        shadowRadius: 40,
-        elevation: 20,
-    } as any,
-    deleteModalHeader: {
-        backgroundColor: '#DD6F10',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    } as any,
-    deleteModalTitle: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '700',
-    } as any,
-    deleteIconCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: '#FFF0E6',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-    } as any,
-    deleteTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.ink,
-        marginBottom: 8,
-    } as any,
-    deleteSubtitle: {
-        fontSize: 13,
-        color: COLORS.sub,
-        textAlign: 'center',
-        lineHeight: 18,
-        paddingHorizontal: 12,
-    } as any,
-    deleteModalButtons: {
-        flexDirection: 'row',
-        gap: 12,
-        justifyContent: 'center',
-        marginTop: 24,
-    } as any,
-    deleteCancelBtn: {
-        paddingHorizontal: 18,
-        paddingVertical: 10,
-        backgroundColor: '#4B5563',
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    } as any,
-    deleteCancelBtnText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    } as any,
-    deleteConfirmBtn: {
-        paddingHorizontal: 18,
-        paddingVertical: 10,
-        backgroundColor: '#DD6F10',
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    } as any,
-    deleteConfirmBtnText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    } as any,
 });

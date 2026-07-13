@@ -7,7 +7,10 @@
  * header, teal/slate accents instead of navy/blue, card style differs.
  *
  * Working features:
- *  - List view (table) <-> Grid view (cards), toggle works on all sizes
+ *  - List view (table) <-> Grid view (cards), toggle works on all sizes.
+ *    The table itself is horizontally scrollable at every breakpoint —
+ *    columns keep fixed widths (never compressed/overlapped); on narrow
+ *    screens you scroll sideways to read every column.
  *  - Delete guard: customers with orders > 0 cannot be deleted — a
  *    warning modal blocks it (matches "Cannot Delete Customer" flow).
  *    Customers with 0 orders show a normal confirm-delete modal.
@@ -20,25 +23,25 @@
  */
 
 import AdminLayout from '@/components/admin-layout';
-import AdminSidebar from '@/components/admin-sidebar';
 import Pagination from '@/components/Pagination';
+
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
+import ArrowLeft from 'react-native-bootstrap-icons/icons/arrow-left';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
 import Building from 'react-native-bootstrap-icons/icons/building';
 import CalendarEvent from 'react-native-bootstrap-icons/icons/calendar-event';
-import ChevronRight from 'react-native-bootstrap-icons/icons/chevron-right';
 import EnvelopeFill from 'react-native-bootstrap-icons/icons/envelope-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
 import Grid3x3GapFill from 'react-native-bootstrap-icons/icons/grid-3x3-gap-fill';
@@ -79,6 +82,8 @@ const COLORS = {
   amber: '#F59E0B',
   amberDark: '#D97706',
   darkOrange: '#E65100',
+  orange: '#F97316',
+  pink: '#F43F5E',
   blue: '#2563EB',
   blueDark: '#1D4ED8',
   headerBg: '#2D2D60',
@@ -101,13 +106,37 @@ const COLORS = {
 // ---------------------------------------------------------------------------
 type Bp = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
 function getBreakpoint(width: number): Bp {
-  if (width < 360) return 'xs';   // 320
-  if (width < 400) return 'sm';   // 375
-  if (width < 768) return 'md';   // 425
+  if (width < 360) return 'xs';   // 320 Mobile S
+  if (width < 400) return 'sm';   // 375 Mobile M
+  if (width < 768) return 'md';   // 425 Mobile L
   if (width < 1024) return 'lg';  // 768 tablet
   if (width < 1440) return 'xl';  // 1024 laptop
-  return 'xxl';                   // 1440 / 2560
+  return 'xxl';                   // 1440 / 1920 / 2560 desktop
 }
+
+// ---------------------------------------------------------------------------
+// Table column config — each column has a minWidth (floor, enforced on
+// narrow screens so text is never compressed/overlapped) and a flex weight
+// (used to distribute any extra space evenly on wide screens, so columns
+// spread out and get proper breathing room instead of leaving a big empty
+// gap on the right).
+// ---------------------------------------------------------------------------
+const COLUMNS = [
+  { key: 'sno', label: 'S.No', minWidth: 56, flex: 0.6 },
+  { key: 'name', label: 'Name', minWidth: 160, flex: 1.6 },
+  { key: 'email', label: 'Email', minWidth: 200, flex: 2 },
+  { key: 'phone', label: 'Phone', minWidth: 130, flex: 1.2 },
+  { key: 'company', label: 'Company', minWidth: 140, flex: 1.3 },
+  { key: 'orders', label: 'Orders', minWidth: 100, flex: 0.9 },
+  { key: 'joined', label: 'Joined', minWidth: 140, flex: 1.2 },
+  { key: 'action', label: 'Action', minWidth: 120, flex: 1.1 },
+] as const;
+
+const CELL_H_PADDING = 18; // generous horizontal breathing room between columns
+const TABLE_MIN_WIDTH = COLUMNS.reduce((sum, c) => sum + c.minWidth, 0) + CELL_H_PADDING * 2;
+
+// Grid view gutter (space between cards)
+const GRID_GAP = 16;
 
 // ---------------------------------------------------------------------------
 // Delete confirmation modal (guarded when orders > 0)
@@ -137,7 +166,7 @@ const DeleteModal: React.FC<{
 
           <View style={styles.modalBody}>
             <View style={styles.trashCircle}>
-              <TrashFill width={26} height={26} fill="#F97316" />
+              <TrashFill width={36} height={36} fill="#F97316" />
             </View>
             <Text style={styles.confirmTitle}>Are you sure you want to delete this customer?</Text>
             <Text style={styles.confirmSub}>This action cannot be undone!</Text>
@@ -233,7 +262,7 @@ const CustomerManagement: React.FC = () => {
   }, [filtered, safePage]);
 
   const handleViewOrders = (customer?: Customer) => {
-    router.push('/ads-orders');
+    router.push('/ads-ordermanagement');
   };
 
   const requestDelete = (customer: Customer) => setDeleteTarget(customer);
@@ -244,96 +273,116 @@ const CustomerManagement: React.FC = () => {
     setDeleteTarget(null);
   };
 
-  const useCardLayout = isPhone || view === 'grid';
+  // Layout is driven purely by the toggle now, at every breakpoint — the
+  // table stays a table (with horizontal scroll) unless Grid is selected.
+  const useCardLayout = view === 'grid';
+
+  // Explicit columns to prevent the last row from stretching
+  const gridColumns = isPhone ? 1 : bp === 'lg' ? 2 : bp === 'xl' ? 3 : 4;
+  const gridCellWidth = `${100 / gridColumns}%` as const;
 
   // ---- Table row -------------------------------------------------------
+  const colStyle = (key: (typeof COLUMNS)[number]['key']) => {
+    const col = COLUMNS.find((c) => c.key === key)!;
+    return { flexGrow: col.flex, flexShrink: 1, flexBasis: col.minWidth, minWidth: col.minWidth };
+  };
+
   const renderRow = ({ item }: { item: Customer }) => (
     <View style={styles.tableRow}>
-      <Text style={[styles.cell, { width: 44, color: COLORS.sub }]}>{item.id}</Text>
-      <Text style={[styles.cell, { width: 160, fontWeight: '700', color: COLORS.slate }]} numberOfLines={1}>{item.name}</Text>
-      <Text style={[styles.cell, { width: 200, color: COLORS.sub }]} numberOfLines={1}>{item.email}</Text>
-      <Text style={[styles.cell, { width: 120 }]} numberOfLines={1}>{item.phone}</Text>
-      <Text style={[styles.cell, { width: 130, color: COLORS.sub }]} numberOfLines={1}>{item.company}</Text>
-      <View style={[styles.cell, { width: 80 }]}>
+      <Text style={[styles.cell, colStyle('sno'), { color: COLORS.sub }]}>{item.id}</Text>
+      <Text style={[styles.cell, colStyle('name'), { fontWeight: '700', color: COLORS.slate }]} numberOfLines={1}>{item.name}</Text>
+      <Text style={[styles.cell, colStyle('email'), { color: COLORS.sub }]} numberOfLines={1}>{item.email}</Text>
+      <Text style={[styles.cell, colStyle('phone')]} numberOfLines={1}>{item.phone}</Text>
+      <Text style={[styles.cell, colStyle('company'), { color: COLORS.sub }]} numberOfLines={1}>{item.company}</Text>
+      <View style={[styles.cell, colStyle('orders')]}>
         <View style={styles.orderChip}>
           <Text style={styles.orderChipText}>{item.orders}</Text>
         </View>
       </View>
-      <Text style={[styles.cell, { width: 130, color: COLORS.sub, fontSize: 12 }]}>{item.joined}</Text>
-      <View style={[styles.cell, { width: 150, flexDirection: 'row', gap: 8 }]}>
-        <TouchableOpacity style={styles.ordersBtn} onPress={() => handleViewOrders(item)}>
-          <LockFill width={12} height={12} fill="#fff" />
-          <Text style={styles.ordersBtnText}>Orders</Text>
+      <Text style={[styles.cell, colStyle('joined'), { color: COLORS.sub, fontSize: 12 }]}>{item.joined}</Text>
+      <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
+        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewOrders(item)}>
+          <LockFill width={15} height={15} fill="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
-          <TrashFill width={13} height={13} fill="#fff" />
+          <TrashFill width={15} height={15} fill="#fff" />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // ---- Grid card ---------------------------------------------------------
-  const renderCard = ({ item }: { item: Customer }) => (
-    <View style={[styles.gridCard, isPhone && { width: '100%' }]}>
+  // ---- Grid card -----------------------------------------------------
+  // Redesigned premium responsive card
+  const renderCard = (item: Customer) => (
+    <View style={styles.gridCard}>
       <View style={styles.gridCardHeader}>
-        <Text style={styles.gridCardName} numberOfLines={1}>{item.name}</Text>
-        <View style={styles.idBadge}>
-          <Text style={styles.idBadgeText}>#{item.id}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14 }}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.gridCardName} numberOfLines={1}>{item.name}</Text>
+            <View style={styles.idBadge}>
+              <Text style={styles.idBadgeText}>ID: #{item.id}</Text>
+            </View>
+          </View>
         </View>
       </View>
 
-      <View style={styles.gridInfoRow}>
-        <EnvelopeFill width={12} height={12} fill={COLORS.sub} />
-        <Text style={styles.gridInfoText} numberOfLines={1}>{item.email}</Text>
-      </View>
-      <View style={styles.gridInfoRow}>
-        <TelephoneFill width={12} height={12} fill={COLORS.sub} />
-        <Text style={styles.gridInfoText} numberOfLines={1}>{item.phone}</Text>
-      </View>
-      <View style={styles.gridInfoRow}>
-        <Building width={12} height={12} fill={COLORS.sub} />
-        <Text style={styles.gridInfoText} numberOfLines={1}>{item.company}</Text>
+      <View style={styles.divider} />
+
+      <View style={styles.gridInfoContainer}>
+        <View style={styles.gridInfoRow}>
+          <View style={styles.iconBox}><EnvelopeFill width={13} height={13} fill="#1d324e" /></View>
+          <Text style={styles.gridInfoText} numberOfLines={1}>{item.email}</Text>
+        </View>
+        <View style={styles.gridInfoRow}>
+          <View style={styles.iconBox}><TelephoneFill width={13} height={13} fill="#1d324e" /></View>
+          <Text style={styles.gridInfoText} numberOfLines={1}>{item.phone}</Text>
+        </View>
+        <View style={styles.gridInfoRow}>
+          <View style={styles.iconBox}><Building width={13} height={13} fill="#1d324e" /></View>
+          <Text style={styles.gridInfoText} numberOfLines={1}>{item.company}</Text>
+        </View>
       </View>
 
       <View style={styles.gridMetaRow}>
         <View style={styles.gridMetaItem}>
-          <BagCheckFill width={12} height={12} fill={COLORS.tealDark} />
-          <Text style={styles.gridMetaText}>{item.orders} orders</Text>
+          <BagCheckFill width={15} height={15} fill={COLORS.amberDark} />
+          <Text style={styles.gridMetaText}>{item.orders} Orders</Text>
         </View>
         <View style={styles.gridMetaItem}>
-          <CalendarEvent width={12} height={12} fill={COLORS.sub} />
-          <Text style={styles.gridMetaText}>{item.joined}</Text>
+          <CalendarEvent width={14} height={14} fill={COLORS.sub} />
+          <Text style={styles.gridMetaDate}>{item.joined}</Text>
         </View>
       </View>
 
       <View style={styles.gridActionsRow}>
         <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
-          <LockFill width={12} height={12} fill="#fff" />
+          <LockFill width={14} height={14} fill="#fff" />
           <Text style={styles.ordersBtnText}>Orders</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
-          <TrashFill width={13} height={13} fill="#fff" />
+          <TrashFill width={16} height={16} fill="#fff" />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  const numColumns = bp === 'xxl' ? 4 : bp === 'xl' ? 3 : bp === 'lg' ? 2 : 1;
-
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {/* ---------- Header ---------- */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn}>
-            <ChevronRight width={24} height={24} fill="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
+        <View style={[styles.header, isPhone && styles.headerPhone]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/Dashboard')}>
+            <ArrowLeft width={22} height={22} fill="#fff" />
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
             <View style={styles.headerIconBox}>
               <PeopleFill width={20} height={20} fill="#fff" />
             </View>
-            <View>
+            <View style={{ flexShrink: 1 }}>
               <Text style={styles.headerTitle}>Customers Management</Text>
               <Text style={styles.headerSubtitle}>Manage all customer accounts and orders</Text>
             </View>
@@ -357,7 +406,7 @@ const CustomerManagement: React.FC = () => {
               onChangeText={(txt) => { setSearch(txt); setPage(1); }}
             />
           </View>
- 
+
           <View style={styles.viewToggle}>
             <TouchableOpacity
               style={[styles.viewToggleBtn, view === 'list' && styles.viewToggleBtnActive]}
@@ -373,33 +422,47 @@ const CustomerManagement: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
- 
+
         {/* ---------- Data ---------- */}
         <View style={styles.dataCard}>
           {useCardLayout ? (
-            <FlatList
-              key={`grid-${numColumns}`}
-              data={paginated}
-              keyExtractor={(c) => String(c.id)}
-              renderItem={renderCard}
-              numColumns={isPhone ? 1 : numColumns}
-              columnWrapperStyle={!isPhone && numColumns > 1 ? { gap: 12 } : undefined}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-              scrollEnabled={false}
-              ListEmptyComponent={<Text style={styles.emptyText}>No customers match your search.</Text>}
-            />
+            paginated.length === 0 ? (
+              <Text style={styles.emptyText}>No customers match your search.</Text>
+            ) : (
+              // Plain flex-wrap grid instead of FlatList numColumns: each
+              // cell reserves a true percentage share of the row
+              // (gridCellWidth) with the gutter applied via padding on the
+              // cell rather than a fixed pixel width on the card, so cards
+              // never overflow the viewport and always wrap correctly at
+              // every breakpoint (1 col phone -> 2 tablet -> 3 laptop -> 4
+              // desktop).
+              <View style={styles.gridWrap}>
+                {paginated.map((item) => (
+                  <View key={item.id} style={[styles.gridCell, { width: gridCellWidth }]}>
+                    {renderCard(item)}
+                  </View>
+                ))}
+              </View>
+            )
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={isTablet}>
-              <View>
+            // Horizontal scroll wrapper: on wide screens the table stretches
+            // to fill the full card width (flexGrow content container +
+            // flex:1 inner view), so columns spread out with proper spacing
+            // instead of leaving empty space on the right. Each column still
+            // has a minWidth floor, so on narrow screens the row simply
+            // can't shrink past it and the ScrollView scrolls horizontally
+            // instead of compressing or overlapping columns.
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator
+              style={styles.tableScroll}
+              contentContainerStyle={{ flexGrow: 1 }}
+            >
+              <View style={{ flex: 1, minWidth: TABLE_MIN_WIDTH }}>
                 <View style={styles.tableHeader}>
-                  <Text style={[styles.headCell, { width: 44 }]}>S.No</Text>
-                  <Text style={[styles.headCell, { width: 160 }]}>Name</Text>
-                  <Text style={[styles.headCell, { width: 200 }]}>Email</Text>
-                  <Text style={[styles.headCell, { width: 120 }]}>Phone</Text>
-                  <Text style={[styles.headCell, { width: 130 }]}>Company</Text>
-                  <Text style={[styles.headCell, { width: 80 }]}>Orders</Text>
-                  <Text style={[styles.headCell, { width: 130 }]}>Joined</Text>
-                  <Text style={[styles.headCell, { width: 150 }]}>Action</Text>
+                  {COLUMNS.map((col) => (
+                    <Text key={col.key} style={[styles.headCell, colStyle(col.key)]}>{col.label}</Text>
+                  ))}
                 </View>
                 <FlatList
                   data={paginated}
@@ -457,7 +520,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 16,
     borderRadius: 14, marginBottom: 16,
   },
-  backBtn: { padding: 8 },
+  headerPhone: {
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  backBtn: { padding: 8, alignSelf: 'flex-start', marginTop: 2 },
   headerContent: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerIconBox: {
     width: 44, height: 44, borderRadius: 10, backgroundColor: COLORS.amber,
@@ -480,49 +547,75 @@ const styles = StyleSheet.create({
     borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 12,
     height: 42, flex: 1, minWidth: 200,
   },
-  searchInput: { flex: 1, fontSize: 13, color: COLORS.slate },
+  searchInput: { flex: 1, fontSize: 13, color: COLORS.slate, outlineStyle: 'none' as any },
   viewToggle: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 3 },
   viewToggleBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
   viewToggleBtnActive: { backgroundColor: '#F97316' },
 
   dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
 
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: COLORS.border, paddingBottom: 10, marginBottom: 4, backgroundColor: '#F8FAFC' },
-  headCell: { fontSize: 12, fontWeight: '700', color: COLORS.sub, paddingHorizontal: 12, paddingVertical: 6 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F1F5F9' },
-  cell: { paddingHorizontal: 12, fontSize: 13, color: COLORS.slate, justifyContent: 'center' },
+  tableScroll: { borderRadius: 8 },
+  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: COLORS.border, paddingVertical: 12, paddingHorizontal: 4, marginBottom: 4, backgroundColor: '#1d324e' },
+  headCell: { fontSize: 12, fontWeight: '700', color: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 6 },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderColor: '#F1F5F9' },
+  cell: { paddingHorizontal: 18, fontSize: 13, color: COLORS.slate, justifyContent: 'center' },
 
   orderChip: { backgroundColor: COLORS.chip, paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999, alignSelf: 'flex-start' },
   orderChipText: { color: COLORS.chipText, fontWeight: '700', fontSize: 12 },
 
-  ordersBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F97316',
-    paddingVertical: 7, paddingHorizontal: 12, borderRadius: 8,
+  // Table actions — solid colored rounded-square icon buttons (orange for
+  // Orders, pink/red for Delete), matching the reference style. Edit removed.
+  ordersIconBtn: {
+    width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.orange,
   },
   ordersBtnWide: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: '#F97316', paddingVertical: 10, borderRadius: 8,
+    backgroundColor: COLORS.orange, paddingVertical: 10, borderRadius: 8,
   },
   ordersBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  deleteBtn: { backgroundColor: '#1D324E', width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-
-  gridCard: {
-    backgroundColor: '#FAFCFF', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 14,
-    height: 200, minHeight: 200,width: 345,
+  deleteBtn: {
+    backgroundColor: COLORS.pink, width: 34, height: 34, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
   },
-  gridCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  gridCardName: { fontSize: 15, fontWeight: '800', color: COLORS.slate, flex: 1, marginRight: 8 },
-  idBadge: { backgroundColor: COLORS.slate, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
-  idBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  gridInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
-  gridInfoText: { fontSize: 12.5, color: COLORS.sub, flexShrink: 1 },
+  // Grid layout
+  gridWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
+  },
+  gridCell: {
+    paddingHorizontal: 8,
+    marginBottom: 16,
+  },
+  gridCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', padding: 20,
+    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+  },
+  gridCardHeader: { marginBottom: 16 },
+  avatarCircle: {
+    width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.chip,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CFFAFE'
+  },
+  avatarText: { fontSize: 18, fontWeight: '800', color: COLORS.tealDark },
+  gridCardName: { fontSize: 17, fontWeight: '800', color: COLORS.slate, marginBottom: 4 },
+  idBadge: { backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8, alignSelf: 'flex-start' },
+  idBadgeText: { color: COLORS.sub, fontSize: 11, fontWeight: '700' },
 
-  gridMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, marginBottom: 12 },
-  gridMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  gridMetaText: { fontSize: 12, color: COLORS.slate, fontWeight: '600' },
+  divider: { height: 1, backgroundColor: '#F1F5F9', marginHorizontal: -20, marginBottom: 16 },
 
-  gridActionsRow: { flexDirection: 'row', gap: 8 },
+  gridInfoContainer: { gap: 10, marginBottom: 18 },
+  gridInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconBox: { width: 26, height: 26, borderRadius: 6, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
+  gridInfoText: { fontSize: 13.5, color: '#475569', flexShrink: 1, fontWeight: '500' },
+
+  gridMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10 },
+  gridMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  gridMetaText: { fontSize: 13, color: COLORS.amberDark, fontWeight: '700' },
+  gridMetaDate: { fontSize: 13, color: COLORS.sub, fontWeight: '600' },
+
+  gridActionsRow: { flexDirection: 'row', gap: 10 },
 
   emptyText: { textAlign: 'center', color: COLORS.sub, paddingVertical: 24, fontSize: 13 },
   footerText: { textAlign: 'center', color: COLORS.sub, fontSize: 12, marginTop: 18 },
@@ -537,7 +630,7 @@ const styles = StyleSheet.create({
   modalHeaderText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalBody: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 10, alignItems: 'center' },
   trashCircle: {
-    width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.warnBg,
+    width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.warnBg,
     alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
   confirmTitle: { fontSize: 15, fontWeight: '700', color: COLORS.slate, textAlign: 'center' },

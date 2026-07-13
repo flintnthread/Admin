@@ -137,7 +137,7 @@ const NAV_ITEMS = {
     ],
   },
   "EMAIL MANAGEMENT": [
-    { label: "Customer Emails", icon: "mail", path: null, color: "#F43F5E" },
+    { label: "Customer Emails", icon: "mail", path: "/customeremails", color: "#F43F5E" },
     { label: "Seller Emails", icon: "mail", path: null, color: "#F97316" },
   ],
   "PAYMENTS & PRODUCTS": [
@@ -178,7 +178,7 @@ const NAV_ITEMS = {
         { label: "Ads Dashboard", icon: "pie-chart", path: "/Addashboard", color: "#3B82F6" },
         { label: "Ad Placements", icon: "layout", path: "ads-placement", color: "#10B981" },
         { label: "Performance Ads", icon: "activity", path: "Performance-ads", color: "#F59E0B" },
-        { label: "Campaigns & Packages", icon: "package", path: "capign&packages", color: "#8B5CF6" },
+        { label: "Campaigns & Packages", icon: "package", path: "campaigns-packages", color: "#8B5CF6" },
         { label: "Ads Types & Details", icon: "layers", path: "ads-types-details", color: "#EC4899" },
         { label: "Orders Management", icon: "shopping-cart", path: "ads-ordermanagement", color: "#14B8A6" },
         { label: "Payments Management", icon: "credit-card", path: "ads-payments", color: "#F97316" },
