@@ -340,12 +340,11 @@ export default function BankApproval() {
               padding: pagePadding,
               maxWidth: width >= 1200 ? "100%" : 1600,
               width: "100%",
-              alignSelf: "center",
-            }
+              alignSelf: "center",           }
           ]}>
 
             {loadError ? (
-              <Text style={{ color: "#DC2626", marginBottom: 12 }}>{loadError}</Text>
+              <Text style={{ color: "#DC262`6`", marginBottom: 12 }}>{loadError}</Text>
             ) : null}
 
             {/* Desktop Page Title Bar */}
