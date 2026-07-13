@@ -853,11 +853,11 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={s.scrollContent}
+        contentContainerStyle={[s.scrollContent, { width: "100%", flexGrow: 1 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ══ HEADER — floats with margin, rounded on all corners (now scrolls) ══ */}
-        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px, backgroundColor: "#FFFFFF" }}>
+        <View style={{ width: "100%", paddingHorizontal: px, backgroundColor: "#FFFFFF" }}>
           <View
             style={[
               s.header,
@@ -988,7 +988,7 @@ export default function CustomerDetailScreen({ customer: customerProp, onBack: o
         )}
       </View>
 
-<View style={[s.body, { maxWidth: 1600, alignSelf: "center", width: "100%", paddingHorizontal: px }]}>
+        <View style={[s.body, { width: "100%", paddingHorizontal: px }]}>
           {/* Profile card */}
           <Card style={[s.profileCard, isMobile && { padding: 14, gap: 12 }]}>
             <View style={[s.profileInner, isMobile && { gap: 12 }]}>
@@ -1249,7 +1249,7 @@ const s = StyleSheet.create({
   hSub:          { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
 
   // Overlapping order-status stat cards
-  statCardsWrap:           { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: -30, marginBottom: 16 },
+  statCardsWrap:           { flexDirection: "row", flexWrap: "wrap", width: "100%", gap: 10, marginTop: -30, marginBottom: 16 },
   // Mobile: horizontal scroll strip (overlaps the navy header)
   statCardsWrapMobile:     { marginTop: -24, marginBottom: 14, paddingHorizontal: 10 },
   statCardsScrollContent:  { flexDirection: "row", gap: 7, paddingRight: 10 },
