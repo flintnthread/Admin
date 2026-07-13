@@ -24,6 +24,7 @@ import {
   Platform,
   Alert,
   DimensionValue,
+  Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
@@ -203,23 +204,68 @@ const StatCard = ({
   iconBg,
   value,
   label,
+  isMobile,
 }: {
   icon: keyof typeof Feather.glyphMap;
   iconColor: string;
   iconBg: string;
   value: number;
   label: string;
+  isMobile?: boolean;
 }) => (
-  <View style={styles.statCard}>
-    <View style={styles.statCardTop}>
-      <View style={[styles.statIconBox, { backgroundColor: iconBg }]}>
-        <Feather name={icon} size={16} color={iconColor} />
-      </View>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
-    <Text style={styles.statLabel}>{label}</Text>
+  <View style={[styles.statCard, isMobile && { alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 }]}>
+    {isMobile ? (
+      <>
+        <View style={[styles.statIconBox, { backgroundColor: iconBg, marginBottom: 6 }]}>
+          <Feather name={icon} size={16} color={iconColor} />
+        </View>
+        <Text style={[styles.statValue, { fontSize: 15 }]}>{value}</Text>
+        <Text style={[styles.statLabel, { marginTop: 4, textAlign: 'center' }]}>{label}</Text>
+      </>
+    ) : (
+      <>
+        <View style={styles.statCardTop}>
+          <View style={[styles.statIconBox, { backgroundColor: iconBg }]}>
+            <Feather name={icon} size={16} color={iconColor} />
+          </View>
+          <Text style={styles.statValue}>{value}</Text>
+        </View>
+        <Text style={styles.statLabel}>{label}</Text>
+      </>
+    )}
   </View>
 );
+
+// ---------------------------------------------------------------------------
+// Success Modal
+// ---------------------------------------------------------------------------
+function SuccessModal({ visible, title, message, onClose }: { visible: boolean; title: string; message: string; onClose: () => void }) {
+  const scale = useRef(new Animated.Value(0.85)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      scale.setValue(0.85);
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 90 }).start();
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.alertOverlay} onPress={onClose}>
+        <AnimatedView style={[styles.alertCard, { transform: [{ scale }] }]}>
+          <View style={styles.alertIconCircle}>
+            <Feather name="check" size={24} color={COLORS.white} />
+          </View>
+          <Text style={styles.alertTitle}>{title}</Text>
+          <Text style={styles.alertMessage}>{message}</Text>
+          <Pressable style={styles.alertBtn} onPress={onClose}>
+            <Text style={styles.alertBtnText}>OK</Text>
+          </Pressable>
+        </AnimatedView>
+      </Pressable>
+    </Modal>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -236,6 +282,7 @@ export default function HomepageSectionsSettingsScreen() {
   const [savedGroups, setSavedGroups] = useState<SectionGroup[]>(INITIAL_GROUPS);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [successAlert, setSuccessAlert] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: '', message: '' });
 
   const isDirty = useMemo(() => JSON.stringify(groups) !== JSON.stringify(savedGroups), [groups, savedGroups]);
 
@@ -277,11 +324,16 @@ export default function HomepageSectionsSettingsScreen() {
       // });
       await new Promise((r) => setTimeout(r, 500));
       setSavedGroups(groups);
-      showThemedAlert({
-        title: 'Saved',
-        text: 'Homepage sections updated.',
-        icon: 'success',
-      });
+      
+      if (Platform.OS === 'web') {
+        showThemedAlert({
+          title: 'Saved',
+          text: 'Homepage sections updated.',
+          icon: 'success',
+        });
+      } else {
+        setSuccessAlert({ visible: true, title: 'Saved', message: 'Homepage sections updated.' });
+      }
     } finally {
       setSaving(false);
     }
@@ -292,7 +344,7 @@ export default function HomepageSectionsSettingsScreen() {
       <View style={styles.screenWrap}>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: isMobile ? 96 : 84 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: isMobile ? 34 : 84 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header card */}
@@ -303,7 +355,7 @@ export default function HomepageSectionsSettingsScreen() {
             </View>
             <View style={{ flexShrink: 1 }}>
               <Text style={styles.headerTitle}>Homepage Sections</Text>
-              <Text style={styles.headerSubtitle}>Manage what shows on your storefront homepage</Text>
+              <Text style={styles.headerSubtitle}>Manage visibility of homepage sections</Text>
             </View>
           </View>
         </View>
@@ -315,7 +367,8 @@ export default function HomepageSectionsSettingsScreen() {
             iconColor={COLORS.navy}
             iconBg={COLORS.bluePale}
             value={totalCount}
-            label="Total Sections"
+            label="Sections"
+            isMobile={isMobile}
           />
           <StatCard
             icon="eye"
@@ -323,6 +376,7 @@ export default function HomepageSectionsSettingsScreen() {
             iconBg={COLORS.greenPale}
             value={visibleCount}
             label="Visible"
+            isMobile={isMobile}
           />
           <StatCard
             icon="eye-off"
@@ -330,6 +384,7 @@ export default function HomepageSectionsSettingsScreen() {
             iconBg={COLORS.redPale}
             value={hiddenCount}
             label="Hidden"
+            isMobile={isMobile}
           />
           <StatCard
             icon="layers"
@@ -337,6 +392,7 @@ export default function HomepageSectionsSettingsScreen() {
             iconBg={COLORS.orangePale}
             value={groups.length}
             label="Groups"
+            isMobile={isMobile}
           />
         </View>
 
@@ -382,12 +438,12 @@ export default function HomepageSectionsSettingsScreen() {
                       rowColumns > 1 && { width: `${100 / rowColumns}%` as DimensionValue, paddingHorizontal: 6 },
                     ]}
                   >
-                    <View style={styles.rowInner}>
-                      <View style={{ flex: 1, paddingRight: 12 }}>
+                    <View style={[styles.rowInner, isMobile && { flexDirection: 'column', alignItems: 'stretch' }]}>
+                      <View style={{ flex: isMobile ? undefined : 1, paddingRight: isMobile ? 0 : 12 }}>
                         <Text style={styles.rowLabel}>{item.label}</Text>
                         <Text style={styles.rowCaption}>{item.caption}</Text>
                       </View>
-                      <View style={styles.rowRight}>
+                      <View style={[styles.rowRight, isMobile && { marginTop: 14, justifyContent: 'space-between' }]}>
                         <View
                           style={[
                             styles.statusBadge,
@@ -419,12 +475,21 @@ export default function HomepageSectionsSettingsScreen() {
         style={[styles.fab, (!isDirty || saving) && styles.fabDisabled]}
       >
         {saving ? (
-          <ActivityIndicator size="small" color={COLORS.white} />
+          <ActivityIndicator size="small" color={(!isDirty || saving) ? COLORS.textFaint : COLORS.white} />
         ) : (
-          <Feather name="save" size={22} color={COLORS.white} />
+          <Feather name="save" size={22} color={(!isDirty || saving) ? COLORS.textFaint : COLORS.white} />
         )}
         {isDirty && !saving && <View style={styles.fabBadge} />}
       </Pressable>
+
+      {Platform.OS !== 'web' && (
+        <SuccessModal
+          visible={successAlert.visible}
+          title={successAlert.title}
+          message={successAlert.message}
+          onClose={() => setSuccessAlert(prev => ({ ...prev, visible: false }))}
+        />
+      )}
       </View>
     </AdminLayout>
   );
@@ -462,10 +527,17 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   fabDisabled: {
-    backgroundColor: 'rgba(239,123,26,0.4)',
-    shadowOpacity: 0.08,
-    elevation: 2,
+    backgroundColor: '#E2E8F0', // Nice slate gray
+    shadowOpacity: 0,
+    elevation: 0,
   },
+  alertOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.55)', padding: 24 },
+  alertCard: { backgroundColor: '#fff', borderRadius: 20, padding: 24, alignItems: 'center', width: '100%', maxWidth: 300, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
+  alertIconCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.green, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  alertTitle: { fontSize: 18, fontWeight: '700', color: COLORS.navy, marginBottom: 8 },
+  alertMessage: { fontSize: 14, color: COLORS.textMid, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  alertBtn: { alignSelf: 'stretch', backgroundColor: COLORS.orange, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  alertBtnText: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
   fabBadge: {
     position: 'absolute',
     top: 2,
@@ -603,11 +675,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   groupTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.navy,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    color: COLORS.textDark,
   },
   itemsWrap: {},
   row: {

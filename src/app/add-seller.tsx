@@ -140,7 +140,7 @@ function Field({
   onChangeText: (v: string) => void;
   placeholder: string;
   keyboardType?: "default" | "email-address" | "phone-pad";
-  error?: boolean;
+  error?: string | boolean;
 }) {
   return (
     <View style={{ flex: 1, minWidth: 140 }}>
@@ -148,7 +148,7 @@ function Field({
         {label} {required && <Text style={{ color: COLORS.orange }}>*</Text>}
       </Text>
       <TextInput
-        style={[styles.input, error && styles.inputError]}
+        style={[styles.input, error ? styles.inputError : null]}
         placeholder={placeholder}
         placeholderTextColor={COLORS.textFaint}
         value={value}
@@ -156,7 +156,9 @@ function Field({
         keyboardType={keyboardType ?? "default"}
         autoCapitalize={keyboardType === "email-address" ? "none" : "words"}
       />
-      {error ? (
+      {error && typeof error === 'string' ? (
+        <Text style={styles.fieldError}>{error}</Text>
+      ) : error ? (
         <Text style={styles.fieldError}>This field is required</Text>
       ) : hint ? (
         <Text style={styles.fieldHint}>{hint}</Text>
@@ -209,11 +211,17 @@ function AddSellerModal({
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", mobile: "" });
-  const [errors, setErrors] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const update = (key: keyof typeof form) => (v: string) => {
     setForm((f) => ({ ...f, [key]: v }));
-    if (errors[key]) setErrors((e) => ({ ...e, [key]: false }));
+    if (errors[key]) {
+      setErrors((e) => {
+        const newE = { ...e };
+        delete newE[key];
+        return newE;
+      });
+    }
   };
   const resetForm = () => {
     setForm({ firstName: "", lastName: "", email: "", mobile: "" });
@@ -221,13 +229,27 @@ function AddSellerModal({
   };
 
   const handleAdd = () => {
-    const nextErrors: Record<string, boolean> = {
-      firstName: !form.firstName.trim(),
-      lastName: !form.lastName.trim(),
-      email: !form.email.trim(),
-      mobile: !form.mobile.trim(),
-    };
-    if (Object.values(nextErrors).some(Boolean)) {
+    const nextErrors: Record<string, string> = {};
+    
+    if (!form.firstName.trim()) nextErrors.firstName = "First name is required";
+    if (!form.lastName.trim()) nextErrors.lastName = "Last name is required";
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!form.email.trim()) {
+      nextErrors.email = "Email address is required";
+    } else if (!emailRegex.test(form.email.trim())) {
+      nextErrors.email = "Enter a valid email address";
+    }
+
+    const mobileRegex = /^[0-9]{10}$/;
+    const cleanMobile = form.mobile.replace(/[\s-]/g, '');
+    if (!form.mobile.trim()) {
+      nextErrors.mobile = "Mobile number is required";
+    } else if (!mobileRegex.test(cleanMobile)) {
+      nextErrors.mobile = "Enter a valid 10-digit number";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
@@ -249,7 +271,7 @@ function AddSellerModal({
         style={[styles.modalOverlayWrap, isTablet && styles.modalOverlayWrapCentered]}
       >
         <Pressable style={styles.modalOverlay} onPress={handleClose} />
-        <View style={[styles.modalCard, isTablet && { width: 480, alignSelf: "center" }]}>
+        <View style={[styles.modalCard, isTablet && { width: 480, alignSelf: "center", borderRadius: 22 }]}>
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={styles.modalIconBadge}>
@@ -453,7 +475,11 @@ export default function AddSellersScreen() {
         </View>
 
         {/* Sellers table / list */}
-        <View style={[styles.tableCard, { width: "100%", alignSelf: "stretch", padding: isMobile ? 12 : 0 }]}>
+        <View style={[
+          styles.tableCard,
+          { width: "100%", alignSelf: "stretch" },
+          isMobile && { backgroundColor: "transparent", borderWidth: 0, overflow: "visible", elevation: 0, shadowOpacity: 0 }
+        ]}>
           <SellersTable isMobile={isMobile} sellers={sellers} />
         </View>
       </ScrollView>
@@ -534,7 +560,7 @@ const styles = StyleSheet.create({
   modalOverlayWrap: { flex: 1, justifyContent: "flex-end" },
   modalOverlayWrapCentered: { justifyContent: "center", alignItems: "center", padding: 24 },
   modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(15,23,42,0.55)" },
-  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 22, borderTopRightRadius: 22, borderRadius: 22, maxHeight: "88%", overflow: "hidden" },
+  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: "88%", overflow: "hidden" },
   modalHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9", backgroundColor: "#fff" },
   modalScrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   modalIconBadge: { width: 30, height: 30, borderRadius: 9, backgroundColor: COLORS.orangeBg, alignItems: "center", justifyContent: "center" },

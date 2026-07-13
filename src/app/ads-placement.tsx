@@ -336,8 +336,8 @@ function PlacementModal({
         style={[styles.modalOverlayWrap, isTablet && styles.modalOverlayWrapCentered]}
       >
         <Pressable style={styles.modalOverlay} onPress={onClose} />
-        <View style={[styles.modalCard, isTablet && { width: 520, alignSelf: "center" }]}>
-          <View style={styles.modalHeaderRow}>
+        <View style={[styles.modalCard,!isTablet && {borderBottomLeftRadius: 0,borderBottomRightRadius: 0,},isTablet && {width: 520,alignSelf: "center",},]}>          
+            <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={styles.modalIconBadge}>
                 <Feather name={isEdit ? "edit-2" : "image"} size={15} color={COLORS.orange} />
@@ -421,9 +421,17 @@ function PlacementsList({
   const needsScroll = !isMobile && width <= 1280;
   if (isMobile) {
     return (
-      <View style={{ gap: 10 }}>
-        {placements.map((p) => (
-          <View key={p.id} style={styles.placementCard}>
+      <View>
+        {placements.map((p, index) => (
+          <Pressable
+            key={p.id}
+            style={({ pressed }) => [
+              styles.placementCard,
+              index !== placements.length - 1 && { marginBottom: 10 },
+              pressed && styles.placementCardPressed,
+            ]}
+            android_ripple={{ color: "#EEF2FF" }}
+          >
             <View style={styles.placementCardTopRow}>
               <View style={{ flexShrink: 1, flex: 1 }}>
                 <Text style={styles.placementName} numberOfLines={1}>{p.name}</Text>
@@ -456,15 +464,15 @@ function PlacementsList({
 
             <View style={styles.placementActionsRow}>
               <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(p)}>
-                <Feather name="edit-2" size={14} color="#fff" />
-                <Text style={styles.actionBtnText}>Edit</Text>
+                <Feather name="edit-2" size={14} color={COLORS.blue} />
+                <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(p)}>
-                <Feather name="trash-2" size={14} color="#fff" />
-                <Text style={styles.actionBtnText}>Delete</Text>
+                <Feather name="trash-2" size={14} color={COLORS.rose} />
+                <Text style={styles.deleteBtnText}>Delete</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Pressable>
         ))}
       </View>
     );
@@ -617,7 +625,7 @@ export default function AdPlacementsScreen() {
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.heroTitle} numberOfLines={1}>Ad Placements</Text>
-                <Text style={styles.heroSubtitle} numberOfLines={2}>Manage where and how ads appear across the app</Text>
+                <Text style={styles.heroSubtitle} numberOfLines={1}>Manage ad placements</Text>              
               </View>
               <TouchableOpacity
                 style={[
@@ -633,7 +641,7 @@ export default function AdPlacementsScreen() {
           </View>
 
           {/* Placements table / list */}
-          <View style={styles.tableCard}>
+          <View style={[styles.tableCard, isMobile && { backgroundColor: "transparent", borderWidth: 0, overflow: "visible" }]}>
             <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={setDeleteTarget} />
           </View>
         </ScrollView>
@@ -703,7 +711,24 @@ const styles = StyleSheet.create({
   typeTagText: { fontSize: 10.5, fontWeight: "600", color: COLORS.blue },
 
   // Mobile card list
-  placementCard: { borderWidth: 1, borderColor: "#F1F5F9", borderRadius: 14, padding: 13 },
+  placementCardPressed: {
+    backgroundColor: "#F8FAFF",
+    borderColor: "#CBD5E1",
+    opacity: 0.98,
+  },
+
+  placementCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    padding: 13,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   placementCardTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
   placementCardDivider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 10 },
   placementRatesRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
@@ -711,8 +736,10 @@ const styles = StyleSheet.create({
   rateValue: { fontSize: 12.5, color: COLORS.text, fontWeight: "600", marginTop: 2 },
   placementActionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
 
-  editBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: COLORS.navy, borderRadius: 10, paddingVertical: 9 },
-  deleteBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: COLORS.rose, borderRadius: 10, paddingVertical: 9 },
+  editBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: COLORS.blueBg, borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: "#DBEAFE" },
+  deleteBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: COLORS.roseBg, borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: "#FFE4E6" },
+  editBtnText: { color: COLORS.blue, fontSize: 12.5, fontWeight: "600" },
+  deleteBtnText: { color: COLORS.rose, fontSize: 12.5, fontWeight: "600" },
   actionBtnText: { color: "#fff", fontSize: 12.5, fontWeight: "600" },
   editBtnSmall: { width: 30, height: 30, borderRadius: 8, backgroundColor: COLORS.navy, alignItems: "center", justifyContent: "center" },
   deleteBtnSmall: { width: 30, height: 30, borderRadius: 8, backgroundColor: COLORS.rose, alignItems: "center", justifyContent: "center" },
@@ -721,7 +748,15 @@ const styles = StyleSheet.create({
   modalOverlayWrap: { flex: 1, justifyContent: "flex-end" },
   modalOverlayWrapCentered: { justifyContent: "center", alignItems: "center", padding: 24 },
   modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(15,23,42,0.55)" },
-  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 22, borderTopRightRadius: 22, borderRadius: 22, maxHeight: "88%", overflow: "hidden" },
+modalCard: {
+  backgroundColor: "#fff",
+  borderTopLeftRadius: 22,
+  borderTopRightRadius: 22,
+  borderBottomLeftRadius: 22,
+  borderBottomRightRadius: 22,
+  maxHeight: "88%",
+  overflow: "hidden",
+},  
   modalHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
   modalIconBadge: { width: 30, height: 30, borderRadius: 9, backgroundColor: COLORS.orangeBg, alignItems: "center", justifyContent: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: COLORS.navy },
