@@ -606,7 +606,7 @@ export default function CustomerManagementScreen() {
   const GAP = 14;
   const cardWidth =
     gridContainerWidth > 0
-      ? (gridContainerWidth - GAP * (gridCols - 1)) / gridCols
+      ? (gridContainerWidth - GAP * (gridCols - 1)) / gridCols - 0.5
       : 0;
 
   return (
@@ -615,7 +615,7 @@ export default function CustomerManagementScreen() {
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingTop: 0 }]}
+        contentContainerStyle={[s.scrollContent, { paddingTop: 0, width: "100%", flexGrow: 1 }]}
         showsVerticalScrollIndicator={false}
       >
 
@@ -688,7 +688,7 @@ export default function CustomerManagementScreen() {
       </View>
 
 
-        <View style={{ alignSelf: "center", width: "100%", maxWidth: 1600, paddingHorizontal: px }}>
+        <View style={{ width: "100%", paddingHorizontal: px }}>
           
           {/* ══ TOOLBAR (Scrollable) ═════════════════════════════════════════════════════ */}
           <View style={{ marginTop: 10, marginBottom: 4 }}>
@@ -844,8 +844,8 @@ const s = StyleSheet.create({
   hSub:        { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1 },
 
   // Overlapping stat cards — desktop / tablet
-  statCardsWrap:   { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: -32, marginBottom: 14 },
-  statCard:        { flex: 1, minWidth: 130, maxWidth: 240, backgroundColor: C.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 4 },
+  statCardsWrap:   { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", width: "100%", gap: 8, marginTop: -32, marginBottom: 14 },
+  statCard:        { flex: 1, minWidth: 130, backgroundColor: C.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: C.border, shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 4 },
   statCardTop:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   statCardIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   statCardValue:   { fontSize: 17, fontWeight: "800" },
