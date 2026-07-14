@@ -836,6 +836,12 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
     return raw.sellerGroups.map((group, gi) => {
       const sellerName = group.seller?.name ?? "Seller";
       const addr = group.seller?.address;
+      const groupTrackingId =
+        group.trackingId ??
+        raw.trackingId ??
+        raw.shiprocketAwbCode ??
+        undefined;
+
       return {
         seller: {
           name: sellerName,
@@ -870,9 +876,10 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
           taxPercent: (item as { taxPercent?: number }).taxPercent,
           qty: item.qty ?? item.quantity ?? 1,
         })),
-        trackingId: raw.trackingId ?? raw.shiprocketAwbCode ?? undefined,
+        subOrderId: group.subOrderId ? String(group.subOrderId) : undefined,
+        trackingId: groupTrackingId,
         hasInvoice: Boolean(group.hasInvoice),
-        hasShippingLabel: Boolean(group.hasShippingLabel),
+        hasShippingLabel: Boolean(group.hasShippingLabel || groupTrackingId),
       };
     });
   }
@@ -939,13 +946,15 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
 
   const groups = Array.from(bySeller.values());
   if (groups.length > 0) {
-    const trackingId = raw.trackingId ?? raw.shiprocketAwbCode;
-    return groups.map((g) => ({
-      ...g,
-      trackingId,
-      hasInvoice: true,
-      hasShippingLabel: Boolean(trackingId),
-    }));
+    return groups.map((g) => {
+      const trackingId = g.trackingId ?? raw.trackingId ?? raw.shiprocketAwbCode;
+      return {
+        ...g,
+        trackingId,
+        hasInvoice: Boolean(raw.hasInvoice || g.hasInvoice),
+        hasShippingLabel: Boolean(trackingId || raw.hasShippingLabel),
+      };
+    });
   }
   return groups;
 }
