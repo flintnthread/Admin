@@ -475,9 +475,9 @@ export default function HomepageSectionsSettingsScreen() {
         style={[styles.fab, (!isDirty || saving) && styles.fabDisabled]}
       >
         {saving ? (
-          <ActivityIndicator size="small" color={(!isDirty || saving) ? COLORS.textFaint : COLORS.white} />
+          <ActivityIndicator size="small" color={(!isDirty || saving) ? COLORS.orange : COLORS.white} />
         ) : (
-          <Feather name="save" size={22} color={(!isDirty || saving) ? COLORS.textFaint : COLORS.white} />
+          <Feather name="save" size={22} color={(!isDirty || saving) ? COLORS.orange : COLORS.white} />
         )}
         {isDirty && !saving && <View style={styles.fabBadge} />}
       </Pressable>
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   fabDisabled: {
-    backgroundColor: '#E2E8F0', // Nice slate gray
+    backgroundColor: COLORS.orangePale,
     shadowOpacity: 0,
     elevation: 0,
   },

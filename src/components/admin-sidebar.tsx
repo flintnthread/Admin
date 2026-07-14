@@ -138,7 +138,7 @@ const NAV_ITEMS = {
   },
   "EMAIL MANAGEMENT": [
     { label: "Customer Emails", icon: "mail", path: "/customeremails", color: "#F43F5E" },
-    { label: "Seller Emails", icon: "mail", path: null, color: "#F97316" },
+    { label: "Seller Emails", icon: "mail", path: "/seller-emails", color: "#F97316" },
   ],
   "PAYMENTS & PRODUCTS": [
     {
