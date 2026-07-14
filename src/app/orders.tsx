@@ -135,6 +135,7 @@ type DocModalType = "invoice" | "label" | null;
 
 interface Product {
   id: string;
+  productId?: string;
   name: string;
   image: string;
   seller: string;
@@ -836,12 +837,6 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
     return raw.sellerGroups.map((group, gi) => {
       const sellerName = group.seller?.name ?? "Seller";
       const addr = group.seller?.address;
-      const groupTrackingId =
-        group.trackingId ??
-        raw.trackingId ??
-        raw.shiprocketAwbCode ??
-        undefined;
-
       return {
         seller: {
           name: sellerName,
@@ -876,10 +871,9 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
           taxPercent: (item as { taxPercent?: number }).taxPercent,
           qty: item.qty ?? item.quantity ?? 1,
         })),
-        subOrderId: group.subOrderId ? String(group.subOrderId) : undefined,
-        trackingId: groupTrackingId,
+        trackingId: raw.trackingId ?? raw.shiprocketAwbCode ?? undefined,
         hasInvoice: Boolean(group.hasInvoice),
-        hasShippingLabel: Boolean(group.hasShippingLabel || groupTrackingId),
+        hasShippingLabel: Boolean(group.hasShippingLabel),
       };
     });
   }
@@ -946,15 +940,13 @@ export function buildSellerGroups(raw: OrderSummary): SellerGroup[] {
 
   const groups = Array.from(bySeller.values());
   if (groups.length > 0) {
-    return groups.map((g) => {
-      const trackingId = g.trackingId ?? raw.trackingId ?? raw.shiprocketAwbCode;
-      return {
-        ...g,
-        trackingId,
-        hasInvoice: Boolean(raw.hasInvoice || g.hasInvoice),
-        hasShippingLabel: Boolean(trackingId || raw.hasShippingLabel),
-      };
-    });
+    const trackingId = raw.trackingId ?? raw.shiprocketAwbCode;
+    return groups.map((g) => ({
+      ...g,
+      trackingId,
+      hasInvoice: true,
+      hasShippingLabel: Boolean(trackingId),
+    }));
   }
   return groups;
 }
@@ -2070,7 +2062,7 @@ const ActionMenu = ({
   order: Order;
   visible: boolean;
   onClose: () => void;
-  onView: (o: Order) => void;
+  onView: (o: Order, sellerName?: string, productIds?: string) => void;
   onGST: (id: string, status: GSTStatus) => void;
   onOpenDoc: (o: Order, type: "invoice" | "label") => void;
   isWeb: boolean;
@@ -3105,21 +3097,23 @@ export const InvoiceModal = ({
 const ProductSummary = ({
   order,
   onView,
+  sellerGroup,
 }: {
   order: Order;
-  onView: (o: Order) => void;
+  onView: (o: Order, sellerName?: string, productIds?: string) => void;
+  sellerGroup?: any;
 }) => {
   const groups = order.sellerGroups;
   const isMultiSeller = groups.length > 1;
-  const firstGroup = groups[0];
-  const primary = firstGroup?.products[0];
-  const itemCount = firstGroup?.products.length ?? 0;
+  const targetGroup = sellerGroup || groups[0];
+  const primary = targetGroup?.products[0];
+  const itemCount = targetGroup?.products.length ?? 0;
 
-  const metaString = firstGroup
+  const metaString = targetGroup
     ? [
-      firstGroup.seller.name,
+      targetGroup.seller.name,
       `${itemCount} item${itemCount !== 1 ? "s" : ""}`,
-      isMultiSeller
+      !sellerGroup && isMultiSeller
         ? `+${groups.length - 1} seller${groups.length > 2 ? "s" : ""}`
         : null,
     ]
@@ -3153,19 +3147,22 @@ const ProductSummary = ({
 };
 
 // ─── Grid Order Card ──────────────────────────────────────────────────────────
-const GridOrderCard = ({
-  order,
+const GridOrderSellerCard = ({
+  row,
   onView,
   onGST,
   onMore,
   isWeb,
 }: {
-  order: Order;
-  onView: (o: Order) => void;
+  row: OrderSellerRow;
+  onView: (o: Order, sellerName?: string, productIds?: string) => void;
   onGST: (id: string, status: GSTStatus) => void;
-  onMore: (o: Order) => void;
+  onMore: (o: Order, sellerName?: string) => void;
   isWeb: boolean;
 }) => {
+  const { order, sellerGroup, amount } = row;
+  const sellerName = sellerGroup.seller.name;
+
   const cfg = STATUS_CFG[order.status];
 
   return (
@@ -3208,21 +3205,26 @@ const GridOrderCard = ({
 
       <View style={s.divider} />
 
-      <ProductSummary order={order} onView={onView} />
+      <ProductSummary order={order} onView={(o) => onView(o, sellerName)} sellerGroup={sellerGroup} />
 
       <View style={s.divider} />
 
       <View style={s.customerRow}>
         <View style={s.customerRowLeft}>
           <View style={s.avatar}>
-            <Text style={s.avatarText}>{getInitials(order.customer.name)}</Text>
+            <Text style={s.avatarText}>{getInitials(sellerName)}</Text>
           </View>
-          <Text style={s.customerName} numberOfLines={1}>
-            {order.customer.name}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.customerName} numberOfLines={1}>
+              {sellerName}
+            </Text>
+            {sellerGroup.subOrderId ? (
+              <Text style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>Sub-Order: {sellerGroup.subOrderId}</Text>
+            ) : null}
+          </View>
         </View>
         <Text style={s.amountVal} numberOfLines={1}>
-          {fmtCur(order.amount)}
+          {fmtCur(amount)}
         </Text>
       </View>
 
@@ -3234,7 +3236,7 @@ const GridOrderCard = ({
         />
         <TouchableOpacity
           style={s.ctaRow}
-          onPress={() => onView(order)}
+          onPress={() => onView(order, sellerGroup.seller.name, sellerGroup.products.map((p: any) => p.id || p.productId).join(','))}
           activeOpacity={0.7}
         >
           <Text style={s.ctaText}>View Details</Text>
@@ -3255,7 +3257,7 @@ const ListTableRow = ({
 }: {
   row: OrderSellerRow;
   idx: number;
-  onView: (o: Order) => void;
+  onView: (o: Order, sellerName?: string, productIds?: string) => void;
   onGST: (id: string, status: GSTStatus) => void;
   onOpenDoc: (o: Order, type: "invoice" | "label") => void;
 }) => {
@@ -3383,7 +3385,7 @@ const ListTableRow = ({
         <View style={s.tableActions}>
           <TouchableOpacity
             style={s.viewBtnSm}
-            onPress={() => onView(order)}
+            onPress={() => onView(order, sellerGroup.seller.name, sellerGroup.products.map(p => p.id || p.productId).join(','))}
             activeOpacity={0.85}
           >
             <EyeIcon color={C.white} />
@@ -3482,10 +3484,14 @@ export default function OrdersScreen() {
   const router = useRouter();
 
   const handleView = useCallback(
-    (o: Order) => {
+    (o: Order, sellerName?: string, productIds?: string) => {
       const id = Number(o.id);
       if (!id || Number.isNaN(id)) return;
-      router.push(`/orderDetails?orderId=${id}`);
+      let url = `/orderDetails?orderId=${id}`;
+      if (productIds) { url += `&productIds=${encodeURIComponent(productIds)}`; } if (sellerName) {
+        url += `&sellerName=${encodeURIComponent(sellerName)}`;
+      }
+      router.push(url as any);
     },
     [router],
   );
@@ -3827,20 +3833,20 @@ export default function OrdersScreen() {
             </View>
           ) : viewMode === "grid" ? (
             <View style={[s.gridWrap, { paddingHorizontal: px }]}>
-              {filtered.map((o) => (
+              {sellerRows.map((row) => (
                 <View
-                  key={o.id}
+                  key={row.rowKey}
                   style={
                     columnCount > 1
                       ? [s.gridItem, { width: cardWidthPercent as any }]
                       : s.gridItemFull
                   }
                 >
-                  <GridOrderCard
-                    order={o}
+                  <GridOrderSellerCard
+                    row={row}
                     onView={handleView}
                     onGST={handleGST}
-                    onMore={(ord) => setActiveAction(ord)}
+                    onMore={(ord) => setActiveAction(ord)} // Keep activeAction as Order for now, or update it if needed
                     isWeb={isWeb}
                   />
                 </View>
