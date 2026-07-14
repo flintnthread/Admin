@@ -82,7 +82,7 @@ const PAGE_SIZE = 5;
 const COLORS = {
     orange: '#F5821F',
     orangeDark: '#DD6F10',
-    navy: '#0B1B33',
+    navy: '#151D4F',
     ink: '#1F2937',
     sub: '#6B7280',
     border: '#E5E7EB',
@@ -116,16 +116,34 @@ const StatCard: React.FC<{
     label: string; value: number; sub: string;
     bg: string; fg: string; Icon: React.ComponentType<any>; wide: boolean;
     style?: any;
-}> = ({ label, value, sub, bg, fg, Icon, wide, style }) => (
-    <View style={[styles.statCard, { width: wide ? '23.5%' : '48%' }, style]}>
-        <View style={{ flex: 1 }}>
-            <Text style={[styles.statLabel, { color: fg }]}>{label}</Text>
-            <Text style={styles.statValue}>{value}</Text>
-            <Text style={styles.statSub}>{sub}</Text>
-        </View>
-        <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
-            <Icon width={20} height={20} fill={fg} />
-        </View>
+    isMobile?: boolean;
+}> = ({ label, value, sub, bg, fg, Icon, wide, style, isMobile }) => (
+    <View style={[
+        styles.statCard,
+        isMobile ? styles.statCardMobile : styles.statCardDesktop,
+        !isMobile && { width: wide ? '23.5%' : '48%' },
+        style
+    ]}>
+        {isMobile ? (
+            <>
+                <View style={[styles.statIconWrap, styles.statIconWrapMobile, { backgroundColor: bg }]}>
+                    <Icon width={14} height={14} fill={fg} />
+                </View>
+                <Text style={[styles.statValue, styles.statValueMobile, { color: fg }]}>{value}</Text>
+                <Text style={styles.statLabelMobile} numberOfLines={1}>{label}</Text>
+            </>
+        ) : (
+            <>
+                <View style={styles.statCardTopRow}>
+                    <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
+                        <Icon width={16} height={16} fill={fg} />
+                    </View>
+                    <Text style={[styles.statValue, { color: fg }]}>{value}</Text>
+                </View>
+                <Text style={styles.statLabel}>{label}</Text>
+                <Text style={styles.statSub}>{sub}</Text>
+            </>
+        )}
     </View>
 );
 
@@ -656,64 +674,35 @@ const AdsAdminUsers: React.FC = () => {
             <View style={styles.screen}>
                 <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
                     {/* ---------- Header ---------- */}
-                    <View style={[styles.headerContainer, isPhone && { paddingBottom: 42, paddingVertical: 16, paddingHorizontal: 12 }]}>
-                        <View style={[styles.headerRow, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }]}>
-                            <View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <View style={{
-                                        backgroundColor: COLORS.orange,
-                                        padding: isPhone ? 4 : 8,
-                                        borderRadius: isPhone ? 6 : 8,
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}>
-                                        <PeopleFill width={isPhone ? 16 : 20} height={isPhone ? 16 : 20} fill="#fff" />
-                                    </View>
-                                    <Text style={[styles.title, { color: '#fff' }, isPhone && { fontSize: 20 }]}>Ads Admin Users</Text>
+                    <View style={[styles.headerContainer, isPhone && styles.headerContainerMobile]}>
+                        <View style={[styles.headerRow, isPhone && { gap: 10 }]}>
+                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: isPhone ? 8 : 12, marginRight: 8 }}>
+                                <View style={styles.heroIconBadge}>
+                                    <PeopleFill width={isPhone ? 16 : 20} height={isPhone ? 16 : 20} fill="#fff" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.heroTitle} numberOfLines={1}>Ads Admin Users</Text>
+                                    <Text style={styles.heroSubtitle} numberOfLines={2}>Manage users and roles</Text>
                                 </View>
                             </View>
 
-                            <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 }]} onPress={openAddModal}>
+                            <TouchableOpacity style={[styles.addBtn, isPhone && { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8 }]} onPress={openAddModal}>
                                 <PlusLg width={14} height={14} fill="#fff" />
-                                <Text style={[styles.addBtnText, isPhone && { fontSize: 11, marginLeft: 2 }]}>Add New User</Text>
+                                {!isPhone && <Text style={styles.addBtnText}>Add New User</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* ---------- Stat cards ---------- */}
-                    {isPhone ? (
-                        <View style={{ marginTop: -32, zIndex: 10, marginBottom: 14 }}>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{
-                                    flexDirection: 'row',
-                                    gap: 12,
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 6,
-                                }}
-                            >
-                                <StatCard label="Total Users" value={stats.total} sub="All registered users" bg={COLORS.blueBg} fg={COLORS.blueText} Icon={PeopleFill} wide={false} style={{ width: 170 }} />
-                                <StatCard label="Active Users" value={stats.active} sub="Currently active users" bg={COLORS.greenBg} fg={COLORS.greenText} Icon={PersonCheckFill} wide={false} style={{ width: 170 }} />
-                                <StatCard label="Inactive Users" value={stats.inactive} sub="Currently inactive users" bg={COLORS.orangeBg} fg={COLORS.orangeText} Icon={PersonXFill} wide={false} style={{ width: 170 }} />
-                                <StatCard label="Last 7 Days Logins" value={stats.recentLogins} sub="Users logged in" bg={COLORS.purpleBg} fg={COLORS.purpleText} Icon={CalendarWeek} wide={false} style={{ width: 170 }} />
-                            </ScrollView>
-                        </View>
-                    ) : (
-                        <View style={[
-                            styles.statsRow,
-                            {
-                                marginTop: -32,
-                                zIndex: 10,
-                                marginHorizontal: 22,
-                            }
-                        ]}>
-                            <StatCard label="Total Users" value={stats.total} sub="All registered users" bg={COLORS.blueBg} fg={COLORS.blueText} Icon={PeopleFill} wide={statsWide} />
-                            <StatCard label="Active Users" value={stats.active} sub="Currently active users" bg={COLORS.greenBg} fg={COLORS.greenText} Icon={PersonCheckFill} wide={statsWide} />
-                            <StatCard label="Inactive Users" value={stats.inactive} sub="Currently inactive users" bg={COLORS.orangeBg} fg={COLORS.orangeText} Icon={PersonXFill} wide={statsWide} />
-                            <StatCard label="Last 7 Days Logins" value={stats.recentLogins} sub="Users logged in" bg={COLORS.purpleBg} fg={COLORS.purpleText} Icon={CalendarWeek} wide={statsWide} />
-                        </View>
-                    )}
+                    <View style={[
+                        styles.statsRow,
+                        isPhone ? styles.statsRowMobile : styles.statsRowDesktop
+                    ]}>
+                        <StatCard isMobile={isPhone} label={isPhone ? "Total" : "Total Users"} value={stats.total} sub="All registered users" bg={COLORS.blueBg} fg={COLORS.blueText} Icon={PeopleFill} wide={statsWide} />
+                        <StatCard isMobile={isPhone} label={isPhone ? "Active" : "Active Users"} value={stats.active} sub="Currently active users" bg={COLORS.greenBg} fg={COLORS.greenText} Icon={PersonCheckFill} wide={statsWide} />
+                        <StatCard isMobile={isPhone} label={isPhone ? "Inactive" : "Inactive Users"} value={stats.inactive} sub="Currently inactive users" bg={COLORS.orangeBg} fg={COLORS.orangeText} Icon={PersonXFill} wide={statsWide} />
+                        <StatCard isMobile={isPhone} label={isPhone ? "Recent" : "Recent Logins"} value={stats.recentLogins} sub="Users logged in" bg={COLORS.purpleBg} fg={COLORS.purpleText} Icon={CalendarWeek} wide={statsWide} />
+                    </View>
 
                     {/* ---------- Toolbar ---------- */}
                     <View style={styles.toolbarCard}>
@@ -889,19 +878,22 @@ const styles = StyleSheet.create({
     screen: { flex: 1, backgroundColor: COLORS.bg, paddingHorizontal: 16, paddingTop: 16 },
 
     headerContainer: {
-        backgroundColor: '#1d324e',
-        marginHorizontal: 2,
-        marginTop: 12,
-        borderRadius: 22,
-        paddingHorizontal: 24,
-        paddingVertical: 28,
-        paddingBottom: 68,
-        shadowColor: '#1d324e',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
-        elevation: 10,
-    } as any,
+        backgroundColor: COLORS.navy,
+        borderRadius: 20,
+        paddingHorizontal: 20,
+        paddingTop: 18,
+        paddingBottom: 38,
+        overflow: "visible",
+        zIndex: 1,
+    },
+    headerContainerMobile: {
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 40,
+    },
+    heroIconBadge: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.orange, alignItems: "center", justifyContent: "center" },
+    heroTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    heroSubtitle: { color: "#94A3B8", fontSize: 12, marginTop: 2, fontWeight: "400" },
 
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
     title: { fontSize: 24, fontWeight: '800', color: COLORS.ink },
@@ -910,20 +902,35 @@ const styles = StyleSheet.create({
     breadcrumbCurrent: { color: COLORS.sub, fontSize: 13 },
 
     addBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.orange,
-        paddingVertical: 11, paddingHorizontal: 18, borderRadius: 10,
+        flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.orange,
+        paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10,
+        shadowColor: COLORS.orange, shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3,
     },
-    addBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    addBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
 
-    statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: '2%', marginBottom: 16, rowGap: 12 },
+    statsRow: { flexDirection: 'row', zIndex: 10, elevation: 5, marginBottom: 16 },
+    statsRowDesktop: { flexWrap: 'nowrap', justifyContent: 'center', gap: 10, marginTop: -20, paddingHorizontal: 22, minWidth: '100%' },
+    statsRowMobile: { flexWrap: 'nowrap', justifyContent: 'space-between', gap: 6, marginTop: -24, paddingHorizontal: 0 },
+
     statCard: {
-        backgroundColor: COLORS.card, borderRadius: 14, padding: 14, flexDirection: 'row',
-        alignItems: 'flex-start', justifyContent: 'space-between', borderWidth: 1, borderColor: COLORS.border,
+        backgroundColor: COLORS.card, borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, 
+        borderWidth: 1, borderColor: "#F1F5F9", shadowColor: "#0F172A", shadowOpacity: 0.1, 
+        shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3,
     },
-    statLabel: { fontSize: 12, fontWeight: '700' },
-    statValue: { fontSize: 22, fontWeight: '800', color: COLORS.ink, marginTop: 4 },
-    statSub: { fontSize: 11, color: COLORS.sub, marginTop: 2 },
-    statIconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    statCardDesktop: { flexGrow: 0, flexShrink: 0, flexDirection: 'column', alignItems: 'flex-start' },
+    statCardMobile: { flex: 1, minWidth: 0, borderRadius: 12, paddingHorizontal: 2, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 2 },
+    statCardTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: '100%', marginBottom: 6 },
+    
+    statIconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    statIconWrapMobile: { width: 26, height: 26 },
+    
+    statValue: { fontSize: 17, fontWeight: "700" },
+    statValueMobile: { fontSize: 14, fontWeight: "800", marginTop: 2, textAlign: "center" },
+    
+    statLabel: { fontSize: 11, color: COLORS.sub, fontWeight: "500" },
+    statLabelMobile: { fontSize: 10, color: COLORS.sub, fontWeight: "600", marginTop: 2, textAlign: "center" },
+    
+    statSub: { fontSize: 10, color: COLORS.sub, marginTop: 2 },
 
     toolbarCard: {
         backgroundColor: COLORS.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: COLORS.border,
