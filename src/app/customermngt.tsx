@@ -24,6 +24,7 @@
 
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -40,9 +41,6 @@ import {
 } from 'react-native';
 import ArrowLeft from 'react-native-bootstrap-icons/icons/arrow-left';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
-import Building from 'react-native-bootstrap-icons/icons/building';
-import CalendarEvent from 'react-native-bootstrap-icons/icons/calendar-event';
-import EnvelopeFill from 'react-native-bootstrap-icons/icons/envelope-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
 import Grid3x3GapFill from 'react-native-bootstrap-icons/icons/grid-3x3-gap-fill';
 import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
@@ -50,7 +48,6 @@ import ListUl from 'react-native-bootstrap-icons/icons/list-ul';
 import LockFill from 'react-native-bootstrap-icons/icons/lock-fill';
 import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
-import TelephoneFill from 'react-native-bootstrap-icons/icons/telephone-fill';
 import TrashFill from 'react-native-bootstrap-icons/icons/trash-fill';
 import XLg from 'react-native-bootstrap-icons/icons/x-lg';
 
@@ -166,7 +163,7 @@ const DeleteModal: React.FC<{
 
           <View style={styles.modalBody}>
             <View style={styles.trashCircle}>
-              <TrashFill width={36} height={36} fill="#F97316" />
+              <Ionicons name="trash" size={26} color="#F97316" />
             </View>
             <Text style={styles.confirmTitle}>Are you sure you want to delete this customer?</Text>
             <Text style={styles.confirmSub}>This action cannot be undone!</Text>
@@ -282,6 +279,8 @@ const CustomerManagement: React.FC = () => {
   const gridCellWidth = `${100 / gridColumns}%` as const;
 
   // ---- Table row -------------------------------------------------------
+  const tableMinWidth = TABLE_MIN_WIDTH;
+
   const colStyle = (key: (typeof COLUMNS)[number]['key']) => {
     const col = COLUMNS.find((c) => c.key === key)!;
     return { flexGrow: col.flex, flexShrink: 1, flexBasis: col.minWidth, minWidth: col.minWidth };
@@ -289,18 +288,30 @@ const CustomerManagement: React.FC = () => {
 
   const renderRow = ({ item }: { item: Customer }) => (
     <View style={styles.tableRow}>
-      <Text style={[styles.cell, colStyle('sno'), { color: COLORS.sub }]}>{item.id}</Text>
-      <Text style={[styles.cell, colStyle('name'), { fontWeight: '700', color: COLORS.slate }]} numberOfLines={1}>{item.name}</Text>
-      <Text style={[styles.cell, colStyle('email'), { color: COLORS.sub }]} numberOfLines={1}>{item.email}</Text>
-      <Text style={[styles.cell, colStyle('phone')]} numberOfLines={1}>{item.phone}</Text>
-      <Text style={[styles.cell, colStyle('company'), { color: COLORS.sub }]} numberOfLines={1}>{item.company}</Text>
-      <View style={[styles.cell, colStyle('orders')]}>
+      <View style={[styles.cell, colStyle('sno'), { overflow: 'hidden' }]}>
+        <Text style={{ color: COLORS.sub, fontSize: 13, width: '100%' }} numberOfLines={1}>{item.id}</Text>
+      </View>
+      <View style={[styles.cell, colStyle('name'), { overflow: 'hidden' }]}>
+        <Text style={{ fontWeight: '700', color: COLORS.slate, fontSize: 13, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
+      </View>
+      <View style={[styles.cell, colStyle('email'), { overflow: 'hidden' }]}>
+        <Text style={{ color: COLORS.sub, fontSize: 13, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.email}</Text>
+      </View>
+      <View style={[styles.cell, colStyle('phone'), { overflow: 'hidden' }]}>
+        <Text style={{ color: COLORS.slate, fontSize: 13, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.phone}</Text>
+      </View>
+      <View style={[styles.cell, colStyle('company'), { overflow: 'hidden' }]}>
+        <Text style={{ color: COLORS.sub, fontSize: 13, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.company}</Text>
+      </View>
+      <View style={[styles.cell, colStyle('orders'), { justifyContent: 'center', overflow: 'hidden' }]}>
         <View style={styles.orderChip}>
           <Text style={styles.orderChipText}>{item.orders}</Text>
         </View>
       </View>
-      <Text style={[styles.cell, colStyle('joined'), { color: COLORS.sub, fontSize: 12 }]}>{item.joined}</Text>
-      <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
+      <View style={[styles.cell, colStyle('joined'), { overflow: 'hidden' }]}>
+        <Text style={{ color: COLORS.sub, fontSize: 12, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.joined}</Text>
+      </View>
+      <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }, !isPhone && { marginLeft: 55 }]}>
         <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewOrders(item)}>
           <LockFill width={15} height={15} fill="#fff" />
         </TouchableOpacity>
@@ -313,84 +324,103 @@ const CustomerManagement: React.FC = () => {
 
   // ---- Grid card -----------------------------------------------------
   // Redesigned premium responsive card
-  const renderCard = (item: Customer) => (
-    <View style={styles.gridCard}>
-      <View style={styles.gridCardHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14 }}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.gridCardName} numberOfLines={1}>{item.name}</Text>
-            <View style={styles.idBadge}>
-              <Text style={styles.idBadgeText}>ID: #{item.id}</Text>
+  // Dynamic top bar colors for grid cards
+  const CARD_TOP_COLORS = ['#2563EB', '#7C3AED', '#10B981', '#F97316', '#EC4899', '#06B6D4'];
+
+  const renderCard = (item: Customer) => {
+    const cardColor = CARD_TOP_COLORS[item.id % CARD_TOP_COLORS.length];
+
+    return (
+      <View style={styles.gridCard}>
+        {/* Dynamic color line indicator at the top */}
+        <View style={[styles.gridCardTopBar, { backgroundColor: cardColor }]} />
+
+        <View style={styles.gridCardHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14 }}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.gridCardName} numberOfLines={1}>{item.name}</Text>
+              <View style={styles.idBadge}>
+                <Text style={styles.idBadgeText}>ID: #{item.id}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.divider} />
+        <View style={styles.divider} />
 
-      <View style={styles.gridInfoContainer}>
-        <View style={styles.gridInfoRow}>
-          <View style={styles.iconBox}><EnvelopeFill width={13} height={13} fill="#1d324e" /></View>
-          <Text style={styles.gridInfoText} numberOfLines={1}>{item.email}</Text>
+        <View style={styles.gridInfoContainer}>
+          <View style={styles.gridInfoRow}>
+            <View style={styles.iconBox}><Ionicons name="mail-outline" size={14} color="#1d324e" /></View>
+            <Text style={styles.gridInfoText} numberOfLines={1}>{item.email}</Text>
+          </View>
+          <View style={styles.gridInfoRow}>
+            <View style={styles.iconBox}><Ionicons name="call-outline" size={14} color="#1d324e" /></View>
+            <Text style={styles.gridInfoText} numberOfLines={1}>{item.phone}</Text>
+          </View>
+          <View style={styles.gridInfoRow}>
+            <View style={styles.iconBox}><Ionicons name="business-outline" size={14} color="#1d324e" /></View>
+            <Text style={styles.gridInfoText} numberOfLines={1}>{item.company}</Text>
+          </View>
         </View>
-        <View style={styles.gridInfoRow}>
-          <View style={styles.iconBox}><TelephoneFill width={13} height={13} fill="#1d324e" /></View>
-          <Text style={styles.gridInfoText} numberOfLines={1}>{item.phone}</Text>
+
+        <View style={styles.gridMetaRow}>
+          <View style={styles.gridMetaItem}>
+            <BagCheckFill width={15} height={15} fill={COLORS.amberDark} />
+            <Text style={styles.gridMetaText}>{item.orders} Orders</Text>
+          </View>
+          <View style={styles.gridMetaItem}>
+            <Ionicons name="calendar-outline" size={14} color={COLORS.sub} />
+            <Text style={styles.gridMetaDate}>{item.joined}</Text>
+          </View>
         </View>
-        <View style={styles.gridInfoRow}>
-          <View style={styles.iconBox}><Building width={13} height={13} fill="#1d324e" /></View>
-          <Text style={styles.gridInfoText} numberOfLines={1}>{item.company}</Text>
+
+        <View style={styles.gridActionsRow}>
+          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
+            <LockFill width={14} height={14} fill="#fff" />
+            <Text style={styles.ordersBtnText}>Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
+            <TrashFill width={16} height={16} fill="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.gridMetaRow}>
-        <View style={styles.gridMetaItem}>
-          <BagCheckFill width={15} height={15} fill={COLORS.amberDark} />
-          <Text style={styles.gridMetaText}>{item.orders} Orders</Text>
-        </View>
-        <View style={styles.gridMetaItem}>
-          <CalendarEvent width={14} height={14} fill={COLORS.sub} />
-          <Text style={styles.gridMetaDate}>{item.joined}</Text>
-        </View>
-      </View>
-
-      <View style={styles.gridActionsRow}>
-        <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
-          <LockFill width={14} height={14} fill="#fff" />
-          <Text style={styles.ordersBtnText}>Orders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
-          <TrashFill width={16} height={16} fill="#fff" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {/* ---------- Header ---------- */}
-        <View style={[styles.header, isPhone && styles.headerPhone]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/Dashboard')}>
-            <ArrowLeft width={22} height={22} fill="#fff" />
-          </TouchableOpacity>
+        <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/Dashboard')}>
+              <ArrowLeft width={isPhone ? 18 : 22} height={isPhone ? 18 : 22} fill="#fff" />
+            </TouchableOpacity>
 
-          <View style={styles.headerContent}>
-            <View style={styles.headerIconBox}>
-              <PeopleFill width={20} height={20} fill="#fff" />
-            </View>
-            <View style={{ flexShrink: 1 }}>
-              <Text style={styles.headerTitle}>Customers Management</Text>
-              <Text style={styles.headerSubtitle}>Manage all customer accounts and orders</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <View style={[styles.headerIconBox, isPhone && { width: 30, height: 30, borderRadius: 6 }]}>
+                <PeopleFill width={isPhone ? 14 : 20} height={isPhone ? 14 : 20} fill="#fff" />
+              </View>
+              {isPhone ? (
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.headerTitle, { fontSize: 16 }]} numberOfLines={1}>Customers</Text>
+                  <Text style={[styles.headerTitle, { fontSize: 16, marginTop: 2 }]} numberOfLines={1}>Management</Text>
+                </View>
+              ) : (
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={styles.headerTitle}>Customers Management</Text>
+                  <Text style={styles.headerSubtitle}>Manage all customer accounts and orders</Text>
+                </View>
+              )}
             </View>
           </View>
 
-          <TouchableOpacity style={styles.refreshBtn} onPress={() => handleViewOrders()}>
-            <BagCheckFill width={14} height={14} fill={COLORS.amber} />
-            <Text style={styles.refreshBtnText}>View Orders</Text>
+          <TouchableOpacity style={[styles.refreshBtn, isPhone && { alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 }]} onPress={() => handleViewOrders()}>
+            <BagCheckFill width={isPhone ? 12 : 14} height={isPhone ? 12 : 14} fill={COLORS.amber} />
+            <Text style={[styles.refreshBtnText, isPhone && { fontSize: 11 }]}>View Orders</Text>
           </TouchableOpacity>
         </View>
 
@@ -461,7 +491,7 @@ const CustomerManagement: React.FC = () => {
               <View style={{ flex: 1, minWidth: TABLE_MIN_WIDTH }}>
                 <View style={styles.tableHeader}>
                   {COLUMNS.map((col) => (
-                    <Text key={col.key} style={[styles.headCell, colStyle(col.key)]}>{col.label}</Text>
+                    <Text key={col.key} style={[styles.headCell, colStyle(col.key), col.key === 'action' && !isPhone && { marginLeft: 65 }]}>{col.label}</Text>
                   ))}
                 </View>
                 <FlatList
@@ -484,11 +514,6 @@ const CustomerManagement: React.FC = () => {
           itemName="customers"
           onPageChange={setPage}
         />
-
-        <Text style={styles.footerText}>
-          2026 © Flintnthread India Pvt. Ltd. Crafted by{' '}
-          <Text style={{ color: COLORS.teal, fontWeight: '700' }}>Flintnthread India Pvt. Ltd.</Text>
-        </Text>
       </ScrollView>
 
       <DeleteModal
@@ -556,9 +581,9 @@ const styles = StyleSheet.create({
 
   tableScroll: { borderRadius: 8 },
   tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: COLORS.border, paddingVertical: 12, paddingHorizontal: 4, marginBottom: 4, backgroundColor: '#1d324e' },
-  headCell: { fontSize: 12, fontWeight: '700', color: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 6 },
+  headCell: { fontSize: 12, fontWeight: '700', color: '#FFFFFF', paddingRight: 16, paddingVertical: 6 },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderColor: '#F1F5F9' },
-  cell: { paddingHorizontal: 18, fontSize: 13, color: COLORS.slate, justifyContent: 'center' },
+  cell: { paddingRight: 16, fontSize: 13, color: COLORS.slate, justifyContent: 'center' },
 
   orderChip: { backgroundColor: COLORS.chip, paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999, alignSelf: 'flex-start' },
   orderChipText: { color: COLORS.chipText, fontWeight: '700', fontSize: 12 },
@@ -592,6 +617,14 @@ const styles = StyleSheet.create({
   gridCard: {
     backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', padding: 20,
     shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    position: 'relative', overflow: 'hidden',
+  },
+  gridCardTopBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
   },
   gridCardHeader: { marginBottom: 16 },
   avatarCircle: {

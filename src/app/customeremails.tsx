@@ -507,15 +507,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14,
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
-    tableHeaderRow: { backgroundColor: '#151D4F', borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    tableHeaderRow: { backgroundColor: '#F5ECDE', borderBottomWidth: 1, borderBottomColor: COLORS.border },
     tableRowAlt: { backgroundColor: '#FCFBF8' },
-    th: { fontSize: 11, fontWeight: '700', color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.4 },
+    th: { fontSize: 11, fontWeight: '700', color: '#1C2439', textTransform: 'uppercase', letterSpacing: 0.4 },
     td: { fontSize: 13, color: COLORS.navySoft },
     tdStrong: { fontSize: 13, color: COLORS.navy, fontWeight: '700' },
     tdMuted: { color: COLORS.muted },
     rowActionBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+        backgroundColor: '#151D4F', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
     },
     rowActionText: { color: '#fff', fontWeight: '700', fontSize: 11 },
 
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     cardDetailText: { fontSize: 12.5, color: COLORS.navySoft, flexShrink: 1 },
     cardActionBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-        backgroundColor: COLORS.primary, paddingVertical: 11, borderRadius: 9, marginTop: 6,
+        backgroundColor: '#151D4F', paddingVertical: 11, borderRadius: 9, marginTop: 6,
     },
 
     // Empty state
