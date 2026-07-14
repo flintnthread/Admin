@@ -764,7 +764,7 @@ modalCard: {
   fieldRow: { flexDirection: "row", gap: 14, marginTop: 14, flexWrap: "wrap" },
   fieldLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 6 },
   fieldError: { fontSize: 11, color: COLORS.rose, marginTop: 4, fontWeight: "500" },
-  input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: "#fff" },
+  input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: "#fff", outlineStyle: "none" } as any,
   inputMultiline: { minHeight: 70, textAlignVertical: "top" },
   inputError: { borderColor: COLORS.rose },
 
