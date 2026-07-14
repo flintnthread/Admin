@@ -30,7 +30,7 @@ import {
 } from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrderDetail, updateOrderStatus, updateOrderItemStatus } from "@/services/orderApi";
+import { fetchOrderDetail, updateOrderStatus } from "@/services/orderApi";
 
 import Svg, { Circle, Path } from "react-native-svg";
 
@@ -123,7 +123,6 @@ type OrderItem = {
   total: number;
   slug: string;
   imageUrl?: string;
-  status?: OrderStatus;
 };
 
 type StatusHistory = {
@@ -131,21 +130,6 @@ type StatusHistory = {
   date: string;
   by: string;
   comment: string;
-  orderItemId?: number;
-  productId?: number;
-};
-
-/** One product's own tracking timeline (scoped to just that line item). */
-type ProductTracking = {
-  itemId: number;
-  productId?: number;
-  product: string;
-  sku: string;
-  seller: string;
-  imageUrl?: string;
-  events: TrackingEvent[];
-  /** This product's own current status — independent of the order's overall status. */
-  status: OrderStatus;
 };
 
 type Address = {
@@ -185,7 +169,6 @@ type UIOrder = {
   shipping: Address;
   shiprocket: ShiprocketInfo;
   tracking: TrackingEvent[];
-  productTracking: ProductTracking[];
   items: OrderItem[];
   subtotal: number;
   shippingCost: number;
@@ -249,8 +232,6 @@ type OrderDetail = Record<string, unknown> & {
     comment?: string;
     createdBy?: number;
     createdAt?: string;
-    orderItemId?: number;
-    productId?: number;
   }>;
   customerId?: number;
 };
@@ -371,7 +352,6 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
       ? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
       : String(item.productId ?? item.id ?? ""),
     imageUrl,
-    status: item.status ? normalizeStatus(item.status) : undefined,
   };
 }
 
@@ -418,46 +398,32 @@ function formatOrderNumber(orderNumber?: string, id?: number): string {
 }
 
 function mapStatusHistoryEntry(entry: NonNullable<OrderDetail["statusHistory"]>[number]): StatusHistory {
-  const raw = entry as Record<string, unknown>;
-  const orderItemId =
-    typeof entry.orderItemId === "number"
-      ? entry.orderItemId
-      : Number(raw.order_item_id ?? raw.itemId ?? raw.item_id ?? NaN);
-  const productId =
-    typeof entry.productId === "number"
-      ? entry.productId
-      : Number(raw.product_id ?? NaN);
-
   return {
     status: normalizeStatus(entry.status),
     date: formatDateTimeWithTime(entry.createdAt),
     by: entry.createdBy ? `Admin #${entry.createdBy}` : "System",
     comment: entry.comment?.trim() || entry.status || "",
-    orderItemId: Number.isFinite(orderItemId) ? orderItemId : undefined,
-    productId: Number.isFinite(productId) ? productId : undefined,
-  };
-}
-
-function statusHistoryEntryToEvent(entry: StatusHistory): TrackingEvent {
-  const [datePart, timePart] = entry.date.includes(",")
-    ? entry.date.split(",").map((part) => part.trim())
-    : [entry.date, ""];
-  const note = entry.comment?.trim();
-  const description =
-    note && note.toLowerCase() !== entry.status.toLowerCase()
-      ? `${entry.status} — ${note}`
-      : entry.status;
-  return {
-    date: datePart,
-    time: timePart,
-    location: entry.by,
-    description,
-    status: entry.status,
   };
 }
 
 function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): TrackingEvent[] {
-  const events: TrackingEvent[] = [...history].reverse().map(statusHistoryEntryToEvent);
+  const events: TrackingEvent[] = [...history].reverse().map((entry) => {
+    const [datePart, timePart] = entry.date.includes(",")
+      ? entry.date.split(",").map((part) => part.trim())
+      : [entry.date, ""];
+    const note = entry.comment?.trim();
+    const description =
+      note && note.toLowerCase() !== entry.status.toLowerCase()
+        ? `${entry.status} — ${note}`
+        : entry.status;
+    return {
+      date: datePart,
+      time: timePart,
+      location: entry.by,
+      description,
+      status: entry.status,
+    };
+  });
 
   const shipStatus = detail?.shiprocketStatus?.trim();
   const shipSynced = detail?.shiprocketSyncedAt ?? detail?.shiprocketPushedAt;
@@ -484,110 +450,18 @@ function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): 
   return events;
 }
 
-/**
- * Builds one independent tracking timeline PER PRODUCT LINE ITEM.
- *
- * If status-history entries carry an item/product association (orderItemId /
- * productId — common in multi-seller marketplaces where each product can be
- * shipped, returned, or replaced independently of the others in the same
- * order), each product only shows the events that belong to it.
- *
- * If the backend hasn't attached that association to a given entry, we fall
- * back to showing that item's own current status as a single-event timeline
- * (rather than dumping the whole order's merged history onto every card),
- * so multi-product orders never show one product's return/replacement noise
- * on another product's card.
- */
-function buildProductTracking(
-  items: OrderItem[],
-  history: StatusHistory[],
-  detail?: OrderDetail
-): ProductTracking[] {
-  if (items.length === 0) return [];
-
-  const hasPerItemAssociation = history.some(
-    (h) => h.orderItemId !== undefined || h.productId !== undefined
-  );
-
-  const shipStatus = detail?.shiprocketStatus?.trim();
-  const shipSynced = detail?.shiprocketSyncedAt ?? detail?.shiprocketPushedAt;
-  const shipCourier = detail?.shiprocketCourierName?.trim() || "ShipRocket";
-  const buildShipEvent = (): TrackingEvent | null => {
-    if (!shipStatus || shipStatus === "—") return null;
-    const syncedLabel = formatDateTimeWithTime(shipSynced);
-    const [datePart, timePart] = syncedLabel.includes(",")
-      ? syncedLabel.split(",").map((part) => part.trim())
-      : [syncedLabel, ""];
-    return {
-      date: datePart,
-      time: timePart,
-      location: shipCourier,
-      description: `Shipment: ${shipStatus}`,
-      status: "Processing",
-    };
-  };
-
-  return items.map((item) => {
-    let itemHistory: StatusHistory[];
-
-    if (hasPerItemAssociation) {
-      itemHistory = history.filter(
-        (h) =>
-          (h.orderItemId !== undefined && h.orderItemId === item.id) ||
-          (h.productId !== undefined &&
-            item.productId !== undefined &&
-            h.productId === item.productId)
-      );
-      // Entries with no association at all (order-level milestones like
-      // "Pending" / order placed) still apply to every product.
-      const unassociated = history.filter(
-        (h) => h.orderItemId === undefined && h.productId === undefined
-      );
-      itemHistory = [...unassociated, ...itemHistory].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-    } else {
-      // No per-item association available from the API — build this
-      // product's own single-status timeline instead of reusing the full
-      // merged order history, so each product still gets its own,
-      // uncluttered timeline.
-      itemHistory = item.status
-        ? [
-            {
-              status: item.status,
-              date: history[0]?.date ?? "",
-              by: history[0]?.by ?? "System",
-              comment: item.status,
-            },
-          ]
-        : history.slice(0, 1);
-    }
-
-    const events = [...itemHistory].reverse().map(statusHistoryEntryToEvent);
-
-    const shipEvent = buildShipEvent();
-    if (shipEvent) {
-      const duplicate = events.some((event) =>
-        event.description.toLowerCase().includes((shipStatus ?? "").toLowerCase())
-      );
-      if (!duplicate) events.unshift(shipEvent);
-    }
-
-    return {
-      itemId: item.id,
-      productId: item.productId,
-      product: item.product,
-      sku: item.sku,
-      seller: item.seller,
-      imageUrl: item.imageUrl,
-      events,
-      status: item.status ?? events[0]?.status ?? "Pending",
-    };
-  });
-}
-
-function mapApiOrderToUi(detail: OrderDetail): UIOrder {
-  const items = (detail.items ?? []).map(mapApiItemToUi);
+function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, productIds?: string): UIOrder {
+  let items = (detail.items ?? []).map(mapApiItemToUi);
+  if (productIds) {
+    const validIds = productIds.split(',');
+    items = items.filter(i => validIds.includes(String(i.productId)) || validIds.includes(String(i.id)));
+  } else if (sellerNameFilter) {
+    items = items.filter(i => i.seller?.trim().toLowerCase() === sellerNameFilter.trim().toLowerCase());
+  }
+  if (items.length === 0 && (detail.items ?? []).length > 0) {
+    console.log('Filter failed, falling back to all items.');
+    items = (detail.items ?? []).map(mapApiItemToUi);
+  }
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const shippingCost = Number(detail.shippingAmount ?? 0);
   const tax = Number(detail.taxAmount ?? 0);
@@ -650,7 +524,6 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
       url: detail.shiprocketTrackingUrl,
     },
     tracking: buildTrackingTimeline(history, detail),
-    productTracking: buildProductTracking(items, history, detail),
     items,
     subtotal,
     shippingCost,
@@ -678,7 +551,6 @@ const INITIAL_ORDER: UIOrder = {
   shipping: { line1: "", line2: "", city: "", state: "", pincode: "", country: "India" },
   shiprocket: { awb: "", courier: "—", status: "—", synced: "—", url: "" },
   tracking: [],
-  productTracking: [],
   items: [],
   subtotal: 0,
   shippingCost: 0,
@@ -1012,100 +884,6 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PER-PRODUCT TRACKING TIMELINE CARD
-// ─────────────────────────────────────────────────────────────────────────────
-function ProductTrackingCard({
-  tracking,
-  expanded,
-  onToggleExpand,
-  onUpdateStatus,
-  updating,
-}: {
-  tracking: ProductTracking;
-  expanded: boolean;
-  onToggleExpand: () => void;
-  onUpdateStatus: (next: OrderStatus) => void;
-  updating: boolean;
-}) {
-  const events = tracking.events;
-
-  return (
-    <Card style={{ overflow: "hidden" }}>
-      <View style={s.ptHeader}>
-        <ProductThumb uri={tracking.imageUrl} size={34} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={s.ptProductName} numberOfLines={1}>
-            {tracking.product}
-          </Text>
-          <Text style={s.ptProductMeta} numberOfLines={1}>
-            {tracking.seller} · SKU {tracking.sku}
-          </Text>
-        </View>
-        <StatusBadge status={tracking.status} />
-      </View>
-
-      {/* Each product gets its OWN status control — updating one product's
-          status never affects any other product in the same order. */}
-      <View style={s.ptStatusRow}>
-        <Text style={s.ptStatusLabel}>Update this product's status</Text>
-        <StatusDropdown
-          current={tracking.status}
-          onSelect={onUpdateStatus}
-          disabled={updating}
-          compact
-          label="Update Status"
-        />
-      </View>
-
-      <ScrollView
-        style={{ maxHeight: 260, paddingHorizontal: 18, paddingTop: 8 }}
-        nestedScrollEnabled
-        scrollEnabled={expanded || events.length <= 3}
-        showsVerticalScrollIndicator={expanded}
-      >
-        {events.length === 0 ? (
-          <Text style={s.emptyTrackingTxt}>No tracking updates yet for this product.</Text>
-        ) : (
-          events.map((ev, idx) => (
-            <View key={`${tracking.itemId}-${ev.date}-${ev.description}-${idx}`} style={s.tlItem}>
-              <View style={s.tlLeft}>
-                <View style={[s.tlDot, idx === 0 && s.tlDotActive]} />
-                {idx < events.length - 1 && <View style={s.tlLine} />}
-              </View>
-              <View style={s.tlContent}>
-                {ev.status && (
-                  <View style={{ marginBottom: 6 }}>
-                    <StatusBadge status={ev.status} />
-                  </View>
-                )}
-                <Text style={s.tlDesc}>{ev.description}</Text>
-                <Text style={s.tlLocation}>{ev.location}</Text>
-                <Text style={s.tlDateTime}>
-                  {ev.date} {ev.time ? `· ${ev.time}` : ""}
-                </Text>
-              </View>
-            </View>
-          ))
-        )}
-        <View style={{ height: 10 }} />
-      </ScrollView>
-
-      {events.length > 3 && (
-        <TouchableOpacity
-          style={{ alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border }}
-          onPress={onToggleExpand}
-          activeOpacity={0.7}
-        >
-          <Text style={{ color: C.primary, fontWeight: "600", fontSize: 13 }}>
-            {expanded ? "View Less ▲" : `View More (${events.length - 3} more) ▼`}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </Card>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // STATUS DROPDOWN (matching the uploaded screenshot)
 // ─────────────────────────────────────────────────────────────────────────────
 function StatusDropdown({
@@ -1113,15 +891,11 @@ function StatusDropdown({
   onSelect,
   disabled = false,
   fullWidth = false,
-  compact = false,
-  label = "Update Status",
 }: {
   current: OrderStatus;
   onSelect: (v: OrderStatus) => void;
   disabled?: boolean;
   fullWidth?: boolean;
-  compact?: boolean;
-  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 210 });
@@ -1139,7 +913,6 @@ function StatusDropdown({
       <TouchableOpacity
         style={[
           s.dropBtn,
-          compact && s.dropBtnCompact,
           { backgroundColor: C.primary, borderColor: C.primary },
           fullWidth && { width: "100%", justifyContent: "center" },
           disabled && { opacity: 0.6 },
@@ -1148,10 +921,8 @@ function StatusDropdown({
         activeOpacity={0.8}
         disabled={disabled}
       >
-        <Text style={[s.dropBtnTxt, compact && s.dropBtnTxtCompact, { color: '#FFF' }]}>
-          {disabled ? "Saving…" : label}
-        </Text>
-        <ChevronIcon size={compact ? 12 : 14} color="#FFF" />
+        <Text style={[s.dropBtnTxt, { color: '#FFF' }]}>Update Status</Text>
+        <ChevronIcon color="#FFF" />
       </TouchableOpacity>
 
       <Modal
@@ -1279,7 +1050,7 @@ export default function OrderDetailScreen() {
   const { width } = useWindowDimensions();
   const { isMobile, isTablet, isLaptop, isDesktop, isWide } = useLayout(width);
   const router = useRouter();
-  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+  const { orderId, sellerName, productIds } = useLocalSearchParams<{ orderId?: string; sellerName?: string; productIds?: string }>();
 
   const [order, setOrder] = useState<UIOrder>(INITIAL_ORDER);
   const [status, setStatus] = useState<OrderStatus>(INITIAL_ORDER.status);
@@ -1294,16 +1065,11 @@ export default function OrderDetailScreen() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
-  const [expandedTrackingItems, setExpandedTrackingItems] = useState<Record<number, boolean>>({});
-  const [itemStatusSavingId, setItemStatusSavingId] = useState<number | null>(null);
+  const [trackingExpanded, setTrackingExpanded] = useState(false);
   const px = isMobile ? 14 : isTablet ? 20 : 28;
 
   const displayOrderId = order.id || orderId || "—";
   const displayOrderNumber = order.orderNumber || "—";
-
-  const toggleProductTrackingExpand = useCallback((itemId: number) => {
-    setExpandedTrackingItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
-  }, []);
 
   const loadOrder = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -1324,7 +1090,7 @@ export default function OrderDetailScreen() {
 
     try {
       const raw = await fetchOrderDetail(id);
-      const uiOrder = mapApiOrderToUi(raw as OrderDetail);
+      const uiOrder = mapApiOrderToUi(raw as OrderDetail, sellerName, productIds);
       setOrder(uiOrder);
       setStatus(uiOrder.status);
     } catch (err) {
@@ -1372,33 +1138,6 @@ export default function OrderDetailScreen() {
       await applyStatusUpdate(nextStatus);
     },
     [applyStatusUpdate, status, statusSaving]
-  );
-
-  /**
-   * Updates a SINGLE product's status, independent of every other product in
-   * the order and independent of the order's own overall status. Each
-   * product's "Update Status" button in the tracking column calls this with
-   * its own item id, so changing one product never touches the others.
-   */
-  const handleItemStatusSelect = useCallback(
-    async (item: OrderItem, nextStatus: OrderStatus) => {
-      if (!orderId || nextStatus === item.status || itemStatusSavingId !== null) return;
-      const id = Number(orderId);
-      if (Number.isNaN(id)) return;
-
-      setItemStatusSavingId(item.id);
-      try {
-        const updated = await updateOrderItemStatus(id, item.id, uiStatusToBackend(nextStatus));
-        const uiOrder = mapApiOrderToUi(updated as OrderDetail);
-        setOrder(uiOrder);
-        setStatus(uiOrder.status);
-      } catch (err) {
-        setError(getApiErrorMessage(err));
-      } finally {
-        setItemStatusSavingId(null);
-      }
-    },
-    [orderId, itemStatusSavingId]
   );
 
   const handleSync = useCallback(async () => {
@@ -1589,38 +1328,57 @@ export default function OrderDetailScreen() {
             </View>
               </View>
 
-              {/* Right Side: Tracking Timeline — one card PER PRODUCT */}
-              <View style={[isWide ? { flex: 1, alignSelf: "stretch" } : { width: "100%" }, { gap: 16 }]}>
-                {order.productTracking.length === 0 ? (
-                  <Card style={{ overflow: "hidden" }}>
-                    <CardHeader icon={<TrackIcon size={16} color={C.primary} />} title="Tracking Timeline" />
-                    <View style={{ padding: 18 }}>
+              {/* Right Side: Tracking Timeline */}
+              <View style={[isWide ? { flex: 1, alignSelf: "stretch" } : { width: "100%" }]}>
+                <Card style={[{ overflow: "hidden" }, isWide ? { flex: 1 } : undefined]}>
+                  <CardHeader icon={<TrackIcon size={16} color={C.primary} />} title="Tracking Timeline" />
+
+                  {/* FIXED 320px height — never grows, content scrolls inside */}
+                  <ScrollView
+                    style={{ height: 320, paddingHorizontal: 18, paddingTop: 12 }}
+                    nestedScrollEnabled
+                    scrollEnabled={trackingExpanded || order.tracking.length <= 3}
+                    showsVerticalScrollIndicator={trackingExpanded}
+                  >
+                    {order.tracking.length === 0 ? (
                       <Text style={s.emptyTrackingTxt}>No tracking updates yet. Status changes will appear here.</Text>
-                    </View>
-                  </Card>
-                ) : (
-                  order.productTracking.map((pt) => {
-                    const item = order.items.find((it) => it.id === pt.itemId);
-                    return (
-                      <ProductTrackingCard
-                        key={pt.itemId}
-                        tracking={pt}
-                        expanded={!!expandedTrackingItems[pt.itemId]}
-                        onToggleExpand={() => toggleProductTrackingExpand(pt.itemId)}
-                        updating={itemStatusSavingId === pt.itemId}
-                        onUpdateStatus={(next) => {
-                          if (item) handleItemStatusSelect(item, next);
-                        }}
-                      />
-                    );
-                  })
-                )}
+                    ) : (
+                      order.tracking.map((ev, idx) => (
+                        <View key={`${ev.date}-${ev.description}-${idx}`} style={s.tlItem}>
+                          <View style={s.tlLeft}>
+                            <View style={[s.tlDot, idx === 0 && s.tlDotActive]} />
+                            {idx < order.tracking.length - 1 && <View style={s.tlLine} />}
+                          </View>
+                          <View style={s.tlContent}>
+                            {ev.status && <View style={{ marginBottom: 6 }}><StatusBadge status={ev.status} /></View>}
+                            <Text style={s.tlDesc}>{ev.description}</Text>
+                            <Text style={s.tlLocation}>{ev.location}</Text>
+                            <Text style={s.tlDateTime}>{ev.date} · {ev.time}</Text>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                    <View style={{ height: 12 }} />
+                  </ScrollView>
+                  {/* View More / View Less — card size NEVER changes */}
+                  {order.tracking.length > 3 && (
+                    <TouchableOpacity
+                      style={{ alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border }}
+                      onPress={() => setTrackingExpanded(!trackingExpanded)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ color: C.primary, fontWeight: "600", fontSize: 13 }}>
+                        {trackingExpanded ? "View Less ▲" : `View More (${order.tracking.length - 3} more) ▼`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </Card>
               </View>
             </View>
 
             {/* ── MIDDLE CONTENT: Orders Table (Full Width) ──────────────── */}
             <View style={{ marginTop: 16 }}>
-              <Card style={{ padding: 0 }}>
+              <Card style={{ padding: 0 }}>              
                 {isWide ? (
                   <View style={s.tblWrap}>
                     <View style={[s.tblRow, s.tblHead, { backgroundColor: C.navy, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
@@ -1993,32 +1751,6 @@ const s = StyleSheet.create({
   cardBody: { padding: 18, gap: 12 },
   cardBodyCompact: { padding: 16, gap: 8 },
 
-  // ── Per-product tracking card header ──────────────────────────────────────
-  ptHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  ptProductName: { fontSize: 13, fontWeight: "700", color: C.text },
-  ptProductMeta: { fontSize: 11, color: C.sub, marginTop: 2 },
-  ptStatusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    backgroundColor: C.cardBg,
-  },
-  ptStatusLabel: { fontSize: 11, color: C.sub, flexShrink: 1 },
-
   // ── Status dropdown ────────────────────────────────────────────────────────
   dropBtn: {
     flexDirection: "row",
@@ -2032,8 +1764,6 @@ const s = StyleSheet.create({
   },
   dropDot: { width: 7, height: 7, borderRadius: 3.5 },
   dropBtnTxt: { fontSize: 13, fontWeight: "700" },
-  dropBtnCompact: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 5 },
-  dropBtnTxtCompact: { fontSize: 11.5 },
   dropOverlay: {
     position: "absolute",
     top: -1000,
