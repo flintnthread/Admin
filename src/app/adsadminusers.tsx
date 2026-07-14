@@ -257,7 +257,7 @@ const DeleteModal: React.FC<{
 
                     <View style={[styles.modalBody, { alignItems: 'center', paddingTop: 26 }]}>
                         <View style={styles.trashCircle}>
-                            <Trash width={26} height={26} fill={COLORS.orange} />
+                            <Ionicons name="trash" size={26} color={COLORS.orange} />
                         </View>
                         <Text style={styles.confirmTitle}>Are you sure you want to delete this user?</Text>
                         <Text style={styles.confirmSub}>
@@ -305,6 +305,8 @@ const UserFormModal: React.FC<{
     onSubmit: (form: UserFormState) => void;
 }> = ({ visible, isEdit, initial, onCancel, onSubmit }) => {
     const [form, setForm] = useState<UserFormState>(initial);
+    const { width } = useWindowDimensions();
+    const isPhone = getBreakpoint(width) === 'xs' || getBreakpoint(width) === 'sm' || getBreakpoint(width) === 'md';
 
     React.useEffect(() => {
         if (visible) setForm(initial);
@@ -379,30 +381,49 @@ const UserFormModal: React.FC<{
                         />
 
                         <Text style={styles.label}>Role</Text>
-                        <View style={styles.pickerWrap}>
-                            <Picker
-                                selectedValue={form.role}
-                                onValueChange={(v) => update('role', v as string)}
-                                style={styles.picker}
-                            >
-                                {ROLES.map((r) => (
-                                    <Picker.Item key={r} label={r} value={r} />
-                                ))}
-                            </Picker>
-                        </View>
+                        {isPhone ? (
+                            <CustomDropdown
+                                label="Select Role"
+                                value={form.role}
+                                options={ROLES as any}
+                                onValueChange={(v) => update('role', v)}
+                            />
+                        ) : (
+                            <View style={styles.pickerWrap}>
+                                <Picker
+                                    selectedValue={form.role}
+                                    onValueChange={(v) => update('role', v as string)}
+                                    style={styles.picker}
+                                >
+                                    {ROLES.map((r) => (
+                                        <Picker.Item key={r} label={r} value={r} />
+                                    ))}
+                                </Picker>
+                            </View>
+                        )}
 
                         <Text style={styles.label}>Status</Text>
-                        <View style={styles.pickerWrap}>
-                            <Picker
-                                selectedValue={form.status}
-                                onValueChange={(v) => update('status', v as string)}
-                                style={styles.picker}
-                            >
-                                {STATUSES.map((s) => (
-                                    <Picker.Item key={s} label={s} value={s} />
-                                ))}
-                            </Picker>
-                        </View>
+                        {isPhone ? (
+                            <CustomDropdown
+                                label="Select Status"
+                                value={form.status}
+                                options={STATUSES as any}
+                                onValueChange={(v) => update('status', v)}
+                            />
+                        ) : (
+                            <View style={styles.pickerWrap}>
+                                <Picker
+                                    selectedValue={form.status}
+                                    onValueChange={(v) => update('status', v as string)}
+                                    style={styles.picker}
+                                >
+                                    {STATUSES.map((s) => (
+                                        <Picker.Item key={s} label={s} value={s} />
+                                    ))}
+                                </Picker>
+                            </View>
+                        )}
+                        <View style={{ height: 120 }} />
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
@@ -418,6 +439,63 @@ const UserFormModal: React.FC<{
                 </View>
             </View>
         </Modal>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// Custom Dropdown Component for Mobile
+// ---------------------------------------------------------------------------
+const CustomDropdown: React.FC<{
+    label: string;
+    value: string;
+    options: string[];
+    onValueChange: (val: string) => void;
+}> = ({ label, value, options, onValueChange }) => {
+    const [open, setOpen] = React.useState(false);
+
+    return (
+        <View style={{ zIndex: open ? 1000 : 1, position: 'relative', flex: 1 }}>
+            <TouchableOpacity
+                style={[
+                    styles.customDropdownTrigger,
+                    open && { borderColor: COLORS.orange }
+                ]}
+                onPress={() => setOpen(!open)}
+            >
+                <Text style={styles.customDropdownTriggerText} numberOfLines={1}>
+                    {value === 'All' ? label : value}
+                </Text>
+                <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={COLORS.sub} />
+            </TouchableOpacity>
+
+            {open && (
+                <View style={styles.customDropdownMenu}>
+                    {options.map((opt) => {
+                        const isSelected = opt === value;
+                        return (
+                            <TouchableOpacity
+                                key={opt}
+                                style={[
+                                    styles.customDropdownItem,
+                                    isSelected && { backgroundColor: '#2563EB' }
+                                ]}
+                                onPress={() => {
+                                    onValueChange(opt);
+                                    setOpen(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.customDropdownItemText,
+                                    isSelected && { color: '#fff', fontWeight: '700' }
+                                ]}>
+                                    {opt === 'All' ? label : opt}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            )}
+        </View>
     );
 };
 
@@ -578,18 +656,26 @@ const AdsAdminUsers: React.FC = () => {
             <View style={styles.screen}>
                 <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
                     {/* ---------- Header ---------- */}
-                    <View style={styles.headerContainer}>
-                        <View style={[styles.headerRow, isPhone && { flexDirection: 'column', alignItems: 'flex-start', gap: 12 }]}>
+                    <View style={[styles.headerContainer, isPhone && { paddingBottom: 42, paddingVertical: 16, paddingHorizontal: 12 }]}>
+                        <View style={[styles.headerRow, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }]}>
                             <View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <PeopleFill width={isPhone ? 20 : 24} height={isPhone ? 20 : 24} fill="#fff" />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{
+                                        backgroundColor: COLORS.orange,
+                                        padding: isPhone ? 4 : 8,
+                                        borderRadius: isPhone ? 6 : 8,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <PeopleFill width={isPhone ? 16 : 20} height={isPhone ? 16 : 20} fill="#fff" />
+                                    </View>
                                     <Text style={[styles.title, { color: '#fff' }, isPhone && { fontSize: 20 }]}>Ads Admin Users</Text>
                                 </View>
                             </View>
 
-                            <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'stretch', justifyContent: 'center' }]} onPress={openAddModal}>
+                            <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 }]} onPress={openAddModal}>
                                 <PlusLg width={14} height={14} fill="#fff" />
-                                <Text style={styles.addBtnText}>Add New User</Text>
+                                <Text style={[styles.addBtnText, isPhone && { fontSize: 11, marginLeft: 2 }]}>Add New User</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -631,11 +717,11 @@ const AdsAdminUsers: React.FC = () => {
 
                     {/* ---------- Toolbar ---------- */}
                     <View style={styles.toolbarCard}>
-                        <View style={[styles.searchBox, isPhone && { width: '100%' }]}>
+                        <View style={[styles.searchBox, isPhone && { width: '100%', borderRadius: 10, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: COLORS.border, marginBottom: 10 }]}>
                             <Search width={15} height={15} fill={COLORS.sub} />
                             <TextInput
-                                style={styles.searchInput}
-                                placeholder="Search users by name, username or email..."
+                                style={[styles.searchInput, isPhone && { color: COLORS.ink, fontSize: 13 }]}
+                                placeholder="Search users by name, username or...."
                                 placeholderTextColor="#9CA3AF"
                                 value={search}
                                 onChangeText={(t) => { setSearch(t); setPage(1); }}
@@ -643,19 +729,50 @@ const AdsAdminUsers: React.FC = () => {
                             />
                         </View>
 
-                        <View style={[styles.filterRow, isPhone && { width: '100%', marginTop: 10 }]}>
-                            <View style={[styles.selectWrap, isPhone && { flex: 1 }]}>
-                                <Picker selectedValue={roleFilter} onValueChange={(v) => { setRoleFilter(v as any); setPage(1); }} style={styles.selectPicker}>
-                                    <Picker.Item label="All Roles" value="All" />
-                                    {ROLES.map((r) => <Picker.Item key={r} label={r} value={r} />)}
-                                </Picker>
-                            </View>
-                            <View style={[styles.selectWrap, isPhone && { flex: 1 }]}>
-                                <Picker selectedValue={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setPage(1); }} style={styles.selectPicker}>
-                                    <Picker.Item label="All Status" value="All" />
-                                    {STATUSES.map((s) => <Picker.Item key={s} label={s} value={s} />)}
-                                </Picker>
-                            </View>
+                        <View style={[styles.filterRow, isPhone && { width: '100%', marginTop: 2 }]}>
+                            {isPhone ? (
+                                <>
+                                    <CustomDropdown
+                                        label="All Roles"
+                                        value={roleFilter}
+                                        options={['All', ...ROLES]}
+                                        onValueChange={(v) => { setRoleFilter(v as any); setPage(1); }}
+                                    />
+                                    <CustomDropdown
+                                        label="All Status"
+                                        value={statusFilter}
+                                        options={['All', ...STATUSES]}
+                                        onValueChange={(v) => { setStatusFilter(v as any); setPage(1); }}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <View style={styles.selectWrap}>
+                                        <Picker
+                                            selectedValue={roleFilter}
+                                            onValueChange={(v) => { setRoleFilter(v as any); setPage(1); }}
+                                            style={styles.selectPicker}
+                                        >
+                                            <Picker.Item label="All Roles" value="All" />
+                                            {ROLES.map((r) => (
+                                                <Picker.Item key={r} label={r} value={r} />
+                                            ))}
+                                        </Picker>
+                                    </View>
+                                    <View style={styles.selectWrap}>
+                                        <Picker
+                                            selectedValue={statusFilter}
+                                            onValueChange={(v) => { setStatusFilter(v as any); setPage(1); }}
+                                            style={styles.selectPicker}
+                                        >
+                                            <Picker.Item label="All Status" value="All" />
+                                            {STATUSES.map((s) => (
+                                                <Picker.Item key={s} label={s} value={s} />
+                                            ))}
+                                        </Picker>
+                                    </View>
+                                </>
+                            )}
                             {!isPhone && (
                                 <View style={styles.viewToggle}>
                                     <TouchableOpacity
@@ -1067,6 +1184,47 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
         paddingTop: 10,
+    } as any,
+    customDropdownTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F3F4F6',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 10,
+        height: 48,
+        paddingHorizontal: 12,
+    } as any,
+    customDropdownTriggerText: {
+        fontSize: 13,
+        color: COLORS.ink,
+        fontWeight: '600',
+    } as any,
+    customDropdownMenu: {
+        position: 'absolute',
+        top: 52,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#9CA3AF',
+        borderRadius: 8,
+        paddingVertical: 4,
+        zIndex: 2000,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+    } as any,
+    customDropdownItem: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    } as any,
+    customDropdownItemText: {
+        fontSize: 13,
+        color: '#4B5563',
     } as any,
 
 });
