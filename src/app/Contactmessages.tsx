@@ -160,9 +160,14 @@ const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pe
     { icon: "clock" as const, value: String(pending), label: "Pending", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
   ];
   return (
-    <View style={mSt.statsGrid}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false} 
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+      style={{ marginTop: -36, zIndex: 10, marginBottom: 16 }}
+    >
       {cards.map((s, i) => (
-        <View key={i} style={[mSt.statCard, i === 2 && { width: "100%" as any }]}>
+        <View key={i} style={[mSt.statCard, { width: 160, marginRight: i === 2 ? 16 : 0 }]}>
           <View style={[mSt.statIcon, { backgroundColor: s.tint }]}>
             <Feather name={s.icon} size={22} color={s.textColor} />
           </View>
@@ -173,7 +178,7 @@ const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pe
           </View>
         </View>
       ))}
-    </View>
+    </ScrollView>
   );
 };
 
@@ -569,6 +574,18 @@ const ContactMessagesScreen: React.FC = () => {
               <Text style={{ color: "#DC2626", paddingHorizontal: 16, marginBottom: 8 }}>{loadError}</Text>
             ) : null}
 
+            {/* ── View Switcher Mobile ── */}
+            {!loading && filtered.length > 0 && (
+              <View style={{ paddingHorizontal: 16, marginBottom: 12, flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+                <TouchableOpacity onPress={() => setViewMode("grid")} style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]}>
+                  <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setViewMode("list")} style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]}>
+                  <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED} />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* ── Content ── */}
             {loading ? (
               <Text style={{ color: TEXT_MUTED, textAlign: "center", padding: 40 }}>Loading messages…</Text>
@@ -581,17 +598,57 @@ const ContactMessagesScreen: React.FC = () => {
                 <Text style={mSt.emptySubtitle}>No messages found matching your criteria.</Text>
               </View>
             ) : (
-              <View style={{ paddingHorizontal: 16, gap: 0 }}>
-                {paginatedMessages.map((item) => (
-                  <MessageCard
-                    key={item.id}
-                    msg={item}
-                    onView={handleView}
-                    onMarkReplied={markReplied}
-                    onReply={setReplyMsg}
-                    onDelete={deleteMessage}
-                  />
-                ))}
+              <View style={{ paddingHorizontal: 16, gap: 12 }}>
+                {viewMode === "grid" ? (
+                  paginatedMessages.map((item) => (
+                    <MessageCard
+                      key={item.id}
+                      msg={item}
+                      onView={handleView}
+                      onMarkReplied={markReplied}
+                      onReply={setReplyMsg}
+                      onDelete={deleteMessage}
+                    />
+                  ))
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={[styles.tableContainer, { minWidth: 1080 }]}>
+                      <View style={[styles.tableHeaderRow, { gap: 24 }]}>
+                        <Text style={[styles.tableHeaderCell, { width: 200 }]}>Sender</Text>
+                        <Text style={[styles.tableHeaderCell, { width: 160 }]}>Subject</Text>
+                        <Text style={[styles.tableHeaderCell, { width: 260 }]}>Preview</Text>
+                        <Text style={[styles.tableHeaderCell, { width: 120 }]}>Date</Text>
+                        <Text style={[styles.tableHeaderCell, { width: 100 }]}>Status</Text>
+                        <Text style={[styles.tableHeaderCell, { width: 130, textAlign: "center" }]}>Actions</Text>
+                      </View>
+                      {paginatedMessages.map((msg) => (
+                        <View key={msg.id} style={[styles.tableRow, { gap: 24 }]}>
+                          <View style={[styles.tableCellRow, { width: 200 }]}>
+                            <View style={[styles.tableAvatar, { backgroundColor: msg.avatarBg }]}>
+                              <Text style={[styles.tableAvatarText, { color: msg.avatarColor }]}>{getInitials(msg.name)}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.tableCell, { fontWeight: "700" }]} numberOfLines={1}>{msg.name}</Text>
+                              <Text style={[styles.tableCell, { color: TEXT_MUTED, fontSize: 11 }]} numberOfLines={1}>{msg.email}</Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.tableCell, { width: 160, fontWeight: "600" }]} numberOfLines={1}>{msg.subject}</Text>
+                          <Text style={[styles.tableCell, { width: 260, color: TEXT_MUTED }]} numberOfLines={2}>{msg.content}</Text>
+                          <Text style={[styles.tableCell, { width: 120, color: TEXT_MUTED }]}>{msg.date.split(" ").slice(0, 3).join(" ")}</Text>
+                          <View style={{ width: 100 }}><StatusBadge status={msg.status} /></View>
+                          <View style={{ width: 130, flexDirection: "row", justifyContent: "center", gap: 6 }}>
+                            <TouchableOpacity style={styles.tableBtnView} onPress={() => handleView(msg)}><Feather name="eye" size={13} color="#FFFFFF" /></TouchableOpacity>
+                            {msg.status !== "Replied" && (
+                              <TouchableOpacity style={styles.tableBtnMark} onPress={() => markReplied(msg.id)}><Feather name="check" size={13} color="#FFFFFF" /></TouchableOpacity>
+                            )}
+                            <TouchableOpacity style={[styles.tableBtnView, { backgroundColor: "#2563EB", borderColor: "#2563EB" }]} onPress={() => setReplyMsg(msg)}><Feather name="corner-up-left" size={13} color="#FFFFFF" /></TouchableOpacity>
+                            <TouchableOpacity style={styles.tableBtnDelete} onPress={() => deleteMessage(msg.id)}><Feather name="trash-2" size={13} color="#FFFFFF" /></TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
               </View>
             )}
 
