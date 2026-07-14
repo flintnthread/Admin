@@ -233,7 +233,7 @@ const NAV_ITEMS = {
     {
       label: "Message Center",
       icon: "mail",
-      path: "/message-center",
+      path: "/Contactmessages",
       color: "#3B82F6",
     },
     { label: "Logos", icon: "image", path: "/Logomanagement", color: "#0EA5E9" },

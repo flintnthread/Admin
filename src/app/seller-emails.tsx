@@ -253,9 +253,10 @@ interface EmailModalProps {
   seller?: Seller | null;
   onSend: (subject: string, message: string) => void;
   isDesktop: boolean;
+  isMobile?: boolean;
 }
 
-function EmailModal({ visible, onClose, mode, seller, onSend, isDesktop }: EmailModalProps) {
+function EmailModal({ visible, onClose, mode, seller, onSend, isDesktop, isMobile }: EmailModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
@@ -275,15 +276,21 @@ function EmailModal({ visible, onClose, mode, seller, onSend, isDesktop }: Email
 
   return (
     <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, isDesktop && styles.modalCardWide]}>
+      <View style={[styles.modalOverlay, isMobile && { justifyContent: 'flex-end', padding: 0 }]}>
+        <View style={[
+          styles.modalCard, 
+          isDesktop && styles.modalCardWide,
+          isMobile && { borderRadius: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22 }
+        ]}>
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderTitleRow}>
-              <Feather name="send" size={16} color={COLORS.white} />
+              <View style={styles.modalIconBadge}>
+                <Feather name="send" size={14} color={COLORS.orange} />
+              </View>
               <Text style={styles.modalHeaderTitle}>{mode === 'single' ? 'Send Email' : 'Send Email to All Sellers'}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
-              <Feather name="x" size={20} color={COLORS.white} />
+              <Feather name="x" size={20} color={COLORS.textMuted} />
             </Pressable>
           </View>
 
@@ -567,6 +574,7 @@ export default function SellerEmailsScreen() {
         seller={activeSeller}
         onSend={handleSend}
         isDesktop={isDesktop}
+        isMobile={!isTablet && !isLaptop && !isDesktop}
       />
     </AdminLayout>
   );
@@ -887,17 +895,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.orange,
+    backgroundColor: COLORS.white,
     paddingHorizontal: 20,
     paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   modalHeaderTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  modalIconBadge: { 
+    width: 30, 
+    height: 30, 
+    borderRadius: 9, 
+    backgroundColor: '#FFF7ED', 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
   modalHeaderTitle: {
-    color: COLORS.white,
+    color: COLORS.navy,
     fontSize: 16,
     fontWeight: '700',
   },
