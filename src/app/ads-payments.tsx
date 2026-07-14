@@ -379,7 +379,7 @@ function StatCard({
   valueColor: string;
 }) {
   return (
-    <View style={[styles.statCard, { flex: 1, minWidth: 150 }]}>
+    <View style={[styles.statCard, { minWidth: 150 }]}>
       <View style={styles.statCardTop}>
         <View style={[styles.statIconBadge, { backgroundColor: iconBg }]}>{icon}</View>
         <Text style={[styles.statValue, { color: valueColor }]} numberOfLines={1}>
@@ -392,11 +392,13 @@ function StatCard({
 }
 function StatCardsRow({
   stats,
+  isPhone
 }: {
   stats: { total: number; captured: number; capturedAmt: number; successRate: number; refunded: number };
+  isPhone?: boolean;
 }) {
-  return (
-    <View style={styles.statsRow}>
+  const cards = (
+    <>
       <StatCard
         icon={<ReceiptGlyph color={COLORS.navy} size={17} />}
         label="TOTAL PAYMENTS"
@@ -429,6 +431,20 @@ function StatCardsRow({
         iconBg={COLORS.orange + '14'}
         valueColor={COLORS.orange}
       />
+    </>
+  );
+
+  if (isPhone) {
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: 16 }}>
+        {cards}
+      </ScrollView>
+    );
+  }
+
+  return (
+    <View style={styles.statsRow}>
+      {cards}
     </View>
   );
 }
@@ -604,16 +620,20 @@ function FilterBar({
               style={styles.searchInput}
             />
           </View>
-          {/* Controls */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, zIndex: 100 }}>
-            <StatusDropdown 
-              value={status} onChange={onStatus} 
-              open={openDropdown === 'status'} onToggle={() => setOpenDropdown(p => p === 'status' ? null : 'status')} 
-            />
-            <MethodDropdown 
-              value={method} onChange={onMethod} 
-              open={openDropdown === 'method'} onToggle={() => setOpenDropdown(p => p === 'method' ? null : 'method')} 
-            />
+          {/* Controls — all in one row, no wrapping */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 8, zIndex: 100, overflow: 'visible' }}>
+            <View style={{ flex: 1, zIndex: openDropdown === 'status' ? 50 : 20, overflow: 'visible' }}>
+              <StatusDropdown 
+                value={status} onChange={onStatus} 
+                open={openDropdown === 'status'} onToggle={() => setOpenDropdown(p => p === 'status' ? null : 'status')} 
+              />
+            </View>
+            <View style={{ flex: 1, zIndex: openDropdown === 'method' ? 50 : 10, overflow: 'visible' }}>
+              <MethodDropdown 
+                value={method} onChange={onMethod} 
+                open={openDropdown === 'method'} onToggle={() => setOpenDropdown(p => p === 'method' ? null : 'method')} 
+              />
+            </View>
             {toggleButtons}
           </View>
         </View>
@@ -754,7 +774,7 @@ function TimelineReceipt({ payment, isLast, onView }: { payment: Payment; isLast
         <View style={[styles.timelineDot, { backgroundColor: meta.color }]} />
         {!isLast && <View style={styles.timelineLine} />}
       </View>
-      <TouchableOpacity style={styles.receiptCard} activeOpacity={0.9} onPress={() => onView(payment)}>
+      <View style={styles.receiptCard}>
         <View style={styles.receiptTopRow}>
           <Text style={styles.idMono} numberOfLines={1}>{payment.paymentId}</Text>
           <StatusBadge status={payment.status} />
@@ -768,7 +788,18 @@ function TimelineReceipt({ payment, isLast, onView }: { payment: Payment; isLast
           </View>
           <Text style={styles.amt}>{fmtINR(payment.amount)}</Text>
         </View>
-      </TouchableOpacity>
+        {/* Explicit View button row */}
+        <View style={styles.receiptViewRow}>
+          <TouchableOpacity
+            style={styles.receiptViewBtn}
+            activeOpacity={0.85}
+            onPress={() => onView(payment)}
+          >
+            <EyeGlyph size={13} />
+            <Text style={styles.receiptViewBtnText}>View Details</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -801,27 +832,42 @@ function PaymentDetailsPanel({ payment, onClose, isTablet }: { payment: Payment;
   return (
     <View style={styles.modalOverlay}>
       <View style={[styles.modalCard, !isTablet && styles.modalCardPhone]}>
+        {/* Orange header */}
         <View style={styles.modalHeader}>
           <Text style={styles.modalHeaderTitle}>Payment Details</Text>
           <TouchableOpacity onPress={onClose} style={styles.modalCloseIcon} activeOpacity={0.8}>
             <XGlyph />
           </TouchableOpacity>
         </View>
-        <View style={styles.modalBody}>
-          <View style={[styles.detailGrid, !isTablet && { flexDirection: 'column' }]}>
-            <View style={styles.detailCol}>
-              <DetailField label="Payment ID" value={payment.paymentId} />
-              <DetailField label="Order ID" value={payment.orderId} />
-              <DetailField label="Amount" value={fmtINR(payment.amount) + '.00'} />
-              <DetailField label="Created" value={payment.createdLabel} />
+        {/* Body — ScrollView ensures content never collapses on small screens */}
+        <ScrollView
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={styles.modalBody}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* Status badge row */}
+          <View style={styles.modalStatusRow}>
+            <View style={[styles.statusBadge, { backgroundColor: meta.bg, alignSelf: 'auto' }]}>
+              <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
             </View>
-            <View style={styles.detailCol}>
-              <DetailField label="Status" value={meta.label.toLowerCase()} />
-              <DetailField label="Method" value={payment.method.toLowerCase()} />
-              <DetailField label="Bank" value={payment.bank ?? 'N/A'} />
-            </View>
+            <Text style={styles.modalAmtBig}>{fmtINR(payment.amount)}</Text>
           </View>
-        </View>
+          {/* All fields listed vertically — safe on any screen size */}
+          <View style={styles.detailFieldsList}>
+            <DetailField label="Payment ID" value={payment.paymentId} />
+            <DetailField label="Order ID" value={payment.orderId} />
+            <DetailField label="Customer" value={payment.customerName} />
+            <DetailField label="Email" value={payment.customerEmail} />
+            <DetailField label="Amount" value={fmtINR(payment.amount)} />
+            <DetailField label="Status" value={meta.label} />
+            <DetailField label="Method" value={payment.method} />
+            <DetailField label="Bank" value={payment.bank ?? 'N/A'} />
+            <DetailField label="Date" value={payment.dateLabel} />
+            <DetailField label="Created" value={payment.createdLabel} />
+          </View>
+        </ScrollView>
+        {/* Footer */}
         <View style={styles.modalFooter}>
           <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose} activeOpacity={0.85}>
             <XGlyph size={12} />
@@ -887,7 +933,7 @@ export default function AdsPaymentsScreen() {
         <ScrollView contentContainerStyle={{ paddingHorizontal: contentPad, paddingTop: 16, paddingBottom: 28, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <ScreenHeader />
           <View style={{ marginTop: -36, paddingHorizontal: 16, zIndex: 10 }}>
-            <StatCardsRow stats={stats} />
+            <StatCardsRow stats={stats} isPhone={bp === 'phone'} />
           </View>
 
           {/*
@@ -969,7 +1015,7 @@ const styles = StyleSheet.create({
   headerStatDiv: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 4 },
 
   /* stat cards */
-  statsRow: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
+  statsRow: { flexDirection: 'row', gap: 16, flexWrap: 'wrap', justifyContent: 'center' },
   statCard: {
     backgroundColor: COLORS.surface,
     padding: 16,
@@ -1003,13 +1049,13 @@ const styles = StyleSheet.create({
   searchBox: { flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink },
 
-  statusDropdownWrap: { position: 'relative', zIndex: 20, minWidth: 148 },
-  statusDropdownBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: COLORS.page },
-  statusDropdownText: { flex: 1, fontWeight: '600', fontSize: 12.5, color: COLORS.ink },
+  statusDropdownWrap: { position: 'relative', zIndex: 20 },
+  statusDropdownBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: COLORS.page },
+  statusDropdownText: { flex: 1, fontWeight: '600', fontSize: 12, color: COLORS.ink },
   statusDropdownMenu: {
-    position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
+    position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
     backgroundColor: COLORS.surface, borderRadius: 10, borderWidth: 1, borderColor: COLORS.rule,
-    overflow: 'hidden', shadowColor: '#1B1F3B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 8, zIndex: 30,
+    overflow: 'hidden', shadowColor: '#1B1F3B', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 30, zIndex: 999,
   },
   dropdownOption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: COLORS.ruleSoft },
   dropdownOptionActive: { backgroundColor: COLORS.navyTint },
@@ -1105,22 +1151,29 @@ const styles = StyleSheet.create({
   modalOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(15,17,32,0.55)', alignItems: 'center', justifyContent: 'center',
-    padding: 18, zIndex: 100, elevation: 20,
+    padding: 18, zIndex: 200, elevation: 50,
   },
-  modalCard: { width: '100%', maxWidth: 480, backgroundColor: COLORS.surface, borderRadius: 16, overflow: 'hidden' },
+  modalCard: { width: '100%', maxWidth: 480, backgroundColor: COLORS.surface, borderRadius: 16 },
   modalCardPhone: { maxWidth: '100%', borderRadius: 14 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.orange, paddingHorizontal: 18, paddingVertical: 16 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.orange, paddingHorizontal: 18, paddingVertical: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   modalHeaderTitle: { fontWeight: '700', fontSize: 16, color: '#fff' },
   modalCloseIcon: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
-  modalBody: { padding: 20 },
+  modalBody: { padding: 20, gap: 0 },
+  modalStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: COLORS.ruleSoft },
+  modalAmtBig: { fontWeight: '800', fontSize: 20, color: COLORS.navyDeep },
+  detailFieldsList: { gap: 14 },
   detailGrid: { flexDirection: 'row', gap: 20 },
-  detailCol: { flex: 1, gap: 16 },
-  detailField: {},
-  detailLabel: { fontWeight: '600', fontSize: 12.5, color: COLORS.ink },
-  detailValue: { fontSize: 12.5, fontWeight: '700', color: COLORS.orangeDeep, marginTop: 3 },
+  detailCol: { flexShrink: 0, gap: 16 },
+  detailField: { paddingVertical: 2 },
+  detailLabel: { fontWeight: '600', fontSize: 11.5, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  detailValue: { fontSize: 13, fontWeight: '700', color: COLORS.navyDeep, marginTop: 2 },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 20, paddingBottom: 20 },
   modalCloseBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.navyMid, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 9 },
   modalCloseBtnText: { fontWeight: '700', fontSize: 12.5, color: '#fff' },
+  /* receipt view button */
+  receiptViewRow: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.ruleSoft },
+  receiptViewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.navyDeep, borderRadius: 8, paddingVertical: 8 },
+  receiptViewBtnText: { fontWeight: '700', fontSize: 12, color: '#fff' },
 
   /* empty state */
   emptyState: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 32, alignItems: 'center' },

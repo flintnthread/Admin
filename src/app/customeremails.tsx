@@ -125,7 +125,7 @@ export default function CustomerEmailsScreen() {
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
 
-    const maxContentWidth = bp === 'xxl' ? 1600 : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
+    const maxContentWidth = bp === 'xxl' ? '100%' : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -183,18 +183,24 @@ export default function CustomerEmailsScreen() {
                     {/* Search + total */}
                     <View style={[styles.toolRow, isCompact && styles.toolRowCompact]}>
                         <View style={styles.searchBox}>
-                            <Ic icon={Search} size={15} color={COLORS.muted} />
+                            <View style={{ flexShrink: 0 }}>
+                                <Ic icon={Search} size={15} color={COLORS.muted} />
+                            </View>
                             <TextInput
                                 value={query}
                                 onChangeText={setQuery}
-                                placeholder="Search customers…"
+                                placeholder={isCompact ? "Search..." : "Search customers"}
                                 placeholderTextColor={COLORS.muted}
-                                style={styles.searchInput}
+                                style={[styles.searchInput, { minWidth: 0 }]}
                             />
                         </View>
                         <View style={styles.totalChip}>
-                            <Ic icon={PeopleFill} size={14} color={COLORS.primary} />
-                            <Text style={styles.totalChipText}>Total: {MOCK_CUSTOMERS.length} Customers</Text>
+                            <View style={{ flexShrink: 0 }}>
+                                <Ic icon={PeopleFill} size={14} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.totalChipText} numberOfLines={1}>
+                                {isCompact ? `${MOCK_CUSTOMERS.length} Customers` : `Total: ${MOCK_CUSTOMERS.length} Customers`}
+                            </Text>
                         </View>
                     </View>
 
@@ -478,7 +484,7 @@ const styles = StyleSheet.create({
     primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
     toolRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-    toolRowCompact: { flexDirection: 'column', alignItems: 'stretch' },
+    toolRowCompact: { flexDirection: 'row' },
     searchBox: {
         flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: COLORS.surface,
@@ -501,15 +507,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14,
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
-    tableHeaderRow: { backgroundColor: '#FBF6EF', borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    tableHeaderRow: { backgroundColor: '#F5ECDE', borderBottomWidth: 1, borderBottomColor: COLORS.border },
     tableRowAlt: { backgroundColor: '#FCFBF8' },
-    th: { fontSize: 11, fontWeight: '700', color: COLORS.navySoft, textTransform: 'uppercase', letterSpacing: 0.4 },
+    th: { fontSize: 11, fontWeight: '700', color: '#1C2439', textTransform: 'uppercase', letterSpacing: 0.4 },
     td: { fontSize: 13, color: COLORS.navySoft },
     tdStrong: { fontSize: 13, color: COLORS.navy, fontWeight: '700' },
     tdMuted: { color: COLORS.muted },
     rowActionBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+        backgroundColor: '#151D4F', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
     },
     rowActionText: { color: '#fff', fontWeight: '700', fontSize: 11 },
 
@@ -541,7 +547,7 @@ const styles = StyleSheet.create({
     cardDetailText: { fontSize: 12.5, color: COLORS.navySoft, flexShrink: 1 },
     cardActionBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-        backgroundColor: COLORS.primary, paddingVertical: 11, borderRadius: 9, marginTop: 6,
+        backgroundColor: '#151D4F', paddingVertical: 11, borderRadius: 9, marginTop: 6,
     },
 
     // Empty state

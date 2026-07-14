@@ -627,16 +627,15 @@ export default function AdPlacementsScreen() {
                 <Text style={styles.heroTitle} numberOfLines={1}>Ad Placements</Text>
                 <Text style={styles.heroSubtitle} numberOfLines={1}>Manage ad placements</Text>              
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.addHeaderBtn,
-                  width < 350 && { width: 40, height: 40, borderRadius: 12, paddingHorizontal: 0, paddingVertical: 0, justifyContent: "center", alignItems: "center" }
-                ]}
-                onPress={openAddModal}
-              >
-                <Feather name="plus" size={15} color="#fff" />
-                {width >= 350 && <Text style={styles.addHeaderBtnText}>{isMobile ? "Add" : "Add Placement"}</Text>}
-              </TouchableOpacity>
+              {!isMobile && (
+                <TouchableOpacity
+                  style={styles.addHeaderBtn}
+                  onPress={openAddModal}
+                >
+                  <Feather name="plus" size={15} color="#fff" />
+                  <Text style={styles.addHeaderBtnText}>Add Placement</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -645,6 +644,12 @@ export default function AdPlacementsScreen() {
             <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={setDeleteTarget} />
           </View>
         </ScrollView>
+
+        {isMobile && (
+          <TouchableOpacity style={styles.fab} onPress={openAddModal}>
+            <Feather name="plus" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
 
         <PlacementModal
           visible={modalOpen}
@@ -764,7 +769,7 @@ modalCard: {
   fieldRow: { flexDirection: "row", gap: 14, marginTop: 14, flexWrap: "wrap" },
   fieldLabel: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 6 },
   fieldError: { fontSize: 11, color: COLORS.rose, marginTop: 4, fontWeight: "500" },
-  input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: "#fff" },
+  input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: "#fff", outlineStyle: "none" } as any,
   inputMultiline: { minHeight: 70, textAlignVertical: "top" },
   inputError: { borderColor: COLORS.rose },
 
@@ -792,6 +797,24 @@ modalCard: {
   resetBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.textMuted },
   addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: COLORS.orange, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 18 },
   addBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
+
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.orange,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    zIndex: 10,
+  },
 
   // Success toast
   successOverlay: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(15,23,42,0.55)", padding: 24 },

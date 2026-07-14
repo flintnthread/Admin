@@ -217,8 +217,13 @@ function HeroHeader({
 
       {/* Stat cards */}
       {isMobile ? (
-        // ── Mobile / small-tablet: 2-column grid, Pincodes full width ──
-        <View style={s.statCardsMobileGrid}>
+        // ── Mobile / small-tablet: horizontally scrollable ──
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.statCardsMobileGrid}
+          contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+        >
           {stats.slice(0, 4).map((p, i) => (
             <View key={i} style={s.statCardMobile}>
               <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
@@ -232,7 +237,7 @@ function HeroHeader({
               </View>
             </View>
           ))}
-          {/* Pincodes — full width */}
+          {/* Pincodes */}
           <View style={s.statCardMobileFull}>
             <View style={[s.statCardIcon, { backgroundColor: stats[4].bg }]}>
               <MaterialIcons name={stats[4].icon} size={20} color={stats[4].color} />
@@ -244,7 +249,7 @@ function HeroHeader({
               <ThemedText style={s.statCardLabel}>{stats[4].label}</ThemedText>
             </View>
           </View>
-        </View>
+        </ScrollView>
       ) : (
         // ── Tablet / Web: horizontal wrapping row ──
         <View style={s.statCardsRow}>
@@ -1573,18 +1578,13 @@ const s = StyleSheet.create({
   statCardValue: { fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 8 },
   statCardLabel: { color: '#6B7280', fontSize: 11, marginTop: 2, fontWeight: '500' },
 
-  // ── Mobile / small-tablet stat cards grid (2-col + full-width Pincodes) ──
+  // ── Mobile / small-tablet stat cards ──
   statCardsMobileGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
     marginTop: -42,
     marginBottom: 16,
-    paddingHorizontal: 2,
   },
   statCardMobile: {
-    // ~48% width so 2 per row with gap
-    width: '48%',
+    width: 165,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 14,
@@ -1600,8 +1600,7 @@ const s = StyleSheet.create({
     borderColor: '#F0F0F0',
   },
   statCardMobileFull: {
-    // full width for Pincodes
-    width: '100%',
+    width: 165,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 14,
