@@ -218,6 +218,63 @@ const emptyForm: FormState = {
     name: '', category: 'Select Category', description: '', techSpecs: '', requirements: '', status: 'Active',
 };
 
+// ---------------------------------------------------------------------------
+// Custom Dropdown Component for Mobile
+// ---------------------------------------------------------------------------
+const CustomDropdown: React.FC<{
+    label: string;
+    value: string;
+    options: string[];
+    onValueChange: (val: string) => void;
+}> = ({ label, value, options, onValueChange }) => {
+    const [open, setOpen] = React.useState(false);
+
+    return (
+        <View style={{ zIndex: open ? 1000 : 1, position: 'relative', width: '100%' }}>
+            <TouchableOpacity
+                style={[
+                    styles.customDropdownTrigger,
+                    open && { borderColor: COLORS.orange }
+                ]}
+                onPress={() => setOpen(!open)}
+            >
+                <Text style={styles.customDropdownTriggerText} numberOfLines={1}>
+                    {value === 'Select Category' ? label : value}
+                </Text>
+                <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={COLORS.sub} />
+            </TouchableOpacity>
+
+            {open && (
+                <View style={styles.customDropdownMenu}>
+                    {options.map((opt) => {
+                        const isSelected = opt === value;
+                        return (
+                            <TouchableOpacity
+                                key={opt}
+                                style={[
+                                    styles.customDropdownItem,
+                                    isSelected && { backgroundColor: '#2563EB' }
+                                ]}
+                                onPress={() => {
+                                    onValueChange(opt);
+                                    setOpen(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.customDropdownItemText,
+                                    isSelected && { color: '#fff', fontWeight: '700' }
+                                ]}>
+                                    {opt === 'Select Category' ? label : opt}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            )}
+        </View>
+    );
+};
+
 const AdTypeFormModal: React.FC<{
     visible: boolean;
     isEdit: boolean;
@@ -268,13 +325,22 @@ const AdTypeFormModal: React.FC<{
                             </View>
                             <View style={[styles.formCol, isPhone && { width: '100%', marginTop: 12 }]}>
                                 <Text style={styles.label}>Category <Text style={styles.req}>*</Text></Text>
-                                <View style={styles.pickerWrap}>
-                                    <Picker selectedValue={form.category} onValueChange={(v) => update('category', v as string)} style={styles.picker}>
-                                        {CATEGORY_OPTIONS.map((c) => (
-                                            <Picker.Item key={c} label={c} value={c} />
-                                        ))}
-                                    </Picker>
-                                </View>
+                                {isPhone ? (
+                                    <CustomDropdown
+                                        label="Select Category"
+                                        value={form.category}
+                                        options={CATEGORY_OPTIONS}
+                                        onValueChange={(v) => update('category', v)}
+                                    />
+                                ) : (
+                                    <View style={styles.pickerWrap}>
+                                        <Picker selectedValue={form.category} onValueChange={(v) => update('category', v as string)} style={styles.picker}>
+                                            {CATEGORY_OPTIONS.map((c) => (
+                                                <Picker.Item key={c} label={c} value={c} />
+                                            ))}
+                                        </Picker>
+                                    </View>
+                                )}
                             </View>
                         </View>
 
@@ -309,13 +375,23 @@ const AdTypeFormModal: React.FC<{
                         />
 
                         <Text style={styles.label}>Status <Text style={styles.req}>*</Text></Text>
-                        <View style={styles.pickerWrap}>
-                            <Picker selectedValue={form.status} onValueChange={(v) => update('status', v as string)} style={styles.picker}>
-                                {STATUS_OPTIONS.map((s) => (
-                                    <Picker.Item key={s} label={s} value={s} />
-                                ))}
-                            </Picker>
-                        </View>
+                        {isPhone ? (
+                            <CustomDropdown
+                                label="Select Status"
+                                value={form.status}
+                                options={STATUS_OPTIONS}
+                                onValueChange={(v) => update('status', v)}
+                            />
+                        ) : (
+                            <View style={styles.pickerWrap}>
+                                <Picker selectedValue={form.status} onValueChange={(v) => update('status', v as string)} style={styles.picker}>
+                                    {STATUS_OPTIONS.map((s) => (
+                                        <Picker.Item key={s} label={s} value={s} />
+                                    ))}
+                                </Picker>
+                            </View>
+                        )}
+                        <View style={{ height: 120 }} />
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
@@ -560,20 +636,27 @@ const AdsTypesDetails: React.FC = () => {
         <View style={styles.screen}>
             <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                 {/* ---------- Header: title + Add button in ONE #1D324E container ---------- */}
-                <View style={[styles.headerContainer, isPhone && { flexDirection: 'column', alignItems: 'flex-start', gap: 14 }]}>
-                    <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[styles.headerContainer, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14, paddingBottom: 50 }]}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             {/* Settings icon inside orange box */}
-                            <View style={styles.headerIconBox}>
-                                <Ionicons name="settings" size={isPhone ? 16 : 18} color="#fff" />
+                            <View style={[styles.headerIconBox, isPhone && { width: 30, height: 30, borderRadius: 6 }]}>
+                                <Ionicons name="settings" size={isPhone ? 14 : 18} color="#fff" />
                             </View>
-                            <Text style={[styles.title, isPhone && { fontSize: 19 }]}>Ads Types & Details Management</Text>
+                            {isPhone ? (
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.title, { fontSize: 17 }]} numberOfLines={1}>Ads Types & Details</Text>
+                                    <Text style={[styles.title, { fontSize: 17, marginTop: 2 }]} numberOfLines={1}>Management</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.title}>Ads Types & Details Management</Text>
+                            )}
                         </View>
                     </View>
 
-                    <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'stretch', justifyContent: 'center' }]} onPress={openAdd}>
-                        <Ionicons name="add" size={16} color="#fff" />
-                        <Text style={styles.addBtnText}>Add New Ad Type</Text>
+                    <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 }]} onPress={openAdd}>
+                        <Ionicons name="add" size={isPhone ? 12 : 14} color="#fff" />
+                        <Text style={[styles.addBtnText, isPhone && { fontSize: 11 }]}>Add New Ad Type</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -602,7 +685,7 @@ const AdsTypesDetails: React.FC = () => {
                 )}
 
                 {/* ---------- Specifications overview ---------- */}
-                <View style={styles.sectionBanner}>
+                <View style={[styles.sectionBanner, { backgroundColor: '#7C3AED' }]}>
                     <Ionicons name="list" size={14} color="#fff" />
                     <Text style={styles.sectionBannerText}>Ad Types & Specifications Overview</Text>
                 </View>
@@ -663,7 +746,7 @@ const AdsTypesDetails: React.FC = () => {
                 </View>
 
                 {/* ---------- Management table ---------- */}
-                <View style={styles.sectionBanner}>
+                <View style={[styles.sectionBanner, { backgroundColor: '#16A34A' }]}>
                     <Ionicons name="list" size={14} color="#fff" />
                     <Text style={styles.sectionBannerText}>Ad Types & Details Management</Text>
                 </View>
@@ -890,4 +973,45 @@ const styles = StyleSheet.create({
     },
     confirmTitle: { fontSize: 15, fontWeight: '700', color: COLORS.ink, textAlign: 'center' },
     confirmSub: { fontSize: 12.5, color: COLORS.sub, marginTop: 4, textAlign: 'center' },
+    customDropdownTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F3F4F6',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 10,
+        height: 48,
+        paddingHorizontal: 12,
+    } as any,
+    customDropdownTriggerText: {
+        fontSize: 13,
+        color: COLORS.ink,
+        fontWeight: '600',
+    } as any,
+    customDropdownMenu: {
+        position: 'absolute',
+        top: 52,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#9CA3AF',
+        borderRadius: 8,
+        paddingVertical: 4,
+        zIndex: 2000,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+    } as any,
+    customDropdownItem: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    } as any,
+    customDropdownItemText: {
+        fontSize: 13,
+        color: '#4B5563',
+    } as any,
 });
