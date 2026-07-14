@@ -5,12 +5,12 @@ import { router, usePathname } from "expo-router";
 import React from "react";
 import {
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Platform,
 } from "react-native";
 
 type Props = {
@@ -137,8 +137,8 @@ const NAV_ITEMS = {
     ],
   },
   "EMAIL MANAGEMENT": [
-    { label: "Customer Emails", icon: "mail", path: null, color: "#F43F5E" },
-    { label: "Seller Emails", icon: "mail", path: null, color: "#F97316" },
+    { label: "Customer Emails", icon: "mail", path: "/customeremails", color: "#F43F5E" },
+    { label: "Seller Emails", icon: "mail", path: "/seller-emails", color: "#F97316" },
   ],
   "PAYMENTS & PRODUCTS": [
     {
@@ -159,8 +159,8 @@ const NAV_ITEMS = {
       path: "/productApproval",
       color: "#22C55E",
     },
-    { label: "Add Sellers", icon: "user-plus", path: null, color: "#10B981" },
-    { label: "Ads Admin Users", icon: "user", path: null, color: "#14B8A6" },
+    { label: "Add Sellers", icon: "user-plus", path: "/add-seller", color: "#10B981" },
+    { label: "Ads Admin Users", icon: "user", path: "/adsadminusers", color: "#14B8A6" },
     {
       label: "Admin Panel Users",
       icon: "shield",
@@ -175,15 +175,15 @@ const NAV_ITEMS = {
       color: "#3B82F6",
       path: null,
       children: [
-        { label: "Ads Dashboard", icon: "pie-chart", path: null, color: "#3B82F6" },
-        { label: "Ad Placements", icon: "layout", path: null, color: "#10B981" },
-        { label: "Performance Ads", icon: "activity", path: null, color: "#F59E0B" },
-        { label: "Campaigns & Packages", icon: "package", path: null, color: "#8B5CF6" },
-        { label: "Ads Types & Details", icon: "layers", path: null, color: "#EC4899" },
-        { label: "Orders Management", icon: "shopping-cart", path: null, color: "#14B8A6" },
-        { label: "Payments Management", icon: "credit-card", path: null, color: "#F97316" },
-        { label: "Customers Management", icon: "users", path: null, color: "#06B6D4" },
-        { label: "Notifications", icon: "bell", path: null, color: "#EAB308" },
+        { label: "Ads Dashboard", icon: "pie-chart", path: "/Addashboard", color: "#3B82F6" },
+        { label: "Ad Placements", icon: "layout", path: "ads-placement", color: "#10B981" },
+        { label: "Performance Ads", icon: "activity", path: "Performance-ads", color: "#F59E0B" },
+        { label: "Campaigns & Packages", icon: "package", path: "campaigns-packages", color: "#8B5CF6" },
+        { label: "Ads Types & Details", icon: "layers", path: "ads-types-details", color: "#EC4899" },
+        { label: "Orders Management", icon: "shopping-cart", path: "ads-ordermanagement", color: "#14B8A6" },
+        { label: "Payments Management", icon: "credit-card", path: "ads-payments", color: "#F97316" },
+        { label: "Customers Management", icon: "users", path: "customermngt", color: "#06B6D4" },
+        { label: "Notifications", icon: "bell", path: "ads-notifications", color: "#EAB308" },
       ],
     },
   ],
@@ -229,14 +229,14 @@ const NAV_ITEMS = {
           color: "#EF4444",
         },
       ],
-    },  
+    },
     {
       label: "Message Center",
       icon: "mail",
-      path: "/message-center",
+      path: "/Contactmessages",
       color: "#3B82F6",
     },
-    { label: "Logos", icon: "image", path: null, color: "#0EA5E9" },
+    { label: "Logos", icon: "image", path: "/Logomanagement", color: "#0EA5E9" },
     {
       label: "Banners",
       icon: "image",
@@ -244,7 +244,7 @@ const NAV_ITEMS = {
       path: null,
       children: [
         { label: "Homepage Banners", icon: "home", path: "/Homepagebanners", color: "#14B8A6" },
-        { label: "Homepage Sections On/Off", icon: "toggle-left", path: null, color: "#14B8A6" },
+        { label: "Homepage Sections On/Off", icon: "toggle-left", path: "/homepage-Sections-Settings", color: "#14B8A6" },
         { label: "General Banners", icon: "image", path: "/Generalbanners", color: "#14B8A6" },
       ],
     },

@@ -129,6 +129,8 @@ export type OrderSellerPreview = {
 };
 
 export type OrderSellerGroupPreview = {
+  subOrderId?: string | number;
+  trackingId?: string;
   seller?: {
     name?: string;
     email?: string;

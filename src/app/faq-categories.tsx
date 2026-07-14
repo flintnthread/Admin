@@ -476,8 +476,13 @@ const FaqCategoriesScreen: React.FC = () => {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Stat cards: 2 per row grid overlapping the header */}
-                            <View style={st.statsGridMobile}>
+                            {/* Stat cards: horizontally scrollable on mobile */}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={st.statsGridMobile}
+                                contentContainerStyle={{ gap: 12, paddingRight: 4 }}
+                            >
                                 {stats.map((s, i) => (
                                     <View key={i} style={[st.statCardMobile, { borderTopColor: s.color }]}>
                                         <View style={st.statCardMobileTopRow}>
@@ -490,7 +495,7 @@ const FaqCategoriesScreen: React.FC = () => {
                                         <Text style={st.statSubLabelMobile}>{s.subLabel}</Text>
                                     </View>
                                 ))}
-                            </View>
+                            </ScrollView>
                         </>
                     ) : (
                         // ── WEB HEADER ──
@@ -740,13 +745,10 @@ const st = StyleSheet.create({
 
     // ── Mobile Stats Grid & Cards ──
     statsGridMobile: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-        rowGap: 12,
         marginTop: -32,
-        marginHorizontal: 24,
+        marginHorizontal: 16,
         zIndex: 10,
+        marginBottom: 4,
     },
     statCardMobile: {
         backgroundColor: BG_CARD,
@@ -755,7 +757,7 @@ const st = StyleSheet.create({
         borderTopWidth: 3,
         borderColor: BORDER,
         padding: 14,
-        width: "48%",
+        width: 155,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,

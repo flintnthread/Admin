@@ -510,8 +510,18 @@ function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): 
   return events;
 }
 
-function mapApiOrderToUi(detail: OrderDetail): UIOrder {
-  const items = (detail.items ?? []).map(mapApiItemToUi);
+function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, productIds?: string): UIOrder {
+  let items = (detail.items ?? []).map(mapApiItemToUi);
+  if (productIds) {
+    const validIds = productIds.split(',');
+    items = items.filter(i => validIds.includes(String(i.productId)) || validIds.includes(String(i.id)));
+  } else if (sellerNameFilter) {
+    items = items.filter(i => i.seller?.trim().toLowerCase() === sellerNameFilter.trim().toLowerCase());
+  }
+  if (items.length === 0 && (detail.items ?? []).length > 0) {
+    console.log('Filter failed, falling back to all items.');
+    items = (detail.items ?? []).map(mapApiItemToUi);
+  }
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const shippingCost = Number(detail.shippingAmount ?? 0);
   const tax = Number(detail.taxAmount ?? 0);
@@ -1099,7 +1109,7 @@ export default function OrderDetailScreen() {
   const { width } = useWindowDimensions();
   const { isMobile, isTablet, isLaptop, isDesktop, isWide } = useLayout(width);
   const router = useRouter();
-  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+  const { orderId, sellerName, productIds } = useLocalSearchParams<{ orderId?: string; sellerName?: string; productIds?: string }>();
 
   const [order, setOrder] = useState<UIOrder>(INITIAL_ORDER);
   const [status, setStatus] = useState<OrderStatus>(INITIAL_ORDER.status);
@@ -1139,7 +1149,7 @@ export default function OrderDetailScreen() {
 
     try {
       const raw = await fetchOrderDetail(id);
-      const uiOrder = mapApiOrderToUi(raw as OrderDetail);
+      const uiOrder = mapApiOrderToUi(raw as OrderDetail, sellerName, productIds);
       setOrder(uiOrder);
       setStatus(uiOrder.status);
     } catch (err) {
@@ -1429,7 +1439,7 @@ export default function OrderDetailScreen() {
 
             {/* ── MIDDLE CONTENT: Orders Table (Full Width) ──────────────── */}
             <View style={{ marginTop: 16 }}>
-              <Card style={{ padding: 0 }}>
+              <Card style={{ padding: 0 }}>              
                 {isWide ? (
                   <View style={s.tblWrap}>
                     <View style={[s.tblRow, s.tblHead, { backgroundColor: C.navy, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>
