@@ -27,7 +27,7 @@ import Pagination from '@/components/Pagination';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -45,6 +45,8 @@ import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamat
 import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
 import Svg, { Line, Rect } from 'react-native-svg';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 
 const GridIcon = ({ active }: { active: boolean }) => (
   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -159,12 +161,17 @@ interface Customer {
   joined: string;
 }
 
-const SEED_CUSTOMERS: Customer[] = [
-  { id: 1, name: 'Flint & Thread', email: 'flintnthread@gmail.com', phone: '8121433370', company: 'Flint & Thread', orders: 1, joined: '26 Oct, 2025' },
-  { id: 2, name: 'Tayi Gopi Chand', email: 'gopichand93667@gmail.com', phone: '09705699481', company: 'N/A', orders: 5, joined: '06 Oct, 2025' },
-  { id: 3, name: 'John Doe', email: 'john@example.com', phone: '9876543210', company: 'ABC Company', orders: 1, joined: '06 Oct, 2025' },
-  { id: 4, name: 'Jane Smith', email: 'jane@example.com', phone: '9876543211', company: 'XYZ Corp', orders: 0, joined: '06 Oct, 2025' },
-];
+function mapAdsCustomer(row: AdsApiRow): Customer {
+  return {
+    id: Number(row.id ?? 0),
+    name: String(row.name ?? '—'),
+    email: String(row.email ?? ''),
+    phone: String(row.phone ?? ''),
+    company: String(row.company ?? 'N/A'),
+    orders: Number(row.orderCount ?? 0) || 0,
+    joined: formatAdsDate(row.createdAt),
+  };
+}
 
 // Distinct palette — teal / slate / amber (different from adsadminusers.tsx's
 // navy + blue/green/purple/orange scheme)
@@ -326,32 +333,41 @@ const CustomerManagement: React.FC = () => {
   const isPhone = bp === 'xs' || bp === 'sm' || bp === 'md';
   const isTablet = bp === 'lg';
 
-  const [customers, setCustomers] = useState<Customer[]>(SEED_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'grid' | 'list'>(isPhone ? 'grid' : 'list');
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return customers;
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.company.toLowerCase().includes(q)
-    );
-  }, [customers, search]);
+  const loadCustomers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchAdsCustomers({
+        page: page - 1,
+        size: PAGE_SIZE,
+        search: search.trim() || undefined,
+      });
+      setCustomers(res.items.map(mapAdsCustomer));
+      setTotalItems(res.totalElements);
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'Failed to load customers.'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const totalItems = filtered.length;
+  useEffect(() => {
+    void loadCustomers();
+  }, [search, page]);
+
+  const paginated = customers;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-
-  const paginated = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, safePage]);
 
   const handleViewOrders = (customer?: Customer) => {
     router.push('/ads-ordermanagement');
@@ -359,10 +375,24 @@ const CustomerManagement: React.FC = () => {
 
   const requestDelete = (customer: Customer) => setDeleteTarget(customer);
   const cancelDelete = () => setDeleteTarget(null);
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
-    setDeleteTarget(null);
+    if (deleteTarget.orders > 0) return;
+    try {
+      const res = await deleteAdsCustomer(deleteTarget.id);
+      const message = String(res.message ?? '');
+      if (message.toLowerCase().includes('cascade')) {
+        setError(message);
+        setDeleteTarget(null);
+        return;
+      }
+      setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      void loadCustomers();
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'Failed to delete customer.'));
+      setDeleteTarget(null);
+    }
   };
 
   // Layout is driven purely by the toggle now, at every breakpoint — the
@@ -550,7 +580,11 @@ const CustomerManagement: React.FC = () => {
 
         {/* ---------- Data ---------- */}
         <View style={styles.dataCard}>
-          {useCardLayout ? (
+          {loading ? (
+            <Text style={styles.emptyText}>Loading customers…</Text>
+          ) : error ? (
+            <Text style={styles.emptyText}>{error}</Text>
+          ) : useCardLayout ? (
             paginated.length === 0 ? (
               <Text style={styles.emptyText}>No customers match your search.</Text>
             ) : (

@@ -16,6 +16,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { createSeller, fetchSellers } from '@/services/sellerApi';
 
 
 /**
@@ -61,13 +63,27 @@ type Seller = {
   status: "Active" | "Inactive";
 };
 
-const INITIAL_SELLERS: Seller[] = [
-  { id: 292, name: "Sankar Pagidiboina", email: "sankar.pagidiboina@gmail.com", mobile: "+91 63050 15198", status: "Active" },
-  { id: 291, name: "Sravani Surampalli", email: "sravani.surampalli@gmail.com", mobile: "+91 63008 85700", status: "Inactive" },
-  { id: 290, name: "Kusuma Adari", email: "adari.kusuma@gmail.com", mobile: "+91 72070 29425", status: "Active" },
-  { id: 289, name: "Pradeep Shette", email: "pradeep.shette@gmail.com", mobile: "+91 79811 55357", status: "Active" },
-  { id: 288, name: "Sandhya Gudisa", email: "sandhya.gudisa@gmail.com", mobile: "+91 81214 33370", status: "Active" },
-];
+function mapSellerStatus(raw?: string): Seller["status"] {
+  const s = String(raw ?? "").toLowerCase();
+  if (s === "active") return "Active";
+  return "Inactive";
+}
+
+function mapSellerRow(s: {
+  id: number;
+  fullName?: string;
+  email?: string;
+  mobile?: string;
+  status?: string;
+}): Seller {
+  return {
+    id: s.id,
+    name: s.fullName ?? `Seller #${s.id}`,
+    email: s.email ?? "",
+    mobile: s.mobile ?? "",
+    status: mapSellerStatus(s.status),
+  };
+}
 
 function initials(name: string) {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -206,7 +222,7 @@ function AddSellerModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onAdded: (seller: { firstName: string; lastName: string; email: string; mobile: string }) => void;
+  onAdded: (form: { firstName: string; lastName: string; email: string; mobile: string }) => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -228,7 +244,9 @@ function AddSellerModal({
     setErrors({});
   };
 
-  const handleAdd = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleAdd = async () => {
     const nextErrors: Record<string, string> = {};
     
     if (!form.firstName.trim()) nextErrors.firstName = "First name is required";
@@ -253,10 +271,16 @@ function AddSellerModal({
       setErrors(nextErrors);
       return;
     }
-    // TODO: wire up to your create-seller API call
-    onAdded(form);
-    resetForm();
-    onClose();
+    setSubmitting(true);
+    try {
+      await onAdded(form);
+      resetForm();
+      onClose();
+    } catch {
+      // parent surfaces error via alert/toast if needed
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -326,9 +350,9 @@ function AddSellerModal({
                 <Feather name="rotate-ccw" size={14} color={COLORS.textMuted} />
                 <Text style={styles.resetBtnText}>Reset</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.addBtn, !isTablet && styles.actionBtnMobile]} onPress={handleAdd}>
+              <TouchableOpacity style={[styles.addBtn, !isTablet && styles.actionBtnMobile]} onPress={handleAdd} disabled={submitting}>
                 <Feather name="user-plus" size={14} color="#fff" />
-                <Text style={styles.addBtnText}>Add seller</Text>
+                <Text style={styles.addBtnText}>{submitting ? 'Adding…' : 'Add seller'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -410,21 +434,39 @@ export default function AddSellersScreen() {
   const isTablet = width >= 768;
   const isMobile = !isTablet;
   const [modalOpen, setModalOpen] = useState(false);
-  const [sellers, setSellers] = useState<Seller[]>(INITIAL_SELLERS);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [successVisible, setSuccessVisible] = useState(false);
   const [lastAddedName, setLastAddedName] = useState("");
 
-  const handleSellerAdded = (form: { firstName: string; lastName: string; email: string; mobile: string }) => {
-    const nextId = Math.max(...sellers.map((s) => s.id)) + 1;
-    const newSeller: Seller = {
-      id: nextId,
-      name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+  const loadSellers = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const page = await fetchSellers({ size: 200 });
+      setSellers((page.items ?? []).map(mapSellerRow));
+    } catch (e) {
+      setLoadError(getApiErrorMessage(e, "Failed to load sellers."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSellers();
+  }, []);
+
+  const handleSellerAdded = async (form: { firstName: string; lastName: string; email: string; mobile: string }) => {
+    const cleanMobile = form.mobile.replace(/[\s-]/g, '');
+    await createSeller({
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
       email: form.email.trim(),
-      mobile: form.mobile.trim(),
-      status: "Active",
-    };
-    setSellers((prev) => [newSeller, ...prev]);
-    setLastAddedName(newSeller.name);
+      mobile: cleanMobile,
+    });
+    await loadSellers();
+    setLastAddedName(`${form.firstName.trim()} ${form.lastName.trim()}`);
     setSuccessVisible(true);
   };
 
@@ -480,7 +522,13 @@ export default function AddSellersScreen() {
           { width: "100%", alignSelf: "stretch" },
           isMobile && { backgroundColor: "transparent", borderWidth: 0, overflow: "visible", elevation: 0, shadowOpacity: 0 }
         ]}>
-          <SellersTable isMobile={isMobile} sellers={sellers} />
+          {loading ? (
+            <Text style={{ padding: 16, color: COLORS.textMuted }}>Loading sellers…</Text>
+          ) : loadError ? (
+            <Text style={{ padding: 16, color: COLORS.rose }}>{loadError}</Text>
+          ) : (
+            <SellersTable isMobile={isMobile} sellers={sellers} />
+          )}
         </View>
       </ScrollView>
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,21 @@ import {
   Animated as RNAnimated,
   DimensionValue,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+  createPerformanceAd,
+  deletePerformanceAd,
+  fetchPerformanceAds,
+  formatAdsDate,
+  toApiStatus,
+  toUiStatus,
+  updatePerformanceAd,
+  type AdsApiRow,
+} from '@/services/adsApi';
 
 // NOTE: adjust the AdminLayout import path above to match your project structure
 // (kept consistent with other screens e.g. homepageSectionsSettings.tsx, customerManagement.tsx)
@@ -101,59 +113,20 @@ const PRICING_MODELS: PricingModel[] = [
 
 const STATUSES: AdStatus[] = ['Active', 'Inactive'];
 
-// -----------------------------
-// Deterministic seeded mock data (Park-Miller LCG)
-// -----------------------------
-function createSeededRandom(seed: number) {
-  let state = seed % 2147483647;
-  if (state <= 0) state += 2147483646;
-  return () => {
-    state = (state * 16807) % 2147483647;
-    return (state - 1) / 2147483646;
+function mapPerformanceAdFromApi(row: AdsApiRow): PerformanceAd {
+  const low = row.lowPrice ?? row.low_price;
+  const high = row.highPrice ?? row.high_price;
+  return {
+    id: Number(row.id),
+    name: String(row.name ?? ''),
+    type: String(row.type ?? '') as AdType,
+    pricingModel: String(row.pricingModel ?? row.pricing_model ?? '') as PricingModel,
+    lowPrice: Number(low ?? 0),
+    highPrice: Number(high ?? 0),
+    description: String(row.description ?? ''),
+    status: toUiStatus(row.status),
+    createdAt: formatAdsDate(row.createdAt),
   };
-}
-
-function generateMockAds(): PerformanceAd[] {
-  const rand = createSeededRandom(7331);
-  const names = [
-    'Search Sponsored Listings - Low',
-    'Search Sponsored Listings - High',
-    'YouTube Video Spotlight',
-    'Instagram Reel Boost',
-    'Instagram Story Push',
-    'Facebook Feed Feature',
-    'Instagram Post Highlight',
-    'Facebook Story Reach',
-  ];
-  const priceBands: [number, number][] = [
-    [20, 50],
-    [50, 100],
-    [15000, 30000],
-    [10000, 25000],
-    [3000, 8000],
-    [7000, 15000],
-    [5000, 12000],
-    [2500, 6000],
-  ];
-
-  return names.map((name, idx) => {
-    const type = AD_TYPES[idx % AD_TYPES.length];
-    const pricingModel = PRICING_MODELS[idx % PRICING_MODELS.length];
-    const statusRoll = rand();
-    const status: AdStatus = statusRoll > 0.75 ? 'Inactive' : 'Active';
-    const day = 3 + Math.floor(rand() * 24);
-    return {
-      id: idx + 1,
-      name,
-      type,
-      pricingModel,
-      lowPrice: priceBands[idx][0],
-      highPrice: priceBands[idx][1],
-      description: `${type} placement for Flint & Thread sellers.`,
-      status,
-      createdAt: `Oct ${String(day).padStart(2, '0')}, 2025`,
-    };
-  });
 }
 
 // -----------------------------
@@ -326,9 +299,29 @@ export default function PerformanceAdsScreen() {
     setAlertState({ visible: true, kind, title, text, onConfirm });
   };
 
-  const [ads, setAds] = useState<PerformanceAd[]>(() => generateMockAds());
+  const [ads, setAds] = useState<PerformanceAd[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  const loadAds = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchPerformanceAds();
+      setAds(rows.map(mapPerformanceAdFromApi));
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, 'Failed to load performance ads.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAds();
+  }, [loadAds]);
 
   const [form, setForm] = useState({
     name: '',
@@ -364,13 +357,21 @@ export default function PerformanceAdsScreen() {
   };
 
   const handleDelete = (ad: PerformanceAd) => {
-    showAlert('confirm', 'Delete this ad?', `"${ad.name}" will be permanently removed.`, () => {
-      setAds((prev) => prev.filter((a) => a.id !== ad.id));
-      showAlert('success', 'Deleted', 'The performance ad was removed.');
+    showAlert('confirm', 'Delete this ad?', `"${ad.name}" will be permanently removed.`, async () => {
+      setSaving(true);
+      try {
+        await deletePerformanceAd(ad.id);
+        await loadAds();
+        showAlert('success', 'Deleted', 'The performance ad was removed.');
+      } catch (err) {
+        Alert.alert('Error', getApiErrorMessage(err, 'Could not delete performance ad.'));
+      } finally {
+        setSaving(false);
+      }
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim() || !form.type || !form.pricingModel || !form.lowPrice || !form.highPrice) {
       showAlert('error', 'Missing information', 'Please fill in all required fields.');
       return;
@@ -382,44 +383,34 @@ export default function PerformanceAdsScreen() {
       return;
     }
 
-    if (editingId) {
-      setAds((prev) =>
-        prev.map((a) =>
-          a.id === editingId
-            ? {
-                ...a,
-                name: form.name,
-                type: form.type as AdType,
-                pricingModel: form.pricingModel as PricingModel,
-                lowPrice: low,
-                highPrice: high,
-                description: form.description,
-                status: form.status,
-              }
-            : a
-        )
-      );
-      showAlert('success', 'Updated', 'Performance ad updated successfully.');
-    } else {
-      const nextId = ads.length ? Math.max(...ads.map((a) => a.id)) + 1 : 1;
-      const newAd: PerformanceAd = {
-        id: nextId,
-        name: form.name,
-        type: form.type as AdType,
-        pricingModel: form.pricingModel as PricingModel,
-        lowPrice: low,
-        highPrice: high,
-        description: form.description,
-        status: form.status,
-        createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-      };
-      setAds((prev) => [newAd, ...prev]);
-      showAlert('success', 'Created', 'New performance ad added.');
-    }
+    const body = {
+      name: form.name.trim(),
+      type: form.type,
+      pricingModel: form.pricingModel,
+      lowPrice: low,
+      highPrice: high,
+      description: form.description,
+      status: toApiStatus(form.status),
+    };
 
-    setModalVisible(false);
-    resetForm();
-    setEditingId(null);
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updatePerformanceAd(editingId, body);
+        showAlert('success', 'Updated', 'Performance ad updated successfully.');
+      } else {
+        await createPerformanceAd(body);
+        showAlert('success', 'Created', 'New performance ad added.');
+      }
+      setModalVisible(false);
+      resetForm();
+      setEditingId(null);
+      await loadAds();
+    } catch (err) {
+      Alert.alert('Error', getApiErrorMessage(err, editingId ? 'Could not update performance ad.' : 'Could not create performance ad.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cardWidth: DimensionValue = useMemo(() => {
@@ -477,7 +468,15 @@ export default function PerformanceAdsScreen() {
           </View>
         </View>
 
-        {isLaptop ? (
+        {loadError ? (
+          <Text style={{ color: COLORS.rose, marginBottom: 12 }}>{loadError}</Text>
+        ) : null}
+
+        {loading ? (
+          <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.orange} />
+          </View>
+        ) : isLaptop ? (
           // ---- Desktop / laptop table ----
           <View style={styles.tableWrap}>
             <View style={styles.tableHeaderRow}>
@@ -571,7 +570,7 @@ export default function PerformanceAdsScreen() {
           </View>
         )}
 
-        {ads.length === 0 && (
+        {!loading && ads.length === 0 && (
           <View style={styles.emptyState}>
             <Feather name="inbox" size={28} color={COLORS.textMuted} />
             <Text style={styles.emptyStateTitle}>No performance ads yet</Text>

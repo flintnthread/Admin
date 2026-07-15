@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Animated,
     Linking,
@@ -49,6 +49,9 @@ import PersonBadgeIcon from "react-native-bootstrap-icons/icons/person-badge";
 //import Wallet2Icon from "react-native-bootstrap-icons/icons/wallet2";
 
 import AdminLayout from "@/components/admin-layout";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { formatDateTime, formatRupee } from "@/lib/format";
+import { fetchAdsOrder, fetchAdsOrderByCode, type AdsApiRow } from "@/services/adsApi";
 
 /* -------------------------------------------------------------------- */
 /*  Palette                                                              */
@@ -128,6 +131,74 @@ interface OrderDetailsData {
     payment: PaymentInfo;
     ad: AdInfo;
     campaign: CampaignInfo;
+}
+
+function mapOrderStatus(raw?: unknown): OrderInfo["status"] {
+    const s = String(raw ?? "pending").toLowerCase();
+    if (s === "paid") return "Paid";
+    if (s === "failed") return "Failed";
+    if (s === "refunded") return "Refunded";
+    return "Pending";
+}
+
+function mapPaymentStatus(raw?: unknown): PaymentInfo["status"] {
+    const s = String(raw ?? "pending").toLowerCase();
+    if (s === "captured" || s === "paid") return "Captured";
+    if (s === "failed") return "Failed";
+    if (s === "refunded") return "Refunded";
+    return "Pending";
+}
+
+function displayValue(value?: unknown): string {
+    const trimmed = String(value ?? "").trim();
+    return trimmed || "—";
+}
+
+function mapApiToOrderDetails(raw: AdsApiRow): OrderDetailsData {
+    const user = (raw.user ?? {}) as Record<string, unknown>;
+    const billingType = String(raw.billingType ?? "monthly").toLowerCase() === "daily" ? "Daily" : "Monthly";
+    const adType = String(raw.adType ?? "—");
+    return {
+        order: {
+            orderId: displayValue(raw.orderId),
+            orderDate: formatDateTime(String(raw.createdAt ?? "")),
+            status: mapOrderStatus(raw.status),
+            amount: formatRupee(Number(raw.amount ?? 0)),
+            billingType,
+            dailyRate: formatRupee(Number(raw.dailyRate ?? 0)),
+            monthlyRate: formatRupee(Number(raw.monthlyRate ?? 0)),
+        },
+        customer: {
+            name: displayValue(user.name ?? raw.customerName),
+            email: displayValue(user.email ?? raw.customerEmail),
+            phone: displayValue(user.phone ?? raw.customerPhone),
+            company: displayValue(user.company),
+            address: displayValue(user.address),
+            city: displayValue(user.city),
+            state: displayValue(user.state),
+            pincode: displayValue(user.pincode),
+        },
+        payment: {
+            paymentId: displayValue(raw.razorpayPaymentId ?? raw.paymentId),
+            paymentMethod: displayValue(raw.paymentMethod ?? raw.paymentStatus),
+            status: mapPaymentStatus(raw.paymentStatus ?? raw.status),
+            paymentDate: formatDateTime(String(raw.updatedAt ?? raw.createdAt ?? "")),
+        },
+        ad: {
+            adName: displayValue(raw.adName),
+            adType,
+            category: displayValue(raw.selectedPlan ?? raw.adType),
+            description: displayValue(raw.adDescription),
+            dailyRate: formatRupee(Number(raw.dailyRate ?? 0)),
+            monthlyRate: formatRupee(Number(raw.monthlyRate ?? 0)),
+        },
+        campaign: {
+            campaignName: displayValue(raw.adName),
+            placement: displayValue(raw.selectedPlan ?? raw.adType),
+            duration: billingType,
+            impressions: "—",
+        },
+    };
 }
 
 const MOCK_DATA: OrderDetailsData = {
@@ -286,16 +357,92 @@ interface OrderDetailsPageProps {
     onBack?: () => void;
 }
 
-const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({ data = MOCK_DATA, onBack }) => {
-    const { order, customer, payment, ad } = data;
+const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({ data: dataProp, onBack }) => {
+    const params = useLocalSearchParams<{ id?: string; orderId?: string }>();
+    const [data, setData] = useState<OrderDetailsData | null>(dataProp ?? null);
+    const [loading, setLoading] = useState(!dataProp);
+    const [error, setError] = useState<string | null>(null);
     const bp = useBreakpoint();
-
     const router = useRouter();
+
+    useEffect(() => {
+        if (dataProp) {
+            setData(dataProp);
+            setLoading(false);
+            return;
+        }
+        const numericId = params.id ? Number(params.id) : NaN;
+        const orderCode = params.orderId ? String(params.orderId) : "";
+        if (!Number.isFinite(numericId) && !orderCode) {
+            setData(MOCK_DATA);
+            setLoading(false);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const raw = Number.isFinite(numericId)
+                    ? await fetchAdsOrder(numericId)
+                    : await fetchAdsOrderByCode(orderCode);
+                if (cancelled) return;
+                if (!raw) {
+                    setError("Order not found.");
+                    setData(null);
+                } else {
+                    setData(mapApiToOrderDetails(raw));
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    setError(getApiErrorMessage(e, "Failed to load order details."));
+                    setData(null);
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [dataProp, params.id, params.orderId]);
 
     const handleBack = () => {
         if (onBack) return onBack();
         router.push("/ads-ordermanagement" as any);
     };
+
+    if (loading) {
+        return (
+            <AdminLayout>
+                <View style={[styles.scrollContent, { padding: bp.pad, alignItems: "center", justifyContent: "center", minHeight: 240 }]}>
+                    <Text style={{ color: COLORS.textMuted }}>Loading order details…</Text>
+                </View>
+            </AdminLayout>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <AdminLayout>
+                <View style={[styles.scrollContent, { padding: bp.pad }]}>
+                    <View style={[styles.pageHeader, bp.isMobile && styles.pageHeaderStacked]}>
+                        <View style={styles.headerLeft}>
+                            <Pressable style={({ pressed }) => [styles.backIconBtn, pressed && { opacity: 0.7 }]} onPress={handleBack}>
+                                <ArrowLeftIcon width={18} height={18} fill="#ffffff" />
+                            </Pressable>
+                            <View>
+                                <Text style={styles.headerTitle}>Order Details</Text>
+                                <Text style={styles.summaryDate}>{error ?? "No order selected."}</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </AdminLayout>
+        );
+    }
+
+    const { order, customer, payment, ad } = data;
 
     const cardBasis = (count: number) => (count === 1 ? "100%" : count === 2 ? "48%" : "31.5%");
 

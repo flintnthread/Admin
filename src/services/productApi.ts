@@ -121,6 +121,20 @@ export async function rejectProduct(id: number, note?: string): Promise<void> {
   });
 }
 
+export async function deactivateProduct(id: number, note?: string): Promise<void> {
+  await adminApiRequest(`/api/admin/products/${id}/deactivate`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function activateProduct(id: number, note?: string): Promise<void> {
+  await adminApiRequest(`/api/admin/products/${id}/activate`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+}
+
 export type CreateProductImagePayload = {
   source: string;
   primary?: boolean;

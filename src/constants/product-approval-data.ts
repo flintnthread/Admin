@@ -1,4 +1,4 @@
-export type ProductStatus = 'pending' | 'review' | 'approved' | 'rejected';
+export type ProductStatus = 'pending' | 'review' | 'approved' | 'rejected' | 'inactive';
 
 export type ApprovalProduct = {
   id: string;

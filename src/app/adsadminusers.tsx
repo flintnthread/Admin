@@ -18,10 +18,21 @@
  */
 
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+    createAdsAdminUser,
+    deleteAdsAdminUser,
+    fetchAdsAdminUsers,
+    toApiStatus,
+    toUiStatus,
+    updateAdsAdminUser,
+    type AdsApiRow,
+} from '@/services/adsApi';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Animated,
     FlatList,
@@ -62,13 +73,41 @@ interface AdsUser {
     lastLogin: string;
 }
 
-const SEED_USERS: AdsUser[] = [
-    { id: 5, fullName: 'Soujanya Veginati', username: 'souji', email: 'soujanyaveginati8096@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Never' },
-    { id: 4, fullName: 'Tayi Gopi Chand', username: 'Gopi', email: 'gopichand93667@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Mar 19, 2026 16:29' },
-    { id: 3, fullName: 'System Administrator', username: 'admin', email: 'admin@ads.com', role: 'Admin', status: 'Active', lastLogin: 'Feb 14, 2026 10:18' },
-    { id: 2, fullName: 'Priya Reddy', username: 'priya', email: 'priyareddy@gmail.com', role: 'Manager', status: 'Inactive', lastLogin: 'Apr 20, 2026 11:45' },
-    { id: 1, fullName: 'Ramesh Kumar', username: 'ramesh', email: 'rameshkumar@gmail.com', role: 'Viewer', status: 'Active', lastLogin: 'Apr 21, 2026 09:12' },
-];
+function toUiRole(role?: unknown): Role {
+    const normalized = String(role ?? '').toLowerCase();
+    if (normalized === 'manager') return 'Manager';
+    if (normalized === 'viewer') return 'Viewer';
+    return 'Admin';
+}
+
+function toApiRole(role: Role): string {
+    return role.toLowerCase();
+}
+
+function formatLastLogin(value?: unknown): string {
+    if (value == null || value === '') return 'Never';
+    const d = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(d.getTime())) return 'Never';
+    return d.toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function mapAdsUserFromApi(row: AdsApiRow): AdsUser {
+    return {
+        id: Number(row.id),
+        fullName: String(row.fullName ?? row.full_name ?? ''),
+        username: String(row.username ?? ''),
+        email: String(row.email ?? ''),
+        role: toUiRole(row.role),
+        status: toUiStatus(row.status),
+        lastLogin: formatLastLogin(row.lastLogin ?? row.last_login),
+    };
+}
 
 const ROLES: Role[] = ['Admin', 'Manager', 'Viewer'];
 const STATUSES: Status[] = ['Active', 'Inactive'];
@@ -410,6 +449,10 @@ const UserFormModal: React.FC<{
             Alert.alert('Missing information', 'Please fill in full name, username and email.');
             return;
         }
+        if (!isEdit && !form.password.trim()) {
+            Alert.alert('Missing information', 'Please enter a password for the new user.');
+            return;
+        }
         onSubmit(form);
     };
 
@@ -599,12 +642,32 @@ const AdsAdminUsers: React.FC = () => {
     const isWide = bp === 'xl' || bp === 'xxl';
     const statsWide = !isPhone; // 4-across from tablet upward, 2x2 on phones
 
-    const [users, setUsers] = useState<AdsUser[]>(SEED_USERS);
+    const [users, setUsers] = useState<AdsUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState<'All' | Role>('All');
     const [statusFilter, setStatusFilter] = useState<'All' | Status>('All');
     const [view, setView] = useState<'grid' | 'list'>('list');
     const [page, setPage] = useState(1);
+
+    const loadUsers = useCallback(async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+            const rows = await fetchAdsAdminUsers();
+            setUsers(rows.map(mapAdsUserFromApi));
+        } catch (err) {
+            setLoadError(getApiErrorMessage(err, 'Failed to load ads admin users.'));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadUsers();
+    }, [loadUsers]);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingUser, setEditingUser] = useState<AdsUser | null>(null);
@@ -673,35 +736,38 @@ const AdsAdminUsers: React.FC = () => {
     };
     const closeModal = () => setModalVisible(false);
 
-    const handleSubmitForm = (form: UserFormState) => {
-        if (editingUser) {
-            setUsers((prev) =>
-                prev.map((u) =>
-                    u.id === editingUser.id
-                        ? { ...u, fullName: form.fullName, username: form.username, email: form.email, role: form.role, status: form.status }
-                        : u
-                )
-            );
-            showToast('✅  User updated successfully!');
-        } else {
-            const newId = users.length ? Math.max(...users.map((u) => u.id)) + 1 : 1;
-            const newUser: AdsUser = {
-                id: newId,
-                fullName: form.fullName,
-                username: form.username,
-                email: form.email,
-                role: form.role,
-                status: form.status,
-                lastLogin: 'Never',
-            };
-            setUsers((prev) => [newUser, ...prev]);
-            setPage(1);
-            setSearch('');
-            setRoleFilter('All');
-            setStatusFilter('All');
-            showToast('✅  New user added successfully!');
+    const handleSubmitForm = async (form: UserFormState) => {
+        const body: AdsApiRow = {
+            fullName: form.fullName.trim(),
+            username: form.username.trim(),
+            email: form.email.trim(),
+            role: toApiRole(form.role),
+            status: toApiStatus(form.status),
+        };
+        if (form.password.trim()) {
+            body.password = form.password;
         }
-        setModalVisible(false);
+
+        setSaving(true);
+        try {
+            if (editingUser) {
+                await updateAdsAdminUser(editingUser.id, body);
+                showToast('✅  User updated successfully!');
+            } else {
+                await createAdsAdminUser({ ...body, password: form.password });
+                showToast('✅  New user added successfully!');
+                setPage(1);
+                setSearch('');
+                setRoleFilter('All');
+                setStatusFilter('All');
+            }
+            setModalVisible(false);
+            await loadUsers();
+        } catch (err) {
+            Alert.alert('Error', getApiErrorMessage(err, editingUser ? 'Could not update user.' : 'Could not add user.'));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleDelete = (user: AdsUser) => {
@@ -709,11 +775,18 @@ const AdsAdminUsers: React.FC = () => {
         setDeleteModalVisible(true);
     };
 
-    const confirmDelete = () => {
-        if (deletingUser) {
-            setUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+    const confirmDelete = async () => {
+        if (!deletingUser) return;
+        setSaving(true);
+        try {
+            await deleteAdsAdminUser(deletingUser.id);
             setDeleteModalVisible(false);
             setDeletingUser(null);
+            await loadUsers();
+        } catch (err) {
+            Alert.alert('Error', getApiErrorMessage(err, 'Could not delete user.'));
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -885,7 +958,14 @@ const AdsAdminUsers: React.FC = () => {
                     </View>
 
                     {/* ---------- Data (table on wide screens, cards on phones / grid view) ---------- */}
-                    {useCardLayout ? (
+                    {loadError ? (
+                        <Text style={{ color: COLORS.danger, marginBottom: 12 }}>{loadError}</Text>
+                    ) : null}
+                    {loading ? (
+                        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={COLORS.orange} />
+                        </View>
+                    ) : useCardLayout ? (
                         filtered.length === 0 ? (
                             <View style={styles.dataCard}>
                                 <Text style={styles.emptyText}>No users match your filters.</Text>

@@ -21,7 +21,7 @@ import {
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
-import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow, type SellerRow } from '@/services/productApi';
+import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, approveProduct, deactivateProduct, activateProduct, type ProductListRow, type SellerRow } from '@/services/productApi';
 import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
 import Pagination from '@/components/Pagination';
 
@@ -62,6 +62,7 @@ type ProductStats = {
   review: number;
   approved: number;
   rejected: number;
+  inactive: number;
   all: number;
 };
 
@@ -70,6 +71,7 @@ const DEFAULT_STATS: ProductStats = {
   review: 0,
   approved: 0,
   rejected: 0,
+  inactive: 0,
   all: 0,
 };
 
@@ -124,6 +126,7 @@ const STATUS_CONFIG: Record<
   review: { label: 'Review', color: PALETTE.blue, bg: PALETTE.blueLight, icon: 'magnify' },
   approved: { label: 'Approved', color: PALETTE.green, bg: PALETTE.greenLight, icon: 'check-circle-outline' },
   rejected: { label: 'Rejected', color: PALETTE.red, bg: PALETTE.redLight, icon: 'close-circle-outline' },
+  inactive: { label: 'Deactivated', color: '#64748B', bg: '#F1F5F9', icon: 'pause-circle-outline' },
 };
 
 type FilterKey = 'all' | ProductStatus;
@@ -272,7 +275,21 @@ function FilterDropdown({
   );
 }
 
-function ActionButtons({ inline, productId, status }: { inline?: boolean; productId?: string; status?: ProductStatus }) {
+function ActionButtons({
+  inline,
+  productId,
+  status,
+  busy,
+  onActivate,
+  onDeactivate,
+}: {
+  inline?: boolean;
+  productId?: string;
+  status?: ProductStatus;
+  busy?: boolean;
+  onActivate?: (id: string) => void;
+  onDeactivate?: (id: string) => void;
+}) {
   const openDetails = () => {
     if (productId) router.push(`/productDetails?id=${productId}`);
   };
@@ -289,23 +306,31 @@ function ActionButtons({ inline, productId, status }: { inline?: boolean; produc
         <MaterialCommunityIcons name="eye-outline" size={inline ? 12 : 14} color={PALETTE.orange} />
         <Text style={[styles.viewDetailsText, inline && styles.actionTextInline]}>View Details</Text>
       </Pressable>
-      {status === 'pending' && (
+      {(status === 'pending' || status === 'inactive' || status === 'rejected') && (
         <Pressable
+          disabled={busy || !productId}
+          onPress={() => productId && onActivate?.(productId)}
           style={({ pressed }) => [
             styles.activateBtn,
             inline && styles.activateBtnInline,
-            pressed && styles.pressed,
+            (busy || pressed) && styles.pressed,
+            busy && { opacity: 0.6 },
           ]}>
           <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
-          <Text style={[styles.activateText, inline && styles.actionTextInline]}>Activate</Text>
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>
+            {status === 'pending' ? 'Activate' : 'Reactivate'}
+          </Text>
         </Pressable>
       )}
       {status === 'approved' && (
         <Pressable
+          disabled={busy || !productId}
+          onPress={() => productId && onDeactivate?.(productId)}
           style={({ pressed }) => [
             styles.deactivateBtn,
             inline && styles.activateBtnInline,
-            pressed && styles.pressed,
+            (busy || pressed) && styles.pressed,
+            busy && { opacity: 0.6 },
           ]}>
           <MaterialCommunityIcons name="close-circle-outline" size={inline ? 12 : 14} color="#FFF" />
           <Text style={[styles.activateText, inline && styles.actionTextInline]}>Deactivate</Text>
@@ -466,6 +491,15 @@ function StatsRow({
       />
       <StatCard
         {...cardProps}
+        count={stats.inactive}
+        label="Deactivated Products"
+        color="#64748B"
+        bg="#F1F5F9"
+        icon="pause-circle-outline"
+        onPress={() => onFilter('inactive')}
+      />
+      <StatCard
+        {...cardProps}
         count={stats.rejected}
         label="Rejected Products"
         color={PALETTE.red}
@@ -499,6 +533,7 @@ function StatusTabs({
     { key: 'pending', label: 'Pending', count: stats.pending, color: PALETTE.orange, bg: PALETTE.orangeLight },
     { key: 'review', label: 'Review', count: stats.review, color: PALETTE.blue, bg: PALETTE.blueLight },
     { key: 'approved', label: 'Approved', count: stats.approved, color: PALETTE.green, bg: PALETTE.greenLight },
+    { key: 'inactive', label: 'Deactivated', count: stats.inactive, color: '#64748B', bg: '#F1F5F9' },
     { key: 'rejected', label: 'Rejected', count: stats.rejected, color: PALETTE.red, bg: PALETTE.redLight },
   ];
 
@@ -684,7 +719,17 @@ function FilterSection({
 
 // ─── Product list ────────────────────────────────────────────────────────────
 
-function ProductCard({ product }: { product: Product }) {
+function ProductCard({
+  product,
+  busy,
+  onActivate,
+  onDeactivate,
+}: {
+  product: Product;
+  busy?: boolean;
+  onActivate?: (id: string) => void;
+  onDeactivate?: (id: string) => void;
+}) {
   return (
     <View style={styles.productCard}>
       <View style={styles.productCardTop}>
@@ -723,7 +768,14 @@ function ProductCard({ product }: { product: Product }) {
             </Text>
           </View>
         </View>
-        <ActionButtons inline productId={product.id} status={product.status} />
+        <ActionButtons
+          inline
+          productId={product.id}
+          status={product.status}
+          busy={busy}
+          onActivate={onActivate}
+          onDeactivate={onDeactivate}
+        />
       </View>
     </View>
   );
@@ -734,11 +786,17 @@ function ProductTable({
   selected,
   onToggle,
   onToggleAll,
+  actionBusyId,
+  onActivate,
+  onDeactivate,
 }: {
   products: Product[];
   selected: Set<string>;
   onToggle: (id: string) => void;
   onToggleAll: () => void;
+  actionBusyId?: string | null;
+  onActivate?: (id: string) => void;
+  onDeactivate?: (id: string) => void;
 }) {
   const allSelected = products.length > 0 && products.every((p) => selected.has(p.id));
 
@@ -791,7 +849,14 @@ function ProductTable({
               <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
 
               <View style={styles.tableColActions}>
-                <ActionButtons inline productId={product.id} status={product.status} />
+                <ActionButtons
+                  inline
+                  productId={product.id}
+                  status={product.status}
+                  busy={actionBusyId === product.id}
+                  onActivate={onActivate}
+                  onDeactivate={onDeactivate}
+                />
               </View>
             </View>
           ))}
@@ -806,6 +871,7 @@ function filterStatusForApi(filter: FilterKey): string | undefined {
   if (filter === 'all') return undefined;
   if (filter === 'approved') return 'active';
   if (filter === 'review') return 'under_review';
+  if (filter === 'inactive') return 'inactive';
   return filter;
 }
 
@@ -824,6 +890,7 @@ export default function ProductApprovalScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [selectedSeller, setSelectedSeller] = useState("All Sellers");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
 
@@ -904,6 +971,7 @@ export default function ProductApprovalScreen() {
           review: Number(apiStats.underReview ?? 0),
           approved: Number(apiStats.approved ?? apiStats.active ?? 0),
           rejected: Number(apiStats.rejected ?? 0),
+          inactive: Number(apiStats.inactive ?? 0),
           all: Number(apiStats.total ?? 0),
         });
       } else {
@@ -937,6 +1005,36 @@ export default function ProductApprovalScreen() {
     setCurrentPage(1);
     setSelected(new Set());
   }, []);
+
+  const handleActivate = useCallback(async (id: string) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId) || numericId <= 0) return;
+    setActionBusyId(id);
+    setError(null);
+    try {
+      await activateProduct(numericId);
+      await loadData();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to activate product.'));
+    } finally {
+      setActionBusyId(null);
+    }
+  }, [loadData]);
+
+  const handleDeactivate = useCallback(async (id: string) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId) || numericId <= 0) return;
+    setActionBusyId(id);
+    setError(null);
+    try {
+      await deactivateProduct(numericId);
+      await loadData();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to deactivate product.'));
+    } finally {
+      setActionBusyId(null);
+    }
+  }, [loadData]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -1044,11 +1142,20 @@ export default function ProductApprovalScreen() {
               selected={selected}
               onToggle={toggleSelect}
               onToggleAll={toggleSelectAll}
+              actionBusyId={actionBusyId}
+              onActivate={handleActivate}
+              onDeactivate={handleDeactivate}
             />
           ) : (
             <View style={styles.productList}>
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  busy={actionBusyId === product.id}
+                  onActivate={handleActivate}
+                  onDeactivate={handleDeactivate}
+                />
               ))}
             </View>
           )}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,10 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { formatDate } from '@/lib/format';
+import { fetchSellers } from '@/services/sellerApi';
+import { sendSellerEmails } from '@/services/emailApi';
 
 // NOTE: adjust the AdminLayout import path above to match your project structure
 
@@ -49,8 +53,6 @@ const COLORS = {
 
 const Animated = RNAnimated;
 
-const TOTAL_SELLERS = 144;
-
 // -----------------------------
 // Types
 // -----------------------------
@@ -65,69 +67,30 @@ interface Seller {
   registeredOn: string;
 }
 
-// -----------------------------
-// Deterministic seeded mock data (Park-Miller LCG)
-// -----------------------------
-function createSeededRandom(seed: number) {
-  let state = seed % 2147483647;
-  if (state <= 0) state += 2147483646;
-  return () => {
-    state = (state * 16807) % 2147483647;
-    return (state - 1) / 2147483646;
-  };
+function mapSellerStatus(raw?: string): SellerStatus {
+  const s = String(raw ?? '').toLowerCase();
+  if (s === 'active') return 'Active';
+  if (s === 'rejected') return 'Rejected';
+  if (s === 'email_pending' || s === 'pending') return 'Email_pending';
+  return 'Email_pending';
 }
 
-function generateMockSellers(): Seller[] {
-  const rand = createSeededRandom(9142);
-  const rows: Array<[string, string, string, SellerStatus, string]> = [
-    ['Sankar Pagidiboina', 'sravanisurampalli10@gmail.com', 'N/A', 'Active', '01 Jul, 2026'],
-    ['Sravani Surampalli', 'sravanisurampalli612@gmail.com', 'N/A', 'Email_pending', '01 Jul, 2026'],
-    ['Kusuma Adari', 'adarikusuma32@gmail.com', 'N/A', 'Active', '20 Jun, 2026'],
-    ['Pradeep Shette', 'pradeepshette16@gmail.com', 'N/A', 'Active', '17 Jun, 2026'],
-    ['Sandhya Gudisa', 'sandhya.fnt@gmail.com', 'N/A', 'Active', '16 Jun, 2026'],
-    ['Janu Sk', 'jaanujanjanu@gmail.com', 'TWINS CUSTOMISED EMBROIDERY WORKS', 'Active', '12 Jun, 2026'],
-    ['Sanju Sandhya', 'flintandthread.hr@gmail.com', 'sg creations', 'Rejected', '05 Jun, 2026'],
-  ];
-
-  const extra = [
-    'Meera Kondapalli',
-    'Ravi Teja',
-    'Anitha Reddy',
-    'Divya Chowdary',
-    'Nikhil Varma',
-    'Lakshmi Prasanna',
-    'Suresh Babu',
-    'Priyanka Rao',
-  ];
-
-  const businesses = ['N/A', 'N/A', 'N/A', 'Studio Weave', 'N/A', 'Threadline Co.', 'N/A', 'N/A'];
-
-  const generated = rows.map((row, idx) => ({
-    id: 292 - idx,
-    name: row[0],
-    email: row[1],
-    business: row[2],
-    status: row[3],
-    registeredOn: row[4],
-  }));
-
-  extra.forEach((name, i) => {
-    const statusRoll = rand();
-    const status: SellerStatus = statusRoll > 0.85 ? 'Rejected' : statusRoll > 0.7 ? 'Email_pending' : 'Active';
-    const day = 1 + Math.floor(rand() * 27);
-    const monthIdx = Math.floor(rand() * 5);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
-    generated.push({
-      id: 285 - i,
-      name,
-      email: `${name.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-      business: businesses[i],
-      status,
-      registeredOn: `${String(day).padStart(2, '0')} ${months[monthIdx]}, 2026`,
-    });
-  });
-
-  return generated;
+function mapSellerRow(s: {
+  id: number;
+  fullName?: string;
+  email?: string;
+  businessName?: string;
+  status?: string;
+  createdAt?: string;
+}): Seller {
+  return {
+    id: s.id,
+    name: s.fullName ?? `Seller #${s.id}`,
+    email: s.email ?? '',
+    business: s.businessName?.trim() || 'N/A',
+    status: mapSellerStatus(s.status),
+    registeredOn: formatDate(s.createdAt),
+  };
 }
 
 // -----------------------------
@@ -251,12 +214,13 @@ interface EmailModalProps {
   onClose: () => void;
   mode: 'single' | 'bulk';
   seller?: Seller | null;
+  sellerCount: number;
   onSend: (subject: string, message: string) => void;
   isDesktop: boolean;
   isMobile?: boolean;
 }
 
-function EmailModal({ visible, onClose, mode, seller, onSend, isDesktop, isMobile }: EmailModalProps) {
+function EmailModal({ visible, onClose, mode, seller, sellerCount, onSend, isDesktop, isMobile }: EmailModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
@@ -306,7 +270,7 @@ function EmailModal({ visible, onClose, mode, seller, onSend, isDesktop, isMobil
               <View style={styles.infoBanner}>
                 <Feather name="info" size={15} color={COLORS.infoText} />
                 <Text style={styles.infoBannerText}>
-                  This email will be sent to all <Text style={styles.infoBannerBold}>{TOTAL_SELLERS} registered sellers</Text>.
+                  This email will be sent to all <Text style={styles.infoBannerBold}>{sellerCount} registered sellers</Text>.
                 </Text>
               </View>
             )}
@@ -366,8 +330,30 @@ function EmailModal({ visible, onClose, mode, seller, onSend, isDesktop, isMobil
 export default function SellerEmailsScreen() {
   const { isTablet, isLaptop, isDesktop } = useBreakpoint();
 
-  const [sellers] = useState<Seller[]>(() => generateMockSellers());
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const page = await fetchSellers({ size: 200 });
+        if (cancelled) return;
+        setSellers((page.items ?? []).map(mapSellerRow));
+      } catch (e) {
+        if (!cancelled) setLoadError(getApiErrorMessage(e, 'Failed to load sellers.'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [emailModalVisible, setEmailModalVisible] = useState(false);
   const [emailMode, setEmailMode] = useState<'single' | 'bulk'>('single');
@@ -393,14 +379,22 @@ export default function SellerEmailsScreen() {
     setEmailModalVisible(true);
   };
 
-  const handleSend = (subject: string, message: string) => {
-    setEmailModalVisible(false);
-    if (emailMode === 'single' && activeSeller) {
-      notify('success', 'Email sent', `Your message was sent to ${activeSeller.name}.`);
-    } else {
-      notify('success', 'Emails queued', `Your message is being sent to all ${TOTAL_SELLERS} registered sellers.`);
+  const handleSend = async (subject: string, message: string) => {
+    try {
+      if (emailMode === 'single' && activeSeller) {
+        await sendSellerEmails({ subject, message, recipients: [activeSeller.id] });
+        notify('success', 'Email sent', `Your message was sent to ${activeSeller.name}.`);
+      } else {
+        await sendSellerEmails({ subject, message, sendAll: true });
+        notify('success', 'Emails queued', `Your message is being sent to all ${sellers.length} registered sellers.`);
+      }
+      setEmailModalVisible(false);
+    } catch (e) {
+      notify('error', 'Send failed', getApiErrorMessage(e, 'Failed to send email.'));
     }
   };
+
+  const totalSellers = sellers.length;
 
   const activeCount = sellers.filter((s) => s.status === 'Active').length;
   const pendingCount = sellers.filter((s) => s.status === 'Email_pending').length;
@@ -440,7 +434,7 @@ export default function SellerEmailsScreen() {
           styles.statsRow, 
           !isTablet && styles.statsRowMobile
         ]}>
-          <StatCard icon="users" value={String(TOTAL_SELLERS)} label="Total Sellers" tint={COLORS.navy} tintBg="#EEF2F7" isMobile={!isTablet} />
+          <StatCard icon="users" value={String(totalSellers)} label="Total Sellers" tint={COLORS.navy} tintBg="#EEF2F7" isMobile={!isTablet} />
           <StatCard icon="check-circle" value={String(activeCount)} label="Active" tint={COLORS.emerald} tintBg={COLORS.emeraldBg} isMobile={!isTablet} />
           <StatCard icon="clock" value={String(pendingCount)} label="Pending" tint={COLORS.amber} tintBg={COLORS.amberBg} isMobile={!isTablet} />
           <StatCard icon="x-circle" value={String(rejectedCount)} label="Rejected" tint={COLORS.rose} tintBg={COLORS.roseBg} isMobile={!isTablet} />
@@ -460,7 +454,13 @@ export default function SellerEmailsScreen() {
           </View>
         </View>
 
-        {isLaptop ? (
+        {loading ? (
+          <Text style={{ marginTop: 16, color: COLORS.textMuted, textAlign: 'center' }}>Loading sellers…</Text>
+        ) : loadError ? (
+          <Text style={{ marginTop: 16, color: COLORS.rose, textAlign: 'center' }}>{loadError}</Text>
+        ) : null}
+
+        {!loading && !loadError && (isLaptop ? (
           // ---- Desktop / laptop table ----
           <View style={styles.tableWrap}>
             <View style={styles.tableHeaderRow}>
@@ -554,7 +554,7 @@ export default function SellerEmailsScreen() {
               </View>
             )}
           </View>
-        )}
+        ))}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -572,6 +572,7 @@ export default function SellerEmailsScreen() {
         onClose={() => setEmailModalVisible(false)}
         mode={emailMode}
         seller={activeSeller}
+        sellerCount={totalSellers}
         onSend={handleSend}
         isDesktop={isDesktop}
         isMobile={!isTablet && !isLaptop && !isDesktop}

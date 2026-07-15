@@ -25,10 +25,22 @@
 
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+    createAdsType,
+    deleteAdsType,
+    fetchAdsTypes,
+    formatAdsDate,
+    toApiStatus,
+    toUiStatus,
+    updateAdsType,
+    type AdsApiRow,
+} from '@/services/adsApi';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Animated,
     FlatList,
@@ -72,58 +84,18 @@ const CATEGORY_OPTIONS = [
 ];
 const STATUS_OPTIONS: Status[] = ['Active', 'Inactive'];
 
-const SEED_AD_TYPES: AdType[] = [
-    {
-        id: 6,
-        name: 'Banner Ads',
-        category: 'Banner Ads',
-        description: 'Static and animated banner advertisements for web display',
-        techSpecs: 'Formats: JPG, PNG, GIF\nSizes: 728x90, 300x250, 160x600\nFile Size: Max 100KB\nAnimation: Max 5 seconds',
-        requirements: 'High-quality images\nBrand-appropriate content\nNo misleading claims\nMobile-responsive design',
-        status: 'Active',
-        created: 'Oct 05, 2025',
-    },
-    {
-        id: 7,
-        name: 'Video Ads',
-        category: 'Video Ads',
-        description: 'Video advertisements for maximum engagement and reach',
-        techSpecs: 'Formats: MP4, WebM\nDuration: 15-30 seconds\nResolution: 1920x1080, 1280x720\nFile Size: Max 10MB',
-        requirements: 'Clear audio and visuals\nCaptioned for accessibility\nSkippable after 5 seconds\nBrand-safe content',
-        status: 'Active',
-        created: 'Oct 05, 2025',
-    },
-    {
-        id: 8,
-        name: 'Native Ads',
-        category: 'Native Ads',
-        description: 'Seamlessly integrated content advertisements that match platform design',
-        techSpecs: 'Content: Text + Image\nHeadline: Max 60 characters\nDescription: Max 150 characters\nImage: 1200x630px',
-        requirements: 'Matches platform tone\nClearly labeled as sponsored\nNo clickbait headlines\nHigh-resolution imagery',
-        status: 'Active',
-        created: 'Oct 05, 2025',
-    },
-    {
-        id: 9,
-        name: 'Social Media Ads',
-        category: 'Social Media Ads',
-        description: 'Advertisement posts for Instagram and Facebook platforms',
-        techSpecs: 'Formats: JPG, PNG, MP4\nAspect Ratio: 1:1, 4:5, 9:16\nFile Size: Max 30MB\nCaption: Max 2200 characters',
-        requirements: 'Follows platform ad policy\nEngaging opening frame\nCTA clearly visible\nNo excessive text on image',
-        status: 'Active',
-        created: 'Oct 05, 2025',
-    },
-    {
-        id: 10,
-        name: 'Search Ads',
-        category: 'Search Ads',
-        description: 'Pay-per-click advertisements in search results',
-        techSpecs: 'Headline: Max 30 characters x3\nDescription: Max 90 characters x2\nDisplay URL: Max 15 characters\nExtensions: Sitelinks, Callouts',
-        requirements: 'Relevant keywords\nAccurate landing page match\nNo trademark misuse\nCompliant with ad policies',
-        status: 'Active',
-        created: 'Oct 05, 2025',
-    },
-];
+function mapAdTypeFromApi(row: AdsApiRow): AdType {
+    return {
+        id: Number(row.id),
+        name: String(row.name ?? ''),
+        category: String(row.category ?? ''),
+        description: String(row.description ?? ''),
+        techSpecs: String(row.specifications ?? ''),
+        requirements: String(row.requirements ?? ''),
+        status: toUiStatus(row.status),
+        created: formatAdsDate(row.createdAt),
+    };
+}
 
 const OVERVIEW_CARDS = [
     { key: 'Banner Ads', iconName: 'image' as const, color: '#EA580C', bg: '#FFF1E6' },
@@ -532,9 +504,29 @@ const AdsTypesDetails: React.FC = () => {
     const statsWide = !isPhone;
     const overviewCols = bp === 'xxl' || bp === 'xl' ? 3 : bp === 'lg' ? 2 : 1;
 
-    const [items, setItems] = useState<AdType[]>(SEED_AD_TYPES);
+    const [items, setItems] = useState<AdType[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
+
+    const loadItems = useCallback(async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+            const rows = await fetchAdsTypes();
+            setItems(rows.map(mapAdTypeFromApi));
+        } catch (err) {
+            setLoadError(getApiErrorMessage(err, 'Failed to load ad types.'));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadItems();
+    }, [loadItems]);
 
     const totalItems = items.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -553,13 +545,13 @@ const AdsTypesDetails: React.FC = () => {
     const [deleteId, setDeleteId] = useState<number | null>(null);
 
     const stats = useMemo(() => {
-        const total = items.length + 7; // demo total to mirror "12 Total Ad Types" seed screenshot
-        const active = items.filter((i) => i.status === 'Active').length + 7;
-        return { total, active, totalAds: 48, urgent: 5 };
+        const total = items.length;
+        const active = items.filter((i) => i.status === 'Active').length;
+        return { total, active, totalAds: total, urgent: items.filter((i) => i.status === 'Inactive').length };
     }, [items]);
 
     const overviewData = useMemo(
-        () => OVERVIEW_CARDS.map((c) => ({ ...c, item: items.find((i) => i.name === c.key) || SEED_AD_TYPES.find((i) => i.name === c.key) })).filter((c) => c.item),
+        () => OVERVIEW_CARDS.map((c) => ({ ...c, item: items.find((i) => i.name === c.key || i.category === c.key) })).filter((c) => c.item),
         [items]
     );
 
@@ -584,26 +576,47 @@ const AdsTypesDetails: React.FC = () => {
     const openEdit = (item: AdType) => { setEditingItem(item); setFormVisible(true); };
     const closeForm = () => setFormVisible(false);
 
-    const handleSubmit = (form: FormState) => {
-        if (editingItem) {
-            setItems((prev) => prev.map((i) => (i.id === editingItem.id ? { ...i, ...form } : i)));
-            showToast('✅ Ad Type updated successfully!');
-        } else {
-            const newId = items.length ? Math.max(...items.map((i) => i.id)) + 1 : 1;
-            setItems((prev) => [
-                { id: newId, ...form, created: 'Today' },
-                ...prev,
-            ]);
-            showToast('✅ Ad Type created successfully!');
+    const handleSubmit = async (form: FormState) => {
+        const body = {
+            name: form.name.trim(),
+            category: form.category,
+            description: form.description.trim(),
+            specifications: form.techSpecs,
+            requirements: form.requirements,
+            status: toApiStatus(form.status),
+        };
+        setSaving(true);
+        try {
+            if (editingItem) {
+                await updateAdsType(editingItem.id, body);
+                showToast('✅ Ad Type updated successfully!');
+            } else {
+                await createAdsType(body);
+                showToast('✅ Ad Type created successfully!');
+            }
+            setFormVisible(false);
+            await loadItems();
+        } catch (err) {
+            Alert.alert('Error', getApiErrorMessage(err, editingItem ? 'Could not update ad type.' : 'Could not create ad type.'));
+        } finally {
+            setSaving(false);
         }
-        setFormVisible(false);
     };
 
     const requestDelete = (id: number) => setDeleteId(id);
     const cancelDelete = () => setDeleteId(null);
-    const confirmDelete = () => {
-        if (deleteId != null) setItems((prev) => prev.filter((i) => i.id !== deleteId));
-        setDeleteId(null);
+    const confirmDelete = async () => {
+        if (deleteId == null) return;
+        setSaving(true);
+        try {
+            await deleteAdsType(deleteId);
+            setDeleteId(null);
+            await loadItems();
+        } catch (err) {
+            Alert.alert('Error', getApiErrorMessage(err, 'Could not delete ad type.'));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const formInitial: FormState = editingItem
@@ -815,7 +828,14 @@ const AdsTypesDetails: React.FC = () => {
                         <Text style={styles.sectionTitle}>Ad Types & Details Management</Text>
                     </View>
                     <View style={styles.sectionDivider} />
-                    {isPhone ? (
+                    {loadError ? (
+                        <Text style={{ color: COLORS.danger, paddingHorizontal: 12, paddingBottom: 12 }}>{loadError}</Text>
+                    ) : null}
+                    {loading ? (
+                        <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={COLORS.orange} />
+                        </View>
+                    ) : isPhone ? (
                         <FlatList
                             data={paginatedItems}
                             keyExtractor={(i) => String(i.id)}

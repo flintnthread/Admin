@@ -402,10 +402,11 @@ export function mapPendingProfileToApprovalRow(
   };
 }
 
-function mapProductStatus(status?: string): "pending" | "approved" | "rejected" | "review" {
+function mapProductStatus(status?: string): "pending" | "approved" | "rejected" | "review" | "inactive" {
   const raw = (status ?? "pending").toLowerCase().replace(/\s+/g, "_");
   if (raw === "active" || raw === "approved") return "approved";
-  if (raw === "rejected" || raw === "inactive") return "rejected";
+  if (raw === "inactive" || raw === "disabled") return "inactive";
+  if (raw === "rejected") return "rejected";
   if (raw === "under_review" || raw === "review") return "review";
   return "pending";
 }

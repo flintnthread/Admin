@@ -13,7 +13,7 @@
  * -----------------------------------------------------------------------
  */
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Animated,
     Modal,
@@ -31,6 +31,10 @@ import {
 import AdminLayout from '@/components/admin-layout';
 
 import { Feather } from '@expo/vector-icons';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { formatDate } from '@/lib/format';
+import { fetchCustomers } from '@/services/customerApi';
+import { sendCustomerEmails } from '@/services/emailApi';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -77,15 +81,15 @@ type Customer = {
     registeredOn: string;
 };
 
-const MOCK_CUSTOMERS: Customer[] = [
-    { id: 257, name: 'Sandeep', email: 'sandeepbhosale.5852@gmail.com', mobile: '9209232425', registeredOn: '13 Jun, 2026' },
-    { id: 256, name: 'Janu', email: 'jaanujanjanu@gmail.com', mobile: '9491079717', registeredOn: '11 Jun, 2026' },
-    { id: 255, name: 'Sai Kiran', email: 'saikiran95730@gmail.com', mobile: '6304797436', registeredOn: '29 May, 2026' },
-    { id: 254, name: 'Ajay Singani', email: 'ajaysingani56@gmail.com', mobile: '9912137150', registeredOn: '29 May, 2026' },
-    { id: 253, name: 'Aruna Bharati Kumari', email: 'akhilabobby204@gmail.com', mobile: '8897941659', registeredOn: '26 May, 2026' },
-    { id: 251, name: 'Sana Shaikh', email: 'attusanshaikh@gmail.com', mobile: '8197481081', registeredOn: '13 May, 2026' },
-    { id: 250, name: 'Prateek Awasthi', email: 'techgeek1809@gmail.com', mobile: '9532369294', registeredOn: '11 May, 2026' },
-];
+function mapCustomerRow(c: { id: number; name?: string; email?: string; phone?: string; createdAt?: string; lastOrderAt?: string }): Customer {
+    return {
+        id: c.id,
+        name: c.name ?? 'Customer',
+        email: c.email ?? '',
+        mobile: c.phone ?? '',
+        registeredOn: formatDate(c.createdAt ?? c.lastOrderAt),
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Responsive helpers
@@ -125,6 +129,9 @@ const initials = (name: string) =>
 // ---------------------------------------------------------------------------
 export default function CustomerEmailsScreen() {
     const { bp, width, isCompact } = useBreakpoint();
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [query, setQuery] = useState('');
     const [singleTarget, setSingleTarget] = useState<Customer | null>(null);
     const [bulkOpen, setBulkOpen] = useState(false);
@@ -148,15 +155,35 @@ export default function CustomerEmailsScreen() {
     };
     // ------------------------------------------------------------------
 
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            setLoadError(null);
+            try {
+                const page = await fetchCustomers(undefined, 0, 100);
+                if (cancelled) return;
+                setCustomers((page.items ?? []).map((c) => mapCustomerRow(c as Customer & { phone?: string; createdAt?: string; lastOrderAt?: string })));
+            } catch (e) {
+                if (!cancelled) setLoadError(getApiErrorMessage(e, 'Failed to load customers.'));
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const maxContentWidth = bp === 'xxl' ? '100%' : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
-        if (!q) return MOCK_CUSTOMERS;
-        return MOCK_CUSTOMERS.filter(
+        if (!q) return customers;
+        return customers.filter(
             (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.mobile.includes(q)
         );
-    }, [query]);
+    }, [query, customers]);
 
     const openSingle = (c: Customer) => {
         setSubject('');
@@ -172,10 +199,18 @@ export default function CustomerEmailsScreen() {
         setSingleTarget(null);
         setBulkOpen(false);
     };
-    const handleSend = () => {
-        // TODO: connect to API — POST subject/message to selected customer(s)
-        closeModals();
-        showToast('✅  Email sent successfully!');
+    const handleSend = async () => {
+        try {
+            if (bulkOpen) {
+                await sendCustomerEmails({ subject, message, sendAll: true });
+            } else if (singleTarget) {
+                await sendCustomerEmails({ subject, message, recipients: [singleTarget.id] });
+            }
+            closeModals();
+            showToast('✅  Email sent successfully!');
+        } catch (e) {
+            showToast(getApiErrorMessage(e, 'Failed to send email.'));
+        }
     };
 
     const gutter = clamp(16, width * 0.03, 40);
@@ -229,20 +264,26 @@ export default function CustomerEmailsScreen() {
                     {/* Results count (search feedback) */}
                     {query.length > 0 && (
                         <Text style={styles.resultsHint}>
-                            Showing {filtered.length} of {MOCK_CUSTOMERS.length}
+                            Showing {filtered.length} of {customers.length}
                         </Text>
                     )}
 
+                    {loading ? (
+                        <Text style={styles.resultsHint}>Loading customers…</Text>
+                    ) : loadError ? (
+                        <Text style={[styles.resultsHint, { color: COLORS.rose }]}>{loadError}</Text>
+                    ) : null}
+
                     {/* Content: table on lg+, cards otherwise */}
-                    {bp === 'lg' || bp === 'xl' || bp === 'xxl' ? (
+                    {!loading && !loadError && (bp === 'lg' || bp === 'xl' || bp === 'xxl' ? (
                         <TableView data={filtered} onSend={openSingle} />
                     ) : bp === 'md' ? (
                         <CardGrid data={filtered} onSend={openSingle} columns={2} />
                     ) : (
                         <CardGrid data={filtered} onSend={openSingle} columns={1} />
-                    )}
+                    ))}
 
-                    {filtered.length === 0 && (
+                    {!loading && !loadError && filtered.length === 0 && (
                         <View style={styles.emptyState}>
                             <Feather name="search" size={28} color={COLORS.muted} />
                             <Text style={styles.emptyTitle}>No customers found</Text>
@@ -285,7 +326,7 @@ export default function CustomerEmailsScreen() {
                     <View style={styles.noticeBox}>
                         <Feather name="info" size={15} color={COLORS.primary} />
                         <Text style={styles.noticeText}>
-                            This email will be sent to all <Text style={{ fontWeight: '700' }}>{MOCK_CUSTOMERS.length} registered customers</Text>.
+                            This email will be sent to all <Text style={{ fontWeight: '700' }}>{customers.length} registered customers</Text>.
                         </Text>
                     </View>
                 }

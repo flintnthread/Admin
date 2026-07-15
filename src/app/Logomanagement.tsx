@@ -7,7 +7,15 @@ import {
   Image,
   StyleSheet,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  fetchSiteLogos,
+  uploadSiteLogoFromDataUrl,
+  uploadSiteLogo,
+  resolveCmsMediaUrl,
+} from "@/services/cmsApi";
 import {
   Moon,
   Sun,
@@ -55,16 +63,37 @@ const LOGO_TYPES = [
   },
 ];
 
-/* ---------- Dummy seed data ---------- */
-function img(seed: string, w = 600, h = 220) {
-  return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+/* ---------- Logo helpers ---------- */
+function fileNameFromPath(path?: string | null) {
+  if (!path) return "—";
+  const parts = path.split(/[/\\]/);
+  return parts[parts.length - 1] || path;
 }
 
-const initialLogos: Record<string, { image: string; fileName: string; size: string }> = {
-  dark: { image: img("flint-dark-logo", 600, 220), fileName: "logo_dark_1759731453_68e35efdcf08d.jpg", size: "47.71 KB" },
-  light: { image: img("flint-light-logo", 600, 220), fileName: "logo_light_1760248096.png", size: "36.61 KB" },
-  favicon: { image: img("flint-favicon", 240, 240), fileName: "favicon_1760179156.png", size: "23.01 KB" },
-};
+function formatUpdatedAt(value?: unknown) {
+  if (!value) {
+    return new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+const emptyLogoSlot = { image: "", fileName: "—", size: "—", path: "" };
 
 function formatBytes(bytes?: number) {
   if (bytes === undefined || bytes === null) return "Unknown size";
@@ -80,14 +109,16 @@ export default function LogoManagement() {
   const columns = width < 520 ? 1 : width < 1040 ? 2 : 3;
   const cardWidthPct = 100 / columns;
 
-  const [logos, setLogos] = React.useState(initialLogos);
+  const [logos, setLogos] = React.useState<Record<string, { image: string; fileName: string; size: string; path: string }>>({
+    dark: { ...emptyLogoSlot },
+    light: { ...emptyLogoSlot },
+    favicon: { ...emptyLogoSlot },
+  });
   const [pending, setPending] = React.useState<Record<string, any>>({ dark: null, light: null, favicon: null });
   const [pickingKey, setPickingKey] = React.useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = React.useState(
-    new Date().toLocaleString("en-US", {
-      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true
-    })
-  );
+  const [loading, setLoading] = React.useState(true);
+  const [updating, setUpdating] = React.useState(false);
+  const [lastUpdated, setLastUpdated] = React.useState("—");
   const [toast, setToast] = React.useState("");
 
   // Pagination state (UI-only)
@@ -105,6 +136,42 @@ export default function LogoManagement() {
     setToast(msg);
     setTimeout(() => setToast(""), 2000);
   }
+
+  const loadLogos = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const row = await fetchSiteLogos();
+      const next: Record<string, { image: string; fileName: string; size: string; path: string }> = {
+        dark: { ...emptyLogoSlot },
+        light: { ...emptyLogoSlot },
+        favicon: { ...emptyLogoSlot },
+      };
+      const mappings = [
+        { key: "dark", path: row.logoDark ?? row.logo_dark },
+        { key: "light", path: row.logoLight ?? row.logo_light },
+        { key: "favicon", path: row.favicon },
+      ];
+      for (const { key, path } of mappings) {
+        const p = path ? String(path) : "";
+        next[key] = {
+          path: p,
+          image: p ? resolveCmsMediaUrl(p) : "",
+          fileName: fileNameFromPath(p),
+          size: p ? "Uploaded" : "—",
+        };
+      }
+      setLogos(next);
+      setLastUpdated(formatUpdatedAt(row.updatedAt ?? row.updated_at));
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Failed to load logos."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadLogos();
+  }, [loadLogos]);
 
   function clearPending(key: string) {
     setPending((prev) => ({ ...prev, [key]: null }));
@@ -136,27 +203,47 @@ export default function LogoManagement() {
     }
   }
 
-  function handleUpdate() {
-    if (!hasPending) return;
-    setLogos((prev) => {
-      const next = { ...prev };
-      Object.entries(pending).forEach(([key, file]) => {
-        if (file) next[key] = file;
-      });
-      return next;
-    });
-    setPending({ dark: null, light: null, favicon: null });
-    setLastUpdated(
-      new Date().toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
-    );
-    showToast("Logos updated successfully");
+  async function handleUpdate() {
+    if (!hasPending || updating) return;
+    setUpdating(true);
+    try {
+      const slotMap: Record<string, "dark" | "light" | "favicon"> = {
+        dark: "dark",
+        light: "light",
+        favicon: "favicon",
+      };
+      const next = { ...logos };
+      for (const [key, file] of Object.entries(pending)) {
+        if (!file) continue;
+        const slot = slotMap[key];
+        const fileName = file.fileName || "logo.png";
+        const pathKey = key === "dark" ? "logoDark" : key === "light" ? "logoLight" : "favicon";
+        let uploadedPath = "";
+        if (String(file.image).startsWith("data:")) {
+          const result = await uploadSiteLogoFromDataUrl(slot, file.image, fileName);
+          uploadedPath = String(result.uploadedPath ?? result[pathKey] ?? "");
+        } else {
+          const res = await fetch(file.image);
+          const blob = await res.blob();
+          const result = await uploadSiteLogo(slot, blob, fileName);
+          uploadedPath = String(result.uploadedPath ?? result[pathKey] ?? "");
+        }
+        next[key] = {
+          path: uploadedPath,
+          image: resolveCmsMediaUrl(uploadedPath),
+          fileName: fileNameFromPath(uploadedPath) || fileName,
+          size: file.size || "Uploaded",
+        };
+      }
+      setLogos(next);
+      setPending({ dark: null, light: null, favicon: null });
+      await loadLogos();
+      showToast("Logos updated successfully");
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Failed to update logos."));
+    } finally {
+      setUpdating(false);
+    }
   }
 
   return (
@@ -207,6 +294,12 @@ export default function LogoManagement() {
           </View>
 
           {/* Logo cards — preview + file meta + replace control combined per type */}
+          {loading ? (
+            <View style={[styles.cardsGrid, { justifyContent: "center", paddingVertical: 40 }]}>
+              <ActivityIndicator size="large" color="#f97316" />
+              <Text style={{ marginTop: 10, color: "#9aa0ac", fontWeight: "600" }}>Loading logos…</Text>
+            </View>
+          ) : (
           <View style={styles.cardsGrid}>
             {pageItems.map((t) => {
               const Icon = t.icon;
@@ -268,6 +361,7 @@ export default function LogoManagement() {
               );
             })}
           </View>
+          )}
 
           {/* Pagination (placed inside scroll content, directly below the image cards) */}
           <View style={{ paddingHorizontal: 6, marginTop: 8 }}>
@@ -287,11 +381,15 @@ export default function LogoManagement() {
             {hasPending ? `${pendingCount} file(s) ready to update` : "No pending changes"}
           </Text>
           <TouchableOpacity
-            style={[styles.updateBtn, !hasPending && { opacity: 0.5 }]}
+            style={[styles.updateBtn, (!hasPending || updating) && { opacity: 0.5 }]}
             onPress={handleUpdate}
-            disabled={!hasPending}
+            disabled={!hasPending || updating}
           >
-            <RefreshCw size={14} color="#fff" />
+            {updating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <RefreshCw size={14} color="#fff" />
+            )}
             <Text style={styles.updateBtnText}>Update Logos</Text>
           </TouchableOpacity>
         </View>

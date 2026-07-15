@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,10 +12,23 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+  createAdPlacement,
+  deleteAdPlacement,
+  fetchAdPlacements,
+  formatAdsDate,
+  toApiStatus,
+  toUiStatus,
+  updateAdPlacement,
+  type AdsApiRow,
+} from '@/services/adsApi';
 
 /**
  * ── INTEGRATION NOTE ─────────────────────────────────────────────
@@ -71,12 +84,20 @@ const PLACEMENT_TYPES: PlacementType[] = [
   "Custom",
 ];
 
-const INITIAL_PLACEMENTS: Placement[] = [
-  { id: 6, name: "Landing Page Sub-Banner", description: "Sub-banner placement on landing pages", type: "Landing Page Banner", dailyRate: 16000, monthlyRate: 325000, status: "Active", created: "Oct 05, 2025" },
-  { id: 7, name: "Category Banner Ads", description: "Banner ads on category pages", type: "Category Banner", dailyRate: 14000, monthlyRate: 200000, status: "Active", created: "Oct 05, 2025" },
-  { id: 8, name: "Category Sub-Banner Ads", description: "Sub-banner ads on category pages", type: "Category Sub-Banner", dailyRate: 7500, monthlyRate: 100000, status: "Active", created: "Oct 05, 2025" },
-  { id: 1, name: "Homepage Main Banner", description: "Premium placement on homepage main banner area", type: "Homepage Banner", dailyRate: 25000, monthlyRate: 450000, status: "Active", created: "Oct 05, 2025" },
-];
+function mapPlacementFromApi(row: AdsApiRow): Placement {
+  const daily = row.dailyRate ?? row.daily_rate;
+  const monthly = row.monthlyRate ?? row.monthly_rate;
+  return {
+    id: Number(row.id),
+    name: String(row.name ?? ''),
+    description: String(row.description ?? ''),
+    type: String(row.type ?? 'Custom') as PlacementType,
+    dailyRate: Number(daily ?? 0),
+    monthlyRate: Number(monthly ?? 0),
+    status: toUiStatus(row.status),
+    created: formatAdsDate(row.createdAt),
+  };
+}
 
 function formatINR(n: number) {
   return `₹${n.toLocaleString("en-IN")}`;
@@ -548,11 +569,31 @@ export default function AdPlacementsScreen() {
   const isTablet = width >= 768;
   const isMobile = !isTablet;
 
-  const [placements, setPlacements] = useState<Placement[]>(INITIAL_PLACEMENTS);
+  const [placements, setPlacements] = useState<Placement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Placement | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: "" });
+
+  const loadPlacements = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchAdPlacements();
+      setPlacements(rows.map(mapPlacementFromApi));
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, 'Failed to load placements.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlacements();
+  }, [loadPlacements]);
 
   const openAddModal = () => {
     setEditingPlacement(null);
@@ -564,49 +605,47 @@ export default function AdPlacementsScreen() {
     setModalOpen(true);
   };
 
-  const handleSubmit = (form: FormState) => {
-    if (editingPlacement) {
-      setPlacements((prev) =>
-        prev.map((p) =>
-          p.id === editingPlacement.id
-            ? {
-                ...p,
-                name: form.name.trim(),
-                description: form.description.trim(),
-                type: form.type,
-                dailyRate: Number(form.dailyRate) || 0,
-                monthlyRate: Number(form.monthlyRate) || 0,
-                status: form.status,
-              }
-            : p
-        )
-      );
-      setToast({ visible: true, message: "Placement updated successfully!" });
-    } else {
-      const nextId = Math.max(...placements.map((p) => p.id)) + 1;
-      const newPlacement: Placement = {
-        id: nextId,
-        name: form.name.trim(),
-        description: form.description.trim(),
-        type: form.type,
-        dailyRate: Number(form.dailyRate) || 0,
-        monthlyRate: Number(form.monthlyRate) || 0,
-        status: form.status,
-        created: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-      };
-      setPlacements((prev) => [newPlacement, ...prev]);
-      setToast({ visible: true, message: "Placement added successfully!" });
+  const handleSubmit = async (form: FormState) => {
+    const body = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      type: form.type,
+      dailyRate: Number(form.dailyRate) || 0,
+      monthlyRate: Number(form.monthlyRate) || 0,
+      status: toApiStatus(form.status),
+    };
+    setSaving(true);
+    try {
+      if (editingPlacement) {
+        await updateAdPlacement(editingPlacement.id, body);
+        setToast({ visible: true, message: "Placement updated successfully!" });
+      } else {
+        await createAdPlacement(body);
+        setToast({ visible: true, message: "Placement added successfully!" });
+      }
+      setModalOpen(false);
+      setEditingPlacement(null);
+      await loadPlacements();
+    } catch (err) {
+      Alert.alert('Error', getApiErrorMessage(err, editingPlacement ? 'Could not update placement.' : 'Could not add placement.'));
+    } finally {
+      setSaving(false);
     }
-    setModalOpen(false);
-    setEditingPlacement(null);
   };
 
-  const confirmDelete = () => {
-    if (deleteTarget) {
-      setPlacements((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await deleteAdPlacement(deleteTarget.id);
       setToast({ visible: true, message: "Placement deleted." });
+      setDeleteTarget(null);
+      await loadPlacements();
+    } catch (err) {
+      Alert.alert('Error', getApiErrorMessage(err, 'Could not delete placement.'));
+    } finally {
+      setSaving(false);
     }
-    setDeleteTarget(null);
   };
 
   return (
@@ -641,7 +680,15 @@ export default function AdPlacementsScreen() {
 
           {/* Placements table / list */}
           <View style={[styles.tableCard, isMobile && { backgroundColor: "transparent", borderWidth: 0, overflow: "visible" }]}>
-            <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={setDeleteTarget} />
+            {loadError ? (
+              <Text style={{ color: COLORS.rose, padding: 16 }}>{loadError}</Text>
+            ) : loading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={COLORS.orange} />
+              </View>
+            ) : (
+              <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={setDeleteTarget} />
+            )}
           </View>
         </ScrollView>
 

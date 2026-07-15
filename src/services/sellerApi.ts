@@ -118,6 +118,18 @@ export async function resendSellerVerification(id: number): Promise<{ message: s
   return adminApiRequest(`/api/admin/sellers/${id}/resend-verification`, { method: "POST" });
 }
 
+export async function createSeller(body: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobile: string;
+}): Promise<Record<string, unknown>> {
+  return adminApiRequest("/api/admin/sellers", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function fetchSellers(params?: {
   status?: string;
   search?: string;
