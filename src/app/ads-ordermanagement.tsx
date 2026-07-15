@@ -1185,7 +1185,7 @@ export default function AdsOrderManagementScreen() {
   const handleViewPayments = (order: Order) => {
     router.push({
       pathname: "/ads-payments" as any,
-      params: { customer: order.customerName },
+      params: { orderId: order.id },
     });
   };
 
