@@ -427,13 +427,6 @@ const ViewModal: React.FC<{ visible: boolean; item: AdType | null; onClose: () =
                         <Text style={styles.viewLabel}>Requirements & Guidelines</Text>
                         <Text style={styles.viewValue}>{item.requirements.replace(/\n/g, '  ')}</Text>
                     </ScrollView>
-
-                    <View style={styles.modalFooter}>
-                        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                            <Ionicons name="close" size={13} color="#fff" />
-                            <Text style={styles.cancelBtnText}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
                 </View>
             </View>
         </Modal>
@@ -958,13 +951,14 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 2,
+        minWidth: 150,
     },
     statIconWrap: {
-        width: 40, height: 40, borderRadius: 10,
+        width: 34, height: 34, borderRadius: 8,
         alignItems: 'center', justifyContent: 'center',
     },
-    statValue: { fontSize: 24, fontWeight: '800', color: COLORS.ink },
-    statLabel: { fontSize: 13, fontWeight: '700', color: COLORS.ink, marginTop: 2 },
+    statValue: { fontSize: 18, fontWeight: '700', color: COLORS.ink },
+    statLabel: { fontSize: 11, fontWeight: '600', color: COLORS.ink, letterSpacing: 0.4, marginTop: 2 },
     statSub: { fontSize: 11, color: COLORS.sub, marginTop: 3 },
 
     sectionBanner: {

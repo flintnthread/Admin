@@ -10,28 +10,28 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import {
-  createAdminUser,
-  deleteAdminUser,
-  fetchAdminUsers,
-  fromApiRole,
-  updateAdminUser,
+    createAdminUser,
+    deleteAdminUser,
+    fetchAdminUsers,
+    fromApiRole,
+    updateAdminUser,
 } from "@/services/adminUserApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
-  Modal,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    Dimensions,
+    Modal,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from "react-native";
 const Icon = Ionicons;
 
@@ -328,6 +328,7 @@ function DeleteModal({ visible, user, onClose, onConfirm }: { visible: boolean; 
           </View>
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <Icon name="close" size={16} color={C.white} />
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.submitBtn, { backgroundColor: C.red }]} onPress={onConfirm}>
@@ -639,7 +640,7 @@ export default function AdminUsersScreen() {
 
       {/* Content */}
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           {/* Header Card */}
           <View style={styles.mobileHeaderCard}>
             {width < 480 ? (
@@ -750,7 +751,7 @@ export default function AdminUsersScreen() {
   // ── Web Layout (NO sidebar) ───────────────────────────────────────────────
   const WebLayout = () => (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 24 }}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 24 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Page Header ── */}
         <View style={styles.webPageHeader}>
@@ -989,10 +990,10 @@ const styles = StyleSheet.create({
 
   // ── Modal ──
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 16 },
-  modalCard: { backgroundColor: C.white, borderRadius: 14, width: "100%", maxWidth: 460, maxHeight: "90%", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, overflow: "visible" },
+  modalCard: { backgroundColor: C.white, borderRadius: 14, width: "100%", maxWidth: 460, maxHeight: "90%", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, overflow: "hidden", alignSelf: "center" },
   modalHeader: { backgroundColor: C.orange, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16 },
   modalTitle: { color: C.white, fontSize: 17, fontWeight: "700" },
-  modalFooter: { flexDirection: "row", gap: 12, padding: 16, borderTopWidth: 1, borderTopColor: C.border, justifyContent: "flex-end" },
+  modalFooter: { flexDirection: "row", gap: 12, padding: 16, borderTopWidth: 1, borderTopColor: C.border, justifyContent: "center" },
   cancelBtn: { backgroundColor: "#374151", borderRadius: 9, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
   cancelBtnText: { color: C.white, fontWeight: "600", fontSize: 14 },
   submitBtn: { backgroundColor: C.orange, borderRadius: 9, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 10 },
