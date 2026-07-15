@@ -129,9 +129,7 @@ export default function PendingSellersScreen() {
           {isMobile ? (
             <View style={{ flexDirection: "column", gap: 2 }}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <TouchableOpacity onPress={() => router.back()} style={{ padding: 4, marginRight: 10 }}>
-                  <Feather name="arrow-left" size={24} color="#fff" />
-                </TouchableOpacity>
+
                 <Text style={[styles.title, { flex: 1, fontSize: 18 }]}>Pending seller profiles</Text>
               </View>
               <Text style={[styles.subtitle, { marginLeft: 42, marginTop: 0 }]}>
@@ -141,9 +139,7 @@ export default function PendingSellersScreen() {
           ) : (
             <View style={styles.header}>
               <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 16 }}>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
-                  <Feather name="arrow-left" size={24} color="#fff" />
-                </TouchableOpacity>
+
                 <View style={styles.headerIconBox}>
                   <Feather name="users" size={20} color="#fff" />
                 </View>

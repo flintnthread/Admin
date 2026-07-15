@@ -1248,8 +1248,14 @@ const DeliveryChargesScreen: React.FC = () => {
 
       {/* ── Page Header ── */}
       <View style={styles.pageHead}>
-        <View style={styles.pageHeadLeft}>
-          <Text style={styles.pageTitle}>Delivery Charges</Text>
+        <View style={[styles.pageHeadLeft, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+          <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="truck" size={26} color="#FFF" />
+          </View>
+          <View>
+            <Text style={styles.pageTitle}>Delivery Charges</Text>
+            <Text style={styles.pageSub}>Manage weight slabs and charges</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.addBtnWhite}
@@ -1455,8 +1461,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   mobileHeaderTitle: {
-    fontSize: 22,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "400",
     color: "#FFFFFF",
     letterSpacing: -0.3,
   },
@@ -1489,7 +1495,7 @@ const styles = StyleSheet.create({
   mobileStatsRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: -32,
+    marginTop: -16,
     marginHorizontal: 16,
     marginBottom: 16,
     zIndex: 10,
@@ -1576,8 +1582,8 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: "#151D4F",
     paddingHorizontal: 32,
-    paddingVertical: 28,
-    paddingBottom: 68,
+    paddingVertical: 14,
+    paddingBottom: 50,
     borderRadius: 22,
     marginHorizontal: 16,
     marginTop: 16,
@@ -1609,8 +1615,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   pageTitle: {
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 22,
+    fontWeight: "400",
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
@@ -1679,7 +1685,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginBottom: 8,
-    marginTop: -52,
+    marginTop: -32,
     marginHorizontal: 16,
     zIndex: 10,
     justifyContent: "center",

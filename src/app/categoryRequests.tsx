@@ -409,7 +409,7 @@ export default function CategoryRequests() {
 
   const filterTabsWeb = (
     <View style={styles.filterContainerWeb}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 10 }}>
         {FILTERS.map((f, i) => {
           const count = getFilterCount(f);
           const isActive = filter === f;
@@ -580,60 +580,58 @@ export default function CategoryRequests() {
         {/* ── Laptop Table / Mobile+Tablet Cards ── */}
         {isLaptop ? (
           <View style={styles.tableWrapper}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: 900 }}>
-                {/* Table Header */}
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.th, { width: 90 }]}>ID</Text>
-                  <Text style={[styles.th, { width: 130 }]}>CATEGORY</Text>
-                  <Text style={[styles.th, { width: 180 }]}>SELLER</Text>
-                  <Text style={[styles.th, { width: 220 }]}>DESCRIPTION</Text>
-                  <Text style={[styles.th, { width: 160 }]}>REASON</Text>
-                  <Text style={[styles.th, { width: 110 }]}>STATUS</Text>
-                  <Text style={[styles.th, { width: 110 }]}>SUBMITTED</Text>
-                  <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>ACTIONS</Text>
-                </View>
-
-                {/* Table Rows */}
-                {paginated.map((req, idx) => (
-                  <View key={req.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
-                    <Text style={[styles.td, { width: 90 }, styles.tdId]} numberOfLines={1}>{req.id}</Text>
-                    <View style={{ width: 130, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                      <Text style={styles.tdCategoryName} numberOfLines={1}>{req.categoryName}</Text>
-                    </View>
-                    <View style={{ width: 180, paddingVertical: 14, paddingHorizontal: 12 }}>
-                      <Text style={styles.tdSellerName} numberOfLines={1}>{req.sellerName}</Text>
-                      <Text style={styles.tdSellerEmail} numberOfLines={1}>{req.sellerEmail}</Text>
-                    </View>
-                    <View style={{ width: 220, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.description}</Text>
-                    </View>
-                    <View style={{ width: 160, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.reason}</Text>
-                    </View>
-                    <View style={{ width: 110, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                      <StatusBadge status={req.status} />
-                    </View>
-                    <Text style={[styles.td, { width: 110 }, styles.tdMuted]} numberOfLines={1}>{req.submitted}</Text>
-                    <View style={{ width: 90, alignItems: 'center', justifyContent: 'center' }}>
-                      <TouchableOpacity
-                        style={styles.viewBtn}
-                        onPress={() => setSelectedRequest(req)}
-                      >
-                        <EyeIcon />
-                        <Text style={styles.viewBtnText}>View</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-
-                {filtered.length === 0 && (
-                  <View style={styles.emptyRow}>
-                    <Text style={styles.emptyText}>No requests match this filter</Text>
-                  </View>
-                )}
+            <View style={{ width: '100%' }}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <Text style={[styles.th, { width: 80 }]}>ID</Text>
+                <Text style={[styles.th, { width: '12%' }]}>CATEGORY</Text>
+                <Text style={[styles.th, { width: '16%' }]}>SELLER</Text>
+                <Text style={[styles.th, { flex: 1.2 }]}>DESCRIPTION</Text>
+                <Text style={[styles.th, { flex: 1 }]}>REASON</Text>
+                <Text style={[styles.th, { width: 100 }]}>STATUS</Text>
+                <Text style={[styles.th, { width: 100 }]}>SUBMITTED</Text>
+                <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>ACTIONS</Text>
               </View>
-            </ScrollView>
+
+              {/* Table Rows */}
+              {paginated.map((req, idx) => (
+                <View key={req.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
+                  <Text style={[styles.td, { width: 80 }, styles.tdId]} numberOfLines={1}>{req.id}</Text>
+                  <View style={{ width: '12%', paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <Text style={styles.tdCategoryName} numberOfLines={1}>{req.categoryName}</Text>
+                  </View>
+                  <View style={{ width: '16%', paddingVertical: 14, paddingHorizontal: 12 }}>
+                    <Text style={styles.tdSellerName} numberOfLines={1}>{req.sellerName}</Text>
+                    <Text style={styles.tdSellerEmail} numberOfLines={1}>{req.sellerEmail}</Text>
+                  </View>
+                  <View style={{ flex: 1.2, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.description}</Text>
+                  </View>
+                  <View style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.reason}</Text>
+                  </View>
+                  <View style={{ width: 100, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <StatusBadge status={req.status} />
+                  </View>
+                  <Text style={[styles.td, { width: 100 }, styles.tdMuted]} numberOfLines={1}>{req.submitted}</Text>
+                  <View style={{ width: 90, alignItems: 'center', justifyContent: 'center' }}>
+                    <TouchableOpacity
+                      style={styles.viewBtn}
+                      onPress={() => setSelectedRequest(req)}
+                    >
+                      <EyeIcon />
+                      <Text style={styles.viewBtnText}>View</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {filtered.length === 0 && (
+                <View style={styles.emptyRow}>
+                  <Text style={styles.emptyText}>No requests match this filter</Text>
+                </View>
+              )}
+            </View>
           </View>
         ) : (
           /* Mobile + Tablet Cards */
@@ -777,8 +775,8 @@ const styles = StyleSheet.create({
   // Web desktop stat cards row
   statsRowWeb: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexWrap: 'nowrap',
+    justifyContent: 'center',
     gap: 8,
     marginTop: -32,
     marginBottom: 14,
@@ -787,7 +785,8 @@ const styles = StyleSheet.create({
   },
   statCardWeb: {
     flex: 1,
-    minWidth: 130,
+    minWidth: 120,
+    maxWidth: 200,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 12,
