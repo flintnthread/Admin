@@ -22,6 +22,7 @@ import {
   Platform,
   LayoutChangeEvent,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Defs, LinearGradient, Stop, Polyline, Text as SvgText } from 'react-native-svg';
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
@@ -349,7 +350,7 @@ function PulseDot() {
   );
 }
 
-function DashboardHeader({ onExport }: { onExport: () => void }) {
+function DashboardHeader() {
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
@@ -359,24 +360,15 @@ function DashboardHeader({ onExport }: { onExport: () => void }) {
         <View style={{ flexShrink: 1 }}>
           <Text style={styles.headerTitle}>Ads Dashboard</Text>
           <View style={styles.headerCrumbRow}>
-            <Text style={styles.headerCrumb}>Dashboard</Text>
+            {/* <Text style={styles.headerCrumb}>Dashboard</Text>
             <Text style={styles.headerCrumbSep}>›</Text>
-            <Text style={styles.headerCrumb}>Ads Dashboard</Text>
+            <Text style={styles.headerCrumb}>Ads Dashboard</Text> */}
             <View style={styles.livePill}>
               <PulseDot />
               <Text style={styles.livePillText}>LIVE</Text>
             </View>
           </View>
         </View>
-      </View>
-      <View style={styles.headerControls}>
-        <TouchableOpacity style={styles.exportBtn} activeOpacity={0.85} onPress={onExport}>
-          <Text style={styles.exportBtnText}>↑ Export report</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bellBtn} activeOpacity={0.85}>
-          <View style={styles.bellDot} />
-          <Text style={styles.bellIcon}>🔔</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -395,7 +387,16 @@ interface StatCardProps {
   trendUp?: boolean;
 }
 
-function StatCard({ label, value, sub, iconNode, accentColor, trend, trendUp }: StatCardProps) {
+function StatCard({
+  label,
+  value,
+  sub,
+  iconNode,
+  accentColor,
+  trend,
+  trendUp,
+  isPhone,
+}: StatCardProps & { isPhone?: boolean }) {
   return (
     <View style={styles.statCard}>
       <View style={[styles.statIconBox, { backgroundColor: accentColor + '18', borderColor: accentColor + '30', borderWidth: 1 }]}>
@@ -769,6 +770,7 @@ function CustomRangeModal({ visible, initialStart, initialEnd, onCancel, onApply
 /* Screen                                                               */
 /* ------------------------------------------------------------------ */
 export default function AdsDashboardScreen() {
+  const router = useRouter();
   const { bp, width: windowWidth } = useBreakpoint();
   const { measuredWidth, onLayout } = useMeasuredWidth(windowWidth);
   const [period, setPeriod] = useState<Period>('Monthly');
@@ -778,18 +780,19 @@ export default function AdsDashboardScreen() {
 
   const dataset: Dataset = useMemo(() => {
     switch (period) {
-      case 'Daily':   return dailyDataset();
-      case 'Weekly':  return weeklyDataset();
-      case 'Yearly':  return yearlyDataset();
-      case 'Custom':  return customDataset(customRange.start, customRange.end);
-      default:        return monthlyDataset();
+      case 'Daily': return dailyDataset();
+      case 'Weekly': return weeklyDataset();
+      case 'Yearly': return yearlyDataset();
+      case 'Custom': return customDataset(customRange.start, customRange.end);
+      default: return monthlyDataset();
     }
   }, [period, customRange]);
 
   const isTablet = bp !== 'phone';
   const isDesktop = bp === 'desktop';
-  const gutter = 16;
-  const contentPad = bp === 'phone' ? 14 : 24;
+  const isPhone = bp === 'phone';
+  const gutter = isPhone ? 12 : 16;
+  const contentPad = isPhone ? 12 : 24;
   const fullWidth = Math.max(0, measuredWidth - contentPad * 2);
   // Half-width for side-by-side tiles: all breakpoints get 2 columns
   const halfWidth = (fullWidth - gutter) / 2;
@@ -802,8 +805,8 @@ export default function AdsDashboardScreen() {
   const revChartWidth = isDesktop
     ? Math.max(100, fullWidth - 180 - 32 - 20)
     : isTablet
-    ? fullWidth - 32
-    : fullWidth - 36;
+      ? fullWidth - 32
+      : fullWidth - 36;
 
   const handlePeriodSelect = (p: Period) => {
     if (p === 'Custom') { setModalVisible(true); return; }
@@ -830,10 +833,10 @@ export default function AdsDashboardScreen() {
 
   const rangeLabel =
     period === 'Custom' ? `${fmtDateShort(customRange.start)} — ${fmtDateShort(customRange.end)}`
-    : period === 'Daily' ? 'Today'
-    : period === 'Weekly' ? 'Last 7 days'
-    : period === 'Yearly' ? 'Last 5 years'
-    : 'Jan – Dec 2026';
+      : period === 'Daily' ? 'Today'
+        : period === 'Weekly' ? 'Last 7 days'
+          : period === 'Yearly' ? 'Last 5 years'
+            : 'Jan – Dec 2026';
 
   // 5 stat cards (Avg Order Value removed)
   const statCards: StatCardProps[] = [
@@ -889,29 +892,21 @@ export default function AdsDashboardScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header ── */}
-          <DashboardHeader onExport={() => {}} />
+          <DashboardHeader />
 
           {/* ── Stat Cards ── */}
-          {bp === 'phone' ? (
-            // Phone: 2-col for first 4 cards, last card full-width
-            <View style={{ marginTop: 20 }}>
-              <View style={[styles.statGrid, { gap: gutter, marginBottom: gutter }]}>
-                {statCards.slice(0, 4).map((card) => (
-                  <View key={card.label} style={{ width: statCardWidth }}>
-                    <StatCard {...card} />
-                  </View>
-                ))}
-              </View>
-              {statCards.slice(4).map((card) => (
-                <StatCard key={card.label} {...card} />
-              ))}
-            </View>
-          ) : (
-            <View style={[styles.statGrid, { gap: gutter, marginTop: 20 }]}>
+          {isPhone ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.statGrid, { gap: gutter, paddingHorizontal: 8 }]} style={{ marginTop: -44, zIndex: 10 }}>
               {statCards.map((card) => (
-                <View key={card.label} style={{ width: statCardWidth }}>
-                  <StatCard {...card} />
+                <View key={card.label} style={{ width: 140 }}>
+                  <StatCard {...card} isPhone={isPhone} />
                 </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={[styles.statGrid, { gap: gutter, marginTop: -60, paddingHorizontal: 16, zIndex: 10 }]}>
+              {statCards.map((card) => (
+                <StatCard key={card.label} {...card} />
               ))}
             </View>
           )}
@@ -1090,16 +1085,38 @@ export default function AdsDashboardScreen() {
           <View style={[styles.qa, { width: fullWidth }]}>
             <Text style={styles.qaTitle}>QUICK ACTIONS</Text>
             <View style={styles.qaGrid}>
-              {['Manage orders', 'View payments', 'Manage customers', 'View notifications'].map((label, i) => (
-                <TouchableOpacity
-                  key={label}
-                  style={[styles.qaBtn, { width: isDesktop ? '23%' : '48%' }]}
-                  activeOpacity={0.85}
-                >
-                  <View style={[styles.qaDot, { backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length] }]} />
-                  <Text style={styles.qaBtnText}>{label}</Text>
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity
+                style={[styles.qaBtn, { width: isDesktop ? '23%' : '48%' }]}
+                activeOpacity={0.85}
+                onPress={() => router.push('/ads-ordermanagement')}
+              >
+                <View style={[styles.qaDot, { backgroundColor: SERIES_COLORS[0] }]} />
+                <Text style={styles.qaBtnText}>Manage orders</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.qaBtn, { width: isDesktop ? '23%' : '48%' }]}
+                activeOpacity={0.85}
+                onPress={() => router.push('/ads-payments')}
+              >
+                <View style={[styles.qaDot, { backgroundColor: SERIES_COLORS[1] }]} />
+                <Text style={styles.qaBtnText}>View payments</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.qaBtn, { width: isDesktop ? '23%' : '48%' }]}
+                activeOpacity={0.85}
+                onPress={() => router.push('/customermngt')}
+              >
+                <View style={[styles.qaDot, { backgroundColor: SERIES_COLORS[2] }]} />
+                <Text style={styles.qaBtnText}>Manage customers</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.qaBtn, { width: isDesktop ? '23%' : '48%' }]}
+                activeOpacity={0.85}
+                onPress={() => router.push('/ads-notification')}
+              >
+                <View style={[styles.qaDot, { backgroundColor: SERIES_COLORS[3] }]} />
+                <Text style={styles.qaBtnText}>View notifications</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -1136,29 +1153,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 10,
+    paddingBottom: 70,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flexShrink: 1 },
   headerBadge: {
     width: 42, height: 42, borderRadius: 11,
-    backgroundColor: COLORS.amber,
+    backgroundColor: '#ef7b1a',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  headerTitle: { fontFamily: FONT.display, fontWeight: '700', fontSize: 16.5, color: '#fff' },
+  headerTitle: { fontWeight: '700', fontSize: 18.5, color: '#fff' },
   headerCrumbRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' },
-  headerCrumb: { fontFamily: FONT.mono, fontSize: 11, color: COLORS.navyMuted },
+  headerCrumb: { fontSize: 11, color: COLORS.navyMuted },
   headerCrumbSep: { fontSize: 11, color: COLORS.navyMuted },
   livePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 3,
     borderRadius: 999, marginLeft: 4,
   },
-  livePillText: { fontFamily: FONT.mono, fontSize: 9, fontWeight: '700', color: '#fff', letterSpacing: 0.6 },
+  livePillText: { fontSize: 9, fontWeight: '700', color: '#fff', letterSpacing: 0.6 },
   pulseWrap: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center' },
   pulseRing: { position: 'absolute', width: 9, height: 9, borderRadius: 4.5, backgroundColor: COLORS.teal },
   pulseCore: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: COLORS.teal },
   headerControls: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   exportBtn: { backgroundColor: COLORS.amber, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8 },
-  exportBtnText: { color: COLORS.navy, fontFamily: FONT.bodyMed, fontWeight: '700', fontSize: 12.5 },
+  exportBtnText: { color: COLORS.navy, fontWeight: '700', fontSize: 12.5 },
   bellBtn: {
     width: 38, height: 38, borderRadius: 8,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
@@ -1167,12 +1185,25 @@ const styles = StyleSheet.create({
   },
   bellIcon: { fontSize: 15 },
   bellDot: { position: 'absolute', top: 6, right: 7, width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.coral, zIndex: 1 },
+  quickActionBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  quickActionText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
 
   /* ── Stat Cards ── */
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  statGrid: { flexDirection: 'row', flexWrap: 'nowrap', justifyContent: 'space-between' },
   statCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     shadowColor: '#1B1F3B',
     shadowOffset: { width: 0, height: 3 },
@@ -1181,25 +1212,27 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
     borderColor: COLORS.ruleSoft,
+    flex: 1,
+    minWidth: 0,
   },
   statIconBox: {
-    width: 44, height: 44, borderRadius: 12,
+    width: 32, height: 32, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   statLabel: {
-    fontFamily: FONT.mono, fontSize: 10.5, fontWeight: '600',
-    color: COLORS.muted, letterSpacing: 0.4,
-    textTransform: 'uppercase', marginBottom: 4,
+    fontSize: 9, fontWeight: '600',
+    color: COLORS.muted, letterSpacing: 0.3,
+    textTransform: 'uppercase', marginBottom: 2,
   },
   statValue: {
-    fontFamily: FONT.display, fontWeight: '700', fontSize: 21,
-    color: COLORS.ink, marginBottom: 6,
+    fontWeight: '700', fontSize: 16,
+    color: COLORS.ink, marginBottom: 4,
   },
-  statSubRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  statSub: { fontFamily: FONT.mono, fontSize: 10, color: COLORS.muted2 },
-  trendBadge: { borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
-  trendText: { fontFamily: FONT.mono, fontSize: 9.5, fontWeight: '700' },
+  statSubRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  statSub: { fontSize: 8, color: COLORS.muted2 },
+  trendBadge: { borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+  trendText: { fontSize: 8, fontWeight: '700' },
 
   /* ── Revenue tile header ── */
   revenueTileHeader: {
@@ -1223,7 +1256,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navy,   // ← #151D4F active
     shadowColor: COLORS.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2,
   },
-  periodChipText: { fontFamily: FONT.bodyMed, fontSize: 12, color: COLORS.muted, fontWeight: '500' },
+  periodChipText: { fontSize: 12, color: COLORS.muted, fontWeight: '500' },
   periodChipTextActive: { color: '#fff', fontWeight: '700' },
 
   /* ── Tile ── */
@@ -1237,65 +1270,65 @@ const styles = StyleSheet.create({
   },
   tileHeadRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
   tileHead: { flex: 1, minWidth: 0 },
-  tileTitle: { fontFamily: FONT.displaySemi, fontWeight: '700', fontSize: 15, color: COLORS.ink },
-  tileSub: { fontFamily: FONT.mono, fontSize: 10.5, color: COLORS.muted2, marginTop: 3 },
+  tileTitle: { fontWeight: '700', fontSize: 15, color: COLORS.ink },
+  tileSub: { fontSize: 10.5, color: COLORS.muted2, marginTop: 3 },
 
   /* ── Gauges ── */
   dialWrap: { alignItems: 'center', justifyContent: 'flex-end' },
   dialLabelWrap: { position: 'absolute', bottom: 4, alignItems: 'center' },
-  dialValue: { fontFamily: FONT.display, fontWeight: '700', fontSize: 20 },
-  dialCaption: { fontFamily: FONT.mono, fontSize: 9, color: COLORS.muted2, marginTop: 2, letterSpacing: 0.6 },
+  dialValue: { fontWeight: '700', fontSize: 20 },
+  dialCaption: { fontSize: 9, color: COLORS.muted2, marginTop: 2, letterSpacing: 0.6 },
   miniGauge: { alignItems: 'center', width: 100 },
   miniGaugeCenter: { position: 'absolute', alignItems: 'center' },
-  miniGaugeValue: { fontFamily: FONT.display, fontWeight: '700', fontSize: 14 },
-  miniGaugeLabel: { fontFamily: FONT.mono, fontSize: 10.5, color: COLORS.muted, marginTop: 8, textAlign: 'center' },
+  miniGaugeValue: { fontWeight: '700', fontSize: 14 },
+  miniGaugeLabel: { fontSize: 10.5, color: COLORS.muted, marginTop: 8, textAlign: 'center' },
 
   /* ── Legend ── */
   legendWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontFamily: FONT.mono, fontSize: 11, color: COLORS.muted },
+  legendText: { fontSize: 11, color: COLORS.muted },
 
   /* ── Donut ── */
   donutCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  donutTotal: { fontFamily: FONT.display, fontWeight: '700', fontSize: 13, color: COLORS.ink },
-  donutTotalLabel: { fontFamily: FONT.mono, fontSize: 9, color: COLORS.muted2, marginTop: 2 },
+  donutTotal: { fontWeight: '700', fontSize: 13, color: COLORS.ink },
+  donutTotalLabel: { fontSize: 9, color: COLORS.muted2, marginTop: 2 },
 
   /* ── Order Grid (Mobile) ── */
   orderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
-  orderGridCard: { 
-    width: '48%', 
+  orderGridCard: {
+    width: '48%',
     minWidth: 160,
     flexGrow: 1,
-    backgroundColor: COLORS.surface, 
-    borderWidth: 1, 
-    borderColor: COLORS.ruleSoft, 
-    borderRadius: 12, 
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.ruleSoft,
+    borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 4,
   },
-  orderGridStrip: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    paddingHorizontal: 12, 
+  orderGridStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  orderGridStatus: { fontFamily: FONT.mono, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  orderGridStatus: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
 
   /* ── Table ── */
   tableHeadRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.rule, paddingBottom: 10, marginBottom: 4 },
-  tableHeadCell: { fontFamily: FONT.mono, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.muted2, fontWeight: '700' },
+  tableHeadCell: { fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.5, color: COLORS.muted2, fontWeight: '700' },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.ruleSoft },
-  oid: { fontFamily: FONT.mono, color: COLORS.indigo, fontWeight: '700', fontSize: 12 },
-  custName: { fontFamily: FONT.bodyMed, fontWeight: '600', fontSize: 13, color: COLORS.ink },
-  custMail: { fontFamily: FONT.mono, fontSize: 10, color: COLORS.muted2, marginTop: 1 },
+  oid: { color: COLORS.indigo, fontWeight: '700', fontSize: 12 },
+  custName: { fontWeight: '600', fontSize: 13, color: COLORS.ink },
+  custMail: { fontSize: 10, color: COLORS.muted2, marginTop: 1 },
   pill: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  pillText: { fontFamily: FONT.mono, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  amt: { fontFamily: FONT.mono, fontWeight: '700', fontSize: 12.5, color: COLORS.ink },
+  pillText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  amt: { fontWeight: '700', fontSize: 12.5, color: COLORS.ink },
   statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  dateCell: { fontFamily: FONT.mono, fontSize: 11, color: COLORS.muted },
+  dateCell: { fontSize: 11, color: COLORS.muted },
   receiptCard: { borderWidth: 1, borderColor: COLORS.ruleSoft, borderRadius: 10, padding: 12, marginBottom: 10, backgroundColor: COLORS.paperDeep },
   receiptTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   receiptBottomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' },
@@ -1303,14 +1336,14 @@ const styles = StyleSheet.create({
   /* ── Side rows ── */
   sideRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   sideRank: { width: 24, height: 24, borderRadius: 7, backgroundColor: COLORS.paperDeep, alignItems: 'center', justifyContent: 'center' },
-  sideRankText: { fontFamily: FONT.mono, fontSize: 10.5, fontWeight: '700', color: COLORS.muted },
-  sideName: { fontFamily: FONT.bodyMed, fontSize: 13, fontWeight: '600', color: COLORS.ink },
-  sideMeta: { fontFamily: FONT.mono, fontSize: 10.5, color: COLORS.muted2, marginTop: 1 },
-  sideValue: { fontFamily: FONT.mono, fontWeight: '700', fontSize: 13, color: COLORS.ink },
+  sideRankText: { fontSize: 10.5, fontWeight: '700', color: COLORS.muted },
+  sideName: { fontSize: 13, fontWeight: '600', color: COLORS.ink },
+  sideMeta: { fontSize: 10.5, color: COLORS.muted2, marginTop: 1 },
+  sideValue: { fontWeight: '700', fontSize: 13, color: COLORS.ink },
 
   /* ── Quick actions ── */
   qa: { backgroundColor: COLORS.navy, borderRadius: 14, padding: 20, marginTop: 4 },
-  qaTitle: { fontFamily: FONT.mono, color: 'rgba(241,242,245,0.5)', fontSize: 10.5, letterSpacing: 1.4, marginBottom: 12 },
+  qaTitle: { color: 'rgba(241,242,245,0.5)', fontSize: 10.5, letterSpacing: 1.4, marginBottom: 12 },
   qaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
   qaBtn: {
     backgroundColor: 'rgba(255,255,255,0.07)',
@@ -1319,19 +1352,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   qaDot: { width: 6, height: 6, borderRadius: 3 },
-  qaBtnText: { color: '#F1F2F5', fontFamily: FONT.bodyMed, fontWeight: '600', fontSize: 12.5, flexShrink: 1 },
+  qaBtnText: { color: '#F1F2F5', fontWeight: '600', fontSize: 12.5, flexShrink: 1 },
 
   /* ── Modal ── */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(20,22,32,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalCard: { width: '100%', maxWidth: 360, backgroundColor: COLORS.surface, borderRadius: 16, padding: 22, position: 'relative', overflow: 'hidden' },
-  modalTitle: { fontFamily: FONT.display, fontWeight: '700', fontSize: 17, color: COLORS.ink, marginTop: 8 },
-  modalSub: { fontFamily: FONT.mono, fontSize: 11, color: COLORS.muted2, marginTop: 4, marginBottom: 16 },
-  modalLabel: { fontFamily: FONT.bodyMed, fontSize: 12, fontWeight: '600', color: COLORS.muted, marginBottom: 6, marginTop: 10 },
-  modalInput: { borderWidth: 1, borderColor: COLORS.rule, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontFamily: FONT.mono, fontSize: 13, color: COLORS.ink },
-  modalError: { fontFamily: FONT.bodyMed, fontSize: 12, color: COLORS.coral, marginTop: 10 },
+  modalTitle: { fontWeight: '700', fontSize: 17, color: COLORS.ink, marginTop: 8 },
+  modalSub: { fontSize: 11, color: COLORS.muted2, marginTop: 4, marginBottom: 16 },
+  modalLabel: { fontSize: 12, fontWeight: '600', color: COLORS.muted, marginBottom: 6, marginTop: 10 },
+  modalInput: { borderWidth: 1, borderColor: COLORS.rule, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: COLORS.ink },
+  modalError: { fontSize: 12, color: COLORS.coral, marginTop: 10 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
   modalBtnGhost: { flex: 1, paddingVertical: 11, borderRadius: 8, borderWidth: 1, borderColor: COLORS.rule, alignItems: 'center' },
-  modalBtnGhostText: { fontFamily: FONT.bodyMed, fontWeight: '600', fontSize: 13, color: COLORS.muted },
+  modalBtnGhostText: { fontWeight: '600', fontSize: 13, color: COLORS.muted },
   modalBtnPrimary: { flex: 1, paddingVertical: 11, borderRadius: 8, backgroundColor: COLORS.indigo, alignItems: 'center' },
-  modalBtnPrimaryText: { fontFamily: FONT.bodyMed, fontWeight: '600', fontSize: 13, color: '#fff' },
+  modalBtnPrimaryText: { fontWeight: '600', fontSize: 13, color: '#fff' },
 });

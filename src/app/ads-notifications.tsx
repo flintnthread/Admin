@@ -155,6 +155,28 @@ function PencilGlyph({ color = "#fff", size = 14 }: { color?: string; size?: num
     </Svg>
   );
 }
+function GridGlyph({ color = COLORS.muted, size = 16 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={2} fill="none" />
+      <Rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={2} fill="none" />
+      <Rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth={2} fill="none" />
+      <Rect x="14" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth={2} fill="none" />
+    </Svg>
+  );
+}
+function ListIconGlyph({ color = COLORS.muted, size = 16 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Line x1="8" y1="6" x2="21" y2="6" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="8" y1="12" x2="21" y2="12" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="8" y1="18" x2="21" y2="18" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Circle cx="4" cy="6" r="1.5" fill={color} />
+      <Circle cx="4" cy="12" r="1.5" fill={color} />
+      <Circle cx="4" cy="18" r="1.5" fill={color} />
+    </Svg>
+  );
+}
 function SearchGlyph({ color = COLORS.muted2, size = 16 }: { color?: string; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
@@ -712,21 +734,26 @@ export default function AdsNotificationsScreen() {
   };
 
   const toggleButtons = (
-    <View style={[styles.viewToggleRow, { marginBottom: 0 }]}>
+    <View style={styles.viewToggleGroup}>
       <TouchableOpacity
-        style={[styles.viewToggleBtn, viewMode === "list" && styles.viewToggleBtnActive]}
-        onPress={() => setViewMode("list")}
-        activeOpacity={0.85}
-      >
-        <Text style={[styles.viewToggleIcon, viewMode === "list" && styles.viewToggleIconActive]}>☰</Text>
-      </TouchableOpacity>
-      <View style={styles.viewToggleDivider} />
-      <TouchableOpacity
-        style={[styles.viewToggleBtn, viewMode === "grid" && styles.viewToggleBtnActive]}
+        style={[
+          styles.viewToggleBoxBtn,
+          viewMode === "grid" && styles.viewToggleBoxBtnActive,
+        ]}
         onPress={() => setViewMode("grid")}
         activeOpacity={0.85}
       >
-        <Text style={[styles.viewToggleIcon, viewMode === "grid" && styles.viewToggleIconActive]}>⊞</Text>
+        <GridGlyph color={viewMode === "grid" ? "#fff" : COLORS.muted} size={16} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.viewToggleBoxBtn,
+          viewMode === "list" && styles.viewToggleBoxBtnActive,
+        ]}
+        onPress={() => setViewMode("list")}
+        activeOpacity={0.85}
+      >
+        <ListIconGlyph color={viewMode === "list" ? "#fff" : COLORS.muted} size={16} />
       </TouchableOpacity>
     </View>
   );
@@ -840,8 +867,8 @@ export default function AdsNotificationsScreen() {
                       style={styles.searchInput}
                     />
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "nowrap", gap: 8, zIndex: 100, overflow: "visible" }}>
-                    <View style={{ flex: 1, zIndex: openDropdown === "status" ? 50 : 20, overflow: "visible" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, zIndex: 100, overflow: "visible" }}>
+                    <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === "status" ? 50 : 20, overflow: "visible" }}>
                       <StatusDropdown
                         value={status}
                         onChange={setStatus}
@@ -849,7 +876,7 @@ export default function AdsNotificationsScreen() {
                         onToggle={() => setOpenDropdown((p) => (p === "status" ? null : "status"))}
                       />
                     </View>
-                    <View style={{ flex: 1, zIndex: openDropdown === "read" ? 50 : 10, overflow: "visible" }}>
+                    <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === "read" ? 50 : 10, overflow: "visible" }}>
                       <ReadDropdown
                         value={readFilter}
                         onChange={setReadFilter}
@@ -950,7 +977,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink, outlineStyle: "none" } as any,
 
-  dropdownWrap: { position: "relative", zIndex: 20 },
+  dropdownWrap: { position: "relative", zIndex: 20, minWidth: 140 },
   dropdownBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -961,6 +988,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     backgroundColor: COLORS.page,
+    minWidth: 140,
   },
   dropdownBtnText: { flex: 1, fontWeight: "600", fontSize: 12, color: COLORS.ink },
   dropdownMenu: {
@@ -980,6 +1008,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 30,
     zIndex: 999,
+    minWidth: 140,
   },
   dropdownOption: {
     flexDirection: "row",
@@ -995,27 +1024,26 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: "700", color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  viewToggleRow: {
+  /* view toggle — two separate boxed icon buttons */
+  viewToggleGroup: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.rule,
-    borderRadius: 10,
-    backgroundColor: COLORS.surface,
-    overflow: "hidden",
+    gap: 8,
   },
-  viewToggleBtn: {
-    flexDirection: "row",
+  viewToggleBoxBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "transparent",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.rule,
   },
-  viewToggleBtnActive: { backgroundColor: COLORS.navyTint },
-  viewToggleIcon: { fontSize: 18, color: COLORS.muted, lineHeight: 20 },
-  viewToggleIconActive: { color: COLORS.navyDeep, fontWeight: "700" },
-  viewToggleDivider: { width: 1, height: 20, backgroundColor: COLORS.rule },
+  viewToggleBoxBtnActive: {
+    backgroundColor: COLORS.navyDeep,
+    borderColor: COLORS.navyDeep,
+  },
 
   avatar: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontWeight: "700", fontSize: 12 },
