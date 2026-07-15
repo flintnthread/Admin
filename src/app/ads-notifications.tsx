@@ -441,10 +441,15 @@ function UpdateNotificationModal({
             </TouchableOpacity>
             {openStatus && (
               <ScrollView style={styles.selectMenu} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {["paid", "pending", "failed", "cancelled", "refunded"].map((opt) => (
+                {["paid", "pending", "failed", "cancelled", "refunded"].map((opt, index, arr) => (
                   <TouchableOpacity
                     key={opt}
-                    style={[styles.selectOption, status === opt && styles.selectOptionActive]}
+                    style={[
+                      styles.selectOption,
+                      status === opt && styles.selectOptionActive,
+                      index === 0 && { borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+                      index === arr.length - 1 && { borderBottomLeftRadius: 8, borderBottomRightRadius: 8, borderBottomWidth: 0 }
+                    ]}
                     onPress={() => { setStatus(opt as NotificationStatus); setOpenStatus(false); }}
                   >
                     <Text style={[styles.selectOptionText, status === opt && styles.selectOptionTextActive]}>
@@ -689,7 +694,7 @@ export default function AdsNotificationsScreen() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [page, setPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<"status" | "read" | null>(null);
-  
+
   const [editing, setEditing] = useState<AppNotification | null>(null);
 
   const bp: Breakpoint = measuredWidth >= 1024 ? "desktop" : measuredWidth >= 640 ? "tablet" : "phone";
@@ -1115,7 +1120,7 @@ const styles = StyleSheet.create({
   modalOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center", zIndex: 9999 },
   modalCard: { width: 400, backgroundColor: COLORS.surface, borderRadius: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
   modalCardPhone: { width: "90%" },
-  modalHeaderOrange: { backgroundColor: COLORS.orange, paddingHorizontal: 20, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  modalHeaderOrange: { backgroundColor: COLORS.orange, paddingHorizontal: 20, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   modalHeaderTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
   modalCloseIcon: { padding: 4 },
   modalBody: { padding: 24, zIndex: 10, elevation: 10 },
@@ -1123,11 +1128,11 @@ const styles = StyleSheet.create({
   selectWrap: { position: "relative", marginBottom: 24 },
   selectBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: COLORS.rule, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12 },
   selectBtnText: { fontSize: 14, color: COLORS.ink },
-  selectMenu: { position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 220, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, zIndex: 999 },
+  selectMenu: { marginTop: 4, maxHeight: 220, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 8, overflow: "hidden" },
   selectOption: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.ruleSoft },
-  selectOptionActive: { backgroundColor: COLORS.blue },
+  selectOptionActive: { backgroundColor: COLORS.orangeTint },
   selectOptionText: { fontSize: 14, color: COLORS.ink },
-  selectOptionTextActive: { color: "#fff", fontWeight: "600" },
+  selectOptionTextActive: { color: COLORS.orangeDeep, fontWeight: "600" },
   checkboxRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: COLORS.muted2, alignItems: "center", justifyContent: "center" },
   checkboxChecked: { backgroundColor: COLORS.orange, borderColor: COLORS.orange },
