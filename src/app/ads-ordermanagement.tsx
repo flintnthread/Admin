@@ -350,6 +350,35 @@ function ClockGlyph({ color, size = 17 }: { color: string; size?: number }) {
     </Svg>
   );
 }
+function GridGlyph({
+  color = COLORS.muted,
+  size = 16,
+}: {
+  color?: string;
+  size?: number;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="3" y="3" width="7" height="7" />
+      <Rect x="14" y="3" width="7" height="7" />
+      <Rect x="14" y="14" width="7" height="7" />
+      <Rect x="3" y="14" width="7" height="7" />
+    </Svg>
+  );
+}
+function ListIconGlyph({
+  color = COLORS.muted,
+  size = 16,
+}: {
+  color?: string;
+  size?: number;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </Svg>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Header — matches ads-payments.tsx style                              */
@@ -379,7 +408,7 @@ function ScreenHeader() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontWeight: "700", fontSize: 22, color: "#FFFFFF" }}>
-            Orders Management
+            Ads Order Management
           </Text>
           <Text
             style={{
@@ -552,7 +581,7 @@ function StatusDropdown({
             { backgroundColor: currentColor ?? "transparent" },
           ]}
         />
-        <Text style={styles.dropdownBtnText} numberOfLines={1}>
+        <Text style={styles.dropdownBtnText} numberOfLines={1} ellipsizeMode="tail">
           {current}
         </Text>
         <ChevronGlyph open={open} color={COLORS.navyDeep} />
@@ -585,6 +614,8 @@ function StatusDropdown({
                     styles.dropdownOptionText,
                     active && styles.dropdownOptionTextActive,
                   ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {opt.label}
                 </Text>
@@ -623,7 +654,7 @@ function BillingDropdown({
         activeOpacity={0.85}
       >
         <View style={[styles.statusDot, { backgroundColor: "transparent" }]} />
-        <Text style={styles.dropdownBtnText} numberOfLines={1}>
+        <Text style={styles.dropdownBtnText} numberOfLines={1} ellipsizeMode="tail">
           {current}
         </Text>
         <ChevronGlyph open={open} color={COLORS.navyDeep} />
@@ -650,6 +681,8 @@ function BillingDropdown({
                     styles.dropdownOptionText,
                     active && styles.dropdownOptionTextActive,
                   ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {opt.label}
                 </Text>
@@ -688,41 +721,26 @@ function FilterBar({
   >(null);
 
   const toggleButtons = (
-    <View style={[styles.viewToggleRow, { marginBottom: 0 }]}>
+    <View style={styles.viewToggleGroup}>
       <TouchableOpacity
         style={[
-          styles.viewToggleBtn,
-          viewMode === "list" && styles.viewToggleBtnActive,
-        ]}
-        onPress={() => setViewMode("list")}
-        activeOpacity={0.85}
-      >
-        <Text
-          style={[
-            styles.viewToggleIcon,
-            viewMode === "list" && styles.viewToggleIconActive,
-          ]}
-        >
-          {"\u2630"}
-        </Text>
-      </TouchableOpacity>
-      <View style={styles.viewToggleDivider} />
-      <TouchableOpacity
-        style={[
-          styles.viewToggleBtn,
-          viewMode === "grid" && styles.viewToggleBtnActive,
+          styles.viewToggleBoxBtn,
+          viewMode === "grid" && styles.viewToggleBoxBtnActive,
         ]}
         onPress={() => setViewMode("grid")}
         activeOpacity={0.85}
       >
-        <Text
-          style={[
-            styles.viewToggleIcon,
-            viewMode === "grid" && styles.viewToggleIconActive,
-          ]}
-        >
-          {"\u229e"}
-        </Text>
+        <GridGlyph color={viewMode === "grid" ? "#fff" : COLORS.muted} size={16} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.viewToggleBoxBtn,
+          viewMode === "list" && styles.viewToggleBoxBtnActive,
+        ]}
+        onPress={() => setViewMode("list")}
+        activeOpacity={0.85}
+      >
+        <ListIconGlyph color={viewMode === "list" ? "#fff" : COLORS.muted} size={16} />
       </TouchableOpacity>
     </View>
   );
@@ -785,6 +803,7 @@ function FilterBar({
             <View
               style={{
                 flex: 1,
+                minWidth: 0,
                 zIndex: openDropdown === "status" ? 50 : 20,
                 overflow: "visible",
               }}
@@ -801,6 +820,7 @@ function FilterBar({
             <View
               style={{
                 flex: 1,
+                minWidth: 0,
                 zIndex: openDropdown === "billing" ? 50 : 10,
                 overflow: "visible",
               }}
@@ -1210,7 +1230,7 @@ export default function AdsOrderManagementScreen() {
               />
               <StatCard
                 icon={<ClockGlyph color={COLORS.orange} size={17} />}
-                label="PENDING AMT"
+                label="PENDING AMOUNT"
                 value={fmtINR(stats.pendingAmt)}
                 iconBg={COLORS.orange + "14"}
                 valueColor={COLORS.orange}
@@ -1241,7 +1261,7 @@ export default function AdsOrderManagementScreen() {
               />
               <StatCard
                 icon={<ClockGlyph color={COLORS.orange} size={17} />}
-                label="PENDING AMT"
+                label="PENDING AMOUNT"
                 value={fmtINR(stats.pendingAmt)}
                 iconBg={COLORS.orange + "14"}
                 valueColor={COLORS.orange}
@@ -1400,7 +1420,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink, outlineStyle: "none" } as any,
 
   /* dropdowns */
-  dropdownWrap: { position: "relative", zIndex: 20 },
+  dropdownWrap: { position: "relative", zIndex: 20, width: 140 },
   dropdownBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1411,8 +1431,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     backgroundColor: COLORS.page,
+    minWidth: 0,
+    flexShrink: 1,
   },
-  dropdownBtnText: { flex: 1, fontWeight: "600", fontSize: 12, color: COLORS.ink },
+  dropdownBtnText: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    fontWeight: "600",
+    fontSize: 12,
+    color: COLORS.ink,
+  },
   dropdownMenu: {
     position: "absolute",
     top: "100%",
@@ -1441,32 +1470,30 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.ruleSoft,
   },
   dropdownOptionActive: { backgroundColor: COLORS.navyTint },
-  dropdownOptionText: { fontSize: 12.5, color: COLORS.ink },
+  dropdownOptionText: { flex: 1, minWidth: 0, fontSize: 12.5, color: COLORS.ink },
   dropdownOptionTextActive: { fontWeight: "700", color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  /* view toggle */
-  viewToggleRow: {
+  /* view toggle — two separate boxed icon buttons */
+  viewToggleGroup: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.rule,
-    borderRadius: 10,
-    backgroundColor: COLORS.surface,
-    overflow: "hidden",
+    gap: 8,
   },
-  viewToggleBtn: {
-    flexDirection: "row",
+  viewToggleBoxBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "transparent",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.rule,
   },
-  viewToggleBtnActive: { backgroundColor: COLORS.navyTint },
-  viewToggleIcon: { fontSize: 18, color: COLORS.sub, lineHeight: 20 },
-  viewToggleIconActive: { color: COLORS.navyDeep, fontWeight: "700" },
-  viewToggleDivider: { width: 1, height: 20, backgroundColor: COLORS.rule },
+  viewToggleBoxBtnActive: {
+    backgroundColor: COLORS.navyDeep,
+    borderColor: COLORS.navyDeep,
+  },
 
   /* shared bits */
   avatar: {

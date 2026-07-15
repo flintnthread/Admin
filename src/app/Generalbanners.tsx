@@ -35,25 +35,24 @@ import {
 } from "lucide-react-native";
 
 const initialBanners = [
-  { id: "1", title: "Women's Chanderi Sarees", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#f6d9d9", text: "Flat 70% Off" },
-  { id: "2", title: "Cute Couple T-Shirt Set", category: "tshirts", date: "07 Jun, 2026", status: "Active", color: "#f3b7b7", text: "Up to 50% Off" },
-  { id: "3", title: "Stylish Travel Backpacks", category: "travel backpacks", date: "07 Jun, 2026", status: "Active", color: "#cdeedd", text: "Min. 60% Off" },
-  { id: "4", title: "SilkLoom Pure Soft Linen Saree", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#dcdaf0", text: "Min. 60% Off" },
-  { id: "5", title: "One Gram Gold Jewellery Locket", category: "jewellery", date: "07 Jun, 2026", status: "Inactive", color: "#5a1f2e", text: "Up to 50% Off", dark: true },
-  { id: "6", title: "Satin Saree", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#215b7a", text: "Min. 40% Off", dark: true },
+  { id: "1", title: "Women's Chanderi Sarees", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#f6d9d9", text: "Flat 70% Off", desktopImage: "https://images.unsplash.com/photo-1583391733958-d25e07fac0ce?q=80&w=2000&auto=format&fit=crop" },
+  { id: "2", title: "Cute Couple T-Shirt Set", category: "tshirts", date: "07 Jun, 2026", status: "Active", color: "#f3b7b7", text: "Up to 50% Off", desktopImage: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=2000&auto=format&fit=crop" },
+  { id: "3", title: "Stylish Travel Backpacks", category: "travel backpacks", date: "07 Jun, 2026", status: "Active", color: "#cdeedd", text: "Min. 60% Off", desktopImage: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=2000&auto=format&fit=crop" },
+  { id: "4", title: "SilkLoom Pure Soft Linen Saree", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#dcdaf0", text: "Min. 60% Off", desktopImage: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=2000&auto=format&fit=crop" },
+  { id: "5", title: "One Gram Gold Jewellery Locket", category: "jewellery", date: "07 Jun, 2026", status: "Inactive", color: "#5a1f2e", text: "Up to 50% Off", dark: true, desktopImage: "https://images.unsplash.com/photo-1599643478524-fb66f728e6f1?q=80&w=2000&auto=format&fit=crop" },
+  { id: "6", title: "Satin Saree", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#215b7a", text: "Min. 40% Off", dark: true, desktopImage: "https://images.unsplash.com/photo-1589465885855-4081075be8c0?q=80&w=2000&auto=format&fit=crop" },
 ];
 
 const emptyForm = {
   title: "",
   category: "",
   text: "",
-  buttonUrl: "",
   buttonText: "Shop Now",
   textPosition: "Left",
   bannerSize: "Full Width",
   status: "Active",
   desktopImage: "",
-  mobileImage: "",
+  imageUrl: "",
 };
 
 const TEXT_POSITIONS = ["Left", "Center", "Right"];
@@ -170,6 +169,11 @@ export default function BannerManagement() {
   // Grid view is the default view when the screen opens
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
+  // Filter picker state
+  const filterBtnRef = useRef<any>(null);
+  const [filterPickerOpen, setFilterPickerOpen] = useState(false);
+  const [filterDropPos, setFilterDropPos] = useState({ top: 200, right: 20 });
+
   // SweetAlert state
   const [sweetVisible, setSweetVisible] = useState(false);
   const [sweetType, setSweetType] = useState<SAlertType>("add-confirm");
@@ -197,21 +201,37 @@ export default function BannerManagement() {
   const numCols = isWeb ? 3 : isTablet ? 2 : 1;
   const gridCardWidth = numCols === 3 ? "31.5%" : numCols === 2 ? "48%" : "100%";
 
-  async function pickImage(field: "desktopImage" | "mobileImage") {
-    if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission required", "Please allow access to your photo library.");
-        return;
+  async function pickImage(field: "desktopImage") {
+    try {
+      if (Platform.OS === "web") {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          if (file) {
+            const uri = URL.createObjectURL(file);
+            setForm((prev) => ({ ...prev, [field]: uri }));
+          }
+        };
+        input.click();
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission required", "Please allow access to your photo library.");
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.85,
+        });
+        if (!result.canceled && result.assets.length > 0) {
+          setForm((f) => ({ ...f, [field]: result.assets[0].uri }));
+        }
       }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.85,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setForm((f) => ({ ...f, [field]: result.assets[0].uri }));
+    } catch (err) {
+      console.error(err);
     }
   }
 
@@ -227,13 +247,12 @@ export default function BannerManagement() {
       title: banner.title,
       category: banner.category || "",
       text: banner.text || "",
-      buttonUrl: banner.buttonUrl || "",
       buttonText: banner.buttonText || "Shop Now",
       textPosition: banner.textPosition || "Left",
       bannerSize: banner.bannerSize || "Full Width",
       status: banner.status || "Active",
       desktopImage: banner.desktopImage || "",
-      mobileImage: banner.mobileImage || "",
+      imageUrl: banner.imageUrl || "",
     });
     setModalVisible(true);
   }
@@ -246,7 +265,12 @@ export default function BannerManagement() {
 
   // Trigger SweetAlert for Save (Add or Edit)
   function handleSavePress() {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || !form.category.trim() || !form.text.trim() || !form.buttonText.trim()) {
+      const msg = "Please fill in all required fields (marked with *)";
+      if (Platform.OS === "web") { if (typeof window !== "undefined") window.alert(msg); }
+      else Alert.alert("Required Fields", msg);
+      return;
+    }
     setPendingForm({ ...form });
     setSweetType(editingId ? "edit-confirm" : "add-confirm");
     setSweetVisible(true);
@@ -256,7 +280,8 @@ export default function BannerManagement() {
   function handleSweetConfirm() {
     if (sweetType === "add-confirm") {
       const palette = ["#fde9c8", "#c9ece6", "#e3d9f7", "#e2f0c4", "#cfeaf5"];
-      const newBanner = {
+      const effectiveImage = pendingForm.imageUrl?.trim() || pendingForm.desktopImage || "";
+      const newBanner: any = {
         id: String(Date.now()),
         title: pendingForm.title,
         category: pendingForm.category || "general",
@@ -264,18 +289,20 @@ export default function BannerManagement() {
         status: pendingForm.status,
         color: palette[banners.length % palette.length],
         text: pendingForm.text,
-        buttonUrl: pendingForm.buttonUrl,
         buttonText: pendingForm.buttonText,
         textPosition: pendingForm.textPosition,
         bannerSize: pendingForm.bannerSize,
+        desktopImage: effectiveImage,
+        imageUrl: pendingForm.imageUrl || "",
       };
       setBanners((prev) => [newBanner, ...prev]);
       setSweetType("add-success");
     } else if (sweetType === "edit-confirm") {
+      const effectiveImage = pendingForm.imageUrl?.trim() || pendingForm.desktopImage || "";
       setBanners((prev) =>
         prev.map((b) =>
           b.id === editingId
-            ? { ...b, title: pendingForm.title, category: pendingForm.category || b.category, text: pendingForm.text, buttonUrl: pendingForm.buttonUrl, buttonText: pendingForm.buttonText, textPosition: pendingForm.textPosition, bannerSize: pendingForm.bannerSize, status: pendingForm.status }
+            ? { ...b, title: pendingForm.title, category: pendingForm.category || b.category, text: pendingForm.text, buttonText: pendingForm.buttonText, textPosition: pendingForm.textPosition, bannerSize: pendingForm.bannerSize, status: pendingForm.status, desktopImage: effectiveImage, imageUrl: pendingForm.imageUrl || "" }
             : b
         )
       );
@@ -392,16 +419,27 @@ export default function BannerManagement() {
                 style={[styles.viewToggleBtn, viewMode === "list" && styles.viewToggleBtnActive]}
                 onPress={() => setViewMode("list")}
               >
-                <List size={16} color={viewMode === "list" ? "#EA580C" : "#6B7280"} />
+                <List size={16} color={viewMode === "list" ? "#FFFFFF" : "#a0aec0"} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.viewToggleBtn, viewMode === "grid" && styles.viewToggleBtnActive]}
                 onPress={() => setViewMode("grid")}
               >
-                <LayoutGrid size={16} color={viewMode === "grid" ? "#EA580C" : "#6B7280"} />
+                <LayoutGrid size={16} color={viewMode === "grid" ? "#FFFFFF" : "#a0aec0"} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.filterBox} onPress={() => setPickerOpen("filter" as string)} activeOpacity={0.8}>
+            <TouchableOpacity
+              ref={filterBtnRef}
+              style={styles.filterBox}
+              onPress={() => {
+                filterBtnRef.current?.measure((_fx: number, _fy: number, _w: number, h: number, _px: number, py: number) => {
+                  setFilterDropPos({ top: py + h + 4, right: 20 });
+                  setFilterPickerOpen(true);
+                });
+                if (!filterBtnRef.current) setFilterPickerOpen(true);
+              }}
+              activeOpacity={0.8}
+            >
               {statusFilter === "All" && <Filter size={14} color="#6b7280" />}
               {statusFilter === "Active" && <CheckCircle2 size={14} color="#16a34a" />}
               {statusFilter === "Inactive" && <Circle size={14} color="#94a3b8" />}
@@ -423,8 +461,11 @@ export default function BannerManagement() {
                 <View style={styles.list}>
                   {paginatedBanners.map((banner) => (
                     <View key={banner.id} style={styles.row}>
-                      <View style={[styles.thumb, { backgroundColor: banner.color }]}>
-                        <Text style={[styles.thumbTag, !!banner.dark && { color: "#fff" }]} numberOfLines={1}>
+                      <View style={[styles.thumb, { backgroundColor: banner.color, overflow: "hidden" }]}>
+                        {!!((banner as any).imageUrl || (banner as any).desktopImage) && (
+                          <Image source={{ uri: (banner as any).imageUrl || (banner as any).desktopImage }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+                        )}
+                        <Text style={[styles.thumbTag, (!!banner.dark || !!((banner as any).imageUrl || (banner as any).desktopImage)) && { color: "#fff" }]} numberOfLines={1}>
                           {banner.text}
                         </Text>
                       </View>
@@ -468,8 +509,11 @@ export default function BannerManagement() {
                       ]}
                     >
                       {/* Banner Preview */}
-                      <View style={[styles.gridThumb, { backgroundColor: banner.color }]}>
-                        <Text style={[styles.gridThumbTag, !!banner.dark && { color: "#fff" }]} numberOfLines={2}>
+                      <View style={[styles.gridThumb, { backgroundColor: banner.color, overflow: "hidden" }]}>
+                        {!!((banner as any).imageUrl || (banner as any).desktopImage) && (
+                          <Image source={{ uri: (banner as any).imageUrl || (banner as any).desktopImage }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+                        )}
+                        <Text style={[styles.gridThumbTag, (!!banner.dark || !!((banner as any).imageUrl || (banner as any).desktopImage)) && { color: "#fff" }]} numberOfLines={2}>
                           {banner.text}
                         </Text>
                       </View>
@@ -527,24 +571,21 @@ export default function BannerManagement() {
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 8 }}>
-                <Field label="Banner Title">
+                <Field label="Banner Title" required>
                   <TextInput style={styles.input} value={form.title} onChangeText={(t) => setForm({ ...form, title: t })} placeholder="e.g. Women's Saree Collection" placeholderTextColor="#9aa0ac" />
                 </Field>
-                <Field label="Category">
+                <Field label="Category" required>
                   <TextInput style={styles.input} value={form.category} onChangeText={(t) => setForm({ ...form, category: t })} placeholder="e.g. sarees, tshirts" placeholderTextColor="#9aa0ac" />
                 </Field>
-                <Field label="Banner Text">
+                <Field label="Banner Text" required>
                   <TextInput style={[styles.input, styles.textarea]} value={form.text} onChangeText={(t) => setForm({ ...form, text: t })} placeholder="e.g. Flat 70% Off" placeholderTextColor="#9aa0ac" multiline numberOfLines={3} />
                 </Field>
-                <Field label="Button URL">
-                  <TextInput style={styles.input} value={form.buttonUrl} onChangeText={(t) => setForm({ ...form, buttonUrl: t })} placeholder="https://example.com/product/..." placeholderTextColor="#9aa0ac" autoCapitalize="none" />
-                </Field>
-                <Field label="Button Text">
+                <Field label="Button Text" required>
                   <TextInput style={styles.input} value={form.buttonText} onChangeText={(t) => setForm({ ...form, buttonText: t })} placeholder="Shop Now" placeholderTextColor="#9aa0ac" />
                 </Field>
                 <View style={styles.fieldRow}>
                   <View style={{ flex: 1 }}>
-                    <Field label="Text Position">
+                    <Field label="Text Position" required>
                       <TouchableOpacity style={styles.selectBox} onPress={() => setPickerOpen("textPosition" as string)}>
                         <Text style={styles.selectText}>{form.textPosition}</Text>
                         <ChevronDown size={14} color="#6b7280" />
@@ -552,7 +593,7 @@ export default function BannerManagement() {
                     </Field>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Field label="Banner Size">
+                    <Field label="Banner Size" required>
                       <TouchableOpacity style={styles.selectBox} onPress={() => setPickerOpen("bannerSize" as string)}>
                         <Text style={styles.selectText}>{form.bannerSize}</Text>
                         <ChevronDown size={14} color="#6b7280" />
@@ -560,7 +601,7 @@ export default function BannerManagement() {
                     </Field>
                   </View>
                 </View>
-                <Field label="Desktop Image (2100×700)">
+                <Field label="Banner Image" required>
                   <TouchableOpacity style={styles.fileBox} onPress={() => pickImage("desktopImage")} activeOpacity={0.75}>
                     <View style={styles.fileInner}>
                       <View style={styles.fileIconWrap}>
@@ -580,27 +621,22 @@ export default function BannerManagement() {
                     </View>
                   )}
                 </Field>
-                <Field label="Mobile Image (940×600) — Optional">
-                  <TouchableOpacity style={styles.fileBox} onPress={() => pickImage("mobileImage")} activeOpacity={0.75}>
-                    <View style={styles.fileInner}>
-                      <View style={styles.fileIconWrap}>
-                        <Upload size={14} color="#f97316" />
-                      </View>
-                      <Text style={styles.fileText} numberOfLines={1}>
-                        {form.mobileImage ? "Image selected" : "Choose File — No file chosen"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                  {!!form.mobileImage && (
-                    <View style={styles.previewWrap}>
-                      <Image source={{ uri: form.mobileImage }} style={styles.previewImg} resizeMode="cover" />
-                      <TouchableOpacity style={styles.previewRemove} onPress={() => setForm((f) => ({ ...f, mobileImage: "" }))}>
-                        <X size={12} color="#fff" />
-                      </TouchableOpacity>
+                <Field label="Image URL (Optional)">
+                  <TextInput
+                    style={styles.input}
+                    value={form.imageUrl}
+                    onChangeText={(t) => setForm({ ...form, imageUrl: t })}
+                    placeholder="https://example.com/banner-image.jpg"
+                    placeholderTextColor="#9aa0ac"
+                    autoCapitalize="none"
+                  />
+                  {!!form.imageUrl?.trim() && (
+                    <View style={[styles.previewWrap, { marginTop: 8 }]}>
+                      <Image source={{ uri: form.imageUrl.trim() }} style={styles.previewImg} resizeMode="cover" />
                     </View>
                   )}
                 </Field>
-                <Field label="Status">
+                <Field label="Status" required>
                   <TouchableOpacity style={styles.selectBox} onPress={() => setPickerOpen("status" as string)}>
                     <Text style={styles.selectText}>{form.status}</Text>
                     <ChevronDown size={14} color="#6b7280" />
@@ -612,7 +648,11 @@ export default function BannerManagement() {
                   <X size={16} color="#374151" />
                   <Text style={styles.btnGhostText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.btnPrimary, !form.title.trim() && { opacity: 0.5 }]} onPress={handleSavePress} disabled={!form.title.trim()}>
+                <TouchableOpacity
+                  style={[styles.btnPrimary, (!form.title.trim() || !form.category.trim() || !form.text.trim() || !form.buttonText.trim()) && { opacity: 0.5 }]}
+                  onPress={handleSavePress}
+                  disabled={!form.title.trim() || !form.category.trim() || !form.text.trim() || !form.buttonText.trim()}
+                >
                   <Save size={16} color="#fff" />
                   <Text style={styles.btnPrimaryText}>{editingId ? "Update Banner" : "Add Banner"}</Text>
                 </TouchableOpacity>
@@ -621,28 +661,57 @@ export default function BannerManagement() {
           </View>
         </Modal>
 
-        {/* Option picker modal */}
+        {/* Option picker modal (form fields only) */}
         <Modal visible={pickerOpen !== null} transparent animationType="fade" onRequestClose={() => setPickerOpen(null)}>
           <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setPickerOpen(null)}>
             <View style={[styles.optionSheet, isWeb && styles.optionSheetWeb]}>
-              {(pickerOpen === "textPosition" ? TEXT_POSITIONS : pickerOpen === "bannerSize" ? BANNER_SIZES : pickerOpen === "status" ? STATUSES : ["All", "Active", "Inactive"]).map((opt) => (
+              {(pickerOpen === "textPosition" ? TEXT_POSITIONS : pickerOpen === "bannerSize" ? BANNER_SIZES : pickerOpen === "status" ? STATUSES : []).map((opt) => (
                 <TouchableOpacity key={opt} style={styles.optionRow} onPress={() => {
-                  if (pickerOpen === "filter") setStatusFilter(opt);
-                  else if (pickerOpen) setForm((f) => ({ ...f, [pickerOpen]: opt }));
+                  if (pickerOpen) setForm((f) => ({ ...f, [pickerOpen]: opt }));
                   setPickerOpen(null);
                 }}>
-                  {pickerOpen === "filter" && (
-                    <View style={{ marginRight: 10 }}>
-                      {opt === "All" && <Filter size={16} color="#6b7280" />}
-                      {opt === "Active" && <CheckCircle2 size={16} color="#16a34a" />}
-                      {opt === "Inactive" && <Circle size={16} color="#94a3b8" />}
-                    </View>
-                  )}
+                  <Text style={styles.optionText}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Filter picker — positioned below the filter button */}
+        <Modal visible={filterPickerOpen} transparent animationType="fade" onRequestClose={() => setFilterPickerOpen(false)}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setFilterPickerOpen(false)}>
+            <View style={{
+              position: "absolute",
+              top: filterDropPos.top,
+              right: filterDropPos.right,
+              backgroundColor: "#fff",
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: "#e2e4ea",
+              minWidth: 170,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 10,
+              overflow: "hidden",
+            }}>
+              {["All", "Active", "Inactive"].map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.optionRow, opt === statusFilter && { backgroundColor: "#f0f4ff" }]}
+                  onPress={() => { setStatusFilter(opt); setFilterPickerOpen(false); }}
+                >
+                  <View style={{ marginRight: 10 }}>
+                    {opt === "All" && <Filter size={16} color="#6b7280" />}
+                    {opt === "Active" && <CheckCircle2 size={16} color="#16a34a" />}
+                    {opt === "Inactive" && <Circle size={16} color="#94a3b8" />}
+                  </View>
                   <Text style={[
                     styles.optionText,
-                    pickerOpen === "filter" && opt === "Active" && { color: "#16a34a", fontWeight: "700" },
-                    pickerOpen === "filter" && opt === "Inactive" && { color: "#94a3b8" },
-                    pickerOpen === "filter" && opt === statusFilter && { fontWeight: "700" },
+                    opt === "Active" && { color: "#16a34a", fontWeight: "700" },
+                    opt === "Inactive" && { color: "#94a3b8" },
+                    opt === statusFilter && { fontWeight: "700" },
                   ]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
@@ -663,10 +732,12 @@ export default function BannerManagement() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldLabel}>
+        {label}{required ? <Text style={{ color: "#ef4444" }}> *</Text> : null}
+      </Text>
       {children}
     </View>
   );
@@ -740,9 +811,9 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, color: "#1f2430" },
 
   // View Toggle
-  viewToggleGroup: { flexDirection: "row", backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e4ea", borderRadius: 10, padding: 4, gap: 4 },
+  viewToggleGroup: { flexDirection: "row", backgroundColor: "#151D4F", borderWidth: 1, borderColor: "#151D4F", borderRadius: 10, padding: 4, gap: 4 },
   viewToggleBtn: { padding: 6, borderRadius: 6 },
-  viewToggleBtnActive: { backgroundColor: "#fff5f0" },
+  viewToggleBtnActive: { backgroundColor: "rgba(255,255,255,0.18)" },
 
   // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", marginTop: 16, paddingBottom: 16 },

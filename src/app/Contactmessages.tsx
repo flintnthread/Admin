@@ -160,9 +160,9 @@ const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pe
     { icon: "clock" as const, value: String(pending), label: "Pending", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
   ];
   return (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false} 
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
       style={{ marginTop: -36, zIndex: 10, marginBottom: 16 }}
     >
