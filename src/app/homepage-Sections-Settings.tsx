@@ -22,23 +22,19 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Platform,
-  Alert,
   DimensionValue,
   Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError } from '@/lib/sweetAlert';
 import {
   fetchHomepageSections,
   saveHomepageSections,
   SECTION_UI_TO_KEY,
   isSectionVisible,
 } from '@/services/cmsApi';
-// SweetAlert2 only runs in a DOM environment; native platforms fall back to
-// the built-in Alert API. Your project already loads swal2 styles globally
-// in admin-layout.tsx, so this reuses the same library/theme.
-import Swal from 'sweetalert2';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -59,27 +55,6 @@ const COLORS = {
   red: '#c94b4b',
   border: '#e9ebf1',
 };
-
-// ---------------------------------------------------------------------------
-// Themed alert — SweetAlert2 on web (matches the rest of the admin panel),
-// falls back to React Native's Alert on iOS/Android where swal2 can't run.
-// ---------------------------------------------------------------------------
-type AlertKind = 'success' | 'error' | 'warning' | 'info';
-
-function showThemedAlert({ title, text, icon = 'success' }: { title: string; text?: string; icon?: AlertKind }) {
-  if (Platform.OS === 'web') {
-    Swal.fire({
-      title,
-      text,
-      icon,
-      confirmButtonColor: COLORS.orange,
-      background: COLORS.white,
-      color: COLORS.textDark,
-    });
-  } else {
-    Alert.alert(title, text);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Data — mirrors the sections/state from the current admin page
@@ -377,22 +352,10 @@ export default function HomepageSectionsSettingsScreen() {
       await saveHomepageSections(buildSectionPayload(groups));
       setSavedGroups(groups);
 
-      if (Platform.OS === 'web') {
-        showThemedAlert({
-          title: 'Saved',
-          text: 'Homepage sections updated.',
-          icon: 'success',
-        });
-      } else {
-        setSuccessAlert({ visible: true, title: 'Saved', message: 'Homepage sections updated.' });
-      }
+      void sweetCrud.saved('Homepage sections');
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to save homepage sections.');
-      if (Platform.OS === 'web') {
-        showThemedAlert({ title: 'Error', text: msg, icon: 'error' });
-      } else {
-        Alert.alert('Error', msg);
-      }
+      void sweetError('Error', msg);
     } finally {
       setSaving(false);
     }

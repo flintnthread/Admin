@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { mapProductListRow } from "@/lib/mappers";
 import { deleteProduct, fetchAdminCatalogProducts } from "@/services/productApi";
 import AdminLayout from "@/components/admin-layout";
@@ -557,7 +558,7 @@ const ProductActionSheet: React.FC<ActionSheetProps> = ({ product, onClose, onDe
         if (label === "Delete Product") {
             onClose();
             setTimeout(() => {
-                onDelete(product.id);
+                void onDelete(product.id);
             }, 300);
         } else if (label === "View Product") {
             onClose();
@@ -643,10 +644,7 @@ const WebProductActionPopup: React.FC<ActionSheetProps> = ({ product, onClose, o
     const handleAction = (label: string) => {
         if (label === "Delete Product") {
             onClose();
-            if (typeof window !== "undefined") {
-                const confirmed = window.confirm(`Delete "${product.name}"?`);
-                if (confirmed) onDelete(product.id);
-            }
+            void onDelete(product.id);
         } else if (label === "View Product") {
             onClose();
             router.push({ pathname: '/productDetails', params: { id: product.id } });
@@ -818,15 +816,17 @@ const WebProductsScreen: React.FC = () => {
     const locationProduct = products.find(p => p.id === locationProductId);
 
     const handleDelete = useCallback(async (id: string) => {
+        const product = products.find(p => p.id === id);
+        if (!product) return;
+        if (!(await sweetCrud.confirmDelete("Product", product.name))) return;
         try {
             await deleteProduct(id);
             setProducts(prev => prev.filter(p => p.id !== id));
+            void sweetCrud.deleted("Product");
         } catch (e) {
-            if (typeof window !== "undefined") {
-                window.alert(getApiErrorMessage(e, "Failed to delete product."));
-            }
+            void sweetError("Error", getApiErrorMessage(e, "Failed to delete product."));
         }
-    }, []);
+    }, [products]);
     const handleUpdateLocation = useCallback((id: string) => setLocationProductId(id), []);
 
     const totalCount = products.length;
@@ -1699,15 +1699,17 @@ const MobileProductsScreen: React.FC = () => {
     const [applied, setApplied] = useState({ category: "All", subcategory: "All", color: "All", size: "All", lowPrice: PRICE_MIN, highPrice: PRICE_MAX });
 
     const handleDelete = useCallback(async (id: string) => {
+        const product = products.find(p => p.id === id);
+        if (!product) return;
+        if (!(await sweetCrud.confirmDelete("Product", product.name))) return;
         try {
             await deleteProduct(id);
             setProducts(prev => prev.filter(p => p.id !== id));
+            void sweetCrud.deleted("Product");
         } catch (e) {
-            if (typeof window !== "undefined") {
-                window.alert(getApiErrorMessage(e, "Failed to delete product."));
-            }
+            void sweetError("Error", getApiErrorMessage(e, "Failed to delete product."));
         }
-    }, []);
+    }, [products]);
     const handleUpdateLocation = useCallback((id: string) => setLocationProductId(id), []);
 
     const totalCount = products.length;

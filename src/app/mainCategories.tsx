@@ -2,6 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
   createMainCategory,
   createSubcategory,
@@ -14,7 +15,6 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -27,7 +27,6 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
-import Swal from "sweetalert2";
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 
@@ -667,15 +666,15 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a category name.");
+      void sweetWarning("Required", "Please enter a category name.");
       return;
     }
     if (!image) {
-      Alert.alert("Required", "Please upload a category image.");
+      void sweetWarning("Required", "Please upload a category image.");
       return;
     }
     if (!gst) {
-      Alert.alert("Required", "Please select GST percentage.");
+      void sweetWarning("Required", "Please select GST percentage.");
       return;
     }
     onSave({ id: editData?.id, name, image, hsn, gst, status, type: "Main Category" });
@@ -878,15 +877,15 @@ const AddCategoryModal = ({
 
   const handleSave = () => {
     if (!mainCat) {
-      Alert.alert("Required", "Please select a main category.");
+      void sweetWarning("Required", "Please select a main category.");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a category name.");
+      void sweetWarning("Required", "Please enter a category name.");
       return;
     }
     if (!gst) {
-      Alert.alert("Required", "Please select GST percentage.");
+      void sweetWarning("Required", "Please select GST percentage.");
       return;
     }
     const selectedMain = mainCategories.find(c => c.name === mainCat);
@@ -1549,6 +1548,13 @@ export default function MainCategories() {
   };
 
   const handleSave = async (data: any) => {
+    const entityLabel = data.type === "Main Category" ? "Main category" : "Category";
+    const isUpdate = !!data.id;
+    if (isUpdate) {
+      if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) return;
+    }
     try {
       // Convert GST percentage string to number
       const gstValue = data.gst ? parseFloat(data.gst.replace('%', '')) : undefined;
@@ -1601,54 +1607,26 @@ export default function MainCategories() {
         setCurrentPage(1);
       }
       setEditCat(null);
+      if (isUpdate) {
+        void sweetCrud.updated(entityLabel);
+      } else {
+        void sweetCrud.added(entityLabel);
+      }
     } catch (error) {
       console.error("Failed to save category:", error);
-      Alert.alert("Error", "Failed to save category. Please try again.");
+      void sweetError("Error", "Failed to save category. Please try again.");
     }
   };
 
   const handleDelete = async (cat: Category) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteCategory(cat.id);
-        setCategories((prev) => prev.filter((c) => c.id !== cat.id));
-        if (Platform.OS === "web") {
-          Swal.fire({
-            icon: "success",
-            title: "Deleted!",
-            text: `"${cat.name}" deleted successfully!`,
-            confirmButtonColor: "#151D4F",
-          });
-        }
-      } catch (error) {
-        console.error("Failed to delete category:", error);
-        Alert.alert("Error", "Failed to delete category. Please try again.");
-      }
-    };
-
-    if (Platform.OS === "web") {
-      Swal.fire({
-        title: "Are you sure?",
-        text: `You won't be able to revert this!`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#151D4F",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!"
-      }).then((result) => {
-        if (result.isConfirmed) {
-          confirmDelete();
-        }
-      });
-    } else {
-      Alert.alert(
-        "Confirm Delete",
-        `Are you sure you want to delete "${cat.name}"?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: confirmDelete }
-        ]
-      );
+    if (!(await sweetCrud.confirmDelete("Category", cat.name))) return;
+    try {
+      await deleteCategory(cat.id);
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      void sweetCrud.deleted("Category");
+    } catch (error) {
+      console.error("Failed to delete category:", error);
+      void sweetError("Error", "Failed to delete category. Please try again.");
     }
   };
 

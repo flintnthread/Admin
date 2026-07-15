@@ -8,7 +8,6 @@ import {
   TextInput,
   Modal as RNModal,
   Platform,
-  Alert,
   useWindowDimensions,
   Animated as RNAnimated,
   DimensionValue,
@@ -17,6 +16,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetError, sweetSuccess, sweetWarning } from '@/lib/sweetAlert';
 import { formatDate } from '@/lib/format';
 import { fetchSellers } from '@/services/sellerApi';
 import { sendSellerEmails } from '@/services/emailApi';
@@ -102,44 +102,6 @@ function useBreakpoint() {
   const isLaptop = width >= 1024;
   const isDesktop = width >= 1440;
   return { width, isTablet, isLaptop, isDesktop };
-}
-
-// -----------------------------
-// Notification helper (SweetAlert2 web / Alert native)
-// -----------------------------
-function notify(kind: 'success' | 'error' | 'confirm', title: string, text?: string, onConfirm?: () => void) {
-  if (Platform.OS === 'web') {
-    // @ts-ignore - injected via CDN / index.html per project convention
-    const swal = (typeof window !== 'undefined' && (window as any).Swal) || null;
-    if (swal) {
-      if (kind === 'confirm') {
-        swal
-          .fire({
-            title,
-            text,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: COLORS.orange,
-            cancelButtonColor: COLORS.textMuted,
-            confirmButtonText: 'Send',
-          })
-          .then((res: any) => {
-            if (res.isConfirmed && onConfirm) onConfirm();
-          });
-        return;
-      }
-      swal.fire({ title, text, icon: kind, confirmButtonColor: COLORS.navy });
-      return;
-    }
-  }
-  if (kind === 'confirm') {
-    Alert.alert(title, text, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Send', onPress: onConfirm },
-    ]);
-  } else {
-    Alert.alert(title, text);
-  }
 }
 
 // -----------------------------
@@ -231,7 +193,7 @@ function EmailModal({ visible, onClose, mode, seller, sellerCount, onSend, isDes
 
   const handleSend = () => {
     if (!subject.trim() || !message.trim()) {
-      notify('error', 'Missing information', 'Please enter a subject and message.');
+      void sweetWarning('Missing information', 'Please enter a subject and message.');
       return;
     }
     onSend(subject, message);
@@ -383,14 +345,14 @@ export default function SellerEmailsScreen() {
     try {
       if (emailMode === 'single' && activeSeller) {
         await sendSellerEmails({ subject, message, recipients: [activeSeller.id] });
-        notify('success', 'Email sent', `Your message was sent to ${activeSeller.name}.`);
+        void sweetSuccess('Email sent', `Your message was sent to ${activeSeller.name}.`);
       } else {
         await sendSellerEmails({ subject, message, sendAll: true });
-        notify('success', 'Emails queued', `Your message is being sent to all ${sellers.length} registered sellers.`);
+        void sweetSuccess('Emails queued', `Your message is being sent to all ${sellers.length} registered sellers.`);
       }
       setEmailModalVisible(false);
     } catch (e) {
-      notify('error', 'Send failed', getApiErrorMessage(e, 'Failed to send email.'));
+      void sweetError('Send failed', getApiErrorMessage(e, 'Failed to send email.'));
     }
   };
 

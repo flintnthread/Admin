@@ -16,7 +16,6 @@ import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Dimensions,
     KeyboardAvoidingView,
     Modal,
@@ -32,6 +31,7 @@ import {
 } from "react-native";
 
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
     createSize,
     deleteSize,
@@ -621,39 +621,11 @@ const EditSizeModal: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────
-// DELETE CONFIRM MODAL
-// ─────────────────────────────────────────────────────────────
-const DeleteModal: React.FC<{
-  visible: boolean;
-  onClose: () => void;
-  onDelete: () => void;
-}> = ({ visible, onClose, onDelete }) => (
-  <ModalWrapper visible={visible} title="Confirm Delete" onClose={onClose}>
-    <View style={{ alignItems: "center", paddingVertical: 16 }}>
-      {/* Bootstrap: trash3 large */}
-      <BI name="trash3" size={52} color="#e07820" />
-      <Text style={[S.deleteTitle, { marginTop: 12 }]}>Are you sure?</Text>
-      <Text style={S.deleteSubtitle}>
-        {"You won't be able to revert this action.\nThis will permanently delete the size."}
-      </Text>
-    </View>
-    <ModalFooter
-      onCancel={onClose}
-      onConfirm={onDelete}
-      confirmLabel="Delete"
-      confirmIcon="trash3"         // Bootstrap: trash3
-      danger
-    />
-  </ModalWrapper>
-);
-
-// ─────────────────────────────────────────────────────────────
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────
 type ModalState =
   | { type: "add" }
   | { type: "edit"; size: SizeItem }
-  | { type: "delete"; size: SizeItem }
   | null;
 
 export default function SizesManagement() {
@@ -726,6 +698,7 @@ export default function SizesManagement() {
   }, [loadSizes]);
 
   async function handleAdd(d: { name: string; code: string; status: "Active" | "Inactive" }) {
+    if (!(await sweetCrud.confirmAdd("Size", d.name))) return;
     setSaving(true);
     try {
       const created = await createSize(d);
@@ -736,14 +709,16 @@ export default function SizesManagement() {
       setPage(1);
       setSearch("");
       setModal(null);
+      void sweetCrud.added("Size");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not add size."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not add size."));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleUpdate(updated: SizeItem) {
+    if (!(await sweetCrud.confirmUpdate("Size", updated.name))) return;
     setSaving(true);
     try {
       const saved = await updateSize(updated.id, {
@@ -756,21 +731,24 @@ export default function SizesManagement() {
       setCatalogFilter(classifySizeCatalog(mapped.name, mapped.code));
       setPage(1);
       setModal(null);
+      void sweetCrud.updated("Size");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not update size."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not update size."));
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(size: SizeItem) {
+    if (!(await sweetCrud.confirmDelete("Size", size.name))) return;
     setSaving(true);
     try {
-      await deleteSize(id);
-      setSizes((prev) => prev.filter((s) => s.id !== id));
+      await deleteSize(size.id);
+      setSizes((prev) => prev.filter((s) => s.id !== size.id));
       setModal(null);
+      void sweetCrud.deleted("Size");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not delete size."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not delete size."));
     } finally {
       setSaving(false);
     }
@@ -950,7 +928,7 @@ export default function SizesManagement() {
                     item={item}
                     idx={(safePage - 1) * PAGE_SIZE + index}
                     onEdit={s => setModal({ type: "edit", size: s })}
-                    onDelete={s => setModal({ type: "delete", size: s })}
+                    onDelete={s => void handleDelete(s)}
                     cardWidth="100%"
                   />
                 </View>
@@ -979,7 +957,7 @@ export default function SizesManagement() {
                         item={item}
                         idx={index}
                         onEdit={s => setModal({ type: "edit", size: s })}
-                        onDelete={s => setModal({ type: "delete", size: s })}
+                        onDelete={s => void handleDelete(s)}
                       />
                     ))}
                   </View>
@@ -1003,11 +981,6 @@ export default function SizesManagement() {
         size={modal?.type === "edit" ? modal.size : null}
         onClose={() => setModal(null)}
         onUpdate={handleUpdate}
-      />
-      <DeleteModal
-        visible={modal?.type === "delete"}
-        onClose={() => setModal(null)}
-        onDelete={() => modal?.type === "delete" && handleDelete(modal.size.id)}
       />
     </AdminLayout>
   );

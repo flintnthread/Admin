@@ -8,7 +8,6 @@ import {
   TextInput,
   Modal as RNModal,
   Platform,
-  Alert,
   useWindowDimensions,
   Animated as RNAnimated,
   DimensionValue,
@@ -18,6 +17,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
   createPerformanceAd,
   deletePerformanceAd,
@@ -287,18 +287,6 @@ export default function PerformanceAdsScreen() {
   const { isTablet, isLaptop, isDesktop, columns, width } = useBreakpoint();
   const isWeb = Platform.OS === 'web';
 
-  const [alertState, setAlertState] = useState<{
-    visible: boolean;
-    kind: 'success' | 'error' | 'confirm';
-    title: string;
-    text: string;
-    onConfirm?: () => void;
-  }>({ visible: false, kind: 'success', title: '', text: '' });
-
-  const showAlert = (kind: 'success' | 'error' | 'confirm', title: string, text: string = '', onConfirm?: () => void) => {
-    setAlertState({ visible: true, kind, title, text, onConfirm });
-  };
-
   const [ads, setAds] = useState<PerformanceAd[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -356,30 +344,29 @@ export default function PerformanceAdsScreen() {
     setModalVisible(true);
   };
 
-  const handleDelete = (ad: PerformanceAd) => {
-    showAlert('confirm', 'Delete this ad?', `"${ad.name}" will be permanently removed.`, async () => {
-      setSaving(true);
-      try {
-        await deletePerformanceAd(ad.id);
-        await loadAds();
-        showAlert('success', 'Deleted', 'The performance ad was removed.');
-      } catch (err) {
-        Alert.alert('Error', getApiErrorMessage(err, 'Could not delete performance ad.'));
-      } finally {
-        setSaving(false);
-      }
-    });
+  const handleDelete = async (ad: PerformanceAd) => {
+    if (!(await sweetCrud.confirmDelete('Performance ad', ad.name))) return;
+    setSaving(true);
+    try {
+      await deletePerformanceAd(ad.id);
+      await loadAds();
+      void sweetCrud.deleted('Performance ad');
+    } catch (err) {
+      void sweetError('Error', getApiErrorMessage(err, 'Could not delete performance ad.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.type || !form.pricingModel || !form.lowPrice || !form.highPrice) {
-      showAlert('error', 'Missing information', 'Please fill in all required fields.');
+      void sweetWarning('Missing information', 'Please fill in all required fields.');
       return;
     }
     const low = Number(form.lowPrice);
     const high = Number(form.highPrice);
     if (Number.isNaN(low) || Number.isNaN(high) || high < low) {
-      showAlert('error', 'Invalid price range', 'High price must be greater than or equal to low price.');
+      void sweetWarning('Invalid price range', 'High price must be greater than or equal to low price.');
       return;
     }
 
@@ -393,21 +380,27 @@ export default function PerformanceAdsScreen() {
       status: toApiStatus(form.status),
     };
 
+    if (editingId) {
+      if (!(await sweetCrud.confirmUpdate('Performance ad', body.name))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd('Performance ad', body.name))) return;
+    }
+
     setSaving(true);
     try {
       if (editingId) {
         await updatePerformanceAd(editingId, body);
-        showAlert('success', 'Updated', 'Performance ad updated successfully.');
+        void sweetCrud.updated('Performance ad');
       } else {
         await createPerformanceAd(body);
-        showAlert('success', 'Created', 'New performance ad added.');
+        void sweetCrud.added('Performance ad');
       }
       setModalVisible(false);
       resetForm();
       setEditingId(null);
       await loadAds();
     } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err, editingId ? 'Could not update performance ad.' : 'Could not create performance ad.'));
+      void sweetError('Error', getApiErrorMessage(err, editingId ? 'Could not update performance ad.' : 'Could not create performance ad.'));
     } finally {
       setSaving(false);
     }
@@ -703,45 +696,6 @@ export default function PerformanceAdsScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
-      </RNModal>
-
-      {/* Custom Alert Modal */}
-      <RNModal visible={alertState.visible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 320, padding: 24, alignItems: 'center' }]}>
-            <Feather 
-              name={alertState.kind === 'success' ? 'check-circle' : alertState.kind === 'error' ? 'x-circle' : 'alert-circle'} 
-              size={48} 
-              color={alertState.kind === 'success' ? COLORS.emerald : alertState.kind === 'error' ? COLORS.rose : COLORS.orange} 
-              style={{ marginBottom: 16 }}
-            />
-            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 8, textAlign: 'center' }}>
-              {alertState.title}
-            </Text>
-            <Text style={{ fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 24 }}>
-              {alertState.text}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              {alertState.kind === 'confirm' && (
-                <Pressable 
-                  style={[styles.cancelButton, { flex: 1, justifyContent: 'center' }]} 
-                  onPress={() => setAlertState(prev => ({ ...prev, visible: false }))}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
-              )}
-              <Pressable 
-                style={[styles.submitButton, { flex: 1, justifyContent: 'center', backgroundColor: alertState.kind === 'confirm' ? COLORS.rose : COLORS.navy }]} 
-                onPress={() => {
-                  setAlertState(prev => ({ ...prev, visible: false }));
-                  if (alertState.onConfirm) alertState.onConfirm();
-                }}
-              >
-                <Text style={styles.submitButtonText}>{alertState.kind === 'confirm' ? 'Delete' : 'OK'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
       </RNModal>
 
     </AdminLayout>

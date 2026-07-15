@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -25,6 +24,7 @@ import {
   type ProductVariant,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
@@ -1103,13 +1103,11 @@ export default function ProductDetailsScreen() {
       setShowApproveModal(false);
       setApproveTemplateId('');
       setApproveNote('');
-      if (Platform.OS === 'web') window.alert('Product approved.');
-      else Alert.alert('Success', 'Product approved.');
+      void sweetSuccess('Product approved.');
       handleBack();
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to approve product.');
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      void sweetError('Error', msg);
     } finally {
       setActionLoading(false);
     }
@@ -1123,13 +1121,11 @@ export default function ProductDetailsScreen() {
       await rejectProduct(productId, rejectNote.trim() || 'Product rejected.');
       setShowRejectModal(false);
       setRejectNote('');
-      if (Platform.OS === 'web') window.alert('Product rejected.');
-      else Alert.alert('Done', 'Product rejected.');
+      void sweetSuccess('Product rejected.');
       handleBack();
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to reject product.');
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      void sweetError('Error', msg);
     } finally {
       setActionLoading(false);
     }

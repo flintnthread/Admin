@@ -3,6 +3,7 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { JobOpening as ApiJob } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { createJob, deleteJob, fetchDepartments, fetchJobs, updateJob } from "@/services/hrApi";
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
@@ -1301,7 +1302,6 @@ const JobOpeningsScreen: React.FC = () => {
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingJob, setEditingJob] = useState<Job | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
-    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: "", message: "" });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -1395,16 +1395,16 @@ const JobOpeningsScreen: React.FC = () => {
             };
             if (updated.id > 0 && jobs.find((j) => j.id === updated.id)) {
                 await updateJob(updated.id, payload);
-                setAlertConfig({ visible: true, title: "Updated!", message: "Job opening updated successfully." });
+                void sweetCrud.updated("Job opening");
             } else {
                 await createJob(payload);
-                setAlertConfig({ visible: true, title: "Added!", message: "New job opening added successfully." });
+                void sweetCrud.added("Job opening");
             }
             await loadJobs();
             setEditModalVisible(false);
             setEditingJob(null);
         } catch (e) {
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e, "Failed to save job opening.") });
+            void sweetError("Error", getApiErrorMessage(e, "Failed to save job opening."));
         }
     };
 
@@ -1413,10 +1413,10 @@ const JobOpeningsScreen: React.FC = () => {
         try {
             await deleteJob(deleteTarget.id);
             await loadJobs();
-            setAlertConfig({ visible: true, title: "Deleted!", message: "Job opening has been deleted." });
+            void sweetCrud.deleted("Job opening");
             setDeleteTarget(null);
         } catch (e) {
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e, "Failed to delete job opening.") });
+            void sweetError("Error", getApiErrorMessage(e, "Failed to delete job opening."));
         }
     };
 
@@ -1884,21 +1884,6 @@ const JobOpeningsScreen: React.FC = () => {
                 onConfirm={handleDelete}
             />
 
-            {/* ── SWEET ALERT ── */}
-            <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                            <Feather name="check" size={32} color="#10b981" />
-                        </View>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1f2937', marginBottom: 8, textAlign: 'center' }}>{alertConfig.title}</Text>
-                        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{alertConfig.message}</Text>
-                        <TouchableOpacity style={{ backgroundColor: T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
-                            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </Container>
     );
 

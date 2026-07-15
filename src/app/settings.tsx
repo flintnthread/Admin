@@ -8,12 +8,12 @@ import {
   StatusBar,
   Platform,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
   fetchIntegrationSettings,
   updateIntegrationSettings,
@@ -96,15 +96,11 @@ export default function SettingsScreen() {
       setSendgridApiKey("");
       setTwilioAuthToken("");
       setShiprocketPassword("");
-      const msg =
-        "Integration settings saved. Email, SMS, and Shiprocket shipping will use these credentials — no restart needed.";
-      if (isWeb) window.alert(msg);
-      else Alert.alert("Success", msg);
+      void sweetCrud.saved("Integration settings");
     } catch (e) {
       const msg = getApiErrorMessage(e);
       setError(msg);
-      if (isWeb) window.alert(msg);
-      else Alert.alert("Error", msg);
+      void sweetError("Error", msg);
     } finally {
       setSaving(false);
     }

@@ -26,6 +26,7 @@
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
     createAdsType,
     deleteAdsType,
@@ -41,7 +42,6 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Animated,
     FlatList,
     Modal,
@@ -286,7 +286,7 @@ const AdTypeFormModal: React.FC<{
 
     const handleSubmit = () => {
         if (!form.name.trim() || form.category === 'Select Category' || !form.description.trim()) {
-            Alert.alert('Missing information', 'Please fill in the ad type name, category and description.');
+            void sweetWarning('Missing information', 'Please fill in the ad type name, category and description.');
             return;
         }
         onSubmit(form);
@@ -452,46 +452,6 @@ const ViewModal: React.FC<{ visible: boolean; item: AdType | null; onClose: () =
 };
 
 // ---------------------------------------------------------------------------
-// Delete modal
-// ---------------------------------------------------------------------------
-const DeleteModal: React.FC<{ visible: boolean; onCancel: () => void; onConfirm: () => void }> = ({ visible, onCancel, onConfirm }) => (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-        <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxWidth: 420 }]}>
-                <View style={styles.modalHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="trash" size={16} color="#fff" />
-                        <Text style={styles.modalHeaderText}>Delete Ad Type</Text>
-                    </View>
-                    <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Ionicons name="close" size={18} color="#fff" />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={[styles.modalBody, { alignItems: 'center', paddingTop: 26 }]}>
-                    <View style={styles.trashCircle}>
-                        <Ionicons name="trash" size={26} color={COLORS.orange} />
-                    </View>
-                    <Text style={styles.confirmTitle}>Are you sure you want to delete this ad type?</Text>
-                    <Text style={styles.confirmSub}>This action cannot be undone!</Text>
-                </View>
-
-                <View style={[styles.modalFooter, { justifyContent: 'center' }]}>
-                    <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                        <Ionicons name="close" size={13} color="#fff" />
-                        <Text style={styles.cancelBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteConfirmBtn} onPress={onConfirm}>
-                        <Ionicons name="trash" size={13} color="#fff" />
-                        <Text style={styles.submitBtnText}>Delete Ad Type</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </View>
-    </Modal>
-);
-
-// ---------------------------------------------------------------------------
 // Table column styling configuration
 // ---------------------------------------------------------------------------
 const COL_STYLES = {
@@ -553,7 +513,6 @@ const AdsTypesDetails: React.FC = () => {
     const [formVisible, setFormVisible] = useState(false);
     const [editingItem, setEditingItem] = useState<AdType | null>(null);
     const [viewItem, setViewItem] = useState<AdType | null>(null);
-    const [deleteId, setDeleteId] = useState<number | null>(null);
 
     const stats = useMemo(() => {
         const total = items.length;
@@ -596,35 +555,41 @@ const AdsTypesDetails: React.FC = () => {
             requirements: form.requirements,
             status: toApiStatus(form.status),
         };
+        if (editingItem) {
+            if (!(await sweetCrud.confirmUpdate('Ad type', body.name))) return;
+        } else {
+            if (!(await sweetCrud.confirmAdd('Ad type', body.name))) return;
+        }
         setSaving(true);
         try {
             if (editingItem) {
                 await updateAdsType(editingItem.id, body);
                 showToast('✅ Ad Type updated successfully!');
+                void sweetCrud.updated('Ad type');
             } else {
                 await createAdsType(body);
                 showToast('✅ Ad Type created successfully!');
+                void sweetCrud.added('Ad type');
             }
             setFormVisible(false);
             await loadItems();
         } catch (err) {
-            Alert.alert('Error', getApiErrorMessage(err, editingItem ? 'Could not update ad type.' : 'Could not create ad type.'));
+            void sweetError('Error', getApiErrorMessage(err, editingItem ? 'Could not update ad type.' : 'Could not create ad type.'));
         } finally {
             setSaving(false);
         }
     };
 
-    const requestDelete = (id: number) => setDeleteId(id);
-    const cancelDelete = () => setDeleteId(null);
-    const confirmDelete = async () => {
-        if (deleteId == null) return;
+    const requestDelete = async (id: number) => {
+        const item = items.find((i) => i.id === id);
+        if (!(await sweetCrud.confirmDelete('Ad type', item?.name))) return;
         setSaving(true);
         try {
-            await deleteAdsType(deleteId);
-            setDeleteId(null);
+            await deleteAdsType(id);
             await loadItems();
+            void sweetCrud.deleted('Ad type');
         } catch (err) {
-            Alert.alert('Error', getApiErrorMessage(err, 'Could not delete ad type.'));
+            void sweetError('Error', getApiErrorMessage(err, 'Could not delete ad type.'));
         } finally {
             setSaving(false);
         }
@@ -661,7 +626,7 @@ const AdsTypesDetails: React.FC = () => {
                 <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
                     <Ionicons name="pencil" size={13} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item.id)}>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => void requestDelete(item.id)}>
                     <Ionicons name="trash" size={13} color="#fff" />
                 </TouchableOpacity>
             </View>
@@ -683,7 +648,7 @@ const AdsTypesDetails: React.FC = () => {
                 <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
                     <Ionicons name="pencil" size={13} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item.id)}>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => void requestDelete(item.id)}>
                     <Ionicons name="trash" size={13} color="#fff" />
                 </TouchableOpacity>
             </View>
@@ -895,7 +860,6 @@ const AdsTypesDetails: React.FC = () => {
                 onSubmit={handleSubmit}
             />
             <ViewModal visible={!!viewItem} item={viewItem} onClose={() => setViewItem(null)} />
-            <DeleteModal visible={deleteId != null} onCancel={cancelDelete} onConfirm={confirmDelete} />
 
             {/* ---- Sliding Green Toast ---- */}
             {toastVisible && (

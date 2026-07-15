@@ -13,6 +13,7 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
   createColor,
   deleteColor,
@@ -24,7 +25,6 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -343,42 +343,6 @@ const ColorFormModal = ({ mode, initial, onSave, onClose }: ColorModalProps) => 
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DeleteModal
-// ─────────────────────────────────────────────────────────────────────────────
-const DeleteModal = ({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) => (
-  <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-    <View style={styles.modalOverlay}>
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-      <View style={[styles.modalCard, { maxWidth: 380 }]}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Confirm Delete</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name={BI.x as any} size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <View style={{ padding: 28, alignItems: "center" }}>
-          <View style={styles.deleteIconCircle}>
-            <Ionicons name={BI.trashFill as any} size={36} color={BRAND} />
-          </View>
-          <Text style={styles.deleteTitle}>Are you sure?</Text>
-          <Text style={styles.deleteSubtitle}>You won't be able to revert this action.</Text>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Ionicons name={BI.x as any} size={15} color="#fff" />
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={onConfirm}>
-              <Ionicons name={BI.trash as any} size={15} color="#fff" />
-              <Text style={styles.saveBtnText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </View>
-  </Modal>
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Grid Card
 // ─────────────────────────────────────────────────────────────────────────────
 const ColorCard = ({
@@ -660,7 +624,6 @@ export default function ColorsScreen() {
   const [page, setPage] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ColorItem | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ColorItem | null>(null);
 
   const filtered = useMemo(
     () => colors.filter((c) =>
@@ -692,13 +655,15 @@ export default function ColorsScreen() {
   }, [loadColors]);
 
   const handleAdd = useCallback(async (data: { name: string; code: string; status: "Active" | "Inactive" }) => {
+    if (!(await sweetCrud.confirmAdd("Color", data.name))) return;
     setSaving(true);
     try {
       const created = await createColor(data);
       setColors((prev) => [...prev, mapColorRow(created)]);
       setAddOpen(false);
+      void sweetCrud.added("Color");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not add color."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not add color."));
     } finally {
       setSaving(false);
     }
@@ -706,33 +671,35 @@ export default function ColorsScreen() {
 
   const handleEdit = useCallback(async (data: { name: string; code: string; status: "Active" | "Inactive" }) => {
     if (!editTarget) return;
+    if (!(await sweetCrud.confirmUpdate("Color", data.name))) return;
     setSaving(true);
     try {
       const updated = await updateColor(editTarget.id, data);
       setColors((prev) => prev.map((c) => (c.id === editTarget.id ? mapColorRow(updated) : c)));
       setEditTarget(null);
+      void sweetCrud.updated("Color");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not update color."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not update color."));
     } finally {
       setSaving(false);
     }
   }, [editTarget]);
 
-  const handleDelete = useCallback(async () => {
-    if (!deleteTarget) return;
+  const handleDelete = useCallback(async (item: ColorItem) => {
+    if (!(await sweetCrud.confirmDelete("Color", item.name))) return;
     setSaving(true);
     try {
-      await deleteColor(deleteTarget.id);
-      setColors((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      await deleteColor(item.id);
+      setColors((prev) => prev.filter((c) => c.id !== item.id));
       const maxPage = Math.max(1, Math.ceil((filtered.length - 1) / PAGE_SIZE));
       if (page > maxPage) setPage(maxPage);
-      setDeleteTarget(null);
+      void sweetCrud.deleted("Color");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not delete color."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not delete color."));
     } finally {
       setSaving(false);
     }
-  }, [deleteTarget, filtered.length, page]);
+  }, [filtered.length, page]);
 
   // ── Native-only FlatList grid render ──────────────────────────────────────
   const renderGridItem = useCallback(({ item }: { item: ColorItem }) => (
@@ -740,7 +707,7 @@ export default function ColorsScreen() {
       item={item}
       cardWidth={cardWidth}
       onEdit={() => setEditTarget(item)}
-      onDelete={() => setDeleteTarget(item)}
+      onDelete={() => void handleDelete(item)}
     />
   ), [cardWidth]);
 
@@ -751,7 +718,7 @@ export default function ColorsScreen() {
       isEven={index % 2 === 0}
       screenWidth={viewMode === "list" ? Math.max(containerWidth, 950) : width}
       onEdit={() => setEditTarget(item)}
-      onDelete={() => setDeleteTarget(item)}
+      onDelete={() => void handleDelete(item)}
     />
   ), [pageItems.length, viewMode, containerWidth, width]);
 
@@ -896,7 +863,7 @@ export default function ColorsScreen() {
             <WebGridView
               items={pageItems}
               onEdit={(item) => setEditTarget(item)}
-              onDelete={(item) => setDeleteTarget(item)}
+              onDelete={(item) => void handleDelete(item)}
               screenWidth={width}
               padding={PADDING}
               gap={GAP}
@@ -921,7 +888,7 @@ export default function ColorsScreen() {
                           isEven={index % 2 === 0}
                           screenWidth={Math.max(containerWidth, 950)}
                           onEdit={() => setEditTarget(item)}
-                          onDelete={() => setDeleteTarget(item)}
+                          onDelete={() => void handleDelete(item)}
                         />
                       ))}
                     </View>
@@ -945,7 +912,6 @@ export default function ColorsScreen() {
           onClose={() => setEditTarget(null)}
         />
       )}
-      {deleteTarget && <DeleteModal onConfirm={handleDelete} onClose={() => setDeleteTarget(null)} />}
     </AdminLayout>
   );
 }

@@ -37,6 +37,7 @@ import {
 import { blurActiveElementOnWeb } from "@/lib/focus";
 import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
 import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
+import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { formatRupee, maskAccount } from "@/lib/format";
 import SellerDocumentImage from "@/components/SellerDocumentImage";
@@ -2327,30 +2328,42 @@ export default function ApprovedSellersScreen() {
       });
       setShowPendingModal(true);
     } catch (e) {
-      Alert.alert("Error", getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e));
     }
   };
 
   const handleApprovePending = async (pending: PendingSeller) => {
+    if (!(await sweetConfirm({
+      title: "Approve seller?",
+      text: `Approve profile for ${pending.name}?`,
+      confirmText: "Yes, Approve",
+    }))) return;
     try {
       await approveSellerProfile(pending.id);
       setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
       setShowPendingModal(false);
       void loadApprovedSellers();
-      showToast("Seller approved successfully!", "success");
+      void sweetSuccess("Success", "Seller approved successfully!");
     } catch (e) {
-      showToast(getApiErrorMessage(e, "Failed to approve seller."), "error");
+      void sweetError("Error", getApiErrorMessage(e, "Failed to approve seller."));
     }
   };
 
   const handleRejectPending = async (pending: PendingSeller) => {
+    if (!(await sweetConfirm({
+      title: "Reject seller?",
+      text: `Reject profile for ${pending.name}?`,
+      confirmText: "Yes, Reject",
+      danger: true,
+      icon: "warning",
+    }))) return;
     try {
       await rejectSellerProfile(pending.id, "Rejected by admin");
       setPendingSellers((prev) => prev.filter((s) => s.id !== pending.id));
       setShowPendingModal(false);
-      showToast("Seller request has been rejected.", "success");
+      void sweetSuccess("Success", "Seller request has been rejected.");
     } catch (e) {
-      showToast(getApiErrorMessage(e, "Failed to reject seller."), "error");
+      void sweetError("Error", getApiErrorMessage(e, "Failed to reject seller."));
     }
   };
 
@@ -2435,7 +2448,7 @@ export default function ApprovedSellersScreen() {
     setDeleteModalVisible(false);
     setDeleteSeller(null);
     setDeleteReason("");
-    showToast("Seller successfully deleted!", "success");
+    void sweetSuccess("Deleted!", "Seller successfully deleted!");
   };
 
   const handleExportCSV = async () => {
@@ -2448,7 +2461,7 @@ export default function ApprovedSellersScreen() {
       const items = await fetchApprovedSellers(500);
       const exportRows = items.map(mapSellerToApprovedRow);
       if (exportRows.length === 0) {
-        Alert.alert("No Data", "There are no approved sellers to export.");
+        void sweetWarning("No Data", "There are no approved sellers to export.");
         return;
       }
 

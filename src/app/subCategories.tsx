@@ -2,9 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState, useEffect } from "react";
-import Swal from "sweetalert2";
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -30,6 +28,7 @@ import {
 } from "@/services/subcategoryApi";
 import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
 import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
@@ -756,15 +755,15 @@ const AddModal = ({
 
   const handleSave = () => {
     if (!mainCategoryId) {
-      Alert.alert("Required", "Please select a main category.");
+      void sweetWarning("Required", "Please select a main category.");
       return;
     }
     if (!categoryId) {
-      Alert.alert("Required", "Please select a category.");
+      void sweetWarning("Required", "Please select a category.");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a subcategory name.");
+      void sweetWarning("Required", "Please enter a subcategory name.");
       return;
     }
     onSave({
@@ -1359,7 +1358,7 @@ export default function Subcategories() {
       const message = getApiErrorMessage(error, "Failed to load subcategories.");
       setLoadError(message);
       console.error("Failed to load subcategories:", error);
-      Alert.alert("Error", message);
+      void sweetError("Error", message);
     } finally {
       setLoading(false);
     }
@@ -1399,8 +1398,13 @@ export default function Subcategories() {
   };
 
   const handleSave = async (data: any) => {
+    const isUpdate = !!data.id;
+    if (isUpdate) {
+      if (!(await sweetCrud.confirmUpdate("Subcategory", data.name))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd("Subcategory", data.name))) return;
+    }
     try {
-      let successMsg = "";
       const statusValue = data.status === "Active";
       const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
       const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
@@ -1443,7 +1447,6 @@ export default function Subcategories() {
               : c
           )
         );
-        successMsg = "Subcategory updated successfully!";
       } else {
         let newRow = await createSubcategory(
           data.categoryId,
@@ -1488,81 +1491,37 @@ export default function Subcategories() {
         };
         setItems((prev) => [newCat, ...prev]);
         setCurrentPage(1);
-        successMsg = "Subcategory added successfully!";
       }
       setEditCat(null);
       await loadSubcategories();
 
-      if (Platform.OS === "web") {
-        setTimeout(() => {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "success",
-            title: successMsg,
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-          });
-        }, 300);
+      if (isUpdate) {
+        void sweetCrud.updated("Subcategory");
       } else {
-        Alert.alert("Success", successMsg);
+        void sweetCrud.added("Subcategory");
       }
     } catch (error) {
       console.error("Failed to save subcategory:", error);
-      Alert.alert("Error", "Failed to save subcategory. Please try again.");
+      void sweetError("Error", "Failed to save subcategory. Please try again.");
     }
   };
 
   const handleDelete = async (id: number) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteSubcategory(id);
-        setItems((prev) => prev.filter((i) => i.id !== id));
-        if (Platform.OS === "web") {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "success",
-            title: "Subcategory deleted successfully!",
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-          });
-        } else {
-          Alert.alert("Success", "Subcategory deleted successfully!");
-        }
-      } catch (error) {
-        console.error("Failed to delete subcategory:", error);
-        Alert.alert("Error", "Failed to delete subcategory. Please try again.");
-      }
-    };
-
-    if (Platform.OS === "web") {
-      Swal.fire({
-        title: "Are you sure?",
-        text: `You won't be able to revert this!`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#151D4F",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!"
-      }).then((result) => {
-        if (result.isConfirmed) {
-          confirmDelete();
-        }
-      });
-    } else {
-      Alert.alert("Delete", "Delete this subcategory?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: confirmDelete },
-      ]);
+    const item = items.find((i) => i.id === id);
+    if (!(await sweetCrud.confirmDelete("Subcategory", item?.name))) return;
+    try {
+      await deleteSubcategory(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      void sweetCrud.deleted("Subcategory");
+    } catch (error) {
+      console.error("Failed to delete subcategory:", error);
+      void sweetError("Error", "Failed to delete subcategory. Please try again.");
     }
   };
 
   const handleExport = () => {
     if (Platform.OS !== "web") {
-      Alert.alert("Export", "CSV export is supported on web.");
+      void sweetInfo("Export", "CSV export is supported on web.");
       return;
     }
     const headers = ["ID", "Main Category", "Category", "Subcategory", "Materials", "Status", "Created"];
