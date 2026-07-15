@@ -195,14 +195,16 @@ const SweetAlert = ({ visible, type, bannerTitle, onConfirm, onCancel }: SweetAl
 
     return (
       <Modal visible transparent animationType="fade" onRequestClose={onConfirm}>
-        <Animated.View style={[sa.successOverlay, { opacity: overlayOpacity }]} onPress={onConfirm}>
-          <Animated.View style={[sa.successCard, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
-            <View style={sa.successIconCircle}>
-              <Feather name="check" size={24} color="#fff" />
-            </View>
-            <Text style={sa.successMessage}>{message}</Text>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onConfirm}>
+          <Animated.View style={[sa.successOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[sa.successCard, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
+              <View style={sa.successIconCircle}>
+                <Feather name="check" size={24} color="#fff" />
+              </View>
+              <Text style={sa.successMessage}>{message}</Text>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
+        </TouchableOpacity>
       </Modal>
     );
   }

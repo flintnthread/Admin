@@ -23,7 +23,7 @@ type Props = {
 };
 
 // Navigation items definition
-const NAV_ITEMS = {
+export const NAV_ITEMS = {
   GENERAL: [
 
 
