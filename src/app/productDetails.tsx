@@ -287,11 +287,13 @@ function mapApiProductDetail(data: Record<string, unknown>): {
   const status: ProductStatus =
     statusRaw === 'approved' || statusRaw === 'active'
       ? 'approved'
-      : statusRaw === 'rejected'
-        ? 'rejected'
-        : statusRaw === 'review' || statusRaw === 'under_review'
-          ? 'review'
-          : 'pending';
+      : statusRaw === 'inactive' || statusRaw === 'disabled'
+        ? 'inactive'
+        : statusRaw === 'rejected'
+          ? 'rejected'
+          : statusRaw === 'review' || statusRaw === 'under_review'
+            ? 'review'
+            : 'pending';
 
   const variants: ProductVariant[] = variantsRaw.map((v) => {
     const sellingWith = toNum(v.finalPrice ?? v.mrpPrice ?? v.sellingPrice);

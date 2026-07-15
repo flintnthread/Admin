@@ -10,7 +10,7 @@
  * object below for your existing import.
  */
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,13 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+  fetchHomepageSections,
+  saveHomepageSections,
+  SECTION_UI_TO_KEY,
+  isSectionVisible,
+} from '@/services/cmsApi';
 // SweetAlert2 only runs in a DOM environment; native platforms fall back to
 // the built-in Alert API. Your project already loads swal2 styles globally
 // in admin-layout.tsx, so this reuses the same library/theme.
@@ -150,6 +157,32 @@ const INITIAL_GROUPS: SectionGroup[] = [
     ],
   },
 ];
+
+function applySectionValues(
+  groups: SectionGroup[],
+  valuesByKey: Record<string, string>,
+): SectionGroup[] {
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const apiKey = SECTION_UI_TO_KEY[item.id];
+      if (!apiKey) return item;
+      return { ...item, visible: isSectionVisible(valuesByKey[apiKey]) };
+    }),
+  }));
+}
+
+function buildSectionPayload(groups: SectionGroup[]) {
+  const items: { key: string; value: string }[] = [];
+  for (const group of groups) {
+    for (const item of group.items) {
+      const apiKey = SECTION_UI_TO_KEY[item.id];
+      if (!apiKey) continue;
+      items.push({ key: apiKey, value: item.visible ? '1' : '0' });
+    }
+  }
+  return items;
+}
 
 // ---------------------------------------------------------------------------
 // Animated toggle switch
@@ -280,11 +313,36 @@ export default function HomepageSectionsSettingsScreen() {
 
   const [groups, setGroups] = useState<SectionGroup[]>(INITIAL_GROUPS);
   const [savedGroups, setSavedGroups] = useState<SectionGroup[]>(INITIAL_GROUPS);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [successAlert, setSuccessAlert] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: '', message: '' });
 
   const isDirty = useMemo(() => JSON.stringify(groups) !== JSON.stringify(savedGroups), [groups, savedGroups]);
+
+  const loadSections = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchHomepageSections();
+      const valuesByKey: Record<string, string> = {};
+      for (const row of rows) {
+        if (row.key) valuesByKey[row.key] = row.value;
+      }
+      const next = applySectionValues(INITIAL_GROUPS, valuesByKey);
+      setGroups(next);
+      setSavedGroups(next);
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, 'Failed to load homepage sections.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSections();
+  }, [loadSections]);
 
   const totalCount = useMemo(() => groups.reduce((sum, g) => sum + g.items.length, 0), [groups]);
   const visibleCount = useMemo(
@@ -316,15 +374,9 @@ export default function HomepageSectionsSettingsScreen() {
     if (!isDirty || saving) return;
     setSaving(true);
     try {
-      // TODO: wire up to your Spring Boot endpoint, e.g.
-      // await fetch('http://<host>:8082/api/admin/homepage-sections', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(groups),
-      // });
-      await new Promise((r) => setTimeout(r, 500));
+      await saveHomepageSections(buildSectionPayload(groups));
       setSavedGroups(groups);
-      
+
       if (Platform.OS === 'web') {
         showThemedAlert({
           title: 'Saved',
@@ -333,6 +385,13 @@ export default function HomepageSectionsSettingsScreen() {
         });
       } else {
         setSuccessAlert({ visible: true, title: 'Saved', message: 'Homepage sections updated.' });
+      }
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to save homepage sections.');
+      if (Platform.OS === 'web') {
+        showThemedAlert({ title: 'Error', text: msg, icon: 'error' });
+      } else {
+        Alert.alert('Error', msg);
       }
     } finally {
       setSaving(false);
@@ -412,13 +471,28 @@ export default function HomepageSectionsSettingsScreen() {
 
         {/* Groups */}
         <View style={styles.groupsWrap}>
-          {filteredGroups.length === 0 && (
+          {loading ? (
             <View style={styles.emptyState}>
-              <Feather name="inbox" size={22} color={COLORS.textFaint} />
-              <Text style={styles.emptyStateText}>No sections match your search.</Text>
+              <ActivityIndicator size="large" color={COLORS.orange} />
+              <Text style={styles.emptyStateText}>Loading sections…</Text>
             </View>
-          )}
-          {filteredGroups.map((group) => (
+          ) : loadError ? (
+            <View style={styles.emptyState}>
+              <Feather name="alert-circle" size={22} color={COLORS.red} />
+              <Text style={styles.emptyStateText}>{loadError}</Text>
+              <Pressable style={styles.alertBtn} onPress={loadSections}>
+                <Text style={styles.alertBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {filteredGroups.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Feather name="inbox" size={22} color={COLORS.textFaint} />
+                  <Text style={styles.emptyStateText}>No sections match your search.</Text>
+                </View>
+              )}
+              {filteredGroups.map((group) => (
             <View key={group.id} style={styles.groupCard}>
               <View style={styles.groupHeader}>
                 <Feather name={group.icon} size={14} color={COLORS.navy} />
@@ -464,6 +538,8 @@ export default function HomepageSectionsSettingsScreen() {
               </View>
             </View>
           ))}
+            </>
+          )}
         </View>
       </ScrollView>
 

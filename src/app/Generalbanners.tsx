@@ -1,7 +1,7 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Alert,
   Animated,
@@ -15,7 +15,17 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ActivityIndicator,
 } from "react-native";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  fetchGeneralBanners,
+  createGeneralBanner,
+  updateGeneralBanner,
+  deleteGeneralBanner,
+  uploadGeneralBannerImage,
+  resolveCmsMediaUrl,
+} from "@/services/cmsApi";
 import {
   Calendar,
   CheckCircle2,
@@ -35,14 +45,84 @@ import {
 } from "lucide-react-native";
 import { Feather } from "@expo/vector-icons";
 
-const initialBanners = [
-  { id: "1", title: "Women's Chanderi Sarees", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#f6d9d9", text: "Flat 70% Off", desktopImage: "https://images.unsplash.com/photo-1583391733958-d25e07fac0ce?q=80&w=2000&auto=format&fit=crop" },
-  { id: "2", title: "Cute Couple T-Shirt Set", category: "tshirts", date: "07 Jun, 2026", status: "Active", color: "#f3b7b7", text: "Up to 50% Off", desktopImage: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=2000&auto=format&fit=crop" },
-  { id: "3", title: "Stylish Travel Backpacks", category: "travel backpacks", date: "07 Jun, 2026", status: "Active", color: "#cdeedd", text: "Min. 60% Off", desktopImage: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=2000&auto=format&fit=crop" },
-  { id: "4", title: "SilkLoom Pure Soft Linen Saree", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#dcdaf0", text: "Min. 60% Off", desktopImage: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=2000&auto=format&fit=crop" },
-  { id: "5", title: "One Gram Gold Jewellery Locket", category: "jewellery", date: "07 Jun, 2026", status: "Inactive", color: "#5a1f2e", text: "Up to 50% Off", dark: true, desktopImage: "https://images.unsplash.com/photo-1599643478524-fb66f728e6f1?q=80&w=2000&auto=format&fit=crop" },
-  { id: "6", title: "Satin Saree", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#215b7a", text: "Min. 40% Off", dark: true, desktopImage: "https://images.unsplash.com/photo-1589465885855-4081075be8c0?q=80&w=2000&auto=format&fit=crop" },
-];
+const PALETTE = ["#f6d9d9", "#f3b7b7", "#cdeedd", "#dcdaf0", "#5a1f2e", "#215b7a"];
+
+const UI_TO_API_SIZE: Record<string, string> = {
+  "Full Width": "full",
+  "Half Width": "medium",
+  "Compact": "small",
+};
+const API_TO_UI_SIZE: Record<string, string> = {
+  full: "Full Width",
+  large: "Half Width",
+  medium: "Half Width",
+  small: "Compact",
+};
+const UI_TO_API_TEXT_POS: Record<string, string> = {
+  Left: "left",
+  Center: "center",
+  Right: "right",
+};
+const API_TO_UI_TEXT_POS: Record<string, string> = {
+  left: "Left",
+  center: "Center",
+  right: "Right",
+};
+
+function formatBannerDate(value?: unknown) {
+  if (!value) return "—";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function isLocalImageUri(uri: string) {
+  return (
+    uri.startsWith("data:") ||
+    uri.startsWith("blob:") ||
+    uri.startsWith("file:") ||
+    uri.startsWith("content:")
+  );
+}
+
+function mapApiBanner(row: Record<string, unknown>, index: number) {
+  const imagePath = String(row.image ?? "");
+  return {
+    id: String(row.id ?? ""),
+    title: String(row.title ?? ""),
+    category: "",
+    date: formatBannerDate(row.createdAt ?? row.created_at),
+    status: row.status === 0 || row.status === "0" ? "Inactive" : "Active",
+    color: PALETTE[index % PALETTE.length],
+    dark: index % 5 === 4 || index % 5 === 5,
+    text: String(row.textContent ?? row.text_content ?? ""),
+    buttonText: String(row.buttonText ?? row.button_text ?? "Shop Now"),
+    textPosition:
+      API_TO_UI_TEXT_POS[String(row.textPosition ?? row.text_position ?? "left").toLowerCase()] ??
+      "Left",
+    bannerSize: API_TO_UI_SIZE[String(row.size ?? "full").toLowerCase()] ?? "Full Width",
+    desktopImage: resolveCmsMediaUrl(imagePath),
+    imagePath,
+    imageUrl: "",
+  };
+}
+
+async function resolveBannerImage(form: {
+  desktopImage: string;
+  imageUrl: string;
+  imagePath?: string;
+}): Promise<string> {
+  const effectiveUri = form.imageUrl?.trim() || form.desktopImage || "";
+  if (!effectiveUri) return form.imagePath ?? "";
+  if (isLocalImageUri(effectiveUri)) {
+    const res = await fetch(effectiveUri);
+    const blob = await res.blob();
+    const uploaded = await uploadGeneralBannerImage(blob, "banner.jpg");
+    return String(uploaded.path ?? "");
+  }
+  if (/^https?:\/\//i.test(effectiveUri)) return effectiveUri;
+  return form.imagePath || effectiveUri;
+}
 
 const emptyForm = {
   title: "",
@@ -54,6 +134,7 @@ const emptyForm = {
   status: "Active",
   desktopImage: "",
   imageUrl: "",
+  imagePath: "",
 };
 
 const TEXT_POSITIONS = ["Left", "Center", "Right"];
@@ -170,7 +251,10 @@ export default function BannerManagement() {
   const isWeb = Platform.OS === "web" && width >= 900;
   const isMobile = !isTablet; // narrow phone-width screens
 
-  const [banners, setBanners] = useState(initialBanners);
+  const [banners, setBanners] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [modalVisible, setModalVisible] = useState(false);
@@ -192,6 +276,30 @@ export default function BannerManagement() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pendingForm, setPendingForm] = useState<any>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  const loadBanners = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchGeneralBanners();
+      setBanners(rows.map((row, i) => mapApiBanner(row, i)));
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, "Failed to load banners."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBanners();
+  }, [loadBanners]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter]);
+
   const filtered = banners.filter((b) => {
     const matchesQuery = (b.title + " " + b.category).toLowerCase().includes(query.toLowerCase());
     const matchesStatus = statusFilter === "All" || b.status === statusFilter;
@@ -201,9 +309,6 @@ export default function BannerManagement() {
   const activeCount = banners.filter((b) => b.status === "Active").length;
   const inactiveCount = banners.length - activeCount;
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
   const totalItems = filtered.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedBanners = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -222,7 +327,7 @@ export default function BannerManagement() {
           const file = e.target.files[0];
           if (file) {
             const uri = URL.createObjectURL(file);
-            setForm((prev) => ({ ...prev, [field]: uri }));
+            setForm((prev) => ({ ...prev, [field]: uri, imagePath: "" }));
           }
         };
         input.click();
@@ -238,7 +343,7 @@ export default function BannerManagement() {
           quality: 0.85,
         });
         if (!result.canceled && result.assets.length > 0) {
-          setForm((f) => ({ ...f, [field]: result.assets[0].uri }));
+          setForm((f) => ({ ...f, [field]: result.assets[0].uri, imagePath: "" }));
         }
       }
     } catch (err) {
@@ -252,7 +357,7 @@ export default function BannerManagement() {
     setModalVisible(true);
   }
 
-  function openEdit(banner: typeof initialBanners[0] & { [key: string]: any }) {
+  function openEdit(banner: { [key: string]: any }) {
     setEditingId(banner.id);
     setForm({
       title: banner.title,
@@ -264,6 +369,7 @@ export default function BannerManagement() {
       status: banner.status || "Active",
       desktopImage: banner.desktopImage || "",
       imageUrl: banner.imageUrl || "",
+      imagePath: banner.imagePath || "",
     });
     setModalVisible(true);
   }
@@ -288,46 +394,78 @@ export default function BannerManagement() {
     setModalVisible(false);
   }
 
-  function handleSweetConfirm() {
-    if (sweetType === "add-confirm") {
-      const palette = ["#fde9c8", "#c9ece6", "#e3d9f7", "#e2f0c4", "#cfeaf5"];
-      const effectiveImage = pendingForm.imageUrl?.trim() || pendingForm.desktopImage || "";
-      const newBanner: any = {
-        id: String(Date.now()),
-        title: pendingForm.title,
-        category: pendingForm.category || "general",
-        date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-        status: pendingForm.status,
-        color: palette[banners.length % palette.length],
-        text: pendingForm.text,
-        buttonText: pendingForm.buttonText,
-        textPosition: pendingForm.textPosition,
-        bannerSize: pendingForm.bannerSize,
-        desktopImage: effectiveImage,
-        imageUrl: pendingForm.imageUrl || "",
-      };
-      setBanners((prev) => [newBanner, ...prev]);
-      setSweetType("add-success");
-    } else if (sweetType === "edit-confirm") {
-      const effectiveImage = pendingForm.imageUrl?.trim() || pendingForm.desktopImage || "";
-      setBanners((prev) =>
-        prev.map((b) =>
-          b.id === editingId
-            ? { ...b, title: pendingForm.title, category: pendingForm.category || b.category, text: pendingForm.text, buttonText: pendingForm.buttonText, textPosition: pendingForm.textPosition, bannerSize: pendingForm.bannerSize, status: pendingForm.status, desktopImage: effectiveImage, imageUrl: pendingForm.imageUrl || "" }
-            : b
-        )
-      );
-      setSweetType("edit-success");
-    } else if (sweetType === "delete-confirm") {
-      setBanners((prev) => prev.filter((b) => b.id !== pendingDeleteId));
-      setPendingDeleteId(null);
-      setSweetType("delete-success");
-    } else {
-      // success stage — done
+  async function handleSweetConfirm() {
+    if (sweetType.endsWith("success")) {
       setSweetVisible(false);
       setPendingForm(null);
       setEditingId(null);
       setForm(emptyForm);
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+
+    try {
+      if (sweetType === "add-confirm") {
+        const image = await resolveBannerImage(pendingForm);
+        const body = {
+          title: pendingForm.title.trim(),
+          textContent: pendingForm.text.trim(),
+          buttonText: pendingForm.buttonText.trim(),
+          textPosition: UI_TO_API_TEXT_POS[pendingForm.textPosition] ?? "left",
+          size: UI_TO_API_SIZE[pendingForm.bannerSize] ?? "full",
+          status: pendingForm.status === "Active" ? 1 : 0,
+          image,
+        };
+        const created = await createGeneralBanner(body);
+        const mapped = mapApiBanner(created, banners.length);
+        setBanners((prev) => [mapped, ...prev]);
+        setSweetType("add-success");
+      } else if (sweetType === "edit-confirm") {
+        const existing = banners.find((b) => String(b.id) === String(editingId));
+        const image = await resolveBannerImage({
+          ...pendingForm,
+          imagePath: existing?.imagePath,
+        });
+        const body = {
+          title: pendingForm.title.trim(),
+          textContent: pendingForm.text.trim(),
+          buttonText: pendingForm.buttonText.trim(),
+          textPosition: UI_TO_API_TEXT_POS[pendingForm.textPosition] ?? "left",
+          size: UI_TO_API_SIZE[pendingForm.bannerSize] ?? "full",
+          status: pendingForm.status === "Active" ? 1 : 0,
+          image,
+        };
+        const updated = await updateGeneralBanner(Number(editingId), body);
+        const mapped = mapApiBanner(updated, 0);
+        setBanners((prev) =>
+          prev.map((b) =>
+            String(b.id) === String(editingId)
+              ? { ...mapped, color: b.color, dark: b.dark, category: pendingForm.category || b.category }
+              : b,
+          ),
+        );
+        setSweetType("edit-success");
+      } else if (sweetType === "delete-confirm") {
+        await deleteGeneralBanner(Number(pendingDeleteId));
+        setBanners((prev) => prev.filter((b) => String(b.id) !== String(pendingDeleteId)));
+        setPendingDeleteId(null);
+        setSweetType("delete-success");
+      }
+    } catch (err) {
+      setSweetVisible(false);
+      const msg = getApiErrorMessage(err, "Operation failed.");
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined") window.alert(msg);
+      } else {
+        Alert.alert("Error", msg);
+      }
+      if (sweetType === "add-confirm" || sweetType === "edit-confirm") {
+        setModalVisible(true);
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -340,7 +478,7 @@ export default function BannerManagement() {
     setPendingDeleteId(null);
   }
 
-  function handleDeletePress(banner: typeof initialBanners[0] & { [key: string]: any }) {
+  function handleDeletePress(banner: { [key: string]: any }) {
     setPendingDeleteId(banner.id);
     setPendingForm(banner);
     setSweetType("delete-confirm");
@@ -462,7 +600,20 @@ export default function BannerManagement() {
           </View>
 
           {/* List or Grid */}
-          {filtered.length === 0 ? (
+          {loading ? (
+            <View style={styles.empty}>
+              <ActivityIndicator size="large" color="#f97316" />
+              <Text style={styles.emptyTitle}>Loading banners…</Text>
+            </View>
+          ) : loadError ? (
+            <View style={styles.empty}>
+              <ImageIcon size={28} color="#c4c8d0" />
+              <Text style={styles.emptyTitle}>{loadError}</Text>
+              <TouchableOpacity style={styles.btnPrimary} onPress={loadBanners}>
+                <Text style={styles.btnPrimaryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filtered.length === 0 ? (
             <View style={styles.empty}>
               <ImageIcon size={28} color="#c4c8d0" />
               <Text style={styles.emptyTitle}>No banners found</Text>
@@ -475,10 +626,10 @@ export default function BannerManagement() {
                   {paginatedBanners.map((banner) => (
                     <View key={banner.id} style={styles.row}>
                       <View style={[styles.thumb, { backgroundColor: banner.color, overflow: "hidden" }]}>
-                        {!!((banner as any).imageUrl || (banner as any).desktopImage) && (
-                          <Image source={{ uri: (banner as any).imageUrl || (banner as any).desktopImage }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+                        {!!(banner.desktopImage || banner.imageUrl) && (
+                          <Image source={{ uri: banner.desktopImage || banner.imageUrl }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
                         )}
-                        <Text style={[styles.thumbTag, (!!banner.dark || !!((banner as any).imageUrl || (banner as any).desktopImage)) && { color: "#fff" }]} numberOfLines={1}>
+                        <Text style={[styles.thumbTag, (!!banner.dark || !!(banner.imageUrl || banner.desktopImage)) && { color: "#fff" }]} numberOfLines={1}>
                           {banner.text}
                         </Text>
                       </View>
@@ -523,10 +674,10 @@ export default function BannerManagement() {
                     >
                       {/* Banner Preview */}
                       <View style={[styles.gridThumb, { backgroundColor: banner.color, overflow: "hidden" }]}>
-                        {!!((banner as any).imageUrl || (banner as any).desktopImage) && (
-                          <Image source={{ uri: (banner as any).imageUrl || (banner as any).desktopImage }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+                        {!!(banner.desktopImage || banner.imageUrl) && (
+                          <Image source={{ uri: banner.desktopImage || banner.imageUrl }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
                         )}
-                        <Text style={[styles.gridThumbTag, (!!banner.dark || !!((banner as any).imageUrl || (banner as any).desktopImage)) && { color: "#fff" }]} numberOfLines={2}>
+                        <Text style={[styles.gridThumbTag, (!!banner.dark || !!(banner.imageUrl || banner.desktopImage)) && { color: "#fff" }]} numberOfLines={2}>
                           {banner.text}
                         </Text>
                       </View>

@@ -65,6 +65,8 @@ import {
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
+import { getApiErrorMessage } from '@/lib/api/client';
+import { fetchAdsPayments, fetchAdsPaymentStats, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 
 /* ------------------------------------------------------------------ */
 /* Design tokens — navy + orange only, shared across the Ads screens   */
@@ -134,81 +136,50 @@ interface Payment {
   createdLabel: string;
 }
 
+function mapPaymentMethod(raw?: unknown): PaymentMethod {
+  const s = String(raw ?? 'card').toLowerCase();
+  if (s.includes('upi')) return 'UPI';
+  if (s.includes('netbank') || s.includes('bank')) return 'Netbanking';
+  if (s.includes('wallet')) return 'Wallet';
+  return 'Card';
+}
+
+function mapPaymentStatus(raw?: unknown): PaymentStatus {
+  const s = String(raw ?? 'pending').toLowerCase();
+  if (s === 'captured' || s === 'paid' || s === 'success') return 'captured';
+  if (s === 'refunded') return 'refunded';
+  if (s === 'failed') return 'failed';
+  return 'pending';
+}
+
+function mapPaymentRow(row: AdsApiRow): Payment {
+  const createdAt = String(row.createdAt ?? '');
+  const dateObj = createdAt ? new Date(createdAt) : new Date();
+  const validDate = Number.isNaN(dateObj.getTime()) ? new Date() : dateObj;
+  const contact = String(row.contact ?? '');
+  const email = String(row.email ?? '');
+  const customerName = contact || email || '—';
+  return {
+    paymentId: String(row.razorpayPaymentId ?? row.id ?? ''),
+    orderId: String(row.orderId ?? '—'),
+    customerName,
+    customerEmail: email || contact,
+    amount: Number(row.amount ?? 0) || 0,
+    status: mapPaymentStatus(row.status),
+    method: mapPaymentMethod(row.method),
+    bank: row.bank != null ? String(row.bank) : null,
+    dateObj: validDate,
+    dateLabel: formatAdsDate(row.createdAt),
+    createdLabel: validDate.toLocaleString('en-IN'),
+  };
+}
+
 const STATUS_META: Record<PaymentStatus, { label: string; color: string; bg: string }> = {
   captured: { label: 'Captured', color: COLORS.active, bg: COLORS.activeLight },
   refunded: { label: 'Refunded', color: COLORS.sub, bg: COLORS.cardBg },
   pending: { label: 'Pending', color: COLORS.primary, bg: COLORS.primaryLight },
   failed: { label: 'Failed', color: COLORS.inactive, bg: COLORS.inactiveLight },
 };
-
-function seeded(seed: number) {
-  let s = seed % 2147483647;
-  if (s <= 0) s += 2147483646;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-const CUSTOMERS = [
-  { name: 'Flint & Thread', mail: 'flintnthread@gmail.com' },
-  { name: 'Tayi Gopi Chand', mail: 'gopichand93667@gmail.com' },
-  { name: 'Rekha Traders', mail: 'rekha.traders@gmail.com' },
-  { name: 'Studio North', mail: 'hello@studionorth.co' },
-  { name: 'Jane Smith', mail: 'jane@example.com' },
-  { name: 'John Doe', mail: 'john@example.com' },
-];
-const METHODS: PaymentMethod[] = ['Card', 'UPI', 'Netbanking', 'Wallet'];
-const BANKS: Record<PaymentMethod, string[]> = {
-  Card: ['HDFC Bank', 'ICICI Bank', 'Axis Bank'],
-  UPI: ['Google Pay', 'PhonePe', 'Paytm'],
-  Netbanking: ['SBI', 'Kotak Mahindra', 'Yes Bank'],
-  Wallet: ['Amazon Pay', 'Mobikwik'],
-};
-const STATUS_POOL: PaymentStatus[] = ['captured', 'captured', 'captured', 'pending', 'failed', 'refunded'];
-
-function randId(rnd: () => number, len: number) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let out = '';
-  for (let i = 0; i < len; i++) out += chars[Math.floor(rnd() * chars.length)];
-  return out;
-}
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function buildPayments(count: number): Payment[] {
-  const rnd = seeded(4071);
-  const list: Payment[] = Array.from({ length: count }).map((_, i) => {
-    const cust = CUSTOMERS[i % CUSTOMERS.length];
-    const method = METHODS[Math.floor(rnd() * METHODS.length)];
-    const status = STATUS_POOL[Math.floor(rnd() * STATUS_POOL.length)];
-    const amount = Math.round((3000 + rnd() * 340000) / 100) * 100;
-    const day = 1 + Math.floor(rnd() * 27);
-    const hour = 8 + Math.floor(rnd() * 12);
-    const minute = Math.floor(rnd() * 60);
-    const dateObj = new Date(2025, 9, day, hour, minute, Math.floor(rnd() * 60));
-    const bankList = BANKS[method];
-    const bank = status === 'failed' ? null : bankList[Math.floor(rnd() * bankList.length)];
-    const hh12 = ((dateObj.getHours() + 11) % 12) + 1;
-    const ampm = dateObj.getHours() >= 12 ? 'PM' : 'AM';
-    return {
-      paymentId: `pay_${randId(rnd, 14)}`,
-      orderId: `AD-2025-${1000 + Math.floor(rnd() * 8999)}`,
-      customerName: cust.name,
-      customerEmail: cust.mail,
-      amount,
-      status,
-      method,
-      bank,
-      dateObj,
-      dateLabel: `${String(day).padStart(2, '0')} ${MONTHS[9]}, 2025`,
-      createdLabel: `${dateObj.getMonth() + 1}/${dateObj.getDate()}/${dateObj.getFullYear()}, ${hh12}:${String(minute).padStart(2, '0')} ${ampm}`,
-    };
-  });
-  return list.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
-}
-
-const ALL_PAYMENTS = buildPayments(38);
 
 /* ------------------------------------------------------------------ */
 /* Layout helpers (same measured-width pattern as the other screens)   */
@@ -918,6 +889,11 @@ export default function AdsPaymentsScreen() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Payment | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({ total: 0, captured: 0, capturedAmt: 0, successRate: 0, refunded: 0 });
 
   const bp: Breakpoint = measuredWidth >= 1024 ? 'desktop' : measuredWidth >= 640 ? 'tablet' : 'phone';
   const isTablet = bp !== 'phone';
@@ -928,28 +904,56 @@ export default function AdsPaymentsScreen() {
   const gridGap = 16;
   const gridCardWidth = (fullWidth - gridGap * (gridCols - 1)) / gridCols;
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return ALL_PAYMENTS.filter((p) => {
-      if (status !== 'all' && p.status !== status) return false;
-      if (method !== 'all' && p.method !== method) return false;
-      if (q && !(p.paymentId.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q) || p.customerName.toLowerCase().includes(q))) return false;
-      return true;
-    });
-  }, [search, status, method]);
-
   useEffect(() => setPage(1), [search, status, method]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [pageRes, statsRes] = await Promise.all([
+          fetchAdsPayments({
+            page: page - 1,
+            size: PAGE_SIZE,
+            search: search.trim() || undefined,
+            status: status === 'all' ? undefined : status,
+          }),
+          fetchAdsPaymentStats(),
+        ]);
+        if (cancelled) return;
+        const mapped = pageRes.items.map(mapPaymentRow);
+        setPayments(mapped);
+        setTotalItems(pageRes.totalElements);
+        const total = Number(statsRes.totalPayments ?? pageRes.totalElements ?? 0);
+        const capturedAmt = Number(statsRes.totalSuccessfulAmount ?? 0);
+        const capturedCount = mapped.filter((p) => p.status === 'captured').length;
+        const refunded = mapped.filter((p) => p.status === 'refunded').length;
+        setStats({
+          total,
+          captured: capturedCount,
+          capturedAmt,
+          successRate: total > 0 ? (capturedCount / Math.max(1, mapped.length)) * 100 : 0,
+          refunded,
+        });
+      } catch (e) {
+        if (!cancelled) setError(getApiErrorMessage(e, 'Failed to load payments.'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [search, status, method, page]);
 
-  const stats = useMemo(() => {
-    const total = ALL_PAYMENTS.length;
-    const captured = ALL_PAYMENTS.filter((p) => p.status === 'captured');
-    const refunded = ALL_PAYMENTS.filter((p) => p.status === 'refunded').length;
-    const capturedAmt = captured.reduce((s, p) => s + p.amount, 0);
-    return { total, captured: captured.length, capturedAmt, successRate: (captured.length / total) * 100, refunded };
-  }, []);
+  const filtered = useMemo(() => {
+    if (method === 'all') return payments;
+    return payments.filter((p) => p.method === method);
+  }, [payments, method]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const pageItems = filtered;
 
   return (
     <AdminLayout>
@@ -986,7 +990,15 @@ export default function AdsPaymentsScreen() {
           </View>
 
           <View style={{ marginTop: 8, zIndex: 1 }}>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Loading payments…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{error}</Text>
+              </View>
+            ) : filtered.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>No payments match your filters</Text>
                 <Text style={styles.emptySub}>Try clearing the search or switching the method/status filters.</Text>
@@ -1000,12 +1012,12 @@ export default function AdsPaymentsScreen() {
             )}
           </View>
 
-          {filtered.length > 0 && (
+          {!loading && !error && totalItems > 0 && (
             <View style={{ marginTop: gutter, zIndex: 0 }}>
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
-                totalItems={filtered.length}
+                totalItems={totalItems}
                 itemsPerPage={PAGE_SIZE}
                 itemName="payments"
                 onPageChange={setPage}

@@ -11,7 +11,17 @@ import {
   StyleSheet,
   useWindowDimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  fetchHomepageBanners,
+  createHomepageBanner,
+  updateHomepageBanner,
+  deleteHomepageBanner,
+  uploadGeneralBannerImage,
+  resolveCmsMediaUrl,
+} from "@/services/cmsApi";
 import {
   PanelTop,
   PanelBottom,
@@ -103,194 +113,69 @@ const SECTIONS = [
   },
 ];
 
-/* ---------- Dummy seed data ---------- */
-function img(seed: string, w = 500, h = 400) {
-  return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+/* ---------- API helpers ---------- */
+const SECTION_KEYS = ["top", "middle", "bottom", "ad", "single", "grid1", "grid2"];
+
+function emptySectionData(): Record<string, any[]> {
+  return SECTION_KEYS.reduce((acc, key) => ({ ...acc, [key]: [] }), {} as Record<string, any[]>);
 }
 
-const initialData = {
-  top: [
-    {
-      id: "t1",
-      title: "Asvi Home Food",
-      subtitle: "Traditional snacks & sweets",
-      image: img("asvi-food", 500, 380),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "t2",
-      title: "F&T Products",
-      subtitle: "Home furniture essentials",
-      image: img("sofa-stuff", 500, 380),
-      position: 2,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "t3",
-      title: "Gaargi Sofa Stuff",
-      subtitle: "Modern furniture picks",
-      image: img("gaargi-bench", 500, 380),
-      position: 3,
-      status: "Active",
-      link: "",
-    },
-  ],
-  middle: [
-    {
-      id: "m1",
-      title: "Festive Collection",
-      subtitle: "Curated ethnic wear",
-      image: img("festive-mid", 600, 500),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "m2",
-      title: "Home Decor Edit",
-      subtitle: "New season interiors",
-      image: img("decor-mid", 600, 500),
-      position: 2,
-      status: "Inactive",
-      link: "",
-    },
-  ],
-  bottom: [
-    {
-      id: "b1",
-      title: "Winter Essentials",
-      subtitle: "Cozy season picks",
-      image: img("winter-1", 500, 380),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "b2",
-      title: "Kitchen Must-Haves",
-      subtitle: "Everyday cookware",
-      image: img("kitchen-1", 500, 380),
-      position: 2,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "b3",
-      title: "Kids Corner",
-      subtitle: "Toys & essentials",
-      image: img("kids-1", 500, 380),
-      position: 3,
-      status: "Inactive",
-      link: "",
-    },
-  ],
-  ad: [
-    {
-      id: "a1",
-      title: "Mega Sale Week",
-      subtitle: "Up to 70% off storewide",
-      image: img("mega-sale", 1200, 300),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-  ],
-  single: [
-    {
-      id: "s1",
-      title: "New Arrivals",
-      subtitle: "Shop the latest drop",
-      image: img("new-arrivals", 1200, 400),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-  ],
-  grid1: [
-    {
-      id: "g1a",
-      title: "Sarees",
-      subtitle: "",
-      image: img("grid1-a", 400, 400),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "g1b",
-      title: "Kurtis",
-      subtitle: "",
-      image: img("grid1-b", 400, 400),
-      position: 2,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "g1c",
-      title: "Footwear",
-      subtitle: "",
-      image: img("grid1-c", 400, 400),
-      position: 3,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "g1d",
-      title: "Bags",
-      subtitle: "",
-      image: img("grid1-d", 400, 400),
-      position: 4,
-      status: "Inactive",
-      link: "",
-    },
-  ],
-  grid2: [
-    {
-      id: "g2a",
-      title: "Jewellery",
-      subtitle: "",
-      image: img("grid2-a", 400, 400),
-      position: 1,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "g2b",
-      title: "Watches",
-      subtitle: "",
-      image: img("grid2-b", 400, 400),
-      position: 2,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "g2c",
-      title: "Home Decor",
-      subtitle: "",
-      image: img("grid2-c", 400, 400),
-      position: 3,
-      status: "Active",
-      link: "",
-    },
-    {
-      id: "g2d",
-      title: "Beauty",
-      subtitle: "",
-      image: img("grid2-d", 400, 400),
-      position: 4,
-      status: "Active",
-      link: "",
-    },
-  ],
-};
+function mapRowToBanner(row: Record<string, unknown>) {
+  const imagePath = String(row.imagePath ?? row.image_path ?? "");
+  return {
+    id: String(row.id ?? ""),
+    title: String(row.title ?? ""),
+    subtitle: String(row.altText ?? row.alt_text ?? ""),
+    imagePath,
+    image: resolveCmsMediaUrl(imagePath),
+    link: String(row.linkUrl ?? row.link_url ?? ""),
+    position: Number(row.position ?? 1),
+    status: row.isActive === false || row.is_active === false || row.isActive === 0 ? "Inactive" : "Active",
+    sortOrder: Number(row.sortOrder ?? row.sort_order ?? 0),
+  };
+}
+
+function isLocalImageUri(uri: string) {
+  return (
+    uri.startsWith("data:") ||
+    uri.startsWith("blob:") ||
+    uri.startsWith("file:") ||
+    uri.startsWith("content:")
+  );
+}
+
+async function resolveImagePath(uri: string, storedPath: string): Promise<string> {
+  if (!uri.trim() && storedPath) return storedPath;
+  if (!isLocalImageUri(uri)) {
+    if (/^https?:\/\//i.test(uri)) return uri;
+    return storedPath || uri;
+  }
+  const res = await fetch(uri);
+  const blob = await res.blob();
+  const ext = uri.includes("png") ? "png" : "jpg";
+  const uploaded = await uploadGeneralBannerImage(blob, `banner.${ext}`);
+  return String(uploaded.path ?? "");
+}
+
+function positionConflictMessage(err: unknown): string | null {
+  const msg = getApiErrorMessage(err, "").toLowerCase();
+  if (
+    msg.includes("section") &&
+    (msg.includes("position") || msg.includes("duplicate") || msg.includes("unique"))
+  ) {
+    return "A banner already exists for this section and position. Choose a different position.";
+  }
+  if (msg.includes("duplicate") || msg.includes("unique constraint")) {
+    return "This section and position combination is already in use.";
+  }
+  return null;
+}
 
 const emptyForm = {
   title: "",
   subtitle: "",
   image: "",
+  imagePath: "",
   link: "",
   position: "1",
   status: "Active",
@@ -300,7 +185,9 @@ export default function HomepageBannerManagement() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 800;
 
-  const [data, setData] = React.useState<Record<string, any[]>>(initialData);
+  const [data, setData] = React.useState<Record<string, any[]>>(emptySectionData);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
   const [activeKey, setActiveKey] = React.useState("top");
   const [modalVisible, setModalVisible] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -332,14 +219,37 @@ export default function HomepageBannerManagement() {
     setCurrentPage(1);
   }, [activeKey]);
 
-  // responsive column count: single card per row on mobile, section's ideal column count on tablet/web
-  const columns = !isTablet ? 1 : activeSection.cols;
-  const cardWidthPct = 100 / columns;
-
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 2000);
   }
+
+  const loadBanners = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await fetchHomepageBanners();
+      const grouped = emptySectionData();
+      for (const row of rows) {
+        const section = String(row.section ?? "").toLowerCase();
+        if (grouped[section]) {
+          grouped[section].push(mapRowToBanner(row));
+        }
+      }
+      setData(grouped);
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Failed to load banners."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadBanners();
+  }, [loadBanners]);
+
+  // responsive column count: single card per row on mobile, section's ideal column count on tablet/web
+  const columns = !isTablet ? 1 : activeSection.cols;
+  const cardWidthPct = 100 / columns;
 
   async function pickImage() {
     if (Platform.OS !== "web") {
@@ -356,7 +266,7 @@ export default function HomepageBannerManagement() {
       quality: 0.85,
     });
     if (!result.canceled && result.assets.length > 0) {
-      setForm((f) => ({ ...f, image: result.assets[0].uri }));
+      setForm((f) => ({ ...f, image: result.assets[0].uri, imagePath: "" }));
     }
   }
 
@@ -366,7 +276,6 @@ export default function HomepageBannerManagement() {
     setForm({
       ...emptyForm,
       position: String(banners.length + 1),
-      image: img(`new-${Date.now()}`, 500, 400),
     });
     setModalVisible(true);
   }
@@ -378,6 +287,7 @@ export default function HomepageBannerManagement() {
       title: banner.title,
       subtitle: banner.subtitle || "",
       image: banner.image,
+      imagePath: banner.imagePath || "",
       link: banner.link || "",
       position: String(banner.position),
       status: banner.status,
@@ -392,60 +302,97 @@ export default function HomepageBannerManagement() {
     setErrors({});
   }
 
-  function handleSave() {
+  async function handleSave() {
     const newErrors: Record<string, string> = {};
     if (!form.title.trim()) newErrors.title = "Title is required.";
-    if (!form.image.trim()) newErrors.image = "Image is required.";
+    if (!form.image.trim() && !form.imagePath.trim()) newErrors.image = "Image is required.";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    setData((prev) => {
-      const list = prev[activeKey];
-      if (editingId) {
-        return {
-          ...prev,
-          [activeKey]: list.map((b: any) =>
-            b.id === editingId
-              ? { ...b, ...form, position: Number(form.position) || 1 }
-              : b,
-          ),
-        };
-      }
-      const newBanner = {
-        id: `${activeKey}-${Date.now()}`,
-        ...form,
-        position: Number(form.position) || list.length + 1,
+    setSaving(true);
+    try {
+      const imagePath = await resolveImagePath(form.image, form.imagePath);
+      const body = {
+        section: activeKey,
+        position: Number(form.position) || 1,
+        title: form.title.trim(),
+        altText: form.subtitle.trim() || form.title.trim(),
+        imagePath,
+        linkUrl: form.link.trim() || "shop-grid.php",
+        isActive: form.status === "Active",
+        sortOrder: Number(form.position) || 1,
       };
-      return { ...prev, [activeKey]: [...list, newBanner] };
-    });
-    showToast(editingId ? "Banner updated" : "Banner added");
-    closeModal();
+
+      if (editingId) {
+        const updated = await updateHomepageBanner(Number(editingId), body);
+        const mapped = mapRowToBanner(updated);
+        setData((prev) => ({
+          ...prev,
+          [activeKey]: prev[activeKey].map((b: any) =>
+            String(b.id) === String(editingId) ? mapped : b,
+          ),
+        }));
+        showToast("Banner updated");
+      } else {
+        const created = await createHomepageBanner(body);
+        const mapped = mapRowToBanner(created);
+        setData((prev) => ({
+          ...prev,
+          [activeKey]: [...prev[activeKey], mapped],
+        }));
+        showToast("Banner added");
+      }
+      closeModal();
+    } catch (err) {
+      const conflict = positionConflictMessage(err);
+      if (conflict) {
+        setErrors({ position: conflict });
+        showToast(conflict);
+      } else {
+        const msg = getApiErrorMessage(err, "Failed to save banner.");
+        showToast(msg);
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function toggleStatus(id: string) {
-    setData((prev) => ({
-      ...prev,
-      [activeKey]: prev[activeKey].map((b: any) =>
-        b.id === id
-          ? { ...b, status: b.status === "Active" ? "Inactive" : "Active" }
-          : b,
-      ),
-    }));
-    showToast("Status updated");
+  async function toggleStatus(id: string) {
+    const banner = banners.find((b: any) => String(b.id) === String(id));
+    if (!banner) return;
+    const nextActive = banner.status !== "Active";
+    try {
+      const updated = await updateHomepageBanner(Number(banner.id), { isActive: nextActive });
+      const mapped = mapRowToBanner(updated);
+      setData((prev) => ({
+        ...prev,
+        [activeKey]: prev[activeKey].map((b: any) =>
+          String(b.id) === String(id) ? mapped : b,
+        ),
+      }));
+      showToast("Status updated");
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Failed to update status."));
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirmDelete) return;
     const { sectionKey, id } = confirmDelete;
-    setData((prev) => ({
-      ...prev,
-      [sectionKey]: prev[sectionKey].filter((b: any) => b.id !== id),
-    }));
-    setConfirmDelete(null);
-    showToast("Banner deleted");
+    try {
+      await deleteHomepageBanner(Number(id));
+      setData((prev) => ({
+        ...prev,
+        [sectionKey]: prev[sectionKey].filter((b: any) => String(b.id) !== String(id)),
+      }));
+      setConfirmDelete(null);
+      showToast("Banner deleted");
+    } catch (err) {
+      showToast(getApiErrorMessage(err, "Failed to delete banner."));
+    }
   }
 
   return (
@@ -614,7 +561,12 @@ export default function HomepageBannerManagement() {
                 </View>
 
                 {/* Cards grid */}
-                {banners.length === 0 ? (
+                {loading ? (
+                  <View style={styles.empty}>
+                    <ActivityIndicator size="large" color="#f97316" />
+                    <Text style={styles.emptyText}>Loading banners…</Text>
+                  </View>
+                ) : banners.length === 0 ? (
                   <View style={styles.empty}>
                     <ImageIcon size={26} color="#c4c8d0" />
                     <Text style={styles.emptyText}>
@@ -641,7 +593,7 @@ export default function HomepageBannerManagement() {
                           <View style={styles.card}>
                             <View style={styles.cardImageWrap}>
                               <Image
-                                source={{ uri: b.image }}
+                                source={{ uri: resolveCmsMediaUrl(b.imagePath || b.image) }}
                                 style={styles.cardImage}
                               />
                               <View style={styles.positionChip}>
@@ -832,11 +784,20 @@ export default function HomepageBannerManagement() {
                   <View style={{ flex: 1 }}>
                     <Field label="Position">
                       <TextInput
-                        style={styles.input}
+                        style={[
+                          styles.input,
+                          errors.position ? styles.inputError : null,
+                        ]}
                         keyboardType="number-pad"
                         value={form.position}
-                        onChangeText={(t) => setForm({ ...form, position: t })}
+                        onChangeText={(t) => {
+                          setForm({ ...form, position: t });
+                          setErrors({ ...errors, position: "" });
+                        }}
                       />
+                      {!!errors.position && (
+                        <Text style={styles.errorText}>{errors.position}</Text>
+                      )}
                     </Field>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -855,7 +816,7 @@ export default function HomepageBannerManagement() {
                   <View style={styles.currentImageWrap}>
                     <Image
                       source={{
-                        uri: form.image || img("placeholder", 500, 300),
+                        uri: form.image || "https://via.placeholder.com/500x300?text=No+Image",
                       }}
                       style={styles.currentImage}
                       resizeMode="cover"
@@ -908,10 +869,15 @@ export default function HomepageBannerManagement() {
                   <Text style={styles.btnSecondaryText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.btnPrimary}
+                  style={[styles.btnPrimary, saving && { opacity: 0.6 }]}
                   onPress={handleSave}
+                  disabled={saving}
                 >
-                  <Save size={15} color="#fff" />
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Save size={15} color="#fff" />
+                  )}
                   <Text style={styles.btnPrimaryText}>
                     {editingId ? "Update Banner" : "Add Banner"}
                   </Text>

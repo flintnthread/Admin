@@ -23,7 +23,7 @@
  *   desktop : width >= 1024
  * ----------------------------------------------------------------
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   View,
@@ -38,6 +38,13 @@ import Svg, { Path, Circle, Rect } from "react-native-svg";
 import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  fetchAdsOrders,
+  fetchAdsOrderStats,
+  formatAdsDate,
+  type AdsApiRow,
+} from "@/services/adsApi";
 
 /* ------------------------------------------------------------------ */
 /* Design tokens — same as ads-payments.tsx                             */
@@ -74,6 +81,7 @@ type OrderStatus = "paid" | "pending";
 
 interface Order {
   id: string;
+  internalId: number;
   customerName: string;
   customerEmail: string;
   adTitle: string;
@@ -86,74 +94,46 @@ interface Order {
   date: string;
 }
 
+function mapAdType(raw?: unknown): Order["adType"] {
+  const label = String(raw ?? "Display");
+  const normalized = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+  if (normalized === "Placement" || normalized === "Performance" || normalized === "Campaign" || normalized === "Display") {
+    return normalized;
+  }
+  return "Display";
+}
+
+function mapBillingType(raw?: unknown): BillingType {
+  return String(raw ?? "").toLowerCase() === "daily" ? "Daily" : "Monthly";
+}
+
+function mapOrderRow(row: AdsApiRow): Order {
+  const status = String(row.status ?? "pending").toLowerCase();
+  const billingType = mapBillingType(row.billingType);
+  const dailyRate = Number(row.dailyRate ?? 0) || 0;
+  const monthlyRate = Number(row.monthlyRate ?? 0) || 0;
+  return {
+    id: String(row.orderId ?? row.id ?? ""),
+    internalId: Number(row.id ?? 0),
+    customerName: String(row.customerName ?? "—"),
+    customerEmail: String(row.customerEmail ?? ""),
+    adTitle: String(row.adName ?? "—"),
+    adType: mapAdType(row.adType),
+    billingType,
+    dailyAmt: billingType === "Daily" ? dailyRate : undefined,
+    monthlyAmt: monthlyRate,
+    amount: Number(row.amount ?? 0) || 0,
+    status: status === "paid" ? "paid" : "pending",
+    date: formatAdsDate(row.createdAt),
+  };
+}
+
 const AD_TYPE_COLORS: Record<string, string> = {
   Placement: COLORS.navyDeep,
   Performance: COLORS.orange,
   Campaign: "#8B5CF6",
   Display: COLORS.blue,
 };
-
-function seeded(seed: number) {
-  let s = seed % 2147483647;
-  if (s <= 0) s += 2147483646;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-const CUSTOMERS = [
-  { name: "Flint & Thread", mail: "flintnthread@gmail.com" },
-  { name: "Tayi Gopi Chand", mail: "gopichand93667@gmail.com" },
-  { name: "Rekha Traders", mail: "rekha.traders@gmail.com" },
-  { name: "Studio North", mail: "hello@studionorth.co" },
-  { name: "Jane Smith", mail: "jane@example.com" },
-  { name: "John Doe", mail: "john@example.com" },
-];
-const AD_TITLES: { title: string; type: Order["adType"] }[] = [
-  { title: "Landing Page Sub-Banner", type: "Placement" },
-  { title: "Instagram Posts", type: "Performance" },
-  { title: "Search Sponsored Listings - High", type: "Performance" },
-  { title: "YouTube Video Spotlight", type: "Performance" },
-  { title: "Homepage Hero Takeover", type: "Placement" },
-  { title: "Retargeting Campaign - Q3", type: "Campaign" },
-  { title: "Display Network Banner", type: "Display" },
-  { title: "LinkedIn Sponsored Post", type: "Performance" },
-];
-
-function buildOrders(count: number): Order[] {
-  const rnd = seeded(2026);
-  return Array.from({ length: count }).map((_, i) => {
-    const cust = CUSTOMERS[i % CUSTOMERS.length];
-    const ad = AD_TITLES[Math.floor(rnd() * AD_TITLES.length)];
-    const billingType: BillingType = rnd() > 0.62 ? "Daily" : "Monthly";
-    const dailyAmt =
-      billingType === "Daily"
-        ? Math.round((3000 + rnd() * 25000) / 100) * 100
-        : undefined;
-    const monthlyAmt = Math.round((5000 + rnd() * 320000) / 100) * 100;
-    const status: OrderStatus = rnd() > 0.42 ? "paid" : "pending";
-    const day = 1 + Math.floor(rnd() * 27);
-    return {
-      id: `AD-2025-${1000 + Math.floor(rnd() * 8999)}`,
-      customerName: cust.name,
-      customerEmail: cust.mail,
-      adTitle: ad.title,
-      adType: ad.type,
-      billingType,
-      dailyAmt,
-      monthlyAmt,
-      amount:
-        billingType === "Daily"
-          ? dailyAmt! * (2 + Math.floor(rnd() * 18))
-          : monthlyAmt,
-      status,
-      date: `${String(day).padStart(2, "0")} Oct, 2025`,
-    };
-  });
-}
-
-const ALL_ORDERS = buildOrders(42);
 
 /* ------------------------------------------------------------------ */
 /* Layout helpers                                                       */
@@ -1123,6 +1103,17 @@ export default function AdsOrderManagementScreen() {
   const [billing, setBilling] = useState<BillingFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [page, setPage] = useState(1);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    total: 0,
+    paidCount: 0,
+    pendingCount: 0,
+    totalRev: 0,
+    pendingAmt: 0,
+  });
 
   const bp: Breakpoint =
     measuredWidth >= 1024
@@ -1139,46 +1130,57 @@ export default function AdsOrderManagementScreen() {
   const gridGap = 16;
   const gridCardWidth = (fullWidth - gridGap * (gridCols - 1)) / gridCols;
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return ALL_ORDERS.filter((o) => {
-      if (status !== "all" && o.status !== status) return false;
-      if (billing !== "all" && o.billingType !== billing) return false;
-      if (
-        q &&
-        !(
-          o.id.toLowerCase().includes(q) ||
-          o.customerName.toLowerCase().includes(q) ||
-          o.adTitle.toLowerCase().includes(q)
-        )
-      )
-        return false;
-      return true;
-    });
-  }, [search, status, billing]);
-
   useEffect(() => setPage(1), [search, status, billing, viewMode]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const stats = useMemo(() => {
-    const total = ALL_ORDERS.length;
-    const paid = ALL_ORDERS.filter((o) => o.status === "paid");
-    const pending = ALL_ORDERS.filter((o) => o.status === "pending");
-    const totalRev = ALL_ORDERS.reduce((s, o) => s + o.amount, 0);
-    const pendingAmt = pending.reduce((s, o) => s + o.amount, 0);
-    return {
-      total,
-      paidCount: paid.length,
-      pendingCount: pending.length,
-      totalRev,
-      pendingAmt,
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [pageRes, statsRes] = await Promise.all([
+          fetchAdsOrders({
+            page: page - 1,
+            size: PAGE_SIZE,
+            search: search.trim() || undefined,
+            status: status === "all" ? undefined : status,
+            billingType: billing === "all" ? undefined : billing.toLowerCase(),
+          }),
+          fetchAdsOrderStats(),
+        ]);
+        if (cancelled) return;
+        setOrders(pageRes.items.map(mapOrderRow));
+        setTotalItems(pageRes.totalElements);
+        const pendingCount = Number(statsRes.pendingOrders ?? 0);
+        const paidCount = Number(statsRes.paidOrders ?? 0);
+        const totalPaid = Number(statsRes.totalPaidAmount ?? 0);
+        setStats({
+          total: Number(statsRes.totalOrders ?? pageRes.totalElements ?? 0),
+          paidCount,
+          pendingCount,
+          totalRev: totalPaid,
+          pendingAmt: Math.max(0, totalPaid * (pendingCount / Math.max(1, paidCount + pendingCount))),
+        });
+      } catch (e) {
+        if (!cancelled) setError(getApiErrorMessage(e, "Failed to load orders."));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-  }, []);
+  }, [search, status, billing, page]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const pageItems = orders;
 
   const handleViewOrder = (order: Order) => {
-    router.push("/order-details" as any);
+    if (order.internalId > 0) {
+      router.push({ pathname: "/order-details" as any, params: { id: String(order.internalId) } });
+      return;
+    }
+    router.push({ pathname: "/order-details" as any, params: { orderId: order.id } });
   };
   const handleViewPayments = (order: Order) => {
     router.push({
@@ -1286,7 +1288,15 @@ export default function AdsOrderManagementScreen() {
 
           {/* Content */}
           <View style={{ marginTop: 8, zIndex: 1 }}>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Loading orders…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{error}</Text>
+              </View>
+            ) : pageItems.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>
                   No orders match your filters
@@ -1324,12 +1334,12 @@ export default function AdsOrderManagementScreen() {
             )}
           </View>
 
-          {filtered.length > 0 && (
+          {!loading && !error && totalItems > 0 && (
             <View style={{ marginTop: gutter, zIndex: 0 }}>
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
-                totalItems={filtered.length}
+                totalItems={totalItems}
                 itemsPerPage={PAGE_SIZE}
                 itemName="orders"
                 onPageChange={setPage}

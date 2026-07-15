@@ -18,14 +18,26 @@
  */
 
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+    createAdsAdminUser,
+    deleteAdsAdminUser,
+    fetchAdsAdminUsers,
+    toApiStatus,
+    toUiStatus,
+    updateAdsAdminUser,
+    type AdsApiRow,
+} from '@/services/adsApi';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Animated,
     FlatList,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -45,6 +57,13 @@ import PersonXFill from 'react-native-bootstrap-icons/icons/person-x-fill';
 import PlusLg from 'react-native-bootstrap-icons/icons/plus-lg';
 import Search from 'react-native-bootstrap-icons/icons/search';
 
+function notify(title: string, message: string) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(message ? `${title}\n\n${message}` : title);
+        return;
+    }
+    Alert.alert(title, message);
+}
 
 // ---------------------------------------------------------------------------
 // Types & seed data
@@ -62,13 +81,41 @@ interface AdsUser {
     lastLogin: string;
 }
 
-const SEED_USERS: AdsUser[] = [
-    { id: 5, fullName: 'Soujanya Veginati', username: 'souji', email: 'soujanyaveginati8096@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Never' },
-    { id: 4, fullName: 'Tayi Gopi Chand', username: 'Gopi', email: 'gopichand93667@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Mar 19, 2026 16:29' },
-    { id: 3, fullName: 'System Administrator', username: 'admin', email: 'admin@ads.com', role: 'Admin', status: 'Active', lastLogin: 'Feb 14, 2026 10:18' },
-    { id: 2, fullName: 'Priya Reddy', username: 'priya', email: 'priyareddy@gmail.com', role: 'Manager', status: 'Inactive', lastLogin: 'Apr 20, 2026 11:45' },
-    { id: 1, fullName: 'Ramesh Kumar', username: 'ramesh', email: 'rameshkumar@gmail.com', role: 'Viewer', status: 'Active', lastLogin: 'Apr 21, 2026 09:12' },
-];
+function toUiRole(role?: unknown): Role {
+    const normalized = String(role ?? '').toLowerCase();
+    if (normalized === 'manager') return 'Manager';
+    if (normalized === 'viewer') return 'Viewer';
+    return 'Admin';
+}
+
+function toApiRole(role: Role): string {
+    return role.toLowerCase();
+}
+
+function formatLastLogin(value?: unknown): string {
+    if (value == null || value === '') return 'Never';
+    const d = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(d.getTime())) return 'Never';
+    return d.toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function mapAdsUserFromApi(row: AdsApiRow): AdsUser {
+    return {
+        id: Number(row.id),
+        fullName: String(row.fullName ?? row.full_name ?? ''),
+        username: String(row.username ?? ''),
+        email: String(row.email ?? ''),
+        role: toUiRole(row.role),
+        status: toUiStatus(row.status),
+        lastLogin: formatLastLogin(row.lastLogin ?? row.last_login),
+    };
+}
 
 const ROLES: Role[] = ['Admin', 'Manager', 'Viewer'];
 const STATUSES: Status[] = ['Active', 'Inactive'];
@@ -391,26 +438,47 @@ const UserFormModal: React.FC<{
     visible: boolean;
     isEdit: boolean;
     initial: UserFormState;
+    saving?: boolean;
     onCancel: () => void;
-    onSubmit: (form: UserFormState) => void;
-}> = ({ visible, isEdit, initial, onCancel, onSubmit }) => {
+    onSubmit: (form: UserFormState) => void | Promise<void>;
+}> = ({ visible, isEdit, initial, saving = false, onCancel, onSubmit }) => {
     const [form, setForm] = useState<UserFormState>(initial);
     const { width } = useWindowDimensions();
     const isPhone = getBreakpoint(width) === 'xs' || getBreakpoint(width) === 'sm' || getBreakpoint(width) === 'md';
+    // Picker is unreliable on react-native-web; always use dropdown on web.
+    const useDropdown = isPhone || Platform.OS === 'web';
 
     React.useEffect(() => {
         if (visible) setForm(initial);
-    }, [visible, initial]);
+        // Only reseat form when modal opens / switches add↔edit (not on every parent re-render).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visible, isEdit, initial.fullName, initial.username, initial.email, initial.role, initial.status]);
 
     const update = (key: keyof UserFormState, val: string) =>
         setForm((f) => ({ ...f, [key]: val }));
 
     const handleSubmit = () => {
+        if (saving) return;
         if (!form.fullName.trim() || !form.username.trim() || !form.email.trim()) {
-            Alert.alert('Missing information', 'Please fill in full name, username and email.');
+            notify('Missing information', 'Please fill in full name, username and email.');
             return;
         }
-        onSubmit(form);
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+        if (!emailOk) {
+            notify('Invalid email', 'Please enter a valid email address.');
+            return;
+        }
+        if (!isEdit && form.password.trim().length < 6) {
+            notify('Missing information', 'Please enter a password of at least 6 characters.');
+            return;
+        }
+        void onSubmit({
+            ...form,
+            fullName: form.fullName.trim(),
+            username: form.username.trim(),
+            email: form.email.trim(),
+            password: form.password,
+        });
     };
 
     if (!visible) return null;
@@ -421,12 +489,12 @@ const UserFormModal: React.FC<{
                 <View style={styles.modalCard}>
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalHeaderText}>{isEdit ? 'Edit User' : 'Add New User'}</Text>
-                        <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={saving}>
                             <Ionicons name="close-outline" size={22} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={styles.modalBody}>
+                    <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
                         <Text style={styles.label}>Full Name</Text>
                         <TextInput
                             style={styles.input}
@@ -434,6 +502,7 @@ const UserFormModal: React.FC<{
                             onChangeText={(t) => update('fullName', t)}
                             placeholder="e.g. Priya Reddy"
                             placeholderTextColor="#9CA3AF"
+                            editable={!saving}
                         />
 
                         <Text style={styles.label}>Username</Text>
@@ -441,10 +510,11 @@ const UserFormModal: React.FC<{
                             style={styles.input}
                             value={form.username}
                             onChangeText={(t) => update('username', t)}
-                            placeholder="admin@flintnthread.in"
+                            placeholder="e.g. priya.admin"
                             placeholderTextColor="#9CA3AF"
                             autoCapitalize="none"
                             autoComplete="username"
+                            editable={!saving}
                         />
 
                         <Text style={styles.label}>Email</Text>
@@ -457,25 +527,27 @@ const UserFormModal: React.FC<{
                             autoCapitalize="none"
                             keyboardType="email-address"
                             autoComplete="email"
+                            editable={!saving}
                         />
 
-                        <Text style={styles.label}>Password</Text>
+                        <Text style={styles.label}>Password{isEdit ? ' (optional)' : ''}</Text>
                         <TextInput
                             style={styles.input}
                             value={form.password}
                             onChangeText={(t) => update('password', t)}
-                            placeholder={isEdit ? 'Leave blank to keep current password' : '••••••••'}
+                            placeholder={isEdit ? 'Leave blank to keep current password' : 'Min. 6 characters'}
                             placeholderTextColor="#9CA3AF"
                             secureTextEntry
                             autoComplete="new-password"
+                            editable={!saving}
                         />
 
                         <Text style={styles.label}>Role</Text>
-                        {isPhone ? (
+                        {useDropdown ? (
                             <CustomDropdown
                                 label="Select Role"
                                 value={form.role}
-                                options={ROLES as any}
+                                options={ROLES as unknown as string[]}
                                 onValueChange={(v) => update('role', v)}
                             />
                         ) : (
@@ -493,11 +565,11 @@ const UserFormModal: React.FC<{
                         )}
 
                         <Text style={styles.label}>Status</Text>
-                        {isPhone ? (
+                        {useDropdown ? (
                             <CustomDropdown
                                 label="Select Status"
                                 value={form.status}
-                                options={STATUSES as any}
+                                options={STATUSES as unknown as string[]}
                                 onValueChange={(v) => update('status', v)}
                             />
                         ) : (
@@ -514,12 +586,20 @@ const UserFormModal: React.FC<{
                             </View>
                         )}
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={saving}>
                                 <Ionicons name="close-outline" size={15} color="#fff" />
                                 <Text style={styles.cancelBtnText}>Cancel</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                                <Ionicons name="save-outline" size={15} color="#fff" />
+                            <TouchableOpacity
+                                style={[styles.submitBtn, saving && { opacity: 0.7 }]}
+                                onPress={handleSubmit}
+                                disabled={saving}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Ionicons name="save-outline" size={15} color="#fff" />
+                                )}
                                 <Text style={styles.submitBtnText}>{isEdit ? 'Save Changes' : 'Add User'}</Text>
                             </TouchableOpacity>
                         </View>
@@ -599,12 +679,32 @@ const AdsAdminUsers: React.FC = () => {
     const isWide = bp === 'xl' || bp === 'xxl';
     const statsWide = !isPhone; // 4-across from tablet upward, 2x2 on phones
 
-    const [users, setUsers] = useState<AdsUser[]>(SEED_USERS);
+    const [users, setUsers] = useState<AdsUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState<'All' | Role>('All');
     const [statusFilter, setStatusFilter] = useState<'All' | Status>('All');
     const [view, setView] = useState<'grid' | 'list'>('list');
     const [page, setPage] = useState(1);
+
+    const loadUsers = useCallback(async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+            const rows = await fetchAdsAdminUsers();
+            setUsers(rows.map(mapAdsUserFromApi));
+        } catch (err) {
+            setLoadError(getApiErrorMessage(err, 'Failed to load ads admin users.'));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadUsers();
+    }, [loadUsers]);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingUser, setEditingUser] = useState<AdsUser | null>(null);
@@ -671,37 +771,50 @@ const AdsAdminUsers: React.FC = () => {
         setEditingUser(user);
         setModalVisible(true);
     };
-    const closeModal = () => setModalVisible(false);
-
-    const handleSubmitForm = (form: UserFormState) => {
-        if (editingUser) {
-            setUsers((prev) =>
-                prev.map((u) =>
-                    u.id === editingUser.id
-                        ? { ...u, fullName: form.fullName, username: form.username, email: form.email, role: form.role, status: form.status }
-                        : u
-                )
-            );
-            showToast('✅  User updated successfully!');
-        } else {
-            const newId = users.length ? Math.max(...users.map((u) => u.id)) + 1 : 1;
-            const newUser: AdsUser = {
-                id: newId,
-                fullName: form.fullName,
-                username: form.username,
-                email: form.email,
-                role: form.role,
-                status: form.status,
-                lastLogin: 'Never',
-            };
-            setUsers((prev) => [newUser, ...prev]);
-            setPage(1);
-            setSearch('');
-            setRoleFilter('All');
-            setStatusFilter('All');
-            showToast('✅  New user added successfully!');
-        }
+    const closeModal = () => {
+        if (saving) return;
         setModalVisible(false);
+        setEditingUser(null);
+    };
+
+    const handleSubmitForm = async (form: UserFormState) => {
+        const body: AdsApiRow = {
+            fullName: form.fullName.trim(),
+            username: form.username.trim(),
+            email: form.email.trim().toLowerCase(),
+            role: toApiRole(form.role),
+            status: toApiStatus(form.status),
+        };
+
+        setSaving(true);
+        try {
+            if (editingUser) {
+                if (form.password.trim()) {
+                    body.password = form.password;
+                }
+                await updateAdsAdminUser(editingUser.id, body);
+                showToast('User updated successfully!');
+            } else {
+                const password = form.password.trim();
+                if (password.length < 6) {
+                    notify('Missing information', 'Please enter a password of at least 6 characters.');
+                    return;
+                }
+                await createAdsAdminUser({ ...body, password });
+                showToast('New user added successfully!');
+                setPage(1);
+                setSearch('');
+                setRoleFilter('All');
+                setStatusFilter('All');
+            }
+            setModalVisible(false);
+            setEditingUser(null);
+            await loadUsers();
+        } catch (err) {
+            notify('Error', getApiErrorMessage(err, editingUser ? 'Could not update user.' : 'Could not add user.'));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleDelete = (user: AdsUser) => {
@@ -709,11 +822,19 @@ const AdsAdminUsers: React.FC = () => {
         setDeleteModalVisible(true);
     };
 
-    const confirmDelete = () => {
-        if (deletingUser) {
-            setUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+    const confirmDelete = async () => {
+        if (!deletingUser) return;
+        setSaving(true);
+        try {
+            await deleteAdsAdminUser(deletingUser.id);
             setDeleteModalVisible(false);
             setDeletingUser(null);
+            showToast('User deleted successfully!');
+            await loadUsers();
+        } catch (err) {
+            notify('Error', getApiErrorMessage(err, 'Could not delete user.'));
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -722,16 +843,20 @@ const AdsAdminUsers: React.FC = () => {
         setDeletingUser(null);
     };
 
-    const formInitial: UserFormState = editingUser
-        ? {
-            fullName: editingUser.fullName,
-            username: editingUser.username,
-            email: editingUser.email,
-            password: '',
-            role: editingUser.role,
-            status: editingUser.status,
-        }
-        : emptyForm;
+    const formInitial: UserFormState = useMemo(
+        () =>
+            editingUser
+                ? {
+                    fullName: editingUser.fullName,
+                    username: editingUser.username,
+                    email: editingUser.email,
+                    password: '',
+                    role: editingUser.role,
+                    status: editingUser.status,
+                }
+                : emptyForm,
+        [editingUser]
+    );
 
     // ---- Row / card renderers ------------------------------------------
     const renderTableRow = ({ item }: { item: AdsUser }) => {
@@ -787,9 +912,14 @@ const AdsAdminUsers: React.FC = () => {
                                 </View>
                             </View>
 
-                            <TouchableOpacity style={[styles.addBtn, isPhone && { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8 }]} onPress={openAddModal}>
+                            <TouchableOpacity
+                                style={[styles.addBtn, isPhone && { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}
+                                onPress={openAddModal}
+                                accessibilityRole="button"
+                                accessibilityLabel="Add New User"
+                            >
                                 <PlusLg width={14} height={14} fill="#fff" />
-                                {!isPhone && <Text style={styles.addBtnText}>Add New User</Text>}
+                                <Text style={styles.addBtnText}>{isPhone ? 'Add' : 'Add New User'}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -885,7 +1015,14 @@ const AdsAdminUsers: React.FC = () => {
                     </View>
 
                     {/* ---------- Data (table on wide screens, cards on phones / grid view) ---------- */}
-                    {useCardLayout ? (
+                    {loadError ? (
+                        <Text style={{ color: COLORS.danger, marginBottom: 12 }}>{loadError}</Text>
+                    ) : null}
+                    {loading ? (
+                        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={COLORS.orange} />
+                        </View>
+                    ) : useCardLayout ? (
                         filtered.length === 0 ? (
                             <View style={styles.dataCard}>
                                 <Text style={styles.emptyText}>No users match your filters.</Text>
@@ -954,9 +1091,11 @@ const AdsAdminUsers: React.FC = () => {
                 </ScrollView>
 
                 <UserFormModal
+                    key={editingUser ? `edit-${editingUser.id}` : 'add-user'}
                     visible={modalVisible}
                     isEdit={!!editingUser}
                     initial={formInitial}
+                    saving={saving}
                     onCancel={closeModal}
                     onSubmit={handleSubmitForm}
                 />
@@ -1021,7 +1160,8 @@ const styles = StyleSheet.create({
     addBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.orange,
         paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10,
-        shadowColor: COLORS.orange, shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3,
+        shadowColor: COLORS.orange, shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 6,
+        zIndex: 20,
     },
     addBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
 

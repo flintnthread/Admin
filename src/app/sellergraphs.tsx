@@ -174,6 +174,7 @@ const EMPTY_CHART_DATA: SellerGraphChartData = {
   profileCompleted: [],
   approved: [],
   productsAdded: [],
+  ordersPlaced: [],
   shiprocketUploaded: [],
   maxY: 100,
 };

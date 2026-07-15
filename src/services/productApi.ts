@@ -77,12 +77,57 @@ export async function fetchAdminCatalogProducts(params?: {
   return fetchProducts({ ...params, adminOnly: true });
 }
 
+export type CatalogMaterial = {
+  material: string;
+  hsnCode?: string;
+  gst?: number;
+};
+
+export type CatalogLeafSubcategory = {
+  id: number;
+  name: string;
+  gstPercentage?: number;
+  materials?: CatalogMaterial[];
+};
+
+export type CatalogMiddleCategory = {
+  id: number;
+  name: string;
+  gstPercentage?: number;
+  materials?: CatalogMaterial[];
+  children?: CatalogLeafSubcategory[];
+};
+
+export type CatalogMainCategory = {
+  id: number;
+  name: string;
+  subcategories?: CatalogMiddleCategory[];
+};
+
+export type DeliverySlabRow = {
+  id?: number;
+  label: string;
+  minWeightKg: number;
+  maxWeightKg: number;
+  intraCityCharge: number;
+  metroMetroCharge: number;
+  custom?: boolean;
+};
+
 export async function fetchProductCatalog(): Promise<{
-  categories: { id: number; name: string; subcategories: { id: number; name: string }[] }[];
+  categories: CatalogMainCategory[];
   colors?: { id: number; name: string; code?: string }[];
   sizes?: { id: number; name: string; code?: string }[];
+  deliverySlabs?: DeliverySlabRow[];
 }> {
   return adminApiRequest("/api/admin/products/catalog");
+}
+
+export async function fetchDeliveryChargesForWeight(weightKg: number): Promise<DeliverySlabRow | null> {
+  if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
+  return adminApiRequest(
+    `/api/admin/products/catalog/delivery-charges?weightKg=${encodeURIComponent(String(weightKg))}`,
+  );
 }
 
 export async function fetchPendingProducts(page = 0, size = 20): Promise<PageResponse<ProductSummary>> {
@@ -118,6 +163,20 @@ export async function rejectProduct(id: number, note?: string): Promise<void> {
   await adminApiRequest(`/api/admin/products/${id}/reject`, {
     method: "POST",
     body: JSON.stringify({ note, reason: note }),
+  });
+}
+
+export async function deactivateProduct(id: number, note?: string): Promise<void> {
+  await adminApiRequest(`/api/admin/products/${id}/deactivate`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function activateProduct(id: number, note?: string): Promise<void> {
+  await adminApiRequest(`/api/admin/products/${id}/activate`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
   });
 }
 

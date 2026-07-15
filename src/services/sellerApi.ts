@@ -118,6 +118,18 @@ export async function resendSellerVerification(id: number): Promise<{ message: s
   return adminApiRequest(`/api/admin/sellers/${id}/resend-verification`, { method: "POST" });
 }
 
+export async function createSeller(body: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobile: string;
+}): Promise<Record<string, unknown>> {
+  return adminApiRequest("/api/admin/sellers", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function fetchSellers(params?: {
   status?: string;
   search?: string;
@@ -146,6 +158,7 @@ export type SellerGraphChartData = {
   profileCompleted: number[];
   approved: number[];
   productsAdded: number[];
+  ordersPlaced: number[];
   shiprocketUploaded: number[];
   maxY: number;
 };
@@ -251,6 +264,7 @@ export function normalizeSellerGraphSummary(
     profileCompleted: num("profileCompleted"),
     approved: num("approved", num("active")),
     productsAdded: num("productsAdded"),
+    ordersPlaced: num("ordersPlaced"),
     shiprocketUploaded: num("shiprocketUploaded"),
     total: num("total", num("registered")),
     active: num("active", num("approved")),
@@ -273,6 +287,7 @@ export function normalizeSellerGraphChart(raw: unknown): SellerGraphChartData {
       profileCompleted: asNums("profileCompleted"),
       approved: asNums("approved"),
       productsAdded: asNums("productsAdded"),
+      ordersPlaced: asNums("ordersPlaced"),
       shiprocketUploaded: asNums("shiprocketUploaded"),
       maxY: Number(o.maxY) || 100,
     };
@@ -284,6 +299,7 @@ export function normalizeSellerGraphChart(raw: unknown): SellerGraphChartData {
       profileCompleted: [],
       approved: [],
       productsAdded: [],
+      ordersPlaced: [],
       shiprocketUploaded: [],
       maxY: Math.max(100, ...raw.map((p) => Number((p as { count?: number }).count) || 0)),
     };
@@ -294,6 +310,7 @@ export function normalizeSellerGraphChart(raw: unknown): SellerGraphChartData {
     profileCompleted: [],
     approved: [],
     productsAdded: [],
+    ordersPlaced: [],
     shiprocketUploaded: [],
     maxY: 100,
   };
@@ -392,10 +409,10 @@ export async function fetchShiprocketSellers(
 }
 
 export async function fetchBankVerifications(
-  status: "pending" | "verified" = "pending",
+  status: "pending" | "processing" | "verified" | "failed" | "expired" = "pending",
   page = 0,
   size = 200
-): Promise<PageResponse<SellerSummary>> {
+): Promise<PageResponse<SellerSummary & { verificationStatus?: string; attempts?: number }>> {
   return adminApiRequest(`/api/admin/sellers/bank/verifications?status=${status}&page=${page}&size=${size}`);
 }
 
@@ -502,22 +519,23 @@ export async function exportSellerProductsCsv(sellerId: number): Promise<string>
 export async function exportSellerOrdersCsv(sellerId: number): Promise<string> {
   // Fetch orders for this seller using the order API
   const q = new URLSearchParams();
-  q.set('page', '0');
-  q.set('size', '1000');
-  q.set('sellerId', String(sellerId));
-  const response = await adminApiRequest<{ items: unknown[] }>(
-    `/api/admin/orders?${q}`
-  );
+  q.set("page", "0");
+  q.set("size", "1000");
+  q.set("sellerId", String(sellerId));
+  const response = await adminApiRequest<{ items: unknown[] }>(`/api/admin/orders?${q}`);
   const orders = response.items || [];
 
-  // Generate CSV
-  const headers = ['Order ID', 'Status', 'Total Amount', 'Created At'];
-  const rows = orders.map((o: any) => [
-    o.id || '',
-    o.status || '',
-    o.totalAmount || 0,
-    o.createdAt || '',
-  ]);
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  return csv;
+  const headers = ["Order ID", "Order Number", "Status", "Payment Status", "Total Amount", "Created At"];
+  const rows = orders.map((raw) => {
+    const o = raw as Record<string, unknown>;
+    return [
+      o.id ?? "",
+      o.orderNumber ?? "",
+      o.orderStatus ?? o.status ?? "",
+      o.paymentStatus ?? "",
+      o.totalAmount ?? 0,
+      o.createdAt ?? "",
+    ];
+  });
+  return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
 }

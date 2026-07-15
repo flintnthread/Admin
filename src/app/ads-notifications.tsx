@@ -26,6 +26,13 @@ import Svg, { Path, Circle, Rect, Line } from "react-native-svg";
 import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import { getApiErrorMessage } from "@/lib/api/client";
+import {
+  fetchAdsNotifications,
+  updateAdsNotification,
+  formatAdsDate,
+  type AdsApiRow,
+} from "@/services/adsApi";
 
 /* ------------------------------------------------------------------ */
 /* Design Tokens                                                        */
@@ -56,7 +63,7 @@ const COLORS = {
 type NotificationStatus = "paid" | "pending" | "failed" | "cancelled" | "refunded";
 
 interface AppNotification {
-  id: string;
+  id: number;
   orderId: string;
   customer: string;
   email: string;
@@ -67,16 +74,27 @@ interface AppNotification {
   date: string;
 }
 
-const INITIAL_DATA: AppNotification[] = [
-  { id: "notif_1", orderId: "AD-2025-2159", customer: "Flint & Thread", email: "flintnthread@gmail.com", detail: "Landing Page Sub-Banner", amount: 325000, status: "paid", unread: true, date: "26 Oct 2025" },
-  { id: "notif_2", orderId: "AD-2025-7865", customer: "Tayi Gopi Chand", email: "gopichand93667@gmail.com", detail: "Instagram Posts", amount: 15000, status: "paid", unread: true, date: "06 Oct 2025" },
-  { id: "notif_3", orderId: "AD-2025-5982", customer: "Tayi Gopi Chand", email: "gopichand93667@gmail.com", detail: "Search Sponsored Listings", amount: 100, status: "pending", unread: true, date: "06 Oct 2025" },
-  { id: "notif_4", orderId: "AD-2025-1780", customer: "Tayi Gopi Chand", email: "gopichand93667@gmail.com", detail: "YouTube Video Spotlight", amount: 30000, status: "pending", unread: true, date: "06 Oct 2025" },
-  { id: "notif_5", orderId: "AD-2025-1277", customer: "Tayi Gopi Chand", email: "gopichand93667@gmail.com", detail: "YouTube Video Spotlight", amount: 30000, status: "pending", unread: true, date: "06 Oct 2025" },
-  { id: "notif_6", orderId: "AD-2025-9988", customer: "Studio North", email: "hello@studionorth.co", detail: "Home Page Hero", amount: 50000, status: "failed", unread: false, date: "05 Oct 2025" },
-  { id: "notif_7", orderId: "AD-2025-5544", customer: "Rekha Traders", email: "rekha@gmail.com", detail: "Sidebar Ad", amount: 12000, status: "refunded", unread: false, date: "04 Oct 2025" },
-  { id: "notif_8", orderId: "AD-2025-1122", customer: "Jane Smith", email: "jane@example.com", detail: "Footer Ad", amount: 8000, status: "cancelled", unread: false, date: "03 Oct 2025" },
-];
+function mapNotificationStatus(raw?: unknown): NotificationStatus {
+  const s = String(raw ?? "pending").toLowerCase();
+  if (s === "paid" || s === "pending" || s === "failed" || s === "cancelled" || s === "refunded") {
+    return s;
+  }
+  return "pending";
+}
+
+function mapNotificationRow(row: AdsApiRow): AppNotification {
+  return {
+    id: Number(row.id ?? 0),
+    orderId: String(row.orderId ?? ""),
+    customer: String(row.userName ?? "—"),
+    email: String(row.userEmail ?? ""),
+    detail: String(row.adName ?? "—"),
+    amount: Number(row.amount ?? 0) || 0,
+    status: mapNotificationStatus(row.status),
+    unread: !Boolean(row.isRead),
+    date: formatAdsDate(row.createdAt),
+  };
+}
 
 const STATUS_META: Record<NotificationStatus, { label: string; color: string; bg: string }> = {
   paid: { label: "Paid", color: COLORS.active, bg: COLORS.active + "15" },
@@ -413,7 +431,7 @@ function UpdateNotificationModal({
 }: {
   notification: AppNotification;
   onClose: () => void;
-  onUpdate: (id: string, status: NotificationStatus, read: boolean) => void;
+  onUpdate: (id: number, status: NotificationStatus, read: boolean) => void;
   isTablet: boolean;
 }) {
   const [status, setStatus] = useState<NotificationStatus>(notification.status);
@@ -687,7 +705,10 @@ export default function AdsNotificationsScreen() {
   const { width: windowWidth } = useBreakpoint();
   const { measuredWidth, onLayout } = useMeasuredWidth(windowWidth);
 
-  const [items, setItems] = useState<AppNotification[]>(INITIAL_DATA);
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
@@ -706,20 +727,40 @@ export default function AdsNotificationsScreen() {
   const gridGap = 16;
   const gridCardWidth = (fullWidth - gridGap * (gridCols - 1)) / gridCols;
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return items.filter((n) => {
-      if (status !== "all" && n.status !== status) return false;
-      if (readFilter === "read" && n.unread) return false;
-      if (readFilter === "unread" && !n.unread) return false;
-      if (q && !(n.orderId.toLowerCase().includes(q) || n.customer.toLowerCase().includes(q) || n.detail.toLowerCase().includes(q))) return false;
-      return true;
-    });
-  }, [items, search, status, readFilter]);
-
   useEffect(() => setPage(1), [search, status, readFilter]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetchAdsNotifications({
+          page: page - 1,
+          size: PAGE_SIZE,
+          search: search.trim() || undefined,
+          status: status === "all" ? undefined : status,
+          unreadOnly: readFilter === "unread" ? true : undefined,
+        });
+        if (cancelled) return;
+        let mapped = res.items.map(mapNotificationRow);
+        if (readFilter === "read") mapped = mapped.filter((n) => !n.unread);
+        setItems(mapped);
+        setTotalItems(res.totalElements);
+      } catch (e) {
+        if (!cancelled) setError(getApiErrorMessage(e, "Failed to load notifications."));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [search, status, readFilter, page]);
+
+  const filtered = items;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const pageItems = filtered;
 
   const stats = useMemo(() => {
     const total = items.length;
@@ -729,13 +770,20 @@ export default function AdsNotificationsScreen() {
     return { total, unread, paid, pending };
   }, [items]);
 
-  const handleUpdate = (id: string, newStatus: NotificationStatus, isRead: boolean) => {
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, status: newStatus, unread: !isRead } : n)));
-    setEditing(null);
+  const handleUpdate = async (id: number, newStatus: NotificationStatus, isRead: boolean) => {
+    try {
+      await updateAdsNotification(id, { status: newStatus, isRead });
+      setItems((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, status: newStatus, unread: !isRead } : n)),
+      );
+      setEditing(null);
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to update notification."));
+    }
   };
 
   const handleOrder = (n: AppNotification) => {
-    router.push('/order-details' as any);
+    router.push({ pathname: "/order-details" as any, params: { orderId: n.orderId } });
   };
 
   const toggleButtons = (
@@ -897,7 +945,15 @@ export default function AdsNotificationsScreen() {
           </View>
 
           <View style={{ marginTop: 8, zIndex: 1 }}>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Loading notifications…</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{error}</Text>
+              </View>
+            ) : filtered.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>No notifications match your filters</Text>
                 <Text style={styles.emptySub}>Try clearing the search or switching the dropdown filters.</Text>
@@ -911,12 +967,12 @@ export default function AdsNotificationsScreen() {
             )}
           </View>
 
-          {filtered.length > 0 && (
+          {!loading && !error && totalItems > 0 && (
             <View style={{ marginTop: gutter, zIndex: 0 }}>
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
-                totalItems={filtered.length}
+                totalItems={totalItems}
                 itemsPerPage={PAGE_SIZE}
                 itemName="notifications"
                 onPageChange={setPage}

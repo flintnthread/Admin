@@ -17,7 +17,25 @@ import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { buildUpdateProductPayload } from "@/lib/product/buildCreateProductPayload";
-import { fetchProductDetail, updateProduct } from "@/services/productApi";
+import { getHsnForMaterial, MATERIAL_TYPES } from "@/lib/product/materialHsn";
+import {
+  buildCategoryPathOptions,
+  buildLeafSubcategoryOptions,
+  formatCategoryPath,
+  materialsForSelection,
+  resolveCategoryPathSelection,
+  resolveGstForMaterial,
+  resolveLeafSubcategory,
+  resolveMaterialOption,
+  resolveWeightSlab,
+  type AdminProductFormCatalog,
+} from "@/lib/product/catalogHelpers";
+import {
+  fetchDeliveryChargesForWeight,
+  fetchProductCatalog,
+  fetchProductDetail,
+  updateProduct,
+} from "@/services/productApi";
 import {
   Alert,
   Animated,
@@ -75,28 +93,67 @@ const STEP_CONFIG = [
   { key: 'details', label: 'Details', color: '#D97706', icon: 'clipboard-text-outline' },
 ];
 
-const CATEGORIES = [
-  'Clothing', 'Electronics', 'Footwear', 'Bags', 'Accessories',
-  'Sports', 'Home & Living', 'Jewellery', 'Ethnic Wear', 'Western Wear',
-];
-const SUBCATEGORIES: Record<string, string[]> = {
-  Clothing: ['T-Shirts','Shirts','Jeans','Dresses','Jackets','Shorts','Innerwear','Ethnic Wear','Kurta Set','Track Pants'],
-  Electronics: ['Mobiles','Laptops','Headphones','Cameras','Tablets'],
-  Footwear: ['Sneakers','Sandals','Formal','Sports','Boots','Casual Shoes','Flip Flops'],
-  Bags: ['Backpacks','Handbags','Wallets','Travel Bags','Laptop Bags'],
-  Accessories: ['Watches','Sunglasses','Jewelry','Belts','Caps','Hair Accessories'],
-  Sports: ['Cricket','Football','Tennis','Yoga','Gym'],
-  'Home & Living': ['Furniture','Decor','Kitchen','Bedding','Wall Clock'],
-  Jewellery: ['Earrings','Necklaces','Rings','Bangles','Pendants'],
-  'Ethnic Wear': ['Sarees','Kurtas & Kurtis','Lehenga Cholis','Dress Material'],
-  'Western Wear': ['Dresses','Jeans','Tops','Trousers'],
-};
 const COLORS_LIST = ['Red','Blue','Green','Black','White','Yellow','Pink','Purple','Orange','Gray','Navy','Maroon'];
 const SIZES_LIST = ['XS','S','M','L','XL','XXL','Free Size','28','30','32','34','36','38','40'];
-const MATERIAL_TYPES = ['Cotton','Polyester','Wool','Silk','Linen','Nylon','Leather','Canvas','Denim','Viscose','Blend'];
 const DELIVERY_OPTIONS = ['Standard Delivery','Express Delivery','Same Day Delivery','Pickup Only'];
 const RETURN_POLICIES = ['7 Days Return','14 Days Return','30 Days Return','No Return'];
 const SIZE_CHART_COLS = ['Size','Chest/Bust','Waist','Hip','Length','Sleeve'];
+
+/** Walk catalog tree to recover main → middle → leaf from a stored subcategory id/name. */
+function resolveCatalogPathFromProduct(
+  catalog: AdminProductFormCatalog | null,
+  subcategoryId?: string | number | null,
+  subcategoryName?: string,
+  categoryName?: string,
+): {
+  category: string;
+  categoryId?: string;
+  categorySubName: string;
+  categorySubId?: string;
+  subcategory: string;
+  subcategoryId?: string;
+} {
+  const sid = subcategoryId != null && subcategoryId !== '' ? Number(subcategoryId) : null;
+  const leafName = (subcategoryName ?? '').trim();
+  for (const cat of catalog?.categories ?? []) {
+    for (const mid of cat.subcategories ?? []) {
+      const children = mid.children ?? [];
+      if (children.length === 0) {
+        if ((sid != null && Number(mid.id) === sid) || (leafName && mid.name === leafName)) {
+          return {
+            category: cat.name,
+            categoryId: String(cat.id),
+            categorySubName: mid.name,
+            categorySubId: String(mid.id),
+            subcategory: mid.name,
+            subcategoryId: String(mid.id),
+          };
+        }
+      } else {
+        for (const leaf of children) {
+          if ((sid != null && Number(leaf.id) === sid) || (leafName && leaf.name === leafName)) {
+            return {
+              category: cat.name,
+              categoryId: String(cat.id),
+              categorySubName: mid.name,
+              categorySubId: String(mid.id),
+              subcategory: leaf.name,
+              subcategoryId: String(leaf.id),
+            };
+          }
+        }
+      }
+    }
+  }
+  return {
+    category: (categoryName ?? '').trim(),
+    categoryId: undefined,
+    categorySubName: '',
+    categorySubId: undefined,
+    subcategory: leafName,
+    subcategoryId: sid != null && Number.isFinite(sid) ? String(sid) : undefined,
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -120,14 +177,20 @@ interface BasicInfo {
   name: string;
   category: string;
   categoryId?: string;
+  categorySubName?: string;
+  categorySubId?: string;
   subcategory: string;
   subcategoryId?: string;
   materialType: string;
   hsnCode: string;
+  gstPercentage?: string;
   shortDesc: string;
   fullDesc: string;
   length: string; width: string; height: string;
   weight: string;
+  weightSlab?: string;
+  intraCityCharge?: string;
+  metroMetroCharge?: string;
   fragile: 'Yes' | 'No';
   customized: boolean;
   custTitle: string;
@@ -181,7 +244,8 @@ const INITIAL_STATE: AppState = {
   isDirty: false,
   basic: {
     id: 'PROD-001', name: 'Classic Polo T-Shirt', category: 'Clothing',
-    subcategory: 'T-Shirts', materialType: 'Cotton', hsnCode: '6109',
+    categorySubName: '', subcategory: 'T-Shirts', materialType: 'Cotton', hsnCode: '6109',
+    gstPercentage: '', weightSlab: '', intraCityCharge: '', metroMetroCharge: '',
     shortDesc: 'Premium combed cotton polo with embroidered logo.',
     fullDesc: 'This classic polo t-shirt is crafted from 100% premium combed cotton.',
     length: '30', width: '25', height: '2', weight: '0.3',
@@ -384,15 +448,111 @@ const DiscardModal = ({ visible, onDiscard, onKeep }: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StepBasic = ({
-  state, setState, openPicker, actionBar
+  state, setState, openPicker, actionBar, catalog,
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   openPicker: (title: string, options: string[], current: string, onSelect: (v: string) => void) => void;
   actionBar?: React.ReactNode;
+  catalog: AdminProductFormCatalog | null;
 }) => {
   const b = state.basic;
   const update = (field: Partial<BasicInfo>) => setState(s => ({ ...s, isDirty: true, basic: { ...s.basic, ...field } }));
+
+  const categoryPathOptions = buildCategoryPathOptions(catalog);
+  const categoryDisplay = formatCategoryPath(b.category, b.categorySubName ?? '');
+  const leafSubcats = buildLeafSubcategoryOptions(catalog, b.category, b.categorySubName ?? '');
+  const materialCatalog = materialsForSelection(
+    catalog,
+    b.category,
+    b.categorySubName ?? '',
+    b.subcategory ?? '',
+  );
+  const materialOptions = materialCatalog.length > 0
+    ? materialCatalog.map((m) => m.material)
+    : MATERIAL_TYPES;
+
+  const selectCategoryPath = (label: string) => {
+    const resolved = resolveCategoryPathSelection(label, catalog);
+    const mid = catalog?.categories
+      ?.find((c: { name: string }) => c.name === resolved.category)
+      ?.subcategories?.find((s: { name: string }) => s.name === resolved.categorySubName);
+    const children = mid?.children ?? [];
+    let subcategory = '';
+    let subcategoryId: string | undefined;
+    if (children.length === 0) {
+      const leaf = resolveLeafSubcategory(
+        catalog,
+        resolved.category,
+        resolved.categorySubName,
+        resolved.categorySubName,
+      );
+      subcategory = leaf.name;
+      subcategoryId = leaf.id != null ? String(leaf.id) : undefined;
+    }
+    update({
+      category: resolved.category,
+      categoryId: resolved.categoryId != null ? String(resolved.categoryId) : undefined,
+      categorySubName: resolved.categorySubName,
+      categorySubId: resolved.categorySubId != null ? String(resolved.categorySubId) : undefined,
+      subcategory,
+      subcategoryId,
+      materialType: '',
+      hsnCode: '',
+      gstPercentage: '',
+    });
+  };
+
+  const selectSubcategory = (leafName: string) => {
+    const leaf = resolveLeafSubcategory(catalog, b.category, b.categorySubName ?? '', leafName);
+    update({
+      subcategory: leaf.name,
+      subcategoryId: leaf.id != null ? String(leaf.id) : undefined,
+      materialType: '',
+      hsnCode: '',
+      gstPercentage: '',
+    });
+  };
+
+  const applyMaterial = (materialName: string) => {
+    const option = resolveMaterialOption(materialCatalog, materialName);
+    const hsn = option?.hsnCode || getHsnForMaterial(materialName);
+    const gst = resolveGstForMaterial(materialCatalog, materialName);
+    update({
+      materialType: materialName,
+      ...(hsn ? { hsnCode: hsn } : {}),
+      ...(gst != null ? { gstPercentage: String(gst) } : {}),
+    });
+  };
+
+  const applyWeight = (raw: string) => {
+    const weight = raw.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
+    const slab = resolveWeightSlab(weight, catalog?.deliverySlabs);
+    update({
+      weight,
+      weightSlab: slab.label,
+      intraCityCharge: slab.custom || !slab.label ? '' : String(slab.intraCityCharge),
+      metroMetroCharge: slab.custom || !slab.label ? '' : String(slab.metroMetroCharge),
+    });
+    const weightKg = parseFloat(weight);
+    if (Number.isFinite(weightKg) && weightKg > 0) {
+      fetchDeliveryChargesForWeight(weightKg)
+        .then((remote) => {
+          if (!remote) return;
+          setState((s) => ({
+            ...s,
+            isDirty: true,
+            basic: {
+              ...s.basic,
+              weightSlab: remote.label,
+              intraCityCharge: remote.custom ? '' : String(remote.intraCityCharge),
+              metroMetroCharge: remote.custom ? '' : String(remote.metroMetroCharge),
+            },
+          }));
+        })
+        .catch(() => { /* keep client slab */ });
+    }
+  };
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.stepScroll} keyboardShouldPersistTaps="handled">
@@ -415,8 +575,8 @@ const StepBasic = ({
           <View style={{ flex: 1 }}>
             <FieldLabel text="Category" required />
             <DropButton
-              value={b.category} placeholder="Select category"
-              onPress={() => openPicker('Select Category', CATEGORIES, b.category, v => update({ category: v, subcategory: '' }))}
+              value={categoryDisplay} placeholder="Select category"
+              onPress={() => openPicker('Select Category', categoryPathOptions, categoryDisplay, selectCategoryPath)}
             />
           </View>
           <View style={{ width: 10 }} />
@@ -424,7 +584,7 @@ const StepBasic = ({
             <FieldLabel text="Subcategory" required />
             <DropButton
               value={b.subcategory} placeholder="Select sub"
-              onPress={() => b.category && openPicker('Select Subcategory', SUBCATEGORIES[b.category] || [], b.subcategory, v => update({ subcategory: v }))}
+              onPress={() => b.category && b.categorySubName && openPicker('Select Subcategory', leafSubcats, b.subcategory, selectSubcategory)}
             />
           </View>
         </View>
@@ -434,7 +594,7 @@ const StepBasic = ({
             <FieldLabel text="Material Type" required />
             <DropButton
               value={b.materialType} placeholder="Select material"
-              onPress={() => openPicker('Select Material', MATERIAL_TYPES, b.materialType, v => update({ materialType: v }))}
+              onPress={() => openPicker('Select Material', materialOptions, b.materialType, applyMaterial)}
             />
             <HintText text="Primary material of the product" />
           </View>
@@ -444,7 +604,7 @@ const StepBasic = ({
             <FieldWrap>
               <TextInput style={styles.input} value={b.hsnCode} onChangeText={v => update({ hsnCode: v })} placeholder="e.g. 6109" placeholderTextColor={COLORS.textPh} keyboardType="numeric" />
             </FieldWrap>
-            <HintText text="Edit if needed" />
+            <HintText text="Auto-filled from material; edit if needed" />
           </View>
         </View>
       </Card>
@@ -502,15 +662,20 @@ const StepBasic = ({
           <View style={{ flex: 1 }}>
             <FieldLabel text="Weight (kg)" required />
             <FieldWrap>
-              <TextInput style={styles.input} value={b.weight} onChangeText={v => update({ weight: v })} placeholder="0.5" placeholderTextColor={COLORS.textPh} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={b.weight} onChangeText={applyWeight} placeholder="0.5" placeholderTextColor={COLORS.textPh} keyboardType="decimal-pad" />
             </FieldWrap>
           </View>
           <View style={{ width: 10 }} />
           <View style={{ flex: 1 }}>
             <FieldLabel text="Weight Slab" />
-            <DropButton value="" placeholder="Auto-selected" onPress={() => {}} />
+            <DropButton value={b.weightSlab || ''} placeholder="Auto-selected" onPress={() => {}} />
           </View>
         </View>
+        {(b.intraCityCharge || b.metroMetroCharge) ? (
+          <Text style={[styles.cardHint, { marginTop: 6 }]}>
+            Intra-city ₹{b.intraCityCharge || '—'} · Metro–metro ₹{b.metroMetroCharge || '—'}
+          </Text>
+        ) : null}
         <Divider />
         <FieldLabel text="Fragile Item?" />
         <View style={styles.radioRow}>
@@ -1159,8 +1324,53 @@ export default function EditProduct() {
   const [showDiscard, setShowDiscard] = useState(false);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [barW, setBarW] = useState(300);
+  const [catalog, setCatalog] = useState<AdminProductFormCatalog | null>(null);
+  const catalogRef = useRef<AdminProductFormCatalog | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProductCatalog()
+      .then((data) => {
+        if (cancelled) return;
+        const next: AdminProductFormCatalog = {
+          categories: data.categories ?? [],
+          colors: data.colors,
+          sizes: data.sizes,
+          deliverySlabs: data.deliverySlabs ?? [],
+        };
+        catalogRef.current = next;
+        setCatalog(next);
+        setState((s) => {
+          if (!s.basic.subcategory && !s.basic.subcategoryId) return s;
+          const path = resolveCatalogPathFromProduct(
+            next,
+            s.basic.subcategoryId,
+            s.basic.subcategory,
+            s.basic.category,
+          );
+          if (!path.categorySubName && !path.category) return s;
+          const slab = resolveWeightSlab(s.basic.weight, next.deliverySlabs);
+          return {
+            ...s,
+            basic: {
+              ...s.basic,
+              ...path,
+              weightSlab: slab.label || s.basic.weightSlab,
+              intraCityCharge: slab.custom || !slab.label ? s.basic.intraCityCharge : String(slab.intraCityCharge),
+              metroMetroCharge: slab.custom || !slab.label ? s.basic.metroMetroCharge : String(slab.metroMetroCharge),
+            },
+          };
+        });
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setToasts((t) => [...t, { id: Date.now(), message: getApiErrorMessage(e, 'Failed to load catalog.'), type: 'error' }]);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const productId = Number(params.productId);
@@ -1175,6 +1385,14 @@ export default function EditProduct() {
         const images = Array.isArray(d.images) ? d.images as { url?: string; isPrimary?: boolean }[] : [];
         const primary = images.find((img) => img.isPrimary) ?? images[0];
         const additional = images.filter((img) => img !== primary).map((img) => img.url ?? '').filter(Boolean);
+        const path = resolveCatalogPathFromProduct(
+          catalogRef.current,
+          d.subcategoryId as string | number | null | undefined,
+          String(d.subcategoryName ?? ''),
+          String(d.categoryName ?? ''),
+        );
+        const weight = d.productWeight != null ? String(d.productWeight) : '';
+        const slab = resolveWeightSlab(weight, catalogRef.current?.deliverySlabs);
         setState((s) => ({
           ...s,
           isDirty: false,
@@ -1182,18 +1400,24 @@ export default function EditProduct() {
             ...s.basic,
             id: String(d.id ?? productId),
             name: String(d.name ?? ''),
-            category: String(d.categoryName ?? ''),
-            categoryId: d.categoryId != null ? String(d.categoryId) : undefined,
-            subcategory: String(d.subcategoryName ?? ''),
-            subcategoryId: d.subcategoryId != null ? String(d.subcategoryId) : undefined,
+            category: path.category || String(d.categoryName ?? ''),
+            categoryId: path.categoryId ?? (d.categoryId != null ? String(d.categoryId) : undefined),
+            categorySubName: path.categorySubName,
+            categorySubId: path.categorySubId,
+            subcategory: path.subcategory || String(d.subcategoryName ?? ''),
+            subcategoryId: path.subcategoryId ?? (d.subcategoryId != null ? String(d.subcategoryId) : undefined),
             materialType: String(d.productMaterialType ?? s.basic.materialType),
             hsnCode: String(d.hsnCode ?? ''),
+            gstPercentage: d.gstPercentage != null ? String(d.gstPercentage) : '',
             shortDesc: String(d.shortDescription ?? ''),
             fullDesc: String(d.description ?? ''),
             length: d.lengthCm != null ? String(d.lengthCm) : s.basic.length,
             width: d.widthCm != null ? String(d.widthCm) : s.basic.width,
             height: d.heightCm != null ? String(d.heightCm) : s.basic.height,
-            weight: d.productWeight != null ? String(d.productWeight) : s.basic.weight,
+            weight: weight || s.basic.weight,
+            weightSlab: slab.label,
+            intraCityCharge: slab.custom || !slab.label ? '' : String(slab.intraCityCharge),
+            metroMetroCharge: slab.custom || !slab.label ? '' : String(slab.metroMetroCharge),
             fragile: d.fragile === true ? 'Yes' : 'No',
           },
           variants: variants.map((v, i) => ({
@@ -1295,6 +1519,7 @@ export default function EditProduct() {
           subcategoryId: state.basic.subcategoryId,
           materialType: state.basic.materialType,
           hsnCode: state.basic.hsnCode,
+          gstPercentage: state.basic.gstPercentage,
           shortDesc: state.basic.shortDesc,
           fullDesc: state.basic.fullDesc,
           length: state.basic.length,
@@ -1426,7 +1651,7 @@ export default function EditProduct() {
 
       {/* Step Content */}
       <View style={{ flex: 1 }}>
-        {state.step === 0 && <StepBasic state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} />}
+        {state.step === 0 && <StepBasic state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} catalog={catalog} />}
         {state.step === 1 && <StepVariants state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} />}
         {state.step === 2 && <StepImages state={state} setState={setState} actionBar={actionBar} />}
         {state.step === 3 && <StepDetails state={state} setState={setState} openPicker={openPicker} actionBar={actionBar} />}

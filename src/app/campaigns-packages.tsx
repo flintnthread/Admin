@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,21 @@ import {
   DimensionValue,
   KeyboardAvoidingView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import { getApiErrorMessage } from '@/lib/api/client';
+import {
+  createCampaignPackage,
+  deleteCampaignPackage,
+  fetchCampaignPackages,
+  formatAdsDate,
+  toApiStatus,
+  toUiStatus,
+  updateCampaignPackage,
+  type AdsApiRow,
+} from '@/services/adsApi';
 // -----------------------------
 // Design tokens
 // -----------------------------
@@ -75,6 +87,7 @@ interface CampaignPackage {
   monthlyPrice: number;
   status: PackageStatus;
   createdAt: string;
+  features?: string;
 }
 
 const PACKAGE_TYPES: PackageType[] = [
@@ -88,6 +101,22 @@ const PACKAGE_TYPES: PackageType[] = [
 
 const STATUSES: PackageStatus[] = ['Active', 'Inactive'];
 
+function mapCampaignPackageFromApi(row: AdsApiRow): CampaignPackage {
+  const campaign = row.campaignPrice ?? row.campaign_price;
+  const monthly = row.monthlyPrice ?? row.monthly_price;
+  return {
+    id: Number(row.id),
+    name: String(row.name ?? ''),
+    description: String(row.description ?? ''),
+    type: String(row.type ?? '') as PackageType,
+    campaignPrice: Number(campaign ?? 0),
+    monthlyPrice: Number(monthly ?? 0),
+    status: toUiStatus(row.status),
+    createdAt: formatAdsDate(row.createdAt),
+    features: String(row.features ?? ''),
+  };
+}
+
 const TYPE_ACCENTS: Record<PackageType, { bg: string; fg: string }> = {
   'Email Campaign': { bg: COLORS.blueSoft, fg: COLORS.blue },
   'Push Campaign': { bg: COLORS.blueSoft, fg: COLORS.blue },
@@ -96,46 +125,6 @@ const TYPE_ACCENTS: Record<PackageType, { bg: string; fg: string }> = {
   'Premium Package': { bg: COLORS.orangeSoft, fg: COLORS.orange },
   'Enterprise Package': { bg: COLORS.greenSoft, fg: COLORS.green },
 };
-
-// -----------------------------
-// Deterministic seeded mock data (Park-Miller LCG)
-// -----------------------------
-function createSeededRandom(seed: number) {
-  let state = seed % 2147483647;
-  if (state <= 0) state += 2147483646;
-  return () => {
-    state = (state * 16807) % 2147483647;
-    return (state - 1) / 2147483646;
-  };
-}
-
-function generateMockPackages(): CampaignPackage[] {
-  const rand = createSeededRandom(4219);
-  const rows: Array<[string, string, PackageType, number, number]> = [
-    ['Email Campaign', 'Targeted email marketing campaigns', 'Email Campaign', 22500, 75000],
-    ['Push Campaign', 'Mobile push notification campaigns', 'Push Campaign', 22500, 75000],
-    ['Exclusive Brand Takeover', 'Complete platform takeover for premium brands', 'Brand Takeover', 150000, 800000],
-    ['Starter Package - Basic', 'Basic advertising package for SMEs', 'Starter Package', 17500, 50000],
-    ['Starter Package - Standard', 'Standard advertising package', 'Starter Package', 32500, 100000],
-    ['Starter Package - Premium', 'Premium advertising package', 'Starter Package', 45000, 150000],
-  ];
-
-  return rows.map((row, idx) => {
-    const statusRoll = rand();
-    const status: PackageStatus = statusRoll > 0.8 ? 'Inactive' : 'Active';
-    const day = 3 + Math.floor(rand() * 24);
-    return {
-      id: idx + 7,
-      name: row[0],
-      description: row[1],
-      type: row[2],
-      campaignPrice: row[3],
-      monthlyPrice: row[4],
-      status,
-      createdAt: `Oct ${String(day).padStart(2, '0')}, 2025`,
-    };
-  });
-}
 
 // -----------------------------
 // Responsive breakpoints
@@ -343,9 +332,29 @@ export default function CampaignsPackagesScreen() {
     setAlertState({ visible: true, kind, title, text, onConfirm });
   };
 
-  const [packages, setPackages] = useState<CampaignPackage[]>(() => generateMockPackages());
+  const [packages, setPackages] = useState<CampaignPackage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  const loadPackages = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const rows = await fetchCampaignPackages();
+      setPackages(rows.map(mapCampaignPackageFromApi));
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, 'Failed to load campaign packages.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPackages();
+  }, [loadPackages]);
 
   const [form, setForm] = useState({
     name: '',
@@ -373,7 +382,7 @@ export default function CampaignsPackagesScreen() {
       campaignPrice: String(pkg.campaignPrice),
       monthlyPrice: String(pkg.monthlyPrice),
       description: pkg.description,
-      features: '',
+      features: pkg.features ?? '',
       status: pkg.status,
     });
     setEditingId(pkg.id);
@@ -381,13 +390,21 @@ export default function CampaignsPackagesScreen() {
   };
 
   const handleDelete = (pkg: CampaignPackage) => {
-    showAlert('confirm', 'Delete this package?', `"${pkg.name}" will be permanently removed.`, () => {
-      setPackages((prev) => prev.filter((p) => p.id !== pkg.id));
-      showAlert('success', 'Deleted', 'The campaign package was removed.');
+    showAlert('confirm', 'Delete this package?', `"${pkg.name}" will be permanently removed.`, async () => {
+      setSaving(true);
+      try {
+        await deleteCampaignPackage(pkg.id);
+        await loadPackages();
+        showAlert('success', 'Deleted', 'The campaign package was removed.');
+      } catch (err) {
+        Alert.alert('Error', getApiErrorMessage(err, 'Could not delete campaign package.'));
+      } finally {
+        setSaving(false);
+      }
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim() || !form.type || !form.campaignPrice || !form.monthlyPrice) {
       showAlert('error', 'Missing information', 'Please fill in all required fields.');
       return;
@@ -399,42 +416,36 @@ export default function CampaignsPackagesScreen() {
       return;
     }
 
-    if (editingId) {
-      setPackages((prev) =>
-        prev.map((p) =>
-          p.id === editingId
-            ? {
-                ...p,
-                name: form.name,
-                type: form.type as PackageType,
-                campaignPrice,
-                monthlyPrice,
-                description: form.description,
-                status: form.status,
-              }
-            : p
-        )
-      );
-      showAlert('success', 'Updated', 'Campaign package updated successfully.');
-    } else {
-      const nextId = packages.length ? Math.max(...packages.map((p) => p.id)) + 1 : 1;
-      const newPkg: CampaignPackage = {
-        id: nextId,
-        name: form.name,
-        description: form.description,
-        type: form.type as PackageType,
-        campaignPrice,
-        monthlyPrice,
-        status: form.status,
-        createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-      };
-      setPackages((prev) => [newPkg, ...prev]);
-      showAlert('success', 'Created', 'New campaign package added.');
+    const body: AdsApiRow = {
+      name: form.name.trim(),
+      type: form.type,
+      campaignPrice,
+      monthlyPrice,
+      description: form.description,
+      status: toApiStatus(form.status),
+    };
+    if (form.features.trim()) {
+      body.features = form.features.trim();
     }
 
-    setModalVisible(false);
-    resetForm();
-    setEditingId(null);
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updateCampaignPackage(editingId, body);
+        showAlert('success', 'Updated', 'Campaign package updated successfully.');
+      } else {
+        await createCampaignPackage(body);
+        showAlert('success', 'Created', 'New campaign package added.');
+      }
+      setModalVisible(false);
+      resetForm();
+      setEditingId(null);
+      await loadPackages();
+    } catch (err) {
+      Alert.alert('Error', getApiErrorMessage(err, editingId ? 'Could not update campaign package.' : 'Could not create campaign package.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const tierCardWidth: DimensionValue = useMemo(() => {
@@ -523,7 +534,15 @@ export default function CampaignsPackagesScreen() {
             </View>
           </View>
 
-        {isLaptop ? (
+        {loadError ? (
+          <Text style={{ color: COLORS.red, margin: 16 }}>{loadError}</Text>
+        ) : null}
+
+        {loading ? (
+          <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.orange} />
+          </View>
+        ) : isLaptop ? (
           // ---- Desktop / laptop table ----
           <View style={styles.tableWrap}>
             <View style={styles.tableHeaderRow}>
@@ -610,7 +629,7 @@ export default function CampaignsPackagesScreen() {
         )}
         </View>
 
-        {packages.length === 0 && (
+        {!loading && packages.length === 0 && (
           <View style={styles.emptyState}>
             <Feather name="inbox" size={28} color={COLORS.textMuted} />
             <Text style={styles.emptyStateTitle}>No campaign packages yet</Text>
