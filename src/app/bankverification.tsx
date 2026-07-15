@@ -59,9 +59,15 @@ type Verification = {
 
 const COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4"];
 
-function mapSellerToVerification(s: SellerSummary, index: number): Verification {
-  const verified = Boolean(s.bankVerified);
-  const status: StatusKey = verified ? "Verified" : "Pending";
+function mapSellerToVerification(s: SellerSummary & { verificationStatus?: string; attempts?: number }, index: number): Verification {
+  const rawStatus = String(s.verificationStatus ?? (s.bankVerified ? "Verified" : "Pending")).trim();
+  const normalized = (rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase()) as StatusKey;
+  const valid: StatusKey[] = ["Pending", "Processing", "Verified", "Failed", "Expired"];
+  const status: StatusKey = valid.includes(normalized)
+    ? normalized
+    : s.bankVerified
+      ? "Verified"
+      : "Pending";
   const created = s.updatedAt ?? s.createdAt;
   return {
     id: `#S${s.id}`,
@@ -74,9 +80,9 @@ function mapSellerToVerification(s: SellerSummary, index: number): Verification 
     ifsc: s.ifscCode ?? "—",
     bank: s.bankName ?? "—",
     status,
-    attempts: 1,
+    attempts: Number(s.attempts ?? 1) || 1,
     created: created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
-    verified: verified && created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+    verified: status === "Verified" && created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
     initials: initialsFromName(s.fullName),
     color: COLORS[index % COLORS.length],
   };
@@ -411,14 +417,27 @@ export default function BankVerifications() {
 
   const loadVerifications = useCallback(async () => {
     try {
-      const [pendingRes, verifiedRes, statsRes] = await Promise.all([
+      const [pendingRes, processingRes, verifiedRes, failedRes, expiredRes, statsRes] = await Promise.all([
         fetchBankVerifications("pending", 0, 500),
+        fetchBankVerifications("processing", 0, 500),
         fetchBankVerifications("verified", 0, 500),
+        fetchBankVerifications("failed", 0, 500),
+        fetchBankVerifications("expired", 0, 500),
         fetchBankStats(),
       ]);
-      const merged = [...(pendingRes.items ?? []), ...(verifiedRes.items ?? [])];
-      setVerifications(merged.map(mapSellerToVerification));
-      setBankStats(statsRes);
+      const merged = [
+        ...(pendingRes.items ?? []),
+        ...(processingRes.items ?? []),
+        ...(verifiedRes.items ?? []),
+        ...(failedRes.items ?? []),
+        ...(expiredRes.items ?? []),
+      ];
+      const byId = new Map<number, ReturnType<typeof mapSellerToVerification>>();
+      merged.forEach((row, index) => {
+        byId.set(row.id, mapSellerToVerification(row, index));
+      });
+      setVerifications(Array.from(byId.values()));
+      setBankStats(statsRes ?? {});
     } catch (e) {
       console.warn(getApiErrorMessage(e));
       setVerifications([]);
@@ -434,14 +453,19 @@ export default function BankVerifications() {
     router.push({ pathname: "/viewbankdetails", params: { sellerId: String(sellerId) } });
   };
 
-  /* Counts from backend stats API */
+  /* Counts from backend stats API, with list fallback when a key is missing */
+  const listCount = (status: StatusKey) => verifications.filter(v => v.status === status).length;
+  const statOr = (key: string, fallback: number) => {
+    const raw = bankStats[key];
+    return raw == null || Number.isNaN(Number(raw)) ? fallback : Number(raw);
+  };
   const counts = {
-    total: bankStats.total ?? verifications.length,
-    pending: bankStats.pending ?? verifications.filter(v => v.status === "Pending").length,
-    processing: bankStats.processing ?? verifications.filter(v => v.status === "Processing").length,
-    verified: bankStats.verified ?? verifications.filter(v => v.status === "Verified").length,
-    failed: bankStats.failed ?? verifications.filter(v => v.status === "Failed").length,
-    expired: bankStats.expired ?? verifications.filter(v => v.status === "Expired").length,
+    total: statOr("total", verifications.length),
+    pending: statOr("pending", listCount("Pending")),
+    processing: statOr("processing", listCount("Processing")),
+    verified: statOr("verified", listCount("Verified")),
+    failed: statOr("failed", listCount("Failed")),
+    expired: statOr("expired", listCount("Expired")),
   };
 
   /* Filter */

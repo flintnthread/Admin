@@ -881,7 +881,7 @@ function splitSellerName(d: Record<string, unknown>) {
   };
 }
 
-function chartToSeries(raw: unknown, valueKey: 'productsAdded' | 'registered'): ChartDataPoint[] {
+function chartToSeries(raw: unknown, valueKey: 'productsAdded' | 'ordersPlaced' | 'registered'): ChartDataPoint[] {
   const chart = normalizeSellerGraphChart(raw);
   return chart.labels.map((label, i) => ({
     label,
@@ -910,8 +910,8 @@ function mapDetailToSellerData(
   };
   const monthlyProducts = chartToSeries(charts?.monthly, 'productsAdded');
   const yearlyProducts = chartToSeries(charts?.yearly, 'productsAdded');
-  const monthlyOrders = chartToSeries(charts?.monthly, 'registered');
-  const yearlyOrders = chartToSeries(charts?.yearly, 'registered');
+  const monthlyOrders = chartToSeries(charts?.monthly, 'ordersPlaced');
+  const yearlyOrders = chartToSeries(charts?.yearly, 'ordersPlaced');
 
   return {
     id: String(d.id ?? ''),
@@ -962,11 +962,15 @@ function mapDetailToSellerData(
     kycRemarks: String(d.kycRemarks ?? '—'),
     productsListingStatus: productCount > 0 ? 'Live' : 'Inactive',
     totalProducts: productCount,
-    productStatusDistribution: {
-      active: Number(productDist.active ?? productCount),
-      inactive: Number(productDist.inactive ?? 0),
-      pending: Number(productDist.pending ?? 0),
-    },
+    productStatusDistribution: (() => {
+      const active = Number(productDist.active ?? 0);
+      const inactive = Number(productDist.inactive ?? 0);
+      const pending = Number(productDist.pending ?? 0);
+      if (productCount > 0 && active + inactive + pending === 0) {
+        return { active: productCount, inactive: 0, pending: 0 };
+      }
+      return { active, inactive, pending };
+    })(),
     orderStatusDistribution: {
       pending: Number(orderDist.pending ?? 0),
       processing: Number(orderDist.processing ?? 0),
@@ -1314,7 +1318,7 @@ export default function ViewSeller() {
     try {
       setCsvLoading(true);
       const csv = await exportSellerProductsCsv(sellerId);
-      downloadCsv(csv, `products_seller_${sellerId}.csv`);
+      await downloadCsv(csv, `products_seller_${sellerId}.csv`);
     } catch (e) {
       alert(getApiErrorMessage(e));
     } finally {
@@ -1328,7 +1332,7 @@ export default function ViewSeller() {
     try {
       setCsvLoading(true);
       const csv = await exportSellerOrdersCsv(sellerId);
-      downloadCsv(csv, `orders_seller_${sellerId}.csv`);
+      await downloadCsv(csv, `orders_seller_${sellerId}.csv`);
     } catch (e) {
       alert(getApiErrorMessage(e));
     } finally {
@@ -1336,24 +1340,29 @@ export default function ViewSeller() {
     }
   };
 
-  const downloadCsv = (csvContent: string, filename: string) => {
-    // Create a Blob with the CSV content
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-
-    // Create a download link
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-
-    // Append to document, click, and remove
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up
-    URL.revokeObjectURL(url);
+  const downloadCsv = async (csvContent: string, filename: string) => {
+    try {
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return;
+      }
+      await Share.share({
+        message: csvContent,
+        title: filename,
+      });
+    } catch (error) {
+      console.error("CSV download error:", error);
+      Alert.alert("Export Error", "Unable to save or share the CSV file.");
+    }
   };
 
   const isMobile = width < 600;
@@ -1364,7 +1373,7 @@ export default function ViewSeller() {
 
   const currentChart = chartData[periodTab];
   const rawData = currentChart
-    ? chartToSeries(currentChart, analyticsTab === 'products' ? 'productsAdded' : 'registered')
+    ? chartToSeries(currentChart, analyticsTab === 'products' ? 'productsAdded' : 'ordersPlaced')
     : (analyticsTab === 'products' ? seller.analyticsData[periodTab] : seller.ordersAnalyticsData[periodTab]);
   const currentData = formatChartData(rawData, periodTab, isDesktopWide);
 
