@@ -80,9 +80,9 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   ]);
 
   const toggleNotif = () => {
-    setNotifOpen(!notifOpen);
     setSettingsOpen(false);
     setProfileOpen(false);
+    router.push("/Admin-notifications" as any);
   };
 
   const toggleSettings = () => {
@@ -266,31 +266,7 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
 
       </View>
 
-      {/* Notifications Dropdown */}
-      {notifOpen && (
-        <View style={[styles.dropdownCard, { right: 108, width: 280, backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.dropdownHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.dropdownTitle, { color: colors.text }]}>Notifications</Text>
-            <TouchableOpacity onPress={handleClearNotifications}>
-              <Text style={{ fontSize: 11, color: "#e8731a", fontWeight: "600" }}>Clear All</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
-            {notifications.length === 0 ? (
-              <View style={{ padding: 16, alignItems: "center" }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No new notifications</Text>
-              </View>
-            ) : (
-              notifications.map((item) => (
-                <View key={item.id} style={[styles.notifItem, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.notifText, { color: colors.text }]}>{item.text}</Text>
-                  <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>{item.time}</Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
-      )}
+      {/* Notifications Dropdown Removed */}
 
       {/* Settings Dropdown */}
       {settingsOpen && (

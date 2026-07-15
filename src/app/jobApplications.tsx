@@ -438,8 +438,10 @@ export default function JobApplicationsScreen() {
 
           {/* ── Header ── */}
           <View style={[styles.header, isWeb && styles.headerWeb]}>
-            <View>
-
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="file-text" size={26} color="#FFF" />
+              </View>
               <Text style={styles.pageTitle}>Job Applications</Text>
             </View>
           </View>
