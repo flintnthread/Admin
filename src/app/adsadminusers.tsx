@@ -23,9 +23,9 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useMemo, useState } from 'react';
 import {
     Alert,
+    Animated,
     FlatList,
     Modal,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -33,21 +33,17 @@ import {
     TextInput,
     TouchableOpacity,
     useWindowDimensions,
-    View,
+    View
 } from 'react-native';
+import Svg, { Line, Rect } from 'react-native-svg';
 
 import Pagination from '@/components/Pagination';
 import CalendarWeek from 'react-native-bootstrap-icons/icons/calendar-week';
-import Grid3x3GapFill from 'react-native-bootstrap-icons/icons/grid-3x3-gap-fill';
-import ListUl from 'react-native-bootstrap-icons/icons/list-ul';
 import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import PersonCheckFill from 'react-native-bootstrap-icons/icons/person-check-fill';
 import PersonXFill from 'react-native-bootstrap-icons/icons/person-x-fill';
 import PlusLg from 'react-native-bootstrap-icons/icons/plus-lg';
-import Save2Fill from 'react-native-bootstrap-icons/icons/save2-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
-import Trash from 'react-native-bootstrap-icons/icons/trash';
-import XLg from 'react-native-bootstrap-icons/icons/x-lg';
 
 
 // ---------------------------------------------------------------------------
@@ -67,11 +63,11 @@ interface AdsUser {
 }
 
 const SEED_USERS: AdsUser[] = [
-    { id: 11, fullName: 'Soujanya Veginati', username: 'souji', email: 'soujanyaveginati8096@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Never' },
-    { id: 8, fullName: 'Tayi Gopi Chand', username: 'Gopi', email: 'gopichand93667@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Mar 19, 2026 16:29' },
-    { id: 1, fullName: 'System Administrator', username: 'admin', email: 'admin@ads.com', role: 'Admin', status: 'Active', lastLogin: 'Feb 14, 2026 10:18' },
-    { id: 12, fullName: 'Priya Reddy', username: 'priya', email: 'priyareddy@gmail.com', role: 'Manager', status: 'Inactive', lastLogin: 'Apr 20, 2026 11:45' },
-    { id: 15, fullName: 'Ramesh Kumar', username: 'ramesh', email: 'rameshkumar@gmail.com', role: 'Viewer', status: 'Active', lastLogin: 'Apr 21, 2026 09:12' },
+    { id: 5, fullName: 'Soujanya Veginati', username: 'souji', email: 'soujanyaveginati8096@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Never' },
+    { id: 4, fullName: 'Tayi Gopi Chand', username: 'Gopi', email: 'gopichand93667@gmail.com', role: 'Admin', status: 'Active', lastLogin: 'Mar 19, 2026 16:29' },
+    { id: 3, fullName: 'System Administrator', username: 'admin', email: 'admin@ads.com', role: 'Admin', status: 'Active', lastLogin: 'Feb 14, 2026 10:18' },
+    { id: 2, fullName: 'Priya Reddy', username: 'priya', email: 'priyareddy@gmail.com', role: 'Manager', status: 'Inactive', lastLogin: 'Apr 20, 2026 11:45' },
+    { id: 1, fullName: 'Ramesh Kumar', username: 'ramesh', email: 'rameshkumar@gmail.com', role: 'Viewer', status: 'Active', lastLogin: 'Apr 21, 2026 09:12' },
 ];
 
 const ROLES: Role[] = ['Admin', 'Manager', 'Viewer'];
@@ -163,6 +159,107 @@ const statusColors = (status: Status) =>
         ? { bg: COLORS.greenBg, fg: COLORS.greenText }
         : { bg: '#FDE8EC', fg: COLORS.danger };
 
+// Grid and List view icons (matching orders.tsx)
+const GridIcon = ({ active }: { active: boolean }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Rect
+      x="3"
+      y="3"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+    <Rect
+      x="14"
+      y="3"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+    <Rect
+      x="3"
+      y="14"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+    <Rect
+      x="14"
+      y="14"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+  </Svg>
+);
+
+const ListIcon = ({ active }: { active: boolean }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Line
+      x1="8"
+      y1="6"
+      x2="21"
+      y2="6"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="8"
+      y1="12"
+      x2="21"
+      y2="12"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="8"
+      y1="18"
+      x2="21"
+      y2="18"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="6"
+      x2="3.01"
+      y2="6"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="12"
+      x2="3.01"
+      y2="12"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="18"
+      x2="3.01"
+      y2="18"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
 // ---------------------------------------------------------------------------
 // Grid view card component (supports hover overlay and responsive layout)
 // ---------------------------------------------------------------------------
@@ -173,21 +270,14 @@ const UserGridCard: React.FC<{
     cardWidth: string | number;
     isMobile: boolean;
 }> = ({ item, onEdit, onDelete, cardWidth, isMobile }) => {
-    const [hovered, setHovered] = useState(false);
     const rc = roleColors(item.role);
     const sc = statusColors(item.status);
 
-    const isWeb = Platform.OS === 'web';
-    const showOverlay = hovered && !isMobile;
-
     return (
         <Pressable
-            onHoverIn={() => isWeb && !isMobile && setHovered(true)}
-            onHoverOut={() => isWeb && !isMobile && setHovered(false)}
             style={[
                 styles.gridCard,
-                { width: cardWidth },
-                hovered && !isMobile && styles.gridCardHovered
+                { width: cardWidth }
             ]}
         >
             {/* Top Banner in #151D4F */}
@@ -195,18 +285,6 @@ const UserGridCard: React.FC<{
                 <View style={styles.gridCardAvatar}>
                     <Text style={styles.gridCardAvatarText}>{item.fullName.charAt(0)}</Text>
                 </View>
-
-                {/* Hover actions overlay (Web/Desktop) */}
-                {showOverlay && (
-                    <View style={styles.gridOverlay}>
-                        <TouchableOpacity style={styles.editBtn} onPress={(e) => { (e as any).stopPropagation?.(); onEdit(); }}>
-                            <Ionicons name="pencil" size={13} color="#fff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.deleteBtn} onPress={(e) => { (e as any).stopPropagation?.(); onDelete(); }}>
-                            <Ionicons name="trash" size={13} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                )}
             </View>
 
             {/* Bottom Card Body */}
@@ -232,17 +310,17 @@ const UserGridCard: React.FC<{
                     Last Login: {item.lastLogin}
                 </Text>
 
-                {/* Mobile / Tablet actions */}
-                {isMobile && (
-                    <View style={styles.gridMobileActions}>
-                        <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-                            <Ionicons name="pencil" size={13} color="#fff" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
-                            <Ionicons name="trash" size={13} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                )}
+                {/* Actions */}
+                <View style={styles.gridActions}>
+                    <TouchableOpacity style={[styles.gridActionBtn, { backgroundColor: '#1d324e' }]} onPress={onEdit}>
+                        <Ionicons name="create-outline" size={15} color="#fff" />
+                        <Text style={styles.gridActionText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.gridActionBtn, { backgroundColor: '#dc2626' }]} onPress={onDelete}>
+                        <Ionicons name="trash-outline" size={15} color="#fff" />
+                        <Text style={styles.gridActionText}>Delete</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </Pressable>
     );
@@ -262,37 +340,31 @@ const DeleteModal: React.FC<{
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
-                <View style={[styles.modalCard, { maxWidth: 420 }]}>
+                <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+                <View style={[styles.modalCard, { maxWidth: 380 }]}>
                     <View style={styles.modalHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Trash width={16} height={16} fill="#fff" />
-                            <Text style={styles.modalHeaderText}>Delete User</Text>
-                        </View>
-                        <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <XLg width={18} height={18} fill="#fff" />
+                        <Text style={styles.modalHeaderText}>Confirm Delete</Text>
+                        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <Ionicons name="close-outline" size={22} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={[styles.modalBody, { alignItems: 'center', paddingTop: 26 }]}>
-                        <View style={styles.trashCircle}>
-                            <Ionicons name="trash" size={26} color={COLORS.orange} />
+                    <View style={{ padding: 28, alignItems: "center" }}>
+                        <View style={styles.deleteIconCircle}>
+                            <Ionicons name="trash" size={36} color="#dc2626" />
                         </View>
-                        <Text style={styles.confirmTitle}>Are you sure you want to delete this user?</Text>
-                        <Text style={styles.confirmSub}>
-                            This action cannot be undone! This will permanently delete the user{' '}
-                            <Text style={{ fontWeight: '700' }}>{user.fullName.toLowerCase()}</Text>.
-                        </Text>
-                    </View>
-
-                    <View style={styles.modalFooter}>
-                        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-                            <XLg width={13} height={13} fill="#fff" />
-                            <Text style={styles.cancelBtnText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.deleteConfirmBtn} onPress={onConfirm}>
-                            <Trash width={13} height={13} fill="#fff" />
-                            <Text style={styles.submitBtnText}>Delete User</Text>
-                        </TouchableOpacity>
+                        <Text style={styles.deleteTitle}>Are you sure?</Text>
+                        <Text style={styles.deleteSubtitle}>You won't be able to revert this action.</Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                                <Ionicons name="close-outline" size={15} color="#fff" />
+                                <Text style={styles.cancelBtnText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.deleteConfirmBtn} onPress={onConfirm}>
+                                <Ionicons name="trash-outline" size={15} color="#fff" />
+                                <Text style={styles.submitBtnText}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </View>
@@ -350,7 +422,7 @@ const UserFormModal: React.FC<{
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalHeaderText}>{isEdit ? 'Edit User' : 'Add New User'}</Text>
                         <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <XLg width={18} height={18} fill="#fff" />
+                            <Ionicons name="close-outline" size={22} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
@@ -372,7 +444,7 @@ const UserFormModal: React.FC<{
                             placeholder="admin@flintnthread.in"
                             placeholderTextColor="#9CA3AF"
                             autoCapitalize="none"
-                            autoComplete="off"
+                            autoComplete="username"
                         />
 
                         <Text style={styles.label}>Email</Text>
@@ -384,7 +456,7 @@ const UserFormModal: React.FC<{
                             placeholderTextColor="#9CA3AF"
                             autoCapitalize="none"
                             keyboardType="email-address"
-                            autoComplete="off"
+                            autoComplete="email"
                         />
 
                         <Text style={styles.label}>Password</Text>
@@ -441,19 +513,18 @@ const UserFormModal: React.FC<{
                                 </Picker>
                             </View>
                         )}
-                        <View style={{ height: 120 }} />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+                                <Ionicons name="close-outline" size={15} color="#fff" />
+                                <Text style={styles.cancelBtnText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+                                <Ionicons name="save-outline" size={15} color="#fff" />
+                                <Text style={styles.submitBtnText}>{isEdit ? 'Save Changes' : 'Add User'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={{ height: 40 }} />
                     </ScrollView>
-
-                    <View style={styles.modalFooter}>
-                        <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-                            <XLg width={14} height={14} fill="#fff" />
-                            <Text style={styles.cancelBtnText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                            <Save2Fill width={14} height={14} fill="#fff" />
-                            <Text style={styles.submitBtnText}>{isEdit ? 'Save Changes' : 'Add User'}</Text>
-                        </TouchableOpacity>
-                    </View>
                 </View>
             </View>
         </Modal>
@@ -541,18 +612,43 @@ const AdsAdminUsers: React.FC = () => {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deletingUser, setDeletingUser] = useState<AdsUser | null>(null);
 
+    // ---- Toast notification ------------------------------------------------
+    const [toastMessage, setToastMessage] = useState('');
+    const [toastVisible, setToastVisible] = useState(false);
+    const toastSlide = React.useRef(new Animated.Value(400)).current;
+
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        setToastVisible(true);
+        toastSlide.setValue(400);
+        Animated.timing(toastSlide, {
+            toValue: 0,
+            duration: 380,
+            useNativeDriver: true,
+        }).start();
+        setTimeout(() => {
+            Animated.timing(toastSlide, {
+                toValue: 400,
+                duration: 320,
+                useNativeDriver: true,
+            }).start(() => setToastVisible(false));
+        }, 3000);
+    };
+
     const filtered = useMemo(() => {
-        return users.filter((u) => {
-            const q = search.trim().toLowerCase();
-            const matchesSearch =
-                !q ||
-                u.fullName.toLowerCase().includes(q) ||
-                u.username.toLowerCase().includes(q) ||
-                u.email.toLowerCase().includes(q);
-            const matchesRole = roleFilter === 'All' || u.role === roleFilter;
-            const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
-            return matchesSearch && matchesRole && matchesStatus;
-        });
+        return users
+            .filter((u) => {
+                const q = search.trim().toLowerCase();
+                const matchesSearch =
+                    !q ||
+                    u.fullName.toLowerCase().includes(q) ||
+                    u.username.toLowerCase().includes(q) ||
+                    u.email.toLowerCase().includes(q);
+                const matchesRole = roleFilter === 'All' || u.role === roleFilter;
+                const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
+                return matchesSearch && matchesRole && matchesStatus;
+            })
+            .sort((a, b) => b.id - a.id);
     }, [users, search, roleFilter, statusFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -586,6 +682,7 @@ const AdsAdminUsers: React.FC = () => {
                         : u
                 )
             );
+            showToast('✅  User updated successfully!');
         } else {
             const newId = users.length ? Math.max(...users.map((u) => u.id)) + 1 : 1;
             const newUser: AdsUser = {
@@ -599,6 +696,10 @@ const AdsAdminUsers: React.FC = () => {
             };
             setUsers((prev) => [newUser, ...prev]);
             setPage(1);
+            setSearch('');
+            setRoleFilter('All');
+            setStatusFilter('All');
+            showToast('✅  New user added successfully!');
         }
         setModalVisible(false);
     };
@@ -656,10 +757,10 @@ const AdsAdminUsers: React.FC = () => {
                 <Text style={[styles.cell, styles.colLastLogin, { color: COLORS.sub, fontSize: 12 }]}>{item.lastLogin}</Text>
                 <View style={[styles.colAction, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <TouchableOpacity style={styles.editBtn} onPress={() => openEditModal(item)}>
-                        <Ionicons name="pencil" size={13} color="#fff" />
+                        <Ionicons name="create-outline" size={14} color="#fff" />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                        <Ionicons name="trash" size={13} color="#fff" />
+                        <Ionicons name="trash-outline" size={14} color="#fff" />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -710,11 +811,13 @@ const AdsAdminUsers: React.FC = () => {
                             <Search width={15} height={15} fill={COLORS.sub} />
                             <TextInput
                                 style={[styles.searchInput, isPhone && { color: COLORS.ink, fontSize: 13 }]}
-                                placeholder="Search users by name, username or...."
+                                placeholder="Search users..."
                                 placeholderTextColor="#9CA3AF"
                                 value={search}
                                 onChangeText={(t) => { setSearch(t); setPage(1); }}
-                                autoComplete={"one-time-code" as any}
+                                autoComplete="off"
+                                autoCorrect={false}
+                                spellCheck={false}
                             />
                         </View>
 
@@ -768,13 +871,13 @@ const AdsAdminUsers: React.FC = () => {
                                         style={[styles.viewToggleBtn, view === 'grid' && styles.viewToggleBtnActive]}
                                         onPress={() => setView('grid')}
                                     >
-                                        <Grid3x3GapFill width={14} height={14} fill={view === 'grid' ? '#fff' : COLORS.ink} />
+                                        <GridIcon active={view === 'grid'} />
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.viewToggleBtn, view === 'list' && styles.viewToggleBtnActive]}
                                         onPress={() => setView('list')}
                                     >
-                                        <ListUl width={14} height={14} fill={view === 'list' ? '#fff' : COLORS.ink} />
+                                        <ListIcon active={view === 'list'} />
                                     </TouchableOpacity>
                                 </View>
                             )}
@@ -864,6 +967,20 @@ const AdsAdminUsers: React.FC = () => {
                     onClose={closeDeleteModal}
                     onConfirm={confirmDelete}
                 />
+
+                {/* ---- Sliding Green Toast ---- */}
+                {toastVisible && (
+                    <View style={styles.toastContainer} pointerEvents="none">
+                        <Animated.View
+                            style={[
+                                styles.toast,
+                                { transform: [{ translateX: toastSlide }] }
+                            ]}
+                        >
+                            <Text style={styles.toastText}>{toastMessage}</Text>
+                        </Animated.View>
+                    </View>
+                )}
             </View>
         </AdminLayout>
     );
@@ -892,7 +1009,7 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     heroIconBadge: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.orange, alignItems: "center", justifyContent: "center" },
-    heroTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    heroTitle: { color: "#fff", fontSize: 24, fontWeight: "800" },
     heroSubtitle: { color: "#94A3B8", fontSize: 12, marginTop: 2, fontWeight: "400" },
 
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
@@ -913,23 +1030,23 @@ const styles = StyleSheet.create({
     statsRowMobile: { flexWrap: 'nowrap', justifyContent: 'space-between', gap: 6, marginTop: -24, paddingHorizontal: 0 },
 
     statCard: {
-        backgroundColor: COLORS.card, borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, 
-        borderWidth: 1, borderColor: "#F1F5F9", shadowColor: "#0F172A", shadowOpacity: 0.1, 
+        backgroundColor: COLORS.card, borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12,
+        borderWidth: 1, borderColor: "#F1F5F9", shadowColor: "#0F172A", shadowOpacity: 0.1,
         shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3,
     },
     statCardDesktop: { flexGrow: 0, flexShrink: 0, flexDirection: 'column', alignItems: 'flex-start' },
     statCardMobile: { flex: 1, minWidth: 0, borderRadius: 12, paddingHorizontal: 2, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 2 },
     statCardTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: '100%', marginBottom: 6 },
-    
+
     statIconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
     statIconWrapMobile: { width: 26, height: 26 },
-    
+
     statValue: { fontSize: 17, fontWeight: "700" },
     statValueMobile: { fontSize: 14, fontWeight: "800", marginTop: 2, textAlign: "center" },
-    
+
     statLabel: { fontSize: 11, color: COLORS.sub, fontWeight: "500" },
     statLabelMobile: { fontSize: 10, color: COLORS.sub, fontWeight: "600", marginTop: 2, textAlign: "center" },
-    
+
     statSub: { fontSize: 10, color: COLORS.sub, marginTop: 2 },
 
     toolbarCard: {
@@ -962,8 +1079,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
     } as any,
     viewToggle: { flexDirection: 'row', backgroundColor: '#F1F2F4', borderRadius: 10, padding: 3 },
-    viewToggleBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8 },
-    viewToggleBtnActive: { backgroundColor: COLORS.orange },
+    viewToggleBtn: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    viewToggleBtnActive: { backgroundColor: COLORS.navy },
 
     dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
 
@@ -1018,8 +1135,8 @@ const styles = StyleSheet.create({
     pill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, alignSelf: 'flex-start' },
     pillText: { fontSize: 11, fontWeight: '700' },
 
-    editBtn: { backgroundColor: COLORS.orange, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    deleteBtn: { backgroundColor: COLORS.danger, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    editBtn: { backgroundColor: '#1d324e', width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    deleteBtn: { backgroundColor: '#dc2626', width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 
     userCard: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1092,12 +1209,17 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16,
         borderRadius: 10, backgroundColor: COLORS.danger,
     },
-    trashCircle: {
-        width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFF1E6',
-        alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    deleteIconCircle: {
+        width: 72, height: 72, borderRadius: 36, backgroundColor: '#FFF1E6',
+        alignItems: 'center', justifyContent: 'center', marginBottom: 16,
     },
-    confirmTitle: { fontSize: 15, fontWeight: '700', color: COLORS.ink, textAlign: 'center' },
-    confirmSub: { fontSize: 12.5, color: COLORS.sub, marginTop: 4, textAlign: 'center' },
+    deleteTitle: { fontSize: 17, fontWeight: '700', color: COLORS.ink, marginBottom: 6 },
+    deleteSubtitle: { fontSize: 14, color: COLORS.sub, textAlign: 'center' },
+
+    modalButtons: {
+        flexDirection: 'row', gap: 12, justifyContent: 'center',
+        marginTop: 24, marginBottom: 8, flexWrap: 'wrap',
+    } as any,
 
     // Responsive Grid Card styles
     gridCard: {
@@ -1112,11 +1234,6 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2,
         marginBottom: 16,
-    } as any,
-    gridCardHovered: {
-        borderColor: COLORS.orange,
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
     } as any,
     gridCardHeader: {
         height: 120,
@@ -1140,27 +1257,6 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: '800',
     } as any,
-    gridOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(21, 29, 79, 0.4)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-    } as any,
-    gridOverlayBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: '#fff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
-    } as any,
     gridCardBody: {
         padding: 16,
     } as any,
@@ -1183,14 +1279,27 @@ const styles = StyleSheet.create({
         color: COLORS.sub,
         marginTop: 4,
     } as any,
-    gridMobileActions: {
+    gridActions: {
         flexDirection: 'row',
-        justifyContent: 'flex-end',
         gap: 8,
         marginTop: 12,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
         paddingTop: 10,
+    } as any,
+    gridActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        borderRadius: 8,
+        paddingVertical: 8,
+    } as any,
+    gridActionText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
     } as any,
     customDropdownTrigger: {
         flexDirection: 'row',
@@ -1232,6 +1341,37 @@ const styles = StyleSheet.create({
     customDropdownItemText: {
         fontSize: 13,
         color: '#4B5563',
+    } as any,
+
+    // Toast
+    toastContainer: {
+        position: 'absolute',
+        top: 16,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 9999,
+    } as any,
+    toast: {
+        backgroundColor: '#16A34A',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 10,
+        minWidth: 220,
+        maxWidth: 340,
+    } as any,
+    toastText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+        flexShrink: 1,
     } as any,
 
 });

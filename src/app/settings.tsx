@@ -109,7 +109,7 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Platform Settings</Text>
             <Text style={styles.subtitle}>
-              Manage SendGrid and Twilio credentials used for admin, seller, and customer emails and SMS.
+              Save once here — the same SendGrid and Twilio credentials are used for customer, seller, and admin emails and mobile OTP SMS.
             </Text>
           </View>
         </View>
@@ -144,7 +144,7 @@ export default function SettingsScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Twilio (SMS / OTP)</Text>
               <Text style={styles.cardHint}>
-                Used for seller and customer OTP SMS.
+                One Account SID + Auth Token + Phone Number for all mobile OTP (customer login and seller registration). No restart needed after save.
                 {current?.twilioAuthTokenConfigured
                   ? ` Auth token: ${current.twilioAuthTokenMasked}`
                   : " Auth token not configured yet."}
@@ -196,7 +196,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
 
             <Text style={styles.note}>
-              Leave password fields empty to keep the current value. Changes apply immediately for new emails and SMS without restarting services.
+              Leave password/token fields empty to keep the current value. Changes apply immediately to customer and seller OTP SMS and emails — no service restart.
             </Text>
           </>
         )}

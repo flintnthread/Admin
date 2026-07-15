@@ -15,29 +15,29 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 
 import { getApiErrorMessage } from "@/lib/api/client";
 import {
-  createSize,
-  deleteSize,
-  fetchSizes,
-  updateSize,
-  type CatalogSize,
+    createSize,
+    deleteSize,
+    fetchSizes,
+    updateSize,
+    type CatalogSize,
 } from "@/services/sizeApi";
 
 // ── Linear Gradient ──────────────────────────────────────────
@@ -1008,7 +1008,7 @@ const S = StyleSheet.create({
     borderWidth: 1.5, borderColor: "#ddd", backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center",
   },
-  viewBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  viewBtnActive: { backgroundColor: "#1d324e", borderColor: "#1d324e" },
 
   // Grid card
   gridCard: {
