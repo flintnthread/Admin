@@ -278,8 +278,8 @@ export function getPublicMediaBaseUrl(): string {
 
 
 /**
- * Product approval / catalog images — local disk under /uploads/products.
- * Prefer admin-backend (/uploads/products) so shared seller folder is served without CDN.
+ * Product approval / catalog images.
+ * Cloudinary absolute URLs are used as-is; relative /uploads paths go through admin media.
  */
 export function resolveProductImageUrl(path?: string | null): string {
   if (!path?.trim()) return "";
@@ -289,17 +289,23 @@ export function resolveProductImageUrl(path?: string | null): string {
     return value;
   }
 
-  let pathname = "";
+  // Cloudinary (or any absolute https without /uploads) — never rewrite
   if (/^https?:\/\//i.test(value)) {
+    if (/res\.cloudinary\.com|cloudinary\.com/i.test(value) || !/\/uploads\//i.test(value)) {
+      return value;
+    }
     try {
-      pathname = new URL(value).pathname || "";
+      const pathname = new URL(value).pathname || "";
+      if (pathname.includes("/uploads/products/")) {
+        return `${resolveAdminApiBaseUrl()}${pathname}`;
+      }
     } catch {
       return value;
     }
-  } else {
-    pathname = normalizeMediaPath(value);
+    return value;
   }
 
+  const pathname = normalizeMediaPath(value);
   if (pathname.includes("/uploads/products/")) {
     return `${resolveAdminApiBaseUrl()}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
   }
