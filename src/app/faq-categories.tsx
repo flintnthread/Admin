@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { mapFaqCategoryRow } from "@/lib/mappers";
 import {
     createFaqCategory,
@@ -17,7 +18,6 @@ import {
     Platform,
     Modal,
     StatusBar,
-    Alert,
     useWindowDimensions,
     DimensionValue,
 } from "react-native";
@@ -25,11 +25,6 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
-
-let Swal: any;
-if (Platform.OS === "web") {
-    Swal = require("sweetalert2");
-}
 
 // ─── THEME — Light / White ────────────────────────────────────────────────────
 const PRIMARY = "#ef7b1a";
@@ -335,6 +330,12 @@ const FaqCategoriesScreen: React.FC = () => {
 
     const handleSave = (data: Partial<FaqCategory>) => {
         void (async () => {
+            const isUpdate = !!editingCat;
+            if (isUpdate) {
+                if (!(await sweetCrud.confirmUpdate("FAQ category", data.name))) return;
+            } else {
+                if (!(await sweetCrud.confirmAdd("FAQ category", data.name))) return;
+            }
             try {
                 const payload = {
                     categoryName: data.name,
@@ -344,18 +345,10 @@ const FaqCategoriesScreen: React.FC = () => {
                 };
                 if (editingCat) {
                     await updateFaqCategory(editingCat.id, payload);
-                    if (Platform.OS === "web") {
-                        Swal.fire("Updated!", "Category has been updated successfully.", "success");
-                    } else {
-                        Alert.alert("Updated!", "Category has been updated successfully.");
-                    }
+                    void sweetCrud.updated("FAQ category");
                 } else {
                     await createFaqCategory(payload);
-                    if (Platform.OS === "web") {
-                        Swal.fire("Added!", "Category has been added successfully.", "success");
-                    } else {
-                        Alert.alert("Added!", "Category has been added successfully.");
-                    }
+                    void sweetCrud.added("FAQ category");
                 }
                 await loadCategories();
                 setSearch("");
@@ -365,9 +358,7 @@ const FaqCategoriesScreen: React.FC = () => {
                 setEditingCat(null);
             } catch (e) {
                 setLoadError(getApiErrorMessage(e));
-                if (Platform.OS === "web") {
-                    Swal.fire("Error", getApiErrorMessage(e), "error");
-                }
+                void sweetError("Error", getApiErrorMessage(e));
             }
         })();
     };
@@ -383,17 +374,13 @@ const FaqCategoriesScreen: React.FC = () => {
                     sortOrder: id,
                     status: cat.status !== "Active",
                 });
-                if (Platform.OS === "web") {
-                    Swal.fire("Updated!", "Status has been changed.", "success");
-                }
+                void sweetCrud.updated("FAQ category");
                 setStatusFilter("All");
                 setCurrentPage(1);
                 await loadCategories();
             } catch (e) {
                 setLoadError(getApiErrorMessage(e));
-                if (Platform.OS === "web") {
-                    Swal.fire("Error", getApiErrorMessage(e), "error");
-                }
+                void sweetError("Error", getApiErrorMessage(e));
             }
         })();
     };
@@ -402,44 +389,19 @@ const FaqCategoriesScreen: React.FC = () => {
         void (async () => {
             try {
                 await deleteFaqCategory(id);
-                if (Platform.OS === "web") {
-                    Swal.fire("Deleted!", "Category has been deleted.", "success");
-                }
+                void sweetCrud.deleted("FAQ category");
                 await loadCategories();
             } catch (e) {
                 setLoadError(getApiErrorMessage(e));
-                if (Platform.OS === "web") {
-                    Swal.fire("Error", getApiErrorMessage(e), "error");
-                }
+                void sweetError("Error", getApiErrorMessage(e));
             }
         })();
     };
 
-    const handleDelete = (id: number) => {
-        if (Platform.OS === "web") {
-            Swal.fire({
-                title: "Are you sure?",
-                text: "You won't be able to revert this!",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#d33",
-                cancelButtonColor: "#3085d6",
-                confirmButtonText: "Yes, delete it!"
-            }).then((result: any) => {
-                if (result.isConfirmed) {
-                    doDelete(id);
-                }
-            });
-        } else {
-            Alert.alert(
-                "Confirm Delete",
-                "Are you sure you want to delete this category?",
-                [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Delete", style: "destructive", onPress: () => doDelete(id) },
-                ]
-            );
-        }
+    const handleDelete = async (id: number) => {
+        const cat = categories.find((c) => c.id === id);
+        if (!(await sweetCrud.confirmDelete("FAQ category", cat?.name))) return;
+        doDelete(id);
     };
 
     // Stat cards data

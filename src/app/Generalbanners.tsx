@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
   fetchGeneralBanners,
   createGeneralBanner,
@@ -386,8 +387,7 @@ export default function BannerManagement() {
   function handleSavePress() {
     if (!form.title.trim() || !form.category.trim() || !form.text.trim() || !form.buttonText.trim()) {
       const msg = "Please fill in all required fields (marked with *)";
-      if (Platform.OS === "web") { if (typeof window !== "undefined") window.alert(msg); }
-      else Alert.alert("Required Fields", msg);
+      void sweetWarning("Required Fields", msg);
       return;
     }
     setPendingForm({ ...form });
@@ -458,11 +458,7 @@ export default function BannerManagement() {
     } catch (err) {
       setSweetVisible(false);
       const msg = getApiErrorMessage(err, "Operation failed.");
-      if (Platform.OS === "web") {
-        if (typeof window !== "undefined") window.alert(msg);
-      } else {
-        Alert.alert("Error", msg);
-      }
+      void sweetError("Error", msg);
       if (sweetType === "add-confirm" || sweetType === "edit-confirm") {
         setModalVisible(true);
       }

@@ -19,6 +19,7 @@
 
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
     createAdsAdminUser,
     deleteAdsAdminUser,
@@ -33,7 +34,6 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Animated,
     FlatList,
     Modal,
@@ -56,14 +56,6 @@ import PersonCheckFill from 'react-native-bootstrap-icons/icons/person-check-fil
 import PersonXFill from 'react-native-bootstrap-icons/icons/person-x-fill';
 import PlusLg from 'react-native-bootstrap-icons/icons/plus-lg';
 import Search from 'react-native-bootstrap-icons/icons/search';
-
-function notify(title: string, message: string) {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert(message ? `${title}\n\n${message}` : title);
-        return;
-    }
-    Alert.alert(title, message);
-}
 
 // ---------------------------------------------------------------------------
 // Types & seed data
@@ -460,16 +452,16 @@ const UserFormModal: React.FC<{
     const handleSubmit = () => {
         if (saving) return;
         if (!form.fullName.trim() || !form.username.trim() || !form.email.trim()) {
-            notify('Missing information', 'Please fill in full name, username and email.');
+            void sweetWarning('Missing information', 'Please fill in full name, username and email.');
             return;
         }
         const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
         if (!emailOk) {
-            notify('Invalid email', 'Please enter a valid email address.');
+            void sweetWarning('Invalid email', 'Please enter a valid email address.');
             return;
         }
         if (!isEdit && form.password.trim().length < 6) {
-            notify('Missing information', 'Please enter a password of at least 6 characters.');
+            void sweetWarning('Missing information', 'Please enter a password of at least 6 characters.');
             return;
         }
         void onSubmit({
@@ -797,7 +789,7 @@ const AdsAdminUsers: React.FC = () => {
             } else {
                 const password = form.password.trim();
                 if (password.length < 6) {
-                    notify('Missing information', 'Please enter a password of at least 6 characters.');
+                    void sweetWarning('Missing information', 'Please enter a password of at least 6 characters.');
                     return;
                 }
                 await createAdsAdminUser({ ...body, password });
@@ -811,7 +803,7 @@ const AdsAdminUsers: React.FC = () => {
             setEditingUser(null);
             await loadUsers();
         } catch (err) {
-            notify('Error', getApiErrorMessage(err, editingUser ? 'Could not update user.' : 'Could not add user.'));
+            void sweetError('Error', getApiErrorMessage(err, editingUser ? 'Could not update user.' : 'Could not add user.'));
         } finally {
             setSaving(false);
         }
@@ -832,7 +824,7 @@ const AdsAdminUsers: React.FC = () => {
             showToast('User deleted successfully!');
             await loadUsers();
         } catch (err) {
-            notify('Error', getApiErrorMessage(err, 'Could not delete user.'));
+            void sweetError('Error', getApiErrorMessage(err, 'Could not delete user.'));
         } finally {
             setSaving(false);
         }

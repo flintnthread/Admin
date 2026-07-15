@@ -13,12 +13,12 @@ import {
   Platform,
   Animated,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError } from '@/lib/sweetAlert';
 import {
   createAdPlacement,
   deleteAdPlacement,
@@ -255,43 +255,6 @@ function SuccessToast({ visible, message, onClose }: { visible: boolean; message
           </View>
           <Text style={styles.successMessage}>{message}</Text>
         </Animated.View>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function DeleteConfirmModal({
-  visible,
-  placementName,
-  onCancel,
-  onConfirm,
-}: {
-  visible: boolean;
-  placementName: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.successOverlay} onPress={onCancel}>
-        <Pressable style={styles.confirmCard} onPress={() => {}}>
-          <View style={[styles.successIconCircle, { backgroundColor: COLORS.rose }]}>
-            <Feather name="trash-2" size={22} color="#fff" />
-          </View>
-          <Text style={styles.confirmTitle}>Delete placement?</Text>
-          <Text style={styles.successMessage}>
-            "{placementName}" will be permanently removed. This can't be undone.
-          </Text>
-          <View style={styles.confirmActionsRow}>
-            <TouchableOpacity style={styles.resetBtn} onPress={onCancel}>
-              <Text style={styles.resetBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.addBtn, { backgroundColor: COLORS.rose }]} onPress={onConfirm}>
-              <Feather name="trash-2" size={14} color="#fff" />
-              <Text style={styles.addBtnText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
       </Pressable>
     </Modal>
   );
@@ -575,7 +538,6 @@ export default function AdPlacementsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Placement | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: "" });
 
   const loadPlacements = useCallback(async () => {
@@ -614,35 +576,42 @@ export default function AdPlacementsScreen() {
       monthlyRate: Number(form.monthlyRate) || 0,
       status: toApiStatus(form.status),
     };
+    if (editingPlacement) {
+      if (!(await sweetCrud.confirmUpdate('Placement', body.name))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd('Placement', body.name))) return;
+    }
     setSaving(true);
     try {
       if (editingPlacement) {
         await updateAdPlacement(editingPlacement.id, body);
         setToast({ visible: true, message: "Placement updated successfully!" });
+        void sweetCrud.updated('Placement');
       } else {
         await createAdPlacement(body);
         setToast({ visible: true, message: "Placement added successfully!" });
+        void sweetCrud.added('Placement');
       }
       setModalOpen(false);
       setEditingPlacement(null);
       await loadPlacements();
     } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err, editingPlacement ? 'Could not update placement.' : 'Could not add placement.'));
+      void sweetError('Error', getApiErrorMessage(err, editingPlacement ? 'Could not update placement.' : 'Could not add placement.'));
     } finally {
       setSaving(false);
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
+  const requestDelete = async (placement: Placement) => {
+    if (!(await sweetCrud.confirmDelete('Placement', placement.name))) return;
     setSaving(true);
     try {
-      await deleteAdPlacement(deleteTarget.id);
+      await deleteAdPlacement(placement.id);
       setToast({ visible: true, message: "Placement deleted." });
-      setDeleteTarget(null);
+      void sweetCrud.deleted('Placement');
       await loadPlacements();
     } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err, 'Could not delete placement.'));
+      void sweetError('Error', getApiErrorMessage(err, 'Could not delete placement.'));
     } finally {
       setSaving(false);
     }
@@ -687,7 +656,7 @@ export default function AdPlacementsScreen() {
                 <ActivityIndicator size="large" color={COLORS.orange} />
               </View>
             ) : (
-              <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={setDeleteTarget} />
+              <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={(p) => void requestDelete(p)} />
             )}
           </View>
         </ScrollView>
@@ -717,13 +686,6 @@ export default function AdPlacementsScreen() {
                 }
               : null
           }
-        />
-
-        <DeleteConfirmModal
-          visible={!!deleteTarget}
-          placementName={deleteTarget?.name ?? ""}
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={confirmDelete}
         />
 
         <SuccessToast visible={toast.visible} message={toast.message} onClose={() => setToast({ visible: false, message: "" })} />

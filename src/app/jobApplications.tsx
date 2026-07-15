@@ -11,6 +11,7 @@ import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate, initialsFromName } from '@/lib/format';
+import { sweetError } from '@/lib/sweetAlert';
 import { fetchJobApplications, fetchJobs, updateJobApplicationStatus } from '@/services/hrApi';
 import { Feather } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -84,29 +85,33 @@ const BI: React.FC<{ name: BIName; size?: number; color?: string; style?: object
 const AVATAR_COLORS = ['#5B4EFF', '#8B5CF6', '#06B6D4', '#F97316', '#EF4444', '#10B981', '#F59E0B', '#EC4899'];
 
 function mapApplication(a: import('@/lib/api/types').JobApplication, index: number) {
-  const statusRaw = (a.status ?? 'pending').toLowerCase();
+  const statusRaw = String(a.status ?? 'pending').toLowerCase();
   const status =
     statusRaw === 'reviewed' ? 'Reviewed' :
-      statusRaw === 'shortlisted' ? 'Shortlisted' :
-        statusRaw === 'interviewed' ? 'Interviewed' :
-          statusRaw === 'rejected' ? 'Rejected' : 'Pending';
-  const jobTitle = a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : '—');
+    statusRaw === 'shortlisted' ? 'Shortlisted' :
+    statusRaw === 'interviewed' ? 'Interviewed' :
+    statusRaw === 'rejected' ? 'Rejected' :
+    statusRaw === 'hired' ? 'Hired' :
+    'Pending';
+  const expYears = a.experienceYears != null ? Number(a.experienceYears) : null;
   return {
-    id: String(a.id),
+    id: String(a.id ?? index),
     jobId: a.jobId,
     name: a.name ?? 'Applicant',
-    role: jobTitle,
-    department: a.departmentName ?? '—',
-    applied: formatDate(a.appliedAt),
-    status,
-    avatar: initialsFromName(a.name),
-    avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
-    experience: '—',
     email: a.email ?? '—',
     phone: a.phone ?? '—',
+    role: a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : '—'),
+    department: a.departmentName ?? '—',
+    applied: formatDate(a.appliedAt),
+    avatar: initialsFromName(a.name),
+    avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
+    status,
+    experience: expYears != null && !Number.isNaN(expYears) ? `${expYears} yr${expYears === 1 ? '' : 's'}` : '—',
     resumePath: a.resumePath ?? '',
     coverLetter: a.coverLetter ?? '',
-    location: '—',
+    location: a.location?.trim() || '—',
+    currentCompany: a.currentCompany ?? '',
+    currentDesignation: a.currentDesignation ?? '',
   };
 }
 
@@ -116,6 +121,7 @@ const STATUS_CONFIG = {
   Shortlisted: { color: C.shortlisted, bg: '#ECFDF5', icon: 'star-fill' },
   Interviewed: { color: C.interviewed, bg: '#F5F3FF', icon: 'mic-fill' },
   Rejected: { color: C.rejected, bg: '#FEF2F2', icon: 'x-circle-fill' },
+  Hired: { color: C.shortlisted, bg: '#ECFDF5', icon: 'check-circle-fill' },
 };
 
 const STAT_CARDS = [
@@ -127,8 +133,8 @@ const STAT_CARDS = [
   { key: 'Rejected', label: 'Rejected', color: C.rejected, icon: 'x-circle-fill' },
 ];
 
-const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'];
-const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'] as const;
+const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'];
+const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'] as const;
 
 // ─── Helper components ───────────────────────────────────────────────────────
 
@@ -371,7 +377,7 @@ export default function JobApplicationsScreen() {
       );
     } catch (e) {
       const msg = getApiErrorMessage(e, 'Failed to update status.');
-      if (Platform.OS === 'web') window.alert(msg);
+      void sweetError('Error', msg);
     } finally {
       setUpdatingId(null);
     }

@@ -1,6 +1,7 @@
 import AdminLayout from "@/components/admin-layout";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetError, sweetInfo, sweetSuccess } from "@/lib/sweetAlert";
 import { mapPayoutToPaymentRow } from "@/lib/mappers";
 import { fetchPayoutStats, fetchPayouts, markPayoutPaid, fetchPayoutDetail, fetchPayoutExportCsv } from "@/services/payoutApi";
 import { Feather } from "@expo/vector-icons";
@@ -9,7 +10,6 @@ import { router } from "expo-router";
 import Pagination from "@/components/Pagination";
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     Platform,
     ScrollView,
@@ -536,13 +536,11 @@ const SellerPaymentsScreen: React.FC = () => {
             await markPayoutPaid(id, transactionRef || undefined, adminNote || undefined, apiStatus);
             setPayModalOrder(null);
             const msg = `Payment marked as ${status}!`;
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Success", msg);
+            void sweetSuccess("Success", msg);
             await loadPayments();
         } catch (e) {
             const msg = getApiErrorMessage(e);
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Error", msg);
+            void sweetError("Error", msg);
         }
     };
 
@@ -556,8 +554,7 @@ const SellerPaymentsScreen: React.FC = () => {
             if (existing) setPayModalOrder(existing);
             else {
                 const msg = getApiErrorMessage(e);
-                if (Platform.OS === "web") window.alert(msg);
-                else Alert.alert("Error", msg);
+                void sweetError("Error", msg);
             }
         }
     };
@@ -573,7 +570,7 @@ const SellerPaymentsScreen: React.FC = () => {
     // ─── CSV EXPORT (backend) ────────────────────────────────────────────────
     const downloadCsv = (content: string, suffix: string) => {
         if (Platform.OS !== "web") {
-            Alert.alert("Export", "CSV export is currently supported on web only.");
+            void sweetInfo("Export", "CSV export is currently supported on web only.");
             return;
         }
         const fileName = `seller_payments_${suffix}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
@@ -590,7 +587,7 @@ const SellerPaymentsScreen: React.FC = () => {
 
     const downloadBackendExport = async (status?: string, minReminderDays?: number) => {
         if (Platform.OS !== "web") {
-            Alert.alert("Export", "CSV export is currently supported on web only.");
+            void sweetInfo("Export", "CSV export is currently supported on web only.");
             return;
         }
         try {
@@ -601,8 +598,7 @@ const SellerPaymentsScreen: React.FC = () => {
             downloadCsv(csv, suffix);
         } catch (e) {
             const msg = getApiErrorMessage(e, "Failed to export payouts.");
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Error", msg);
+            void sweetError("Error", msg);
         }
     };
 

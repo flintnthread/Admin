@@ -2,6 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import { mapDeliverySlabRow } from "@/lib/mappers";
 import {
   createDeliverySlab,
@@ -12,7 +13,6 @@ import {
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   SafeAreaView,
@@ -25,7 +25,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import Swal from "sweetalert2";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -755,44 +754,24 @@ const DeliveryChargeModal: React.FC<{
 
   const handleSave = () => {
     if (!label.trim()) {
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error", text: "Please enter a weight slab description.", confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Validation Error", "Please enter a weight slab description.");
-      }
+      void sweetWarning("Validation Error", "Please enter a weight slab description.");
       return;
     }
     if (minKg.trim() === "") {
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error", text: "Please enter a minimum weight.", confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Validation Error", "Please enter a minimum weight.");
-      }
+      void sweetWarning("Validation Error", "Please enter a minimum weight.");
       return;
     }
     if (maxKg.trim() === "") {
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error", text: "Please enter a maximum weight.", confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Validation Error", "Please enter a maximum weight.");
-      }
+      void sweetWarning("Validation Error", "Please enter a maximum weight.");
       return;
     }
     if (!isCustomPricing) {
       if (intraCity.trim() === "") {
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "error", title: "Error", text: "Please enter an intra-city charge.", confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Validation Error", "Please enter an intra-city charge.");
-        }
+        void sweetWarning("Validation Error", "Please enter an intra-city charge.");
         return;
       }
       if (metroMetro.trim() === "") {
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "error", title: "Error", text: "Please enter a metro-metro charge.", confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Validation Error", "Please enter a metro-metro charge.");
-        }
+        void sweetWarning("Validation Error", "Please enter a metro-metro charge.");
         return;
       }
     }
@@ -967,6 +946,12 @@ const DeliveryChargesScreen: React.FC = () => {
     active: boolean;
     custom: boolean;
   }) => {
+    const isUpdate = editingSlabId != null;
+    if (isUpdate) {
+      if (!(await sweetCrud.confirmUpdate("Delivery charge", data.label))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd("Delivery charge", data.label))) return;
+    }
     try {
       const payload = {
         label: data.label,
@@ -983,19 +968,13 @@ const DeliveryChargesScreen: React.FC = () => {
         await createDeliverySlab(payload);
       }
       await loadSlabs();
-      const msg = editingSlabId != null ? "Delivery charge updated successfully!" : "Delivery charge added successfully!";
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "success", title: "Success!", text: msg, confirmButtonColor: "#1E2B6B" });
+      if (isUpdate) {
+        void sweetCrud.updated("Delivery charge");
       } else {
-        Alert.alert("Success", msg);
+        void sweetCrud.added("Delivery charge");
       }
     } catch (e) {
-      const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error!", text: msg, confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Error", msg);
-      }
+      void sweetError("Error", getApiErrorMessage(e));
     }
   };
 
@@ -1014,47 +993,15 @@ const DeliveryChargesScreen: React.FC = () => {
     setEditingSlabId(id);
   };
 
-  const handleDelete = (id: number) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteDeliverySlab(id);
-        await loadSlabs();
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "success", title: "Deleted!", text: "Delivery charge deleted successfully!", confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Deleted", "Delivery charge deleted successfully!");
-        }
-      } catch (e) {
-        const msg = getApiErrorMessage(e, "Failed to delete delivery charge.");
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "error", title: "Error!", text: msg, confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Error", msg);
-        }
-      }
-    };
-
-    if (Platform.OS === "web") {
-      Swal.fire({
-        title: "Are you sure?",
-        text: "You won't be able to revert this!",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#1E2B6B",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!"
-      }).then((result) => {
-        if (result.isConfirmed) confirmDelete();
-      });
-    } else {
-      Alert.alert(
-        "Confirm Delete",
-        "Are you sure you want to delete this delivery charge?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: confirmDelete }
-        ]
-      );
+  const handleDelete = async (id: number) => {
+    const slab = slabs.find((s) => s.id === id);
+    if (!(await sweetCrud.confirmDelete("Delivery charge", slab?.label))) return;
+    try {
+      await deleteDeliverySlab(id);
+      await loadSlabs();
+      void sweetCrud.deleted("Delivery charge");
+    } catch (e) {
+      void sweetError("Error", getApiErrorMessage(e, "Failed to delete delivery charge."));
     }
   };
 

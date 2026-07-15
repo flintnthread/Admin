@@ -1,6 +1,7 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetConfirm, sweetError, sweetSuccess } from "@/lib/sweetAlert";
 import { formatDateTime, initialsFromName } from "@/lib/format";
 import {
   approveSellerProfile,
@@ -13,7 +14,6 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   ScrollView,
@@ -75,30 +75,22 @@ export default function PendingSellersScreen() {
     );
   }, [sellers, search]);
 
-  const handleApprove = (seller: PendingProfileSeller) => {
-    const run = async () => {
-      setActionId(seller.sellerId);
-      try {
-        await approveSellerProfile(seller.sellerId);
-        await load();
-        if (Platform.OS === "web") window.alert("Seller profile approved.");
-        else Alert.alert("Success", "Seller profile approved.");
-      } catch (e) {
-        const msg = getApiErrorMessage(e);
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Error", msg);
-      } finally {
-        setActionId(null);
-      }
-    };
-
-    if (Platform.OS === "web") {
-      if (window.confirm(`Approve profile for ${seller.fullName}?`)) void run();
-    } else {
-      Alert.alert("Approve seller", `Approve profile for ${seller.fullName}?`, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Approve", onPress: () => void run() },
-      ]);
+  const handleApprove = async (seller: PendingProfileSeller) => {
+    if (!(await sweetConfirm({
+      title: "Approve seller",
+      text: `Approve profile for ${seller.fullName}?`,
+      confirmText: "Approve",
+    }))) return;
+    setActionId(seller.sellerId);
+    try {
+      await approveSellerProfile(seller.sellerId);
+      await load();
+      void sweetSuccess("Success", "Seller profile approved.");
+    } catch (e) {
+      const msg = getApiErrorMessage(e);
+      void sweetError("Error", msg);
+    } finally {
+      setActionId(null);
     }
   };
 
@@ -113,8 +105,7 @@ export default function PendingSellersScreen() {
       await load();
     } catch (e) {
       const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Error", msg);
+      void sweetError("Error", msg);
     } finally {
       setActionId(null);
     }

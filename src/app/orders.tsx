@@ -4,6 +4,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import { resolveMediaUrl } from "@/lib/api/media";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
+import { sweetError } from "@/lib/sweetAlert";
 import { downloadOrderExportExcel, downloadOrderInvoicePdf, downloadOrderShippingLabelPdf, fetchOrderInvoice, fetchOrders, fetchOrderShippingLabel, fetchOrderStats, updateOrderGstStatus, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -3503,8 +3504,7 @@ export default function OrdersScreen() {
       );
     } catch (err) {
       const msg = getApiErrorMessage(err, "Failed to update GST status.");
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Error", msg);
+      void sweetError("Error", msg);
     }
   }, []);
 
@@ -3539,7 +3539,7 @@ export default function OrdersScreen() {
         `orders_${new Date().toISOString().slice(0, 10)}.xlsx`
       );
     } catch (e) {
-      Alert.alert("Export failed", e instanceof Error ? e.message : "Could not export orders.");
+      void sweetError("Export failed", e instanceof Error ? e.message : "Could not export orders.");
     }
   }, [searchQuery, statusFilter, paymentFilter, sortOption]);
 

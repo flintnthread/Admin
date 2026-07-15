@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Image,
     Modal,
     Platform,
@@ -17,6 +16,7 @@ import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetError, sweetSuccess } from "@/lib/sweetAlert";
 import { mapPayoutDetailToSpdOrder } from "@/lib/mappers";
 import { fetchPayoutDetail, generatePayoutInvoice, markPayoutPaid } from "@/services/payoutApi";
 import { FLINT_THREAD_LOGO_BASE64 } from "@/constants/logoBase64";
@@ -903,8 +903,7 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
             setInvoiceVisible(true);
         } catch (e) {
             const msg = getApiErrorMessage(e);
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Error", msg);
+            void sweetError("Error", msg);
         } finally {
             setInvoiceLoading(false);
         }
@@ -945,12 +944,10 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
             setPayModalVisible(false);
             await loadDetail(order.id);
             const msg = "Payment marked as Paid!";
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Success", msg);
+            void sweetSuccess("Success", msg);
         } catch (e) {
             const msg = getApiErrorMessage(e);
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Error", msg);
+            void sweetError("Error", msg);
         } finally {
             setPayLoading(false);
         }
@@ -1052,11 +1049,11 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
                         UTI: "com.adobe.pdf",
                     });
                 } else {
-                    Alert.alert("Invoice saved", uri);
+                    void sweetSuccess("Invoice saved", uri);
                 }
             } catch (err) {
                 console.error(err);
-                Alert.alert("Error", "Failed to generate invoice PDF");
+                void sweetError("Error", "Failed to generate invoice PDF");
             }
         }
     };

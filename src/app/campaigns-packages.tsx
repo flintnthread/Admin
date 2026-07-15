@@ -8,7 +8,6 @@ import {
   TextInput,
   Modal as RNModal,
   Platform,
-  Alert,
   useWindowDimensions,
   Animated as RNAnimated,
   DimensionValue,
@@ -19,6 +18,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
   createCampaignPackage,
   deleteCampaignPackage,
@@ -320,18 +320,6 @@ const PRICING_TIERS: PricingTier[] = [
 export default function CampaignsPackagesScreen() {
   const { isTablet, isLaptop, isDesktop } = useBreakpoint();
 
-  const [alertState, setAlertState] = useState<{
-    visible: boolean;
-    kind: 'success' | 'error' | 'confirm';
-    title: string;
-    text: string;
-    onConfirm?: () => void;
-  }>({ visible: false, kind: 'success', title: '', text: '' });
-
-  const showAlert = (kind: 'success' | 'error' | 'confirm', title: string, text: string = '', onConfirm?: () => void) => {
-    setAlertState({ visible: true, kind, title, text, onConfirm });
-  };
-
   const [packages, setPackages] = useState<CampaignPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -389,30 +377,29 @@ export default function CampaignsPackagesScreen() {
     setModalVisible(true);
   };
 
-  const handleDelete = (pkg: CampaignPackage) => {
-    showAlert('confirm', 'Delete this package?', `"${pkg.name}" will be permanently removed.`, async () => {
-      setSaving(true);
-      try {
-        await deleteCampaignPackage(pkg.id);
-        await loadPackages();
-        showAlert('success', 'Deleted', 'The campaign package was removed.');
-      } catch (err) {
-        Alert.alert('Error', getApiErrorMessage(err, 'Could not delete campaign package.'));
-      } finally {
-        setSaving(false);
-      }
-    });
+  const handleDelete = async (pkg: CampaignPackage) => {
+    if (!(await sweetCrud.confirmDelete('Campaign package', pkg.name))) return;
+    setSaving(true);
+    try {
+      await deleteCampaignPackage(pkg.id);
+      await loadPackages();
+      void sweetCrud.deleted('Campaign package');
+    } catch (err) {
+      void sweetError('Error', getApiErrorMessage(err, 'Could not delete campaign package.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.type || !form.campaignPrice || !form.monthlyPrice) {
-      showAlert('error', 'Missing information', 'Please fill in all required fields.');
+      void sweetWarning('Missing information', 'Please fill in all required fields.');
       return;
     }
     const campaignPrice = Number(form.campaignPrice);
     const monthlyPrice = Number(form.monthlyPrice);
     if (Number.isNaN(campaignPrice) || Number.isNaN(monthlyPrice)) {
-      showAlert('error', 'Invalid pricing', 'Please enter valid numeric prices.');
+      void sweetWarning('Invalid pricing', 'Please enter valid numeric prices.');
       return;
     }
 
@@ -428,21 +415,27 @@ export default function CampaignsPackagesScreen() {
       body.features = form.features.trim();
     }
 
+    if (editingId) {
+      if (!(await sweetCrud.confirmUpdate('Campaign package', body.name))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd('Campaign package', body.name))) return;
+    }
+
     setSaving(true);
     try {
       if (editingId) {
         await updateCampaignPackage(editingId, body);
-        showAlert('success', 'Updated', 'Campaign package updated successfully.');
+        void sweetCrud.updated('Campaign package');
       } else {
         await createCampaignPackage(body);
-        showAlert('success', 'Created', 'New campaign package added.');
+        void sweetCrud.added('Campaign package');
       }
       setModalVisible(false);
       resetForm();
       setEditingId(null);
       await loadPackages();
     } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err, editingId ? 'Could not update campaign package.' : 'Could not create campaign package.'));
+      void sweetError('Error', getApiErrorMessage(err, editingId ? 'Could not update campaign package.' : 'Could not create campaign package.'));
     } finally {
       setSaving(false);
     }
@@ -767,44 +760,6 @@ export default function CampaignsPackagesScreen() {
         </KeyboardAvoidingView>
       </RNModal>
 
-      {/* Custom Alert Modal */}
-      <RNModal visible={alertState.visible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 320, padding: 24, alignItems: 'center' }]}>
-            <Feather 
-              name={alertState.kind === 'success' ? 'check-circle' : alertState.kind === 'error' ? 'x-circle' : 'alert-circle'} 
-              size={48} 
-              color={alertState.kind === 'success' ? COLORS.green : alertState.kind === 'error' ? COLORS.red : COLORS.orange} 
-              style={{ marginBottom: 16 }}
-            />
-            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 8, textAlign: 'center' }}>
-              {alertState.title}
-            </Text>
-            <Text style={{ fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 24 }}>
-              {alertState.text}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              {alertState.kind === 'confirm' && (
-                <Pressable 
-                  style={[styles.cancelButton, { flex: 1, justifyContent: 'center' }]} 
-                  onPress={() => setAlertState(prev => ({ ...prev, visible: false }))}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
-              )}
-              <Pressable 
-                style={[styles.submitButton, { flex: 1, justifyContent: 'center', backgroundColor: alertState.kind === 'confirm' ? COLORS.red : COLORS.navy }]} 
-                onPress={() => {
-                  setAlertState(prev => ({ ...prev, visible: false }));
-                  if (alertState.onConfirm) alertState.onConfirm();
-                }}
-              >
-                <Text style={styles.submitButtonText}>{alertState.kind === 'confirm' ? 'Delete' : 'OK'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </RNModal>
     </AdminLayout>
   );
 }

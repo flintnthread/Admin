@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetWarning } from "@/lib/sweetAlert";
 import { buildUpdateProductPayload } from "@/lib/product/buildCreateProductPayload";
 import { getHsnForMaterial, MATERIAL_TYPES } from "@/lib/product/materialHsn";
 import {
@@ -42,7 +43,6 @@ import {
   updateProduct,
 } from "@/services/productApi";
 import {
-  Alert,
   Animated,
   FlatList,
   KeyboardAvoidingView,
@@ -962,7 +962,7 @@ const StepImages = ({
   ];
   const addFakeImage = () => {
     const all = getAllImages();
-    if (all.length >= 8) { Alert.alert('Maximum 8 images reached'); return; }
+    if (all.length >= 8) { void sweetWarning('Maximum images', 'Maximum 8 images reached'); return; }
     const uri = fakeImageUrls[all.length % fakeImageUrls.length];
     if (all.length === 0) {
       setState(s => ({ ...s, isDirty: true, images: { ...s.images, primaryImage: uri } }));
@@ -1305,7 +1305,7 @@ const StepDetails = ({
                 </TouchableOpacity>
                 <View style={{ width: 10 }} />
                 <TouchableOpacity style={[styles.successBtn, { flex: 1 }]} onPress={() => {
-                  if (!customPolicyText.trim()) { Alert.alert('Please write your custom return policy.'); return; }
+                  if (!customPolicyText.trim()) { void sweetWarning('Policy required', 'Please write your custom return policy.'); return; }
                   updateDetails({ returnPolicy: 'Custom Policy', returnPolicyText: customPolicyText });
                   setCustomPolicyVisible(false);
                 }}>

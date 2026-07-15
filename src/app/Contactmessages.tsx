@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import { mapContactRow } from "@/lib/mappers";
 import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact } from "@/services/contactApi";
 import {
@@ -14,7 +15,6 @@ import {
   useWindowDimensions,
   Modal,
   TextInput,
-  Alert,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
@@ -255,8 +255,7 @@ const ReplyMessageModal: React.FC<{
   if (!visible || !msg) return null;
   const handleSend = () => {
     if (!replyText.trim()) {
-      if (Platform.OS === "web") window.alert("Please enter a reply message.");
-      else Alert.alert("Validation", "Please enter a reply message.");
+      void sweetWarning("Validation", "Please enter a reply message.");
       return;
     }
     onSend(msg.id, replyText);
@@ -322,8 +321,7 @@ const AddMessageModal: React.FC<{
   const handleSave = () => {
     if (!name.trim() || !email.trim() || !subject.trim() || !content.trim()) {
       const msg = "Please fill all required fields.";
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Validation", msg);
+      void sweetWarning("Validation", msg);
       return;
     }
     const now = new Date();
@@ -452,8 +450,7 @@ const ContactMessagesScreen: React.FC = () => {
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, status: "Replied" } : m)));
     } catch (e) {
       const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Error", msg);
+      void sweetError("Error", msg);
     }
   };
 
@@ -464,36 +461,21 @@ const ContactMessagesScreen: React.FC = () => {
       setReplyMsg(null);
       await loadMessages();
       const successMsg = "Reply sent successfully!";
-      if (Platform.OS === "web") window.alert(successMsg);
-      else Alert.alert("Success", successMsg);
+      void sweetSuccess("Success", successMsg);
     } catch (e) {
       const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") window.alert(msg);
-      else Alert.alert("Error", msg);
+      void sweetError("Error", msg);
     }
   };
 
-  const deleteMessage = (id: number) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteContact(id);
-        await loadMessages();
-        const msg = "Message deleted successfully!";
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Deleted", msg);
-      } catch (e) {
-        const err = getApiErrorMessage(e);
-        if (Platform.OS === "web") window.alert(err);
-        else Alert.alert("Error", err);
-      }
-    };
-    if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to delete this message?")) void confirmDelete();
-    } else {
-      Alert.alert("Confirm Delete", "Are you sure you want to delete this message?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => void confirmDelete() },
-      ]);
+  const deleteMessage = async (id: number) => {
+    if (!(await sweetCrud.confirmDelete("Message"))) return;
+    try {
+      await deleteContact(id);
+      await loadMessages();
+      void sweetCrud.deleted("Message");
+    } catch (e) {
+      void sweetError("Error", getApiErrorMessage(e));
     }
   };
 
