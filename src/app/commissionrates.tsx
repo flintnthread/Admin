@@ -83,11 +83,7 @@ const CommissionRatesScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, !isWeb && { marginBottom: 16 }]}>
         <Text style={styles.headerTitle}>Platform commission rates</Text>
-        <View style={styles.breadcrumb}>
-          <Text style={styles.breadcrumbLink}>Dashboard</Text>
-          <Feather name="chevron-right" size={14} color={TEXT_MUTED} style={{ marginHorizontal: 4 }} />
-          <Text style={styles.breadcrumbCurrent}>Commission (B2B / B2C)</Text>
-        </View>
+        
       </View>
 
       {/* Main Card */}

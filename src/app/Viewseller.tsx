@@ -285,12 +285,12 @@ const MOCK_SELLER: SellerData = {
 
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
 const COLORS = {
-  primary: '#B85C00',
-  primaryLight: '#E07B30',
+  primary: '#F97316',
+  primaryLight: '#FFA55C',
   primaryBg: '#FFF5EE',
-  headerBg: '#1E2A45',          // ← dark blue for page header container
-  headerBgDeep: '#16213A',      // ← slightly deeper for subtle depth
-  sectionHeader: '#A0522D',
+  headerBg: '#1D324E',          // ← dark blue for page header container
+  headerBgDeep: '#152540',      // ← slightly deeper for subtle depth
+  sectionHeader: '#FFFFFF',
   white: '#FFFFFF',
   text: '#1A1A1A',
   textSecondary: '#666666',
@@ -735,7 +735,7 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
 // ─── Section Header ───────────────────────────────────────────────────────────
 const SectionHeader: React.FC<{ icon: string; title: string }> = ({ icon, title }) => (
   <View style={styles.sectionHeader}>
-    <BootstrapIcon name={icon} size={16} color={COLORS.white} />
+    <BootstrapIcon name={icon} size={16} color={COLORS.primary} />
     <Text style={[styles.sectionHeaderText, { marginLeft: 8 }]}>{title}</Text>
   </View>
 );
@@ -1401,7 +1401,7 @@ export default function ViewSeller() {
 
   return (
     <AdminLayout>
-      <ScrollView style={styles.root} contentContainerStyle={styles.container}>
+      <ScrollView style={styles.root} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         {/* ── Page Header — dark blue container (matches approveseller) ── */}
         <View style={[styles.pageHeaderContainer, { marginHorizontal: isMobile ? 12 : 20 }]}>
@@ -1675,48 +1675,49 @@ export default function ViewSeller() {
           </View>
         </View>
 
-        {/* ── Warehouse Information ──────────────────────────────────────── */}
-        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-          <SectionHeader icon="geo-alt" title="Warehouse / Pickup Address" />
-          <View style={styles.infoGrid}>
-            <InfoRow label="Address" value={seller.warehouseAddress} isHalf width={width} />
-            <InfoRow label="Area" value={seller.warehouseArea} isHalf width={width} />
-            <InfoRow label="City" value={seller.warehouseCity} isHalf width={width} />
-            <InfoRow label="State" value={seller.warehouseState} isHalf width={width} />
-            <InfoRow label="Country" value={seller.warehouseCountry} isHalf width={width} />
+        {/* ── Warehouse Information & Verification Status ─────────────────── */}
+        <View style={[styles.rowCards, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <View style={[styles.card, styles.halfCard]}>
+            <SectionHeader icon="geo-alt" title="Warehouse / Pickup Address" />
+            <View style={styles.infoGrid}>
+              <InfoRow label="Address" value={seller.warehouseAddress} isHalf width={width} />
+              <InfoRow label="Area" value={seller.warehouseArea} isHalf width={width} />
+              <InfoRow label="City" value={seller.warehouseCity} isHalf width={width} />
+              <InfoRow label="State" value={seller.warehouseState} isHalf width={width} />
+              <InfoRow label="Country" value={seller.warehouseCountry} isHalf width={width} />
+            </View>
           </View>
-        </View>
 
-        {/* ── Verification Status ────────────────────────────────────────── */}
-        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-          <SectionHeader icon="shield-check" title="Verification Status" />
-          <View style={styles.infoGrid}>
-            <InfoRow
-              label="Profile Completed"
-              value={<StatusBadge label={seller.profileCompleted ? 'Yes' : 'No'} color={seller.profileCompleted ? COLORS.success : COLORS.danger} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow
-              label="KYC Verified"
-              value={<StatusBadge label={seller.kycVerified ? 'Verified' : 'Pending'} color={seller.kycVerified ? COLORS.success : COLORS.warning} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow
-              label="Bank Verified"
-              value={<StatusBadge label={seller.bankVerified ? 'Verified' : 'Pending'} color={seller.bankVerified ? COLORS.success : COLORS.warning} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow
-              label="Mobile Verified"
-              value={<StatusBadge label={seller.mobileVerified ? 'Verified' : 'Not Verified'} color={seller.mobileVerified ? COLORS.success : COLORS.danger} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow label="KYC Remarks" value={seller.kycRemarks} isHalf width={width} />
-            <InfoRow label="Admin Remarks" value={seller.adminRemarks} isHalf width={width} />
+          <View style={[styles.card, styles.halfCard]}>
+            <SectionHeader icon="shield-check" title="Verification Status" />
+            <View style={styles.infoGrid}>
+              <InfoRow
+                label="Profile Completed"
+                value={<StatusBadge label={seller.profileCompleted ? 'Yes' : 'No'} color={seller.profileCompleted ? COLORS.success : COLORS.danger} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow
+                label="KYC Verified"
+                value={<StatusBadge label={seller.kycVerified ? 'Verified' : 'Pending'} color={seller.kycVerified ? COLORS.success : COLORS.warning} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow
+                label="Bank Verified"
+                value={<StatusBadge label={seller.bankVerified ? 'Verified' : 'Pending'} color={seller.bankVerified ? COLORS.success : COLORS.warning} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow
+                label="Mobile Verified"
+                value={<StatusBadge label={seller.mobileVerified ? 'Verified' : 'Not Verified'} color={seller.mobileVerified ? COLORS.success : COLORS.danger} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow label="KYC Remarks" value={seller.kycRemarks} isHalf width={width} />
+              <InfoRow label="Admin Remarks" value={seller.adminRemarks} isHalf width={width} />
+            </View>
           </View>
         </View>
 
@@ -1850,6 +1851,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  rowCards: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfCard: {
+    flex: 1,
+  },
   pageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1939,7 +1947,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionHeaderText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.2,

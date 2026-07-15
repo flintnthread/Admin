@@ -37,7 +37,7 @@ import {
     updateAdsType,
     type AdsApiRow,
 } from '@/services/adsApi';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -98,14 +98,15 @@ function mapAdTypeFromApi(row: AdsApiRow): AdType {
 }
 
 const OVERVIEW_CARDS = [
-    { key: 'Banner Ads', iconName: 'image' as const, color: '#EA580C', bg: '#FFF1E6' },
-    { key: 'Video Ads', iconName: 'play-circle' as const, color: '#16A34A', bg: '#E9FBF0' },
-    { key: 'Native Ads', iconName: 'code-slash' as const, color: '#CA8A04', bg: '#FEF9E7' },
+    { key: 'Banner Ads', iconName: 'image' as const, color: '#2563EB', bg: '#DBEAFE' },
+    { key: 'Video Ads', iconName: 'play-circle' as const, color: '#16A34A', bg: '#DCFCE7' },
+    { key: 'Native Ads', iconName: 'code-slash' as const, color: '#EA580C', bg: '#FFEDD5' },
 ];
 
 // Palette
 const COLORS = {
     header: '#151D4F',
+    navy: '#1D324E',
     orange: '#F5821F',
     orangeDark: '#DD6F10',
     ink: '#1F2937',
@@ -138,19 +139,36 @@ function getBreakpoint(width: number): Bp {
 // Small reusable pieces
 // ---------------------------------------------------------------------------
 const StatCard: React.FC<{
-    label: string; value: number | string; sub: string;
-    bg: string; fg: string; iconName: any; wide: boolean;
-}> = ({ label, value, sub, bg, fg, iconName, wide }) => (
-    <View style={[styles.statCard, wide ? { width: '23.5%' } : { width: 148, minWidth: 148 }]}>
-        {/* Top row: icon left, count right */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View style={[styles.statIconWrap, { backgroundColor: bg }]}>
-                <Ionicons name={iconName} size={18} color={fg} />
-            </View>
-            <Text style={[styles.statValue, { color: fg }]}>{value}</Text>
-        </View>
-        <Text style={styles.statLabel}>{label}</Text>
-        <Text style={styles.statSub}>{sub}</Text>
+    icon: keyof typeof Feather.glyphMap;
+    value: string;
+    label: string;
+    tint: string;
+    tintBg: string;
+    isMobile: boolean;
+}> = ({ icon, value, label, tint, tintBg, isMobile }) => (
+    <View style={[
+        styles.statCard,
+        isMobile ? styles.statCardMobile : styles.statCardDesktop
+    ]}>
+        {isMobile ? (
+            <>
+                <View style={[styles.statIconBox, styles.statIconBoxMobile, { backgroundColor: tintBg }]}>
+                    <Feather name={icon} size={14} color={tint} />
+                </View>
+                <Text style={[styles.statValue, styles.statValueMobile, { color: tint }]}>{value}</Text>
+                <Text style={styles.statLabelMobile} numberOfLines={1}>{label}</Text>
+            </>
+        ) : (
+            <>
+                <View style={styles.statCardTopRow}>
+                    <View style={[styles.statIconBox, { backgroundColor: tintBg }]}>
+                        <Feather name={icon} size={15} color={tint} />
+                    </View>
+                    <Text style={[styles.statValue, { color: tint }]}>{value}</Text>
+                </View>
+                <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+            </>
+        )}
     </View>
 );
 
@@ -639,7 +657,11 @@ const AdsTypesDetails: React.FC = () => {
 
     return (
         <View style={styles.screen}>
-            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView 
+                contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: 16 }} 
+                horizontal={false}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* ---------- Header: title + Add button in ONE #1D324E container ---------- */}
                 <View style={[styles.headerContainer, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, paddingBottom: 50 }]}>
                     <View style={{ flex: 1, marginRight: 8, flexShrink: 1 }}>
@@ -673,33 +695,20 @@ const AdsTypesDetails: React.FC = () => {
                 </View>
 
                 {/* ---------- Stat cards ---------- */}
-                {isPhone ? (
-                    /* Mobile 320–425px: horizontal scroll so all 4 cards fit in one row */
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.statsRowScroll}
-                        style={styles.statsRowScrollWrap}
-                    >
-                        <StatCard label="Total Ad Types" value={stats.total} sub="All active ad types" bg="#F5F3FF" fg="#7C3AED" iconName="cube" wide={false} />
-                        <StatCard label="Active Ad Types" value={stats.active} sub="Currently active" bg="#E9FBF0" fg="#16A34A" iconName="shield-checkmark" wide={false} />
-                        <StatCard label="Total Ads" value={stats.totalAds} sub="Across all types" bg="#E0F2FE" fg="#0284C7" iconName="bar-chart" wide={false} />
-                        <StatCard label="Urgent Review" value={stats.urgent} sub="Require attention" bg="#FEE2E2" fg="#DC2626" iconName="alert-circle" wide={false} />
-                    </ScrollView>
-                ) : (
-                    /* Tablet 768px+: standard flex-wrap row */
-                    <View style={styles.statsRow}>
-                        <StatCard label="Total Ad Types" value={stats.total} sub="All active ad types" bg="#F5F3FF" fg="#7C3AED" iconName="cube" wide={statsWide} />
-                        <StatCard label="Active Ad Types" value={stats.active} sub="Currently active" bg="#E9FBF0" fg="#16A34A" iconName="shield-checkmark" wide={statsWide} />
-                        <StatCard label="Total Ads" value={stats.totalAds} sub="Across all types" bg="#E0F2FE" fg="#0284C7" iconName="bar-chart" wide={statsWide} />
-                        <StatCard label="Urgent Review" value={stats.urgent} sub="Require attention" bg="#FEE2E2" fg="#DC2626" iconName="alert-circle" wide={statsWide} />
-                    </View>
-                )}
+                <View style={[
+                    styles.statsRow,
+                    isPhone && styles.statsRowMobile
+                ]}>
+                    <StatCard icon="layers" value={String(stats.total)} label="Total Ad Types" tint={COLORS.navy} tintBg="#EEF2F7" isMobile={isPhone} />
+                    <StatCard icon="check-circle" value={String(stats.active)} label="Active" tint={COLORS.greenText} tintBg={COLORS.greenBg} isMobile={isPhone} />
+                    <StatCard icon="bar-chart" value={String(stats.totalAds)} label="Total Ads" tint={COLORS.skyText} tintBg={COLORS.skyBg} isMobile={isPhone} />
+                    <StatCard icon="alert-circle" value={String(stats.urgent)} label="Urgent Review" tint={COLORS.redText} tintBg={COLORS.redBg} isMobile={isPhone} />
+                </View>
 
                 {/* ---------- Specifications overview ---------- */}
-                <View style={[styles.overviewCard, styles.overviewCardHighlighted]}>
-                    <View style={[styles.sectionTitleRow, styles.sectionTitleRowHighlighted]}>
-                        <Text style={styles.sectionTitle}>Ad Types & Specifications Overview</Text>
+                <View style={styles.overviewCard}>
+                    <View style={styles.sectionTitleRowOverview}>
+                        <Text style={[styles.sectionTitle, styles.sectionTitleOverview]}>Ad Types & Specifications Overview</Text>
                     </View>
                     <View style={styles.sectionDivider} />
                     {isPhone ? (
@@ -781,8 +790,9 @@ const AdsTypesDetails: React.FC = () => {
                 </View>
 
                 {/* ---------- Management table ---------- */}
-                <View style={[styles.dataCard, styles.dataCardHighlighted]}>
-                    <View style={[styles.sectionTitleRow, styles.sectionTitleRowHighlightedDataCard]}>
+                <View style={{ overflow: 'hidden' }}>
+                    <View style={styles.dataCard}>
+                    <View style={styles.sectionTitleRow}>
                         <Text style={styles.sectionTitle}>Ad Types & Details Management</Text>
                     </View>
                     <View style={styles.sectionDivider} />
@@ -802,10 +812,10 @@ const AdsTypesDetails: React.FC = () => {
                             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
                         />
                     ) : (
-                        <View style={{ flex: 1 }}>
+                        <View style={{ flex: 1, width: '100%' }}>
                             <ScrollView
                                 horizontal
-                                showsHorizontalScrollIndicator
+                                showsHorizontalScrollIndicator={false}
                                 style={{ borderRadius: 8 }}
                                 contentContainerStyle={{ flexGrow: 1 }}
                             >
@@ -829,6 +839,7 @@ const AdsTypesDetails: React.FC = () => {
                             </ScrollView>
                         </View>
                     )}
+                    </View>
                 </View>
 
                 <Pagination
@@ -876,7 +887,7 @@ export default function AdsTypesDetailsPage() {
 // Styles
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: COLORS.bg, paddingHorizontal: 16, paddingTop: 16 },
+    screen: { flex: 1, backgroundColor: COLORS.bg, paddingTop: 16 },
 
     headerContainer: {
         backgroundColor: COLORS.header, borderRadius: 14, padding: 18,
@@ -899,31 +910,18 @@ const styles = StyleSheet.create({
     },
     addBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-    /* Tablet+ row (flex-wrap) */
-    statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: '2%', marginBottom: 16, rowGap: 12, marginTop: -46, marginHorizontal: 8 },
-    /* Mobile horizontal scroll wrapper */
-    statsRowScrollWrap: { marginTop: -46, marginBottom: 16 },
-    statsRowScroll: { flexDirection: 'row', gap: 10, paddingHorizontal: 8, paddingBottom: 4 },
-    statCard: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
-        minWidth: 150,
-    },
-    statIconWrap: {
-        width: 34, height: 34, borderRadius: 8,
-        alignItems: 'center', justifyContent: 'center',
-    },
-    statValue: { fontSize: 18, fontWeight: '700', color: COLORS.ink },
-    statLabel: { fontSize: 11, fontWeight: '600', color: COLORS.ink, letterSpacing: 0.4, marginTop: 2 },
-    statSub: { fontSize: 11, color: COLORS.sub, marginTop: 3 },
+    statsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: -32, paddingHorizontal: 2, zIndex: 10, elevation: 5 },
+    statsRowMobile: { flexWrap: 'wrap', justifyContent: 'space-between', gap: 5, marginTop: -36, paddingHorizontal: 0, zIndex: 10, elevation: 5 },
+    statCard: { backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#0F172A', shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+    statCardDesktop: { flexGrow: 0, flexShrink: 0, width: 154 },
+    statCardMobile: { flex: 1, minWidth: 0, borderRadius: 12, paddingHorizontal: 6, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 4 },
+    statCardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    statIconBox: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    statIconBoxMobile: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    statValue: { fontSize: 17, fontWeight: '700' },
+    statValueMobile: { fontSize: 14, fontWeight: '800', marginTop: 2, textAlign: 'center' },
+    statLabel: { fontSize: 11, color: COLORS.sub, fontWeight: '500', marginTop: 7 },
+    statLabelMobile: { fontSize: 10, color: COLORS.sub, fontWeight: '600', marginTop: 2, textAlign: 'center' },
 
     sectionBanner: {
         flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.orange,
@@ -937,16 +935,26 @@ const styles = StyleSheet.create({
     },
     sectionTitleRow: {
         flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingVertical: 16,
+        backgroundColor: '#151D4F',
+        borderTopLeftRadius: 14, borderTopRightRadius: 14,
+        marginHorizontal: -12, marginTop: -12, paddingHorizontal: 26,
+    },
+    sectionTitleRowOverview: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
         paddingVertical: 16, paddingHorizontal: 14,
     },
     sectionTitle: {
-        fontSize: 18, fontWeight: '700', color: '#1D324E',
+        fontSize: 18, fontWeight: '700', color: '#fff',
+    },
+    sectionTitleOverview: {
+        color: '#1D324E',
     },
     sectionDivider: {
         borderBottomWidth: 1, borderColor: '#E5E7EB', marginBottom: 12,
     },
 
-    overviewCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 14, marginBottom: 16 },
+    overviewCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 14, marginBottom: 16, marginTop: 16 },
     overviewCardHighlighted: { borderWidth: 2, borderColor: COLORS.orange, backgroundColor: '#FFFBF5' },
     sectionTitleRowHighlighted: { backgroundColor: '#FFF1E6', paddingHorizontal: 14, paddingVertical: 16, marginHorizontal: -14, marginTop: -14, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
 
@@ -983,8 +991,8 @@ const styles = StyleSheet.create({
     dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
     dataCardHighlighted: { borderWidth: 2, borderColor: COLORS.orange, backgroundColor: '#FFFBF5' },
     sectionTitleRowHighlightedDataCard: { backgroundColor: '#FFF1E6', paddingHorizontal: 12, paddingVertical: 16, marginHorizontal: -12, marginTop: -12, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-    tableHeader: { flexDirection: 'row', backgroundColor: '#1D324E', paddingVertical: 10, paddingHorizontal: 4, borderRadius: 8, marginBottom: 4 },
-    headCell: { fontSize: 12, fontWeight: '700', color: '#fff', paddingHorizontal: 4 },
+    tableHeader: { flexDirection: 'row', backgroundColor: '#faf8f4', paddingVertical: 10, paddingHorizontal: 4, borderRadius: 8, marginBottom: 4 },
+    headCell: { fontSize: 12, fontWeight: '700', color: '#64748B', paddingHorizontal: 4, textTransform: 'uppercase', letterSpacing: 0.3 },
     tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F2F4' },
     cell: { paddingHorizontal: 4, fontSize: 13, color: COLORS.ink },
 

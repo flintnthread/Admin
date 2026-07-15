@@ -1120,8 +1120,8 @@ function EntityModal({
                     </ThemedText>
                   </Pressable>
                   {parentOpen && parentOptions.length > 0 && (
-                    <View style={[s.fieldInput, { padding: 0, maxHeight: 180 }]}>
-                      <ScrollView nestedScrollEnabled>
+                    <View style={{ borderWidth: 1, borderColor: LocationColors.border, borderRadius: 10, backgroundColor: LocationColors.cardBg, overflow: 'hidden' }}>
+                      <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                         {parentOptions.map((opt) => (
                           <Pressable
                             key={opt.id}
@@ -1559,8 +1559,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     minWidth: 180,
-    flexGrow: 1,
-    flexBasis: 180,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',

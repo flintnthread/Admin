@@ -169,7 +169,7 @@ const GridCard: React.FC<{
 }> = ({ cat, onEdit, onToggle, onDelete, onNavigate }) => {
     const isActive = cat.status === "Active";
     return (
-        <TouchableOpacity style={[cSt.card, { borderTopColor: cat.color }]} onPress={onNavigate} activeOpacity={0.8}>
+        <TouchableOpacity style={cSt.card} onPress={onNavigate} activeOpacity={0.8}>
             {/* Top row: icon + action buttons */}
             <View style={cSt.topRow}>
                 <View style={[cSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
@@ -446,7 +446,7 @@ const FaqCategoriesScreen: React.FC = () => {
                                 contentContainerStyle={{ gap: 12, paddingRight: 4 }}
                             >
                                 {stats.map((s, i) => (
-                                    <View key={i} style={[st.statCardMobile, { borderTopColor: s.color }]}>
+                                    <View key={i} style={st.statCardMobile}>
                                         <View style={st.statCardMobileTopRow}>
                                             <View style={[st.statIconMobile, { backgroundColor: s.color + "1a" }]}>
                                                 <Feather name={s.icon as any} size={18} color={s.color} />
@@ -484,11 +484,7 @@ const FaqCategoriesScreen: React.FC = () => {
                             {stats.map((s, i) => (
                                 <View
                                     key={i}
-                                    style={[
-                                        st.statCard,
-                                        { borderTopColor: s.color },
-                                        { width: statWidthMap[statColumns], flexGrow: 0, flexBasis: undefined, minWidth: 0 },
-                                    ]}
+                                    style={st.statCard}
                                 >
                                     <View style={[st.statIconWrap, { backgroundColor: s.color + "18" }]}>
                                         <Feather name={s.icon as any} size={22} color={s.color} />
@@ -659,7 +655,7 @@ const st = StyleSheet.create({
 
     // ── Web Header ──
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
-    headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 56, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
+    headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 14, paddingBottom: 40, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },
@@ -716,7 +712,6 @@ const st = StyleSheet.create({
         backgroundColor: BG_CARD,
         borderRadius: 14,
         borderWidth: 1,
-        borderTopWidth: 3,
         borderColor: BORDER,
         padding: 14,
         width: 155,
@@ -764,8 +759,8 @@ const st = StyleSheet.create({
     // so the cards can never visually spill past the header at tablet /
     // 1024px widths. Column count + card width are driven explicitly by
     // `statColumns` / `statWidthMap` above instead of relying on flex-wrap.
-    statsRow: { flexDirection: "row", flexWrap: "wrap" as any, rowGap: 12, columnGap: 12, marginBottom: 4, marginTop: -46, marginHorizontal: 16, zIndex: 10 },
-    statCard: { backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 3, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
+    statsRow: { flexDirection: "row", flexWrap: "wrap" as any, rowGap: 12, columnGap: 12, marginBottom: 4, marginTop: -46, marginHorizontal: 16, zIndex: 10, justifyContent: "center" },
+    statCard: { backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     statIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     statValue: { fontSize: 22, fontWeight: "800" },
     statLabel: { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", letterSpacing: 0.5 },
@@ -817,7 +812,6 @@ const cSt = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 1,
         borderColor: BORDER,
-        borderTopWidth: 4,
         padding: 16,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 3 },

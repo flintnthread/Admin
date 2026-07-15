@@ -1520,9 +1520,14 @@ const JobOpeningsScreen: React.FC = () => {
                                 width: "100%",
                                 gap: 10,
                             }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.pageTitle}>Open Positions</Text>
-                                    <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                                <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 14 }}>
+                                    <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                                        <Feather name="briefcase" size={26} color="#FFF" />
+                                    </View>
+                                    <View>
+                                        <Text style={s.pageTitle}>Open Positions</Text>
+                                        <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                                    </View>
                                 </View>
                                 <TouchableOpacity
                                     style={s.addBtn}

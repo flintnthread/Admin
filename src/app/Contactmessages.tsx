@@ -91,11 +91,11 @@ const MessageCard: React.FC<{
   onDelete: (id: number) => void;
 }> = ({ msg, onView, onMarkReplied, onReply, onDelete }) => (
   <View style={styles.card}>
-    <View style={styles.cardBanner}>
-      <AvatarIcon color={msg.avatarColor} bg={msg.avatarBg} name={msg.name} />
-    </View>
-    <View style={styles.cardBody}>
-      <Text style={styles.cardName}>{msg.name}</Text>
+    <View style={[styles.cardBody, { paddingTop: 20 }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <AvatarIcon color={msg.avatarColor} bg={msg.avatarBg} name={msg.name} />
+        <Text style={[styles.cardName, { flex: 1, marginBottom: 0 }]}>{msg.name}</Text>
+      </View>
       <View style={styles.cardMeta}>
         <View style={styles.cardDateRow}>
           <Feather name="calendar" size={11} color={TEXT_MUTED} />
@@ -204,7 +204,7 @@ const ViewDetailModal: React.FC<{
           <Feather name="x" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
-      <ScrollView style={styles.modalBody}>
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
         <View style={styles.infoGrid}>
           <View style={styles.infoCard}><Text style={styles.infoLabel}>From</Text><Text style={styles.infoValue}>{msg.name}</Text></View>
           <View style={styles.infoCard}><Text style={styles.infoLabel}>Subject</Text><Text style={styles.infoValue}>{msg.subject}</Text></View>
@@ -274,7 +274,7 @@ const ReplyMessageModal: React.FC<{
               <Feather name="x" size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          <ScrollView style={[styles.modalBody, { backgroundColor: "#FFFFFF" }]}>
+          <ScrollView style={[styles.modalBody, { backgroundColor: "#FFFFFF" }]} showsVerticalScrollIndicator={false}>
             <Text style={[styles.inputLabel, { color: "#64748b", fontWeight: "600", fontSize: 13, marginBottom: 8 }]}>Customer</Text>
             <View style={{ backgroundColor: "#F8FAFC", borderRadius: 8, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: "#E2E8F0" }}>
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#0F172A" }}>{msg.name}</Text>
@@ -339,7 +339,7 @@ const AddMessageModal: React.FC<{
         </View>
         <TouchableOpacity onPress={onClose}><Feather name="x" size={18} color="#FFFFFF" /></TouchableOpacity>
       </View>
-      <ScrollView style={styles.modalBody}>
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
             <Text style={styles.inputLabel}>Name <Text style={styles.textAsterisk}>*</Text></Text>
@@ -435,7 +435,7 @@ const ContactMessagesScreen: React.FC = () => {
     return mf && ms;
   });
 
-  const ITEMS_PER_PAGE = 9;
+  const ITEMS_PER_PAGE = 8;
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginatedMessages = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
@@ -668,9 +668,14 @@ const ContactMessagesScreen: React.FC = () => {
     >
       {/* ── Header ── */}
       <View style={[styles.header, isWeb && styles.webHeader, !isWeb && { borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
-        <View style={styles.headerTextContainer}>
-          <Text style={[styles.headerTitle, { color: "#FFFFFF" }]}>Contact Messages</Text>
-          <Text style={[styles.headerSubtitle, { color: "#D1D5DB" }]}>Manage and respond to incoming contact messages.</Text>
+        <View style={[styles.headerTextContainer, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+          <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="message-square" size={26} color="#FFF" />
+          </View>
+          <View>
+            <Text style={[styles.headerTitle, { color: "#FFFFFF" }]}>Contact Messages</Text>
+            <Text style={[styles.headerSubtitle, { color: "#D1D5DB" }]}>Manage and respond to incoming contact messages.</Text>
+          </View>
         </View>
         <View style={styles.headerActions} />
       </View>
@@ -687,8 +692,11 @@ const ContactMessagesScreen: React.FC = () => {
         {/* ── Web Toolbar ── */}
         {isWeb && (
           <View style={styles.webToolbar}>
-            <View style={[styles.viewSwitcher, { alignItems: "center" }]}>
-              <Text style={styles.viewLabel}>View:</Text>
+            <View style={styles.searchContainerWeb}>
+              <Feather name="search" size={16} color={TEXT_MUTED} style={styles.searchIcon} />
+              <TextInput style={styles.searchInput} placeholder="Search by name, subject, or email..." placeholderTextColor={TEXT_MUTED} value={search} onChangeText={(t) => { setSearch(t); setCurrentPage(1); }} />
+            </View>
+            <View style={[styles.viewSwitcher, { alignItems: "center", backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }]}>
               <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
                 <TouchableOpacity style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]} onPress={() => setViewMode("grid")} activeOpacity={0.8}>
                   <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
@@ -697,10 +705,6 @@ const ContactMessagesScreen: React.FC = () => {
                   <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
                 </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.searchContainerWeb}>
-              <Feather name="search" size={16} color={TEXT_MUTED} style={styles.searchIcon} />
-              <TextInput style={styles.searchInput} placeholder="Search by name, subject, or email..." placeholderTextColor={TEXT_MUTED} value={search} onChangeText={(t) => { setSearch(t); setCurrentPage(1); }} />
             </View>
             <View style={styles.filterPills}>
               {(["All", "Not Replied", "Replied"] as FilterType[]).map((f) => (
@@ -729,19 +733,19 @@ const ContactMessagesScreen: React.FC = () => {
             )}
 
             {viewMode === "list" && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={[styles.tableContainer, { minWidth: 1080 }]}>
-                  <View style={[styles.tableHeaderRow, { gap: 24 }]}>
-                    <Text style={[styles.tableHeaderCell, { width: 200 }]}>Sender</Text>
-                    <Text style={[styles.tableHeaderCell, { width: 160 }]}>Subject</Text>
-                    <Text style={[styles.tableHeaderCell, { width: 260 }]}>Preview</Text>
-                    <Text style={[styles.tableHeaderCell, { width: 120 }]}>Date</Text>
-                    <Text style={[styles.tableHeaderCell, { width: 100 }]}>Status</Text>
-                    <Text style={[styles.tableHeaderCell, { width: 130, textAlign: "center" }]}>Actions</Text>
+              <View style={{ width: "100%", paddingBottom: 20 }}>
+                <View style={[styles.tableContainer, { width: "100%" }]}>
+                  <View style={[styles.tableHeaderRow, { gap: 16 }]}>
+                    <Text style={[styles.tableHeaderCell, { width: "18%" }]}>Sender</Text>
+                    <Text style={[styles.tableHeaderCell, { width: "20%" }]}>Subject</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Preview</Text>
+                    <Text style={[styles.tableHeaderCell, { width: "12%" }]}>Date</Text>
+                    <Text style={[styles.tableHeaderCell, { width: "10%" }]}>Status</Text>
+                    <Text style={[styles.tableHeaderCell, { width: 140 }]}>Actions</Text>
                   </View>
                   {paginatedMessages.map((msg) => (
-                    <View key={msg.id} style={[styles.tableRow, { gap: 24 }]}>
-                      <View style={[styles.tableCellRow, { width: 200 }]}>
+                    <View key={msg.id} style={[styles.tableRow, { gap: 16 }]}>
+                      <View style={[styles.tableCellRow, { width: "18%" }]}>
                         <View style={[styles.tableAvatar, { backgroundColor: msg.avatarBg }]}>
                           <Text style={[styles.tableAvatarText, { color: msg.avatarColor }]}>{getInitials(msg.name)}</Text>
                         </View>
@@ -750,11 +754,11 @@ const ContactMessagesScreen: React.FC = () => {
                           <Text style={[styles.tableCell, { color: TEXT_MUTED, fontSize: 11 }]} numberOfLines={1}>{msg.email}</Text>
                         </View>
                       </View>
-                      <Text style={[styles.tableCell, { width: 160, fontWeight: "600" }]} numberOfLines={1}>{msg.subject}</Text>
-                      <Text style={[styles.tableCell, { width: 260, color: TEXT_MUTED }]} numberOfLines={2}>{msg.content}</Text>
-                      <Text style={[styles.tableCell, { width: 120, color: TEXT_MUTED }]}>{msg.date.split(" ").slice(0, 3).join(" ")}</Text>
-                      <View style={{ width: 100 }}><StatusBadge status={msg.status} /></View>
-                      <View style={{ width: 130, flexDirection: "row", justifyContent: "center", gap: 6 }}>
+                      <Text style={[styles.tableCell, { width: "20%", fontWeight: "600" }]} numberOfLines={1}>{msg.subject}</Text>
+                      <Text style={[styles.tableCell, { flex: 1, color: TEXT_MUTED }]} numberOfLines={2}>{msg.content}</Text>
+                      <Text style={[styles.tableCell, { width: "12%", color: TEXT_MUTED }]}>{msg.date.split(" ").slice(0, 3).join(" ")}</Text>
+                      <View style={{ width: "10%" }}><StatusBadge status={msg.status} /></View>
+                      <View style={{ width: 140, flexDirection: "row", justifyContent: "flex-start", gap: 6 }}>
                         <TouchableOpacity style={styles.tableBtnView} onPress={() => handleView(msg)}><Feather name="eye" size={13} color="#FFFFFF" /></TouchableOpacity>
                         {msg.status !== "Replied" && (
                           <TouchableOpacity style={styles.tableBtnMark} onPress={() => markReplied(msg.id)}><Feather name="check" size={13} color="#FFFFFF" /></TouchableOpacity>
@@ -765,7 +769,7 @@ const ContactMessagesScreen: React.FC = () => {
                     </View>
                   ))}
                 </View>
-              </ScrollView>
+              </View>
             )}
 
             {!loading && !loadError && filtered.length > 0 && (
@@ -1309,8 +1313,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   cardGridItem: {
-    flexBasis: "31%",
-    maxWidth: 360,
+    flexBasis: "23.5%",
+    maxWidth: "24%",
     marginHorizontal: 0,
   },
 
@@ -1422,9 +1426,10 @@ const styles = StyleSheet.create({
   // ── Action Buttons ──
   actionRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 12,
     padding: 12,
     alignItems: "center",
+    justifyContent: "center",
   },
   btnView: {
     flex: 1,
@@ -1433,10 +1438,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 5,
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
     borderColor: PRIMARY_LIGHT,
+    shadowColor: PRIMARY,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   btnViewText: {
     fontSize: 12,
@@ -1444,34 +1454,49 @@ const styles = StyleSheet.create({
     color: PRIMARY,
   },
   btnMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ECFDF5",
     borderWidth: 1,
     borderColor: "#A7F3D0",
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   btnReply: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
     borderColor: PRIMARY_LIGHT,
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   btnDelete: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FEF2F2",
     borderWidth: 1,
     borderColor: "#FECACA",
+    shadowColor: "#DC2626",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   // ── Stats (Web) ──

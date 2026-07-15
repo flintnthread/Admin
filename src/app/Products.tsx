@@ -1074,8 +1074,13 @@ const WebProductsScreen: React.FC = () => {
                             wst.pageHeader,
                             isMobileWeb && { flexDirection: "column", alignItems: "flex-start", paddingHorizontal: 18, paddingVertical: 18, paddingBottom: isMobileWeb ? 52 : 68, gap: 12 },
                         ]}>
-                            <View style={wst.titleContainer}>
-                                <Text style={[wst.pageTitle, isMobileWeb && { fontSize: 20 }]}>Product Management</Text>
+                            <View style={[wst.titleContainer, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+                                <View style={wst.pageIcon}>
+                                    <MaterialCommunityIcons name="package-variant" size={28} color="#FFF" />
+                                </View>
+                                <View>
+                                    <Text style={[wst.pageTitle, isMobileWeb && { fontSize: 20 }]}>Product Management</Text>
+                                </View>
                             </View>
                             <View style={[
                                 { flexDirection: "row", gap: 8, alignItems: "center" },
@@ -1484,6 +1489,7 @@ const wst = StyleSheet.create({
     pageContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 },
     pageHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.navyDeep, paddingHorizontal: 32, paddingVertical: 28, paddingBottom: 68, borderRadius: 22, marginHorizontal: 2, marginTop: 12, shadowColor: C.navyDeep, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     titleContainer: { paddingLeft: 0, marginVertical: 0 },
+    pageIcon: { width: 52, height: 52, borderRadius: 14, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center' },
     breadcrumb: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
     breadcrumbDim: { fontSize: 13, color: "rgba(255,255,255,0.75)" },
     breadcrumbActive: { fontSize: 13, color: C.white },

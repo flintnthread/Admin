@@ -855,7 +855,7 @@ export default function SellersScreen() {
         </View>
 
         {/* ── Stat Cards Row ── */}
-        {width >= 1250 ? (
+        {width >= 1440 ? (
           <View style={SS.statGrid}>
             {[
               { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
@@ -904,22 +904,18 @@ export default function SellersScreen() {
                   key={c.label}
                   style={[
                     SS.statCard,
-                    {
-                      width: 190,
-                      minWidth: 190,
-                      flexShrink: 0,
-                      flex: 0,
-                    }
+                    SS.statCardCompact,
                   ]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={SS.statLabel}>{c.label.toUpperCase()}</Text>
-                    <Text style={SS.statValue}>{c.value}</Text>
-                    <Text style={SS.statSub}>{c.sub}</Text>
-                  </View>
-                  <View style={[SS.statIconBox, { backgroundColor: c.iconBg }]}>
+                  <View style={[SS.statIconBoxCompact, { backgroundColor: c.iconBg }]}>
                     {c.icon}
                   </View>
+                  <Text style={[SS.statValueCompact, { color: '#1C1C2E' }]} numberOfLines={1}>
+                    {c.value}
+                  </Text>
+                  <Text style={SS.statLabelCompact} numberOfLines={1}>
+                    {c.label}
+                  </Text>
                 </View>
               ))}
             </ScrollView>
@@ -1111,6 +1107,24 @@ const SS = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+  // Compact card — mobile horizontal scroll row (matches customerDetails.tsx)
+  statCardCompact: {
+    width: 52,
+    flexDirection: 'column',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#E5EAF2',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+    gap: 4,
+  },
   statLabel: {
     fontSize: 10,
     fontWeight: '700',
@@ -1118,10 +1132,20 @@ const SS = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 4,
   },
+  statLabelCompact: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
   statValue: {
     fontSize: 24,
     fontWeight: '800',
     color: '#1C1C2E',
+  },
+  statValueCompact: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   statSub: {
     fontSize: 11,
@@ -1132,6 +1156,13 @@ const SS = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statIconBoxCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
