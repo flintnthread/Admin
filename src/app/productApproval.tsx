@@ -213,7 +213,7 @@ function StatCard({
             <MaterialCommunityIcons name={icon} size={22} color={color} />
           </View>
           <View style={styles.statContent}>
-            <Text style={styles.statCount}>{count}</Text>
+            <Text style={styles.statCount} adjustsFontSizeToFit numberOfLines={1}>{count}</Text>
             <Text style={styles.statLabel} numberOfLines={2}>
               {label}
             </Text>
@@ -439,9 +439,9 @@ function PageHeader({ isWide, stats, onFilter, isMobile, isTablet }: { isWide: b
       </View>
       {/* Mobile/Tablet: stat cards overlapping the header bottom */}
       {(isMobile || isTablet) && stats && onFilter && (
-        <View style={styles.mobileHeaderStats}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mobileHeaderStats} contentContainerStyle={{ paddingHorizontal: 8, flexGrow: 1, justifyContent: 'center' }}>
           <StatsRow stats={stats} onFilter={onFilter} isWide={false} />
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -804,63 +804,63 @@ function ProductTable({
     <View style={styles.tableCard}>
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
-            <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
-            <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
-            <Text style={[styles.tableHeaderText, styles.tableColPrice]}>Total Price</Text>
-            <Text style={[styles.tableHeaderText, styles.tableColStatus]}>Status</Text>
-            <Text style={[styles.tableHeaderText, styles.tableColDate]}>Submitted On</Text>
-            <Text style={[styles.tableHeaderText, styles.tableColActions]}>Actions</Text>
-          </View>
+          <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
+          <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
+          <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
+          <Text style={[styles.tableHeaderText, styles.tableColPrice]}>Total Price</Text>
+          <Text style={[styles.tableHeaderText, styles.tableColStatus]}>Status</Text>
+          <Text style={[styles.tableHeaderText, styles.tableColDate]}>Submitted On</Text>
+          <Text style={[styles.tableHeaderText, styles.tableColActions]}>Actions</Text>
+        </View>
 
-          {products.map((product) => (
-            <View key={product.id} style={styles.tableRow}>
+        {products.map((product) => (
+          <View key={product.id} style={styles.tableRow}>
 
-              <View style={[styles.tableColProduct, styles.tableCellProduct]}>
-                <Image
-                  source={{ uri: product.image }}
-                  style={styles.tableThumb}
-                  contentFit="cover"
-                />
-                <View style={styles.tableProductInfo}>
-                  <View style={styles.productNameRow}>
-                    <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
-                    {product.isNew && <NewBadge />}
-                  </View>
-                  <Text style={styles.productDesc} numberOfLines={2}>
-                    {product.description}
-                  </Text>
+            <View style={[styles.tableColProduct, styles.tableCellProduct]}>
+              <Image
+                source={{ uri: product.image }}
+                style={styles.tableThumb}
+                contentFit="cover"
+              />
+              <View style={styles.tableProductInfo}>
+                <View style={styles.productNameRow}>
+                  <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
+                  {product.isNew && <NewBadge />}
                 </View>
-              </View>
-
-              <View style={styles.tableColSeller}>
-                <Text style={styles.sellerName}>{product.seller}</Text>
-                <Text style={styles.sellerEmail}>{product.email}</Text>
-              </View>
-
-              <Text style={[styles.tableColCategory, styles.tableCellText]}>{product.category}</Text>
-
-              <Text style={[styles.tableColPrice, styles.tableCellText]}>{product.price ?? '—'}</Text>
-
-              <View style={styles.tableColStatus}>
-                <StatusBadge status={product.status} />
-              </View>
-
-              <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
-
-              <View style={styles.tableColActions}>
-                <ActionButtons
-                  inline
-                  productId={product.id}
-                  status={product.status}
-                  busy={actionBusyId === product.id}
-                  onActivate={onActivate}
-                  onDeactivate={onDeactivate}
-                />
+                <Text style={styles.productDesc} numberOfLines={2}>
+                  {product.description}
+                </Text>
               </View>
             </View>
-          ))}
-        </View>
+
+            <View style={styles.tableColSeller}>
+              <Text style={styles.sellerName}>{product.seller}</Text>
+              <Text style={styles.sellerEmail}>{product.email}</Text>
+            </View>
+
+            <Text style={[styles.tableColCategory, styles.tableCellText]}>{product.category}</Text>
+
+            <Text style={[styles.tableColPrice, styles.tableCellText]}>{product.price ?? '—'}</Text>
+
+            <View style={styles.tableColStatus}>
+              <StatusBadge status={product.status} />
+            </View>
+
+            <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
+
+            <View style={styles.tableColActions}>
+              <ActionButtons
+                inline
+                productId={product.id}
+                status={product.status}
+                busy={actionBusyId === product.id}
+                onActivate={onActivate}
+                onDeactivate={onDeactivate}
+              />
+            </View>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -1101,7 +1101,11 @@ export default function ProductApprovalScreen() {
         showsVerticalScrollIndicator={false}>
         <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} isTablet={isTablet} />
 
-        {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
+        {isWide && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsScrollWrapper} contentContainerStyle={styles.statsScrollContent}>
+            <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
+          </ScrollView>
+        )}
 
         <View style={styles.scrollContent}>
 
@@ -1137,15 +1141,29 @@ export default function ProductApprovalScreen() {
               </Pressable>
             </View>
           ) : isWide ? (
-            <ProductTable
-              products={products}
-              selected={selected}
-              onToggle={toggleSelect}
-              onToggleAll={toggleSelectAll}
-              actionBusyId={actionBusyId}
-              onActivate={handleActivate}
-              onDeactivate={handleDeactivate}
-            />
+            width < 1440 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 8 }}>
+                <ProductTable
+                  products={products}
+                  selected={selected}
+                  onToggle={toggleSelect}
+                  onToggleAll={toggleSelectAll}
+                  actionBusyId={actionBusyId}
+                  onActivate={handleActivate}
+                  onDeactivate={handleDeactivate}
+                />
+              </ScrollView>
+            ) : (
+              <ProductTable
+                products={products}
+                selected={selected}
+                onToggle={toggleSelect}
+                onToggleAll={toggleSelectAll}
+                actionBusyId={actionBusyId}
+                onActivate={handleActivate}
+                onDeactivate={handleDeactivate}
+              />
+            )
           ) : (
             <View style={styles.productList}>
               {products.map((product) => (
@@ -1375,7 +1393,6 @@ const styles = StyleSheet.create({
   },
   mobileHeaderStats: {
     marginTop: -42,
-    marginHorizontal: 8,
     zIndex: 10,
     elevation: 10,
     marginBottom: 4,
@@ -1440,25 +1457,34 @@ const styles = StyleSheet.create({
   // Stats — 2×2 grid on mobile & tablet (native + web responsive)
   statsGridCompact: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 10,
-    width: '100%',
     alignSelf: 'stretch',
+    paddingBottom: 4,
+    justifyContent: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 12,
     width: '100%',
   },
   statsGridWide: {
     flexWrap: 'nowrap',
+    minWidth: 900,
+    justifyContent: 'center',
+  },
+  statsScrollWrapper: {
     marginTop: -60,
-    marginHorizontal: 16,
     zIndex: 10,
     marginBottom: 4,
-    maxWidth: 900,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
+  },
+  statsScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   statCard: {
     flexDirection: 'row',
@@ -1470,7 +1496,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.border,
     flex: 1,
-    minWidth: 220,
+    minWidth: 120,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -1478,13 +1504,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statCardGrid: {
-    width: '48%',
-    maxWidth: '48%',
-    flexBasis: '48%',
-    flexGrow: 0,
-    flexShrink: 0,
-    flex: 0,
-    minWidth: 0,
+    width: 150,
     flexDirection: 'column',
     alignItems: 'stretch',
     padding: 12,
@@ -1929,37 +1949,37 @@ const styles = StyleSheet.create({
   },
   tableColProduct: {
     flex: 1,
-    minWidth: 200,
+    minWidth: 180,
     paddingRight: 16,
   },
   tableColSeller: {
     flex: 1,
-    minWidth: 160,
+    minWidth: 140,
     paddingRight: 16,
   },
   tableColCategory: {
     flex: 1.4,
-    minWidth: 220,
+    minWidth: 160,
     paddingRight: 16,
   },
   tableColPrice: {
     flex: 0.9,
-    minWidth: 120,
+    minWidth: 100,
     paddingRight: 16,
   },
   tableColStatus: {
     flex: 0.8,
-    minWidth: 120,
+    minWidth: 100,
     paddingRight: 16,
   },
   tableColDate: {
     flex: 1,
-    minWidth: 150,
+    minWidth: 120,
     paddingRight: 16,
   },
   tableColActions: {
     flex: 1.2,
-    minWidth: 200,
+    minWidth: 160,
   },
   checkbox: {
     width: 18,
