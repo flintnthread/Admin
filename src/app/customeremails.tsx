@@ -30,11 +30,11 @@ import {
 
 import AdminLayout from '@/components/admin-layout';
 
-import { Feather } from '@expo/vector-icons';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/format';
 import { fetchCustomers } from '@/services/customerApi';
 import { sendCustomerEmails } from '@/services/emailApi';
+import { Feather } from '@expo/vector-icons';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -175,8 +175,6 @@ export default function CustomerEmailsScreen() {
         };
     }, []);
 
-    const maxContentWidth = bp === 'xxl' ? '100%' : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
-
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return customers;
@@ -217,8 +215,8 @@ export default function CustomerEmailsScreen() {
 
     return (
         <AdminLayout>
-            <ScrollView contentContainerStyle={{ flexGrow: 1, backgroundColor: COLORS.bg }}>
-                <View style={[styles.pageInner, { paddingHorizontal: gutter, maxWidth: maxContentWidth, alignSelf: 'center', width: '100%' }]}>
+            <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+                <View style={[styles.pageInner, { paddingHorizontal: 16 }]}>
                     {/* Header */}
                     <View style={[styles.hero, isCompact && styles.heroMobile]}>
                         <View style={styles.heroTopRow}>
@@ -291,7 +289,7 @@ export default function CustomerEmailsScreen() {
                         </View>
                     )}
                 </View>
-            </ScrollView>
+            </View>
 
             {/* Single-customer send modal */}
             <SendModal

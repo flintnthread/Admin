@@ -66,6 +66,7 @@ import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { useLocalSearchParams } from 'expo-router';
 import { fetchAdsPayments, fetchAdsPaymentStats, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 
 /* ------------------------------------------------------------------ */
@@ -552,6 +553,13 @@ function FilterBar({
 }) {
   const [openDropdown, setOpenDropdown] = useState<'status' | 'method' | null>(null);
 
+  const hasFilters = search !== '' || status !== 'all' || method !== 'all';
+  const handleClearFilters = () => {
+    onSearch('');
+    onStatus('all');
+    onMethod('all');
+  };
+
   const toggleButtons = (
     <View style={styles.viewToggleGroup}>
       <TouchableOpacity
@@ -562,7 +570,7 @@ function FilterBar({
         onPress={() => setViewMode('grid')}
         activeOpacity={0.85}
       >
-        <GridGlyph color={viewMode === 'grid' ? '#fff' : COLORS.muted} size={16} />
+        <GridGlyph color={viewMode === 'grid' ? '#fff' : '#374151'} size={16} />
       </TouchableOpacity>
       <TouchableOpacity
         style={[
@@ -572,7 +580,7 @@ function FilterBar({
         onPress={() => setViewMode('list')}
         activeOpacity={0.85}
       >
-        <ListIconGlyph color={viewMode === 'list' ? '#fff' : COLORS.muted} size={16} />
+        <ListIconGlyph color={viewMode === 'list' ? '#fff' : '#374151'} size={16} />
       </TouchableOpacity>
     </View>
   );
@@ -592,6 +600,11 @@ function FilterBar({
               style={styles.searchInput}
             />
           </View>
+          {hasFilters && (
+            <TouchableOpacity onPress={handleClearFilters} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: COLORS.inactiveLight, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: COLORS.inactive, fontWeight: '600', fontSize: 13 }}>Clear</Text>
+            </TouchableOpacity>
+          )}
           {toggleButtons}
           <StatusDropdown 
             value={status} onChange={onStatus} 
@@ -630,6 +643,11 @@ function FilterBar({
               />
             </View>
             {toggleButtons}
+            {hasFilters && (
+              <TouchableOpacity onPress={handleClearFilters} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: COLORS.inactiveLight, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: COLORS.inactive, fontWeight: '600', fontSize: 13 }}>Clear</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -880,10 +898,11 @@ function PaymentDetailsPanel({ payment, onClose, isTablet }: { payment: Payment;
 const PAGE_SIZE = 8;
 
 export default function AdsPaymentsScreen() {
+  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { width: windowWidth } = useBreakpoint();
   const { measuredWidth, onLayout } = useMeasuredWidth(windowWidth);
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(orderId || '');
   const [method, setMethod] = useState<MethodFilter>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
@@ -905,6 +924,13 @@ export default function AdsPaymentsScreen() {
   const gridCardWidth = (fullWidth - gridGap * (gridCols - 1)) / gridCols;
 
   useEffect(() => setPage(1), [search, status, method]);
+
+  // If the `orderId` param changes, update the search state
+  useEffect(() => {
+    if (orderId) {
+      setSearch(orderId);
+    }
+  }, [orderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1099,25 +1125,22 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: '700', color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: COLORS.rule },
 
-  /* view toggle — two separate boxed icon buttons */
+  /* view toggle — pill container with navy active button */
   viewToggleGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 3,
   },
   viewToggleBoxBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.rule,
   },
   viewToggleBoxBtnActive: {
-    backgroundColor: COLORS.navyDeep,
-    borderColor: COLORS.navyDeep,
+    backgroundColor: '#1E2B6B',
   },
 
   /* grid card */

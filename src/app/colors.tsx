@@ -1288,6 +1288,7 @@ const styles = StyleSheet.create({
     top: "100%" as any,
     left: 0, right: 0,
     backgroundColor: "#fff",
+    
     borderWidth: 1.5, borderColor: BRAND, borderTopWidth: 0,
     borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
     overflow: "hidden", zIndex: 200,

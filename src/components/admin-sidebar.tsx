@@ -4,13 +4,13 @@ import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import React from "react";
 import {
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 type Props = {
@@ -23,7 +23,7 @@ type Props = {
 };
 
 // Navigation items definition
-const NAV_ITEMS = {
+export const NAV_ITEMS = {
   GENERAL: [
 
 

@@ -992,14 +992,14 @@ const DepartmentsScreen: React.FC = () => {
                                     onPress={() => setViewMode('grid')}
                                     activeOpacity={0.8}
                                 >
-                                    <Feather name="grid" size={14} color={viewMode === 'grid' ? T.orange : T.textHint} />
+                                    <Feather name="grid" size={16} color={viewMode === 'grid' ? '#fff' : '#374151'} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[mob.toggleBtn, mob.toggleBtnMid, viewMode === 'list' && mob.toggleBtnActive]}
+                                    style={[mob.toggleBtn, viewMode === 'list' && mob.toggleBtnActive]}
                                     onPress={() => setViewMode('list')}
                                     activeOpacity={0.8}
                                 >
-                                    <Feather name="list" size={14} color={viewMode === 'list' ? T.orange : T.textHint} />
+                                    <Feather name="list" size={16} color={viewMode === 'list' ? '#fff' : '#374151'} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -1058,12 +1058,14 @@ const DepartmentsScreen: React.FC = () => {
                                 )}
                             </View>
                             <View style={s.filterGroup}>
-                                <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
-                                    <Feather name="grid" size={16} color={viewMode === 'grid' ? T.orange : T.textHint} />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
-                                    <Feather name="list" size={16} color={viewMode === 'list' ? T.orange : T.textHint} />
-                                </TouchableOpacity>
+                                <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
+                                    <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
+                                        <Feather name="grid" size={16} color={viewMode === 'grid' ? '#fff' : '#374151'} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
+                                        <Feather name="list" size={16} color={viewMode === 'list' ? '#fff' : '#374151'} />
+                                    </TouchableOpacity>
+                                </View>
                                 <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
                                     <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
                                     <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
@@ -1362,24 +1364,19 @@ const mob = StyleSheet.create({
     // Grid/List segmented toggle (light)
     toggleGroup: {
         flexDirection: "row",
-        backgroundColor: T.bg,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: T.border,
-        overflow: "hidden",
+        backgroundColor: "#E5E7EB",
+        borderRadius: 10,
+        padding: 3,
     },
     toggleBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
         alignItems: "center",
         justifyContent: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    toggleBtnMid: {
-        borderLeftWidth: 1,
-        borderLeftColor: T.border,
     },
     toggleBtnActive: {
-        backgroundColor: T.orangeLight,
+        backgroundColor: "#1E2B6B",
     },
     toggleTxt: {
         fontSize: 12,
@@ -1599,18 +1596,14 @@ const s = StyleSheet.create({
         color: T.textM,
     },
     viewBtn: {
-        width: 38,
-        height: 38,
+        width: 36,
+        height: 36,
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: T.border,
-        backgroundColor: T.card,
         alignItems: "center",
         justifyContent: "center",
     },
     viewBtnActive: {
-        borderColor: T.orange,
-        backgroundColor: T.orangeLight,
+        backgroundColor: "#1E2B6B",
     },
     tableCard: {
         backgroundColor: T.card,
