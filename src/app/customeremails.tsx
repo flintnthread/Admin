@@ -30,11 +30,11 @@ import {
 
 import AdminLayout from '@/components/admin-layout';
 
-import { Feather } from '@expo/vector-icons';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/format';
 import { fetchCustomers } from '@/services/customerApi';
 import { sendCustomerEmails } from '@/services/emailApi';
+import { Feather } from '@expo/vector-icons';
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -155,8 +155,6 @@ export default function CustomerEmailsScreen() {
     };
     // ------------------------------------------------------------------
 
-<<<<<<< HEAD
-=======
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -177,9 +175,6 @@ export default function CustomerEmailsScreen() {
         };
     }, []);
 
-    const maxContentWidth = bp === 'xxl' ? '100%' : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
-
->>>>>>> 4e3b0236b18ea5dc03b5f77eea0a4ffcdc27d449
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return customers;
