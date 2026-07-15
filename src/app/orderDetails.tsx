@@ -406,6 +406,67 @@ function mapStatusHistoryEntry(entry: NonNullable<OrderDetail["statusHistory"]>[
   };
 }
 
+function resolveStringValue(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  return undefined;
+}
+
+function resolveShiprocketData(detail?: OrderDetail) {
+  const shiprocketObject =
+    detail && detail.shiprocket && typeof detail.shiprocket === "object" && !Array.isArray(detail.shiprocket)
+      ? (detail.shiprocket as Record<string, unknown>)
+      : undefined;
+  const shipmentObject =
+    detail && detail.shipment && typeof detail.shipment === "object" && !Array.isArray(detail.shipment)
+      ? (detail.shipment as Record<string, unknown>)
+      : undefined;
+  const trackingObject =
+    detail && detail.trackingData && typeof detail.trackingData === "object" && !Array.isArray(detail.trackingData)
+      ? (detail.trackingData as Record<string, unknown>)
+      : undefined;
+
+  const trackingUrl = resolveStringValue(detail?.shiprocketTrackingUrl)
+    ?? resolveStringValue(shiprocketObject?.trackingUrl)
+    ?? resolveStringValue(shipmentObject?.trackingUrl)
+    ?? resolveStringValue(trackingObject?.trackingUrl);
+
+  const awb = resolveStringValue(detail?.shiprocketAwbCode)
+    ?? resolveStringValue(shiprocketObject?.awb)
+    ?? resolveStringValue(shipmentObject?.awb)
+    ?? resolveStringValue(trackingObject?.awb)
+    ?? (trackingUrl ? trackingUrl.split("/").pop() ?? "" : "");
+
+  const courier = resolveStringValue(detail?.shiprocketCourierName)
+    ?? resolveStringValue(shiprocketObject?.courier)
+    ?? resolveStringValue(shiprocketObject?.courierName)
+    ?? resolveStringValue(shipmentObject?.courier)
+    ?? resolveStringValue(trackingObject?.courier)
+    ?? (trackingUrl ? "ShipRocket" : undefined);
+
+  const status = resolveStringValue(detail?.shiprocketStatus)
+    ?? resolveStringValue(shiprocketObject?.status)
+    ?? resolveStringValue(shipmentObject?.status)
+    ?? resolveStringValue(trackingObject?.status);
+
+  const syncedAt = resolveStringValue(detail?.shiprocketSyncedAt)
+    ?? resolveStringValue(detail?.shiprocketPushedAt)
+    ?? resolveStringValue(shiprocketObject?.syncedAt)
+    ?? resolveStringValue(shiprocketObject?.updatedAt)
+    ?? resolveStringValue(shipmentObject?.syncedAt)
+    ?? resolveStringValue(trackingObject?.updatedAt);
+
+  return {
+    awb: awb || "—",
+    courier: courier || "—",
+    status: status || "—",
+    synced: formatDateTimeWithTime(syncedAt),
+    url: trackingUrl,
+  };
+}
+
 function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): TrackingEvent[] {
   const events: TrackingEvent[] = [...history].reverse().map((entry) => {
     const [datePart, timePart] = entry.date.includes(",")
@@ -425,22 +486,21 @@ function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): 
     };
   });
 
-  const shipStatus = detail?.shiprocketStatus?.trim();
-  const shipSynced = detail?.shiprocketSyncedAt ?? detail?.shiprocketPushedAt;
-  if (shipStatus && shipStatus !== "—") {
-    const syncedLabel = formatDateTimeWithTime(shipSynced);
+  const shiprocket = resolveShiprocketData(detail);
+  if (shiprocket.status && shiprocket.status !== "—") {
+    const syncedLabel = shiprocket.synced;
     const [datePart, timePart] = syncedLabel.includes(",")
       ? syncedLabel.split(",").map((part) => part.trim())
       : [syncedLabel, ""];
     const shipEvent: TrackingEvent = {
       date: datePart,
       time: timePart,
-      location: detail?.shiprocketCourierName?.trim() || "ShipRocket",
-      description: `Shipment: ${shipStatus}`,
+      location: shiprocket.courier && shiprocket.courier !== "—" ? shiprocket.courier : "ShipRocket",
+      description: `Shipment: ${shiprocket.status}`,
       status: "Processing",
     };
     const duplicate = events.some((event) =>
-      event.description.toLowerCase().includes(shipStatus.toLowerCase())
+      event.description.toLowerCase().includes(shiprocket.status.toLowerCase())
     );
     if (!duplicate) {
       events.unshift(shipEvent);
@@ -450,8 +510,18 @@ function buildTrackingTimeline(history: StatusHistory[], detail?: OrderDetail): 
   return events;
 }
 
-function mapApiOrderToUi(detail: OrderDetail): UIOrder {
-  const items = (detail.items ?? []).map(mapApiItemToUi);
+function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, productIds?: string): UIOrder {
+  let items = (detail.items ?? []).map(mapApiItemToUi);
+  if (productIds) {
+    const validIds = productIds.split(',');
+    items = items.filter(i => validIds.includes(String(i.productId)) || validIds.includes(String(i.id)));
+  } else if (sellerNameFilter) {
+    items = items.filter(i => i.seller?.trim().toLowerCase() === sellerNameFilter.trim().toLowerCase());
+  }
+  if (items.length === 0 && (detail.items ?? []).length > 0) {
+    console.log('Filter failed, falling back to all items.');
+    items = (detail.items ?? []).map(mapApiItemToUi);
+  }
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const shippingCost = Number(detail.shippingAmount ?? 0);
   const tax = Number(detail.taxAmount ?? 0);
@@ -459,8 +529,7 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
   const walletDeduction = Number(detail.walletDeduction ?? 0);
   const referralDiscount = Number(detail.referralDiscountAmount ?? 0);
   const total = Number(detail.totalAmount ?? subtotal + shippingCost + tax - discount - walletDeduction - referralDiscount);
-  const awb = detail.shiprocketAwbCode?.trim()
-    || (detail.shiprocketTrackingUrl ? detail.shiprocketTrackingUrl.split("/").pop() ?? "" : "");
+  const shiprocket = resolveShiprocketData(detail);
 
   const history: StatusHistory[] =
     detail.statusHistory && detail.statusHistory.length > 0
@@ -507,11 +576,11 @@ function mapApiOrderToUi(detail: OrderDetail): UIOrder {
       country: detail.shippingCountry ?? "India",
     },
     shiprocket: {
-      awb: awb || "—",
-      courier: detail.shiprocketCourierName?.trim() || (detail.shiprocketTrackingUrl ? "ShipRocket" : "—"),
-      status: detail.shiprocketStatus?.trim() || "—",
-      synced: formatDateTimeWithTime(detail.shiprocketSyncedAt ?? detail.shiprocketPushedAt),
-      url: detail.shiprocketTrackingUrl,
+      awb: shiprocket.awb,
+      courier: shiprocket.courier,
+      status: shiprocket.status,
+      synced: shiprocket.synced,
+      url: shiprocket.url,
     },
     tracking: buildTrackingTimeline(history, detail),
     items,
@@ -1040,7 +1109,7 @@ export default function OrderDetailScreen() {
   const { width } = useWindowDimensions();
   const { isMobile, isTablet, isLaptop, isDesktop, isWide } = useLayout(width);
   const router = useRouter();
-  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+  const { orderId, sellerName, productIds } = useLocalSearchParams<{ orderId?: string; sellerName?: string; productIds?: string }>();
 
   const [order, setOrder] = useState<UIOrder>(INITIAL_ORDER);
   const [status, setStatus] = useState<OrderStatus>(INITIAL_ORDER.status);
@@ -1080,7 +1149,7 @@ export default function OrderDetailScreen() {
 
     try {
       const raw = await fetchOrderDetail(id);
-      const uiOrder = mapApiOrderToUi(raw as OrderDetail);
+      const uiOrder = mapApiOrderToUi(raw as OrderDetail, sellerName, productIds);
       setOrder(uiOrder);
       setStatus(uiOrder.status);
     } catch (err) {
@@ -1302,7 +1371,7 @@ export default function OrderDetailScreen() {
                   }
                 />
                 <View style={s.cardBodyCompact}>
-                  <InfoRow label="AWB / Tracking #" value={order.shiprocket.awb} />
+                  <InfoRow label="AWB / Tracking #" value={order.shiprocket.awb !== "—" ? order.shiprocket.awb : "Shiprocket pending"} />
                   <InfoRow label="Courier Partner" value={order.shiprocket.courier} />
                   <InfoRow label="Shipment Status" value={
                     <View style={[s.badge, { backgroundColor: C.blueLight }]}>
@@ -1310,9 +1379,11 @@ export default function OrderDetailScreen() {
                     </View>
                   } />
                   <InfoRow label="Last Synced" value={order.shiprocket.synced} />
-                  <TouchableOpacity style={[s.trackBtn, { marginTop: 8 }]} onPress={() => { if (order.shiprocket.url) Linking.openURL(order.shiprocket.url); }}>
-                    <Text style={s.trackBtnTxt}>Track on ShipRocket</Text>
-                  </TouchableOpacity>
+                  {order.shiprocket.url ? (
+                    <TouchableOpacity style={[s.trackBtn, { marginTop: 8 }]} onPress={() => { if (order.shiprocket.url) Linking.openURL(order.shiprocket.url); }}>
+                      <Text style={s.trackBtnTxt}>Track on ShipRocket</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </Card>
             </View>
@@ -1368,7 +1439,7 @@ export default function OrderDetailScreen() {
 
             {/* ── MIDDLE CONTENT: Orders Table (Full Width) ──────────────── */}
             <View style={{ marginTop: 16 }}>
-              <Card style={{ padding: 0 }}>
+              <Card style={{ padding: 0 }}>              
                 {isWide ? (
                   <View style={s.tblWrap}>
                     <View style={[s.tblRow, s.tblHead, { backgroundColor: C.navy, borderTopLeftRadius: 16, borderTopRightRadius: 16 }]}>

@@ -1474,8 +1474,13 @@ const JobOpeningsScreen: React.FC = () => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Stat cards: 2 per row grid overlapping the header */}
-                        <View style={s.mobileStatsGrid}>
+                        {/* Stat cards: horizontally scrollable on mobile */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={s.mobileStatsGrid}
+                            contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+                        >
                             <View style={[s.mobileStatCard, { borderTopColor: T.orange }]}>
                                 <View style={s.mobileStatTopRow}>
                                     <View style={[s.mobileStatIcon, { backgroundColor: T.orangeLight }]}>
@@ -1512,7 +1517,7 @@ const JobOpeningsScreen: React.FC = () => {
                                 </View>
                                 <Text style={s.mobileStatLabel}>Urgent</Text>
                             </View>
-                        </View>
+                        </ScrollView>
                     </>
                 ) : (
                     <>
@@ -2083,12 +2088,8 @@ const s = StyleSheet.create({
         elevation: 4,
     },
 
-    // Mobile stat cards grid (2 per row, overlapping the header)
+    // Mobile stat cards horizontally scrollable
     mobileStatsGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap" as any,
-        justifyContent: "space-between",
-        rowGap: 12,
         marginTop: -32,
         marginHorizontal: 16,
         zIndex: 10,
@@ -2101,7 +2102,7 @@ const s = StyleSheet.create({
         borderTopWidth: 3,
         borderColor: T.border,
         padding: 14,
-        width: "48%",
+        width: 155,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
