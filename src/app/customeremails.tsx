@@ -24,6 +24,7 @@ import {
     StyleSheet,
     Text,
     TextInput,
+    TouchableOpacity,
     useWindowDimensions,
     View
 } from 'react-native';
@@ -33,7 +34,6 @@ import AdminLayout from '@/components/admin-layout';
 import Calendar3 from 'react-native-bootstrap-icons/icons/calendar3';
 import EnvelopeFill from 'react-native-bootstrap-icons/icons/envelope-fill';
 import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
-import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
 import Send from 'react-native-bootstrap-icons/icons/telegram';
 import Telephone from 'react-native-bootstrap-icons/icons/telephone';
@@ -43,17 +43,34 @@ import XLg from 'react-native-bootstrap-icons/icons/x-lg';
 // Design tokens
 // ---------------------------------------------------------------------------
 const COLORS = {
-    bg: '#F6F4EF',
-    surface: '#FFFFFF',
-    border: '#ECE6DA',
-    navy: '#1C2439',
-    navySoft: '#5B6478',
-    muted: '#8B8FA3',
-    primary: '#E8672C',
-    primaryDark: '#C8531F',
-    primarySoft: '#FDE7DA',
-    danger: '#D64545',
-    chipBg: '#FBEFE6',
+  navy: "#151D4F",
+  navySoft: "#152238",
+  orange: "#F97316",
+  orangeDark: "#EA580C",
+  bg: "#F8FAFC",
+  card: "#FFFFFF",
+  surface: "#FFFFFF",
+  border: "#E2E8F0",
+  text: "#1E293B",
+  textMuted: "#64748B",
+  textFaint: "#94A3B8",
+  muted: "#8B8FA3",
+  emerald: "#059669",
+  emeraldBg: "#ECFDF5",
+  rose: "#E11D48",
+  roseBg: "#FFF1F2",
+  amber: "#D97706",
+  amberBg: "#FFFBEB",
+  orangeBg: "#FFF7ED",
+  slate: '#64748B',
+  slateSoft: '#F1F5F9',
+  infoSoft: '#EFF6FF',
+  infoText: '#3B82F6',
+  white: '#ffffff',
+  primary: "#F97316",
+  primaryDark: "#EA580C",
+  primarySoft: "#FDE7DA",
+  chipBg: "#FBEFE6",
 };
 
 // ---------------------------------------------------------------------------
@@ -180,48 +197,44 @@ export default function CustomerEmailsScreen() {
             <ScrollView contentContainerStyle={{ flexGrow: 1, backgroundColor: COLORS.bg }}>
                 <View style={[styles.pageInner, { paddingHorizontal: gutter, maxWidth: maxContentWidth, alignSelf: 'center', width: '100%' }]}>
                     {/* Header */}
-                    <View style={[styles.headerRow, isCompact && styles.headerRowCompact, { backgroundColor: '#151D4F', padding: 20, borderRadius: 12 }]}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <View style={{ backgroundColor: '#F97316', padding: 8, borderRadius: 8 }}>
-                                <Ic icon={EnvelopeFill} size={18} color="#fff" />
+                    <View style={[styles.hero, isCompact && styles.heroMobile]}>
+                        <View style={styles.heroTopRow}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: isCompact ? 8 : 12, flex: 1, marginRight: 8 }}>
+                                <View style={styles.heroIconBadge}>
+                                    <Ic icon={EnvelopeFill} size={18} color="#fff" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.heroTitle}>Customer Emails</Text>
+                                    <Text style={styles.heroSubtitle} numberOfLines={2}>Manage and send emails to customers</Text>
+                                </View>
                             </View>
-                            <Text style={[styles.pageTitle, { color: '#ffffff' }]}>Customer Emails</Text>
+                            {!isCompact && (
+                                <TouchableOpacity
+                                    style={styles.addHeaderBtn}
+                                    onPress={openBulk}
+                                >
+                                    <Ic icon={EnvelopeFill} size={15} color="#fff" />
+                                    <Text style={styles.addHeaderBtnText}>Send to All</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
-
-                        <Pressable
-                            onPress={openBulk}
-                            style={({ pressed }) => [
-                                styles.primaryBtn,
-                                isCompact && styles.primaryBtnCompact,
-                                pressed && { opacity: 0.85 },
-                            ]}
-                        >
-                            <Ic icon={EnvelopeFill} size={15} color="#fff" />
-                            <Text style={styles.primaryBtnText}>{isCompact ? 'Mail All' : 'Send Mail to All'}</Text>
-                        </Pressable>
+                        <View style={isCompact ? styles.headerCardSpacerMobile : styles.headerCardSpacer} />
                     </View>
 
-                    {/* Search + total */}
-                    <View style={[styles.toolRow, isCompact && styles.toolRowCompact]}>
-                        <View style={styles.searchBox}>
-                            <View style={{ flexShrink: 0 }}>
-                                <Ic icon={Search} size={15} color={COLORS.muted} />
-                            </View>
+                    {/* Search + total strip */}
+                    <View style={[styles.searchStrip, isCompact && styles.searchStripMobile]}>
+                        <View style={styles.searchInputWrap}>
+                            <Ic icon={Search} size={16} color={COLORS.textFaint} />
                             <TextInput
+                                style={styles.searchInput}
+                                placeholder="Search customers..."
+                                placeholderTextColor={COLORS.textFaint}
                                 value={query}
                                 onChangeText={setQuery}
-                                placeholder={isCompact ? "Search..." : "Search customers"}
-                                placeholderTextColor={COLORS.muted}
-                                style={[styles.searchInput, { minWidth: 0 }]}
                             />
                         </View>
-                        <View style={styles.totalChip}>
-                            <View style={{ flexShrink: 0 }}>
-                                <Ic icon={PeopleFill} size={14} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.totalChipText} numberOfLines={1}>
-                                {isCompact ? `${MOCK_CUSTOMERS.length} Customers` : `Total: ${MOCK_CUSTOMERS.length} Customers`}
-                            </Text>
+                        <View style={styles.totalBadge}>
+                            <Text style={styles.totalBadgeText}>{filtered.length} Customers</Text>
                         </View>
                     </View>
 
@@ -320,13 +333,13 @@ export default function CustomerEmailsScreen() {
 function TableView({ data, onSend }: { data: Customer[]; onSend: (c: Customer) => void }) {
     return (
         <View style={styles.tableCard}>
-            <View style={[styles.tableRow, styles.tableHeaderRow]}>
-                <Text style={[styles.th, { flex: 0.6 }]}>ID</Text>
-                <Text style={[styles.th, { flex: 1.6 }]}>Name</Text>
-                <Text style={[styles.th, { flex: 2.4 }]}>Email</Text>
-                <Text style={[styles.th, { flex: 1.3 }]}>Mobile</Text>
-                <Text style={[styles.th, { flex: 1.5 }]}>Registered On</Text>
-                <Text style={[styles.th, { flex: 1.4, textAlign: 'right' }]}>Action</Text>
+            <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>ID</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Name</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 2.4 }]}>Email</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Mobile</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Registered On</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>Action</Text>
             </View>
 
             {data.map((c, idx) => (
@@ -439,12 +452,14 @@ function SendModal({
             <View style={styles.modalBackdrop}>
                 <View style={[styles.modalCard, isCompact && styles.modalCardCompact]}>
                     <View style={styles.modalHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ic icon={icon} size={16} color="#fff" />
-                            <Text style={styles.modalTitle}>{title}</Text>
+                        <View style={styles.modalHeaderTitleRow}>
+                            <View style={styles.modalIconBadge}>
+                                <Ic icon={Send} size={14} color={COLORS.orange} />
+                            </View>
+                            <Text style={styles.modalHeaderTitle}>{title}</Text>
                         </View>
-                        <Pressable onPress={onCancel} hitSlop={10}>
-                            <Ic icon={XLg} size={16} color="#fff" />
+                        <Pressable onPress={onCancel} hitSlop={8}>
+                            <Ic icon={XLg} size={20} color={COLORS.textMuted} />
                         </Pressable>
                     </View>
 
@@ -505,6 +520,90 @@ const styles = StyleSheet.create({
     breadcrumbSep: { color: COLORS.muted, fontSize: 12 },
     breadcrumbTextActive: { color: COLORS.muted, fontSize: 12 },
 
+    // Hero header (from seller-emails.tsx)
+    hero: { backgroundColor: COLORS.navy, borderRadius: 20, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 0, overflow: "visible", zIndex: 1 },
+    heroMobile: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 0 },
+    heroTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+    heroIconBadge: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.orange, alignItems: "center", justifyContent: "center" },
+    heroTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    heroSubtitle: { color: "#94A3B8", fontSize: 12, marginTop: 2, fontWeight: "400" },
+    headerCardSpacer: { height: 38 },
+    headerCardSpacerMobile: { height: 40 },
+    addHeaderBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: COLORS.orange,
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        shadowColor: COLORS.orange,
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
+    },
+    addHeaderBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+
+    // Search strip (from seller-emails.tsx)
+    searchStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 16,
+        paddingHorizontal: 4,
+        gap: 14,
+        zIndex: 10,
+    },
+    searchStripMobile: {
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: 10,
+        marginTop: 16,
+    },
+    searchInputWrap: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: "#F1F5F9",
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: Platform.OS === 'web' ? 12 : 10,
+        shadowColor: "#0F172A",
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 3,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        color: COLORS.text,
+    },
+    totalBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: "#F1F5F9",
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        shadowColor: "#0F172A",
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 3,
+    },
+    totalBadgeText: {
+        color: COLORS.navy,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+
     primaryBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 11,
@@ -520,7 +619,6 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.surface,
         borderRadius: 10, paddingHorizontal: 14, height: 44,
     },
-    searchInput: { flex: 1, fontSize: 13, color: COLORS.navy, ...(Platform.OS === 'web' && { outlineStyle: 'none' as any }) },
     totalChip: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: COLORS.chipBg, borderRadius: 10, paddingHorizontal: 14, height: 44,
@@ -537,7 +635,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14,
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
-    tableHeaderRow: { backgroundColor: '#F5ECDE', borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    tableHeaderRow: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.navy,
+        paddingVertical: 12,
+        paddingHorizontal: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: "#E5E7EB",
+    },
+    tableHeaderCell: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: "#fff",
+    },
     tableRowAlt: { backgroundColor: '#FCFBF8' },
     th: { fontSize: 11, fontWeight: '700', color: '#1C2439', textTransform: 'uppercase', letterSpacing: 0.4 },
     td: { fontSize: 13, color: COLORS.navySoft },
@@ -595,8 +705,32 @@ const styles = StyleSheet.create({
     },
     modalCardCompact: { maxWidth: '100%' },
     modalHeader: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: COLORS.primary, paddingHorizontal: 18, paddingVertical: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        backgroundColor: '#F97316',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    modalHeaderTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    modalIconBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: COLORS.orangeBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalHeaderTitle: {
+        color: COLORS.navy,
+        fontSize: 16,
+        fontWeight: '700',
     },
     modalTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 },
     modalBody: { paddingHorizontal: 18, paddingTop: 16 },
