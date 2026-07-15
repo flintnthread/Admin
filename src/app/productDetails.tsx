@@ -28,8 +28,45 @@ import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
+import {
+  isSweetsCategory,
+  isSweetsPlaceholderColor,
+  variantDimensionLabels,
+} from '@/lib/product/sweetsCategory';
 
 const PLACEHOLDER_IMAGE = '';
+
+/** Approve-modal templates — selecting one auto-fills Admin Notes. */
+const APPROVE_NOTE_TEMPLATES: { id: string; label: string; note: string }[] = [
+  {
+    id: '1',
+    label: '1. Approved – Clean & Simple',
+    note: 'Product reviewed and approved. All details and images meet the required quality standards.',
+  },
+  {
+    id: '2',
+    label: '2. Approved with Minor Changes',
+    note:
+      'Product approved. Minor adjustments suggested for future listings (image clarity, description format, pricing alignment).',
+  },
+  {
+    id: '9',
+    label: '9. Verified Stock & Pricing',
+    note: 'Product verified. Stock quantity and pricing validated. Approved for listing.',
+  },
+  {
+    id: '5',
+    label: '5. Needs Revision',
+    note:
+      'Product review pending revisions. Update the product specifications and correct formatting issues to proceed with approval.',
+  },
+  {
+    id: '10',
+    label: '10. Flagged for Further Review',
+    note:
+      'Product held for additional verification. Team will contact for supporting documents if required.',
+  },
+];
 
 type ApiImage = { url?: string; variantId?: number };
 type ApiSizeChartRow = { size?: string; chest?: string; waist?: string; hip?: string; length?: string };
@@ -463,13 +500,16 @@ function InfoRow({ label, value, valueColor }: { label: string; value: string; v
 function VariantsTab({
   isWide,
   variants,
+  sweetsProduct,
 }: {
   isWide: boolean;
   variants: ProductVariant[];
+  sweetsProduct: boolean;
 }) {
   const stats = getVariantStats(variants);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const commissionLabel = variants[0]?.commissionPercent ?? 0;
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
   return (
     <View style={styles.tabContent}>
@@ -530,7 +570,7 @@ function VariantsTab({
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.variantTable}>
               <View style={styles.variantTableHeader}>
-                <Text style={[styles.vth, styles.vcolSize]}>Size</Text>
+                <Text style={[styles.vth, styles.vcolSize]}>{dimLabels.sizeLabel}</Text>
                 <Text style={[styles.vth, styles.vcolSku]}>SKU</Text>
                 <Text style={[styles.vth, styles.vcolStock]}>Stock</Text>
                 <Text style={[styles.vth, styles.vcolMinQty]}>Min{'\n'}Qty</Text>
@@ -558,7 +598,7 @@ function VariantsTab({
       ) : (
         <View style={styles.variantGrid}>
           {variants.map((v) => (
-            <VariantCard key={v.id} variant={v} compact={false} />
+            <VariantCard key={v.id} variant={v} compact={false} sweetsProduct={sweetsProduct} />
           ))}
         </View>
       )}
@@ -628,18 +668,31 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
   );
 }
 
-function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact?: boolean }) {
+function VariantCard({
+  variant: v,
+  compact,
+  sweetsProduct,
+}: {
+  variant: ProductVariant;
+  compact?: boolean;
+  sweetsProduct?: boolean;
+}) {
+  const dimLabels = variantDimensionLabels(!!sweetsProduct);
   return (
     <View style={[styles.variantCard, compact && styles.variantCardCompact]}>
       <View style={styles.variantCardTop}>
         <Image source={{ uri: v.image }} style={styles.variantCardImg} contentFit="cover" />
         <View style={styles.variantCardInfo}>
-          <View style={styles.vcellColor}>
-            <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
-            <Text style={styles.vColorName}>{v.colorName}</Text>
-          </View>
+          {dimLabels.showColor && !isSweetsPlaceholderColor(v.colorName) ? (
+            <View style={styles.vcellColor}>
+              <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
+              <Text style={styles.vColorName}>{v.colorName}</Text>
+            </View>
+          ) : null}
           <View style={styles.vSizePill}>
-            <Text style={styles.vSizeText}>Size {v.size}</Text>
+            <Text style={styles.vSizeText}>
+              {dimLabels.sizeLabel} {v.size}
+            </Text>
           </View>
           <Text style={styles.vSkuText}>{v.sku}</Text>
         </View>
@@ -983,6 +1036,9 @@ export default function ProductDetailsScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveTemplateId, setApproveTemplateId] = useState('');
+  const [approveNote, setApproveNote] = useState('');
   const handleBack = () => {
     if (product?.status === 'pending' || product?.status === 'review') {
       router.push('/productApproval');
@@ -1024,33 +1080,38 @@ export default function ProductDetailsScreen() {
   const canReview =
     product?.status === 'pending' || product?.status === 'review' || product?.dbStatus === 'pending';
 
+  const openApproveModal = () => {
+    setApproveTemplateId('');
+    setApproveNote('');
+    setShowApproveModal(true);
+  };
+
+  const handleApproveTemplateChange = (templateId: string) => {
+    setApproveTemplateId(templateId);
+    const matched = APPROVE_NOTE_TEMPLATES.find((t) => t.id === templateId);
+    setApproveNote(matched?.note ?? '');
+  };
+
   const handleApprove = async () => {
     const productId = Number(id);
     if (Number.isNaN(productId)) return;
 
-    const run = async () => {
-      setActionLoading(true);
-      try {
-        await approveProduct(productId);
-        if (Platform.OS === 'web') window.alert('Product approved.');
-        else Alert.alert('Success', 'Product approved.');
-        handleBack();
-      } catch (err) {
-        const msg = getApiErrorMessage(err, 'Failed to approve product.');
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Error', msg);
-      } finally {
-        setActionLoading(false);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Approve this product?')) void run();
-    } else {
-      Alert.alert('Approve product', 'Approve this product for listing?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Approve', onPress: () => void run() },
-      ]);
+    setActionLoading(true);
+    try {
+      const note = approveNote.trim();
+      await approveProduct(productId, note || undefined);
+      setShowApproveModal(false);
+      setApproveTemplateId('');
+      setApproveNote('');
+      if (Platform.OS === 'web') window.alert('Product approved.');
+      else Alert.alert('Success', 'Product approved.');
+      handleBack();
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to approve product.');
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1105,10 +1166,121 @@ export default function ProductDetailsScreen() {
   const contentMax = isWide ? Math.min(width, 1200) : width;
   const firstVariant = variants[0];
   const commissionLabel = firstVariant?.commissionPercent ?? 0;
+  const sweetsProduct =
+    isSweetsCategory(product.categoryLabel, product.subcategory, product.category) ||
+    isSweetsPlaceholderColor(product.color);
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
   return (
     <AdminLayout>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <Modal visible={showApproveModal} transparent animationType="fade">
+          <View style={styles.rejectModalBackdrop}>
+            <View style={[styles.rejectModalCard, styles.approveModalCard]}>
+              <View style={styles.approveModalHeader}>
+                <Text style={styles.rejectModalTitle}>Approve Product</Text>
+                <Pressable
+                  onPress={() => {
+                    if (actionLoading) return;
+                    setShowApproveModal(false);
+                  }}
+                  hitSlop={8}
+                >
+                  <MaterialCommunityIcons name="close" size={22} color={PALETTE.textSecondary} />
+                </Pressable>
+              </View>
+
+              <Text style={styles.approveModalLabel}>Select Template (Optional)</Text>
+              {Platform.OS === 'web' ? (
+                <View style={styles.approveSelectWrap}>
+                  {/* @ts-expect-error web-only select */}
+                  <select
+                    value={approveTemplateId}
+                    onChange={(e: { target: { value: string } }) =>
+                      handleApproveTemplateChange(e.target.value)
+                    }
+                    style={{
+                      width: '100%',
+                      height: 42,
+                      border: '1px solid #E5E7EB',
+                      borderRadius: 8,
+                      background: '#FFFFFF',
+                      fontSize: 14,
+                      color: '#111827',
+                      outline: 'none',
+                      paddingLeft: 12,
+                      paddingRight: 12,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="">-- Select a template --</option>
+                    {APPROVE_NOTE_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </View>
+              ) : (
+                <View style={styles.approveTemplateList}>
+                  {APPROVE_NOTE_TEMPLATES.map((t) => {
+                    const active = approveTemplateId === t.id;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        style={[styles.approveTemplateOption, active && styles.approveTemplateOptionActive]}
+                        onPress={() => handleApproveTemplateChange(t.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.approveTemplateOptionText,
+                            active && styles.approveTemplateOptionTextActive,
+                          ]}
+                        >
+                          {t.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              <Text style={styles.approveModalHint}>
+                Select a template to auto-fill notes, or write custom notes below
+              </Text>
+
+              <Text style={styles.approveModalLabel}>Admin Notes (Optional)</Text>
+              <TextInput
+                style={styles.rejectModalInput}
+                placeholder="Admin notes for this approval"
+                placeholderTextColor={PALETTE.textMuted}
+                value={approveNote}
+                onChangeText={setApproveNote}
+                multiline
+              />
+
+              <View style={styles.approveModalActions}>
+                <Pressable
+                  style={styles.rejectActionBtn}
+                  disabled={actionLoading}
+                  onPress={() => setShowApproveModal(false)}
+                >
+                  <Text style={styles.rejectActionText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => void handleApprove()}
+                >
+                  <Text style={styles.approveActionText}>
+                    {actionLoading ? 'Approving…' : 'Approve Product'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         <Modal visible={showRejectModal} transparent animationType="fade">
           <View style={styles.rejectModalBackdrop}>
             <View style={styles.rejectModalCard}>
@@ -1166,7 +1338,7 @@ export default function ProductDetailsScreen() {
                 <Pressable
                   style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
                   disabled={actionLoading}
-                  onPress={() => void handleApprove()}
+                  onPress={openApproveModal}
                 >
                   <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
                   <Text style={styles.approveActionText}>Approve</Text>
@@ -1188,7 +1360,7 @@ export default function ProductDetailsScreen() {
                 <Pressable
                   style={[styles.approveActionBtn, styles.mobileActionBtnFlex, actionLoading && { opacity: 0.6 }]}
                   disabled={actionLoading}
-                  onPress={() => void handleApprove()}
+                  onPress={openApproveModal}
                 >
                   <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
                   <Text style={styles.approveActionText}>Approve</Text>
@@ -1305,7 +1477,9 @@ export default function ProductDetailsScreen() {
 
                   <View style={styles.footerTags}>
                     <View style={styles.footerTag}>
-                      <Text style={styles.footerTagText}>Size: {product.size}</Text>
+                      <Text style={styles.footerTagText}>
+                        {dimLabels.sizeLabel}: {product.size}
+                      </Text>
                     </View>
                     <View style={styles.footerTag}>
                       <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
@@ -1389,8 +1563,10 @@ export default function ProductDetailsScreen() {
                     <InfoRow label="Seller" value={product.seller} />
                     {product.email ? <InfoRow label="Seller Email" value={product.email} /> : null}
                     {sellerPhone ? <InfoRow label="Seller Phone" value={sellerPhone} /> : null}
-                    <InfoRow label="Color" value={product.color} />
-                    <InfoRow label="Size" value={product.size} />
+                    {dimLabels.showColor && !isSweetsPlaceholderColor(product.color) ? (
+                      <InfoRow label={dimLabels.colorLabel} value={product.color} />
+                    ) : null}
+                    <InfoRow label={dimLabels.sizeLabel} value={product.size} />
                     <InfoRow label="HSN Code" value={product.hsnCode} />
                     <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
                     <InfoRow label="Material" value={product.material} />
@@ -1417,7 +1593,7 @@ export default function ProductDetailsScreen() {
             )}
 
             {activeTab === 'variants' && (
-              <VariantsTab isWide={isWide} variants={variants} />
+              <VariantsTab isWide={isWide} variants={variants} sweetsProduct={sweetsProduct} />
             )}
 
             {activeTab === 'specifications' && extras && (
@@ -1553,6 +1729,59 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     fontSize: 14,
     color: PALETTE.textPrimary,
+  },
+  approveModalCard: {
+    maxWidth: 520,
+    gap: 10,
+  },
+  approveModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  approveModalLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.textPrimary,
+    marginTop: 4,
+  },
+  approveModalHint: {
+    fontSize: 12,
+    color: PALETTE.textMuted,
+    marginTop: -2,
+  },
+  approveSelectWrap: {
+    width: '100%',
+  },
+  approveTemplateList: {
+    gap: 6,
+  },
+  approveTemplateOption: {
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FAFAFA',
+  },
+  approveTemplateOptionActive: {
+    borderColor: PALETTE.orange,
+    backgroundColor: '#FFF7ED',
+  },
+  approveTemplateOptionText: {
+    fontSize: 13,
+    color: PALETTE.textPrimary,
+  },
+  approveTemplateOptionTextActive: {
+    fontWeight: '700',
+    color: PALETTE.orange,
+  },
+  approveModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 8,
   },
 
   heroCard: {

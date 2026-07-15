@@ -38,6 +38,9 @@ export default function SettingsScreen() {
   const [twilioAccountSid, setTwilioAccountSid] = useState("");
   const [twilioAuthToken, setTwilioAuthToken] = useState("");
   const [twilioPhoneNumber, setTwilioPhoneNumber] = useState("");
+  const [shiprocketEmail, setShiprocketEmail] = useState("");
+  const [shiprocketPassword, setShiprocketPassword] = useState("");
+  const [shiprocketPickupLocation, setShiprocketPickupLocation] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +53,8 @@ export default function SettingsScreen() {
           setCurrent(data);
           setTwilioAccountSid(data.twilioAccountSid ?? "");
           setTwilioPhoneNumber(data.twilioPhoneNumber ?? "");
+          setShiprocketEmail(data.shiprocketEmail ?? "");
+          setShiprocketPickupLocation(data.shiprocketPickupLocation ?? "");
         }
       } catch (e) {
         if (!cancelled) setError(getApiErrorMessage(e));
@@ -71,18 +76,28 @@ export default function SettingsScreen() {
         twilioAccountSid?: string;
         twilioAuthToken?: string;
         twilioPhoneNumber?: string;
+        shiprocketEmail?: string;
+        shiprocketPassword?: string;
+        shiprocketPickupLocation?: string;
       } = {};
 
       if (sendgridApiKey.trim()) payload.sendgridApiKey = sendgridApiKey.trim();
       if (twilioAccountSid.trim()) payload.twilioAccountSid = twilioAccountSid.trim();
       if (twilioAuthToken.trim()) payload.twilioAuthToken = twilioAuthToken.trim();
       if (twilioPhoneNumber.trim()) payload.twilioPhoneNumber = twilioPhoneNumber.trim();
+      if (shiprocketEmail.trim()) payload.shiprocketEmail = shiprocketEmail.trim();
+      if (shiprocketPassword.trim()) payload.shiprocketPassword = shiprocketPassword.trim();
+      if (shiprocketPickupLocation.trim()) {
+        payload.shiprocketPickupLocation = shiprocketPickupLocation.trim();
+      }
 
       const updated = await updateIntegrationSettings(payload);
       setCurrent(updated);
       setSendgridApiKey("");
       setTwilioAuthToken("");
-      const msg = "Integration settings saved. User, seller, and admin mail/SMS will use these credentials.";
+      setShiprocketPassword("");
+      const msg =
+        "Integration settings saved. Email, SMS, and Shiprocket shipping will use these credentials — no restart needed.";
       if (isWeb) window.alert(msg);
       else Alert.alert("Success", msg);
     } catch (e) {
@@ -109,7 +124,7 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Platform Settings</Text>
             <Text style={styles.subtitle}>
-              Save once here — the same SendGrid and Twilio credentials are used for customer, seller, and admin emails and mobile OTP SMS.
+              Save once here — SendGrid, Twilio, and Shiprocket credentials are shared across customer, seller, and admin services.
             </Text>
           </View>
         </View>
@@ -185,6 +200,51 @@ export default function SettingsScreen() {
               />
             </View>
 
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Shiprocket (Shipping)</Text>
+              <Text style={styles.cardHint}>
+                Login email, password, and default pickup nickname for order shipments. Password can include special characters (#, !) safely — stored in the database, not properties files.
+                {current?.shiprocketPasswordConfigured
+                  ? ` Password: ${current.shiprocketPasswordMasked}`
+                  : " Password not configured yet."}
+              </Text>
+
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                value={shiprocketEmail}
+                onChangeText={setShiprocketEmail}
+                placeholder="flintandthread@gmail.com"
+                placeholderTextColor={TEXT_MUTED}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+              />
+
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                value={shiprocketPassword}
+                onChangeText={setShiprocketPassword}
+                placeholder="Enter new password to update"
+                placeholderTextColor={TEXT_MUTED}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Text style={styles.label}>Default Pickup Location</Text>
+              <TextInput
+                style={styles.input}
+                value={shiprocketPickupLocation}
+                onChangeText={setShiprocketPickupLocation}
+                placeholder="ASVI HOME FOODS"
+                placeholderTextColor={TEXT_MUTED}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+
             <TouchableOpacity
               style={[styles.saveBtn, (loading || saving) && { opacity: 0.6 }]}
               onPress={() => void handleSave()}
@@ -196,7 +256,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
 
             <Text style={styles.note}>
-              Leave password/token fields empty to keep the current value. Changes apply immediately to customer and seller OTP SMS and emails — no service restart.
+              Leave password/token fields empty to keep the current value. Changes apply immediately — no service restart.
             </Text>
           </>
         )}
