@@ -907,7 +907,7 @@ const AdsAdminUsers: React.FC = () => {
                                     <PeopleFill width={isPhone ? 16 : 20} height={isPhone ? 16 : 20} fill="#fff" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.heroTitle} numberOfLines={1}>Ads Admin Users</Text>
+                                    <Text style={[styles.heroTitle, isPhone && styles.heroTitleMobile]} numberOfLines={1}>Ads Admin Users</Text>
                                     <Text style={styles.heroSubtitle} numberOfLines={2}>Manage users and roles</Text>
                                 </View>
                             </View>
@@ -919,7 +919,7 @@ const AdsAdminUsers: React.FC = () => {
                                 accessibilityLabel="Add New User"
                             >
                                 <PlusLg width={14} height={14} fill="#fff" />
-                                <Text style={styles.addBtnText}>{isPhone ? 'Add' : 'Add New User'}</Text>
+                                {!isPhone && <Text style={styles.addBtnText}>Add New User</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1149,6 +1149,7 @@ const styles = StyleSheet.create({
     },
     heroIconBadge: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.orange, alignItems: "center", justifyContent: "center" },
     heroTitle: { color: "#fff", fontSize: 24, fontWeight: "800" },
+    heroTitleMobile: { fontSize: 18 },
     heroSubtitle: { color: "#94A3B8", fontSize: 12, marginTop: 2, fontWeight: "400" },
 
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
