@@ -11,7 +11,7 @@ import type {
   SupportTicketSummary,
 } from "@/lib/api/types";
 import type { PendingProfileSeller } from "@/services/sellerApi";
-import { resolveMediaUrl, resolveAdminMediaUrl, buildMediaUrlCandidates, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from "@/lib/api/media";
+import { resolveMediaUrl, resolveAdminMediaUrl, buildMediaUrlCandidates, resolveSellerDocumentImageUrl, resolveSellerProfileImage, resolveProductImageUrl } from "@/lib/api/media";
 import {
   mapBusinessProofDocuments,
   mapLiveSelfieDocuments,
@@ -440,7 +440,8 @@ export function mapProductListToApprovalRow(
     .filter(Boolean)
     .join(" › ") || p.categoryName || "—";
   const imagePath = String(p.imageUrl ?? raw.imagePath ?? raw.image_path ?? "");
-  const imageCandidates = buildMediaUrlCandidates(imagePath, imagePath);
+  // Exact Cloudinary / absolute URL from API — no fallback candidate rewriting.
+  const image = resolveProductImageUrl(imagePath);
   const sku = String(p.sku ?? raw.variantSku ?? "").trim();
 
   return {
@@ -451,8 +452,8 @@ export function mapProductListToApprovalRow(
     sellerEmail: p.sellerEmail ?? "",
     status: mapProductStatus(p.status ?? (p as { displayStatus?: string }).displayStatus),
     submittedAt: formatDate(p.createdAt),
-    image: imageCandidates[0] ?? resolveMediaUrl(imagePath) ?? resolveAdminMediaUrl(imagePath),
-    imageCandidates,
+    image,
+    imageCandidates: image ? [image] : [],
     category: categoryLabel,
     price: p.price != null ? formatRupee(p.price) : "—",
   };

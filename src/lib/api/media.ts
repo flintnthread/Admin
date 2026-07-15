@@ -277,6 +277,36 @@ export function getPublicMediaBaseUrl(): string {
 
 
 
+/**
+ * Product approval / catalog images — local disk under /uploads/products.
+ * Prefer admin-backend (/uploads/products) so shared seller folder is served without CDN.
+ */
+export function resolveProductImageUrl(path?: string | null): string {
+  if (!path?.trim()) return "";
+  const value = path.trim();
+
+  if (/^(data:|blob:)/i.test(value)) {
+    return value;
+  }
+
+  let pathname = "";
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      pathname = new URL(value).pathname || "";
+    } catch {
+      return value;
+    }
+  } else {
+    pathname = normalizeMediaPath(value);
+  }
+
+  if (pathname.includes("/uploads/products/")) {
+    return `${resolveAdminApiBaseUrl()}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+  }
+
+  return resolveMediaUrl(value);
+}
+
 /** Placeholder when a seller document / live selfie image is missing or fails to load. */
 
 export function getSellerDocumentPlaceholderUrl(): string {
