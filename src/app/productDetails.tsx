@@ -28,6 +28,11 @@ import { getApiErrorMessage } from '@/lib/api/client';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
+import {
+  isSweetsCategory,
+  isSweetsPlaceholderColor,
+  variantDimensionLabels,
+} from '@/lib/product/sweetsCategory';
 
 const PLACEHOLDER_IMAGE = '';
 
@@ -463,13 +468,16 @@ function InfoRow({ label, value, valueColor }: { label: string; value: string; v
 function VariantsTab({
   isWide,
   variants,
+  sweetsProduct,
 }: {
   isWide: boolean;
   variants: ProductVariant[];
+  sweetsProduct: boolean;
 }) {
   const stats = getVariantStats(variants);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const commissionLabel = variants[0]?.commissionPercent ?? 0;
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
   return (
     <View style={styles.tabContent}>
@@ -530,7 +538,7 @@ function VariantsTab({
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.variantTable}>
               <View style={styles.variantTableHeader}>
-                <Text style={[styles.vth, styles.vcolSize]}>Size</Text>
+                <Text style={[styles.vth, styles.vcolSize]}>{dimLabels.sizeLabel}</Text>
                 <Text style={[styles.vth, styles.vcolSku]}>SKU</Text>
                 <Text style={[styles.vth, styles.vcolStock]}>Stock</Text>
                 <Text style={[styles.vth, styles.vcolMinQty]}>Min{'\n'}Qty</Text>
@@ -558,7 +566,7 @@ function VariantsTab({
       ) : (
         <View style={styles.variantGrid}>
           {variants.map((v) => (
-            <VariantCard key={v.id} variant={v} compact={false} />
+            <VariantCard key={v.id} variant={v} compact={false} sweetsProduct={sweetsProduct} />
           ))}
         </View>
       )}
@@ -628,18 +636,31 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
   );
 }
 
-function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact?: boolean }) {
+function VariantCard({
+  variant: v,
+  compact,
+  sweetsProduct,
+}: {
+  variant: ProductVariant;
+  compact?: boolean;
+  sweetsProduct?: boolean;
+}) {
+  const dimLabels = variantDimensionLabels(!!sweetsProduct);
   return (
     <View style={[styles.variantCard, compact && styles.variantCardCompact]}>
       <View style={styles.variantCardTop}>
         <Image source={{ uri: v.image }} style={styles.variantCardImg} contentFit="cover" />
         <View style={styles.variantCardInfo}>
-          <View style={styles.vcellColor}>
-            <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
-            <Text style={styles.vColorName}>{v.colorName}</Text>
-          </View>
+          {dimLabels.showColor && !isSweetsPlaceholderColor(v.colorName) ? (
+            <View style={styles.vcellColor}>
+              <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
+              <Text style={styles.vColorName}>{v.colorName}</Text>
+            </View>
+          ) : null}
           <View style={styles.vSizePill}>
-            <Text style={styles.vSizeText}>Size {v.size}</Text>
+            <Text style={styles.vSizeText}>
+              {dimLabels.sizeLabel} {v.size}
+            </Text>
           </View>
           <Text style={styles.vSkuText}>{v.sku}</Text>
         </View>
@@ -1105,6 +1126,10 @@ export default function ProductDetailsScreen() {
   const contentMax = isWide ? Math.min(width, 1200) : width;
   const firstVariant = variants[0];
   const commissionLabel = firstVariant?.commissionPercent ?? 0;
+  const sweetsProduct =
+    isSweetsCategory(product.categoryLabel, product.subcategory, product.category) ||
+    isSweetsPlaceholderColor(product.color);
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
   return (
     <AdminLayout>
@@ -1305,7 +1330,9 @@ export default function ProductDetailsScreen() {
 
                   <View style={styles.footerTags}>
                     <View style={styles.footerTag}>
-                      <Text style={styles.footerTagText}>Size: {product.size}</Text>
+                      <Text style={styles.footerTagText}>
+                        {dimLabels.sizeLabel}: {product.size}
+                      </Text>
                     </View>
                     <View style={styles.footerTag}>
                       <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
@@ -1389,8 +1416,10 @@ export default function ProductDetailsScreen() {
                     <InfoRow label="Seller" value={product.seller} />
                     {product.email ? <InfoRow label="Seller Email" value={product.email} /> : null}
                     {sellerPhone ? <InfoRow label="Seller Phone" value={sellerPhone} /> : null}
-                    <InfoRow label="Color" value={product.color} />
-                    <InfoRow label="Size" value={product.size} />
+                    {dimLabels.showColor && !isSweetsPlaceholderColor(product.color) ? (
+                      <InfoRow label={dimLabels.colorLabel} value={product.color} />
+                    ) : null}
+                    <InfoRow label={dimLabels.sizeLabel} value={product.size} />
                     <InfoRow label="HSN Code" value={product.hsnCode} />
                     <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
                     <InfoRow label="Material" value={product.material} />
@@ -1417,7 +1446,7 @@ export default function ProductDetailsScreen() {
             )}
 
             {activeTab === 'variants' && (
-              <VariantsTab isWide={isWide} variants={variants} />
+              <VariantsTab isWide={isWide} variants={variants} sweetsProduct={sweetsProduct} />
             )}
 
             {activeTab === 'specifications' && extras && (

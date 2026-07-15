@@ -19,6 +19,11 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import { buildUpdateProductPayload } from "@/lib/product/buildCreateProductPayload";
 import { getHsnForMaterial, MATERIAL_TYPES } from "@/lib/product/materialHsn";
 import {
+  isSweetsCategory,
+  variantDimensionLabels,
+  SWEETS_DEFAULT_COLOR,
+} from "@/lib/product/sweetsCategory";
+import {
   buildCategoryPathOptions,
   buildLeafSubcategoryOptions,
   formatCategoryPath,
@@ -773,6 +778,13 @@ const StepVariants = ({
   openPicker: (title: string, options: string[], current: string, onSelect: (v: string) => void) => void;
   actionBar?: React.ReactNode;
 }) => {
+  const sweetsProduct = isSweetsCategory(
+    state.basic.category,
+    state.basic.categorySubName,
+    state.basic.subcategory
+  );
+  const dimLabels = variantDimensionLabels(sweetsProduct);
+
   const updateVariant = (id: string, field: Partial<Variant>) => {
     setState(s => ({
       ...s,
@@ -792,7 +804,23 @@ const StepVariants = ({
 
   const addVariant = () => {
     const id = `v${Date.now()}`;
-    setState(s => ({ ...s, isDirty: true, variants: [...s.variants, { id, color: '', size: '', sku: '', stock: '', mrp: '', sellingPrice: '', discount: '0' }] }));
+    setState(s => ({
+      ...s,
+      isDirty: true,
+      variants: [
+        ...s.variants,
+        {
+          id,
+          color: sweetsProduct ? SWEETS_DEFAULT_COLOR : "",
+          size: "",
+          sku: "",
+          stock: "",
+          mrp: "",
+          sellingPrice: "",
+          discount: "0",
+        },
+      ],
+    }));
   };
 
   const removeVariant = (id: string) => {
@@ -821,14 +849,27 @@ const StepVariants = ({
           </View>
           <Divider />
           <View style={styles.row2}>
+            {dimLabels.showColor ? (
+              <View style={{ flex: 1 }}>
+                <FieldLabel text={dimLabels.colorLabel} required />
+                <DropButton value={v.color} placeholder="Select color" onPress={() => openPicker('Select Color', COLORS_LIST, v.color, val => updateVariant(v.id, { color: val }))} />
+              </View>
+            ) : null}
+            {dimLabels.showColor ? <View style={{ width: 10 }} /> : null}
             <View style={{ flex: 1 }}>
-              <FieldLabel text="Color" required />
-              <DropButton value={v.color} placeholder="Select color" onPress={() => openPicker('Select Color', COLORS_LIST, v.color, val => updateVariant(v.id, { color: val }))} />
-            </View>
-            <View style={{ width: 10 }} />
-            <View style={{ flex: 1 }}>
-              <FieldLabel text="Size" required />
-              <DropButton value={v.size} placeholder="Select size" onPress={() => openPicker('Select Size', SIZES_LIST, v.size, val => updateVariant(v.id, { size: val }))} />
+              <FieldLabel text={dimLabels.sizeLabel} required />
+              <DropButton
+                value={v.size}
+                placeholder={dimLabels.sizePlaceholder}
+                onPress={() =>
+                  openPicker(dimLabels.sizeSelectTitle, SIZES_LIST, v.size, (val) =>
+                    updateVariant(v.id, {
+                      size: val,
+                      ...(sweetsProduct ? { color: SWEETS_DEFAULT_COLOR } : {}),
+                    })
+                  )
+                }
+              />
             </View>
           </View>
 

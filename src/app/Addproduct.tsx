@@ -25,6 +25,11 @@ import {
     type AdminProductFormCatalog,
 } from "@/lib/product/catalogHelpers";
 import { createProduct, fetchDeliveryChargesForWeight, fetchProductCatalog } from "@/services/productApi";
+import {
+    isSweetsCategory,
+    variantDimensionLabels,
+    SWEETS_DEFAULT_COLOR,
+} from "@/lib/product/sweetsCategory";
 
 const AppText = Text;
 
@@ -954,12 +959,14 @@ const validateBasicInfo = (data: any): string[] => {
     return e;
 };
 
-const validateVariants = (variants: any[]): string[] => {
+const validateVariants = (variants: any[], opts?: { sweets?: boolean }): string[] => {
     const e: string[] = [];
+    const sweets = opts?.sweets === true;
+    const sizeWord = sweets ? "Weight" : "Size";
     variants.forEach((v, i) => {
         const n = i + 1;
-        if (!v.color) e.push(`Variant #${n}: Color is required`);
-        if (!v.size) e.push(`Variant #${n}: Size is required`);
+        if (!sweets && !v.color) e.push(`Variant #${n}: Color is required`);
+        if (!v.size) e.push(`Variant #${n}: ${sizeWord} is required`);
         if (!v.stock?.trim()) e.push(`Variant #${n}: Stock Qty is required`);
         if (!v.mrp?.trim()) e.push(`Variant #${n}: MRP is required`);
         if (!v.sellingPrice?.trim()) e.push(`Variant #${n}: Selling Price is required`);
@@ -1985,7 +1992,9 @@ type Variant = {
     images: string[]; videoUrl: string;
 };
 
-const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar }: any) => {
+const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar, categoryName = "", categorySubName = "", subcategoryName = "" }: any) => {
+    const sweetsProduct = isSweetsCategory(categoryName, categorySubName, subcategoryName);
+    const dimLabels = variantDimensionLabels(sweetsProduct);
     const [clrPick, setClrPick] = useState<string | null>(null);
     const [szPick, setSzPick] = useState<string | null>(null);
 
@@ -1997,7 +2006,21 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
 
     const addVariant = () => {
         const id = Date.now().toString();
-        setVariants((p: Variant[]) => [...p, { id, color: "", size: "", sku: "", stock: "", mrp: "", sellingPrice: "", discount: "0", images: [], videoUrl: "" }]);
+        setVariants((p: Variant[]) => [
+            ...p,
+            {
+                id,
+                color: sweetsProduct ? SWEETS_DEFAULT_COLOR : "",
+                size: "",
+                sku: "",
+                stock: "",
+                mrp: "",
+                sellingPrice: "",
+                discount: "0",
+                images: [],
+                videoUrl: "",
+            },
+        ]);
     };
 
     const addVariantImage = (id: string, uris: string[]) => {
@@ -2046,20 +2069,23 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                     </View>
                     <Divider />
                     <View style={[at.row2, Platform.OS === 'web' && { zIndex: 20 }]}>
+                        {dimLabels.showColor ? (
+                            <View style={{ flex: 1 }}>
+                                <Lbl text={dimLabels.colorLabel} required />
+                                <Drop placeholder="Select color" value={v.color} onPress={() => setClrPick(v.id)} hasError={hasErr(v.id, "color")} options={colorOptions} onSelect={(val: string) => {
+                                    const color = catalog?.colors?.find((c: { name: string }) => c.name === val);
+                                    upVariant(v.id, "color", val);
+                                    upVariant(v.id, "colorId", color?.id);
+                                }} />
+                            </View>
+                        ) : null}
                         <View style={{ flex: 1 }}>
-                            <Lbl text="Color" required />
-                            <Drop placeholder="Select color" value={v.color} onPress={() => setClrPick(v.id)} hasError={hasErr(v.id, "color")} options={colorOptions} onSelect={(val: string) => {
-                                const color = catalog?.colors?.find((c: { name: string }) => c.name === val);
-                                upVariant(v.id, "color", val);
-                                upVariant(v.id, "colorId", color?.id);
-                            }} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Lbl text="Size" required />
-                            <Drop placeholder="Select size" value={v.size} onPress={() => setSzPick(v.id)} hasError={hasErr(v.id, "size")} options={sizeOptions} onSelect={(val: string) => {
+                            <Lbl text={dimLabels.sizeLabel} required />
+                            <Drop placeholder={dimLabels.sizePlaceholder} value={v.size} onPress={() => setSzPick(v.id)} hasError={hasErr(v.id, "size") || hasErr(v.id, "weight")} options={sizeOptions} onSelect={(val: string) => {
                                 const size = catalog?.sizes?.find((s: { name: string; code: string }) => s.name === val || `${s.name} (${s.code})` === val || s.code === val);
                                 upVariant(v.id, "size", size?.name ?? val);
                                 upVariant(v.id, "sizeId", size?.id);
+                                if (sweetsProduct) upVariant(v.id, "color", SWEETS_DEFAULT_COLOR);
                             }} />
                         </View>
                     </View>
@@ -2112,7 +2138,7 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                 <AppText style={vt.infoTxt}>Each variant can have its own price, stock, and images. At least one variant is required.</AppText>
             </View>
 
-            <PM visible={!!clrPick} title="Select Color" options={colorOptions} selected={variants.find((v: Variant) => v.id === clrPick)?.color || ""}
+            <PM visible={dimLabels.showColor && !!clrPick} title="Select Color" options={colorOptions} selected={variants.find((v: Variant) => v.id === clrPick)?.color || ""}
                 onSelect={(val: string) => {
                     if (!clrPick) return;
                     const color = catalog?.colors?.find((c: { name: string }) => c.name === val);
@@ -2120,7 +2146,7 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                     upVariant(clrPick, "colorId", color?.id);
                 }}
                 onClose={() => setClrPick(null)} />
-            <PM visible={!!szPick} title="Select Size" options={sizeOptions} selected={variants.find((v: Variant) => v.id === szPick)?.size || ""}
+            <PM visible={!!szPick} title={dimLabels.sizeSelectTitle} options={sizeOptions} selected={variants.find((v: Variant) => v.id === szPick)?.size || ""}
                 onSelect={(val: string) => {
                     if (!szPick) return;
                     const size = catalog?.sizes?.find((s: { name: string; code: string }) => s.name === val || `${s.name} (${s.code})` === val || s.code === val);
@@ -2844,7 +2870,13 @@ const AddNewProduct: React.FC = () => {
             setBasicErrors([]);
         }
         if (step === 1) {
-            const errors = validateVariants(variants);
+            const errors = validateVariants(variants, {
+                sweets: isSweetsCategory(
+                    basicData.category,
+                    basicData.categorySubName,
+                    basicData.subcategory
+                ),
+            });
             setVariantErrors(errors);
             if (errors.length > 0) { showErrors(errors); return; }
             setVariantErrors([]);
@@ -2862,7 +2894,13 @@ const AddNewProduct: React.FC = () => {
 
     const handleSave = () => {
         const basicErrs = validateBasicInfo(basicData);
-        const variantErrs = validateVariants(variants);
+        const variantErrs = validateVariants(variants, {
+            sweets: isSweetsCategory(
+                basicData.category,
+                basicData.categorySubName,
+                basicData.subcategory
+            ),
+        });
         const imageErrs = validateImages(imagesData);
         const detailErrs = validateDetails(detailsData);
         const allErrors = [...basicErrs, ...variantErrs, ...imageErrs, ...detailErrs];
@@ -2950,7 +2988,20 @@ const AddNewProduct: React.FC = () => {
     const stepContent = (
         <>
             {step === 0 && <StepBasicInfo data={basicData} onChange={upBasic} errors={basicErrors} validationTrigger={validationTrigger} catalog={catalog} isDesktop={isDesktop} actionBar={actionBar} />}
-            {step === 1 && <StepVariants variants={variants} setVariants={setVariants} rmVariant={rmVariant} errors={variantErrors} catalog={catalog} isDesktop={isDesktop} actionBar={actionBar} />}
+            {step === 1 && (
+                <StepVariants
+                    variants={variants}
+                    setVariants={setVariants}
+                    rmVariant={rmVariant}
+                    errors={variantErrors}
+                    catalog={catalog}
+                    isDesktop={isDesktop}
+                    actionBar={actionBar}
+                    categoryName={basicData.category}
+                    categorySubName={basicData.categorySubName}
+                    subcategoryName={basicData.subcategory}
+                />
+            )}
             {step === 2 && <StepImages data={imagesData} onChange={(k: string, v: any) => setImagesData((p) => ({ ...p, [k]: v }))} errors={imageErrors} isDesktop={isDesktop} actionBar={actionBar} />}
             {step === 3 && <StepDetails data={detailsData} onChange={upDetails} errors={detailErrors} validationTrigger={validationTrigger} isDesktop={isDesktop} actionBar={actionBar} />}
         </>
