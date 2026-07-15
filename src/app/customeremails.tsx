@@ -14,8 +14,9 @@
  * -----------------------------------------------------------------------
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
+    Animated,
     Modal,
     Platform,
     Pressable,
@@ -125,6 +126,23 @@ export default function CustomerEmailsScreen() {
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
 
+    // ---- Toast -------------------------------------------------------
+    const [toastVisible, setToastVisible] = useState(false);
+    const [toastMsg, setToastMsg] = useState('');
+    const toastSlide = useRef(new Animated.Value(400)).current;
+
+    const showToast = (msg: string) => {
+        setToastMsg(msg);
+        setToastVisible(true);
+        toastSlide.setValue(400);
+        Animated.timing(toastSlide, { toValue: 0, duration: 380, useNativeDriver: true }).start();
+        setTimeout(() => {
+            Animated.timing(toastSlide, { toValue: 400, duration: 320, useNativeDriver: true })
+                .start(() => setToastVisible(false));
+        }, 3000);
+    };
+    // ------------------------------------------------------------------
+
     const maxContentWidth = bp === 'xxl' ? '100%' : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
 
     const filtered = useMemo(() => {
@@ -152,6 +170,7 @@ export default function CustomerEmailsScreen() {
     const handleSend = () => {
         // TODO: connect to API — POST subject/message to selected customer(s)
         closeModals();
+        showToast('✅  Email sent successfully!');
     };
 
     const gutter = clamp(16, width * 0.03, 40);
@@ -161,10 +180,12 @@ export default function CustomerEmailsScreen() {
             <ScrollView contentContainerStyle={{ flexGrow: 1, backgroundColor: COLORS.bg }}>
                 <View style={[styles.pageInner, { paddingHorizontal: gutter, maxWidth: maxContentWidth, alignSelf: 'center', width: '100%' }]}>
                     {/* Header */}
-                    <View style={[styles.headerRow, isCompact && styles.headerRowCompact, { backgroundColor: '#1d324e', padding: 20, borderRadius: 12 }]}>
-                        <View style={{ flex: 1 }}>
+                    <View style={[styles.headerRow, isCompact && styles.headerRowCompact, { backgroundColor: '#151D4F', padding: 20, borderRadius: 12 }]}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={{ backgroundColor: '#F97316', padding: 8, borderRadius: 8 }}>
+                                <Ic icon={EnvelopeFill} size={18} color="#fff" />
+                            </View>
                             <Text style={[styles.pageTitle, { color: '#ffffff' }]}>Customer Emails</Text>
-
                         </View>
 
                         <Pressable
@@ -276,6 +297,17 @@ export default function CustomerEmailsScreen() {
                 sendLabel="Send to All"
                 isCompact={isCompact}
             />
+
+            {/* ---- Sliding Green Toast ---- */}
+            {toastVisible && (
+                <View style={styles.toastContainer} pointerEvents="none">
+                    <Animated.View
+                        style={[styles.toast, { transform: [{ translateX: toastSlide }] }]}
+                    >
+                        <Text style={styles.toastText}>{toastMsg}</Text>
+                    </Animated.View>
+                </View>
+            )}
         </AdminLayout>
     );
 }
@@ -307,7 +339,6 @@ function TableView({ data, onSend }: { data: Customer[]; onSend: (c: Customer) =
                         <Text style={styles.tdStrong} numberOfLines={1}>{c.name}</Text>
                     </View>
                     <View style={{ flex: 2.4, flexDirection: 'row', alignItems: 'center' }}>
-                        <Ic icon={EnvelopeFill} size={13} color={COLORS.muted} />
                         <Text style={styles.td} numberOfLines={1}> {c.email}</Text>
                     </View>
                     <Text style={[styles.td, { flex: 1.3 }]}>{c.mobile}</Text>
@@ -349,7 +380,6 @@ function CardGrid({ data, onSend, columns }: { data: Customer[]; onSend: (c: Cus
                     </View>
 
                     <View style={styles.cardDetailRow}>
-                        <Ic icon={EnvelopeFill} size={13} color={COLORS.primary} />
                         <Text style={styles.cardDetailText} numberOfLines={1}>{c.email}</Text>
                     </View>
                     <View style={styles.cardDetailRow}>
@@ -590,12 +620,44 @@ const styles = StyleSheet.create({
     textArea: { minHeight: 120 },
     helperText: { fontSize: 11, color: COLORS.muted, marginTop: -6, marginBottom: 4 },
     modalFooter: {
-        flexDirection: 'row', justifyContent: 'flex-end', gap: 10,
+        flexDirection: 'row', justifyContent: 'center', gap: 10,
         paddingHorizontal: 18, paddingVertical: 14, borderTopWidth: 1, borderTopColor: COLORS.border,
     },
     ghostBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: COLORS.bg, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 10,
+        backgroundColor: '#1d324e', paddingHorizontal: 16, paddingVertical: 11, borderRadius: 10,
     },
-    ghostBtnText: { color: COLORS.navySoft, fontWeight: '700', fontSize: 13 },
+    ghostBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
+
+    // Toast
+    toastContainer: {
+        position: 'absolute',
+        top: 16,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 9999,
+        pointerEvents: 'none',
+    } as any,
+    toast: {
+        backgroundColor: '#16A34A',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 10,
+        minWidth: 220,
+        maxWidth: 340,
+    } as any,
+    toastText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+        flexShrink: 1,
+    } as any,
 });

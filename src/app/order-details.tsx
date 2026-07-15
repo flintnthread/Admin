@@ -55,7 +55,7 @@ import AdminLayout from "@/components/admin-layout";
 /* -------------------------------------------------------------------- */
 
 const COLORS = {
-    navy: "#1d324e",
+    navy: "#151D4F",
     navyLight: "#2b4568",
     bg: "#f4f6f9",
     card: "#ffffff",

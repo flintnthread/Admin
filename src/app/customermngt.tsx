@@ -42,14 +42,109 @@ import {
 import ArrowLeft from 'react-native-bootstrap-icons/icons/arrow-left';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
-import Grid3x3GapFill from 'react-native-bootstrap-icons/icons/grid-3x3-gap-fill';
 import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
-import ListUl from 'react-native-bootstrap-icons/icons/list-ul';
-import LockFill from 'react-native-bootstrap-icons/icons/lock-fill';
-import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
-import TrashFill from 'react-native-bootstrap-icons/icons/trash-fill';
-import XLg from 'react-native-bootstrap-icons/icons/x-lg';
+import Svg, { Line, Rect } from 'react-native-svg';
+
+const GridIcon = ({ active }: { active: boolean }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Rect
+      x="3"
+      y="3"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+    />
+    <Rect
+      x="14"
+      y="3"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+    />
+    <Rect
+      x="3"
+      y="14"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+    />
+    <Rect
+      x="14"
+      y="14"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+    />
+  </Svg>
+);
+
+const ListIcon = ({ active }: { active: boolean }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Line
+      x1="8"
+      y1="6"
+      x2="21"
+      y2="6"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="8"
+      y1="12"
+      x2="21"
+      y2="12"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="8"
+      y1="18"
+      x2="21"
+      y2="18"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="6"
+      x2="3.01"
+      y2="6"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="12"
+      x2="3.01"
+      y2="12"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="18"
+      x2="3.01"
+      y2="18"
+      stroke={active ? '#fff' : COLORS.slate}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+  </Svg>
+);
 
 // ---------------------------------------------------------------------------
 // Types & seed data
@@ -83,7 +178,7 @@ const COLORS = {
   pink: '#F43F5E',
   blue: '#2563EB',
   blueDark: '#1D4ED8',
-  headerBg: '#2D2D60',
+  headerBg: '#151D4F',
   slate: '#1E293B',
   sub: '#64748B',
   border: '#E2E8F0',
@@ -153,11 +248,11 @@ const DeleteModal: React.FC<{
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TrashFill width={16} height={16} fill="#fff" />
+              <Ionicons name="trash" size={16} color="#fff" />
               <Text style={styles.modalHeaderText}>Delete Customer</Text>
             </View>
             <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <XLg width={18} height={18} fill="#fff" />
+              <Ionicons name="close" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
 
@@ -194,7 +289,7 @@ const DeleteModal: React.FC<{
 
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <XLg width={13} height={13} fill={COLORS.slate} />
+              <Ionicons name="close-outline" size={15} color="#fff" />
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -204,12 +299,12 @@ const DeleteModal: React.FC<{
             >
               {blocked ? (
                 <>
-                  <XLg width={13} height={13} fill="#94A3B8" />
+                  <Ionicons name="close-outline" size={15} color="#94A3B8" />
                   <Text style={styles.confirmDeleteBtnTextDisabled}>Cannot Delete</Text>
                 </>
               ) : (
                 <>
-                  <TrashFill width={13} height={13} fill="#fff" />
+                  <Ionicons name="trash-outline" size={15} color="#fff" />
                   <Text style={styles.confirmDeleteBtnText}>Delete</Text>
                 </>
               )}
@@ -233,7 +328,7 @@ const CustomerManagement: React.FC = () => {
 
   const [customers, setCustomers] = useState<Customer[]>(SEED_CUSTOMERS);
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'grid' | 'list'>('list');
+  const [view, setView] = useState<'grid' | 'list'>(isPhone ? 'grid' : 'list');
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -313,10 +408,10 @@ const CustomerManagement: React.FC = () => {
       </View>
       <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }, !isPhone && { marginLeft: 55 }]}>
         <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewOrders(item)}>
-          <LockFill width={15} height={15} fill="#fff" />
+          <Ionicons name="eye" size={15} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
-          <TrashFill width={15} height={15} fill="#fff" />
+          <Ionicons name="trash-outline" size={15} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -366,6 +461,8 @@ const CustomerManagement: React.FC = () => {
           </View>
         </View>
 
+        <View style={styles.divider} />
+
         <View style={styles.gridMetaRow}>
           <View style={styles.gridMetaItem}>
             <BagCheckFill width={15} height={15} fill={COLORS.amberDark} />
@@ -379,11 +476,11 @@ const CustomerManagement: React.FC = () => {
 
         <View style={styles.gridActionsRow}>
           <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
-            <LockFill width={14} height={14} fill="#fff" />
-            <Text style={styles.ordersBtnText}>Orders</Text>
+            <Ionicons name="eye" size={14} color="#fff" />
+            <Text style={styles.ordersBtnText}>View</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
-            <TrashFill width={16} height={16} fill="#fff" />
+            <Ionicons name="trash-outline" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -394,20 +491,16 @@ const CustomerManagement: React.FC = () => {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {/* ---------- Header ---------- */}
-        <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/Dashboard')}>
-              <ArrowLeft width={isPhone ? 18 : 22} height={isPhone ? 18 : 22} fill="#fff" />
+        <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+            <TouchableOpacity style={[styles.backBtn, isPhone && { padding: 6 }]} onPress={() => router.push('/Dashboard')}>
+              <ArrowLeft width={isPhone ? 16 : 22} height={isPhone ? 16 : 22} fill="#fff" />
             </TouchableOpacity>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-              <View style={[styles.headerIconBox, isPhone && { width: 30, height: 30, borderRadius: 6 }]}>
-                <PeopleFill width={isPhone ? 14 : 20} height={isPhone ? 14 : 20} fill="#fff" />
-              </View>
               {isPhone ? (
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.headerTitle, { fontSize: 16 }]} numberOfLines={1}>Customers</Text>
-                  <Text style={[styles.headerTitle, { fontSize: 16, marginTop: 2 }]} numberOfLines={1}>Management</Text>
+                  <Text style={[styles.headerTitle, { fontSize: 14, lineHeight: 18 }]} numberOfLines={2}>Customers Management</Text>
                 </View>
               ) : (
                 <View style={{ flexShrink: 1 }}>
@@ -418,15 +511,15 @@ const CustomerManagement: React.FC = () => {
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.refreshBtn, isPhone && { alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 }]} onPress={() => handleViewOrders()}>
+          <TouchableOpacity style={[styles.refreshBtn, isPhone && { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 }]} onPress={() => handleViewOrders()}>
             <BagCheckFill width={isPhone ? 12 : 14} height={isPhone ? 12 : 14} fill={COLORS.amber} />
             <Text style={[styles.refreshBtnText, isPhone && { fontSize: 11 }]}>View Orders</Text>
           </TouchableOpacity>
         </View>
 
         {/* ---------- Toolbar ---------- */}
-        <View style={styles.toolbarCard}>
-          <View style={[styles.searchBox, isPhone && { width: '100%' }]}>
+        <View style={[styles.toolbarCard, isPhone && { flexWrap: 'nowrap' }]}>
+          <View style={[styles.searchBox, isPhone && { minWidth: 0 }]}>
             <Search width={15} height={15} fill={COLORS.sub} />
             <TextInput
               style={styles.searchInput}
@@ -437,20 +530,22 @@ const CustomerManagement: React.FC = () => {
             />
           </View>
 
-          <View style={styles.viewToggle}>
-            <TouchableOpacity
-              style={[styles.viewToggleBtn, view === 'list' && styles.viewToggleBtnActive]}
-              onPress={() => setView('list')}
-            >
-              <ListUl width={14} height={14} fill={view === 'list' ? '#fff' : COLORS.slate} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewToggleBtn, view === 'grid' && styles.viewToggleBtnActive]}
-              onPress={() => setView('grid')}
-            >
-              <Grid3x3GapFill width={14} height={14} fill={view === 'grid' ? '#fff' : COLORS.slate} />
-            </TouchableOpacity>
-          </View>
+          {!isPhone && (
+            <View style={styles.viewToggle}>
+              <TouchableOpacity
+                style={[styles.viewToggleBtn, view === 'list' && styles.viewToggleBtnActive]}
+                onPress={() => setView('list')}
+              >
+                <ListIcon active={view === 'list'} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewToggleBtn, view === 'grid' && styles.viewToggleBtnActive]}
+                onPress={() => setView('grid')}
+              >
+                <GridIcon active={view === 'grid'} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* ---------- Data ---------- */}
@@ -469,6 +564,19 @@ const CustomerManagement: React.FC = () => {
               <View style={styles.gridWrap}>
                 {paginated.map((item) => (
                   <View key={item.id} style={[styles.gridCell, { width: gridCellWidth }]}>
+                    {renderCard(item)}
+                  </View>
+                ))}
+              </View>
+            )
+          ) : isPhone ? (
+            // Mobile list view: show cards instead of horizontal scroll table
+            paginated.length === 0 ? (
+              <Text style={styles.emptyText}>No customers match your search.</Text>
+            ) : (
+              <View style={styles.mobileListWrap}>
+                {paginated.map((item) => (
+                  <View key={item.id} style={styles.mobileListCard}>
                     {renderCard(item)}
                   </View>
                 ))}
@@ -574,8 +682,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 13, color: COLORS.slate, outlineStyle: 'none' as any },
   viewToggle: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 3 },
-  viewToggleBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
-  viewToggleBtnActive: { backgroundColor: '#F97316' },
+  viewToggleBtn: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  viewToggleBtnActive: { backgroundColor: '#1d324e' },
 
   dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
 
@@ -592,15 +700,15 @@ const styles = StyleSheet.create({
   // Orders, pink/red for Delete), matching the reference style. Edit removed.
   ordersIconBtn: {
     width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: COLORS.orange,
+    backgroundColor: '#1d324e',
   },
   ordersBtnWide: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: COLORS.orange, paddingVertical: 10, borderRadius: 8,
+    backgroundColor: '#1d324e', paddingVertical: 10, borderRadius: 8,
   },
   ordersBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   deleteBtn: {
-    backgroundColor: COLORS.pink, width: 34, height: 34, borderRadius: 10,
+    backgroundColor: '#dc2626', width: 34, height: 34, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -650,6 +758,9 @@ const styles = StyleSheet.create({
 
   gridActionsRow: { flexDirection: 'row', gap: 10 },
 
+  mobileListWrap: { gap: 12 },
+  mobileListCard: { width: '100%' },
+
   emptyText: { textAlign: 'center', color: COLORS.sub, paddingVertical: 24, fontSize: 13 },
   footerText: { textAlign: 'center', color: COLORS.sub, fontSize: 12, marginTop: 18 },
 
@@ -658,7 +769,7 @@ const styles = StyleSheet.create({
   modalCard: { width: '100%', maxWidth: 440, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: COLORS.amber, paddingHorizontal: 18, paddingVertical: 16,
+    backgroundColor: '#F97316', paddingHorizontal: 18, paddingVertical: 16,
   },
   modalHeaderText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalBody: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 10, alignItems: 'center' },
@@ -681,7 +792,7 @@ const styles = StyleSheet.create({
   warnBody: { fontSize: 12, color: '#991B1B', lineHeight: 17 },
 
   modalFooter: {
-    flexDirection: 'row', justifyContent: 'flex-end', gap: 10,
+    flexDirection: 'row', justifyContent: 'center', gap: 10,
     paddingHorizontal: 18, paddingVertical: 16,
   },
   cancelBtn: {

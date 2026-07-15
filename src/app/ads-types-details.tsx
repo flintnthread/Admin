@@ -30,9 +30,11 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useMemo, useState } from 'react';
 import {
     Alert,
+    Animated,
     FlatList,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -131,7 +133,7 @@ const OVERVIEW_CARDS = [
 
 // Palette
 const COLORS = {
-    header: '#1D324E',
+    header: '#151D4F',
     orange: '#F5821F',
     orangeDark: '#DD6F10',
     ink: '#1F2937',
@@ -391,7 +393,7 @@ const AdTypeFormModal: React.FC<{
                                 </Picker>
                             </View>
                         )}
-                        <View style={{ height: 120 }} />
+                        <View style={{ height: 20 }} />
                     </ScrollView>
 
                     <View style={styles.modalFooter}>
@@ -491,7 +493,7 @@ const DeleteModal: React.FC<{ visible: boolean; onCancel: () => void; onConfirm:
                     <Text style={styles.confirmSub}>This action cannot be undone!</Text>
                 </View>
 
-                <View style={styles.modalFooter}>
+                <View style={[styles.modalFooter, { justifyContent: 'center' }]}>
                     <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
                         <Ionicons name="close" size={13} color="#fff" />
                         <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -505,6 +507,19 @@ const DeleteModal: React.FC<{ visible: boolean; onCancel: () => void; onConfirm:
         </View>
     </Modal>
 );
+
+// ---------------------------------------------------------------------------
+// Table column styling configuration
+// ---------------------------------------------------------------------------
+const COL_STYLES = {
+    id: { flex: 0.6, minWidth: 50, paddingHorizontal: 6 },
+    name: { flex: 1.8, minWidth: 150, paddingHorizontal: 6 },
+    category: { flex: 1.5, minWidth: 130, paddingHorizontal: 6 },
+    description: { flex: 3, minWidth: 280, paddingHorizontal: 6 },
+    status: { flex: 1.2, minWidth: 100, paddingHorizontal: 6 },
+    created: { flex: 1.2, minWidth: 100, paddingHorizontal: 6 },
+    action: { flex: 1.5, minWidth: 120, paddingHorizontal: 6 },
+};
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -530,6 +545,7 @@ const AdsTypesDetails: React.FC = () => {
         return items.slice(start, start + PAGE_SIZE);
     }, [items, safePage]);
     const [expandedOverview, setExpandedOverview] = useState<string | null>(null);
+    const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
     const [formVisible, setFormVisible] = useState(false);
     const [editingItem, setEditingItem] = useState<AdType | null>(null);
@@ -543,9 +559,25 @@ const AdsTypesDetails: React.FC = () => {
     }, [items]);
 
     const overviewData = useMemo(
-        () => OVERVIEW_CARDS.map((c) => ({ ...c, item: items.find((i) => i.name === c.key) })).filter((c) => c.item),
+        () => OVERVIEW_CARDS.map((c) => ({ ...c, item: items.find((i) => i.name === c.key) || SEED_AD_TYPES.find((i) => i.name === c.key) })).filter((c) => c.item),
         [items]
     );
+
+    // ---- Toast -------------------------------------------------------
+    const [toastVisible, setToastVisible] = useState(false);
+    const [toastMsg, setToastMsg] = useState('');
+    const toastSlide = React.useRef(new Animated.Value(400)).current;
+
+    const showToast = (msg: string) => {
+        setToastMsg(msg);
+        setToastVisible(true);
+        toastSlide.setValue(400);
+        Animated.timing(toastSlide, { toValue: 0, duration: 380, useNativeDriver: true }).start();
+        setTimeout(() => {
+            Animated.timing(toastSlide, { toValue: 400, duration: 320, useNativeDriver: true })
+                .start(() => setToastVisible(false));
+        }, 3000);
+    };
 
     // ---- CRUD ------------------------------------------------------------
     const openAdd = () => { setEditingItem(null); setFormVisible(true); };
@@ -555,12 +587,14 @@ const AdsTypesDetails: React.FC = () => {
     const handleSubmit = (form: FormState) => {
         if (editingItem) {
             setItems((prev) => prev.map((i) => (i.id === editingItem.id ? { ...i, ...form } : i)));
+            showToast('✅ Ad Type updated successfully!');
         } else {
             const newId = items.length ? Math.max(...items.map((i) => i.id)) + 1 : 1;
             setItems((prev) => [
                 { id: newId, ...form, created: 'Today' },
                 ...prev,
             ]);
+            showToast('✅ Ad Type created successfully!');
         }
         setFormVisible(false);
     };
@@ -586,17 +620,17 @@ const AdsTypesDetails: React.FC = () => {
     // ---- Renderers ---------------------------------------------------------
     const renderTableRow = ({ item }: { item: AdType }) => (
         <View style={styles.tableRow}>
-            <Text style={[styles.cell, { flex: 0.5, color: COLORS.sub }]}>{item.id}</Text>
-            <Text style={[styles.cell, { flex: 1.8, fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
-            <View style={[styles.cell, { flex: 1.5 }]}>
+            <Text style={[styles.cell, COL_STYLES.id, { color: COLORS.sub }]} numberOfLines={1}>{item.id}</Text>
+            <Text style={[styles.cell, COL_STYLES.name, { fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
+            <View style={[styles.cell, COL_STYLES.category]}>
                 <Pill text={item.category} bg={COLORS.blueBg} fg={COLORS.blueText} />
             </View>
-            <Text style={[styles.cell, { flex: 3, color: COLORS.sub }]} numberOfLines={2}>{item.description}</Text>
-            <View style={[styles.cell, { flex: 1.2 }]}>
+            <Text style={[styles.cell, COL_STYLES.description, { color: COLORS.sub }]} numberOfLines={2}>{item.description}</Text>
+            <View style={[styles.cell, COL_STYLES.status]}>
                 <Pill text={item.status} bg={item.status === 'Active' ? COLORS.greenBg : COLORS.redBg} fg={item.status === 'Active' ? COLORS.greenText : COLORS.redText} />
             </View>
-            <Text style={[styles.cell, { flex: 1.2, color: COLORS.sub, fontSize: 12 }]}>{item.created}</Text>
-            <View style={[styles.cell, { flex: 1.5, flexDirection: 'row', gap: 6 }]}>
+            <Text style={[styles.cell, COL_STYLES.created, { color: COLORS.sub, fontSize: 12 }]} numberOfLines={1}>{item.created}</Text>
+            <View style={[styles.cell, COL_STYLES.action, { flexDirection: 'row', gap: 6 }]}>
                 <TouchableOpacity style={styles.viewBtn} onPress={() => setViewItem(item)}>
                     <Ionicons name="eye" size={13} color="#fff" />
                 </TouchableOpacity>
@@ -636,14 +670,22 @@ const AdsTypesDetails: React.FC = () => {
         <View style={styles.screen}>
             <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                 {/* ---------- Header: title + Add button in ONE #1D324E container ---------- */}
-                <View style={[styles.headerContainer, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14, paddingBottom: 50 }]}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.headerContainer, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, paddingBottom: 50 }]}>
+                    <View style={{ flex: 1, marginRight: 8, flexShrink: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             {/* Settings icon inside orange box */}
-                            <View style={[styles.headerIconBox, isPhone && { width: 30, height: 30, borderRadius: 6 }]}>
-                                <Ionicons name="settings" size={isPhone ? 14 : 18} color="#fff" />
+                            <View style={[styles.headerIconBox, isPhone && { width: 28, height: 28, borderRadius: 6 }]}>
+                                <Ionicons name="settings" size={isPhone ? 12 : 18} color="#fff" />
                             </View>
-                            {isPhone ? (
+                            {bp === 'xs' ? (
+                                <View style={{ flex: 1, flexShrink: 1 }}>
+                                    <Text style={[styles.title, { fontSize: 14, lineHeight: 18 }]} numberOfLines={2}>Ads Types & Details Management</Text>
+                                </View>
+                            ) : bp === 'sm' ? (
+                                <View style={{ flex: 1, flexShrink: 1 }}>
+                                    <Text style={[styles.title, { fontSize: 15, lineHeight: 19 }]} numberOfLines={2}>Ads Types & Details Management</Text>
+                                </View>
+                            ) : isPhone ? (
                                 <View style={{ flex: 1 }}>
                                     <Text style={[styles.title, { fontSize: 17 }]} numberOfLines={1}>Ads Types & Details</Text>
                                     <Text style={[styles.title, { fontSize: 17, marginTop: 2 }]} numberOfLines={1}>Management</Text>
@@ -654,9 +696,8 @@ const AdsTypesDetails: React.FC = () => {
                         </View>
                     </View>
 
-                    <TouchableOpacity style={[styles.addBtn, isPhone && { alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 }]} onPress={openAdd}>
-                        <Ionicons name="add" size={isPhone ? 12 : 14} color="#fff" />
-                        <Text style={[styles.addBtnText, isPhone && { fontSize: 11 }]}>Add New Ad Type</Text>
+                    <TouchableOpacity style={[styles.addBtn, bp === 'xs' && { paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 }, isPhone && bp !== 'xs' && { alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 }]} onPress={openAdd}>
+                        <Text style={[styles.addBtnText, bp === 'xs' && { fontSize: 11 }, isPhone && bp !== 'xs' && { fontSize: 11 }]}>{bp === 'xs' ? '+ Add' : 'Add New Ad Type'}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -685,17 +726,22 @@ const AdsTypesDetails: React.FC = () => {
                 )}
 
                 {/* ---------- Specifications overview ---------- */}
-                <View style={[styles.sectionBanner, { backgroundColor: '#7C3AED' }]}>
-                    <Ionicons name="list" size={14} color="#fff" />
-                    <Text style={styles.sectionBannerText}>Ad Types & Specifications Overview</Text>
-                </View>
-
-                <View style={styles.overviewCard}>
+                <View style={[styles.overviewCard, styles.overviewCardHighlighted]}>
+                    <View style={[styles.sectionTitleRow, styles.sectionTitleRowHighlighted]}>
+                        <Text style={styles.sectionTitle}>Ad Types & Specifications Overview</Text>
+                    </View>
+                    <View style={styles.sectionDivider} />
                     {isPhone ? (
                         overviewData.map(({ key, iconName, color, bg, item }) => {
                             const open = expandedOverview === key;
                             return (
-                                <View key={key} style={styles.accordionItem}>
+                                <View key={key} style={[
+                                    styles.accordionItem,
+                                    {
+                                        borderLeftWidth: 4,
+                                        borderLeftColor: color,
+                                    }
+                                ]}>
                                     <TouchableOpacity
                                         style={styles.accordionHeader}
                                         onPress={() => setExpandedOverview(open ? null : key)}
@@ -728,7 +774,25 @@ const AdsTypesDetails: React.FC = () => {
                     ) : (
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
                             {overviewData.map(({ key, iconName, color, bg, item }) => (
-                                <View key={key} style={[styles.overviewFullCard, { width: overviewCols === 3 ? '31.8%' : overviewCols === 2 ? '48%' : '100%' }]}>
+                                <Pressable
+                                    key={key}
+                                    onHoverIn={() => setHoveredCard(key)}
+                                    onHoverOut={() => setHoveredCard(null)}
+                                    style={[
+                                        styles.overviewFullCard,
+                                        {
+                                            width: overviewCols === 3 ? '31.8%' : overviewCols === 2 ? '48%' : '100%',
+                                            borderTopWidth: 4,
+                                            borderTopColor: color,
+                                            shadowColor: color,
+                                            shadowOpacity: hoveredCard === key ? 0.22 : 0.12,
+                                            shadowRadius: hoveredCard === key ? 16 : 10,
+                                            shadowOffset: hoveredCard === key ? { width: 0, height: 8 } : { width: 0, height: 4 },
+                                            transform: hoveredCard === key ? [{ translateY: -4 }] : [{ translateY: 0 }],
+                                            elevation: hoveredCard === key ? 6 : 3,
+                                        }
+                                    ]}
+                                >
                                     <View style={[styles.overviewIconCircle, { backgroundColor: color }]}>
                                         <Ionicons name={iconName} size={20} color="#fff" />
                                     </View>
@@ -739,19 +803,18 @@ const AdsTypesDetails: React.FC = () => {
                                             <SpecLine key={idx} label={s.label} value={s.value} />
                                         ))}
                                     </View>
-                                </View>
+                                </Pressable>
                             ))}
                         </View>
                     )}
                 </View>
 
                 {/* ---------- Management table ---------- */}
-                <View style={[styles.sectionBanner, { backgroundColor: '#16A34A' }]}>
-                    <Ionicons name="list" size={14} color="#fff" />
-                    <Text style={styles.sectionBannerText}>Ad Types & Details Management</Text>
-                </View>
-
-                <View style={styles.dataCard}>
+                <View style={[styles.dataCard, styles.dataCardHighlighted]}>
+                    <View style={[styles.sectionTitleRow, styles.sectionTitleRowHighlightedDataCard]}>
+                        <Text style={styles.sectionTitle}>Ad Types & Details Management</Text>
+                    </View>
+                    <View style={styles.sectionDivider} />
                     {isPhone ? (
                         <FlatList
                             data={paginatedItems}
@@ -762,21 +825,30 @@ const AdsTypesDetails: React.FC = () => {
                         />
                     ) : (
                         <View style={{ flex: 1 }}>
-                            <View style={styles.tableHeader}>
-                                <Text style={[styles.headCell, { flex: 0.5 }]}>ID</Text>
-                                <Text style={[styles.headCell, { flex: 1.8 }]}>Name</Text>
-                                <Text style={[styles.headCell, { flex: 1.5 }]}>Category</Text>
-                                <Text style={[styles.headCell, { flex: 3 }]}>Description</Text>
-                                <Text style={[styles.headCell, { flex: 1.2 }]}>Status</Text>
-                                <Text style={[styles.headCell, { flex: 1.2 }]}>Created</Text>
-                                <Text style={[styles.headCell, { flex: 1.5 }]}>Action</Text>
-                            </View>
-                            <FlatList
-                                data={paginatedItems}
-                                keyExtractor={(i) => String(i.id)}
-                                renderItem={renderTableRow}
-                                scrollEnabled={false}
-                            />
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator
+                                style={{ borderRadius: 8 }}
+                                contentContainerStyle={{ flexGrow: 1 }}
+                            >
+                                <View style={{ flex: 1, minWidth: 1000 }}>
+                                    <View style={styles.tableHeader}>
+                                        <Text style={[styles.headCell, COL_STYLES.id]}>ID</Text>
+                                        <Text style={[styles.headCell, COL_STYLES.name]}>Name</Text>
+                                        <Text style={[styles.headCell, COL_STYLES.category]}>Category</Text>
+                                        <Text style={[styles.headCell, COL_STYLES.description]}>Description</Text>
+                                        <Text style={[styles.headCell, COL_STYLES.status]}>Status</Text>
+                                        <Text style={[styles.headCell, COL_STYLES.created]}>Created</Text>
+                                        <Text style={[styles.headCell, COL_STYLES.action]}>Action</Text>
+                                    </View>
+                                    <FlatList
+                                        data={paginatedItems}
+                                        keyExtractor={(i) => String(i.id)}
+                                        renderItem={renderTableRow}
+                                        scrollEnabled={false}
+                                    />
+                                </View>
+                            </ScrollView>
                         </View>
                     )}
                 </View>
@@ -800,6 +872,17 @@ const AdsTypesDetails: React.FC = () => {
             />
             <ViewModal visible={!!viewItem} item={viewItem} onClose={() => setViewItem(null)} />
             <DeleteModal visible={deleteId != null} onCancel={cancelDelete} onConfirm={confirmDelete} />
+
+            {/* ---- Sliding Green Toast ---- */}
+            {toastVisible && (
+                <View style={styles.toastContainer} pointerEvents="none">
+                    <Animated.View
+                        style={[styles.toast, { transform: [{ translateX: toastSlide }] }]}
+                    >
+                        <Text style={styles.toastText}>{toastMsg}</Text>
+                    </Animated.View>
+                </View>
+            )}
         </View>
     );
 };
@@ -869,17 +952,47 @@ const styles = StyleSheet.create({
         borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12,
     },
     sectionBannerText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    innerHeader: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12,
+        borderTopLeftRadius: 14, borderTopRightRadius: 14,
+    },
+    sectionTitleRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingVertical: 16, paddingHorizontal: 14,
+    },
+    sectionTitle: {
+        fontSize: 18, fontWeight: '700', color: '#1D324E',
+    },
+    sectionDivider: {
+        borderBottomWidth: 1, borderColor: '#E5E7EB', marginBottom: 12,
+    },
 
     overviewCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 14, marginBottom: 16 },
+    overviewCardHighlighted: { borderWidth: 2, borderColor: COLORS.orange, backgroundColor: '#FFFBF5' },
+    sectionTitleRowHighlighted: { backgroundColor: '#FFF1E6', paddingHorizontal: 14, paddingVertical: 16, marginHorizontal: -14, marginTop: -14, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
 
     overviewFullCard: {
-        backgroundColor: '#FAFAFA', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 16, alignItems: 'center',
+        backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 16, alignItems: 'center',
     },
     overviewIconCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
     overviewCardTitle: { fontSize: 15, fontWeight: '800', color: COLORS.ink, marginBottom: 4 },
     overviewCardDesc: { fontSize: 12, color: COLORS.sub, textAlign: 'center' },
 
-    accordionItem: { borderBottomWidth: 1, borderColor: COLORS.border },
+    accordionItem: {
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 1,
+    },
     accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
     overviewIconWrap: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
     overviewTitle: { fontSize: 13.5, fontWeight: '700', color: COLORS.ink },
@@ -890,6 +1003,8 @@ const styles = StyleSheet.create({
     specLineText: { fontSize: 12, color: COLORS.ink, flexShrink: 1 },
 
     dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
+    dataCardHighlighted: { borderWidth: 2, borderColor: COLORS.orange, backgroundColor: '#FFFBF5' },
+    sectionTitleRowHighlightedDataCard: { backgroundColor: '#FFF1E6', paddingHorizontal: 12, paddingVertical: 16, marginHorizontal: -12, marginTop: -12, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
     tableHeader: { flexDirection: 'row', backgroundColor: '#1D324E', paddingVertical: 10, paddingHorizontal: 4, borderRadius: 8, marginBottom: 4 },
     headCell: { fontSize: 12, fontWeight: '700', color: '#fff', paddingHorizontal: 4 },
     tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F2F4' },
@@ -941,11 +1056,18 @@ const styles = StyleSheet.create({
 
     viewRow: { flexDirection: 'row', gap: 20, marginBottom: 4 },
     viewCol: { flex: 1 },
-    viewLabel: { fontSize: 12, fontWeight: '700', color: COLORS.sub, marginTop: 12, marginBottom: 4, textTransform: 'uppercase' },
+    viewLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.orange,
+        marginTop: 12,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+    },
     viewValue: { fontSize: 14, color: COLORS.ink, lineHeight: 20 },
 
     modalFooter: {
-        flexDirection: 'row', justifyContent: 'flex-end', gap: 10,
+        flexDirection: 'row', justifyContent: 'center', gap: 10,
         paddingHorizontal: 18, paddingVertical: 16, borderTopWidth: 1, borderColor: COLORS.border,
     },
     cancelBtn: {
@@ -1013,5 +1135,37 @@ const styles = StyleSheet.create({
     customDropdownItemText: {
         fontSize: 13,
         color: '#4B5563',
+    } as any,
+
+    // Toast
+    toastContainer: {
+        position: 'absolute',
+        top: 16,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 9999,
+        pointerEvents: 'none',
+    } as any,
+    toast: {
+        backgroundColor: '#16A34A',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 10,
+        minWidth: 220,
+        maxWidth: 340,
+    } as any,
+    toastText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+        flexShrink: 1,
     } as any,
 });
