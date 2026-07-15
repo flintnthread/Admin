@@ -33,6 +33,7 @@ import {
   Upload,
   X,
 } from "lucide-react-native";
+import { Feather } from "@expo/vector-icons";
 
 const initialBanners = [
   { id: "1", title: "Women's Chanderi Sarees", category: "sarees", date: "07 Jun, 2026", status: "Active", color: "#f6d9d9", text: "Flat 70% Off", desktopImage: "https://images.unsplash.com/photo-1583391733958-d25e07fac0ce?q=80&w=2000&auto=format&fit=crop" },
@@ -89,8 +90,13 @@ const SweetAlert = ({ visible, type, bannerTitle, onConfirm, onCancel }: SweetAl
       ]).start(() => {
         Animated.spring(iconScale, { toValue: 1, tension: 70, friction: 6, useNativeDriver: true }).start();
       });
+      // Auto-close success states after 2 seconds
+      if (type.endsWith("success")) {
+        const timer = setTimeout(onConfirm, 2000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [visible, type]);
+  }, [visible, type, onConfirm]);
 
   if (!visible) return null;
 
@@ -98,31 +104,44 @@ const SweetAlert = ({ visible, type, bannerTitle, onConfirm, onCancel }: SweetAl
   const isDelete = type.startsWith("delete");
   const isEdit = type.startsWith("edit");
 
-  const iconBg = isSuccess ? "#22c55e" : isDelete ? "#ef4444" : "#f97316";
-  const confirmBg = isSuccess ? "#22c55e" : isDelete ? "#ef4444" : "#f97316";
-  const title = isSuccess
-    ? isDelete ? "Banner Deleted!" : isEdit ? "Banner Updated!" : "Banner Added!"
-    : isDelete ? "Delete Banner?" : isEdit ? "Update Banner?" : "Add Banner?";
-  const subtitle = isSuccess
-    ? isDelete
-      ? "The banner has been successfully removed."
+  // Success popup matches Ads Placements design
+  if (isSuccess) {
+    const message = isDelete
+      ? "Banner deleted successfully!"
       : isEdit
-        ? `"${bannerTitle}" has been updated successfully.`
-        : `"${bannerTitle}" has been added to banners.`
-    : isDelete
-      ? `Are you sure you want to delete "${bannerTitle}"? This action cannot be undone.`
-      : isEdit
-        ? `Save changes to "${bannerTitle}"?`
-        : "Are you sure you want to add this new banner?";
+        ? "Banner updated successfully!"
+        : "Banner added successfully!";
+
+    return (
+      <Modal visible transparent animationType="fade" onRequestClose={onConfirm}>
+        <Animated.View style={[sa.successOverlay, { opacity: overlayOpacity }]} onPress={onConfirm}>
+          <Animated.View style={[sa.successCard, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
+            <View style={sa.successIconCircle}>
+              <Feather name="check" size={24} color="#fff" />
+            </View>
+            <Text style={sa.successMessage}>{message}</Text>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+    );
+  }
+
+  // Confirm dialogs (add, edit, delete)
+  const iconBg = isDelete ? "#ef4444" : "#f97316";
+  const confirmBg = isDelete ? "#ef4444" : "#f97316";
+  const title = isDelete ? "Delete Banner?" : isEdit ? "Update Banner?" : "Add Banner?";
+  const subtitle = isDelete
+    ? `Are you sure you want to delete "${bannerTitle}"? This action cannot be undone.`
+    : isEdit
+      ? `Save changes to "${bannerTitle}"?`
+      : "Are you sure you want to add this new banner?";
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onCancel}>
       <Animated.View style={[sa.overlay, { opacity: overlayOpacity }]}>
         <Animated.View style={[sa.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
           <Animated.View style={[sa.iconCircle, { backgroundColor: iconBg, transform: [{ scale: iconScale }] }]}>
-            {isSuccess ? (
-              <Text style={sa.iconText}>✓</Text>
-            ) : isDelete ? (
+            {isDelete ? (
               <Text style={sa.iconText}>🗑</Text>
             ) : (
               <Text style={sa.iconText}>{isEdit ? "✎" : "+"}</Text>
@@ -131,20 +150,12 @@ const SweetAlert = ({ visible, type, bannerTitle, onConfirm, onCancel }: SweetAl
           <Text style={sa.title}>{title}</Text>
           <Text style={sa.subtitle}>{subtitle}</Text>
           <View style={sa.btnRow}>
-            {isSuccess ? (
-              <TouchableOpacity style={[sa.confirmBtn, { backgroundColor: confirmBg }]} onPress={onConfirm} activeOpacity={0.85}>
-                <Text style={sa.confirmTxt}>Done</Text>
-              </TouchableOpacity>
-            ) : (
-              <>
-                <TouchableOpacity style={sa.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
-                  <Text style={sa.cancelTxt}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[sa.confirmBtn, { backgroundColor: confirmBg }]} onPress={onConfirm} activeOpacity={0.85}>
-                  <Text style={sa.confirmTxt}>{isDelete ? "Yes, Delete" : isEdit ? "Yes, Update" : "Yes, Add"}</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            <TouchableOpacity style={sa.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
+              <Text style={sa.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[sa.confirmBtn, { backgroundColor: confirmBg }]} onPress={onConfirm} activeOpacity={0.85}>
+              <Text style={sa.confirmTxt}>{isDelete ? "Yes, Delete" : isEdit ? "Yes, Update" : "Yes, Add"}</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </Animated.View>
@@ -416,14 +427,16 @@ export default function BannerManagement() {
             </View>
             <View style={styles.viewToggleGroup}>
               <TouchableOpacity
-                style={[styles.viewToggleBtn, viewMode === "list" && styles.viewToggleBtnActive]}
+                style={[styles.viewToggleBoxBtn, viewMode === "list" && styles.viewToggleBoxBtnActive]}
                 onPress={() => setViewMode("list")}
+                activeOpacity={0.85}
               >
                 <List size={16} color={viewMode === "list" ? "#FFFFFF" : "#a0aec0"} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.viewToggleBtn, viewMode === "grid" && styles.viewToggleBtnActive]}
+                style={[styles.viewToggleBoxBtn, viewMode === "grid" && styles.viewToggleBoxBtnActive]}
                 onPress={() => setViewMode("grid")}
+                activeOpacity={0.85}
               >
                 <LayoutGrid size={16} color={viewMode === "grid" ? "#FFFFFF" : "#a0aec0"} />
               </TouchableOpacity>
@@ -811,9 +824,9 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, color: "#1f2430" },
 
   // View Toggle
-  viewToggleGroup: { flexDirection: "row", backgroundColor: "#151D4F", borderWidth: 1, borderColor: "#151D4F", borderRadius: 10, padding: 4, gap: 4 },
-  viewToggleBtn: { padding: 6, borderRadius: 6 },
-  viewToggleBtnActive: { backgroundColor: "rgba(255,255,255,0.18)" },
+  viewToggleGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
+  viewToggleBoxBtn: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e4ea" },
+  viewToggleBoxBtnActive: { backgroundColor: "#151D4F", borderColor: "#151D4F" },
 
   // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", marginTop: 16, paddingBottom: 16 },
@@ -891,6 +904,13 @@ const styles = StyleSheet.create({
 
 // ─── SweetAlert Styles ─────────────────────────────────────────────────────────
 const sa = StyleSheet.create({
+  // Success popup (matches Ads Placements design)
+  successOverlay: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(15,23,42,0.55)", padding: 24 },
+  successCard: { backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 24, paddingVertical: 24, alignItems: "center", width: "100%", maxWidth: 300 },
+  successIconCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#059669", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  successMessage: { fontSize: 13, color: "#64748B", textAlign: "center", lineHeight: 18 },
+
+  // Confirm dialogs
   overlay: { flex: 1, backgroundColor: "rgba(15,18,33,0.6)", justifyContent: "center", alignItems: "center" },
   card: { backgroundColor: "#fff", borderRadius: 20, padding: 28, width: 320, maxWidth: "88%", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 12 },
   iconCircle: { width: 70, height: 70, borderRadius: 35, alignItems: "center", justifyContent: "center", marginBottom: 18 },
