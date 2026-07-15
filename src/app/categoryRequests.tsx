@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapCategoryRequestRow } from '@/lib/mappers';
 import {
@@ -7,20 +8,18 @@ import {
   fetchCategoryRequestStats,
   rejectCategoryRequest,
 } from '@/services/categoryRequestApi';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
   Modal,
+  ScrollView,
   StyleSheet,
-  useWindowDimensions,
+  Text,
   TextInput,
-  Platform,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import AdminLayout from '@/components/admin-layout';
-import Pagination from '@/components/Pagination';
-import Svg, { Path, Circle, Rect, G, Polyline } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

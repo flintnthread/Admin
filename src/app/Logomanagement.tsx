@@ -83,7 +83,11 @@ export default function LogoManagement() {
   const [logos, setLogos] = React.useState(initialLogos);
   const [pending, setPending] = React.useState<Record<string, any>>({ dark: null, light: null, favicon: null });
   const [pickingKey, setPickingKey] = React.useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = React.useState("October 12, 2025, 5:48 am");
+  const [lastUpdated, setLastUpdated] = React.useState(
+    new Date().toLocaleString("en-US", {
+      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true
+    })
+  );
   const [toast, setToast] = React.useState("");
 
   // Pagination state (UI-only)
@@ -144,7 +148,7 @@ export default function LogoManagement() {
     setPending({ dark: null, light: null, favicon: null });
     setLastUpdated(
       new Date().toLocaleString("en-US", {
-        month: "long",
+        month: "short",
         day: "numeric",
         year: "numeric",
         hour: "numeric",
@@ -166,11 +170,10 @@ export default function LogoManagement() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerIcon}>
-              <ImageIcon size={20} color="#fff" />
+              <ImageIcon size={24} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle}>Logo Management</Text>
-              <Text style={styles.headerSubtitle}>Dashboard › Logos</Text>
             </View>
             <View style={styles.headerBadge}>
               <Clock size={11} color="#c6cadb" />
@@ -201,20 +204,6 @@ export default function LogoManagement() {
                 </View>
               );
             })}
-            <View style={styles.statusChipCard}>
-              <View style={[styles.statusChipIcon, { backgroundColor: "#6366f1" }]}>
-                <FolderOpen size={14} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.statusChipLabel} numberOfLines={1}>
-                  Upload Directory
-                </Text>
-                <View style={styles.statusChipValueRow}>
-                  <CheckCircle2 size={11} color="#16a34a" />
-                  <Text style={styles.statusChipValue}>Writable</Text>
-                </View>
-              </View>
-            </View>
           </View>
 
           {/* Logo cards — preview + file meta + replace control combined per type */}
@@ -335,15 +324,19 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: "#f97316",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#f97316",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  headerTitle: { fontSize: 15.5, fontWeight: "700", color: "#fff" },
-  headerSubtitle: { fontSize: 11.5, color: "#b6bcdb", marginTop: 1 },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: "#fff", letterSpacing: -0.3 },
   headerBadge: {
     flexDirection: "row",
     alignItems: "center",

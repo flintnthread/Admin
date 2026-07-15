@@ -340,6 +340,25 @@ function avatarColor(name: string) {
   return COLORS.avatarPalette[Math.abs(h) % COLORS.avatarPalette.length];
 }
 
+function GridGlyph({ color = COLORS.muted, size = 16 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="3" y="3" width="7" height="7" />
+      <Rect x="14" y="3" width="7" height="7" />
+      <Rect x="14" y="14" width="7" height="7" />
+      <Rect x="3" y="14" width="7" height="7" />
+    </Svg>
+  );
+}
+
+function ListIconGlyph({ color = COLORS.muted, size = 16 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </Svg>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Header + embedded stat cards (like other screens)                    */
 /* ------------------------------------------------------------------ */
@@ -563,21 +582,26 @@ function FilterBar({
   const [openDropdown, setOpenDropdown] = useState<'status' | 'method' | null>(null);
 
   const toggleButtons = (
-    <View style={[styles.viewToggleRow, { marginBottom: 0 }]}>
+    <View style={styles.viewToggleGroup}>
       <TouchableOpacity
-        style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
-        onPress={() => setViewMode('list')}
-        activeOpacity={0.85}
-      >
-        <Text style={[styles.viewToggleIcon, viewMode === 'list' && styles.viewToggleIconActive]}>☰</Text>
-      </TouchableOpacity>
-      <View style={styles.viewToggleDivider} />
-      <TouchableOpacity
-        style={[styles.viewToggleBtn, viewMode === 'grid' && styles.viewToggleBtnActive]}
+        style={[
+          styles.viewToggleBoxBtn,
+          viewMode === 'grid' && styles.viewToggleBoxBtnActive,
+        ]}
         onPress={() => setViewMode('grid')}
         activeOpacity={0.85}
       >
-        <Text style={[styles.viewToggleIcon, viewMode === 'grid' && styles.viewToggleIconActive]}>⊞</Text>
+        <GridGlyph color={viewMode === 'grid' ? '#fff' : COLORS.muted} size={16} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.viewToggleBoxBtn,
+          viewMode === 'list' && styles.viewToggleBoxBtnActive,
+        ]}
+        onPress={() => setViewMode('list')}
+        activeOpacity={0.85}
+      >
+        <ListIconGlyph color={viewMode === 'list' ? '#fff' : COLORS.muted} size={16} />
       </TouchableOpacity>
     </View>
   );
@@ -621,14 +645,14 @@ function FilterBar({
             />
           </View>
           {/* Controls — all in one row, no wrapping */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 8, zIndex: 100, overflow: 'visible' }}>
-            <View style={{ flex: 1, zIndex: openDropdown === 'status' ? 50 : 20, overflow: 'visible' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, zIndex: 100, overflow: 'visible' }}>
+            <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === 'status' ? 50 : 20, overflow: 'visible' }}>
               <StatusDropdown 
                 value={status} onChange={onStatus} 
                 open={openDropdown === 'status'} onToggle={() => setOpenDropdown(p => p === 'status' ? null : 'status')} 
               />
             </View>
-            <View style={{ flex: 1, zIndex: openDropdown === 'method' ? 50 : 10, overflow: 'visible' }}>
+            <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === 'method' ? 50 : 10, overflow: 'visible' }}>
               <MethodDropdown 
                 value={method} onChange={onMethod} 
                 open={openDropdown === 'method'} onToggle={() => setOpenDropdown(p => p === 'method' ? null : 'method')} 
@@ -1049,7 +1073,7 @@ const styles = StyleSheet.create({
   searchBox: { flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink },
 
-  statusDropdownWrap: { position: 'relative', zIndex: 20 },
+  statusDropdownWrap: { position: 'relative', zIndex: 20, width: 140 },
   statusDropdownBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: COLORS.page },
   statusDropdownText: { flex: 1, fontWeight: '600', fontSize: 12, color: COLORS.ink },
   statusDropdownMenu: {
@@ -1063,13 +1087,26 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: '700', color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: COLORS.rule },
 
-  /* view toggle */
-  viewToggleRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, backgroundColor: COLORS.surface, overflow: 'hidden' },
-  viewToggleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'transparent' },
-  viewToggleBtnActive: { backgroundColor: COLORS.navyTint },
-  viewToggleIcon: { fontSize: 18, color: COLORS.sub, lineHeight: 20 },
-  viewToggleIconActive: { color: COLORS.navyDeep, fontWeight: '700' },
-  viewToggleDivider: { width: 1, height: 20, backgroundColor: COLORS.rule },
+  /* view toggle — two separate boxed icon buttons */
+  viewToggleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewToggleBoxBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.rule,
+  },
+  viewToggleBoxBtnActive: {
+    backgroundColor: COLORS.navyDeep,
+    borderColor: COLORS.navyDeep,
+  },
 
   /* grid card */
   gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
@@ -1161,10 +1198,10 @@ const styles = StyleSheet.create({
   modalBody: { padding: 20, gap: 0 },
   modalStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: COLORS.ruleSoft },
   modalAmtBig: { fontWeight: '800', fontSize: 20, color: COLORS.navyDeep },
-  detailFieldsList: { gap: 14 },
+  detailFieldsList: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
   detailGrid: { flexDirection: 'row', gap: 20 },
   detailCol: { flexShrink: 0, gap: 16 },
-  detailField: { paddingVertical: 2 },
+  detailField: { paddingVertical: 2, width: '48%' },
   detailLabel: { fontWeight: '600', fontSize: 11.5, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   detailValue: { fontSize: 13, fontWeight: '700', color: COLORS.navyDeep, marginTop: 2 },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 20, paddingBottom: 20 },

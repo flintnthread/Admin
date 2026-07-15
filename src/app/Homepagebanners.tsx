@@ -38,13 +38,69 @@ import Pagination from "@/components/Pagination";
 
 /* ---------- Section config ---------- */
 const SECTIONS = [
-  { key: "top", label: "Top Section", icon: PanelTop, desc: "Hero banners displayed right below the navigation bar", size: "940 × 640 px", cols: 3, color: "#3b82f6" },
-  { key: "middle", label: "Middle Section", icon: Layers, desc: "Feature spotlight banners placed mid-page", size: "940 × 788 px", cols: 2, color: "#8b5cf6" },
-  { key: "bottom", label: "Bottom Section", icon: PanelBottom, desc: "Closing banners shown just before the footer", size: "940 × 640 px", cols: 3, color: "#14b8a6" },
-  { key: "ad", label: "Ad Banner", icon: Megaphone, desc: "Single full-width promotional strip", size: "1920 × 400 px", cols: 2, color: "#ef4444" },
-  { key: "single", label: "Single Banner", icon: ImageIcon, desc: "One large standalone feature banner", size: "1600 × 500 px", cols: 2, color: "#22c55e" },
-  { key: "grid1", label: "Shop Grid Banner 1", icon: Grid3x3, desc: "Small square banners inside shop grid block 1", size: "600 × 600 px", cols: 4, color: "#ec4899" },
-  { key: "grid2", label: "Shop Grid Banner 2", icon: Grid2x2, desc: "Small square banners inside shop grid block 2", size: "600 × 600 px", cols: 4, color: "#f59e0b" },
+  {
+    key: "top",
+    label: "Top Section",
+    icon: PanelTop,
+    desc: "Hero banners displayed right below the navigation bar",
+    size: "940 × 640 px",
+    cols: 3,
+    color: "#3b82f6",
+  },
+  {
+    key: "middle",
+    label: "Middle Section",
+    icon: Layers,
+    desc: "Feature spotlight banners placed mid-page",
+    size: "940 × 788 px",
+    cols: 2,
+    color: "#8b5cf6",
+  },
+  {
+    key: "bottom",
+    label: "Bottom Section",
+    icon: PanelBottom,
+    desc: "Closing banners shown just before the footer",
+    size: "940 × 640 px",
+    cols: 3,
+    color: "#14b8a6",
+  },
+  {
+    key: "ad",
+    label: "Ad Banner",
+    icon: Megaphone,
+    desc: "Single full-width promotional strip",
+    size: "1920 × 400 px",
+    cols: 2,
+    color: "#ef4444",
+  },
+  {
+    key: "single",
+    label: "Single Banner",
+    icon: ImageIcon,
+    desc: "One large standalone feature banner",
+    size: "1600 × 500 px",
+    cols: 2,
+    color: "#22c55e",
+  },
+  {
+    key: "grid1",
+    label: "Shop Grid Banner 1",
+    icon: Grid3x3,
+    desc: "Small square banners inside shop grid block 1",
+    size: "600 × 600 px",
+    cols: 4,
+    color: "#ec4899",
+  },
+  {
+    key: "grid2",
+    label: "Shop Grid Banner 2",
+    icon: Grid2x2,
+    desc: "Small square banners inside shop grid block 2",
+    size: "600 × 600 px",
+    cols: 4,
+    color: "#f59e0b",
+  },
 ];
 
 /* ---------- Dummy seed data ---------- */
@@ -54,40 +110,191 @@ function img(seed: string, w = 500, h = 400) {
 
 const initialData = {
   top: [
-    { id: "t1", title: "Asvi Home Food", subtitle: "Traditional snacks & sweets", image: img("asvi-food", 500, 380), position: 1, status: "Active", link: "" },
-    { id: "t2", title: "F&T Products", subtitle: "Home furniture essentials", image: img("sofa-stuff", 500, 380), position: 2, status: "Active", link: "" },
-    { id: "t3", title: "Gaargi Sofa Stuff", subtitle: "Modern furniture picks", image: img("gaargi-bench", 500, 380), position: 3, status: "Active", link: "" },
+    {
+      id: "t1",
+      title: "Asvi Home Food",
+      subtitle: "Traditional snacks & sweets",
+      image: img("asvi-food", 500, 380),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "t2",
+      title: "F&T Products",
+      subtitle: "Home furniture essentials",
+      image: img("sofa-stuff", 500, 380),
+      position: 2,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "t3",
+      title: "Gaargi Sofa Stuff",
+      subtitle: "Modern furniture picks",
+      image: img("gaargi-bench", 500, 380),
+      position: 3,
+      status: "Active",
+      link: "",
+    },
   ],
   middle: [
-    { id: "m1", title: "Festive Collection", subtitle: "Curated ethnic wear", image: img("festive-mid", 600, 500), position: 1, status: "Active", link: "" },
-    { id: "m2", title: "Home Decor Edit", subtitle: "New season interiors", image: img("decor-mid", 600, 500), position: 2, status: "Inactive", link: "" },
+    {
+      id: "m1",
+      title: "Festive Collection",
+      subtitle: "Curated ethnic wear",
+      image: img("festive-mid", 600, 500),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "m2",
+      title: "Home Decor Edit",
+      subtitle: "New season interiors",
+      image: img("decor-mid", 600, 500),
+      position: 2,
+      status: "Inactive",
+      link: "",
+    },
   ],
   bottom: [
-    { id: "b1", title: "Winter Essentials", subtitle: "Cozy season picks", image: img("winter-1", 500, 380), position: 1, status: "Active", link: "" },
-    { id: "b2", title: "Kitchen Must-Haves", subtitle: "Everyday cookware", image: img("kitchen-1", 500, 380), position: 2, status: "Active", link: "" },
-    { id: "b3", title: "Kids Corner", subtitle: "Toys & essentials", image: img("kids-1", 500, 380), position: 3, status: "Inactive", link: "" },
+    {
+      id: "b1",
+      title: "Winter Essentials",
+      subtitle: "Cozy season picks",
+      image: img("winter-1", 500, 380),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "b2",
+      title: "Kitchen Must-Haves",
+      subtitle: "Everyday cookware",
+      image: img("kitchen-1", 500, 380),
+      position: 2,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "b3",
+      title: "Kids Corner",
+      subtitle: "Toys & essentials",
+      image: img("kids-1", 500, 380),
+      position: 3,
+      status: "Inactive",
+      link: "",
+    },
   ],
   ad: [
-    { id: "a1", title: "Mega Sale Week", subtitle: "Up to 70% off storewide", image: img("mega-sale", 1200, 300), position: 1, status: "Active", link: "" },
+    {
+      id: "a1",
+      title: "Mega Sale Week",
+      subtitle: "Up to 70% off storewide",
+      image: img("mega-sale", 1200, 300),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
   ],
   single: [
-    { id: "s1", title: "New Arrivals", subtitle: "Shop the latest drop", image: img("new-arrivals", 1200, 400), position: 1, status: "Active", link: "" },
+    {
+      id: "s1",
+      title: "New Arrivals",
+      subtitle: "Shop the latest drop",
+      image: img("new-arrivals", 1200, 400),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
   ],
   grid1: [
-    { id: "g1a", title: "Sarees", subtitle: "", image: img("grid1-a", 400, 400), position: 1, status: "Active", link: "" },
-    { id: "g1b", title: "Kurtis", subtitle: "", image: img("grid1-b", 400, 400), position: 2, status: "Active", link: "" },
-    { id: "g1c", title: "Footwear", subtitle: "", image: img("grid1-c", 400, 400), position: 3, status: "Active", link: "" },
-    { id: "g1d", title: "Bags", subtitle: "", image: img("grid1-d", 400, 400), position: 4, status: "Inactive", link: "" },
+    {
+      id: "g1a",
+      title: "Sarees",
+      subtitle: "",
+      image: img("grid1-a", 400, 400),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "g1b",
+      title: "Kurtis",
+      subtitle: "",
+      image: img("grid1-b", 400, 400),
+      position: 2,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "g1c",
+      title: "Footwear",
+      subtitle: "",
+      image: img("grid1-c", 400, 400),
+      position: 3,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "g1d",
+      title: "Bags",
+      subtitle: "",
+      image: img("grid1-d", 400, 400),
+      position: 4,
+      status: "Inactive",
+      link: "",
+    },
   ],
   grid2: [
-    { id: "g2a", title: "Jewellery", subtitle: "", image: img("grid2-a", 400, 400), position: 1, status: "Active", link: "" },
-    { id: "g2b", title: "Watches", subtitle: "", image: img("grid2-b", 400, 400), position: 2, status: "Active", link: "" },
-    { id: "g2c", title: "Home Decor", subtitle: "", image: img("grid2-c", 400, 400), position: 3, status: "Active", link: "" },
-    { id: "g2d", title: "Beauty", subtitle: "", image: img("grid2-d", 400, 400), position: 4, status: "Active", link: "" },
+    {
+      id: "g2a",
+      title: "Jewellery",
+      subtitle: "",
+      image: img("grid2-a", 400, 400),
+      position: 1,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "g2b",
+      title: "Watches",
+      subtitle: "",
+      image: img("grid2-b", 400, 400),
+      position: 2,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "g2c",
+      title: "Home Decor",
+      subtitle: "",
+      image: img("grid2-c", 400, 400),
+      position: 3,
+      status: "Active",
+      link: "",
+    },
+    {
+      id: "g2d",
+      title: "Beauty",
+      subtitle: "",
+      image: img("grid2-d", 400, 400),
+      position: 4,
+      status: "Active",
+      link: "",
+    },
   ],
 };
 
-const emptyForm = { title: "", subtitle: "", image: "", link: "", position: "1", status: "Active" };
+const emptyForm = {
+  title: "",
+  subtitle: "",
+  image: "",
+  link: "",
+  position: "1",
+  status: "Active",
+};
 
 export default function HomepageBannerManagement() {
   const { width } = useWindowDimensions();
@@ -98,19 +305,28 @@ export default function HomepageBannerManagement() {
   const [modalVisible, setModalVisible] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState(emptyForm);
-  const [confirmDelete, setConfirmDelete] = React.useState<{ sectionKey: string; id: string } | null>(null);
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [confirmDelete, setConfirmDelete] = React.useState<{
+    sectionKey: string;
+    id: string;
+  } | null>(null);
   const [toast, setToast] = React.useState("");
   const [statusPickerOpen, setStatusPickerOpen] = React.useState(false);
 
   const activeSection = SECTIONS.find((s) => s.key === activeKey)!;
-  const banners = (data[activeKey] || []).slice().sort((a: any, b: any) => a.position - b.position);
+  const banners = (data[activeKey] || [])
+    .slice()
+    .sort((a: any, b: any) => a.position - b.position);
 
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 8;
   const totalItems = banners.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const paginatedBanners = banners.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedBanners = banners.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   React.useEffect(() => {
     setCurrentPage(1);
@@ -127,7 +343,8 @@ export default function HomepageBannerManagement() {
 
   async function pickImage() {
     if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         alert("Permission required to access photo library.");
         return;
@@ -145,12 +362,18 @@ export default function HomepageBannerManagement() {
 
   function openAdd() {
     setEditingId(null);
-    setForm({ ...emptyForm, position: String(banners.length + 1), image: img(`new-${Date.now()}`, 500, 400) });
+    setErrors({});
+    setForm({
+      ...emptyForm,
+      position: String(banners.length + 1),
+      image: img(`new-${Date.now()}`, 500, 400),
+    });
     setModalVisible(true);
   }
 
   function openEdit(banner: any) {
     setEditingId(banner.id);
+    setErrors({});
     setForm({
       title: banner.title,
       subtitle: banner.subtitle || "",
@@ -166,17 +389,28 @@ export default function HomepageBannerManagement() {
     setModalVisible(false);
     setEditingId(null);
     setForm(emptyForm);
+    setErrors({});
   }
 
   function handleSave() {
-    if (!form.title.trim()) return;
+    const newErrors: Record<string, string> = {};
+    if (!form.title.trim()) newErrors.title = "Title is required.";
+    if (!form.image.trim()) newErrors.image = "Image is required.";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setData((prev) => {
       const list = prev[activeKey];
       if (editingId) {
         return {
           ...prev,
           [activeKey]: list.map((b: any) =>
-            b.id === editingId ? { ...b, ...form, position: Number(form.position) || 1 } : b
+            b.id === editingId
+              ? { ...b, ...form, position: Number(form.position) || 1 }
+              : b,
           ),
         };
       }
@@ -195,7 +429,9 @@ export default function HomepageBannerManagement() {
     setData((prev) => ({
       ...prev,
       [activeKey]: prev[activeKey].map((b: any) =>
-        b.id === id ? { ...b, status: b.status === "Active" ? "Inactive" : "Active" } : b
+        b.id === id
+          ? { ...b, status: b.status === "Active" ? "Inactive" : "Active" }
+          : b,
       ),
     }));
     showToast("Status updated");
@@ -230,8 +466,12 @@ export default function HomepageBannerManagement() {
                     <ImageIcon size={22} color="#fff" />
                   </View>
                   <View style={{ flexShrink: 1 }}>
-                    <Text style={styles.headerTitle}>Homepage Banner Management</Text>
-                    <Text style={styles.headerSubtitle}>Dashboard › Homepage Banners</Text>
+                    <Text style={styles.headerTitle}>
+                      Homepage Banner Management
+                    </Text>
+                    <Text style={styles.headerSubtitle}>
+                      Dashboard › Homepage Banners
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -253,7 +493,12 @@ export default function HomepageBannerManagement() {
                       style={[styles.navItem, active && styles.navItemActive]}
                       onPress={() => setActiveKey(s.key)}
                     >
-                      <View style={[styles.navIconDot, { backgroundColor: s.color }]}>
+                      <View
+                        style={[
+                          styles.navIconDot,
+                          { backgroundColor: s.color },
+                        ]}
+                      >
                         <Icon size={14} color="#fff" />
                       </View>
                       <Text
@@ -262,8 +507,18 @@ export default function HomepageBannerManagement() {
                       >
                         {s.label}
                       </Text>
-                      <View style={[styles.navCount, active && styles.navCountActive]}>
-                        <Text style={[styles.navCountText, active && { color: "#fff" }]}>
+                      <View
+                        style={[
+                          styles.navCount,
+                          active && styles.navCountActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.navCountText,
+                            active && { color: "#fff" },
+                          ]}
+                        >
                           {count}
                         </Text>
                       </View>
@@ -272,12 +527,13 @@ export default function HomepageBannerManagement() {
                 })}
               </View>
             ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.statCardsScroll}
-                contentContainerStyle={styles.statCardsWrap}
-              >
+              <View style={{ flexGrow: 0, flexShrink: 0 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.statCardsScroll}
+                  contentContainerStyle={[styles.statCardsWrap, { alignItems: 'flex-start' }]}
+                >
                 {SECTIONS.map((s) => {
                   const Icon = s.icon;
                   const active = s.key === activeKey;
@@ -289,17 +545,30 @@ export default function HomepageBannerManagement() {
                       onPress={() => setActiveKey(s.key)}
                     >
                       <View style={styles.statCardInner}>
-                        <View style={[styles.statCardIcon, { backgroundColor: s.color }]}>
+                        <View
+                          style={[
+                            styles.statCardIcon,
+                            { backgroundColor: s.color },
+                          ]}
+                        >
                           <Icon size={16} color="#fff" />
                         </View>
                         <View style={{ marginLeft: 8 }}>
                           <Text
-                            style={[styles.statCardLabel, active && styles.statCardLabelActive]}
+                            style={[
+                              styles.statCardLabel,
+                              active && styles.statCardLabelActive,
+                            ]}
                             numberOfLines={1}
                           >
                             {s.label}
                           </Text>
-                          <Text style={[styles.statCardCount, active && styles.statCardCountActive]}>
+                          <Text
+                            style={[
+                              styles.statCardCount,
+                              active && styles.statCardCountActive,
+                            ]}
+                          >
                             {count} Banner{count !== 1 ? "s" : ""}
                           </Text>
                         </View>
@@ -307,7 +576,8 @@ export default function HomepageBannerManagement() {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+                </ScrollView>
+              </View>
             )}
 
             {/* Main */}
@@ -347,30 +617,49 @@ export default function HomepageBannerManagement() {
                 {banners.length === 0 ? (
                   <View style={styles.empty}>
                     <ImageIcon size={26} color="#c4c8d0" />
-                    <Text style={styles.emptyText}>No banners in this section yet</Text>
+                    <Text style={styles.emptyText}>
+                      No banners in this section yet
+                    </Text>
                     <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
                       <Plus size={14} color="#fff" />
-                      <Text style={styles.addBtnText}>Add your first banner</Text>
+                      <Text style={styles.addBtnText}>
+                        Add your first banner
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
                   <>
                     <View style={styles.grid}>
                       {paginatedBanners.map((b) => (
-                        <View key={b.id} style={[styles.cardWrap, { width: `${cardWidthPct}%` }]}>
+                        <View
+                          key={b.id}
+                          style={[
+                            styles.cardWrap,
+                            { width: `${cardWidthPct}%` },
+                          ]}
+                        >
                           <View style={styles.card}>
                             <View style={styles.cardImageWrap}>
-                              <Image source={{ uri: b.image }} style={styles.cardImage} />
+                              <Image
+                                source={{ uri: b.image }}
+                                style={styles.cardImage}
+                              />
                               <View style={styles.positionChip}>
-                                <Text style={styles.positionChipText}>Pos {b.position}</Text>
+                                <Text style={styles.positionChipText}>
+                                  Pos {b.position}
+                                </Text>
                               </View>
                               <View
                                 style={[
                                   styles.statusChip,
-                                  b.status === "Active" ? styles.statusOn : styles.statusOff,
+                                  b.status === "Active"
+                                    ? styles.statusOn
+                                    : styles.statusOff,
                                 ]}
                               >
-                                <Text style={styles.statusChipText}>{b.status}</Text>
+                                <Text style={styles.statusChipText}>
+                                  {b.status}
+                                </Text>
                               </View>
                             </View>
 
@@ -379,7 +668,10 @@ export default function HomepageBannerManagement() {
                                 {b.title}
                               </Text>
                               {!!b.subtitle && (
-                                <Text style={styles.cardSubtitle} numberOfLines={1}>
+                                <Text
+                                  style={styles.cardSubtitle}
+                                  numberOfLines={1}
+                                >
                                   {b.subtitle}
                                 </Text>
                               )}
@@ -396,18 +688,29 @@ export default function HomepageBannerManagement() {
                               <TouchableOpacity
                                 style={[
                                   styles.actionBtn,
-                                  b.status === "Active" ? styles.actionToggleOn : styles.actionToggleOff,
+                                  b.status === "Active"
+                                    ? styles.actionToggleOn
+                                    : styles.actionToggleOff,
                                 ]}
                                 onPress={() => toggleStatus(b.id)}
                               >
                                 <Power
                                   size={12}
-                                  color={b.status === "Active" ? "#92400e" : "#4b5563"}
+                                  color={
+                                    b.status === "Active"
+                                      ? "#92400e"
+                                      : "#4b5563"
+                                  }
                                 />
                                 <Text
                                   style={[
                                     styles.actionToggleText,
-                                    { color: b.status === "Active" ? "#92400e" : "#4b5563" },
+                                    {
+                                      color:
+                                        b.status === "Active"
+                                          ? "#92400e"
+                                          : "#4b5563",
+                                    },
                                   ]}
                                 >
                                   Toggle
@@ -415,7 +718,12 @@ export default function HomepageBannerManagement() {
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.actionBtn, styles.actionDelete]}
-                                onPress={() => setConfirmDelete({ sectionKey: activeKey, id: b.id })}
+                                onPress={() =>
+                                  setConfirmDelete({
+                                    sectionKey: activeKey,
+                                    id: b.id,
+                                  })
+                                }
                               >
                                 <Trash2 size={13} color="#dc2626" />
                               </TouchableOpacity>
@@ -440,55 +748,76 @@ export default function HomepageBannerManagement() {
         </ScrollView>
 
         {/* Add / Edit modal */}
-        <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={closeModal}
+        >
           <View style={styles.overlay}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalHeaderTitle} numberOfLines={1}>
-                  {editingId ? "Edit Banner" : `Add Banner — ${activeSection.label}`}
-                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                    flex: 1,
+                  }}
+                >
+                  {editingId ? (
+                    <Pencil size={16} color="#fff" />
+                  ) : (
+                    <Plus size={16} color="#fff" />
+                  )}
+                  <Text style={styles.modalHeaderTitle} numberOfLines={1}>
+                    {editingId ? "Edit Banner" : `Add Banner`}
+                  </Text>
+                </View>
                 <TouchableOpacity onPress={closeModal} hitSlop={10}>
                   <X size={18} color="#fff" />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 8 }}>
-                <View style={styles.preview}>
-                  <Image
-                    source={{ uri: form.image || img("placeholder", 500, 300) }}
-                    style={styles.previewImage}
-                  />
+              <ScrollView
+                style={styles.modalBody}
+                contentContainerStyle={{ paddingBottom: 8 }}
+              >
+                <View style={styles.fieldRow}>
+                  <View style={{ flex: 1 }}>
+                    <Field label="Banner Title *">
+                      <TextInput
+                        style={[
+                          styles.input,
+                          errors.title ? styles.inputError : null,
+                        ]}
+                        value={form.title}
+                        onChangeText={(t) => {
+                          setForm({ ...form, title: t });
+                          setErrors({ ...errors, title: "" });
+                        }}
+                        placeholder="e.g. Festive Collection"
+                        placeholderTextColor="#9aa0ac"
+                      />
+                      {!!errors.title && (
+                        <Text style={styles.errorText}>{errors.title}</Text>
+                      )}
+                    </Field>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Field label="Alt Text *">
+                      <TextInput
+                        style={styles.input}
+                        value={form.subtitle}
+                        onChangeText={(t) => setForm({ ...form, subtitle: t })}
+                        placeholder="e.g. Curated ethnic wear"
+                        placeholderTextColor="#9aa0ac"
+                      />
+                    </Field>
+                  </View>
                 </View>
 
-                <Field label="Banner Title">
-                  <TextInput
-                    style={styles.input}
-                    value={form.title}
-                    onChangeText={(t) => setForm({ ...form, title: t })}
-                    placeholder="e.g. Festive Collection"
-                    placeholderTextColor="#9aa0ac"
-                  />
-                </Field>
-
-                <Field label="Subtitle">
-                  <TextInput
-                    style={styles.input}
-                    value={form.subtitle}
-                    onChangeText={(t) => setForm({ ...form, subtitle: t })}
-                    placeholder="e.g. Curated ethnic wear"
-                    placeholderTextColor="#9aa0ac"
-                  />
-                </Field>
-
-                <Field label="Banner Image">
-                  <TouchableOpacity style={styles.fileBox} onPress={pickImage}>
-                    <Text style={styles.fileBoxText}>
-                      {form.image ? "Change Image" : "Choose Image"}
-                    </Text>
-                  </TouchableOpacity>
-                </Field>
-
-                <Field label="Button / Redirect URL">
+                <Field label="Link URL">
                   <TextInput
                     style={styles.input}
                     value={form.link}
@@ -522,17 +851,65 @@ export default function HomepageBannerManagement() {
                     </Field>
                   </View>
                 </View>
+                <Field label="Current Image">
+                  <View style={styles.currentImageWrap}>
+                    <Image
+                      source={{
+                        uri: form.image || img("placeholder", 500, 300),
+                      }}
+                      style={styles.currentImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                </Field>
+
+                <Field label="Replace Image">
+                  <View style={{ gap: 6 }}>
+                    <View
+                      style={[
+                        styles.customFileInput,
+                        errors.image ? styles.inputError : null,
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={styles.chooseFileBtn}
+                        onPress={() => {
+                          pickImage();
+                          setErrors({ ...errors, image: "" });
+                        }}
+                      >
+                        <Text style={styles.chooseFileText}>Choose File</Text>
+                      </TouchableOpacity>
+                      <View style={styles.fileNameWrap}>
+                        <Text style={styles.fileNameText} numberOfLines={1}>
+                          {form.image ? "image_selected.jpg" : "No file chosen"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.fileHint}>
+                      Leave empty to keep current image.{" "}
+                      <Text style={{ fontWeight: "700" }}>
+                        Recommended: {activeSection.size}
+                      </Text>{" "}
+                      | Max size: 2MB
+                    </Text>
+                    {!!errors.image && (
+                      <Text style={styles.errorText}>{errors.image}</Text>
+                    )}
+                  </View>
+                </Field>
               </ScrollView>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity style={styles.btnGhost} onPress={closeModal}>
-                  <X size={15} color="#374151" />
-                  <Text style={styles.btnGhostText}>Cancel</Text>
+                <TouchableOpacity
+                  style={styles.btnSecondary}
+                  onPress={closeModal}
+                >
+                  <Text style={styles.btnSecondaryText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.btnPrimary, !form.title.trim() && { opacity: 0.5 }]}
+                  style={styles.btnPrimary}
                   onPress={handleSave}
-                  disabled={!form.title.trim()}
                 >
                   <Save size={15} color="#fff" />
                   <Text style={styles.btnPrimaryText}>
@@ -583,12 +960,20 @@ export default function HomepageBannerManagement() {
           <View style={styles.overlay}>
             <View style={styles.confirmCard}>
               <Text style={styles.confirmTitle}>Delete this banner?</Text>
-              <Text style={styles.confirmSubtitle}>This action can&apos;t be undone.</Text>
+              <Text style={styles.confirmSubtitle}>
+                This action can&apos;t be undone.
+              </Text>
               <View style={styles.confirmActions}>
-                <TouchableOpacity style={styles.btnGhost} onPress={() => setConfirmDelete(null)}>
+                <TouchableOpacity
+                  style={styles.btnGhost}
+                  onPress={() => setConfirmDelete(null)}
+                >
                   <Text style={styles.btnGhostText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.btnDanger} onPress={handleDelete}>
+                <TouchableOpacity
+                  style={styles.btnDanger}
+                  onPress={handleDelete}
+                >
                   <Text style={styles.btnPrimaryText}>Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -607,7 +992,13 @@ export default function HomepageBannerManagement() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -629,8 +1020,18 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 14,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, flexShrink: 1 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    flexShrink: 1,
+  },
   headerIcon: {
     width: 44,
     height: 44,
@@ -707,8 +1108,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eceef2",
     borderRadius: 14,
-    padding: 12,
-    minWidth: 160,
+    padding: 10,
+    paddingHorizontal: 12,
   },
   statCardInner: {
     flexDirection: "row",
@@ -727,7 +1128,12 @@ const styles = StyleSheet.create({
   },
   statCardLabel: { fontSize: 13, fontWeight: "700", color: "#1c2333" },
   statCardLabelActive: { color: "#fff" },
-  statCardCount: { fontSize: 11, color: "#9aa0ac", marginTop: 2, fontWeight: "600" },
+  statCardCount: {
+    fontSize: 11,
+    color: "#9aa0ac",
+    marginTop: 2,
+    fontWeight: "600",
+  },
   statCardCountActive: { color: "#c6cadb" },
 
   main: { flex: 1 },
@@ -748,7 +1154,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  infoTitle: { color: "#fff", fontSize: 14, fontWeight: "700", marginBottom: 2 },
+  infoTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
   infoDesc: { color: "#c6cadb", fontSize: 11.5, marginBottom: 8 },
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   tag: {
@@ -795,7 +1206,11 @@ const styles = StyleSheet.create({
     borderColor: "#eceef2",
     overflow: "hidden",
   },
-  cardImageWrap: { width: "100%", aspectRatio: 4 / 3, backgroundColor: "#eef0f4" },
+  cardImageWrap: {
+    width: "100%",
+    aspectRatio: 4 / 3,
+    backgroundColor: "#eef0f4",
+  },
   cardImage: { width: "100%", height: "100%" },
   positionChip: {
     position: "absolute",
@@ -838,7 +1253,13 @@ const styles = StyleSheet.create({
   actionToggleOn: { backgroundColor: "#fde68a", flex: 1.3 },
   actionToggleOff: { backgroundColor: "#e5e7eb", flex: 1.3 },
   actionToggleText: { fontSize: 10, fontWeight: "700" },
-  actionDelete: { backgroundColor: "#fee2e2", width: 32, flexShrink: 0, justifyContent: "center", alignItems: "center" },
+  actionDelete: {
+    backgroundColor: "#fee2e2",
+    width: 32,
+    flexShrink: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   empty: {
     backgroundColor: "#fff",
@@ -849,7 +1270,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 46,
   },
-  emptyText: { marginTop: 8, marginBottom: 12, fontWeight: "600", color: "#6b7280", fontSize: 12.5 },
+  emptyText: {
+    marginTop: 8,
+    marginBottom: 12,
+    fontWeight: "600",
+    color: "#6b7280",
+    fontSize: 12.5,
+  },
 
   btnPrimary: {
     flexDirection: "row",
@@ -857,11 +1284,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 7,
     backgroundColor: "#f97316",
-    borderRadius: 10,
-    paddingVertical: 11,
+    borderRadius: 6,
+    paddingVertical: 10,
     paddingHorizontal: 16,
   },
   btnPrimaryText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  btnSecondary: {
+    backgroundColor: "#6b7280",
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnSecondaryText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   btnGhost: {
     flexDirection: "row",
     alignItems: "center",
@@ -884,8 +1320,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  overlay: { flex: 1, backgroundColor: "rgba(15,18,33,0.55)", justifyContent: "center", alignItems: "center" },
-  modalCard: { backgroundColor: "#fff", borderRadius: 18, width: 520, maxWidth: "90%", maxHeight: "90%" },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,18,33,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    width: 520,
+    maxWidth: "90%",
+    maxHeight: "90%",
+  },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -900,11 +1347,44 @@ const styles = StyleSheet.create({
   modalHeaderTitle: { flex: 1, color: "#fff", fontSize: 14, fontWeight: "700" },
   modalBody: { paddingHorizontal: 18, paddingTop: 14 },
 
-  preview: { width: "100%", aspectRatio: 16 / 9, borderRadius: 10, overflow: "hidden", backgroundColor: "#eef0f4", marginBottom: 14 },
-  previewImage: { width: "100%", height: "100%" },
+  currentImageWrap: {
+    width: 220,
+    height: 130,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#eef0f4",
+    borderWidth: 1,
+    borderColor: "#e2e4ea",
+  },
+  currentImage: { width: "100%", height: "100%" },
+  customFileInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e2e4ea",
+    borderRadius: 6,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  chooseFileBtn: {
+    backgroundColor: "#f9fafb",
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRightWidth: 1,
+    borderRightColor: "#e2e4ea",
+  },
+  chooseFileText: { color: "#4b5563", fontSize: 13, fontWeight: "600" },
+  fileNameWrap: { flex: 1, paddingHorizontal: 12 },
+  fileNameText: { color: "#9ca3af", fontSize: 13 },
+  fileHint: { color: "#6b7280", fontSize: 11.5, marginTop: 2 },
 
   field: { marginBottom: 14 },
-  fieldLabel: { fontSize: 11.5, fontWeight: "700", color: "#4b5563", marginBottom: 5 },
+  fieldLabel: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#4b5563",
+    marginBottom: 5,
+  },
   input: {
     borderWidth: 1,
     borderColor: "#e2e4ea",
@@ -915,8 +1395,14 @@ const styles = StyleSheet.create({
     color: "#1c2333",
     backgroundColor: "#fff",
   },
-  fileBox: { borderWidth: 1, borderColor: "#e2e4ea", borderRadius: 9, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: "#f9fafb", alignItems: "center" },
-  fileBoxText: { color: "#4b5563", fontSize: 13, fontWeight: "500" },
+  inputError: {
+    borderColor: "#dc2626",
+  },
+  errorText: {
+    color: "#dc2626",
+    fontSize: 11,
+    marginTop: 4,
+  },
   fieldRow: { flexDirection: "row", gap: 12 },
   selectBox: {
     flexDirection: "row",
@@ -940,22 +1426,38 @@ const styles = StyleSheet.create({
     borderTopColor: "#f0f0f2",
   },
 
-  optionSheet: { backgroundColor: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingVertical: 8 },
-  optionRow: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  optionSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingVertical: 8,
+  },
+  optionRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
   optionText: { fontSize: 14.5, color: "#1c2333" },
 
   confirmCard: {
     alignSelf: "center",
     marginTop: "auto",
     marginBottom: "auto",
-    width: "85%",
+    width: "90%",
+    maxWidth: 400,
     backgroundColor: "#fff",
     borderRadius: 14,
     padding: 20,
   },
   confirmTitle: { fontSize: 15, fontWeight: "700", color: "#1c2333" },
   confirmSubtitle: { fontSize: 12.5, color: "#9aa0ac", marginTop: 4 },
-  confirmActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 18 },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 18,
+  },
 
   toast: {
     position: "absolute",
