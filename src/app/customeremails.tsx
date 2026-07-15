@@ -9,8 +9,7 @@
  * screen can be dropped in and viewed immediately. Wire up your own
  * fetch/send handlers where marked "// TODO: connect to API".
  *
- * Icons: react-native-bootstrap-icons
- *   npm install react-native-bootstrap-icons react-native-svg
+ * Icons: Feather (from @expo/vector-icons)
  * -----------------------------------------------------------------------
  */
 
@@ -31,46 +30,40 @@ import {
 
 import AdminLayout from '@/components/admin-layout';
 
-import Calendar3 from 'react-native-bootstrap-icons/icons/calendar3';
-import EnvelopeFill from 'react-native-bootstrap-icons/icons/envelope-fill';
-import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
-import Search from 'react-native-bootstrap-icons/icons/search';
-import Send from 'react-native-bootstrap-icons/icons/telegram';
-import Telephone from 'react-native-bootstrap-icons/icons/telephone';
-import XLg from 'react-native-bootstrap-icons/icons/x-lg';
+import { Feather } from '@expo/vector-icons';
 
 // ---------------------------------------------------------------------------
 // Design tokens
 // ---------------------------------------------------------------------------
 const COLORS = {
-  navy: "#151D4F",
-  navySoft: "#152238",
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  bg: "#F8FAFC",
-  card: "#FFFFFF",
-  surface: "#FFFFFF",
-  border: "#E2E8F0",
-  text: "#1E293B",
-  textMuted: "#64748B",
-  textFaint: "#94A3B8",
-  muted: "#8B8FA3",
-  emerald: "#059669",
-  emeraldBg: "#ECFDF5",
-  rose: "#E11D48",
-  roseBg: "#FFF1F2",
-  amber: "#D97706",
-  amberBg: "#FFFBEB",
-  orangeBg: "#FFF7ED",
-  slate: '#64748B',
-  slateSoft: '#F1F5F9',
-  infoSoft: '#EFF6FF',
-  infoText: '#3B82F6',
-  white: '#ffffff',
-  primary: "#F97316",
-  primaryDark: "#EA580C",
-  primarySoft: "#FDE7DA",
-  chipBg: "#FBEFE6",
+    navy: "#151D4F",
+    navySoft: "#152238",
+    orange: "#F97316",
+    orangeDark: "#EA580C",
+    bg: "#F8FAFC",
+    card: "#FFFFFF",
+    surface: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#1E293B",
+    textMuted: "#64748B",
+    textFaint: "#94A3B8",
+    muted: "#8B8FA3",
+    emerald: "#059669",
+    emeraldBg: "#ECFDF5",
+    rose: "#E11D48",
+    roseBg: "#FFF1F2",
+    amber: "#D97706",
+    amberBg: "#FFFBEB",
+    orangeBg: "#FFF7ED",
+    slate: '#64748B',
+    slateSoft: '#F1F5F9',
+    infoSoft: '#EFF6FF',
+    infoText: '#3B82F6',
+    white: '#ffffff',
+    primary: "#F97316",
+    primaryDark: "#EA580C",
+    primarySoft: "#FDE7DA",
+    chipBg: "#FBEFE6",
 };
 
 // ---------------------------------------------------------------------------
@@ -125,12 +118,7 @@ const initials = (name: string) =>
         .map((n) => n[0]?.toUpperCase())
         .join('');
 
-// ---------------------------------------------------------------------------
-// Icon wrapper (keeps every icon call consistent)
-// ---------------------------------------------------------------------------
-const Ic = ({ icon: IconCmp, size = 16, color = COLORS.navy }: { icon: any; size?: number; color?: string }) => (
-    <IconCmp width={size} height={size} color={color} fill={color} />
-);
+// Icons use Feather from @expo/vector-icons (same as seller-emails.tsx)
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -201,7 +189,7 @@ export default function CustomerEmailsScreen() {
                         <View style={styles.heroTopRow}>
                             <View style={{ flexDirection: "row", alignItems: "center", gap: isCompact ? 8 : 12, flex: 1, marginRight: 8 }}>
                                 <View style={styles.heroIconBadge}>
-                                    <Ic icon={EnvelopeFill} size={18} color="#fff" />
+                                    <Feather name="mail" size={18} color="#fff" />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.heroTitle}>Customer Emails</Text>
@@ -213,7 +201,7 @@ export default function CustomerEmailsScreen() {
                                     style={styles.addHeaderBtn}
                                     onPress={openBulk}
                                 >
-                                    <Ic icon={EnvelopeFill} size={15} color="#fff" />
+                                    <Feather name="mail" size={15} color="#fff" />
                                     <Text style={styles.addHeaderBtnText}>Send to All</Text>
                                 </TouchableOpacity>
                             )}
@@ -224,7 +212,7 @@ export default function CustomerEmailsScreen() {
                     {/* Search + total strip */}
                     <View style={[styles.searchStrip, isCompact && styles.searchStripMobile]}>
                         <View style={styles.searchInputWrap}>
-                            <Ic icon={Search} size={16} color={COLORS.textFaint} />
+                            <Feather name="search" size={16} color={COLORS.textFaint} />
                             <TextInput
                                 style={styles.searchInput}
                                 placeholder="Search customers..."
@@ -256,7 +244,7 @@ export default function CustomerEmailsScreen() {
 
                     {filtered.length === 0 && (
                         <View style={styles.emptyState}>
-                            <Ic icon={Search} size={28} color={COLORS.muted} />
+                            <Feather name="search" size={28} color={COLORS.muted} />
                             <Text style={styles.emptyTitle}>No customers found</Text>
                             <Text style={styles.emptySub}>Try a different name, email, or mobile number.</Text>
                         </View>
@@ -268,7 +256,7 @@ export default function CustomerEmailsScreen() {
             <SendModal
                 visible={!!singleTarget}
                 title="Send Email"
-                icon={Send}
+                icon="send"
                 info={
                     singleTarget ? (
                         <View style={styles.toField}>
@@ -292,10 +280,10 @@ export default function CustomerEmailsScreen() {
             <SendModal
                 visible={bulkOpen}
                 title="Send Email to All Customers"
-                icon={EnvelopeFill}
+                icon="mail"
                 info={
                     <View style={styles.noticeBox}>
-                        <Ic icon={InfoCircleFill} size={15} color={COLORS.primary} />
+                        <Feather name="info" size={15} color={COLORS.primary} />
                         <Text style={styles.noticeText}>
                             This email will be sent to all <Text style={{ fontWeight: '700' }}>{MOCK_CUSTOMERS.length} registered customers</Text>.
                         </Text>
@@ -352,11 +340,11 @@ function TableView({ data, onSend }: { data: Customer[]; onSend: (c: Customer) =
                         <Text style={styles.tdStrong} numberOfLines={1}>{c.name}</Text>
                     </View>
                     <View style={{ flex: 2.4, flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={styles.td} numberOfLines={1}> {c.email}</Text>
+                        <Text style={styles.td} numberOfLines={1}>{c.email}</Text>
                     </View>
                     <Text style={[styles.td, { flex: 1.3 }]}>{c.mobile}</Text>
                     <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center' }}>
-                        <Ic icon={Calendar3} size={13} color={COLORS.muted} />
+                        <Feather name="calendar" size={13} color={COLORS.muted} />
                         <Text style={styles.td}> {c.registeredOn}</Text>
                     </View>
                     <View style={{ flex: 1.4, alignItems: 'flex-end' }}>
@@ -364,7 +352,7 @@ function TableView({ data, onSend }: { data: Customer[]; onSend: (c: Customer) =
                             onPress={() => onSend(c)}
                             style={({ pressed }) => [styles.rowActionBtn, pressed && { opacity: 0.85 }]}
                         >
-                            <Ic icon={Send} size={12} color="#fff" />
+                            <Feather name="send" size={12} color="#fff" />
                             <Text style={styles.rowActionText}>Send Email</Text>
                         </Pressable>
                     </View>
@@ -396,11 +384,11 @@ function CardGrid({ data, onSend, columns }: { data: Customer[]; onSend: (c: Cus
                         <Text style={styles.cardDetailText} numberOfLines={1}>{c.email}</Text>
                     </View>
                     <View style={styles.cardDetailRow}>
-                        <Ic icon={Telephone} size={13} color={COLORS.primary} />
+                        <Feather name="phone" size={13} color={COLORS.primary} />
                         <Text style={styles.cardDetailText}>{c.mobile}</Text>
                     </View>
                     <View style={styles.cardDetailRow}>
-                        <Ic icon={Calendar3} size={13} color={COLORS.primary} />
+                        <Feather name="calendar" size={13} color={COLORS.primary} />
                         <Text style={styles.cardDetailText}>Registered {c.registeredOn}</Text>
                     </View>
 
@@ -408,7 +396,7 @@ function CardGrid({ data, onSend, columns }: { data: Customer[]; onSend: (c: Cus
                         onPress={() => onSend(c)}
                         style={({ pressed }) => [styles.cardActionBtn, pressed && { opacity: 0.85 }]}
                     >
-                        <Ic icon={Send} size={13} color="#fff" />
+                        <Feather name="send" size={13} color="#fff" />
                         <Text style={styles.rowActionText}>Send Email</Text>
                     </Pressable>
                 </View>
@@ -436,7 +424,7 @@ function SendModal({
 }: {
     visible: boolean;
     title: string;
-    icon: any;
+    icon: string;
     info: React.ReactNode;
     subject: string;
     message: string;
@@ -454,12 +442,12 @@ function SendModal({
                     <View style={styles.modalHeader}>
                         <View style={styles.modalHeaderTitleRow}>
                             <View style={styles.modalIconBadge}>
-                                <Ic icon={Send} size={14} color={COLORS.orange} />
+                                <Feather name="send" size={14} color={COLORS.orange} />
                             </View>
                             <Text style={styles.modalHeaderTitle}>{title}</Text>
                         </View>
                         <Pressable onPress={onCancel} hitSlop={8}>
-                            <Ic icon={XLg} size={20} color={COLORS.textMuted} />
+                            <Feather name="x" size={20} color={COLORS.textMuted} />
                         </Pressable>
                     </View>
 
@@ -490,11 +478,11 @@ function SendModal({
 
                     <View style={styles.modalFooter}>
                         <Pressable onPress={onCancel} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.8 }]}>
-                            <Ic icon={XLg} size={13} color={COLORS.navySoft} />
+                            <Feather name="x" size={13} color={COLORS.navySoft} />
                             <Text style={styles.ghostBtnText}>Cancel</Text>
                         </Pressable>
                         <Pressable onPress={onSend} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}>
-                            <Ic icon={Send} size={14} color="#fff" />
+                            <Feather name="send" size={14} color="#fff" />
                             <Text style={styles.primaryBtnText}>{sendLabel}</Text>
                         </Pressable>
                     </View>
@@ -655,7 +643,7 @@ const styles = StyleSheet.create({
     tdMuted: { color: COLORS.muted },
     rowActionBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: '#151D4F', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+        backgroundColor: '#F97316', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
     },
     rowActionText: { color: '#fff', fontWeight: '700', fontSize: 11 },
 
@@ -687,7 +675,7 @@ const styles = StyleSheet.create({
     cardDetailText: { fontSize: 12.5, color: COLORS.navySoft, flexShrink: 1 },
     cardActionBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-        backgroundColor: '#151D4F', paddingVertical: 11, borderRadius: 9, marginTop: 6,
+        backgroundColor: '#F97316', paddingVertical: 11, borderRadius: 9, marginTop: 6,
     },
 
     // Empty state

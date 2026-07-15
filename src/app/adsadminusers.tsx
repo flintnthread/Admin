@@ -35,11 +35,10 @@ import {
     useWindowDimensions,
     View
 } from 'react-native';
+import Svg, { Line, Rect } from 'react-native-svg';
 
 import Pagination from '@/components/Pagination';
 import CalendarWeek from 'react-native-bootstrap-icons/icons/calendar-week';
-import Grid3x3GapFill from 'react-native-bootstrap-icons/icons/grid-3x3-gap-fill';
-import ListUl from 'react-native-bootstrap-icons/icons/list-ul';
 import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import PersonCheckFill from 'react-native-bootstrap-icons/icons/person-check-fill';
 import PersonXFill from 'react-native-bootstrap-icons/icons/person-x-fill';
@@ -159,6 +158,107 @@ const statusColors = (status: Status) =>
     status === 'Active'
         ? { bg: COLORS.greenBg, fg: COLORS.greenText }
         : { bg: '#FDE8EC', fg: COLORS.danger };
+
+// Grid and List view icons (matching orders.tsx)
+const GridIcon = ({ active }: { active: boolean }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Rect
+      x="3"
+      y="3"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+    <Rect
+      x="14"
+      y="3"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+    <Rect
+      x="3"
+      y="14"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+    <Rect
+      x="14"
+      y="14"
+      width="7"
+      height="7"
+      rx="1"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+    />
+  </Svg>
+);
+
+const ListIcon = ({ active }: { active: boolean }) => (
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+    <Line
+      x1="8"
+      y1="6"
+      x2="21"
+      y2="6"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="8"
+      y1="12"
+      x2="21"
+      y2="12"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="8"
+      y1="18"
+      x2="21"
+      y2="18"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="6"
+      x2="3.01"
+      y2="6"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="12"
+      x2="3.01"
+      y2="12"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+    <Line
+      x1="3"
+      y1="18"
+      x2="3.01"
+      y2="18"
+      stroke={active ? '#fff' : COLORS.ink}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+  </Svg>
+);
 
 // ---------------------------------------------------------------------------
 // Grid view card component (supports hover overlay and responsive layout)
@@ -771,13 +871,13 @@ const AdsAdminUsers: React.FC = () => {
                                         style={[styles.viewToggleBtn, view === 'grid' && styles.viewToggleBtnActive]}
                                         onPress={() => setView('grid')}
                                     >
-                                        <Grid3x3GapFill width={14} height={14} fill={view === 'grid' ? '#fff' : COLORS.ink} />
+                                        <GridIcon active={view === 'grid'} />
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.viewToggleBtn, view === 'list' && styles.viewToggleBtnActive]}
                                         onPress={() => setView('list')}
                                     >
-                                        <ListUl width={14} height={14} fill={view === 'list' ? '#fff' : COLORS.ink} />
+                                        <ListIcon active={view === 'list'} />
                                     </TouchableOpacity>
                                 </View>
                             )}
@@ -979,8 +1079,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
     } as any,
     viewToggle: { flexDirection: 'row', backgroundColor: '#F1F2F4', borderRadius: 10, padding: 3 },
-    viewToggleBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8 },
-    viewToggleBtnActive: { backgroundColor: COLORS.orange },
+    viewToggleBtn: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    viewToggleBtnActive: { backgroundColor: COLORS.navy },
 
     dataCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 12 },
 
