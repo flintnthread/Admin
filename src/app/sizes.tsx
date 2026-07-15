@@ -39,6 +39,15 @@ import {
     updateSize,
     type CatalogSize,
 } from "@/services/sizeApi";
+import {
+  SIZE_CATALOG_ALL,
+  SIZE_CATALOG_GROUPS,
+  classifySizeCatalog,
+  countSizesByCatalogGroup,
+  filterSizesByCatalogGroup,
+  sizeCatalogGroupLabel,
+  type SizeCatalogFilterId,
+} from "@/lib/sizeCatalogGroups";
 
 // ── Linear Gradient ──────────────────────────────────────────
 // Expo:  import { LinearGradient } from "expo-linear-gradient";
@@ -322,6 +331,9 @@ const GridCard: React.FC<{
 
       <View style={S.gridCardBottom}>
         <Text style={S.gridCardName} numberOfLines={1}>{item.name}</Text>
+        <Text style={S.gridCardCatalog} numberOfLines={1}>
+          {sizeCatalogGroupLabel(classifySizeCatalog(item.name, item.code))}
+        </Text>
         <View style={S.gridCardMeta}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {/* Bootstrap: calendar3 */}
@@ -363,6 +375,9 @@ const ListRow: React.FC<{
     </Text>
     <Text style={[S.listCell, { flex: 1.2, color: "#555" }]} numberOfLines={1}>
       {item.code}
+    </Text>
+    <Text style={[S.listCell, { flex: 1.2, color: "#8b3e0f", fontWeight: "600" }]} numberOfLines={1}>
+      {sizeCatalogGroupLabel(classifySizeCatalog(item.name, item.code))}
     </Text>
     <View style={[S.listCell, { flex: 1.4, flexDirection: "row", alignItems: "center" }]}>
       {/* Bootstrap: calendar3 */}
@@ -444,6 +459,8 @@ const SizeForm: React.FC<{
 }> = ({ name, setName, code, setCode, status, setStatus }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 600;
+  const matchedGroup = classifySizeCatalog(name, code);
+  const matchedLabel = sizeCatalogGroupLabel(matchedGroup);
 
   return (
     <View>
@@ -452,7 +469,7 @@ const SizeForm: React.FC<{
         style={S.input}
         value={name}
         onChangeText={setName}
-        placeholder="Enter size name"
+        placeholder="e.g. M, UK 8, 32, 2-3Y, Free Size"
         placeholderTextColor="#bbb"
       />
 
@@ -461,9 +478,17 @@ const SizeForm: React.FC<{
         style={S.input}
         value={code}
         onChangeText={setCode}
-        placeholder="Enter size code"
+        placeholder="e.g. M, UK-8, 32, 2-3Y, FS"
         placeholderTextColor="#bbb"
       />
+
+      <View style={S.catalogMatchBox}>
+        <Text style={S.catalogMatchLabel}>Will appear under</Text>
+        <Text style={S.catalogMatchValue}>{matchedLabel}</Text>
+        <Text style={S.catalogMatchHint}>
+          Matched from name/code · Apparel, Footwear, Waist, Kids, Free Size, or Other
+        </Text>
+      </View>
 
       <Text style={S.label}>Status</Text>
       {isMobile ? (
@@ -652,6 +677,7 @@ export default function SizesManagement() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
+  const [catalogFilter, setCatalogFilter] = useState<SizeCatalogFilterId>(SIZE_CATALOG_ALL);
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState<ModalState>(null);
   const [containerWidth, setContainerWidth] = useState(width);
@@ -659,19 +685,28 @@ export default function SizesManagement() {
   const cardWidth = Math.max(0, (containerWidth - PADDING * 2 - GAP * (numCols - 1)) / numCols);
   const cardWidthPct = `${(100 / numCols).toFixed(4)}%` as any;
 
-  const filtered = useMemo(
-    () => sizes.filter(s =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.code.toLowerCase().includes(search.toLowerCase())
-    ),
-    [sizes, search]
-  );
+  const catalogCounts = useMemo(() => countSizesByCatalogGroup(sizes), [sizes]);
+
+  const filtered = useMemo(() => {
+    const byGroup = filterSizesByCatalogGroup(sizes, catalogFilter);
+    const q = search.toLowerCase().trim();
+    if (!q) return byGroup;
+    return byGroup.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q)
+    );
+  }, [sizes, search, catalogFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
+  function handleCatalogFilter(id: SizeCatalogFilterId) {
+    setCatalogFilter(id);
+    setPage(1);
+  }
 
   const loadSizes = useCallback(async () => {
     setLoading(true);
@@ -694,7 +729,12 @@ export default function SizesManagement() {
     setSaving(true);
     try {
       const created = await createSize(d);
-      setSizes((prev) => [...prev, mapSizeRow(created)]);
+      const mapped = mapSizeRow(created);
+      setSizes((prev) => [...prev, mapped]);
+      const group = classifySizeCatalog(mapped.name, mapped.code);
+      setCatalogFilter(group);
+      setPage(1);
+      setSearch("");
       setModal(null);
     } catch (error) {
       Alert.alert("Error", getApiErrorMessage(error, "Could not add size."));
@@ -711,7 +751,10 @@ export default function SizesManagement() {
         code: updated.code,
         status: updated.status,
       });
-      setSizes((prev) => prev.map((s) => (s.id === updated.id ? mapSizeRow(saved) : s)));
+      const mapped = mapSizeRow(saved);
+      setSizes((prev) => prev.map((s) => (s.id === updated.id ? mapped : s)));
+      setCatalogFilter(classifySizeCatalog(mapped.name, mapped.code));
+      setPage(1);
       setModal(null);
     } catch (error) {
       Alert.alert("Error", getApiErrorMessage(error, "Could not update size."));
@@ -849,6 +892,36 @@ export default function SizesManagement() {
             </View>
           </View>
 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: PADDING, marginTop: 10 }}
+            contentContainerStyle={S.catalogTabsRow}
+          >
+            <TouchableOpacity
+              style={[S.catalogTab, catalogFilter === SIZE_CATALOG_ALL && S.catalogTabActive]}
+              onPress={() => handleCatalogFilter(SIZE_CATALOG_ALL)}
+            >
+              <Text style={[S.catalogTabText, catalogFilter === SIZE_CATALOG_ALL && S.catalogTabTextActive]}>
+                All ({catalogCounts.all})
+              </Text>
+            </TouchableOpacity>
+            {SIZE_CATALOG_GROUPS.map((g) => {
+              const active = catalogFilter === g.id;
+              return (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[S.catalogTab, active && S.catalogTabActive]}
+                  onPress={() => handleCatalogFilter(g.id)}
+                >
+                  <Text style={[S.catalogTabText, active && S.catalogTabTextActive]}>
+                    {g.label} ({catalogCounts[g.id]})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           {/* ── LIST / GRID ── */}
           {paginated.length === 0 ? (
             <View style={S.emptyBox}>
@@ -893,6 +966,7 @@ export default function SizesManagement() {
                       <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Catalog</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
                       <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
                       <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
@@ -1033,7 +1107,65 @@ const S = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
   gridCardBottom: { backgroundColor: "#fff", padding: 10 },
-  gridCardName: { fontSize: 13, fontWeight: "600", color: "#222", marginBottom: 4 },
+  gridCardName: { fontSize: 13, fontWeight: "600", color: "#222", marginBottom: 2 },
+  gridCardCatalog: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#8b3e0f",
+    marginBottom: 6,
+  },
+  catalogTabsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  catalogTab: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#e5d5c8",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  catalogTabActive: {
+    backgroundColor: "#8b3e0f",
+    borderColor: "#8b3e0f",
+  },
+  catalogTabText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6b5a4e",
+  },
+  catalogTabTextActive: {
+    color: "#fff",
+  },
+  catalogMatchBox: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+  },
+  catalogMatchLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#9A3412",
+    marginBottom: 2,
+  },
+  catalogMatchValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#C2410C",
+  },
+  catalogMatchHint: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "#9A3412",
+    lineHeight: 15,
+  },
   gridCardMeta: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between", flexWrap: "wrap", gap: 4,

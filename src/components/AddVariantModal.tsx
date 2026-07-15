@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -14,6 +14,10 @@ import {
 } from 'react-native';
 
 import type { ProductVariant } from '@/constants/product-approval-data';
+import {
+  SWEETS_DEFAULT_COLOR,
+  variantDimensionLabels,
+} from '@/lib/product/sweetsCategory';
 
 const PALETTE = {
   navy: '#1E3A5F',
@@ -35,6 +39,7 @@ type AddVariantModalProps = {
   visible: boolean;
   onClose: () => void;
   onAdd: (variant: ProductVariant) => void;
+  sweetsProduct?: boolean;
 };
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
@@ -86,11 +91,17 @@ function SelectField({
   );
 }
 
-export function AddVariantModal({ visible, onClose, onAdd }: AddVariantModalProps) {
+export function AddVariantModal({
+  visible,
+  onClose,
+  onAdd,
+  sweetsProduct = false,
+}: AddVariantModalProps) {
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
-  const [color, setColor] = useState('');
+  const [color, setColor] = useState(sweetsProduct ? SWEETS_DEFAULT_COLOR : '');
   const [size, setSize] = useState('');
   const [stock, setStock] = useState('');
   const [mrp, setMrp] = useState('');
@@ -99,8 +110,12 @@ export function AddVariantModal({ visible, onClose, onAdd }: AddVariantModalProp
   const [imageUrl, setImageUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
 
+  useEffect(() => {
+    if (sweetsProduct) setColor(SWEETS_DEFAULT_COLOR);
+  }, [sweetsProduct]);
+
   const reset = () => {
-    setColor('');
+    setColor(sweetsProduct ? SWEETS_DEFAULT_COLOR : '');
     setSize('');
     setStock('');
     setMrp('');
@@ -126,13 +141,13 @@ export function AddVariantModal({ visible, onClose, onAdd }: AddVariantModalProp
 
     const variant: ProductVariant = {
       id: `v-${Date.now()}`,
-      colorName: color || 'Coffee Brown',
+      colorName: sweetsProduct ? SWEETS_DEFAULT_COLOR : color || 'Coffee Brown',
       colorHex: '#6F4E37',
       image:
         imageUrl ||
         'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=120&h=120&fit=crop',
       size: size || '6',
-      sku: `PRE-${(color || 'CO').slice(0, 2).toUpperCase()}${size || '6'}-${Math.floor(Math.random() * 9000) + 1000}`,
+      sku: `PRE-${(sweetsProduct ? 'SW' : (color || 'CO')).slice(0, 2).toUpperCase()}${size || '6'}-${Math.floor(Math.random() * 9000) + 1000}`,
       stock: stockNum,
       mrp: mrpNum,
       discountPercent: discNum,
@@ -172,19 +187,21 @@ export function AddVariantModal({ visible, onClose, onAdd }: AddVariantModalProp
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.form}>
             {/* Row 1 */}
             <View style={[styles.row, isWide && styles.rowTwoCol]}>
-              <View style={[styles.field, isWide && styles.fieldHalf]}>
-                <FieldLabel label="Color" required />
+              {dimLabels.showColor ? (
+                <View style={[styles.field, isWide && styles.fieldHalf]}>
+                  <FieldLabel label={dimLabels.colorLabel} required />
+                  <SelectField
+                    placeholder="Select color"
+                    value={color}
+                    options={COLOR_OPTIONS}
+                    onSelect={setColor}
+                  />
+                </View>
+              ) : null}
+              <View style={[styles.field, isWide && dimLabels.showColor ? styles.fieldHalf : undefined]}>
+                <FieldLabel label={dimLabels.sizeLabel} required />
                 <SelectField
-                  placeholder="Select color"
-                  value={color}
-                  options={COLOR_OPTIONS}
-                  onSelect={setColor}
-                />
-              </View>
-              <View style={[styles.field, isWide && styles.fieldHalf]}>
-                <FieldLabel label="Size" required />
-                <SelectField
-                  placeholder="Select size"
+                  placeholder={dimLabels.sizePlaceholder}
                   value={size}
                   options={SIZE_OPTIONS}
                   onSelect={setSize}

@@ -4016,9 +4016,7 @@ const s = StyleSheet.create({
   },
   statCardsWrapMobile: { flexWrap: "nowrap", gap: 6, marginTop: -26, justifyContent: "center" },
   statCard: {
-    flex: 1,
-    minWidth: 130,
-    maxWidth: 240,
+    width: 200,
     backgroundColor: C.card,
     borderRadius: 14,
     padding: 12,

@@ -23,7 +23,7 @@ type Props = {
 };
 
 // Navigation items definition
-const NAV_ITEMS = {
+export const NAV_ITEMS = {
   GENERAL: [
 
 
@@ -176,14 +176,14 @@ const NAV_ITEMS = {
       path: null,
       children: [
         { label: "Ads Dashboard", icon: "pie-chart", path: "/Addashboard", color: "#3B82F6" },
-        { label: "Ad Placements", icon: "layout", path: "ads-placement", color: "#10B981" },
-        { label: "Performance Ads", icon: "activity", path: "Performance-ads", color: "#F59E0B" },
-        { label: "Campaigns & Packages", icon: "package", path: "campaigns-packages", color: "#8B5CF6" },
-        { label: "Ads Types & Details", icon: "layers", path: "ads-types-details", color: "#EC4899" },
-        { label: "Orders Management", icon: "shopping-cart", path: "ads-ordermanagement", color: "#14B8A6" },
-        { label: "Payments Management", icon: "credit-card", path: "ads-payments", color: "#F97316" },
-        { label: "Customers Management", icon: "users", path: "customermngt", color: "#06B6D4" },
-        { label: "Notifications", icon: "bell", path: "ads-notifications", color: "#EAB308" },
+        { label: "Ad Placements", icon: "layout", path: "/ads-placement", color: "#10B981" },
+        { label: "Performance Ads", icon: "activity", path: "/Performance-ads", color: "#F59E0B" },
+        { label: "Campaigns & Packages", icon: "package", path: "/campaigns-packages", color: "#8B5CF6" },
+        { label: "Ads Types & Details", icon: "layers", path: "/ads-types-details", color: "#EC4899" },
+        { label: "Orders Management", icon: "shopping-cart", path: "/ads-ordermanagement", color: "#14B8A6" },
+        { label: "Payments Management", icon: "credit-card", path: "/ads-payments", color: "#F97316" },
+        { label: "Customers Management", icon: "users", path: "/customermngt", color: "#06B6D4" },
+        { label: "Notifications", icon: "bell", path: "/ads-notifications", color: "#EAB308" },
       ],
     },
   ],
@@ -283,6 +283,8 @@ const NAV_ITEMS = {
   ],
 } as const;
 
+let globalSidebarScrollY = 0;
+
 export default function AdminSidebar({
   collapsed,
   onToggleCollapse,
@@ -313,12 +315,21 @@ export default function AdminSidebar({
   });
 
   const toggleExpanded = (label: string) => {
-    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+    setExpandedItems((prev) => (prev[label] ? {} : { [label]: true }));
+    setEcommerceExpanded(false);
   };
 
   const navigate = (path: string | null) => {
     if (path) router.push(path as never);
   };
+
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: globalSidebarScrollY, animated: false });
+    }, 10);
+    return () => clearTimeout(timer);
+  }, []);
 
   const colors = useTheme();
   const { theme } = useThemeContext();
@@ -366,9 +377,15 @@ export default function AdminSidebar({
 
       {/* Scrollable nav items */}
       <ScrollView
+        ref={scrollRef}
         style={styles.navScroll}
         contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 20 : 60 }}
         showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: globalSidebarScrollY }}
+        onScroll={(e) => {
+          globalSidebarScrollY = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
       >
         {/* GENERAL */}
         <View style={styles.section}>
@@ -447,7 +464,11 @@ export default function AdminSidebar({
           {!collapsed && <Text style={styles.sectionTitle}>APPS</Text>}
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => setEcommerceExpanded(!ecommerceExpanded)}
+            onPress={() => {
+              const nextState = !ecommerceExpanded;
+              setEcommerceExpanded(nextState);
+              if (nextState) setExpandedItems({});
+            }}
           >
             <Feather
               name="shopping-bag"

@@ -913,14 +913,19 @@ const DepartmentsScreen: React.FC = () => {
                         s.pageHead,
                         isMobileScreen && { padding: 16, paddingBottom: 40, borderRadius: 16 }
                     ]}>
-                        <View style={s.pageHeadLeft}>
-                            <Text style={[
-                                s.pageTitle,
-                                isMobileScreen && { fontSize: 18, lineHeight: 22 }
-                            ]}>Manage Departments</Text>
-                            {!isSmallMobile && (
-                                <Text style={s.pageSub}>Organize your workforce by department structure</Text>
-                            )}
+                        <View style={[s.pageHeadLeft, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+                            <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                                <Feather name="briefcase" size={26} color="#FFF" />
+                            </View>
+                            <View>
+                                <Text style={[
+                                    s.pageTitle,
+                                    isMobileScreen && { fontSize: 18, lineHeight: 22 }
+                                ]}>Manage Departments</Text>
+                                {!isSmallMobile && (
+                                    <Text style={s.pageSub}>Organize your workforce by department structure</Text>
+                                )}
+                            </View>
                         </View>
                         <TouchableOpacity
                             style={[

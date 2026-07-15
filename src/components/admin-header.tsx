@@ -17,6 +17,33 @@ import { useRouter } from "expo-router";
 import { useThemeContext } from "@/context/theme-context";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/context/auth-context";
+import { NAV_ITEMS } from "./admin-sidebar";
+
+// Flatten NAV_ITEMS to get a searchable list of routes
+const searchableRoutes: { label: string; path: string; icon?: string }[] = [];
+Object.values(NAV_ITEMS).forEach((section: any) => {
+  if (Array.isArray(section)) {
+    section.forEach((item: any) => {
+      if (item.path) searchableRoutes.push({ label: item.label, path: item.path, icon: item.icon });
+      if (item.children) {
+        item.children.forEach((child: any) => {
+          if (child.path) searchableRoutes.push({ label: child.label, path: child.path, icon: child.icon });
+        });
+      }
+    });
+  } else if (section && typeof section === 'object') {
+    if (section.children) {
+      section.children.forEach((child: any) => {
+        if (child.path) searchableRoutes.push({ label: child.label, path: child.path, icon: child.icon });
+      });
+    }
+    if (section.standalone) {
+      section.standalone.forEach((child: any) => {
+        if (child.path) searchableRoutes.push({ label: child.label, path: child.path, icon: child.icon });
+      });
+    }
+  }
+});
 
 type Props = {
   /** Called when the hamburger icon is tapped (mobile only) */
@@ -41,6 +68,10 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   // Notifications state
   const [notifications, setNotifications] = useState([
     { id: "1", text: "New seller request pending approval", time: "5 mins ago" },
@@ -49,9 +80,9 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   ]);
 
   const toggleNotif = () => {
-    setNotifOpen(!notifOpen);
     setSettingsOpen(false);
     setProfileOpen(false);
+    router.push("/Admin-notifications" as any);
   };
 
   const toggleSettings = () => {
@@ -101,13 +132,75 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
       )}
 
       {/* Search box */}
-      <View style={[styles.searchContainer, { backgroundColor: isDark ? "#2A2B2D" : "#F3F4F6" }]}>
+      <View style={[styles.searchContainer, { backgroundColor: isDark ? "#2A2B2D" : "#F3F4F6", position: 'relative', zIndex: 100 }]}>
         <Feather name="search" size={16} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search..."
+          placeholder="Search pages..."
           placeholderTextColor={colors.textSecondary}
+          value={searchQuery}
+          onChangeText={(text) => {
+            setSearchQuery(text);
+            setShowSearchResults(text.length > 0);
+          }}
+          onFocus={() => {
+            if (searchQuery.length > 0) setShowSearchResults(true);
+          }}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => { setSearchQuery(""); setShowSearchResults(false); }} style={{ padding: 4 }}>
+            <Feather name="x" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        {/* Search Results Dropdown */}
+        {showSearchResults && (
+          <View
+            style={[
+              styles.dropdownCard,
+              {
+                top: 45,
+                left: 0,
+                right: 0,
+                width: '100%',
+                maxHeight: 300,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                zIndex: 999,
+              },
+            ]}
+            {...(Platform.OS === "web"
+              ? ({ onMouseLeave: () => setShowSearchResults(false) } as object)
+              : {})}
+          >
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {(() => {
+                const results = searchableRoutes.filter(route => route.label.toLowerCase().includes(searchQuery.toLowerCase()));
+                if (results.length === 0) {
+                  return (
+                    <View style={{ padding: 16, alignItems: "center" }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No pages found</Text>
+                    </View>
+                  );
+                }
+                return results.map((item, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.dropdownOption, { borderBottomWidth: idx === results.length - 1 ? 0 : 1, borderBottomColor: colors.border }]}
+                    onPress={() => {
+                      setShowSearchResults(false);
+                      setSearchQuery("");
+                      router.push(item.path as any);
+                    }}
+                  >
+                    <Feather name={item.icon as any} size={14} color={colors.text} style={{ marginRight: 8 }} />
+                    <Text style={[styles.dropdownOptionText, { color: colors.text }]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ));
+              })()}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Right-hand actions */}
@@ -173,31 +266,7 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
 
       </View>
 
-      {/* Notifications Dropdown */}
-      {notifOpen && (
-        <View style={[styles.dropdownCard, { right: 108, width: 280, backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.dropdownHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.dropdownTitle, { color: colors.text }]}>Notifications</Text>
-            <TouchableOpacity onPress={handleClearNotifications}>
-              <Text style={{ fontSize: 11, color: "#e8731a", fontWeight: "600" }}>Clear All</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
-            {notifications.length === 0 ? (
-              <View style={{ padding: 16, alignItems: "center" }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No new notifications</Text>
-              </View>
-            ) : (
-              notifications.map((item) => (
-                <View key={item.id} style={[styles.notifItem, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.notifText, { color: colors.text }]}>{item.text}</Text>
-                  <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>{item.time}</Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
-      )}
+      {/* Notifications Dropdown Removed */}
 
       {/* Settings Dropdown */}
       {settingsOpen && (
