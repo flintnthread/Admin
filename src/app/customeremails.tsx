@@ -155,6 +155,8 @@ export default function CustomerEmailsScreen() {
     };
     // ------------------------------------------------------------------
 
+<<<<<<< HEAD
+=======
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -177,6 +179,7 @@ export default function CustomerEmailsScreen() {
 
     const maxContentWidth = bp === 'xxl' ? '100%' : bp === 'xl' ? 1280 : bp === 'lg' ? 1040 : undefined;
 
+>>>>>>> 4e3b0236b18ea5dc03b5f77eea0a4ffcdc27d449
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return customers;
@@ -217,8 +220,8 @@ export default function CustomerEmailsScreen() {
 
     return (
         <AdminLayout>
-            <ScrollView contentContainerStyle={{ flexGrow: 1, backgroundColor: COLORS.bg }}>
-                <View style={[styles.pageInner, { paddingHorizontal: gutter, maxWidth: maxContentWidth, alignSelf: 'center', width: '100%' }]}>
+            <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+                <View style={[styles.pageInner, { paddingHorizontal: 16 }]}>
                     {/* Header */}
                     <View style={[styles.hero, isCompact && styles.heroMobile]}>
                         <View style={styles.heroTopRow}>
@@ -291,7 +294,7 @@ export default function CustomerEmailsScreen() {
                         </View>
                     )}
                 </View>
-            </ScrollView>
+            </View>
 
             {/* Single-customer send modal */}
             <SendModal
