@@ -589,14 +589,14 @@ const FaqCategoriesScreen: React.FC = () => {
 
                                 <View style={st.viewToggle}>
                                     <TouchableOpacity
-                                        style={[st.viewBtn, viewMode === "grid" && { backgroundColor: PRIMARY }]}
+                                        style={[st.viewBtn, viewMode === "grid" && st.viewBtnActive]}
                                         onPress={() => setViewMode("grid")}>
-                                        <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_MUTED} />
+                                        <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
                                     </TouchableOpacity>
                                     <TouchableOpacity
-                                        style={[st.viewBtn, viewMode === "list" && { backgroundColor: PRIMARY }]}
+                                        style={[st.viewBtn, viewMode === "list" && st.viewBtnActive]}
                                         onPress={() => setViewMode("list")}>
-                                        <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_MUTED} />
+                                        <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -821,8 +821,9 @@ const st = StyleSheet.create({
     chips: { flexDirection: "row", gap: 6, flexWrap: "wrap" as any },
     chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, backgroundColor: BG_PAGE },
     chipText: { fontSize: 12, fontWeight: "600", color: TEXT_BODY },
-    viewToggle: { flexDirection: "row", backgroundColor: BG_PAGE, borderRadius: 8, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
-    viewBtn: { padding: 8 },
+    viewToggle: { flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 },
+    viewBtn: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    viewBtnActive: { backgroundColor: "#1E2B6B" },
 
     // ── Result count ──
     resultCount: { fontSize: 12, color: TEXT_MUTED, fontWeight: "500" },

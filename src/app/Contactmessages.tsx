@@ -576,12 +576,12 @@ const ContactMessagesScreen: React.FC = () => {
 
             {/* ── View Switcher Mobile ── */}
             {!loading && filtered.length > 0 && (
-              <View style={{ paddingHorizontal: 16, marginBottom: 12, flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+              <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
                 <TouchableOpacity onPress={() => setViewMode("grid")} style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]}>
-                  <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED} />
+                  <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setViewMode("list")} style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]}>
-                  <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED} />
+                  <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
                 </TouchableOpacity>
               </View>
             )}
@@ -705,14 +705,16 @@ const ContactMessagesScreen: React.FC = () => {
         {/* ── Web Toolbar ── */}
         {isWeb && (
           <View style={styles.webToolbar}>
-            <View style={styles.viewSwitcher}>
+            <View style={[styles.viewSwitcher, { alignItems: "center" }]}>
               <Text style={styles.viewLabel}>View:</Text>
-              <TouchableOpacity style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]} onPress={() => setViewMode("grid")} activeOpacity={0.8}>
-                <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : TEXT_MUTED} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]} onPress={() => setViewMode("list")} activeOpacity={0.8}>
-                <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : TEXT_MUTED} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
+                <TouchableOpacity style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]} onPress={() => setViewMode("grid")} activeOpacity={0.8}>
+                  <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]} onPress={() => setViewMode("list")} activeOpacity={0.8}>
+                  <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={styles.searchContainerWeb}>
               <Feather name="search" size={16} color={TEXT_MUTED} style={styles.searchIcon} />
@@ -1174,6 +1176,7 @@ const styles = StyleSheet.create({
   viewSwitcher: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
     backgroundColor: "#F1F5F9",
     borderRadius: 999,
     paddingHorizontal: 8,
@@ -1186,15 +1189,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   viewButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 2,
   },
   viewButtonActive: {
-    backgroundColor: PRIMARY,
+    backgroundColor: "#1E2B6B",
   },
 
   // ── Mobile Controls ──

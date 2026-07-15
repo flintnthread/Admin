@@ -659,18 +659,18 @@ const ViewToggle: React.FC<{
     view: "grid" | "list";
     onToggle: (v: "grid" | "list") => void;
 }> = ({ view, onToggle }) => (
-    <View style={[vt.wrap, { height: 42, padding: 2 }]}>
+    <View style={vt.wrap}>
         <TouchableOpacity
-            style={[vt.btn, view === "grid" && vt.active, { width: 36, height: 36 }]}
+            style={[vt.btn, view === "grid" && vt.active]}
             onPress={() => onToggle("grid")}
         >
-            <Feather name="grid" size={16} color={view === "grid" ? T.orange : T.textHint} />
+            <Feather name="grid" size={16} color={view === "grid" ? "#fff" : "#374151"} />
         </TouchableOpacity>
         <TouchableOpacity
-            style={[vt.btn, view === "list" && vt.active, { width: 36, height: 36 }]}
+            style={[vt.btn, view === "list" && vt.active]}
             onPress={() => onToggle("list")}
         >
-            <Feather name="list" size={16} color={view === "list" ? T.orange : T.textHint} />
+            <Feather name="list" size={16} color={view === "list" ? "#fff" : "#374151"} />
         </TouchableOpacity>
     </View>
 );
@@ -678,29 +678,19 @@ const ViewToggle: React.FC<{
 const vt = StyleSheet.create({
     wrap: {
         flexDirection: "row",
-        backgroundColor: T.bg,
-        borderRadius: 11,
-        borderWidth: 1,
-        borderColor: T.border,
+        backgroundColor: "#E5E7EB",
+        borderRadius: 10,
         padding: 3,
-        gap: 2,
-        height: 54,
-        alignItems: "center",
     },
     btn: {
-        width: 46,
-        height: 46,
-        borderRadius: 9,
+        width: 36,
+        height: 36,
+        borderRadius: 8,
         alignItems: "center",
         justifyContent: "center",
     },
     active: {
-        backgroundColor: T.card,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 1,
+        backgroundColor: "#1E2B6B",
     },
 });
 

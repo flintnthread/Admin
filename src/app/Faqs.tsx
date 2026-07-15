@@ -772,12 +772,12 @@ const FaqQuestionsScreen: React.FC = () => {
                                             <TouchableOpacity
                                                 style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
                                                 onPress={() => setViewMode("list")}>
-                                                <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
+                                                <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
                                             </TouchableOpacity>
                                             <TouchableOpacity
                                                 style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
                                                 onPress={() => setViewMode("grid")}>
-                                                <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
+                                                <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -820,12 +820,12 @@ const FaqQuestionsScreen: React.FC = () => {
                                         <TouchableOpacity
                                             style={[st.viewToggleBtn, viewMode === "list" && st.viewToggleBtnActive]}
                                             onPress={() => setViewMode("list")}>
-                                            <Feather name="list" size={15} color={viewMode === "list" ? "#fff" : TEXT_BODY} />
+                                            <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[st.viewToggleBtn, viewMode === "grid" && st.viewToggleBtnActive]}
                                             onPress={() => setViewMode("grid")}>
-                                            <Feather name="grid" size={15} color={viewMode === "grid" ? "#fff" : TEXT_BODY} />
+                                            <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -980,9 +980,9 @@ const st = StyleSheet.create({
     gridContainer: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 
     // View toggle
-    viewToggle: { flexDirection: "row", borderRadius: 10, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
-    viewToggleBtn: { padding: 8, backgroundColor: BG_PAGE },
-    viewToggleBtnActive: { backgroundColor: PRIMARY },
+    viewToggle: { flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 },
+    viewToggleBtn: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    viewToggleBtnActive: { backgroundColor: "#1E2B6B" },
 
     // Empty
     empty: { alignItems: "center", paddingVertical: 60, gap: 12, backgroundColor: BG_CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER },

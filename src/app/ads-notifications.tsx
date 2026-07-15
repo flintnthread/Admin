@@ -796,7 +796,7 @@ export default function AdsNotificationsScreen() {
         onPress={() => setViewMode("grid")}
         activeOpacity={0.85}
       >
-        <GridGlyph color={viewMode === "grid" ? "#fff" : COLORS.muted} size={16} />
+        <GridGlyph color={viewMode === "grid" ? "#fff" : "#374151"} size={16} />
       </TouchableOpacity>
       <TouchableOpacity
         style={[
@@ -806,7 +806,7 @@ export default function AdsNotificationsScreen() {
         onPress={() => setViewMode("list")}
         activeOpacity={0.85}
       >
-        <ListIconGlyph color={viewMode === "list" ? "#fff" : COLORS.muted} size={16} />
+        <ListIconGlyph color={viewMode === "list" ? "#fff" : "#374151"} size={16} />
       </TouchableOpacity>
     </View>
   );
@@ -1085,25 +1085,22 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: "700", color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  /* view toggle — two separate boxed icon buttons */
+  /* view toggle — pill container with navy active button */
   viewToggleGroup: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 3,
   },
   viewToggleBoxBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.rule,
   },
   viewToggleBoxBtnActive: {
-    backgroundColor: COLORS.navyDeep,
-    borderColor: COLORS.navyDeep,
+    backgroundColor: "#1E2B6B",
   },
 
   avatar: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
