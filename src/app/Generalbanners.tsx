@@ -569,14 +569,14 @@ export default function BannerManagement() {
                 onPress={() => setViewMode("list")}
                 activeOpacity={0.85}
               >
-                <List size={16} color={viewMode === "list" ? "#FFFFFF" : "#a0aec0"} />
+                <List size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.viewToggleBoxBtn, viewMode === "grid" && styles.viewToggleBoxBtnActive]}
                 onPress={() => setViewMode("grid")}
                 activeOpacity={0.85}
               >
-                <LayoutGrid size={16} color={viewMode === "grid" ? "#FFFFFF" : "#a0aec0"} />
+                <LayoutGrid size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -975,9 +975,9 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, color: "#1f2430" },
 
   // View Toggle
-  viewToggleGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
-  viewToggleBoxBtn: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e4ea" },
-  viewToggleBoxBtnActive: { backgroundColor: "#151D4F", borderColor: "#151D4F" },
+  viewToggleGroup: { flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 },
+  viewToggleBoxBtn: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  viewToggleBoxBtnActive: { backgroundColor: "#1E2B6B" },
 
   // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", marginTop: 16, paddingBottom: 16 },

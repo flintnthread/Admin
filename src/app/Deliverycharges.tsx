@@ -1130,13 +1130,13 @@ const DeliveryChargesScreen: React.FC = () => {
                     style={[styles.mobileViewBtn, viewMode === "grid" && styles.mobileViewBtnActive]}
                     onPress={() => setViewMode("grid")}
                   >
-                    <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : "#94A3B8"} />
+                    <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.mobileViewBtn, viewMode === "list" && styles.mobileViewBtnActive]}
                     onPress={() => setViewMode("list")}
                   >
-                    <Feather name="list" size={15} color={viewMode === "list" ? T.orange : "#94A3B8"} />
+                    <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1300,18 +1300,18 @@ const DeliveryChargesScreen: React.FC = () => {
           </View>
 
           <View style={styles.filterGroup}>
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
               <TouchableOpacity
                 style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
                 onPress={() => setViewMode("grid")}
               >
-                <Feather name="grid" size={16} color={viewMode === "grid" ? T.orange : T.textHint} />
+                <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
                 onPress={() => setViewMode("list")}
               >
-                <Feather name="list" size={16} color={viewMode === "list" ? T.orange : T.textHint} />
+                <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1553,21 +1553,19 @@ const styles = StyleSheet.create({
   },
   mobileViewToggle: {
     flexDirection: "row",
-    gap: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 3,
   },
   mobileViewBtn: {
     width: 36,
     height: 36,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
   mobileViewBtnActive: {
-    borderColor: T.orange,
-    backgroundColor: T.orangeLight,
+    backgroundColor: "#1E2B6B",
   },
 
   // ── PAGE HEADER (WEB) ──────────────────────────────────────────────────────
@@ -1747,18 +1745,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   viewBtn: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: T.border,
-    backgroundColor: T.card,
     alignItems: "center",
     justifyContent: "center",
   },
   viewBtnActive: {
-    borderColor: T.orange,
-    backgroundColor: T.orangeLight,
+    backgroundColor: "#1E2B6B",
   },
   tableCard: {
     backgroundColor: T.card,

@@ -1260,10 +1260,10 @@ const WebProductsScreen: React.FC = () => {
                                 </View>
                                 <View style={wst.viewToggle}>
                                     <TouchableOpacity style={[wst.viewBtn, viewType === "list" && wst.viewBtnActive]} onPress={() => setViewType("list")}>
-                                        <MaterialCommunityIcons name="format-list-bulleted" size={15} color={viewType === "list" ? C.white : C.textMid} />
+                                        <Feather name="list" size={16} color={viewType === "list" ? "#fff" : "#374151"} />
                                     </TouchableOpacity>
                                     <TouchableOpacity style={[wst.viewBtn, viewType === "grid" && wst.viewBtnActive]} onPress={() => setViewType("grid")}>
-                                        <MaterialCommunityIcons name="grid" size={15} color={viewType === "grid" ? C.white : C.textMid} />
+                                        <Feather name="grid" size={16} color={viewType === "grid" ? "#fff" : "#374151"} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -1581,9 +1581,9 @@ const wst = StyleSheet.create({
     clearChipTxt: { fontSize: 11, color: C.navy },
     activeSortIndicator: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.purplePale, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
     activeSortTxt: { fontSize: 11, color: C.purple },
-    viewToggle: { flexDirection: "row", backgroundColor: C.bg, borderRadius: 7, padding: 2, borderWidth: 1, borderColor: C.border },
-    viewBtn: { width: 28, height: 28, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-    viewBtnActive: { backgroundColor: C.navy },
+    viewToggle: { flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 },
+    viewBtn: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    viewBtnActive: { backgroundColor: "#1E2B6B" },
     tableScroll: { flex: 1 },
     tableHead: { flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 11, backgroundColor: "#F8F9FC", borderBottomWidth: 1.5, borderBottomColor: C.border, gap: 24 },
     tableHeadCell: { fontSize: 11, color: C.textLight, textTransform: "uppercase", letterSpacing: 0.5 },
@@ -1899,10 +1899,10 @@ const MobileProductsScreen: React.FC = () => {
                             </TouchableOpacity>
                             <View style={s.viewToggle}>
                                 <TouchableOpacity style={[s.viewBtn, viewType === "list" && s.viewBtnActive]} onPress={() => setViewType("list")}>
-                                    <MaterialCommunityIcons name="format-list-bulleted" size={17} color={viewType === "list" ? C.white : C.textLight} />
+                                    <Feather name="list" size={16} color={viewType === "list" ? "#fff" : "#374151"} />
                                 </TouchableOpacity>
                                 <TouchableOpacity style={[s.viewBtn, viewType === "grid" && s.viewBtnActive]} onPress={() => setViewType("grid")}>
-                                    <MaterialCommunityIcons name="grid" size={17} color={viewType === "grid" ? C.white : C.textLight} />
+                                    <Feather name="grid" size={16} color={viewType === "grid" ? "#fff" : "#374151"} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -2164,9 +2164,9 @@ const s = StyleSheet.create({
     sortBtnRight: { flexDirection: "row", alignItems: "center", gap: 6 },
     viewRangePill: { backgroundColor: C.navyDeep + "12", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
     viewRangePillTxt: { fontSize: 11, color: C.navy },
-    viewToggle: { flexDirection: "row", backgroundColor: C.card, borderRadius: 10, padding: 3, borderWidth: 1, borderColor: C.border },
-    viewBtn: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-    viewBtnActive: { backgroundColor: C.navy },
+    viewToggle: { flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 },
+    viewBtn: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    viewBtnActive: { backgroundColor: "#1E2B6B" },
     sortMenuWrapper: { paddingHorizontal: 18, paddingTop: 4, marginBottom: 6, width: 320 },
     sortMenu: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: "hidden", elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 14 },
     sortMenuHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
