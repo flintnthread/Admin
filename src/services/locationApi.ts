@@ -16,6 +16,9 @@ export type LocationRow = {
   parentId?: number;
   parentName?: string;
   active?: boolean;
+  cityCount?: number;
+  areaCount?: number;
+  pincodeCount?: number;
   [key: string]: unknown;
 };
 
