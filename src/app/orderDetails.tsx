@@ -1457,7 +1457,7 @@ export default function OrderDetailScreen() {
                           <ProductThumb uri={item.imageUrl} size={44} />
                           <View style={{ flex: 1, gap: 4, alignItems: "flex-start" }}>
                             <Text style={s.tblCellTxt} numberOfLines={2}>{item.product}</Text>
-                            <TouchableOpacity onPress={() => { if(item.productId) router.push({ pathname: "/productDetails", params: { id: String(item.productId) } }); }} activeOpacity={0.7} disabled={!item.productId}>
+                            <TouchableOpacity onPress={() => { if(item.productId) router.push({ pathname: "/productDetails", params: { id: String(item.productId), name: item.product } }); }} activeOpacity={0.7} disabled={!item.productId}>
                               <View style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]}>
                                 <BoxArrowUpRightIcon size={11} color={C.primary} />
                                 <Text style={s.viewProductTxt}>View</Text>
@@ -1484,7 +1484,7 @@ export default function OrderDetailScreen() {
                         <View style={s.itemCardTop}>
                           <ProductThumb uri={item.imageUrl} size={48} />
                           <Text style={s.itemCardName}>{item.product}</Text>
-                          <TouchableOpacity style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]} onPress={() => { if (item.productId) router.push({ pathname: "/productDetails", params: { id: String(item.productId) } }); }} activeOpacity={0.7} disabled={!item.productId}>
+                          <TouchableOpacity style={[s.viewProductBtn, !item.productId && s.viewProductBtnDisabled]} onPress={() => { if (item.productId) router.push({ pathname: "/productDetails", params: { id: String(item.productId), name: item.product } }); }} activeOpacity={0.7} disabled={!item.productId}>
                             <BoxArrowUpRightIcon size={11} color={C.primary} />
                             <Text style={s.viewProductTxt}>View</Text>
                           </TouchableOpacity>

@@ -82,7 +82,7 @@ const LIST_COLS: Record<DetailTab, { codeLabel?: string; countLabel?: string }> 
   overview: {},
   countries: { codeLabel: 'Code' },
   states: { countLabel: 'Cities' },
-  cities: { codeLabel: 'Code', countLabel: 'Areas' },
+  cities: { codeLabel: 'State', countLabel: 'Areas' },
   areas: { codeLabel: 'City', countLabel: 'Pins' },
   pincodes: {},
 };
@@ -112,14 +112,38 @@ const TAB_META: Record<
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+function toCount(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 function mapLocationRow(row: LocationRow, index: number, tab: DetailTab): ListRow {
   const theme = ROW_THEMES[index % ROW_THEMES.length];
+  let code: string | undefined;
+  let count: number | undefined;
+
+  if (tab === 'countries') {
+    code = row.code ? String(row.code) : undefined;
+  } else if (tab === 'states') {
+    count = toCount(row.cityCount) ?? 0;
+  } else if (tab === 'cities') {
+    code = row.stateName ? String(row.stateName) : undefined;
+    count = toCount(row.areaCount) ?? 0;
+  } else if (tab === 'areas') {
+    code = row.cityName ? String(row.cityName) : undefined;
+    count = toCount(row.pincodeCount) ?? 0;
+  }
+
   return {
     id: row.id,
     name: String(row.name ?? row.pincode ?? row.id ?? '—'),
     status: row.active === false ? 'Inactive' : 'Active',
-    code: row.code ? String(row.code) : row.stateName ? String(row.stateName) : undefined,
-    count: typeof row.cityCount === 'number' ? row.cityCount : undefined,
+    code,
+    count,
     iconBg: theme.bg,
     iconColor: theme.color,
   };
