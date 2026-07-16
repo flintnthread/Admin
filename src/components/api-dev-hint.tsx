@@ -78,7 +78,7 @@ export default function ApiDevHint() {
         <Text style={styles.help}>
           {errorDetail ?? "Cannot reach admin API."}
           {"\n\n"}
-          Production: https://flintnthread.online/api/admin/health
+          Production: https://flintnthread.online/api/admin/health or https://flintnthread.in/api/admin/health
           {"\n"}
           Local dev: set EXPO_PUBLIC_ADMIN_API_USE_LOCAL=true in .env
         </Text>

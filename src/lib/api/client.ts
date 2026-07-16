@@ -54,7 +54,7 @@ async function buildAdminRequest(path: string, init?: RequestOptions): Promise<{
     } catch {
       const tried = getAdminApiBaseUrlCandidates().join(", ");
       throw new AdminApiError(
-        `Cannot reach admin API. Tried: ${tried}.\n• Ensure https://flintnthread.online/api/admin/health returns ok on VPS.`
+      `Cannot reach admin API. Tried: ${tried}.\n• Ensure https://flintnthread.online/api/admin/health or https://flintnthread.in/api/admin/health returns ok on VPS.`
       );
     }
   }
@@ -97,7 +97,7 @@ export async function adminApiFetch(path: string, init?: RequestOptions): Promis
     const debug = resolveAdminApiBaseUrl();
     const tried = getAdminApiBaseUrlCandidates().join(", ");
     throw new AdminApiError(
-      `Cannot reach admin API at ${debug}. Also tried: ${tried}.\n• Check network and https://flintnthread.online/api/admin/health`
+      `Cannot reach admin API at ${debug}. Also tried: ${tried}.\n• Check network and https://flintnthread.online/api/admin/health (or https://flintnthread.in)`
     );
   }
 }
@@ -113,7 +113,7 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     const debug = resolveAdminApiBaseUrl();
     const tried = getAdminApiBaseUrlCandidates().join(", ");
     throw new AdminApiError(
-      `Cannot reach admin API at ${debug}. Also tried: ${tried}.\n• Check network and https://flintnthread.online/api/admin/health`
+      `Cannot reach admin API at ${debug}. Also tried: ${tried}.\n• Check network and https://flintnthread.online/api/admin/health (or https://flintnthread.in)`
     );
   }
 
@@ -144,7 +144,7 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
   }
   if (!contentType.includes("application/json") && raw.trimStart().startsWith("<")) {
     throw new AdminApiError(
-      `Admin API returned HTML instead of JSON at ${url}. Expected JSON from https://flintnthread.online/api/admin/...`,
+      `Admin API returned HTML instead of JSON at ${url}. Expected JSON from https://flintnthread.online/api/admin/... or https://flintnthread.in/api/admin/...`,
       res.status
     );
   }
@@ -153,7 +153,7 @@ export async function adminApiRequest<T>(path: string, init?: RequestOptions): P
     return JSON.parse(raw) as T;
   } catch {
     throw new AdminApiError(
-      `Invalid JSON from admin API at ${url}. Check https://flintnthread.online/api/admin/health`,
+      `Invalid JSON from admin API at ${url}. Check https://flintnthread.online/api/admin/health or https://flintnthread.in/api/admin/health`,
       res.status
     );
   }
