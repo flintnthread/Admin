@@ -1,8 +1,9 @@
 import { adminApiRequest } from "@/lib/api/client";
+import type { PageResponse } from "@/lib/api/types";
 
-export type LocationRow = { 
-  id: number; 
-  name?: string; 
+export type LocationRow = {
+  id: number;
+  name?: string;
   pincode?: string;
   code?: string;
   countryId?: number;
@@ -15,7 +16,7 @@ export type LocationRow = {
   parentId?: number;
   parentName?: string;
   active?: boolean;
-  [key: string]: unknown 
+  [key: string]: unknown;
 };
 
 export type LocationCounts = {
@@ -26,38 +27,134 @@ export type LocationCounts = {
   pincodes: number;
 };
 
+export type LocationListParams = {
+  search?: string;
+  page?: number;
+  size?: number;
+  countryId?: number;
+  stateId?: number;
+  cityId?: number;
+  areaId?: number;
+};
+
+const PAGE_FETCH_SIZE = 500;
+
+function normalizePageResponse<T>(raw: unknown): PageResponse<T> {
+  if (raw && typeof raw === "object" && Array.isArray((raw as PageResponse<T>).items)) {
+    const page = raw as PageResponse<T>;
+    return {
+      items: page.items ?? [],
+      totalElements: Number(page.totalElements ?? page.items?.length ?? 0),
+      totalPages: Number(page.totalPages ?? 1),
+      page: Number(page.page ?? 0),
+      size: Number(page.size ?? page.items?.length ?? 0),
+    };
+  }
+  // Backward-compatible: older APIs returned a bare array
+  if (Array.isArray(raw)) {
+    return {
+      items: raw as T[],
+      totalElements: raw.length,
+      totalPages: 1,
+      page: 0,
+      size: raw.length,
+    };
+  }
+  return { items: [], totalElements: 0, totalPages: 0, page: 0, size: 0 };
+}
+
+async function fetchAllPages(
+  fetchPage: (page: number, size: number) => Promise<PageResponse<LocationRow>>
+): Promise<LocationRow[]> {
+  const all: LocationRow[] = [];
+  let page = 0;
+  let totalPages = 1;
+  while (page < totalPages) {
+    const result = await fetchPage(page, PAGE_FETCH_SIZE);
+    all.push(...result.items);
+    totalPages = Math.max(result.totalPages, 1);
+    if (result.items.length === 0) break;
+    page += 1;
+    // Safety: stop if API misreports totalPages but keeps returning data forever
+    if (page > 200) break;
+  }
+  return all;
+}
+
+export async function fetchCountriesPage(params: LocationListParams = {}): Promise<PageResponse<LocationRow>> {
+  const q = new URLSearchParams();
+  if (params.search) q.set("search", params.search);
+  q.set("page", String(params.page ?? 0));
+  q.set("size", String(params.size ?? 20));
+  const raw = await adminApiRequest(`/api/admin/locations/countries?${q.toString()}`);
+  return normalizePageResponse<LocationRow>(raw);
+}
+
+export async function fetchStatesPage(params: LocationListParams = {}): Promise<PageResponse<LocationRow>> {
+  const q = new URLSearchParams();
+  if (params.countryId != null) q.set("countryId", String(params.countryId));
+  if (params.search) q.set("search", params.search);
+  q.set("page", String(params.page ?? 0));
+  q.set("size", String(params.size ?? 20));
+  const raw = await adminApiRequest(`/api/admin/locations/states?${q.toString()}`);
+  return normalizePageResponse<LocationRow>(raw);
+}
+
+export async function fetchCitiesPage(params: LocationListParams = {}): Promise<PageResponse<LocationRow>> {
+  const q = new URLSearchParams();
+  if (params.stateId != null) q.set("stateId", String(params.stateId));
+  if (params.search) q.set("search", params.search);
+  q.set("page", String(params.page ?? 0));
+  q.set("size", String(params.size ?? 20));
+  const raw = await adminApiRequest(`/api/admin/locations/cities?${q.toString()}`);
+  return normalizePageResponse<LocationRow>(raw);
+}
+
+export async function fetchAreasPage(params: LocationListParams = {}): Promise<PageResponse<LocationRow>> {
+  const q = new URLSearchParams();
+  if (params.cityId != null) q.set("cityId", String(params.cityId));
+  if (params.search) q.set("search", params.search);
+  q.set("page", String(params.page ?? 0));
+  q.set("size", String(params.size ?? 20));
+  const raw = await adminApiRequest(`/api/admin/locations/areas?${q.toString()}`);
+  return normalizePageResponse<LocationRow>(raw);
+}
+
+export async function fetchPincodesPage(params: LocationListParams = {}): Promise<PageResponse<LocationRow>> {
+  const q = new URLSearchParams();
+  if (params.cityId != null) q.set("cityId", String(params.cityId));
+  if (params.areaId != null) q.set("areaId", String(params.areaId));
+  if (params.search) q.set("search", params.search);
+  q.set("page", String(params.page ?? 0));
+  q.set("size", String(params.size ?? 20));
+  const raw = await adminApiRequest(`/api/admin/locations/pincodes?${q.toString()}`);
+  return normalizePageResponse<LocationRow>(raw);
+}
+
+/** Loads every country by paging through the API (no hard cap). */
 export async function fetchCountries(search?: string): Promise<LocationRow[]> {
-  const q = search ? `?search=${encodeURIComponent(search)}` : "";
-  return adminApiRequest(`/api/admin/locations/countries${q}`);
+  return fetchAllPages((page, size) => fetchCountriesPage({ search, page, size }));
 }
 
 export async function fetchStates(countryId?: number, search?: string): Promise<LocationRow[]> {
-  const q = new URLSearchParams();
-  if (countryId != null) q.set("countryId", String(countryId));
-  if (search) q.set("search", search);
-  const qs = q.toString();
-  return adminApiRequest(`/api/admin/locations/states${qs ? `?${qs}` : ""}`);
+  return fetchAllPages((page, size) => fetchStatesPage({ countryId, search, page, size }));
 }
 
 export async function fetchCities(stateId?: number, search?: string): Promise<LocationRow[]> {
-  const q = new URLSearchParams();
-  if (stateId != null) q.set("stateId", String(stateId));
-  if (search) q.set("search", search);
-  const qs = q.toString();
-  return adminApiRequest(`/api/admin/locations/cities${qs ? `?${qs}` : ""}`);
+  return fetchAllPages((page, size) => fetchCitiesPage({ stateId, search, page, size }));
 }
 
 export async function fetchAreas(cityId?: number, search?: string): Promise<LocationRow[]> {
-  const q = new URLSearchParams();
-  if (cityId != null) q.set("cityId", String(cityId));
-  if (search) q.set("search", search);
-  const qs = q.toString();
-  return adminApiRequest(`/api/admin/locations/areas${qs ? `?${qs}` : ""}`);
+  return fetchAllPages((page, size) => fetchAreasPage({ cityId, search, page, size }));
 }
 
-export async function fetchPincodes(search?: string): Promise<LocationRow[]> {
-  const q = search ? `?search=${encodeURIComponent(search)}` : "";
-  return adminApiRequest(`/api/admin/locations/pincodes${q}`);
+export async function fetchPincodes(
+  search?: string,
+  filters?: { cityId?: number; areaId?: number }
+): Promise<LocationRow[]> {
+  return fetchAllPages((page, size) =>
+    fetchPincodesPage({ search, cityId: filters?.cityId, areaId: filters?.areaId, page, size })
+  );
 }
 
 export async function fetchLocationCounts(): Promise<LocationCounts> {

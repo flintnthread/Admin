@@ -4,11 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import {
   fetchAreas,
+  fetchAreasPage,
   fetchCities,
+  fetchCitiesPage,
   fetchCountries,
+  fetchCountriesPage,
   fetchLocationCounts,
   fetchPincodes,
+  fetchPincodesPage,
   fetchStates,
+  fetchStatesPage,
   createCountry,
   createState,
   createCity,
@@ -120,23 +125,6 @@ function mapLocationRow(row: LocationRow, index: number, tab: DetailTab): ListRo
   };
 }
 
-function getRelationValue(row: Record<string, any> | null | undefined, keys: string[]): string | number | undefined {
-  if (!row) return undefined;
-  for (const key of keys) {
-    const value = row[key];
-    if (value !== undefined && value !== null && value !== '') return value;
-  }
-  return undefined;
-}
-
-function belongsTo(child: Record<string, any>, parent: Option, idKeys: string[], nameKeys: string[]): boolean {
-  const childId = getRelationValue(child, idKeys);
-  if (childId !== undefined) return String(childId) === String(parent.id);
-  const childName = getRelationValue(child, nameKeys);
-  if (childName !== undefined) return String(childName).toLowerCase() === parent.name.toLowerCase();
-  return true;
-}
-
 type MaterialIconName = keyof typeof MaterialIcons.glyphMap;
 
 function Icon({
@@ -184,20 +172,22 @@ function HeroHeader({
   countriesCount,
   statesCount,
   citiesCount,
+  areasCount,
   pincodesCount,
 }: {
   isMobile: boolean;
   countriesCount: number;
   statesCount: number;
   citiesCount: number;
+  areasCount: number;
   pincodesCount: number;
 }) {
   const stats = [
     { label: 'Countries', value: countriesCount, icon: 'public' as MaterialIconName, color: '#2563EB', bg: '#EFF6FF' },
     { label: 'Active States', value: statesCount, icon: 'map' as MaterialIconName, color: '#059669', bg: '#ECFDF5' },
-    { label: 'Inactive', value: 0, icon: 'location-off' as MaterialIconName, color: '#DC2626', bg: '#FEF2F2' },
     { label: 'Cities', value: citiesCount, icon: 'location-city' as MaterialIconName, color: '#D97706', bg: '#FFFBEB' },
-    { label: 'Pincodes', value: `${pincodesCount.toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, color: '#7C3AED', bg: '#F5F3FF' },
+    { label: 'Areas', value: areasCount.toLocaleString(), icon: 'place' as MaterialIconName, color: '#DC2626', bg: '#FEF2F2' },
+    { label: 'Pincodes', value: pincodesCount.toLocaleString(), icon: 'mail-outline' as MaterialIconName, color: '#7C3AED', bg: '#F5F3FF' },
   ];
 
   return (
@@ -210,7 +200,7 @@ function HeroHeader({
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText style={s.heroHeading}>Locations Management</ThemedText>
-            <ThemedText style={s.heroSub}>Manage all countries, states, cities and pincodes</ThemedText>
+            <ThemedText style={s.heroSub}>Manage all countries, states, cities, areas and pincodes</ThemedText>
           </View>
         </View>
       </View>
@@ -491,6 +481,7 @@ function OverviewPanel({
   statesCount,
   citiesCount,
   pincodesCount,
+  areasCount,
   countryOptions,
   stateOptions,
   cityOptions,
@@ -510,6 +501,7 @@ function OverviewPanel({
   statesCount: number;
   citiesCount: number;
   pincodesCount: number;
+  areasCount: number;
   countryOptions: Option[];
   stateOptions: Option[];
   cityOptions: Option[];
@@ -529,7 +521,8 @@ function OverviewPanel({
         { label: 'Countries', value: countriesCount || 1, color: '#2563EB' },
         { label: 'States', value: statesCount || 36, color: '#9333EA' },
         { label: 'Cities', value: citiesCount || 532, color: '#EA580C' },
-        { label: 'Pincodes', value: Math.min(pincodesCount || 100, 500), color: '#16A34A' },
+        { label: 'Areas', value: areasCount || 0, color: '#DC2626' },
+        { label: 'Pincodes', value: pincodesCount || 0, color: '#16A34A' },
       ];
     }
     if (selectedCountry && !selectedState) {
@@ -555,7 +548,7 @@ function OverviewPanel({
       ];
     }
     return [];
-  }, [selectedCountry, selectedState, selectedCity, stateOptions, cityOptions, cityPincodes, pincodesLoading, countriesCount, statesCount, citiesCount, pincodesCount]);
+  }, [selectedCountry, selectedState, selectedCity, stateOptions, cityOptions, cityPincodes, pincodesLoading, countriesCount, statesCount, citiesCount, areasCount, pincodesCount]);
 
   const breadcrumb = [selectedCountry?.name, selectedState?.name, selectedCity?.name].filter(Boolean).join(' › ');
 
@@ -1229,8 +1222,10 @@ export default function LocationsScreen() {
 
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [rows, setRows] = useState<ListRow[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -1252,25 +1247,56 @@ export default function LocationsScreen() {
 
   const meta = TAB_META[detailTab];
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
   const loadRows = useCallback(async () => {
     try {
-      if (detailTab === 'overview') { setRows([]); return; }
-      let data: LocationRow[] = [];
-      if (detailTab === 'countries') data = await fetchCountries();
-      else if (detailTab === 'states') data = await fetchStates();
-      else if (detailTab === 'cities') data = await fetchCities();
-      else if (detailTab === 'areas') data = await fetchAreas();
-      else if (detailTab === 'pincodes') data = await fetchPincodes();
-      setRows(data.map((r, i) => mapLocationRow(r, i, detailTab)));
+      if (detailTab === 'overview') {
+        setRows([]);
+        setTotalItems(0);
+        return;
+      }
+      const page = Math.max(currentPage - 1, 0);
+      const search = debouncedQuery || undefined;
+      let result;
+      if (detailTab === 'countries') result = await fetchCountriesPage({ search, page, size: itemsPerPage });
+      else if (detailTab === 'states') result = await fetchStatesPage({ search, page, size: itemsPerPage });
+      else if (detailTab === 'cities') result = await fetchCitiesPage({ search, page, size: itemsPerPage });
+      else if (detailTab === 'areas') result = await fetchAreasPage({ search, page, size: itemsPerPage });
+      else result = await fetchPincodesPage({ search, page, size: itemsPerPage });
+
+      setRows(result.items.map((r, i) => mapLocationRow(r, page * itemsPerPage + i, detailTab)));
+      setTotalItems(result.totalElements);
+      // If the current page is past the last page (e.g. after delete), snap back
+      if (result.totalPages > 0 && page >= result.totalPages) {
+        setCurrentPage(result.totalPages);
+      }
     } catch (e) {
       console.warn(getApiErrorMessage(e));
       setRows([]);
+      setTotalItems(0);
     }
-  }, [detailTab]);
+  }, [detailTab, currentPage, debouncedQuery, itemsPerPage]);
 
   useEffect(() => { loadRows(); }, [loadRows]);
-  useEffect(() => { setQuery(''); setCurrentPage(1); }, [detailTab]);
-  useEffect(() => { setCurrentPage(1); }, [query]);
+  useEffect(() => { setQuery(''); setDebouncedQuery(''); setCurrentPage(1); }, [detailTab]);
+  useEffect(() => { setCurrentPage(1); }, [debouncedQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const counts = await fetchLocationCounts();
+        if (!cancelled) setLocationCounts(counts);
+      } catch (e) {
+        console.warn(getApiErrorMessage(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (detailTab !== 'overview' || analysisCountries.length > 0) return;
@@ -1278,11 +1304,8 @@ export default function LocationsScreen() {
     (async () => {
       setOverviewLoading(true);
       try {
-        const [c, counts] = await Promise.all([fetchCountries(), fetchLocationCounts()]);
-        if (!cancelled) {
-          setAnalysisCountries(c);
-          setLocationCounts(counts);
-        }
+        const c = await fetchCountries();
+        if (!cancelled) setAnalysisCountries(c);
       }
       catch (e) { console.warn(getApiErrorMessage(e)); }
       finally { if (!cancelled) setOverviewLoading(false); }
@@ -1320,13 +1343,9 @@ export default function LocationsScreen() {
     (async () => {
       setPincodesLoading(true);
       try {
-        const all = await fetchPincodes();
-        if (cancelled) return;
-        const matches = all.filter((p) =>
-          belongsTo(p as unknown as Record<string, any>, selectedCity, ['cityId', 'city_id'], ['cityName', 'city_name', 'city'])
-        );
-        setCityPincodes(matches);
-      } catch (e) { setCityPincodes([]); }
+        const matches = await fetchPincodes(undefined, { cityId: selectedCity.id });
+        if (!cancelled) setCityPincodes(matches);
+      } catch (e) { if (!cancelled) setCityPincodes([]); }
       finally { if (!cancelled) setPincodesLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -1340,16 +1359,8 @@ export default function LocationsScreen() {
   const handleSelectState = (opt: Option) => { setSelectedState(opt); setSelectedCity(null); };
   const resetSelection = () => { setSelectedCountry(null); setSelectedState(null); setSelectedCity(null); };
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q));
-  }, [query, rows]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-  const paginatedRows = useMemo(() => {
-    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filtered, currentPage, itemsPerPage]);
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedRows = rows;
 
   const openAdd = () => { setActiveRow(null); setModalMode('add'); setModalVisible(true); };
   const openEdit = (row: ListRow) => { setActiveRow(row); setModalMode('edit'); setModalVisible(true); };
@@ -1393,6 +1404,10 @@ export default function LocationsScreen() {
       }
       closeModal();
       await loadRows();
+      try {
+        const counts = await fetchLocationCounts();
+        setLocationCounts(counts);
+      } catch { /* keep previous counts */ }
     } catch (e: unknown) {
       console.warn(getApiErrorMessage(e));
       throw new Error(getApiErrorMessage(e));
@@ -1407,11 +1422,14 @@ export default function LocationsScreen() {
       else if (detailTab === 'cities') await deleteCity(deleteTarget.id);
       else if (detailTab === 'areas') await deleteArea(deleteTarget.id);
       else if (detailTab === 'pincodes') await deletePincode(deleteTarget.id);
-      setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      await loadRows();
+      const counts = await fetchLocationCounts();
+      setLocationCounts(counts);
     } catch (e) {
       console.warn(getApiErrorMessage(e));
+      setDeleteTarget(null);
     }
-    setDeleteTarget(null);
   };
 
   return (
@@ -1426,7 +1444,8 @@ export default function LocationsScreen() {
           countriesCount={locationCounts?.countries ?? analysisCountries.length ?? 195}
           statesCount={locationCounts?.states ?? analysisStates.length ?? 36}
           citiesCount={locationCounts?.cities ?? analysisCities.length ?? 532}
-          pincodesCount={locationCounts?.pincodes ?? 19000}
+          areasCount={locationCounts?.areas ?? 0}
+          pincodesCount={locationCounts?.pincodes ?? 0}
         />
 
         <TabBar active={detailTab} onChange={setDetailTab} />
@@ -1438,7 +1457,8 @@ export default function LocationsScreen() {
             countriesCount={locationCounts?.countries ?? analysisCountries.length ?? 195}
             statesCount={locationCounts?.states ?? analysisStates.length ?? 36}
             citiesCount={locationCounts?.cities ?? analysisCities.length ?? 532}
-            pincodesCount={locationCounts?.pincodes ?? 19000}
+            areasCount={locationCounts?.areas ?? 0}
+            pincodesCount={locationCounts?.pincodes ?? 0}
             countryOptions={countryOptions}
             stateOptions={stateOptions}
             cityOptions={cityOptions}
@@ -1493,7 +1513,7 @@ export default function LocationsScreen() {
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={filtered.length}
+              totalItems={totalItems}
               itemsPerPage={itemsPerPage}
               itemName={meta.plural}
               onPageChange={setCurrentPage}
