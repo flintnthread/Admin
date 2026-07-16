@@ -10,6 +10,7 @@ import {
   fetchMainCategories,
   fetchSubcategories,
   updateCategory,
+  uploadCategoryImages,
   type CategoryRow
 } from "@/services/categoryApi";
 import * as ImagePicker from "expo-image-picker";
@@ -520,7 +521,7 @@ const ImagePickerField = ({
   onPick,
 }: {
   image: string | null;
-  onPick: (uri: string) => void;
+  onPick: (uri: string, file?: File | null) => void;
 }) => {
   const handlePick = async () => {
     if (Platform.OS === "web") {
@@ -528,10 +529,14 @@ const ImagePickerField = ({
       input.type = "file";
       input.accept = "image/jpeg,image/png";
       input.onchange = (e: any) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0] as File | undefined;
         if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            void sweetWarning("Image too large", "Please choose an image under 2MB.");
+            return;
+          }
           const reader = new FileReader();
-          reader.onload = (ev) => onPick(ev.target?.result as string);
+          reader.onload = (ev) => onPick(ev.target?.result as string, file);
           reader.readAsDataURL(file);
         }
       };
@@ -542,7 +547,7 @@ const ImagePickerField = ({
         allowsEditing: false,
         quality: 1,
       });
-      if (!result.canceled) onPick(result.assets[0].uri);
+      if (!result.canceled) onPick(result.assets[0].uri, null);
     }
   };
 
@@ -638,16 +643,22 @@ const Dropdown = ({
 const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { visible: boolean; onClose: () => void; onSave: (data: any) => Promise<void>; isWeb: boolean; editData?: Category | null; }) => {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageChanged, setImageChanged] = useState(false);
   const [hsn, setHsn] = useState("");
   const [gst, setGst] = useState("");
   const [status, setStatus] = useState("Active");
+  const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setName("");
     setImage(null);
+    setImageFile(null);
+    setImageChanged(false);
     setHsn("");
     setGst("");
     setStatus("Active");
+    setSaving(false);
   };
 
   React.useEffect(() => {
@@ -655,8 +666,10 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
       if (editData) {
         setName(editData.name);
         setImage(editData.image || null);
-        setHsn(editData.hsn);
-        setGst(editData.gst);
+        setImageFile(null);
+        setImageChanged(false);
+        setHsn(editData.hsn === "—" ? "" : editData.hsn);
+        setGst(editData.gst === "—" ? "" : editData.gst);
         setStatus(editData.status);
       } else {
         reset();
@@ -664,12 +677,12 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
     }
   }, [visible, editData]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       void sweetWarning("Required", "Please enter a category name.");
       return;
     }
-    if (!image) {
+    if (!editData && !image) {
       void sweetWarning("Required", "Please upload a category image.");
       return;
     }
@@ -677,9 +690,26 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
       void sweetWarning("Required", "Please select GST percentage.");
       return;
     }
-    onSave({ id: editData?.id, name, image, hsn, gst, status, type: "Main Category" });
-    reset();
-    onClose();
+    setSaving(true);
+    try {
+      await onSave({
+        id: editData?.id,
+        name: name.trim(),
+        image,
+        imageFile,
+        imageChanged,
+        hsn: hsn.trim(),
+        gst,
+        status,
+        type: "Main Category",
+      });
+      reset();
+      onClose();
+    } catch {
+      // Parent shows error toast
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -742,10 +772,21 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
               <Text style={styles.fieldHint}>
                 1600 × 1600 (no crop) · JPG, PNG (Max 2MB)
               </Text>
-              <ImagePickerField image={image} onPick={setImage} />
+              <ImagePickerField
+                image={image}
+                onPick={(uri, file) => {
+                  setImage(uri);
+                  setImageFile(file ?? null);
+                  setImageChanged(true);
+                }}
+              />
               {image && (
                 <TouchableOpacity
-                  onPress={() => setImage(null)}
+                  onPress={() => {
+                    setImage(null);
+                    setImageFile(null);
+                    setImageChanged(true);
+                  }}
                   style={styles.removeImg}
                 >
                   <Text style={styles.removeImgText}>Remove image</Text>
@@ -817,8 +858,8 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
+            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={() => void handleSave()} disabled={saving}>
+              <Text style={styles.saveBtnText}>{saving ? "Saving..." : editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -847,17 +888,23 @@ const AddCategoryModal = ({
   const [mainCat, setMainCat] = useState("");
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageChanged, setImageChanged] = useState(false);
   const [hsn, setHsn] = useState("");
   const [gst, setGst] = useState("");
   const [status, setStatus] = useState("Active");
+  const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setMainCat("");
     setName("");
     setImage(null);
+    setImageFile(null);
+    setImageChanged(false);
     setHsn("");
     setGst("");
     setStatus("Active");
+    setSaving(false);
   };
 
   React.useEffect(() => {
@@ -866,8 +913,10 @@ const AddCategoryModal = ({
         setMainCat(editData.parent || "");
         setName(editData.name);
         setImage(editData.image || null);
-        setHsn(editData.hsn);
-        setGst(editData.gst);
+        setImageFile(null);
+        setImageChanged(false);
+        setHsn(editData.hsn === "—" ? "" : editData.hsn);
+        setGst(editData.gst === "—" ? "" : editData.gst);
         setStatus(editData.status);
       } else {
         reset();
@@ -875,7 +924,7 @@ const AddCategoryModal = ({
     }
   }, [visible, editData]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!mainCat) {
       void sweetWarning("Required", "Please select a main category.");
       return;
@@ -889,19 +938,32 @@ const AddCategoryModal = ({
       return;
     }
     const selectedMain = mainCategories.find(c => c.name === mainCat);
-    onSave({
-      id: editData?.id,
-      parentId: selectedMain?.id,
-      name,
-      image,
-      hsn,
-      gst,
-      status,
-      type: "Category",
-      parent: mainCat,
-    });
-    reset();
-    onClose();
+    if (!selectedMain?.id) {
+      void sweetWarning("Required", "Please select a valid main category.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        id: editData?.id,
+        parentId: selectedMain.id,
+        name: name.trim(),
+        image,
+        imageFile,
+        imageChanged,
+        hsn: hsn.trim(),
+        gst,
+        status,
+        type: "Category",
+        parent: mainCat,
+      });
+      reset();
+      onClose();
+    } catch {
+      // Parent shows error toast
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -981,10 +1043,21 @@ const AddCategoryModal = ({
               <Text style={styles.fieldHint}>
                 1600 × 1600 (no crop) · JPG, PNG (Max 2MB)
               </Text>
-              <ImagePickerField image={image} onPick={setImage} />
+              <ImagePickerField
+                image={image}
+                onPick={(uri, file) => {
+                  setImage(uri);
+                  setImageFile(file ?? null);
+                  setImageChanged(true);
+                }}
+              />
               {image && (
                 <TouchableOpacity
-                  onPress={() => setImage(null)}
+                  onPress={() => {
+                    setImage(null);
+                    setImageFile(null);
+                    setImageChanged(true);
+                  }}
                   style={styles.removeImg}
                 >
                   <Text style={styles.removeImgText}>Remove image</Text>
@@ -1057,10 +1130,11 @@ const AddCategoryModal = ({
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: "#F97316" }]}
-              onPress={handleSave}
+              style={[styles.saveBtn, { backgroundColor: "#F97316" }, saving && { opacity: 0.7 }]}
+              onPress={() => void handleSave()}
+              disabled={saving}
             >
-              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
+              <Text style={styles.saveBtnText}>{saving ? "Saving..." : editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1551,37 +1625,83 @@ export default function MainCategories() {
     const entityLabel = data.type === "Main Category" ? "Main category" : "Category";
     const isUpdate = !!data.id;
     if (isUpdate) {
-      if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) return;
+      if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) {
+        throw new Error("cancelled");
+      }
     } else {
-      if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) return;
+      if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) {
+        throw new Error("cancelled");
+      }
     }
     try {
-      // Convert GST percentage string to number
-      const gstValue = data.gst ? parseFloat(data.gst.replace('%', '')) : undefined;
-      const statusValue = data.status === "Active" ? true : false;
+      const gstValue = data.gst ? parseFloat(String(data.gst).replace("%", "")) : undefined;
+      const statusValue = data.status === "Active";
+      const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
+      // Prefer multipart upload for new files. For data-URL fallback (no File), send image string.
+      const imagePayload =
+        !shouldUploadImage && typeof data.image === "string" && data.image.startsWith("data:image/")
+          ? data.image
+          : undefined;
 
       if (data.id) {
-        // Update existing category
-        await updateCategory(
+        let saved = await updateCategory(
           data.id,
           data.name,
           data.hsn,
           gstValue,
-          data.image,
-          data.mobileImage,
-          data.bannerImage,
+          imagePayload,
+          undefined,
+          undefined,
           statusValue
         );
+        if (shouldUploadImage) {
+          saved = await uploadCategoryImages(data.id, data.imageFile);
+        }
+        const imageUrl = pickCategoryImageUrl(saved, "categories");
         setCategories((prev) =>
-          prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+          prev.map((c) =>
+            c.id === data.id
+              ? {
+                  ...c,
+                  ...data,
+                  name: saved.categoryName || data.name,
+                  hsn: saved.hsnCode || data.hsn || "—",
+                  gst: saved.gstPercentage != null ? `${saved.gstPercentage}%` : data.gst,
+                  status: saved.status ? "Active" : "Inactive",
+                  image: imageUrl || data.image || c.image,
+                }
+              : c
+          )
         );
       } else {
-        // Create new category
         let newRow: CategoryRow;
         if (data.type === "Main Category") {
-          newRow = await createMainCategory(data.name, data.hsn, gstValue, data.image, data.mobileImage, data.bannerImage, statusValue);
+          newRow = await createMainCategory(
+            data.name,
+            data.hsn,
+            gstValue,
+            imagePayload,
+            undefined,
+            undefined,
+            statusValue
+          );
         } else {
-          newRow = await createSubcategory(data.parentId, data.name, data.hsn, gstValue, data.image, data.mobileImage, data.bannerImage, statusValue);
+          if (!data.parentId) {
+            throw new Error("Please select a main category.");
+          }
+          newRow = await createSubcategory(
+            data.parentId,
+            data.name,
+            data.hsn,
+            gstValue,
+            imagePayload,
+            undefined,
+            undefined,
+            statusValue
+          );
+        }
+        if (shouldUploadImage && newRow.id) {
+          newRow = await uploadCategoryImages(newRow.id, data.imageFile);
         }
         const newCat: Category = {
           id: newRow.id,
@@ -1613,8 +1733,12 @@ export default function MainCategories() {
         void sweetCrud.added(entityLabel);
       }
     } catch (error) {
+      if (error instanceof Error && error.message === "cancelled") {
+        throw error;
+      }
       console.error("Failed to save category:", error);
-      void sweetError("Error", "Failed to save category. Please try again.");
+      void sweetError("Error", getApiErrorMessage(error, "Failed to save category. Please try again."));
+      throw error;
     }
   };
 

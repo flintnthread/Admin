@@ -6,6 +6,10 @@ export type CatalogSize = {
   code: string;
   status: "Active" | "Inactive";
   createdDate?: string;
+  /** Main category names from products that use this size via variants. */
+  categories?: string[];
+  /** Primary (first) category, or "Unassigned" when unused. */
+  primaryCategory?: string;
 };
 
 export async function fetchSizes(): Promise<CatalogSize[]> {
