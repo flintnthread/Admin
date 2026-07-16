@@ -82,8 +82,15 @@ const CommissionRatesScreen: React.FC = () => {
     <ScrollView style={styles.mainContainer} contentContainerStyle={isWeb ? styles.webMainContent : styles.mobileMainContent}>
       {/* Header */}
       <View style={[styles.header, !isWeb && { marginBottom: 16 }]}>
-        <Text style={styles.headerTitle}>Platform commission rates</Text>
-        
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerIconContainer}>
+            <Feather name="percent" size={22} color="#FFFFFF" />
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Platform commission rates</Text>
+            <Text style={styles.headerSubtitle}>Manage global commission rates for B2B and B2C sales</Text>
+          </View>
+        </View>
       </View>
 
       {/* Main Card */}
@@ -212,7 +219,28 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     color: "#FFFFFF",
-    marginBottom: 6,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    fontWeight: "500",
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: PRIMARY_ORANGE,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   breadcrumb: {
     flexDirection: "row",

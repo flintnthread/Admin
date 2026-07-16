@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { sweetError, sweetSuccess, sweetWarning } from '@/lib/sweetAlert';
 import { formatDate } from '@/lib/format';
@@ -325,9 +326,21 @@ export default function SellerEmailsScreen() {
     const q = search.trim().toLowerCase();
     if (!q) return sellers;
     return sellers.filter(
-      (s) => s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || s.business.toLowerCase().includes(q)
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.email.toLowerCase().includes(q) ||
+        (s.business && s.business.toLowerCase().includes(q))
     );
   }, [search, sellers]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredSellers.length / itemsPerPage));
+  const paginatedSellers = useMemo(() => {
+    return filteredSellers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredSellers, currentPage, itemsPerPage]);
+
+  useEffect(() => { setCurrentPage(1); }, [search]);
 
   const openSingleEmail = (seller: Seller) => {
     setActiveSeller(seller);
@@ -434,7 +447,7 @@ export default function SellerEmailsScreen() {
               <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Registered On</Text>
               <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>Action</Text>
             </View>
-            {filteredSellers.map((s, idx) => (
+            {paginatedSellers.map((s, idx) => (
               <View key={s.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                 <Text style={[styles.tableCell, styles.tableCellMuted, { flex: 0.4 }]}>{s.id}</Text>
                 <Text style={[styles.tableCellStrong, { flex: 1.3 }]}>{s.name}</Text>
@@ -473,7 +486,7 @@ export default function SellerEmailsScreen() {
         ) : (
           // ---- Mobile / tablet card list ----
           <View style={[styles.cardList, !isLaptop && isTablet && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }]}>
-            {filteredSellers.map((s) => (
+            {paginatedSellers.map((s) => (
               <View key={s.id} style={[styles.sellerCard, !isLaptop && isTablet && { width: '48%', marginBottom: 12 }]}>
                 <View style={styles.sellerCardTopRow}>
                   <View style={styles.sellerCardIdBadge}>
@@ -517,6 +530,17 @@ export default function SellerEmailsScreen() {
             )}
           </View>
         ))}
+
+        {!loading && !loadError && filteredSellers.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredSellers.length}
+            itemsPerPage={itemsPerPage}
+            itemName="sellers"
+            onPageChange={setCurrentPage}
+          />
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

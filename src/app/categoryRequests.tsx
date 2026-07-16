@@ -1,6 +1,7 @@
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetConfirm } from '@/lib/sweetAlert';
 import { mapCategoryRequestRow } from '@/lib/mappers';
 import {
   approveCategoryRequest,
@@ -152,8 +153,15 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
 
   const isPending = request.status === 'Pending';
 
-  const handleAction = (action: 'Approved' | 'Rejected') => {
+  const handleAction = async (action: 'Approved' | 'Rejected') => {
     if (!adminReason.trim()) return;
+    const confirmed = await sweetConfirm({
+      title: `${action === 'Approved' ? 'Approve' : 'Reject'} Category Request?`,
+      text: `Are you sure you want to ${action.toLowerCase()} this category request?`,
+      confirmText: `Yes, ${action === 'Approved' ? 'Approve' : 'Reject'}`,
+      danger: action === 'Rejected',
+    });
+    if (!confirmed) return;
     onUpdate(request.id, action, adminReason);
     onClose();
   };

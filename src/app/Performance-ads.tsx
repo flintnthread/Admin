@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
@@ -311,6 +312,13 @@ export default function PerformanceAdsScreen() {
     void loadAds();
   }, [loadAds]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(ads.length / itemsPerPage));
+  const paginatedAds = useMemo(() => {
+    return ads.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [ads, currentPage, itemsPerPage]);
+
   const [form, setForm] = useState({
     name: '',
     type: '' as AdType | '',
@@ -482,7 +490,7 @@ export default function PerformanceAdsScreen() {
               <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Created</Text>
               <Text style={[styles.tableHeaderCell, { flex: 0.9, textAlign: 'right' }]}>Action</Text>
             </View>
-            {ads.map((ad, idx) => (
+            {paginatedAds.map((ad, idx) => (
               <View key={ad.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                 <Text style={[styles.tableCell, styles.tableCellMuted, { flex: 0.4 }]}>{ad.id}</Text>
                 <View style={{ flex: 1.6 }}>
@@ -522,7 +530,7 @@ export default function PerformanceAdsScreen() {
         ) : (
           // ---- Mobile / tablet card list ----
           <View style={styles.cardList}>
-            {ads.map((ad) => (
+            {paginatedAds.map((ad) => (
               <View key={ad.id} style={styles.adCard}>
                 <View style={styles.adCardTopRow}>
                   <View style={styles.adCardIdBadge}>
@@ -561,6 +569,17 @@ export default function PerformanceAdsScreen() {
               </View>
             ))}
           </View>
+        )}
+
+        {!loading && ads.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={ads.length}
+            itemsPerPage={itemsPerPage}
+            itemName="ads"
+            onPageChange={setCurrentPage}
+          />
         )}
 
         {!loading && ads.length === 0 && (

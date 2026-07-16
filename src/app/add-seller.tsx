@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { createSeller, fetchSellers } from '@/services/sellerApi';
 
@@ -440,6 +441,12 @@ export default function AddSellersScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [lastAddedName, setLastAddedName] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  const totalPages = Math.ceil(sellers.length / itemsPerPage) || 1;
+  const paginatedSellers = sellers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const loadSellers = async () => {
     setLoading(true);
     setLoadError(null);
@@ -527,9 +534,20 @@ export default function AddSellersScreen() {
           ) : loadError ? (
             <Text style={{ padding: 16, color: COLORS.rose }}>{loadError}</Text>
           ) : (
-            <SellersTable isMobile={isMobile} sellers={sellers} />
+            <SellersTable isMobile={isMobile} sellers={paginatedSellers} />
           )}
         </View>
+
+        {!loading && !loadError && sellers.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={sellers.length}
+            itemsPerPage={itemsPerPage}
+            itemName="sellers"
+            onPageChange={setCurrentPage}
+          />
+        )}
       </ScrollView>
 
       <AddSellerModal visible={modalOpen} onClose={() => setModalOpen(false)} onAdded={handleSellerAdded} />
