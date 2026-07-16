@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
@@ -344,6 +345,13 @@ export default function CampaignsPackagesScreen() {
     void loadPackages();
   }, [loadPackages]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(packages.length / itemsPerPage));
+  const paginatedPackages = useMemo(() => {
+    return packages.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [packages, currentPage, itemsPerPage]);
+
   const [form, setForm] = useState({
     name: '',
     type: '' as PackageType | '',
@@ -416,9 +424,9 @@ export default function CampaignsPackagesScreen() {
     }
 
     if (editingId) {
-      if (!(await sweetCrud.confirmUpdate('Campaign package', body.name))) return;
+      if (!(await sweetCrud.confirmUpdate('Campaign package', body.name as string))) return;
     } else {
-      if (!(await sweetCrud.confirmAdd('Campaign package', body.name))) return;
+      if (!(await sweetCrud.confirmAdd('Campaign package', body.name as string))) return;
     }
 
     setSaving(true);
@@ -548,7 +556,7 @@ export default function CampaignsPackagesScreen() {
               <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Created</Text>
               <Text style={[styles.tableHeaderCell, { flex: 0.9, textAlign: 'right' }]}>Action</Text>
             </View>
-            {packages.map((pkg, idx) => (
+            {paginatedPackages.map((pkg, idx) => (
               <View key={pkg.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
                 <Text style={[styles.tableCell, styles.tableCellMuted, { flex: 0.4 }]}>{pkg.id}</Text>
                 <View style={{ flex: 1.8 }}>
@@ -580,7 +588,7 @@ export default function CampaignsPackagesScreen() {
         ) : (
           // ---- Mobile / tablet card list ----
           <View style={[styles.cardList, isTablet && styles.cardListTablet]}>
-            {packages.map((pkg) => (
+            {paginatedPackages.map((pkg) => (
               <View key={pkg.id} style={[styles.pkgCard, isTablet && { width: '48%' }]}>
                 <View style={styles.pkgCardTopRow}>
                   <View style={styles.pkgCardIdBadge}>
@@ -628,6 +636,17 @@ export default function CampaignsPackagesScreen() {
             <Text style={styles.emptyStateTitle}>No campaign packages yet</Text>
             <Text style={styles.emptyStateText}>Create your first package to see it listed here.</Text>
           </View>
+        )}
+
+        {!loading && !loadError && packages.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={packages.length}
+            itemsPerPage={itemsPerPage}
+            itemName="packages"
+            onPageChange={setCurrentPage}
+          />
         )}
 
         <View style={{ height: 40 }} />

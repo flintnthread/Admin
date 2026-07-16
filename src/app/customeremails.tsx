@@ -57,6 +57,7 @@ import {
 
 
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 
 
 
@@ -366,6 +367,24 @@ export default function CustomerEmailsScreen() {
 
 
 
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const itemsPerPage = 10;
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+
+    const paginatedCustomers = useMemo(() => {
+
+        return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    }, [filtered, currentPage, itemsPerPage]);
+
+
+
+    useEffect(() => { setCurrentPage(1); }, [query]);
+
+
+
     const openSingle = (c: Customer) => {
 
         setSubject('');
@@ -548,17 +567,39 @@ export default function CustomerEmailsScreen() {
 
                     {!loading && !loadError && (bp === 'lg' || bp === 'xl' || bp === 'xxl' ? (
 
-                        <TableView data={filtered} onSend={openSingle} />
+                        <TableView data={paginatedCustomers} onSend={openSingle} />
 
                     ) : bp === 'md' ? (
 
-                        <CardGrid data={filtered} onSend={openSingle} columns={2} />
+                        <CardGrid data={paginatedCustomers} onSend={openSingle} columns={2} />
 
                     ) : (
 
-                        <CardGrid data={filtered} onSend={openSingle} columns={1} />
+                        <CardGrid data={paginatedCustomers} onSend={openSingle} columns={1} />
 
                     ))}
+
+
+
+                    {!loading && !loadError && filtered.length > 0 && (
+
+                        <Pagination
+
+                            currentPage={currentPage}
+
+                            totalPages={totalPages}
+
+                            totalItems={filtered.length}
+
+                            itemsPerPage={itemsPerPage}
+
+                            itemName="customers"
+
+                            onPageChange={setCurrentPage}
+
+                        />
+
+                    )}
 
 
 

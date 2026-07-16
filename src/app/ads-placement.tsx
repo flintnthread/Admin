@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,8 +15,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { sweetCrud, sweetError } from '@/lib/sweetAlert';
 import {
@@ -557,6 +558,13 @@ export default function AdPlacementsScreen() {
     void loadPlacements();
   }, [loadPlacements]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(placements.length / itemsPerPage));
+  const paginatedPlacements = useMemo(() => {
+    return placements.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [placements, currentPage, itemsPerPage]);
+
   const openAddModal = () => {
     setEditingPlacement(null);
     setModalOpen(true);
@@ -656,9 +664,20 @@ export default function AdPlacementsScreen() {
                 <ActivityIndicator size="large" color={COLORS.orange} />
               </View>
             ) : (
-              <PlacementsList isMobile={isMobile} placements={placements} onEdit={openEditModal} onDelete={(p) => void requestDelete(p)} />
+              <PlacementsList isMobile={isMobile} placements={paginatedPlacements} onEdit={openEditModal} onDelete={(p) => void requestDelete(p)} />
             )}
           </View>
+
+          {!loading && !loadError && placements.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={placements.length}
+              itemsPerPage={itemsPerPage}
+              itemName="placements"
+              onPageChange={setCurrentPage}
+            />
+          )}
         </ScrollView>
 
         {isMobile && (
