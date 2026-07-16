@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
+import { sweetCrud, sweetError, sweetWarning, sweetSuccess } from "@/lib/sweetAlert";
 import { mapContactRow } from "@/lib/mappers";
 import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact } from "@/services/contactApi";
 import {
@@ -502,20 +502,33 @@ const ContactMessagesScreen: React.FC = () => {
             {/* ── Mobile Stat Cards (overlapping header) ── */}
             <MobileStatsSection stats={contactStats} />
 
-            {/* ── Search bar ── */}
-            <View style={mSt.searchWrap}>
-              <Feather name="search" size={16} color={TEXT_MUTED} style={{ marginRight: 8 }} />
-              <TextInput
-                style={mSt.searchInput}
-                placeholder="Search by name, subject or email..."
-                placeholderTextColor={TEXT_MUTED}
-                value={search}
-                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                  <Feather name="x" size={14} color={TEXT_MUTED} />
-                </TouchableOpacity>
+            {/* ── Search & View Switcher ── */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, marginBottom: 12 }}>
+              <View style={[mSt.searchWrap, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}>
+                <Feather name="search" size={16} color={TEXT_MUTED} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={mSt.searchInput}
+                  placeholder="Search by name, subject or email..."
+                  placeholderTextColor={TEXT_MUTED}
+                  value={search}
+                  onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
+                    <Feather name="x" size={14} color={TEXT_MUTED} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {!loading && filtered.length > 0 && (
+                <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
+                  <TouchableOpacity onPress={() => setViewMode("grid")} style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]}>
+                    <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setViewMode("list")} style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]}>
+                    <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
 
@@ -556,17 +569,7 @@ const ContactMessagesScreen: React.FC = () => {
               <Text style={{ color: "#DC2626", paddingHorizontal: 16, marginBottom: 8 }}>{loadError}</Text>
             ) : null}
 
-            {/* ── View Switcher Mobile ── */}
-            {!loading && filtered.length > 0 && (
-              <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
-                <TouchableOpacity onPress={() => setViewMode("grid")} style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]}>
-                  <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setViewMode("list")} style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]}>
-                  <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
-                </TouchableOpacity>
-              </View>
-            )}
+
 
             {/* ── Content ── */}
             {loading ? (
@@ -725,7 +728,7 @@ const ContactMessagesScreen: React.FC = () => {
             {viewMode === "grid" && (
               <View style={[styles.cardGrid, !isWeb && { marginHorizontal: 0 }]}>
                 {paginatedMessages.map((item) => (
-                  <View key={item.id} style={[styles.cardGridItem, !isWeb && { flexBasis: "100%", maxWidth: "100%", marginHorizontal: 0 }]}>
+                  <View key={item.id} style={styles.cardGridItem}>
                     <MessageCard msg={item} onView={handleView} onMarkReplied={markReplied} onReply={setReplyMsg} onDelete={deleteMessage} />
                   </View>
                 ))}
@@ -1313,8 +1316,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   cardGridItem: {
-    flexBasis: "23.5%",
-    maxWidth: "24%",
+    flexBasis: "31.5%",
+    maxWidth: "32%",
     marginHorizontal: 0,
   },
 

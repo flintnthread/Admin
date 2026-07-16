@@ -622,7 +622,7 @@ const SellerPaymentsScreen: React.FC = () => {
                         <Feather name="credit-card" size={22} color="#fff" />
                     </View>
                     <View>
-                        <Text style={styles.headerTitle}>Seller Payments</Text>
+                        <Text style={[styles.headerTitle, windowWidth <= 350 && { fontWeight: "600" }]}>Seller Payments</Text>
                         <Text style={styles.headerSubtitle}>Manage & process seller payouts</Text>
                     </View>
                 </View>
@@ -635,7 +635,7 @@ const SellerPaymentsScreen: React.FC = () => {
                 isUltraWide && { justifyContent: "space-between", flexDirection: "row", alignItems: "center" }
             ]}>
                 <View style={[
-                    { gap: isUltraWide ? 24 : 16, flex: isUltraWide ? 1 : undefined },
+                    { gap: isUltraWide ? 24 : (windowWidth <= 350 ? 12 : 16), flex: isUltraWide ? 1 : undefined },
                     isUltraWide ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
                 ]}>
                     {[
@@ -645,13 +645,13 @@ const SellerPaymentsScreen: React.FC = () => {
                         { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
                     ].map((s, i) => (
                         <React.Fragment key={i}>
-                            <View style={[styles.statBlockSingle, windowWidth < 600 && { width: "47%" }]}>
-                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
-                                    <Feather name={s.icon as any} size={20} color="#ffffff" />
+                            <View style={[styles.statBlockSingle, windowWidth < 600 && { width: windowWidth <= 350 ? "100%" : "47%" }]}>
+                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }, windowWidth <= 350 && { width: 36, height: 36 }]}>
+                                    <Feather name={s.icon as any} size={windowWidth <= 350 ? 16 : 20} color="#ffffff" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.statValueSingle} numberOfLines={1}>{s.value}</Text>
-                                    <Text style={styles.statLabelSingle} numberOfLines={1}>{s.label}</Text>
+                                    <Text style={[styles.statValueSingle, windowWidth <= 350 && { fontWeight: "600", fontSize: 16 }]} numberOfLines={windowWidth <= 350 ? undefined : 1}>{s.value}</Text>
+                                    <Text style={[styles.statLabelSingle, windowWidth <= 350 && { fontWeight: "500", fontSize: 11 }]} numberOfLines={windowWidth <= 350 ? undefined : 1}>{s.label}</Text>
                                 </View>
                             </View>
                             {i < 3 && isUltraWide && <View style={styles.statDividerSingle} />}
