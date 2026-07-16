@@ -12,7 +12,10 @@ import {
   Pressable,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import AdminLayout from '@/components/admin-layout';
+import { usePayoutRequestAlerts } from "@/hooks/usePayoutRequestAlerts";
+import { useAuth } from "@/context/auth-context";
 
 /**
  * ── INTEGRATION NOTE ─────────────────────────────────────────────
@@ -39,7 +42,7 @@ const COLORS = {
   orangeBg: "#FFF7ED",
 };
 
-type NotifType = "Order" | "Seller" | "Ad" | "Ticket";
+type NotifType = "Order" | "Seller" | "Ad" | "Ticket" | "Payment";
 
 type TypeMeta = { label: string; color: string; bg: string; icon: keyof typeof Feather.glyphMap };
 
@@ -48,6 +51,7 @@ const TYPE_META: Record<NotifType, TypeMeta> = {
   Seller: { label: "Sellers", color: "#D97706", bg: "#FFFBEB", icon: "user-plus" },
   Ad: { label: "Ads", color: "#0D9488", bg: "#F0FDFA", icon: "target" },
   Ticket: { label: "Tickets", color: "#E11D48", bg: "#FFF1F2", icon: "headphones" },
+  Payment: { label: "Payments", color: "#2563EB", bg: "#EFF6FF", icon: "credit-card" },
 };
 
 type Notification = {
@@ -150,6 +154,7 @@ function RefreshToast({ visible, onClose }: { visible: boolean; onClose: () => v
 
 const FILTERS: { key: "All" | NotifType; label: string; color: string }[] = [
   { key: "All", label: "All", color: COLORS.orange },
+  { key: "Payment", label: "Payments", color: TYPE_META.Payment.color },
   { key: "Order", label: "Orders", color: TYPE_META.Order.color },
   { key: "Seller", label: "Sellers", color: TYPE_META.Seller.color },
   { key: "Ad", label: "Ads", color: TYPE_META.Ad.color },
@@ -161,6 +166,9 @@ export default function NotificationsScreen() {
   const isTablet = width >= 768;
   const isDesktop = width >= 1024;
   const isMobile = !isTablet;
+  const router = useRouter();
+  const { token } = useAuth();
+  const { notifications: payoutNotifs, pendingCount, refresh } = usePayoutRequestAlerts(!!token);
 
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [activeFilter, setActiveFilter] = useState<"All" | NotifType>("All");
@@ -169,8 +177,26 @@ export default function NotificationsScreen() {
   const [refreshToast, setRefreshToast] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  useEffect(() => {
+    const paymentRows: Notification[] = payoutNotifs.map((n) => ({
+      id: 100000 + n.requestId,
+      type: "Payment" as const,
+      title: n.text,
+      message: n.detail,
+      time: n.time,
+      unread: true,
+    }));
+    setNotifications([...paymentRows, ...INITIAL_NOTIFICATIONS]);
+  }, [payoutNotifs]);
+
   const counts = useMemo(() => {
-    const c = { "New Orders": 0, "Pending Sellers": 0, "Pending Ads": 0, "Open Tickets": 0 };
+    const c = {
+      "Payment Requests": pendingCount,
+      "New Orders": 0,
+      "Pending Sellers": 0,
+      "Pending Ads": 0,
+      "Open Tickets": 0,
+    };
     notifications.forEach((n) => {
       if (n.unread) {
         if (n.type === "Order") c["New Orders"]++;
@@ -180,7 +206,7 @@ export default function NotificationsScreen() {
       }
     });
     return c;
-  }, [notifications]);
+  }, [notifications, pendingCount]);
 
   const filtered = useMemo(() => {
     return notifications
@@ -190,19 +216,29 @@ export default function NotificationsScreen() {
         const q = query.toLowerCase();
         return n.title.toLowerCase().includes(q) || n.message.toLowerCase().includes(q);
       })
-      .sort(timeSort);
+      .sort((a, b) => {
+        if (a.type === "Payment" && b.type !== "Payment") return -1;
+        if (b.type === "Payment" && a.type !== "Payment") return 1;
+        return timeSort(a, b);
+      });
   }, [notifications, activeFilter, query]);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      setRefreshToast(true);
-    }, 500);
+    await refresh();
+    setRefreshing(false);
+    setRefreshToast(true);
   };
 
   const markRead = (id: number) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+  };
+
+  const openNotification = (n: Notification) => {
+    markRead(n.id);
+    if (n.type === "Payment") {
+      router.push({ pathname: "/Sellerpayments", params: { tab: "requests" } } as any);
+    }
   };
 
   const clearFilters = () => {
@@ -228,10 +264,13 @@ export default function NotificationsScreen() {
                 </View>
                 <View style={{ flexShrink: 1 }}>
                   <Text style={styles.heroTitle}>Notifications Center</Text>
-                  <Text style={styles.heroSubtitle}>Stay on top of orders, sellers, ads & support</Text>
+                  <Text style={styles.heroSubtitle}>
+                    Payment requests, orders, sellers, ads & support
+                    {pendingCount > 0 ? ` · ${pendingCount} payment request(s)` : ""}
+                  </Text>
                 </View>
               </View>
-              <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
+              <TouchableOpacity style={styles.refreshBtn} onPress={() => void handleRefresh()}>
                 <Animated.View>
                   <Feather name="refresh-cw" size={14} color="#fff" />
                 </Animated.View>
@@ -242,9 +281,9 @@ export default function NotificationsScreen() {
 
           {/* Overlapping stat cards */}
           <View style={[styles.statsRow, isMobile && styles.statsRowMobile]}>
+            <StatCard icon="credit-card" value={counts["Payment Requests"]} label="Payment Requests" tint={TYPE_META.Payment.color} tintBg={TYPE_META.Payment.bg} isMobile={isMobile} />
             <StatCard icon="box" value={counts["New Orders"]} label="New Orders" tint={TYPE_META.Order.color} tintBg={TYPE_META.Order.bg} isMobile={isMobile} />
             <StatCard icon="user-plus" value={counts["Pending Sellers"]} label="Pending Sellers" tint={TYPE_META.Seller.color} tintBg={TYPE_META.Seller.bg} isMobile={isMobile} />
-            <StatCard icon="target" value={counts["Pending Ads"]} label="Pending Ads" tint={TYPE_META.Ad.color} tintBg={TYPE_META.Ad.bg} isMobile={isMobile} />
             <StatCard icon="headphones" value={counts["Open Tickets"]} label="Open Tickets" tint={TYPE_META.Ticket.color} tintBg={TYPE_META.Ticket.bg} isMobile={isMobile} />
           </View>
 
@@ -321,7 +360,7 @@ export default function NotificationsScreen() {
                   return (
                     <TouchableOpacity
                       key={n.id}
-                      onPress={() => markRead(n.id)}
+                      onPress={() => openNotification(n)}
                       style={[styles.listItem, { borderLeftColor: meta.color }]}
                     >
                       <TypeIcon type={n.type} />
@@ -349,7 +388,7 @@ export default function NotificationsScreen() {
                   return (
                     <TouchableOpacity
                       key={n.id}
-                      onPress={() => markRead(n.id)}
+                      onPress={() => openNotification(n)}
                       style={[
                         styles.gridItem,
                         { width: gridColumns === 1 ? "100%" : "48.5%", borderTopColor: meta.color },
