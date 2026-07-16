@@ -205,6 +205,8 @@ export type CreateProductVariantPayload = {
 export type CreateProductPayload = {
   categoryId?: number;
   categoryName?: string;
+  childCategoryId?: number;
+  middleCategoryName?: string;
   subcategoryId?: number;
   subcategoryName?: string;
   name: string;

@@ -9,6 +9,8 @@ type BasicData = {
   name: string;
   category: string;
   categoryId?: string | number | null;
+  categorySubId?: string | number | null;
+  categorySubName?: string;
   subcategory: string;
   subcategoryId?: string | number | null;
   materialType: string;
@@ -189,6 +191,10 @@ export async function buildCreateProductPayload(input: {
   const categoryId = toOptionalNumber(basic.categoryId);
   if (categoryId != null) payload.categoryId = categoryId;
   if (basic.category?.trim()) payload.categoryName = basic.category.trim();
+
+  const childCategoryId = toOptionalNumber(basic.categorySubId);
+  if (childCategoryId != null) payload.childCategoryId = childCategoryId;
+  if (basic.categorySubName?.trim()) payload.middleCategoryName = basic.categorySubName.trim();
 
   const subcategoryId = toOptionalNumber(basic.subcategoryId);
   if (subcategoryId != null) payload.subcategoryId = subcategoryId;
