@@ -1023,7 +1023,7 @@ function SectionCard({
 }
 
 export default function ProductDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const { isWide, width } = useBreakpoint();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeImage, setActiveImage] = useState(0);
@@ -1039,6 +1039,7 @@ export default function ProductDetailsScreen() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveTemplateId, setApproveTemplateId] = useState('');
   const [approveNote, setApproveNote] = useState('');
+  const fallbackName = typeof name === 'string' && name.trim() ? name.trim() : 'Product';
   const handleBack = () => {
     if (product?.status === 'pending' || product?.status === 'review') {
       router.push('/productApproval');
@@ -1149,6 +1150,7 @@ export default function ProductDetailsScreen() {
       <AdminLayout>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.notFound}>
+            <Text style={styles.notFoundTitle} numberOfLines={2}>{fallbackName}</Text>
             <Text style={styles.notFoundText}>{error ?? 'Product not found'}</Text>
             <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : handleBack())}>
               <Text style={styles.backBtnLightText}>{error ? 'Retry' : 'Go Back'}</Text>
@@ -2333,6 +2335,7 @@ const styles = StyleSheet.create({
   sizeChartFooterText: { fontSize: 13, color: PALETTE.blue, fontWeight: '600', flex: 1 },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  notFoundTitle: { fontSize: 18, fontWeight: '800', color: PALETTE.textPrimary, textAlign: 'center', maxWidth: 320 },
   notFoundText: { fontSize: 16, fontWeight: '600', color: PALETTE.textSecondary },
   backBtnLight: {
     backgroundColor: PALETTE.purple,
