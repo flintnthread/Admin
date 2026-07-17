@@ -1,21 +1,3 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Modal as RNModal,
-  Platform,
-  useWindowDimensions,
-  Animated as RNAnimated,
-  DimensionValue,
-  KeyboardAvoidingView,
-  Dimensions,
-  ActivityIndicator,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
@@ -30,6 +12,24 @@ import {
   updateCampaignPackage,
   type AdsApiRow,
 } from '@/services/adsApi';
+import { Feather } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  DimensionValue,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Animated as RNAnimated,
+  Modal as RNModal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 // -----------------------------
 // Design tokens
 // -----------------------------
@@ -423,25 +423,27 @@ export default function CampaignsPackagesScreen() {
       body.features = form.features.trim();
     }
 
-    if (editingId) {
-      if (!(await sweetCrud.confirmUpdate('Campaign package', body.name as string))) return;
-    } else {
-      if (!(await sweetCrud.confirmAdd('Campaign package', body.name as string))) return;
-    }
-
     setSaving(true);
     try {
       if (editingId) {
         await updateCampaignPackage(editingId, body);
-        void sweetCrud.updated('Campaign package');
+        setModalVisible(false);
+        resetForm();
+        setEditingId(null);
+        await loadPackages();
+        setTimeout(() => {
+          void sweetCrud.updated('Campaign package');
+        }, 250);
       } else {
         await createCampaignPackage(body);
-        void sweetCrud.added('Campaign package');
+        setModalVisible(false);
+        resetForm();
+        setEditingId(null);
+        await loadPackages();
+        setTimeout(() => {
+          void sweetCrud.added('Campaign package');
+        }, 250);
       }
-      setModalVisible(false);
-      resetForm();
-      setEditingId(null);
-      await loadPackages();
     } catch (err) {
       void sweetError('Error', getApiErrorMessage(err, editingId ? 'Could not update campaign package.' : 'Could not create campaign package.'));
     } finally {
