@@ -521,7 +521,9 @@ function NotificationsTable({
 }) {
   return (
     <View style={styles.tableCard}>
-      <View style={styles.tableHeadRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
+        <View style={{ width: "100%", minWidth: 960 }}>
+          <View style={styles.tableHeadRow}>
         <Text style={[styles.tableHeadCell, { flex: 1.2 }]}>Date</Text>
         <Text style={[styles.tableHeadCell, { flex: 1 }]}>Order ID</Text>
         <Text style={[styles.tableHeadCell, { flex: 1.5 }]}>Customer</Text>
@@ -567,6 +569,8 @@ function NotificationsTable({
           </View>
         );
       })}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -920,8 +924,8 @@ export default function AdsNotificationsScreen() {
                       style={styles.searchInput}
                     />
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, zIndex: 100, overflow: "visible" }}>
-                    <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === "status" ? 50 : 20, overflow: "visible" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "nowrap", gap: 6, zIndex: 100, overflow: "visible" }}>
+                    <View style={{ flexShrink: 1, zIndex: openDropdown === "status" ? 50 : 20, overflow: "visible" }}>
                       <StatusDropdown
                         value={status}
                         onChange={setStatus}
@@ -929,7 +933,7 @@ export default function AdsNotificationsScreen() {
                         onToggle={() => setOpenDropdown((p) => (p === "status" ? null : "status"))}
                       />
                     </View>
-                    <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === "read" ? 50 : 10, overflow: "visible" }}>
+                    <View style={{ flexShrink: 1, zIndex: openDropdown === "read" ? 50 : 10, overflow: "visible" }}>
                       <ReadDropdown
                         value={readFilter}
                         onChange={setReadFilter}
@@ -1038,7 +1042,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink, outlineStyle: "none" } as any,
 
-  dropdownWrap: { position: "relative", zIndex: 20, minWidth: 140 },
+  dropdownWrap: { position: "relative", zIndex: 20 },
   dropdownBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1046,12 +1050,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.rule,
     borderRadius: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     backgroundColor: COLORS.page,
-    minWidth: 140,
+    minWidth: 0,
+    flexShrink: 1,
   },
-  dropdownBtnText: { flex: 1, fontWeight: "600", fontSize: 12, color: COLORS.ink },
+  dropdownBtnText: { flexShrink: 1, fontWeight: "600", fontSize: 12, color: COLORS.ink },
   dropdownMenu: {
     position: "absolute",
     top: "100%",
@@ -1093,8 +1098,8 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   viewToggleBoxBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",

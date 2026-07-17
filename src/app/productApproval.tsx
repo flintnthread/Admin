@@ -432,8 +432,8 @@ function PageHeader({ isWide, stats, onFilter, isMobile, isTablet }: { isWide: b
           <View style={styles.pageIcon}>
             <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
           </View>
-          <View>
-            <Text style={styles.pageTitle}>Product Approvals</Text>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={[styles.pageTitle, isMobile && { fontSize: 18 }]}>Product Approvals</Text>
           </View>
         </View>
       </View>
@@ -706,7 +706,6 @@ function FilterSection({
             <Text style={styles.filterLabel}>Status</Text>
             <Pressable style={styles.filterSelect}>
               <Text style={styles.filterSelectText}>All ({stats.all})</Text>
-              <MaterialCommunityIcons name="chevron-down" size={18} color={PALETTE.textSecondary} />
             </Pressable>
           </View>
         )}

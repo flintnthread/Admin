@@ -170,11 +170,8 @@ const GridCard: React.FC<{
     const isActive = cat.status === "Active";
     return (
         <TouchableOpacity style={cSt.card} onPress={onNavigate} activeOpacity={0.8}>
-            {/* Top row: icon + action buttons */}
-            <View style={cSt.topRow}>
-                <View style={[cSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                    <Feather name={safeIcon(cat.icon) as any} size={20} color={cat.color} />
-                </View>
+            {/* Top row: action buttons */}
+            <View style={[cSt.topRow, { justifyContent: "flex-end" }]}>
                 <View style={cSt.actionBtns}>
                     <TouchableOpacity style={cSt.iconBtn} onPress={onEdit}>
                         <Feather name="edit-2" size={13} color={TEXT_BODY} />
@@ -228,9 +225,6 @@ const ListRow: React.FC<{
     return (
         <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
             <View style={{ flex: 1.5, flexDirection: "row", alignItems: "center", gap: 14 }}>
-                <View style={[lSt.iconWrap, { backgroundColor: cat.color + "1a" }]}>
-                    <Feather name={safeIcon(cat.icon) as any} size={18} color={cat.color} />
-                </View>
                 <View style={lSt.info}>
                     <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
                     <Text style={lSt.desc} numberOfLines={1}>{cat.description}</Text>
