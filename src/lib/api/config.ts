@@ -298,7 +298,7 @@ export function resolvePublicMediaBaseUrl(): string {
     const lan = getExpoDevLanHost();
     return `http://${lan || "localhost"}:8083`;
   }
-  return "https://flintnthread.in";
+  return "https://flintnthread.com";
 }
 
 export const ADMIN_TOKEN_STORAGE_KEY = "admin_auth_token";
