@@ -21,6 +21,7 @@ import {
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
+import { sweetConfirm, sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, approveProduct, deactivateProduct, activateProduct, type ProductListRow, type SellerRow } from '@/services/productApi';
 import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
 import Pagination from '@/components/Pagination';
@@ -432,8 +433,8 @@ function PageHeader({ isWide, stats, onFilter, isMobile, isTablet }: { isWide: b
           <View style={styles.pageIcon}>
             <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
           </View>
-          <View>
-            <Text style={styles.pageTitle}>Product Approvals</Text>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={[styles.pageTitle, isMobile && { fontSize: 18 }]}>Product Approvals</Text>
           </View>
         </View>
       </View>
@@ -706,7 +707,6 @@ function FilterSection({
             <Text style={styles.filterLabel}>Status</Text>
             <Pressable style={styles.filterSelect}>
               <Text style={styles.filterSelectText}>All ({stats.all})</Text>
-              <MaterialCommunityIcons name="chevron-down" size={18} color={PALETTE.textSecondary} />
             </Pressable>
           </View>
         )}
@@ -1009,13 +1009,22 @@ export default function ProductApprovalScreen() {
   const handleActivate = useCallback(async (id: string) => {
     const numericId = Number(id);
     if (!Number.isFinite(numericId) || numericId <= 0) return;
+    const confirmed = await sweetConfirm({
+      title: 'Activate product?',
+      text: 'This product will become visible to buyers.',
+      confirmText: 'Yes, Activate',
+    });
+    if (!confirmed) return;
     setActionBusyId(id);
     setError(null);
     try {
       await activateProduct(numericId);
       await loadData();
+      void sweetSuccess('Activated!', 'Product activated successfully.');
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to activate product.'));
+      const msg = getApiErrorMessage(err, 'Failed to activate product.');
+      setError(msg);
+      void sweetError('Error', msg);
     } finally {
       setActionBusyId(null);
     }
@@ -1024,13 +1033,23 @@ export default function ProductApprovalScreen() {
   const handleDeactivate = useCallback(async (id: string) => {
     const numericId = Number(id);
     if (!Number.isFinite(numericId) || numericId <= 0) return;
+    const confirmed = await sweetConfirm({
+      title: 'Deactivate product?',
+      text: 'This product will be hidden from buyers.',
+      confirmText: 'Yes, Deactivate',
+      danger: true,
+    });
+    if (!confirmed) return;
     setActionBusyId(id);
     setError(null);
     try {
       await deactivateProduct(numericId);
       await loadData();
+      void sweetSuccess('Deactivated!', 'Product deactivated successfully.');
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to deactivate product.'));
+      const msg = getApiErrorMessage(err, 'Failed to deactivate product.');
+      setError(msg);
+      void sweetError('Error', msg);
     } finally {
       setActionBusyId(null);
     }

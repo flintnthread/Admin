@@ -775,15 +775,14 @@ function FilterBar({
               flexDirection: "row",
               alignItems: "center",
               flexWrap: "nowrap",
-              gap: 8,
+              gap: 6,
               zIndex: 100,
               overflow: "visible",
             }}
           >
             <View
               style={{
-                flex: 1,
-                minWidth: 0,
+                flexShrink: 1,
                 zIndex: openDropdown === "status" ? 50 : 20,
                 overflow: "visible",
               }}
@@ -799,8 +798,7 @@ function FilterBar({
             </View>
             <View
               style={{
-                flex: 1,
-                minWidth: 0,
+                flexShrink: 1,
                 zIndex: openDropdown === "billing" ? 50 : 10,
                 overflow: "visible",
               }}
@@ -836,7 +834,9 @@ function OrdersTable({
 }) {
   return (
     <View style={styles.tableCard}>
-      <View style={styles.tableHeadRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
+        <View style={{ width: "100%", minWidth: 960 }}>
+          <View style={styles.tableHeadRow}>
         <Text style={[styles.tableHeadCell, { flex: 0.9 }]}>Order ID</Text>
         <Text style={[styles.tableHeadCell, { flex: 1.5 }]}>Customer</Text>
         <Text style={[styles.tableHeadCell, { flex: 1.6 }]}>Ad Details</Text>
@@ -907,6 +907,8 @@ function OrdersTable({
           </View>
         );
       })}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -1430,7 +1432,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink, outlineStyle: "none" } as any,
 
   /* dropdowns */
-  dropdownWrap: { position: "relative", zIndex: 20, width: 140 },
+  dropdownWrap: { position: "relative", zIndex: 20 },
   dropdownBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1438,14 +1440,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.rule,
     borderRadius: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     backgroundColor: COLORS.page,
     minWidth: 0,
     flexShrink: 1,
   },
   dropdownBtnText: {
-    flex: 1,
     flexShrink: 1,
     minWidth: 0,
     fontWeight: "600",
@@ -1488,21 +1489,22 @@ const styles = StyleSheet.create({
   viewToggleGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    padding: 4,
+    gap: 0,
   },
   viewToggleBoxBtn: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.rule,
+    backgroundColor: "transparent",
+    borderWidth: 0,
   },
   viewToggleBoxBtnActive: {
     backgroundColor: COLORS.navyDeep,
-    borderColor: COLORS.navyDeep,
   },
 
   /* shared bits */

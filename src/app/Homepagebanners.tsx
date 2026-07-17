@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import {
   fetchHomepageBanners,
   createHomepageBanner,
@@ -312,6 +313,13 @@ export default function HomepageBannerManagement() {
       return;
     }
 
+    const label = "Banner";
+    if (editingId) {
+      if (!(await sweetCrud.confirmUpdate(label, form.title.trim()))) return;
+    } else if (!(await sweetCrud.confirmAdd(label, form.title.trim()))) {
+      return;
+    }
+
     setSaving(true);
     try {
       const imagePath = await resolveImagePath(form.image, form.imagePath);
@@ -335,7 +343,7 @@ export default function HomepageBannerManagement() {
             String(b.id) === String(editingId) ? mapped : b,
           ),
         }));
-        showToast("Banner updated");
+        void sweetCrud.updated(label);
       } else {
         const created = await createHomepageBanner(body);
         const mapped = mapRowToBanner(created);
@@ -343,17 +351,16 @@ export default function HomepageBannerManagement() {
           ...prev,
           [activeKey]: [...prev[activeKey], mapped],
         }));
-        showToast("Banner added");
+        void sweetCrud.added(label);
       }
       closeModal();
     } catch (err) {
       const conflict = positionConflictMessage(err);
       if (conflict) {
         setErrors({ position: conflict });
-        showToast(conflict);
+        void sweetWarning("Position conflict", conflict);
       } else {
-        const msg = getApiErrorMessage(err, "Failed to save banner.");
-        showToast(msg);
+        void sweetError("Error", getApiErrorMessage(err, "Failed to save banner."));
       }
     } finally {
       setSaving(false);
@@ -373,9 +380,9 @@ export default function HomepageBannerManagement() {
           String(b.id) === String(id) ? mapped : b,
         ),
       }));
-      showToast("Status updated");
+      void sweetSuccess("Status updated", nextActive ? "Banner is now active." : "Banner is now inactive.");
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Failed to update status."));
+      void sweetError("Error", getApiErrorMessage(err, "Failed to update status."));
     }
   }
 
@@ -389,9 +396,9 @@ export default function HomepageBannerManagement() {
         [sectionKey]: prev[sectionKey].filter((b: any) => String(b.id) !== String(id)),
       }));
       setConfirmDelete(null);
-      showToast("Banner deleted");
+      void sweetCrud.deleted("Banner");
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Failed to delete banner."));
+      void sweetError("Error", getApiErrorMessage(err, "Failed to delete banner."));
     }
   }
 

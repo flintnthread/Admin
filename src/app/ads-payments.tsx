@@ -629,14 +629,14 @@ function FilterBar({
             />
           </View>
           {/* Controls — all in one row, no wrapping */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, zIndex: 100, overflow: 'visible' }}>
-            <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === 'status' ? 50 : 20, overflow: 'visible' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 6, zIndex: 100, overflow: 'visible' }}>
+            <View style={{ flexShrink: 1, zIndex: openDropdown === 'status' ? 50 : 20, overflow: 'visible' }}>
               <StatusDropdown 
                 value={status} onChange={onStatus} 
                 open={openDropdown === 'status'} onToggle={() => setOpenDropdown(p => p === 'status' ? null : 'status')} 
               />
             </View>
-            <View style={{ flex: 1, minWidth: 120, zIndex: openDropdown === 'method' ? 50 : 10, overflow: 'visible' }}>
+            <View style={{ flexShrink: 1, zIndex: openDropdown === 'method' ? 50 : 10, overflow: 'visible' }}>
               <MethodDropdown 
                 value={method} onChange={onMethod} 
                 open={openDropdown === 'method'} onToggle={() => setOpenDropdown(p => p === 'method' ? null : 'method')} 
@@ -1111,9 +1111,9 @@ const styles = StyleSheet.create({
   searchBox: { flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink },
 
-  statusDropdownWrap: { position: 'relative', zIndex: 20, width: 140 },
-  statusDropdownBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: COLORS.page },
-  statusDropdownText: { flex: 1, fontWeight: '600', fontSize: 12, color: COLORS.ink },
+  statusDropdownWrap: { position: 'relative', zIndex: 20 },
+  statusDropdownBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 10, backgroundColor: COLORS.page },
+  statusDropdownText: { flexShrink: 1, fontWeight: '600', fontSize: 12, color: COLORS.ink },
   statusDropdownMenu: {
     position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
     backgroundColor: COLORS.surface, borderRadius: 10, borderWidth: 1, borderColor: COLORS.rule,
@@ -1133,8 +1133,8 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   viewToggleBoxBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',

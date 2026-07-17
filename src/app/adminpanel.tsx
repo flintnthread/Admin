@@ -9,6 +9,7 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
     createAdminUser,
     deleteAdminUser,
@@ -591,6 +592,7 @@ export default function AdminUsersScreen() {
   );
 
   async function handleAdd(form: UserForm) {
+    if (!(await sweetCrud.confirmAdd("Admin user", form.name || form.email))) return;
     try {
       await createAdminUser({
         email: form.email,
@@ -601,13 +603,15 @@ export default function AdminUsersScreen() {
       });
       await loadUsers();
       setAddVisible(false);
+      void sweetCrud.added("Admin user");
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to add admin user."));
     }
   }
 
   async function handleEdit(form: UserForm) {
     if (!editUser) return;
+    if (!(await sweetCrud.confirmUpdate("Admin user", form.name || form.email))) return;
     try {
       await updateAdminUser(editUser.id, {
         fullName: form.name,
@@ -617,8 +621,9 @@ export default function AdminUsersScreen() {
       });
       await loadUsers();
       setEditUser(null);
+      void sweetCrud.updated("Admin user");
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to update admin user."));
     }
   }
 
@@ -628,8 +633,9 @@ export default function AdminUsersScreen() {
       await deleteAdminUser(deleteUser.id);
       await loadUsers();
       setDeleteUser(null);
+      void sweetCrud.deleted("Admin user");
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to delete admin user."));
     }
   }
 
@@ -1076,7 +1082,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 16,
     overflow: "hidden",
-    width: 340,
+    width: 393,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
