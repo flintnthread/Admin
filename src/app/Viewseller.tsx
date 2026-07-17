@@ -2,7 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import SellerMediaImage from "@/components/SellerMediaImage";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
+import { buildMediaUrlCandidates, isPdfMedia, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   exportSellerOrdersCsv, exportSellerProductsCsv, fetchSellerAnalyticsChart, fetchSellerDetail, normalizeSellerGraphChart,
@@ -1308,7 +1308,8 @@ export default function ViewSeller() {
 
   const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
-    setSelectedDocUrl(path || url || '');
+    // Always resolve to flintnthread.com/uploads/seller_documents/... (never .in)
+    setSelectedDocUrl(resolveSellerDocumentImageUrl(path, url));
     setDocModalVisible(true);
   };
 

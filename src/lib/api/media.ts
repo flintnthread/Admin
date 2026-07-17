@@ -123,7 +123,7 @@ export function resolveAdminMediaUrl(path?: string | null): string {
   return `${resolveAdminApiBaseUrl()}${normalizeMediaPath(value)}`;
 }
 
-/** CDN first (production), admin-backend fallback (local dev). */
+/** CDN first (production). Admin-backend fallback only for local/non-upload paths. */
 export function buildMediaUrlCandidates(
   path?: string | null,
   cdnUrl?: string | null,
@@ -133,10 +133,20 @@ export function buildMediaUrlCandidates(
     if (url && !urls.includes(url)) urls.push(url);
   };
 
+  // Always prefer flintnthread.com for /uploads/... (products + seller docs)
   push(resolveMediaUrl(cdnUrl));
   push(resolveMediaUrl(path));
-  push(resolveAdminMediaUrl(path));
-  push(resolveAdminMediaUrl(cdnUrl));
+
+  // Do not fall back to flintnthread.in / admin host for seller docs or product files —
+  // those hosts return 500 / HTML for /uploads/
+  const combined = `${path ?? ""} ${cdnUrl ?? ""}`;
+  const isUpload =
+    /\/uploads\/(seller_documents|sellers|kyc_images|products)\//i.test(combined) ||
+    SELLER_DOCUMENT_FILE.test((path ?? cdnUrl ?? "").split("/").pop() ?? "");
+  if (!isUpload) {
+    push(resolveAdminMediaUrl(path));
+    push(resolveAdminMediaUrl(cdnUrl));
+  }
 
   return urls;
 }
