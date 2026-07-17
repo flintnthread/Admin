@@ -298,11 +298,9 @@ export async function ensureAdminApiReachable(): Promise<string> {
   );
 }
 
-/** Public CDN / media host for uploads — matches backend app.media.public-base-url */
+/** Public CDN for ALL uploads (products + seller docs) — same host as product images. */
 export function resolvePublicMediaBaseUrl(): string {
-  const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  // Local Admin web → seller-service serves shared product files
+  // Local Admin web → seller-service serves shared files
   if (
     Platform.OS === "web" &&
     typeof window !== "undefined" &&
@@ -316,6 +314,15 @@ export function resolvePublicMediaBaseUrl(): string {
   if (useLocalApiFallbacks()) {
     const lan = getExpoDevLanHost();
     return `http://${lan || "localhost"}:8083`;
+  }
+  // Production: always flintnthread.com (ignore .in / .online env mistakes)
+  const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "") || "";
+  if (
+    fromEnv &&
+    !/flintnthread\.(in|online)/i.test(fromEnv) &&
+    !/localhost|127\.0\.0\.1/i.test(fromEnv)
+  ) {
+    return fromEnv;
   }
   return "https://flintnthread.com";
 }
