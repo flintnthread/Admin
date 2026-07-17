@@ -19,7 +19,7 @@
 
 import AdminLayout from '@/components/admin-layout';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { sweetError, sweetWarning } from '@/lib/sweetAlert';
+import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import {
     createAdsAdminUser,
     deleteAdsAdminUser,
@@ -785,7 +785,7 @@ const AdsAdminUsers: React.FC = () => {
                     body.password = form.password;
                 }
                 await updateAdsAdminUser(editingUser.id, body);
-                showToast('User updated successfully!');
+                void sweetCrud.updated('Ads admin user');
             } else {
                 const password = form.password.trim();
                 if (password.length < 6) {
@@ -793,7 +793,7 @@ const AdsAdminUsers: React.FC = () => {
                     return;
                 }
                 await createAdsAdminUser({ ...body, password });
-                showToast('New user added successfully!');
+                void sweetCrud.added('Ads admin user');
                 setPage(1);
                 setSearch('');
                 setRoleFilter('All');
@@ -821,7 +821,7 @@ const AdsAdminUsers: React.FC = () => {
             await deleteAdsAdminUser(deletingUser.id);
             setDeleteModalVisible(false);
             setDeletingUser(null);
-            showToast('User deleted successfully!');
+            void sweetCrud.deleted('Ads admin user');
             await loadUsers();
         } catch (err) {
             void sweetError('Error', getApiErrorMessage(err, 'Could not delete user.'));

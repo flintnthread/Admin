@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapSellerSupportTicket } from "@/lib/mappers";
+import { sweetConfirm, sweetError, sweetSuccess } from "@/lib/sweetAlert";
 import {
   fetchSupportTicket,
   fetchSupportTickets,
@@ -958,39 +959,67 @@ export default function SupportTicketManagement() {
 
   const handleReopen = useCallback((id: string) => {
     void (async () => {
+      const confirmed = await sweetConfirm({
+        title: "Reopen ticket?",
+        text: "This ticket will be marked as open again.",
+        confirmText: "Yes, Reopen",
+      });
+      if (!confirmed) return;
       try {
         await updateSupportTicketStatus(Number(id), "open");
         await refreshTicket(id);
         await loadTickets();
         await loadStats();
+        void sweetSuccess("Reopened!", "Ticket is open again.");
       } catch (e) {
-        setLoadError(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e);
+        setLoadError(msg);
+        void sweetError("Error", msg);
       }
     })();
   }, [loadStats, loadTickets, refreshTicket]);
 
   const handleResolve = useCallback((id: string) => {
     void (async () => {
+      const confirmed = await sweetConfirm({
+        title: "Resolve ticket?",
+        text: "Mark this ticket as resolved?",
+        confirmText: "Yes, Resolve",
+      });
+      if (!confirmed) return;
       try {
         await updateSupportTicketStatus(Number(id), "resolved");
         await refreshTicket(id);
         await loadTickets();
         await loadStats();
+        void sweetSuccess("Resolved!", "Ticket marked as resolved.");
       } catch (e) {
-        setLoadError(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e);
+        setLoadError(msg);
+        void sweetError("Error", msg);
       }
     })();
   }, [loadStats, loadTickets, refreshTicket]);
 
   const handleCloseTicket = useCallback((id: string) => {
     void (async () => {
+      const confirmed = await sweetConfirm({
+        title: "Close ticket?",
+        text: "This ticket will be closed.",
+        confirmText: "Yes, Close",
+        danger: true,
+      });
+      if (!confirmed) return;
       try {
         await updateSupportTicketStatus(Number(id), "closed");
         await refreshTicket(id);
         await loadTickets();
         await loadStats();
+        void sweetSuccess("Closed!", "Ticket closed successfully.");
       } catch (e) {
-        setLoadError(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e);
+        setLoadError(msg);
+        void sweetError("Error", msg);
       }
     })();
   }, [loadStats, loadTickets, refreshTicket]);
@@ -1002,8 +1031,11 @@ export default function SupportTicketManagement() {
         await refreshTicket(id);
         await loadTickets();
         await loadStats();
+        void sweetSuccess("Sent!", "Reply sent successfully.");
       } catch (e) {
-        setLoadError(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e);
+        setLoadError(msg);
+        void sweetError("Error", msg);
       }
     })();
   }, [loadStats, loadTickets, refreshTicket]);
