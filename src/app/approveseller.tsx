@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -3395,9 +3395,11 @@ export default function ApprovedSellersScreen() {
             {viewMode === "list" && isLargeScreen ? (
               /* Desktop Table View */
               <View style={styles.tableCard}>
-                <View style={styles.tableHeaderRow}>
-                  <Text style={[styles.tableTh, { flex: 2.2 }]}>Seller</Text>
-                  <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
+                  <View style={{ minWidth: 1200, width: "100%" }}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableTh, { flex: 2.2 }]}>Seller</Text>
+                      <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
                   <Text style={[styles.tableTh, { flex: 1.8 }]}>Business Type</Text>
                   <Text style={[styles.tableTh, { flex: 0.8, textAlign: "center" }]}>Products</Text>
                   <Text style={[styles.tableTh, { flex: 1.2, textAlign: "right" }]}>Wallet Balance</Text>
@@ -3492,6 +3494,8 @@ export default function ApprovedSellersScreen() {
                     <Text style={styles.emptyText}>No sellers found matching the query.</Text>
                   </View>
                 )}
+                  </View>
+                </ScrollView>
               </View>
             ) : (
               /* Mobile List / Grid Card View */
@@ -4219,7 +4223,8 @@ const styles = StyleSheet.create({
   toolbar: {
     width: "100%",
     justifyContent: "space-between",
-    alignItems: "stretch",
+    alignItems: "center",
+    flexWrap: "wrap",
     marginBottom: 24,
     gap: 16,
     position: "relative",
