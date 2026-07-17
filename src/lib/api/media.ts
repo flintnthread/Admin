@@ -48,7 +48,7 @@ export function normalizeMediaPath(value: string): string {
 }
 
 /**
- * Resolve to CDN URL (app.media.public-base-url = https://flintnthread.in).
+ * Resolve to CDN URL (app.media.public-base-url = https://flintnthread.com).
  * Seller docs/profile → https://flintnthread.in/uploads/seller_documents/...
  */
 export function resolveMediaUrl(path?: string | null): string {
@@ -155,29 +155,46 @@ export function getPublicMediaBaseUrl(): string {
   return resolvePublicMediaBaseUrl();
 }
 
+/** Cloudinary thumbnails for faster admin product grids. */
+export function optimizeProductImageUrl(url: string, width = 420): string {
+  const trimmed = String(url ?? "").trim();
+  if (!trimmed || !/res\.cloudinary\.com/i.test(trimmed)) return trimmed;
+
+  const match = trimmed.match(
+    /^(https?:\/\/res\.cloudinary\.com\/[^/]+\/(?:image|video)\/upload\/)(.*)$/i
+  );
+  if (!match) return trimmed;
+
+  const [, prefix, rest] = match;
+  if (/^(w_|c_|q_|f_|h_|ar_|g_)/i.test(rest)) return trimmed;
+
+  const transform = `w_${width},q_auto,f_auto`;
+  return `${prefix}${transform}/${rest}`;
+}
+
 /**
  * Product approval / catalog images.
- * Cloudinary absolute URLs are used as-is; relative /uploads paths go through admin media.
+ * Product files ALWAYS use https://flintnthread.com/uploads/products/...
+ * Cloudinary absolute URLs are used as-is.
  */
 export function resolveProductImageUrl(path?: string | null): string {
   if (!path?.trim()) return "";
   const value = path.trim();
+  const PRODUCT_CDN = "https://flintnthread.com";
 
   if (/^(data:|blob:)/i.test(value)) {
     return value;
   }
 
-  // Cloudinary (or any absolute https without /uploads) — never rewrite
   if (/^https?:\/\//i.test(value)) {
-    if (/res\.cloudinary\.com|cloudinary\.com/i.test(value) || !/\/uploads\//i.test(value)) {
-      return value;
+    if (/res\.cloudinary\.com/i.test(value)) {
+      return optimizeProductImageUrl(value);
     }
     try {
       const pathname = new URL(value).pathname || "";
       if (pathname.includes("/uploads/products/")) {
-        return `${resolveAdminApiBaseUrl()}${normalizeMediaPath(pathname)}`;
+        return `${PRODUCT_CDN}${normalizeMediaPath(pathname)}`;
       }
-      // Seller docs / profile still use CDN
       if (
         pathname.includes("/uploads/seller_documents/") ||
         pathname.includes("/uploads/sellers/") ||
@@ -193,7 +210,7 @@ export function resolveProductImageUrl(path?: string | null): string {
 
   const pathname = normalizeMediaPath(value);
   if (pathname.includes("/uploads/products/")) {
-    return `${resolveAdminApiBaseUrl()}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+    return `${PRODUCT_CDN}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
   }
 
   return resolveMediaUrl(value);
