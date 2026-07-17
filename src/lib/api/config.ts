@@ -3,11 +3,11 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 
 /** Production admin API — nginx on either domain routes /api/admin/ → 8082 */
-export const PRODUCTION_ADMIN_API_URL = "https://flintnthread.online";
 export const PRODUCTION_ADMIN_API_URL_IN = "https://flintnthread.in";
+export const PRODUCTION_ADMIN_API_URL = "https://flintnthread.online";
 export const PRODUCTION_ADMIN_API_URLS = [
-  PRODUCTION_ADMIN_API_URL,
   PRODUCTION_ADMIN_API_URL_IN,
+  PRODUCTION_ADMIN_API_URL,
 ] as const;
 
 const ADMIN_API_PORT = 8082;

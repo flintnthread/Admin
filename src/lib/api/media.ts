@@ -155,6 +155,23 @@ export function getPublicMediaBaseUrl(): string {
   return resolvePublicMediaBaseUrl();
 }
 
+/** Cloudinary thumbnails for faster admin product grids. */
+export function optimizeProductImageUrl(url: string, width = 420): string {
+  const trimmed = String(url ?? "").trim();
+  if (!trimmed || !/res\.cloudinary\.com/i.test(trimmed)) return trimmed;
+
+  const match = trimmed.match(
+    /^(https?:\/\/res\.cloudinary\.com\/[^/]+\/(?:image|video)\/upload\/)(.*)$/i
+  );
+  if (!match) return trimmed;
+
+  const [, prefix, rest] = match;
+  if (/^(w_|c_|q_|f_|h_|ar_|g_)/i.test(rest)) return trimmed;
+
+  const transform = `w_${width},q_auto,f_auto`;
+  return `${prefix}${transform}/${rest}`;
+}
+
 /**
  * Product approval / catalog images.
  * Cloudinary absolute URLs are used as-is; relative /uploads paths go through admin media.
@@ -170,7 +187,7 @@ export function resolveProductImageUrl(path?: string | null): string {
   // Cloudinary (or any absolute https without /uploads) — never rewrite
   if (/^https?:\/\//i.test(value)) {
     if (/res\.cloudinary\.com|cloudinary\.com/i.test(value) || !/\/uploads\//i.test(value)) {
-      return value;
+      return optimizeProductImageUrl(value);
     }
     try {
       const pathname = new URL(value).pathname || "";
