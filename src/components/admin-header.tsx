@@ -18,6 +18,8 @@ import { useThemeContext } from "@/context/theme-context";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/context/auth-context";
 import { NAV_ITEMS } from "./admin-sidebar";
+import { usePayoutRequestAlerts } from "@/hooks/usePayoutRequestAlerts";
+import { unlockAlertAudio } from "@/lib/playAlertBeep";
 
 // Flatten NAV_ITEMS to get a searchable list of routes
 const searchableRoutes: { label: string; path: string; icon?: string }[] = [];
@@ -56,7 +58,9 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   const { theme, toggleTheme } = useThemeContext();
   const colors = useTheme();
   const isDark = theme === "dark";
-  const { user, signOut } = useAuth();
+  const { user, signOut, token } = useAuth();
+  const router = useRouter();
+  const { notifications: payoutNotifications, pendingCount } = usePayoutRequestAlerts(!!token);
 
   // Dropdown states
   const [notifOpen, setNotifOpen] = useState(false);
@@ -72,17 +76,11 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  // Notifications state
-  const [notifications, setNotifications] = useState([
-    { id: "1", text: "New seller request pending approval", time: "5 mins ago" },
-    { id: "2", text: "Low stock alert: Silk Saree (only 3 left)", time: "1 hour ago" },
-    { id: "3", text: "New support ticket #1042 created", time: "2 hours ago" },
-  ]);
-
   const toggleNotif = () => {
+    unlockAlertAudio();
     setSettingsOpen(false);
     setProfileOpen(false);
-    router.push("/Admin-notifications" as any);
+    setNotifOpen((v) => !v);
   };
 
   const toggleSettings = () => {
@@ -96,12 +94,6 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
     setNotifOpen(false);
     setSettingsOpen(false);
   };
-
-  const handleClearNotifications = () => {
-    setNotifications([]);
-  };
-
-  const router = useRouter();
 
   const handleProfileClick = () => {
     setProfileOpen(false);
@@ -117,6 +109,11 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
     setLogoutModalOpen(false);
     signOut();
     router.replace("/login");
+  };
+
+  const openRequestsTab = () => {
+    setNotifOpen(false);
+    router.push({ pathname: "/Sellerpayments", params: { tab: "requests" } } as any);
   };
 
   return (
@@ -211,14 +208,97 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
         </TouchableOpacity>
 
         {/* Notifications */}
-        <TouchableOpacity onPress={toggleNotif} style={styles.actionBtn}>
-          <Feather name="bell" size={18} color={isDark ? "#FFFFFF" : "#374151"} />
-          {notifications.length > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{notifications.length}</Text>
+        <View style={{ position: "relative" }}>
+          <TouchableOpacity onPress={toggleNotif} style={styles.actionBtn}>
+            <Feather name="bell" size={18} color={isDark ? "#FFFFFF" : "#374151"} />
+            {pendingCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{pendingCount > 99 ? "99+" : pendingCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {notifOpen && (
+            <View
+              style={[
+                styles.dropdownCard,
+                {
+                  right: 0,
+                  width: 340,
+                  maxWidth: 360,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  zIndex: 1000,
+                },
+              ]}
+              {...(Platform.OS === "web"
+                ? ({ onMouseLeave: () => setNotifOpen(false) } as object)
+                : {})}
+            >
+              <View style={[styles.dropdownHeader, { borderBottomColor: colors.border, justifyContent: "space-between" }]}>
+                <Text style={[styles.dropdownTitle, { color: colors.text }]}>Payment Requests</Text>
+                {pendingCount > 0 && (
+                  <View style={[styles.notifBadge, { position: "relative", top: 0, right: 0 }]}>
+                    <Text style={styles.notifBadgeText}>{pendingCount}</Text>
+                  </View>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} keyboardShouldPersistTaps="handled">
+                {payoutNotifications.length === 0 ? (
+                  <View style={{ padding: 16, alignItems: "center" }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No pending payment requests</Text>
+                  </View>
+                ) : (
+                  payoutNotifications.map((n, idx) => (
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[
+                        styles.dropdownOption,
+                        {
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          gap: 2,
+                          borderBottomWidth: idx === payoutNotifications.length - 1 ? 0 : 1,
+                          borderBottomColor: colors.border,
+                        },
+                      ]}
+                      onPress={openRequestsTab}
+                    >
+                      <Text style={[styles.dropdownOptionText, { color: colors.text, fontWeight: "700" }]} numberOfLines={2}>
+                        {n.text}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
+                        {n.detail}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: "#ef7b1a", marginTop: 2 }}>{n.time}</Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+              <View style={{ padding: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <TouchableOpacity
+                  onPress={openRequestsTab}
+                  style={[styles.dropdownOption, { justifyContent: "center" }]}
+                >
+                  <Text style={[styles.dropdownOptionText, { color: "#ef7b1a", fontWeight: "700" }]}>
+                    Open Seller Payments → Requests
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setNotifOpen(false);
+                    router.push("/Admin-notifications" as any);
+                  }}
+                  style={[styles.dropdownOption, { justifyContent: "center" }]}
+                >
+                  <Text style={[styles.dropdownOptionText, { color: colors.textSecondary }]}>
+                    All notifications
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-        </TouchableOpacity>
+        </View>
 
         {/* Settings */}
         <TouchableOpacity onPress={toggleSettings} style={styles.actionBtn}>
@@ -265,8 +345,6 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
 
 
       </View>
-
-      {/* Notifications Dropdown Removed */}
 
       {/* Settings Dropdown */}
       {settingsOpen && (

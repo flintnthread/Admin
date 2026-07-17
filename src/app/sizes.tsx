@@ -39,15 +39,10 @@ import {
     updateSize,
     type CatalogSize,
 } from "@/services/sizeApi";
-import {
-  SIZE_CATALOG_ALL,
-  SIZE_CATALOG_GROUPS,
-  classifySizeCatalog,
-  countSizesByCatalogGroup,
-  filterSizesByCatalogGroup,
-  sizeCatalogGroupLabel,
-  type SizeCatalogFilterId,
-} from "@/lib/sizeCatalogGroups";
+
+const SIZE_CATALOG_ALL = "all";
+const UNASSIGNED_CATEGORY = "Unassigned";
+type SizeCatalogFilterId = typeof SIZE_CATALOG_ALL | string;
 
 // ── Linear Gradient ──────────────────────────────────────────
 // Expo:  import { LinearGradient } from "expo-linear-gradient";
@@ -93,19 +88,29 @@ interface SizeItem {
   code: string;
   createdDate: string;
   status: "Active" | "Inactive";
+  categories: string[];
+  primaryCategory: string;
 }
 
 function mapSizeRow(row: CatalogSize): SizeItem {
+  const categories = Array.isArray(row.categories)
+    ? row.categories.map((c) => String(c).trim()).filter(Boolean)
+    : [];
+  const primaryCategory =
+    String(row.primaryCategory ?? "").trim() ||
+    (categories[0] ?? UNASSIGNED_CATEGORY);
   return {
-    id: row.id,
-    name: row.name,
-    code: row.code,
-    status: row.status,
+    id: Number(row.id),
+    name: String(row.name ?? "").trim() || "—",
+    code: String(row.code ?? "").trim() || "—",
+    status: row.status === "Inactive" ? "Inactive" : "Active",
     createdDate: row.createdDate ?? todayStr(),
+    categories,
+    primaryCategory,
   };
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 48;
 
 const CARD_GRADIENTS: [string, string][] = [
   ["#1d324e", "#101d2e"],
@@ -332,7 +337,7 @@ const GridCard: React.FC<{
       <View style={S.gridCardBottom}>
         <Text style={S.gridCardName} numberOfLines={1}>{item.name}</Text>
         <Text style={S.gridCardCatalog} numberOfLines={1}>
-          {sizeCatalogGroupLabel(classifySizeCatalog(item.name, item.code))}
+          {item.primaryCategory}
         </Text>
         <View style={S.gridCardMeta}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -377,7 +382,7 @@ const ListRow: React.FC<{
       {item.code}
     </Text>
     <Text style={[S.listCell, { flex: 1.2, color: "#8b3e0f", fontWeight: "600" }]} numberOfLines={1}>
-      {sizeCatalogGroupLabel(classifySizeCatalog(item.name, item.code))}
+      {item.primaryCategory}
     </Text>
     <View style={[S.listCell, { flex: 1.4, flexDirection: "row", alignItems: "center" }]}>
       {/* Bootstrap: calendar3 */}
@@ -459,8 +464,6 @@ const SizeForm: React.FC<{
 }> = ({ name, setName, code, setCode, status, setStatus }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 600;
-  const matchedGroup = classifySizeCatalog(name, code);
-  const matchedLabel = sizeCatalogGroupLabel(matchedGroup);
 
   return (
     <View>
@@ -483,10 +486,10 @@ const SizeForm: React.FC<{
       />
 
       <View style={S.catalogMatchBox}>
-        <Text style={S.catalogMatchLabel}>Will appear under</Text>
-        <Text style={S.catalogMatchValue}>{matchedLabel}</Text>
+        <Text style={S.catalogMatchLabel}>Category assignment</Text>
+        <Text style={S.catalogMatchValue}>From product usage</Text>
         <Text style={S.catalogMatchHint}>
-          Matched from name/code · Apparel, Footwear, Waist, Kids, Free Size, or Other
+          Tabs group sizes by product main categories (via product variants). Unused sizes appear under Unassigned.
         </Text>
       </View>
 
@@ -657,16 +660,54 @@ export default function SizesManagement() {
   const cardWidth = Math.max(0, (containerWidth - PADDING * 2 - GAP * (numCols - 1)) / numCols);
   const cardWidthPct = `${(100 / numCols).toFixed(4)}%` as any;
 
-  const catalogCounts = useMemo(() => countSizesByCatalogGroup(sizes), [sizes]);
+  const catalogTabs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of sizes) {
+      const cats = s.categories.length > 0 ? s.categories : [UNASSIGNED_CATEGORY];
+      const unique = [...new Set(cats)];
+      for (const cat of unique) {
+        counts.set(cat, (counts.get(cat) ?? 0) + 1);
+      }
+    }
+    const named = [...counts.entries()]
+      .filter(([name]) => name !== UNASSIGNED_CATEGORY)
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
+      .map(([name, count]) => ({ id: name, label: name, count }));
+    const unassignedCount = counts.get(UNASSIGNED_CATEGORY) ?? 0;
+    if (unassignedCount > 0) {
+      named.push({ id: UNASSIGNED_CATEGORY, label: UNASSIGNED_CATEGORY, count: unassignedCount });
+    }
+    return named;
+  }, [sizes]);
+
+  const catalogCounts = useMemo(() => {
+    const result: Record<string, number> = { [SIZE_CATALOG_ALL]: sizes.length };
+    for (const tab of catalogTabs) {
+      result[tab.id] = tab.count;
+    }
+    return result;
+  }, [sizes.length, catalogTabs]);
 
   const filtered = useMemo(() => {
-    const byGroup = filterSizesByCatalogGroup(sizes, catalogFilter);
+    const byGroup =
+      catalogFilter === SIZE_CATALOG_ALL
+        ? sizes
+        : sizes.filter((s) => {
+            if (catalogFilter === UNASSIGNED_CATEGORY) {
+              return s.categories.length === 0;
+            }
+            return s.categories.some(
+              (c) => c.toLowerCase() === String(catalogFilter).toLowerCase()
+            );
+          });
     const q = search.toLowerCase().trim();
     if (!q) return byGroup;
     return byGroup.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
-        s.code.toLowerCase().includes(q)
+        s.code.toLowerCase().includes(q) ||
+        s.primaryCategory.toLowerCase().includes(q) ||
+        s.categories.some((c) => c.toLowerCase().includes(q))
     );
   }, [sizes, search, catalogFilter]);
 
@@ -704,8 +745,9 @@ export default function SizesManagement() {
       const created = await createSize(d);
       const mapped = mapSizeRow(created);
       setSizes((prev) => [...prev, mapped]);
-      const group = classifySizeCatalog(mapped.name, mapped.code);
-      setCatalogFilter(group);
+      setCatalogFilter(
+        mapped.categories[0] ?? mapped.primaryCategory ?? SIZE_CATALOG_ALL
+      );
       setPage(1);
       setSearch("");
       setModal(null);
@@ -728,7 +770,9 @@ export default function SizesManagement() {
       });
       const mapped = mapSizeRow(saved);
       setSizes((prev) => prev.map((s) => (s.id === updated.id ? mapped : s)));
-      setCatalogFilter(classifySizeCatalog(mapped.name, mapped.code));
+      setCatalogFilter(
+        mapped.categories[0] ?? mapped.primaryCategory ?? SIZE_CATALOG_ALL
+      );
       setPage(1);
       setModal(null);
       void sweetCrud.updated("Size");
@@ -884,7 +928,7 @@ export default function SizesManagement() {
                 All ({catalogCounts.all})
               </Text>
             </TouchableOpacity>
-            {SIZE_CATALOG_GROUPS.map((g) => {
+            {catalogTabs.map((g) => {
               const active = catalogFilter === g.id;
               return (
                 <TouchableOpacity
@@ -893,7 +937,7 @@ export default function SizesManagement() {
                   onPress={() => handleCatalogFilter(g.id)}
                 >
                   <Text style={[S.catalogTabText, active && S.catalogTabTextActive]}>
-                    {g.label} ({catalogCounts[g.id]})
+                    {g.label} ({g.count})
                   </Text>
                 </TouchableOpacity>
               );
@@ -944,7 +988,7 @@ export default function SizesManagement() {
                       <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Catalog</Text>
+                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Category</Text>
                       <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
                       <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
                       <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
