@@ -1641,17 +1641,17 @@ export default function MainCategories() {
       const gstValue = data.gst ? parseFloat(String(data.gst).replace("%", "")) : undefined;
       const statusValue = data.status === "Active";
       const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
-      // Prefer multipart upload for new files. For data-URL fallback (no File), send image string.
-      const imagePayload =
-        !shouldUploadImage && typeof data.image === "string" && data.image.startsWith("data:image/")
-          ? data.image
-          : undefined;
 
       let imageUploadFailed = false;
       const uploadImageSafely = async (categoryId: number, existing: CategoryRow): Promise<CategoryRow> => {
         if (!shouldUploadImage || !data.imageFile) return existing;
         try {
-          const compressed = await compressImageFile(data.imageFile);
+          // Aggressive recompress right before upload (survives nginx ~1MB defaults).
+          const compressed = await compressImageFile(data.imageFile, {
+            maxEdge: 1100,
+            maxBytes: 400_000,
+            fileName: data.imageFile instanceof File ? data.imageFile.name : "category.jpg",
+          });
           return await uploadCategoryImages(categoryId, compressed.file);
         } catch (uploadError) {
           imageUploadFailed = true;
@@ -1660,7 +1660,7 @@ export default function MainCategories() {
           void sweetWarning(
             "Category saved without image",
             is413
-              ? "The category was saved, but the image was rejected as too large (413). Edit the category and try a smaller image."
+              ? "The category was saved, but the image was rejected as too large (413). Edit the category and try a smaller JPG under 500KB."
               : getApiErrorMessage(
                   uploadError,
                   "The category was saved, but the image upload failed. You can edit and retry the image."
@@ -1670,13 +1670,16 @@ export default function MainCategories() {
         }
       };
 
+      // Never send base64 image payloads in JSON create/update — that often triggers 413.
+      // Images go only through multipart /upload-images after the category row exists.
+
       if (data.id) {
         let saved = await updateCategory(
           data.id,
           data.name,
           data.hsn,
           gstValue,
-          imagePayload,
+          undefined,
           undefined,
           undefined,
           statusValue
@@ -1705,7 +1708,7 @@ export default function MainCategories() {
             data.name,
             data.hsn,
             gstValue,
-            imagePayload,
+            undefined,
             undefined,
             undefined,
             statusValue
@@ -1719,7 +1722,7 @@ export default function MainCategories() {
             data.name,
             data.hsn,
             gstValue,
-            imagePayload,
+            undefined,
             undefined,
             undefined,
             statusValue
