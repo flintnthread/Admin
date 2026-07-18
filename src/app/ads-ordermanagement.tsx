@@ -35,7 +35,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Path, Circle, Rect } from "react-native-svg";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
@@ -1097,10 +1097,12 @@ const PAGE_SIZE = 8;
 
 export default function AdsOrderManagementScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ customerEmail?: string; customerName?: string }>();
   const { width: windowWidth } = useWindowDimensions();
   const { measuredWidth, onLayout } = useMeasuredWidth(windowWidth);
 
-  const [search, setSearch] = useState("");
+  const initialSearch = String(params.customerEmail || params.customerName || "").trim();
+  const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [billing, setBilling] = useState<BillingFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -1133,6 +1135,14 @@ export default function AdsOrderManagementScreen() {
   const gridCardWidth = (fullWidth - gridGap * (gridCols - 1)) / gridCols;
 
   useEffect(() => setPage(1), [search, status, billing, viewMode]);
+
+  useEffect(() => {
+    const seeded = String(params.customerEmail || params.customerName || "").trim();
+    if (seeded && seeded !== search) {
+      setSearch(seeded);
+      setPage(1);
+    }
+  }, [params.customerEmail, params.customerName]);
 
   useEffect(() => {
     let cancelled = false;

@@ -123,7 +123,7 @@ export function resolveAdminMediaUrl(path?: string | null): string {
   return `${resolveAdminApiBaseUrl()}${normalizeMediaPath(value)}`;
 }
 
-/** CDN first (production). Admin-backend fallback only for local/non-upload paths. */
+/** CDN only for seller docs/products — no admin .in/.online fallbacks. */
 export function buildMediaUrlCandidates(
   path?: string | null,
   cdnUrl?: string | null,
@@ -137,9 +137,19 @@ export function buildMediaUrlCandidates(
   push(resolveMediaUrl(cdnUrl));
   push(resolveMediaUrl(path));
 
-  // Seller docs / products: also try admin API origin when CDN path 404s.
-  push(resolveAdminMediaUrl(path));
-  push(resolveAdminMediaUrl(cdnUrl));
+  const combined = `${path ?? ""} ${cdnUrl ?? ""}`;
+  const isSellerOrProductUpload =
+    /\/uploads\/(seller_documents|sellers|kyc_images|products)\//i.test(combined) ||
+    SELLER_DOCUMENT_FILE.test((path ?? cdnUrl ?? "").split("/").pop() ?? "") ||
+    /^\d+_(profile_pic|aadhar|aadhaar|pan|bank|business|live_selfie)/i.test(
+      (path ?? cdnUrl ?? "").split("/").pop() ?? "",
+    );
+
+  // Catalog/CMS and other non-CDN assets may still need admin origin.
+  if (!isSellerOrProductUpload) {
+    push(resolveAdminMediaUrl(path));
+    push(resolveAdminMediaUrl(cdnUrl));
+  }
 
   return urls;
 }
@@ -149,6 +159,7 @@ export function buildSellerImageCandidates(seller: {
   profilePicUrl?: string | null;
   profilePicPath?: string | null;
   liveSelfiePath?: string | null;
+  avatar?: string | null;
 }): string[] {
   const urls: string[] = [];
   const push = (url: string) => {
@@ -161,6 +172,8 @@ export function buildSellerImageCandidates(seller: {
   for (const entry of buildMediaUrlCandidates(seller.liveSelfiePath, null)) {
     push(entry);
   }
+  const avatarUrl = resolveMediaUrl(seller.avatar);
+  if (avatarUrl) push(avatarUrl);
 
   return urls;
 }
@@ -170,11 +183,13 @@ export function resolveSellerProfileImage(seller: {
   profilePicUrl?: string | null;
   profilePicPath?: string | null;
   liveSelfiePath?: string | null;
+  avatar?: string | null;
 }): string {
   return (
     resolveMediaUrl(seller.profilePicUrl) ||
     resolveMediaUrl(seller.profilePicPath) ||
     resolveMediaUrl(seller.liveSelfiePath) ||
+    resolveMediaUrl(seller.avatar) ||
     buildSellerImageCandidates(seller)[0] ||
     ""
   );
@@ -255,7 +270,6 @@ export function getSellerDocumentPlaceholderUrl(): string {
 /**
  * Resolve seller KYC / document / profile image to CDN URL
  * (https://flintnthread.com/uploads/seller_documents/...).
- * Falls back to placeholder when path and backend URL are empty.
  */
 export function resolveSellerDocumentImageUrl(
   path?: string | null,
@@ -266,6 +280,9 @@ export function resolveSellerDocumentImageUrl(
   if (fromBackend) return fromBackend;
   const fromPath = resolveMediaUrl(path);
   if (fromPath) return fromPath;
-  const candidates = buildMediaUrlCandidates(path, backendUrl);
-  return candidates[0] || getSellerDocumentPlaceholderUrl();
+  // CDN-only candidates — never admin .in/.online (those 404 as "Page not found").
+  const candidates = buildMediaUrlCandidates(path, backendUrl).filter((u) =>
+    /flintnthread\.com/i.test(u),
+  );
+  return candidates[0] || "";
 }

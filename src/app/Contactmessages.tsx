@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { sweetCrud, sweetError, sweetWarning, sweetSuccess } from "@/lib/sweetAlert";
 import { mapContactRow } from "@/lib/mappers";
-import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact } from "@/services/contactApi";
+import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact, createContact } from "@/services/contactApi";
 import {
   View,
   Text,
@@ -308,7 +308,7 @@ const ReplyMessageModal: React.FC<{
 const AddMessageModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-  onSave: (msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">) => void;
+  onSave: (msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">) => void | Promise<void>;
   isWeb: boolean;
 }> = ({ visible, onClose, onSave, isWeb }) => {
   const [name, setName] = useState("");
@@ -317,8 +317,9 @@ const AddMessageModal: React.FC<{
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState<MessageStatus>("Unread");
+  const [saving, setSaving] = useState(false);
   if (!visible) return null;
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim() || !email.trim() || !subject.trim() || !content.trim()) {
       const msg = "Please fill all required fields.";
       void sweetWarning("Validation", msg);
@@ -326,9 +327,13 @@ const AddMessageModal: React.FC<{
     }
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + " " + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    onSave({ name, email, phone: phone || "N/A", subject, content, date: dateStr, status });
-    setName(""); setEmail(""); setPhone(""); setSubject(""); setContent(""); setStatus("Unread");
-    onClose();
+    setSaving(true);
+    try {
+      await onSave({ name, email, phone: phone || "N/A", subject, content, date: dateStr, status });
+      setName(""); setEmail(""); setPhone(""); setSubject(""); setContent(""); setStatus("Unread");
+    } finally {
+      setSaving(false);
+    }
   };
   const content_el = (
     <View style={[styles.modalContainer, isWeb && styles.modalContainerWeb]}>
@@ -381,9 +386,9 @@ const AddMessageModal: React.FC<{
           <Feather name="x" size={14} color="#FFFFFF" />
           <Text style={styles.btnCancelText}> Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnUpdate} onPress={handleSave}>
+        <TouchableOpacity style={styles.btnUpdate} onPress={handleSave} disabled={saving}>
           <Feather name="save" size={14} color="#FFFFFF" />
-          <Text style={styles.btnUpdateText}> Save Message</Text>
+          <Text style={styles.btnUpdateText}>{saving ? " Saving…" : " Save Message"}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -427,6 +432,7 @@ const ContactMessagesScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [viewMsg, setViewMsg] = useState<ContactMessage | null>(null);
   const [replyMsg, setReplyMsg] = useState<ContactMessage | null>(null);
+  const [addModalVisible, setAddModalVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const filtered = messages.filter((m) => {
@@ -468,6 +474,27 @@ const ContactMessagesScreen: React.FC = () => {
     }
   };
 
+  const handleAddMessage = async (msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">) => {
+    try {
+      await createContact({
+        name: msg.name,
+        email: msg.email,
+        phone: msg.phone,
+        subject: msg.subject,
+        message: msg.content,
+        status: msg.status,
+      });
+      setAddModalVisible(false);
+      setCurrentPage(1);
+      setFilter("All");
+      setSearch("");
+      await loadMessages();
+      void sweetSuccess("Success", "Contact message added successfully.");
+    } catch (e) {
+      void sweetError("Error", getApiErrorMessage(e, "Could not add message."));
+    }
+  };
+
   const deleteMessage = async (id: number) => {
     if (!(await sweetCrud.confirmDelete("Message"))) return;
     try {
@@ -497,6 +524,13 @@ const ContactMessagesScreen: React.FC = () => {
                 <Text style={mSt.headerTitle}>Contact Messages</Text>
                 <Text style={mSt.headerSubtitle}>Manage all support & feedback conversations</Text>
               </View>
+              <TouchableOpacity
+                style={{ backgroundColor: "#F97316", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 4 }}
+                onPress={() => setAddModalVisible(true)}
+              >
+                <Feather name="plus" size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 11 }}>Add</Text>
+              </TouchableOpacity>
             </View>
 
             {/* ── Mobile Stat Cards (overlapping header) ── */}
@@ -649,6 +683,7 @@ const ContactMessagesScreen: React.FC = () => {
 
           <ViewDetailModal visible={!!viewMsg} onClose={() => setViewMsg(null)} msg={viewMsg} onMarkReplied={markReplied} onReply={setReplyMsg} isWeb={false} />
           <ReplyMessageModal visible={!!replyMsg} onClose={() => setReplyMsg(null)} onSend={handleSendReply} msg={replyMsg} isWeb={false} />
+          <AddMessageModal visible={addModalVisible} onClose={() => setAddModalVisible(false)} onSave={handleAddMessage} isWeb={false} />
         </View>
       </AdminLayout>
     );
@@ -675,7 +710,16 @@ const ContactMessagesScreen: React.FC = () => {
             <Text style={[styles.headerSubtitle, { color: "#D1D5DB" }]}>Manage and respond to incoming contact messages.</Text>
           </View>
         </View>
-        <View style={styles.headerActions} />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F97316", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 }}
+            onPress={() => setAddModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Feather name="plus" size={16} color="#FFFFFF" />
+            <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 13 }}>Add Message</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loadError ? (
@@ -788,6 +832,7 @@ const ContactMessagesScreen: React.FC = () => {
         </View>
         <ViewDetailModal visible={!!viewMsg} onClose={() => setViewMsg(null)} msg={viewMsg} onMarkReplied={markReplied} onReply={setReplyMsg} isWeb={isWeb} />
         <ReplyMessageModal visible={!!replyMsg} onClose={() => setReplyMsg(null)} onSend={handleSendReply} msg={replyMsg} isWeb={isWeb} />
+        <AddMessageModal visible={addModalVisible} onClose={() => setAddModalVisible(false)} onSave={handleAddMessage} isWeb={isWeb} />
       </View>
     </AdminLayout>
   );

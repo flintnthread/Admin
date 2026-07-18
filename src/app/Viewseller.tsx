@@ -2,7 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import SellerMediaImage from "@/components/SellerMediaImage";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { buildMediaUrlCandidates, isPdfMedia, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from '@/lib/api/media';
+import { isPdfMedia, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   exportSellerOrdersCsv, exportSellerProductsCsv, fetchSellerAnalyticsChart, fetchSellerDetail, normalizeSellerGraphChart,
@@ -582,11 +582,11 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
-  const candidates = React.useMemo(
-    () => buildMediaUrlCandidates(docUrl, docUrl),
-    [docUrl],
-  );
-  const imageUri = candidates[imageIndex] ?? "";
+  const candidates = React.useMemo(() => {
+    const uri = resolveSellerDocumentImageUrl(docUrl, docUrl);
+    return uri ? [uri] : [];
+  }, [docUrl]);
+  const imageUri = candidates[0] ?? "";
   const isPdf = isPdfMedia(docUrl);
 
   useEffect(() => {
@@ -1007,7 +1007,7 @@ function mapDetailToSellerData(
             name,
             available: apiDoc.available !== false,
             path: rawPath || undefined,
-            url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+            url: resolveSellerDocumentImageUrl(rawPath, apiDoc.url) || undefined,
           });
           apiDocsByName.delete(name);
         } else {
@@ -1023,7 +1023,7 @@ function mapDetailToSellerData(
           name,
           available: apiDoc.available !== false,
           path: rawPath || undefined,
-          url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+          url: resolveSellerDocumentImageUrl(rawPath, apiDoc.url) || undefined,
         });
       });
       return finalDocs;
@@ -1799,7 +1799,14 @@ export default function ViewSeller() {
           {seller.verificationDocuments.map((doc, i) => (
             <View key={i} style={styles.docRow}>
               <View style={styles.docLeft}>
-                <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                {doc.available && doc.url && !isPdfMedia(doc.url) ? (
+                  <Image
+                    source={{ uri: resolveSellerDocumentImageUrl(doc.path, doc.url) }}
+                    style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: COLORS.border }}
+                  />
+                ) : (
+                  <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                )}
                 <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
               </View>
               {doc.available && (

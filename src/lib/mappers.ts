@@ -68,6 +68,8 @@ export type SellerDetailView = {
   kycVerifiedOn: string;
   kycRemarks: string;
   profilePicUrl: string;
+  profilePicPath?: string;
+  liveSelfiePath?: string;
   documents: SellerDocumentView[];
   liveSelfieImages: SellerDocumentView[];
   businessProofDocuments: SellerDocumentView[];
@@ -191,6 +193,8 @@ export function mapSellerDetailView(detail: Record<string, unknown>): SellerDeta
     kycVerifiedOn: formatDate(detail.kycVerifiedAt != null ? String(detail.kycVerifiedAt) : undefined),
     kycRemarks: String(detail.kycRemarks ?? ""),
     profilePicUrl: resolveSellerProfileImage(detail as never),
+    profilePicPath: detail.profilePicPath != null ? String(detail.profilePicPath) : undefined,
+    liveSelfiePath: detail.liveSelfiePath != null ? String(detail.liveSelfiePath) : undefined,
     documents,
     liveSelfieImages,
     businessProofDocuments,
@@ -333,7 +337,11 @@ export function mapSellerDetailToApprovedRow(detail: SellerDetailView): Approved
     id: detail.id,
     name: detail.fullName,
     email: detail.email,
-    avatar: detail.profilePicUrl,
+    avatar: resolveSellerProfileImage({
+      profilePicUrl: detail.profilePicUrl,
+      profilePicPath: detail.profilePicPath,
+      liveSelfiePath: detail.liveSelfiePath,
+    }),
     businessName: detail.businessName,
     businessType: detail.businessType,
     sellerCategory: detail.sellerCategory,

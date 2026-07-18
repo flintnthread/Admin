@@ -50,7 +50,13 @@ import {
   fetchDashboardActivity,
   fetchDashboardTraffic,
   fetchDashboardCatalogQuality,
+  fetchDashboardCustomerInsights,
+  fetchDashboardSellerInsights,
+  fetchDashboardPayments,
   type DashboardTopProduct,
+  type DashboardCustomerInsights,
+  type DashboardSellerInsights,
+  type DashboardPaymentsSummary,
 } from "@/services/dashboardApi";
 import { resolveMediaUrl } from "@/lib/api/media";
 import { formatDate } from "@/lib/format";
@@ -298,6 +304,9 @@ export default function DashboardScreen() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [traffic, setTraffic] = useState<any>(null);
   const [catalogQuality, setCatalogQuality] = useState<any>(null);
+  const [customerInsights, setCustomerInsights] = useState<DashboardCustomerInsights | null>(null);
+  const [sellerInsights, setSellerInsights] = useState<DashboardSellerInsights | null>(null);
+  const [paymentsSummary, setPaymentsSummary] = useState<DashboardPaymentsSummary | null>(null);
 
   // UX Controls
   const [loading, setLoading] = useState(true);
@@ -633,6 +642,9 @@ export default function DashboardScreen() {
         activityRes,
         trafficRes,
         catalogQualityRes,
+        customerInsightsRes,
+        sellerInsightsRes,
+        paymentsRes,
       ] = await Promise.allSettled([
         fetchDashboardStats(),
         fetchOrders({ page: 0, size: 20 }),
@@ -647,6 +659,9 @@ export default function DashboardScreen() {
         fetchDashboardActivity(10),
         fetchDashboardTraffic(),
         fetchDashboardCatalogQuality(),
+        fetchDashboardCustomerInsights(),
+        fetchDashboardSellerInsights(),
+        fetchDashboardPayments(),
       ]);
 
       if (statsRes.status === "fulfilled") setStats(statsRes.value);
@@ -675,6 +690,9 @@ export default function DashboardScreen() {
       if (activityRes.status === "fulfilled") setNotifications(activityRes.value || []);
       if (trafficRes.status === "fulfilled") setTraffic(trafficRes.value);
       if (catalogQualityRes.status === "fulfilled") setCatalogQuality(catalogQualityRes.value);
+      if (customerInsightsRes.status === "fulfilled") setCustomerInsights(customerInsightsRes.value);
+      if (sellerInsightsRes.status === "fulfilled") setSellerInsights(sellerInsightsRes.value);
+      if (paymentsRes.status === "fulfilled") setPaymentsSummary(paymentsRes.value);
     } catch (err) {
       console.error("Dashboard enhancement fetch error:", err);
       setError(getApiErrorMessage(err, "Failed to load dashboard data."));
@@ -750,6 +768,8 @@ export default function DashboardScreen() {
       monthOrders: Number(stats?.monthOrders ?? 0),
       allTimeRevenue: Number(stats?.totalRevenue ?? stats?.allTimeRevenue ?? 0),
       allTimeOrders: Number(stats?.totalOrders ?? stats?.allTimeOrders ?? 0),
+      yearRevenue: Number(stats?.yearRevenue ?? stats?.totalRevenue ?? stats?.allTimeRevenue ?? 0),
+      yearOrders: Number(stats?.yearOrders ?? stats?.totalOrders ?? stats?.allTimeOrders ?? 0),
       pendingOrders: Number(stats?.pendingOrders ?? 0),
       processingCount: Number(stats?.processingCount ?? stats?.processingOrders ?? 0),
       returnedCount: Number(stats?.returnedCount ?? stats?.returnedOrders ?? 0),
@@ -758,7 +778,7 @@ export default function DashboardScreen() {
       productsCount: Number(productStats?.total ?? 0),
       outOfStock: Number(productStats?.outOfStock ?? 0),
       lowStock: Number(productStats?.lowStock ?? 0),
-      categoriesCount: Number(stats?.totalCategories ?? 12),
+      categoriesCount: Number(stats?.totalCategories ?? productStats?.categories ?? 0),
     };
   }, [stats, productStats]);
 
@@ -1479,7 +1499,7 @@ export default function DashboardScreen() {
                       { label: "Today", sales: rupee(d.todayRevenue), ords: d.todayOrders },
                       { label: "This Week", sales: rupee(d.weekRevenue), ords: d.weekOrders },
                       { label: "This Month", sales: rupee(d.monthRevenue), ords: d.monthOrders },
-                      { label: "This Year (2026)", sales: rupee(d.allTimeRevenue), ords: d.allTimeOrders }
+                      { label: "This Year (2026)", sales: rupee(d.yearRevenue), ords: d.yearOrders }
                     ].map((row, idx) => (
                       <View key={idx} style={styles.tableRowData}>
                         <Text style={[styles.tableCellText, { flex: 1.5, fontWeight: "600" }]}>{row.label}</Text>
@@ -2137,13 +2157,13 @@ export default function DashboardScreen() {
                     <View style={styles.ordersChecklistGrid}>
                       {[
                         { label: "Total Products", count: d.productsCount, bg: C.violetBg, color: C.violet },
-                        { label: "Published Items", count: 685, bg: C.activeBg, color: C.active },
-                        { label: "Draft Products", count: 23, bg: C.greyBg, color: C.grey },
+                        { label: "Published Items", count: Number(productStats?.active ?? productStats?.approved ?? catalogQuality?.productImagesAttached ?? d.productsCount), bg: C.activeBg, color: C.active },
+                        { label: "Draft Products", count: Number(productStats?.draft ?? productStats?.pending ?? 0), bg: C.greyBg, color: C.grey },
                         { label: "Out of Stock", count: d.outOfStock, bg: C.inactiveBg, color: C.inactive },
                         { label: "Low Stock Items", count: d.lowStock, bg: C.warningBg, color: C.warning },
-                        { label: "Hidden Catalog", count: 0, bg: C.primaryLight, color: C.primary },
+                        { label: "Hidden Catalog", count: Number(productStats?.inactive ?? productStats?.hidden ?? 0), bg: C.primaryLight, color: C.primary },
                         { label: "Total Categories", count: d.categoriesCount, bg: C.purpleBg, color: C.purple },
-                        { label: "Active Brands", count: 8, bg: C.processingBg, color: C.processing }
+                        { label: "Active Brands", count: Number(productStats?.brands ?? catalogQuality?.categoryBrandMappings ?? 0), bg: C.processingBg, color: C.processing }
                       ].map((item, idx) => (
                         <View key={idx} style={[styles.orderCheckCard, { borderColor: item.color, backgroundColor: item.bg }]}>
                           <Text style={styles.orderCheckLabel}>{item.label}</Text>
@@ -2453,12 +2473,12 @@ export default function DashboardScreen() {
                     <Text style={styles.cardColTitle}><FontAwesome name="users" size={16} color={C.primary} /> Customer Base Analytics</Text>
                     <View style={styles.paymentOverviewList}>
                       {[
-                        { label: "Total Registered Customers", count: customerStats?.total ?? 0 },
-                        { label: "New Customers Registered Today", count: 4 },
-                        { label: "New Customers This Week", count: 18 },
-                        { label: "New Customers This Month", count: 42 },
-                        { label: "Active Customers (Placed Order)", count: 112 },
-                        { label: "Inactive Customers (No Order)", count: 92 }
+                        { label: "Total Registered Customers", count: customerInsights?.total ?? customerStats?.total ?? 0 },
+                        { label: "New Customers Registered Today", count: customerInsights?.newToday ?? 0 },
+                        { label: "New Customers This Week", count: customerInsights?.newWeek ?? 0 },
+                        { label: "New Customers This Month", count: customerInsights?.newMonth ?? 0 },
+                        { label: "Active Customers (Placed Order)", count: customerInsights?.activeCustomers ?? 0 },
+                        { label: "Inactive Customers (No Order)", count: customerInsights?.inactiveCustomers ?? 0 }
                       ].map((item, idx) => (
                         <View key={idx} style={styles.paymentMetricRow}>
                           <Text style={styles.paymentMetricLabel}>{item.label}</Text>
@@ -2473,11 +2493,11 @@ export default function DashboardScreen() {
                     <Text style={styles.cardColTitle}><FontAwesome name="building" size={16} color={C.purple} /> Seller Network Summary</Text>
                     <View style={styles.paymentOverviewList}>
                       {[
-                        { label: "Total Sellers Enrolled", count: sellerStats?.total ?? sellerStats?.registered ?? 0 },
-                        { label: "Active Sellers (With Products)", count: sellerStats?.active ?? sellerStats?.approved ?? 0 },
-                        { label: "Inactive Sellers (No Products)", count: 70 },
-                        { label: "Pending Verification Sellers", count: sellerStats?.pending ?? 0 },
-                        { label: "Top Performing Sellers (Verified)", count: 10 }
+                        { label: "Total Sellers Enrolled", count: sellerInsights?.registered ?? sellerStats?.total ?? sellerStats?.registered ?? 0 },
+                        { label: "Active Sellers (With Products)", count: sellerInsights?.active ?? sellerStats?.active ?? sellerStats?.approved ?? 0 },
+                        { label: "Inactive Sellers (No Products)", count: sellerInsights?.inactiveNoProducts ?? 0 },
+                        { label: "Pending Verification Sellers", count: sellerInsights?.pending ?? sellerStats?.pending ?? 0 },
+                        { label: "Top Performing Sellers (Verified)", count: sellerInsights?.topPerformers ?? 0 }
                       ].map((item, idx) => (
                         <View key={idx} style={styles.paymentMetricRow}>
                           <Text style={styles.paymentMetricLabel}>{item.label}</Text>
@@ -3414,10 +3434,10 @@ const getStyles = (isDark: boolean, screenW: number) => {
     },
     calWeekdaysRow: {
       flexDirection: "row",
-      justifyContent: "space-between",
+      width: "100%",
     },
     calWeekdayText: {
-      width: 38,
+      flex: 1,
       textAlign: "center",
       fontSize: 11,
       fontWeight: "600",
@@ -3426,10 +3446,11 @@ const getStyles = (isDark: boolean, screenW: number) => {
     calGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
+      width: "100%",
       rowGap: 4,
     },
     calDayCell: {
-      width: 38,
+      width: "14.2857%",
       height: 36,
       justifyContent: "center",
       alignItems: "center",

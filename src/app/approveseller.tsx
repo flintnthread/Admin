@@ -39,9 +39,10 @@ import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView
 import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
 import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { resolveSellerDocumentImageUrl, isPdfMedia } from "@/lib/api/media";
+import { resolveSellerDocumentImageUrl, isPdfMedia, resolveSellerProfileImage } from "@/lib/api/media";
 import { formatRupee, maskAccount } from "@/lib/format";
 import SellerDocumentImage from "@/components/SellerDocumentImage";
+import SellerMediaImage from "@/components/SellerMediaImage";
 
 type Seller = ApprovedSellerRow;
 
@@ -643,16 +644,19 @@ export default function ApprovedSellersScreen() {
           {/* 1. Seller Profile Header Card */}
           <View style={stylesMobile.detailsProfileCard}>
             {(() => {
-              const avatarUri =
-                resolveSellerDocumentImageUrl(null, sellerDetail?.profilePicUrl) ||
-                resolveSellerDocumentImageUrl(null, seller.avatar) ||
-                "";
-              return avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={stylesMobile.detailsLargeAvatar} />
-              ) : (
-                <View style={[stylesMobile.detailsLargeAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Feather name="user" size={40} color="#94A3B8" />
-                </View>
+              return (
+                <SellerMediaImage
+                  seller={{
+                    profilePicUrl: sellerDetail?.profilePicUrl,
+                    profilePicPath: sellerDetail?.profilePicPath,
+                    liveSelfiePath: sellerDetail?.liveSelfiePath,
+                    avatar: seller.avatar,
+                    name: seller.name,
+                  }}
+                  size={88}
+                  style={stylesMobile.detailsLargeAvatar}
+                  borderRadius={44}
+                />
               );
             })()}
             <Text style={stylesMobile.detailsProfileName}>{seller.name}</Text>
@@ -1839,13 +1843,15 @@ export default function ApprovedSellersScreen() {
                       openSellerDetail(seller.id, seller.status);
                     }}
                   >
-                    {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (
-                      <Image source={{ uri: seller.avatar }} style={stylesMobile.sellerCardAvatar} />
-                    ) : (
-                      <View style={[stylesMobile.sellerCardAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
-                        <Feather name="user" size={18} color="#94A3B8" />
-                      </View>
-                    )}
+                    <SellerMediaImage
+                      seller={{
+                        avatar: seller.avatar,
+                        profilePicUrl: seller.avatar,
+                        name: seller.name,
+                      }}
+                      size={40}
+                      style={stylesMobile.sellerCardAvatar}
+                    />
                     <View style={stylesMobile.sellerCardMeta}>
                       <Text style={stylesMobile.sellerCardName} numberOfLines={1}>{seller.name}</Text>
                       <Text style={stylesMobile.sellerCardBusiness} numberOfLines={1}>{seller.businessName}</Text>
@@ -2600,9 +2606,12 @@ export default function ApprovedSellersScreen() {
             };
 
             const profileImage =
-              resolveSellerDocumentImageUrl(null, detail?.profilePicUrl) ||
-              resolveSellerDocumentImageUrl(null, seller.avatar) ||
-              seller.avatar;
+              resolveSellerProfileImage({
+                profilePicUrl: detail?.profilePicUrl,
+                profilePicPath: detail?.profilePicPath,
+                liveSelfiePath: detail?.liveSelfiePath,
+                avatar: seller.avatar,
+              }) || seller.avatar;
             const kycStatusLabel = detail?.kycStatusLabel ?? "Not Completed";
             const kycBarColor = sellerKycBadgeColor(kycStatusLabel);
             const verificationBadge = detail?.kycVerificationBadge ?? "Pending";
@@ -2644,7 +2653,17 @@ export default function ApprovedSellersScreen() {
                       <Text style={styles.headerBackBtnText}>Back</Text>
                     </TouchableOpacity>
                     <View style={styles.avatarWrapper}>
-                      {(profileImage && typeof profileImage === 'string' && profileImage.trim() !== '' && profileImage !== 'null' && profileImage !== 'N/A' && profileImage !== 'undefined') ? (<Image source={{ uri: profileImage }} style={styles.detailsAvatar} />) : (<View style={[styles.detailsAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={32} color="#9CA3AF" /></View>)}
+                      <SellerMediaImage
+                        seller={{
+                          profilePicUrl: detail?.profilePicUrl,
+                          profilePicPath: detail?.profilePicPath,
+                          liveSelfiePath: detail?.liveSelfiePath,
+                          avatar: seller.avatar,
+                          name: seller.name,
+                        }}
+                        size={64}
+                        style={styles.detailsAvatar}
+                      />
                       <View style={styles.statusDotActive} />
                     </View>
                     <View style={styles.detailsMeta}>
@@ -2893,7 +2912,18 @@ export default function ApprovedSellersScreen() {
                         <Text style={styles.sidebarCardTitle}>Profile Picture</Text>
                       </View>
                       <View style={styles.sidebarCardBody}>
-                        {(profileImage && typeof profileImage === 'string' && profileImage.trim() !== '' && profileImage !== 'null' && profileImage !== 'N/A' && profileImage !== 'undefined') ? (<Image source={{ uri: profileImage }} style={styles.sidebarProfileImg} />) : (<View style={[styles.sidebarProfileImg, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={80} color="#9CA3AF" /></View>)}
+                        <SellerMediaImage
+                          seller={{
+                            profilePicUrl: detail?.profilePicUrl,
+                            profilePicPath: detail?.profilePicPath,
+                            liveSelfiePath: detail?.liveSelfiePath,
+                            avatar: seller.avatar,
+                            name: seller.name,
+                          }}
+                          size={160}
+                          style={styles.sidebarProfileImg}
+                          borderRadius={12}
+                        />
                       </View>
                     </View>
 
@@ -3471,7 +3501,15 @@ export default function ApprovedSellersScreen() {
                           style={[styles.tableCell, styles.colSeller, { flexDirection: "row", alignItems: "center" }]}
                           onPress={() => openSellerDetail(seller.id, seller.status)}
                         >
-                          {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
+                          <SellerMediaImage
+                            seller={{
+                              avatar: seller.avatar,
+                              profilePicUrl: seller.avatar,
+                              name: seller.name,
+                            }}
+                            size={34}
+                            style={styles.sellerAvatar}
+                          />
                           <View style={styles.sellerMeta}>
                             <Text style={styles.sellerName} numberOfLines={1}>{seller.name}</Text>
                             <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
@@ -3571,7 +3609,15 @@ export default function ApprovedSellersScreen() {
                         style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
                         onPress={() => openSellerDetail(seller.id, seller.status)}
                       >
-                        {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.cardAvatar} />) : (<View style={[styles.cardAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={20} color="#9CA3AF" /></View>)}
+                        <SellerMediaImage
+                          seller={{
+                            avatar: seller.avatar,
+                            profilePicUrl: seller.avatar,
+                            name: seller.name,
+                          }}
+                          size={44}
+                          style={styles.cardAvatar}
+                        />
                         <View style={styles.cardTitleContainer}>
                           <Text style={styles.cardName}>{seller.name}</Text>
                           <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>

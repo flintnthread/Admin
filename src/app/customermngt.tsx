@@ -46,7 +46,8 @@ import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill'
 import Search from 'react-native-bootstrap-icons/icons/search';
 import Svg, { Line, Rect } from 'react-native-svg';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+import { deleteAdsCustomer, fetchAdsCustomers, fetchAdsOrders, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+import { sweetWarning } from '@/lib/sweetAlert';
 
 const GridIcon = ({ active }: { active: boolean }) => (
   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -369,8 +370,44 @@ const CustomerManagement: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
-  const handleViewOrders = (customer?: Customer) => {
-    router.push('/ads-ordermanagement');
+  const handleViewOrders = async (customer?: Customer) => {
+    if (!customer) {
+      router.push('/ads-ordermanagement');
+      return;
+    }
+    try {
+      const page = await fetchAdsOrders({
+        search: customer.email || customer.name,
+        page: 0,
+        size: 20,
+      });
+      const items = page.items ?? [];
+      const match =
+        items.find((row) => String(row.customerEmail ?? '').toLowerCase() === customer.email.toLowerCase()) ??
+        items[0];
+      if (match) {
+        const internalId = Number(match.id ?? 0);
+        const orderCode = String(match.orderId ?? match.id ?? '');
+        if (internalId > 0) {
+          router.push({ pathname: '/order-details' as any, params: { id: String(internalId) } });
+          return;
+        }
+        if (orderCode) {
+          router.push({ pathname: '/order-details' as any, params: { orderId: orderCode } });
+          return;
+        }
+      }
+      router.push({
+        pathname: '/ads-ordermanagement' as any,
+        params: { customerEmail: customer.email, customerName: customer.name },
+      });
+    } catch (e) {
+      void sweetWarning('Orders', getApiErrorMessage(e, 'Could not open customer orders.'));
+      router.push({
+        pathname: '/ads-ordermanagement' as any,
+        params: { customerEmail: customer.email },
+      });
+    }
   };
 
   const requestDelete = (customer: Customer) => setDeleteTarget(customer);

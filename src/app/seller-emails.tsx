@@ -178,7 +178,7 @@ interface EmailModalProps {
   mode: 'single' | 'bulk';
   seller?: Seller | null;
   sellerCount: number;
-  onSend: (subject: string, message: string) => void;
+  onSend: (subject: string, message: string) => void | Promise<void>;
   isDesktop: boolean;
   isMobile?: boolean;
 }
@@ -186,19 +186,26 @@ interface EmailModalProps {
 function EmailModal({ visible, onClose, mode, seller, sellerCount, onSend, isDesktop, isMobile }: EmailModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   const reset = () => {
     setSubject('');
     setMessage('');
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!subject.trim() || !message.trim()) {
       void sweetWarning('Missing information', 'Please enter a subject and message.');
       return;
     }
-    onSend(subject, message);
-    reset();
+    if (sending) return;
+    setSending(true);
+    try {
+      await onSend(subject, message);
+      reset();
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -275,9 +282,11 @@ function EmailModal({ visible, onClose, mode, seller, sellerCount, onSend, isDes
                 <Feather name="x" size={15} color={COLORS.textMuted} />
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.submitButton} onPress={handleSend}>
+              <Pressable style={[styles.submitButton, sending && { opacity: 0.7 }]} onPress={handleSend} disabled={sending}>
                 <Feather name="send" size={14} color={COLORS.white} />
-                <Text style={styles.submitButtonText}>{mode === 'single' ? 'Send Email' : 'Send to All'}</Text>
+                <Text style={styles.submitButtonText}>
+                  {sending ? 'Sending…' : mode === 'single' ? 'Send Email' : 'Send to All'}
+                </Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -362,12 +371,17 @@ export default function SellerEmailsScreen() {
         await sendSellerEmails({ subject, message, recipients: [activeSeller.id] });
         void sweetSuccess('Email sent', `Your message was sent to ${activeSeller.name}.`);
       } else {
-        await sendSellerEmails({ subject, message, sendAll: true });
-        void sweetSuccess('Emails queued', `Your message is being sent to all ${sellers.length} registered sellers.`);
+        const result = await sendSellerEmails({ subject, message, sendAll: true });
+        const sent = Number((result as any)?.sent ?? (result as any)?.requested ?? totalSellers);
+        void sweetSuccess(
+          'Emails queued',
+          `Your message is being sent to all ${sent || totalSellers} registered sellers.`
+        );
       }
       setEmailModalVisible(false);
     } catch (e) {
       void sweetError('Send failed', getApiErrorMessage(e, 'Failed to send email.'));
+      throw e;
     }
   };
 

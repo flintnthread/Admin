@@ -87,7 +87,7 @@ function isLocalImageUri(uri: string) {
 }
 
 function mapApiBanner(row: Record<string, unknown>, index: number) {
-  const imagePath = String(row.image ?? "");
+  const imagePath = String(row.image ?? row.imagePath ?? row.image_path ?? "");
   return {
     id: String(row.id ?? ""),
     title: String(row.title ?? ""),
@@ -625,7 +625,7 @@ export default function BannerManagement() {
                     <View key={banner.id} style={styles.row}>
                       <View style={[styles.thumb, { backgroundColor: banner.color, overflow: "hidden" }]}>
                         {!!(banner.desktopImage || banner.imageUrl) && (
-                          <Image source={{ uri: banner.desktopImage || banner.imageUrl }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+                          <Image source={{ uri: resolveCmsMediaUrl(banner.desktopImage || banner.imageUrl || banner.imagePath) }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
                         )}
                         <Text style={[styles.thumbTag, (!!banner.dark || !!(banner.imageUrl || banner.desktopImage)) && { color: "#fff" }]} numberOfLines={1}>
                           {banner.text}
@@ -673,7 +673,7 @@ export default function BannerManagement() {
                       {/* Banner Preview */}
                       <View style={[styles.gridThumb, { backgroundColor: banner.color, overflow: "hidden" }]}>
                         {!!(banner.desktopImage || banner.imageUrl) && (
-                          <Image source={{ uri: banner.desktopImage || banner.imageUrl }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+                          <Image source={{ uri: resolveCmsMediaUrl(banner.desktopImage || banner.imageUrl || banner.imagePath) }} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
                         )}
                         <Text style={[styles.gridThumbTag, (!!banner.dark || !!(banner.imageUrl || banner.desktopImage)) && { color: "#fff" }]} numberOfLines={2}>
                           {banner.text}

@@ -78,18 +78,20 @@ async function buildAdminRequest(path: string, init?: RequestOptions): Promise<{
   const baseUrl = await resolveReachableAdminApiBaseUrl(auth);
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
+  const extra = (init?.headers ?? {}) as Record<string, string>;
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(init?.headers as Record<string, string> | undefined),
+    ...extra,
   };
 
   const hasBody = init?.body != null;
   const isFormData =
     typeof FormData !== "undefined" && init?.body instanceof FormData;
-  if (hasBody && !isFormData && !headers["Content-Type"]) {
+  // Always pin JSON for string/object bodies so Spring never returns HTTP 415 (text/plain).
+  if (hasBody && !isFormData) {
     headers["Content-Type"] = "application/json";
   }
-  if (isFormData && headers["Content-Type"]) {
+  if (isFormData) {
     delete headers["Content-Type"];
   }
   if (auth && token) {
