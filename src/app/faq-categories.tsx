@@ -171,13 +171,13 @@ const GridCard: React.FC<{
     return (
         <TouchableOpacity style={cSt.card} onPress={onNavigate} activeOpacity={0.8}>
             {/* Top row: action buttons */}
-            <View style={[cSt.topRow, { justifyContent: "flex-end" }]}>
+            <View style={cSt.topRow}>
+                <View style={[cSt.iconWrap, { backgroundColor: (cat.color || "#000") + "15" }]}>
+                    <Feather name={safeIcon(cat.icon) as any} size={22} color={cat.color || "#000"} />
+                </View>
                 <View style={cSt.actionBtns}>
                     <TouchableOpacity style={cSt.iconBtn} onPress={onEdit}>
                         <Feather name="edit-2" size={13} color={TEXT_BODY} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[cSt.iconBtn, cSt.iconBtnRed]} onPress={onToggle}>
-                        <Feather name={isActive ? "eye-off" : "eye"} size={13} color={ACCENT_RED} />
                     </TouchableOpacity>
                     <TouchableOpacity style={[cSt.iconBtn, cSt.iconBtnRed]} onPress={onDelete}>
                         <Feather name="trash-2" size={13} color={ACCENT_RED} />
@@ -225,6 +225,9 @@ const ListRow: React.FC<{
     return (
         <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
             <View style={{ flex: 1.5, flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <View style={[lSt.iconWrap, { backgroundColor: (cat.color || "#000") + "15" }]}>
+                    <Feather name={safeIcon(cat.icon) as any} size={20} color={cat.color || "#000"} />
+                </View>
                 <View style={lSt.info}>
                     <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
                     <Text style={lSt.desc} numberOfLines={1}>{cat.description}</Text>
@@ -248,9 +251,6 @@ const ListRow: React.FC<{
             <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <TouchableOpacity style={lSt.btn} onPress={onEdit}>
                     <Feather name="edit-2" size={14} color={PRIMARY} />
-                </TouchableOpacity>
-                <TouchableOpacity style={[lSt.btn, lSt.btnRed]} onPress={onToggle}>
-                    <Feather name={isActive ? "eye-off" : "eye"} size={14} color={ACCENT_RED} />
                 </TouchableOpacity>
                 <TouchableOpacity style={[lSt.btn, lSt.btnRed]} onPress={onDelete}>
                     <Feather name="trash-2" size={14} color={ACCENT_RED} />
@@ -764,7 +764,7 @@ const st = StyleSheet.create({
     toolbarWrap: { flexWrap: "wrap" as any },
     searchWrap: { flex: 1, minWidth: 160, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: PRIMARY + "55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
     searchWrapFull: { flexBasis: "100%" as any, flex: 1, minWidth: 0 },
-    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, paddingVertical: 0 },
+    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, paddingVertical: 0, outlineStyle: 'none' } as any,
     // Wraps the filter chips + grid/list toggle as a single row so the toggle
     // always renders beside the chips (never on its own separate line).
     filterViewRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },

@@ -21,9 +21,9 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type MessageStatus = "Replied" | "Not Replied";
+type MessageStatus = "Read" | "Unread";
 type ViewMode = "grid" | "list";
-type FilterType = "All" | "Not Replied" | "Replied";
+type FilterType = "All" | "Unread" | "Read";
 
 interface ContactMessage {
   id: number;
@@ -57,7 +57,7 @@ function toUiContact(row: ReturnType<typeof mapContactRow>, index: number): Cont
     subject: row.subject,
     content: row.message,
     date: row.date,
-    status: row.status === "read" ? "Replied" : "Not Replied",
+    status: row.status === "read" ? "Read" : "Unread",
     avatarColor: av.color,
     avatarBg: av.bg,
   };
@@ -75,9 +75,9 @@ const AvatarIcon: React.FC<{ color: string; bg: string; name: string }> = ({ col
 );
 
 const StatusBadge: React.FC<{ status: MessageStatus }> = ({ status }) => (
-  <View style={[styles.statusBadge, { backgroundColor: status === "Replied" ? "#D1FAE5" : "#FEF3C7" }]}>
-    <Text style={[styles.statusText, { color: status === "Replied" ? "#059669" : "#D97706" }]}>
-      {status === "Replied" ? "✓  Replied" : "⏳  Pending"}
+  <View style={[styles.statusBadge, { backgroundColor: status === "Read" ? "#D1FAE5" : "#FEF3C7" }]}>
+    <Text style={[styles.statusText, { color: status === "Read" ? "#059669" : "#D97706" }]}>
+      {status === "Read" ? "✓  Read" : "⏳  Unread"}
     </Text>
   </View>
 );
@@ -110,7 +110,7 @@ const MessageCard: React.FC<{
         <Feather name="eye" size={14} color={msg.isRead ? "#3B82F6" : PRIMARY} />
         <Text style={[styles.btnViewText, { color: msg.isRead ? "#3B82F6" : PRIMARY }]}>View</Text>
       </TouchableOpacity>
-      {msg.status !== "Replied" && (
+      {msg.status !== "Read" && (
         <TouchableOpacity style={styles.btnMark} onPress={() => onMarkReplied(msg.id)} activeOpacity={0.75}>
           <Feather name="check" size={13} color="#059669" />
         </TouchableOpacity>
@@ -130,8 +130,8 @@ const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: 
   const { total, replied, pending } = stats;
   const statsData = [
     { icon: "message-square" as const, value: String(total), label: "New Messages", sub: "This Month", tint: "#EDE9FE", textColor: "#7C3AED" },
-    { icon: "corner-up-left" as const, value: String(replied), label: "Replied", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
-    { icon: "clock" as const, value: String(pending), label: "Pending", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
+    { icon: "corner-up-left" as const, value: String(replied), label: "Read", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
+    { icon: "clock" as const, value: String(pending), label: "Unread", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
   ];
   return (
     <View style={styles.statsRow}>
@@ -156,8 +156,8 @@ const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pe
   const { total, replied, pending } = stats;
   const cards = [
     { icon: "message-square" as const, value: String(total), label: "New Messages", sub: "This Month", tint: "#EDE9FE", textColor: "#7C3AED" },
-    { icon: "corner-up-left" as const, value: String(replied), label: "Replied", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
-    { icon: "clock" as const, value: String(pending), label: "Pending", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
+    { icon: "corner-up-left" as const, value: String(replied), label: "Read", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
+    { icon: "clock" as const, value: String(pending), label: "Unread", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
   ];
   return (
     <ScrollView
@@ -223,10 +223,10 @@ const ViewDetailModal: React.FC<{
           <Feather name="x" size={14} color="#FFFFFF" />
           <Text style={styles.btnCancelText}> Close</Text>
         </TouchableOpacity>
-        {msg.status !== "Replied" && (
+        {msg.status !== "Read" && (
           <TouchableOpacity style={styles.btnMarkModal} onPress={handleMarkReplied}>
             <Feather name="check" size={14} color="#FFFFFF" />
-            <Text style={styles.btnUpdateText}> Mark as Replied</Text>
+            <Text style={styles.btnUpdateText}> Mark as Read</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.btnUpdate} onPress={() => { onClose(); onReply(msg); }}>
@@ -316,7 +316,7 @@ const AddMessageModal: React.FC<{
   const [phone, setPhone] = useState("");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
-  const [status, setStatus] = useState<MessageStatus>("Not Replied");
+  const [status, setStatus] = useState<MessageStatus>("Unread");
   if (!visible) return null;
   const handleSave = () => {
     if (!name.trim() || !email.trim() || !subject.trim() || !content.trim()) {
@@ -327,7 +327,7 @@ const AddMessageModal: React.FC<{
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + " " + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
     onSave({ name, email, phone: phone || "N/A", subject, content, date: dateStr, status });
-    setName(""); setEmail(""); setPhone(""); setSubject(""); setContent(""); setStatus("Not Replied");
+    setName(""); setEmail(""); setPhone(""); setSubject(""); setContent(""); setStatus("Unread");
     onClose();
   };
   const content_el = (
@@ -358,11 +358,11 @@ const AddMessageModal: React.FC<{
           <View style={[styles.inputGroup, { flex: 1 }]}>
             <Text style={styles.inputLabel}>Status</Text>
             <View style={styles.statusSelector}>
-              <TouchableOpacity style={[styles.statusOption, status === "Not Replied" && styles.statusOptionActive]} onPress={() => setStatus("Not Replied")} activeOpacity={0.8}>
-                <Text style={[styles.statusOptionText, status === "Not Replied" && styles.statusOptionTextActive]}>Not Replied</Text>
+              <TouchableOpacity style={[styles.statusOption, status === "Unread" && styles.statusOptionActive]} onPress={() => setStatus("Unread")} activeOpacity={0.8}>
+                <Text style={[styles.statusOptionText, status === "Unread" && styles.statusOptionTextActive]}>Not Replied</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.statusOption, status === "Replied" && styles.statusOptionRepliedActive]} onPress={() => setStatus("Replied")} activeOpacity={0.8}>
-                <Text style={[styles.statusOptionText, status === "Replied" && styles.statusOptionRepliedText]}>Replied</Text>
+              <TouchableOpacity style={[styles.statusOption, status === "Read" && styles.statusOptionRepliedActive]} onPress={() => setStatus("Read")} activeOpacity={0.8}>
+                <Text style={[styles.statusOptionText, status === "Read" && styles.statusOptionRepliedText]}>Replied</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -447,7 +447,7 @@ const ContactMessagesScreen: React.FC = () => {
   const markReplied = async (id: number) => {
     try {
       await updateContactStatus(id, true);
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, status: "Replied" } : m)));
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, status: "Read" } : m)));
     } catch (e) {
       const msg = getApiErrorMessage(e);
       void sweetError("Error", msg);
@@ -540,15 +540,10 @@ const ContactMessagesScreen: React.FC = () => {
             >
               {([
                 { label: "All", count: messages.length, filterVal: "All" as FilterType },
-                { label: "New", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
-                { label: "Replied", count: contactStats.replied, filterVal: "Replied" as FilterType },
-                { label: "Pending", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
+                { label: "Unread", count: contactStats.pending, filterVal: "Unread" as FilterType },
+                { label: "Read", count: contactStats.replied, filterVal: "Read" as FilterType },
               ]).map((f) => {
-                const activeMatch =
-                  f.label === "All" ? filter === "All"
-                    : f.label === "Replied" ? filter === "Replied"
-                      : f.label === "New" ? filter === "Not Replied"
-                        : filter === "Not Replied" && f.label === "Pending";
+                const activeMatch = f.filterVal === filter;
                 return (
                   <TouchableOpacity
                     key={f.label}
@@ -623,7 +618,7 @@ const ContactMessagesScreen: React.FC = () => {
                           <View style={{ width: 100 }}><StatusBadge status={msg.status} /></View>
                           <View style={{ width: 130, flexDirection: "row", justifyContent: "center", gap: 6 }}>
                             <TouchableOpacity style={styles.tableBtnView} onPress={() => handleView(msg)}><Feather name="eye" size={13} color="#FFFFFF" /></TouchableOpacity>
-                            {msg.status !== "Replied" && (
+                            {msg.status !== "Read" && (
                               <TouchableOpacity style={styles.tableBtnMark} onPress={() => markReplied(msg.id)}><Feather name="check" size={13} color="#FFFFFF" /></TouchableOpacity>
                             )}
                             <TouchableOpacity style={[styles.tableBtnView, { backgroundColor: "#2563EB", borderColor: "#2563EB" }]} onPress={() => setReplyMsg(msg)}><Feather name="corner-up-left" size={13} color="#FFFFFF" /></TouchableOpacity>
@@ -710,7 +705,7 @@ const ContactMessagesScreen: React.FC = () => {
               </View>
             </View>
             <View style={styles.filterPills}>
-              {(["All", "Not Replied", "Replied"] as FilterType[]).map((f) => (
+              {(["All", "Unread", "Read"] as FilterType[]).map((f) => (
                 <TouchableOpacity key={f} style={[styles.pill, filter === f && styles.pillActive]} onPress={() => { setFilter(f); setCurrentPage(1); }} activeOpacity={0.8}>
                   <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>{f}</Text>
                 </TouchableOpacity>
@@ -763,7 +758,7 @@ const ContactMessagesScreen: React.FC = () => {
                       <View style={{ width: "10%" }}><StatusBadge status={msg.status} /></View>
                       <View style={{ width: 140, flexDirection: "row", justifyContent: "flex-start", gap: 6 }}>
                         <TouchableOpacity style={styles.tableBtnView} onPress={() => handleView(msg)}><Feather name="eye" size={13} color="#FFFFFF" /></TouchableOpacity>
-                        {msg.status !== "Replied" && (
+                        {msg.status !== "Read" && (
                           <TouchableOpacity style={styles.tableBtnMark} onPress={() => markReplied(msg.id)}><Feather name="check" size={13} color="#FFFFFF" /></TouchableOpacity>
                         )}
                         <TouchableOpacity style={[styles.tableBtnView, { backgroundColor: "#2563EB", borderColor: "#2563EB" }]} onPress={() => setReplyMsg(msg)}><Feather name="corner-up-left" size={13} color="#FFFFFF" /></TouchableOpacity>
@@ -930,7 +925,8 @@ const mSt = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: TEXT_PRIMARY,
-  },
+    outlineStyle: 'none',
+  } as any,
 
   // Filter pills
   filterRow: {
@@ -1225,7 +1221,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 13,
     color: TEXT_PRIMARY,
-  },
+    outlineStyle: 'none',
+  } as any,
   viewSwitcherMobile: {
     flexDirection: "row",
     alignItems: "center",
