@@ -514,15 +514,17 @@ export default function CustomerEmailsScreen() {
 
                             <TextInput
 
-                                style={styles.searchInput}
+                                style={Platform.OS === 'web' ? [styles.searchInput, { outlineStyle: 'none' }] : styles.searchInput}
 
-                                placeholder="Search customers..."
+                                placeholder={width === 320 ? "" : "Search customers..."}
 
                                 placeholderTextColor={COLORS.textFaint}
 
                                 value={query}
 
                                 onChangeText={setQuery}
+
+                                numberOfLines={1}
 
                             />
 
@@ -1206,9 +1208,9 @@ const styles = StyleSheet.create({
 
     searchStripMobile: {
 
-        flexDirection: 'column',
+        flexDirection: 'row',
 
-        alignItems: 'stretch',
+        alignItems: 'center',
 
         gap: 10,
 
@@ -1230,7 +1232,7 @@ const styles = StyleSheet.create({
 
         borderWidth: 1,
 
-        borderColor: "#F1F5F9",
+        borderColor: "#E5E7EB",
 
         borderRadius: 14,
 
@@ -1238,27 +1240,15 @@ const styles = StyleSheet.create({
 
         paddingVertical: Platform.OS === 'web' ? 12 : 10,
 
-        shadowColor: "#0F172A",
-
-        shadowOpacity: 0.1,
-
-        shadowRadius: 10,
-
-        shadowOffset: { width: 0, height: 5 },
-
-        elevation: 3,
-
     },
 
     searchInput: {
-
         flex: 1,
-
         fontSize: 14,
-
         color: COLORS.text,
-
-    },
+        borderWidth: 0,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    } as any,
 
     totalBadge: {
 
@@ -1276,7 +1266,7 @@ const styles = StyleSheet.create({
 
         paddingHorizontal: 14,
 
-        paddingVertical: 12,
+        paddingVertical: Platform.OS === 'web' ? 12 : 10,
 
         borderRadius: 14,
 
@@ -1655,8 +1645,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
 
         alignItems: 'center',
-
-        shadowColor: '#000',
 
         shadowOffset: { width: 0, height: 4 },
 

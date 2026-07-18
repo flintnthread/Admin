@@ -26,27 +26,26 @@ import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { Ionicons } from '@expo/vector-icons';
 
+import { getApiErrorMessage } from '@/lib/api/client';
+import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
-import ArrowLeft from 'react-native-bootstrap-icons/icons/arrow-left';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
 import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
 import Svg, { Line, Rect } from 'react-native-svg';
-import { getApiErrorMessage } from '@/lib/api/client';
-import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 
 const GridIcon = ({ active }: { active: boolean }) => (
   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -523,8 +522,10 @@ const CustomerManagement: React.FC = () => {
         {/* ---------- Header ---------- */}
         <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-            <TouchableOpacity style={[styles.backBtn, isPhone && { padding: 6 }]} onPress={() => router.push('/Dashboard')}>
-              <ArrowLeft width={isPhone ? 16 : 22} height={isPhone ? 16 : 22} fill="#fff" />
+            <TouchableOpacity onPress={() => router.push('/Dashboard')}>
+              <View style={[styles.headerIconBox, isPhone && { width: 36, height: 36 }]}>
+                <Ionicons name="people" size={isPhone ? 18 : 24} color="#fff" />
+              </View>
             </TouchableOpacity>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
@@ -694,7 +695,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8, alignSelf: 'flex-start', marginTop: 2 },
   headerContent: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerIconBox: {
-    width: 44, height: 44, borderRadius: 10, backgroundColor: COLORS.amber,
+    width: 44, height: 44, borderRadius: 10, backgroundColor: '#F97316',
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
