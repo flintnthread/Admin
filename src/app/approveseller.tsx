@@ -1,30 +1,4 @@
-import AdminLayout from "@/components/admin-layout";
-import Pagination from "@/components/Pagination";
-import SellerDocumentImage from "@/components/SellerDocumentImage";
-import { useAuth } from "@/context/auth-context";
-import { useThemeContext } from "@/context/theme-context";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { resolveSellerDocumentImageUrl } from "@/lib/api/media";
-import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
-import { blurActiveElementOnWeb } from "@/lib/focus";
-import { formatRupee, maskAccount } from "@/lib/format";
-import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
-import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
-import {
-  approveSellerProfile,
-  blockSeller,
-  fetchApprovedSellerLocationStats,
-  fetchApprovedSellers,
-  fetchPendingProfileDetail,
-  fetchPendingProfileSellers,
-  fetchSellerDetail,
-  rejectSellerProfile,
-  unblockSeller,
-  updateSellerStatus,
-} from "@/services/sellerApi";
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -41,6 +15,32 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
+import SellerDocumentImage from "@/components/SellerDocumentImage";
+import { useAuth } from "@/context/auth-context";
+import { useThemeContext } from "@/context/theme-context";
+import {
+  approveSellerProfile,
+  blockSeller,
+  fetchApprovedSellerLocationStats,
+  fetchApprovedSellers,
+  fetchPendingProfileDetail,
+  fetchPendingProfileSellers,
+  fetchSellerDetail,
+  rejectSellerProfile,
+  unblockSeller,
+  updateSellerStatus,
+} from "@/services/sellerApi";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveSellerDocumentImageUrl, isPdfMedia } from "@/lib/api/media";
+import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
+import { blurActiveElementOnWeb } from "@/lib/focus";
+import { formatRupee, maskAccount } from "@/lib/format";
+import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
+import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 
 type Seller = ApprovedSellerRow;
 
@@ -129,7 +129,8 @@ export default function ApprovedSellersScreen() {
   const [deleteReason, setDeleteReason] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   // --- DOCUMENT PREVIEW STATE ---
-  const [previewDoc, setPreviewDoc] = useState<{ name: string, url: string } | null>(null);
+
+  const [previewDoc, setPreviewDoc] = useState<{name: string, url: string, path?: string | null} | null>(null);
 
   // --- TOAST SYSTEM STATE & HELPERS ---
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
@@ -328,10 +329,10 @@ export default function ApprovedSellersScreen() {
 
   const formatCompactRupee = (value: number) => {
     if (value >= 10000000) {
-      return `₹${(value / 10000000).toFixed(2)}Cr`;
+      return `?${(value / 10000000).toFixed(2)}Cr`;
     }
     if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(2)}L`;
+      return `?${(value / 100000).toFixed(2)}L`;
     }
     return formatRupee(value);
   };
@@ -641,13 +642,19 @@ export default function ApprovedSellersScreen() {
         >
           {/* 1. Seller Profile Header Card */}
           <View style={stylesMobile.detailsProfileCard}>
-            {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (
-              <Image source={{ uri: seller.avatar }} style={stylesMobile.detailsLargeAvatar} />
-            ) : (
-              <View style={[stylesMobile.detailsLargeAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="user" size={40} color="#94A3B8" />
-              </View>
-            )}
+            {(() => {
+              const avatarUri =
+                resolveSellerDocumentImageUrl(null, sellerDetail?.profilePicUrl) ||
+                resolveSellerDocumentImageUrl(null, seller.avatar) ||
+                "";
+              return avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={stylesMobile.detailsLargeAvatar} />
+              ) : (
+                <View style={[stylesMobile.detailsLargeAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="user" size={40} color="#94A3B8" />
+                </View>
+              );
+            })()}
             <Text style={stylesMobile.detailsProfileName}>{seller.name}</Text>
             <Text style={stylesMobile.detailsProfileBusiness}>{seller.businessName}</Text>
 
@@ -797,10 +804,7 @@ export default function ApprovedSellersScreen() {
                     <TouchableOpacity
                       style={stylesMobile.docRedesignedViewBtn}
                       onPress={() =>
-                        setPreviewDoc({
-                          name: doc.name,
-                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                        })
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                       }
                     >
                       <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -816,10 +820,7 @@ export default function ApprovedSellersScreen() {
                   <TouchableOpacity
                     key={`${doc.name}-${doc.url}-${idx}`}
                     onPress={() =>
-                      setPreviewDoc({
-                        name: doc.name,
-                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                      })
+                      setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                     }
                   >
                     <SellerDocumentImage
@@ -839,10 +840,7 @@ export default function ApprovedSellersScreen() {
                     key={`${doc.name}-${doc.url}-${idx}`}
                     style={stylesMobile.selfieThumbWrapperMobile}
                     onPress={() =>
-                      setPreviewDoc({
-                        name: doc.name,
-                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                      })
+                      setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                     }
                   >
                     <SellerDocumentImage
@@ -874,11 +872,28 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                  <SellerDocumentImage
-                    url={previewDoc.url}
-                    resizeMode="contain"
-                    style={{ width: '100%', height: '100%' }}
-                  />
+                  {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                    <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                      <Feather name="file-text" size={40} color="#64748B" />
+                      <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                        onPress={() => {
+                          const href = previewDoc.url || previewDoc.path;
+                          if (href) void Linking.openURL(href);
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <SellerDocumentImage
+                      path={previewDoc.path}
+                      url={previewDoc.url}
+                      resizeMode="contain"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  )}
                 </View>
               </View>
             </View>
@@ -2055,9 +2070,60 @@ export default function ApprovedSellersScreen() {
                       <Text style={styles.messageSendBtnText}>Send Message</Text>
                     </TouchableOpacity>
                   </View>
+        {/* --- MOBILE EDIT STATUS/KYC MODAL --- */}
+        {renderMobileEditModal()}
+
+        {/* --- ALL STATES INSIGHTS MODAL --- */}
+        {renderAllStatesModal()}
+
+        {/* --- ALL CITIES INSIGHTS MODAL --- */}
+        {renderAllCitiesModal()}
+
+
+
+        {/* --- DYNAMIC MODALS FOR MOBILE LIST VIEW --- */}
+        {previewDoc && (
+          <Modal
+            visible={!!previewDoc}
+            onRequestClose={() => setPreviewDoc(null)}
+            transparent
+            animationType="fade"
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { width: isLargeScreen ? '80%' : '92%', maxWidth: 800, padding: 0 }]}>
+                <View style={[styles.modalHeader, { padding: isLargeScreen ? 20 : 16 }]}>
+                  <Text style={styles.modalTitle}>{previewDoc.name} Preview</Text>
+                  <TouchableOpacity onPress={() => setPreviewDoc(null)}>
+                    <Feather name="x" size={isLargeScreen ? 24 : 20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
+                  {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                    <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                      <Feather name="file-text" size={40} color="#64748B" />
+                      <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                        onPress={() => {
+                          const href = previewDoc.url || previewDoc.path;
+                          if (href) void Linking.openURL(href);
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <SellerDocumentImage
+                      path={previewDoc.path}
+                      url={previewDoc.url}
+                      resizeMode="contain"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  )}
                 </View>
               </View>
-            </Modal>
+            </View>
+          </Modal>
           )}
 
           {/* --- DEACTIVATE SELLER MODAL FOR MOBILE LIST --- */}
@@ -2285,21 +2351,6 @@ export default function ApprovedSellersScreen() {
     }
     return null;
   }, [selectedSellerId, sellers, sellerDetail]);
-
-  const loadPendingSellers = useCallback(async () => {
-    if (!token) return;
-    setPendingLoading(true);
-    setPendingError(null);
-    try {
-      const rows = await fetchPendingProfileSellers();
-      setPendingSellers(rows.map(mapPendingProfileRow));
-    } catch (e) {
-      setPendingError(getApiErrorMessage(e, "Failed to load pending sellers."));
-      setPendingSellers([]);
-    } finally {
-      setPendingLoading(false);
-    }
-  }, [token]);
 
   useEffect(() => {
     if (authLoading || !token) return;
@@ -2884,10 +2935,7 @@ export default function ApprovedSellersScreen() {
                               <TouchableOpacity
                                 style={styles.docViewBtn}
                                 onPress={() =>
-                                  setPreviewDoc({
-                                    name: doc.name,
-                                    url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                                  })
+                                  setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                                 }
                               >
                                 <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -2902,11 +2950,8 @@ export default function ApprovedSellersScreen() {
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
                               onPress={() =>
-                                setPreviewDoc({
-                                  name: doc.name,
-                                  url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                                })
-                              }
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
+                      }
                             >
                               <SellerDocumentImage
                                 path={doc.path}
@@ -2923,11 +2968,8 @@ export default function ApprovedSellersScreen() {
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
                               onPress={() =>
-                                setPreviewDoc({
-                                  name: doc.name,
-                                  url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                                })
-                              }
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
+                      }
                             >
                               <SellerDocumentImage
                                 path={doc.path}
@@ -3292,18 +3334,175 @@ export default function ApprovedSellersScreen() {
                       }}
                       onSubmitEditing={handleApplyFilter}
                     />
+
                     {searchQuery ? (
                       <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchBtn}>
                         <Ionicons name="close-circle" size={18} color="#9CA3AF" />
                       </TouchableOpacity>
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
+                    onPress={() => setViewMode("list")}
+                  >
+                    <Ionicons
+                      name="list-outline"
+                      size={16}
+                      color={viewMode === "list" ? "#1d324e" : "#6B7280"}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+              </>
+            ) : null}
 
-                  {/* Action Buttons Row */}
-                  <View style={styles.toolbarActions}>
-                    <TouchableOpacity style={styles.applyBtn} onPress={handleApplyFilter}>
-                      <Text style={styles.applyBtnText}>Apply</Text>
-                    </TouchableOpacity>
+            {/* --- INSIGHTS SECTION --- */}
+            <View style={styles.insightsCard}>
+              <View style={styles.insightsHeader}>
+                <Text style={styles.insightsTitle}>Insights</Text>
+                <Text style={styles.insightsSubtitle}>Top 10 by count — Filter-aware</Text>
+              </View>
+
+              <View style={[styles.insightsContainer, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                {/* State-wise table */}
+                <View style={styles.insightsColumn}>
+                  <Text style={styles.insightsColTitle}>State-wise Approved Sellers</Text>
+                  <View style={styles.insightsTableHeader}>
+                    <Text style={styles.insightsTh}>State</Text>
+                    <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
+                  </View>
+                  {stateCounts.map((item, idx) => (
+                    <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                      <Text style={styles.insightsTdText}>{item.name}</Text>
+                      <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
+                    </View>
+                  ))}
+                  {stateCounts.length === 0 && (
+                    <Text style={styles.emptyInsights}>No state data available</Text>
+                  )}
+                </View>
+
+                {/* Divider for large screen */}
+                {isLargeScreen && <View style={styles.verticalDivider} />}
+
+                {/* City-wise table */}
+                <View style={styles.insightsColumn}>
+                  <Text style={styles.insightsColTitle}>City-wise Approved Sellers</Text>
+                  <View style={styles.insightsTableHeader}>
+                    <Text style={styles.insightsTh}>City</Text>
+                    <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
+                  </View>
+                  {cityCounts.map((item, idx) => (
+                    <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                      <Text style={styles.insightsTdText}>{item.name}</Text>
+                      <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
+                    </View>
+                  ))}
+                  {cityCounts.length === 0 && (
+                    <Text style={styles.emptyInsights}>No city data available</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* --- SELLERS TABLE / CARDS --- */}
+            {viewMode === "list" && isLargeScreen ? (
+              /* Desktop Table View */
+              <View style={styles.tableCard}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
+                  <View style={{ minWidth: 1400, width: "100%" }}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableTh, styles.colSeller]}>Seller</Text>
+                      <Text style={[styles.tableTh, styles.colBusiness]}>Business Name</Text>
+                      <Text style={[styles.tableTh, styles.colType]}>Business Type</Text>
+                      <Text style={[styles.tableTh, styles.colProducts, { textAlign: "center" }]}>Products</Text>
+                      <Text style={[styles.tableTh, styles.colWallet, { textAlign: "right" }]}>Wallet Balance</Text>
+                      <Text style={[styles.tableTh, styles.colJoin, { textAlign: "center" }]}>Join Date</Text>
+                      <Text style={[styles.tableTh, styles.colRevenue, { textAlign: "right" }]}>Revenue</Text>
+                      <Text style={[styles.tableTh, styles.colAction, { textAlign: "center" }]}>Action</Text>
+                    </View>
+
+                    {paginatedSellers.map((seller) => (
+                      <View key={seller.id} style={[styles.tableRow, seller.status === "Inactive" && styles.rowBlocked]}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          style={[styles.tableCell, styles.colSeller, { flexDirection: "row", alignItems: "center" }]}
+                          onPress={() => openSellerDetail(seller.id, seller.status)}
+                        >
+                          {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
+                          <View style={styles.sellerMeta}>
+                            <Text style={styles.sellerName} numberOfLines={1}>{seller.name}</Text>
+                            <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
+                          </View>
+                        </TouchableOpacity>
+                        <Text style={[styles.tableCellTextBold, styles.colBusiness]} numberOfLines={1}>{seller.businessName}</Text>
+                        <Text style={[styles.tableCellText, styles.colType]} numberOfLines={1}>{seller.businessType}</Text>
+                        <Text style={[styles.tableCellText, styles.colProducts, { textAlign: "center" }]} numberOfLines={1}>{seller.products}</Text>
+                        <Text style={[styles.tableCellCurrency, styles.colWallet, { textAlign: "right" }]} numberOfLines={1}>
+                          {formatRupee(seller.walletBalance)}
+                        </Text>
+                        <Text style={[styles.tableCellText, styles.colJoin, { textAlign: "center" }]} numberOfLines={1}>{seller.joinDate}</Text>
+                        <Text style={[styles.tableCellCurrency, styles.colRevenue, { textAlign: "right" }]} numberOfLines={1}>
+                          {formatRupee(seller.revenue)}
+                        </Text>
+                        <View style={[styles.tableCellActions, styles.colAction]}>
+                      <TouchableOpacity
+                        style={styles.actionEyeBtn}
+                        onPress={() => openSellerDetail(seller.id, seller.status)}
+                      >
+                        <Ionicons name="eye" size={15} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionMessageBtn}
+                        onPress={() => {
+                          setMessageSeller(seller);
+                          setMessageModalVisible(true);
+                        }}
+                      >
+                        <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionBlockBtn, seller.status === "Inactive" && styles.actionBlockBtnActive]}
+                        onPress={() => {
+                          if (seller.status === "Active") {
+                            setDeactivateSeller(seller);
+                            setDeactivateReason("");
+                            setDeactivateModalVisible(true);
+                          } else {
+                            void (async () => {
+                              try {
+                                await unblockSeller(seller.id);
+                                setData((prev) =>
+                                  prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
+                                );
+                                showToast("Seller successfully unblocked!", "success");
+                              } catch (e) {
+                                showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
+                              }
+                            })();
+                          }
+                        }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={15}
+                          color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionDeleteBtn}
+                        onPress={() => {
+                          setDeleteSeller(seller);
+                          setDeleteReason("");
+                          setDeleteModalVisible(true);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
 
                     <TouchableOpacity
                       style={[styles.exportBtn, exportLoading && { opacity: 0.7 }]}
@@ -3373,6 +3572,7 @@ export default function ApprovedSellersScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
+                </ScrollView>
                 </View>
 
                 {/* --- INSIGHTS SECTION --- */}
@@ -3681,7 +3881,7 @@ export default function ApprovedSellersScreen() {
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-            <Text style={styles.footerCopyrightText}>2026 © Flintnthread India Pvt. Ltd. Crafted by </Text>
+            <Text style={styles.footerCopyrightText}>2026 — Flintnthread India Pvt. Ltd. Crafted by </Text>
             <Feather name="heart" size={12} color="#EF4444" />
             <Text style={styles.footerCopyrightText}> Flintnthread India Pvt. Ltd.</Text>
           </View>
@@ -4033,11 +4233,28 @@ export default function ApprovedSellersScreen() {
                 </TouchableOpacity>
               </View>
               <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                <SellerDocumentImage
-                  url={previewDoc.url}
-                  resizeMode="contain"
-                  style={{ width: '100%', height: '100%' }}
-                />
+                {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                  <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                    <Feather name="file-text" size={40} color="#64748B" />
+                    <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                      onPress={() => {
+                        const href = previewDoc.url || previewDoc.path;
+                        if (href) void Linking.openURL(href);
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <SellerDocumentImage
+                    path={previewDoc.path}
+                    url={previewDoc.url}
+                    resizeMode="contain"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                )}
               </View>
             </View>
           </View>
@@ -4529,7 +4746,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#4B5563",
+    minWidth: 0,
   },
+  colSeller: { flex: 2.2, minWidth: 180, paddingHorizontal: 6 },
+  colBusiness: { flex: 2, minWidth: 160, paddingHorizontal: 6 },
+  colType: { flex: 1.8, minWidth: 140, paddingHorizontal: 6 },
+  colProducts: { flex: 0.8, minWidth: 80, paddingHorizontal: 6 },
+  colWallet: { flex: 1.2, minWidth: 110, paddingHorizontal: 6 },
+  colJoin: { flex: 1.2, minWidth: 100, paddingHorizontal: 6 },
+  colRevenue: { flex: 1.2, minWidth: 110, paddingHorizontal: 6 },
+  colAction: { flex: 1.6, minWidth: 150, paddingHorizontal: 6, flexShrink: 0 },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4544,29 +4770,35 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     justifyContent: "center",
+    minWidth: 0,
   },
   tableCellText: {
     fontSize: 13,
     color: "#374151",
+    minWidth: 0,
   },
   tableCellTextBold: {
     fontSize: 13,
     fontWeight: "600",
     color: "#1E293B",
+    minWidth: 0,
   },
   tableCellCurrency: {
     fontSize: 13,
     fontWeight: "600",
     color: "#D97706",
+    minWidth: 0,
   },
   sellerAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
     marginRight: 12,
+    flexShrink: 0,
   },
   sellerMeta: {
     flex: 1,
+    minWidth: 0,
     justifyContent: "center",
   },
   sellerName: {
@@ -4584,6 +4816,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 6,
+    flexShrink: 0,
   },
   actionEyeBtn: {
     width: 28,

@@ -1160,8 +1160,7 @@ export default function ProductApprovalScreen() {
               </Pressable>
             </View>
           ) : isWide ? (
-            width < 1440 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 8, minWidth: '100%' }}>
                 <ProductTable
                   products={products}
                   selected={selected}
@@ -1172,17 +1171,6 @@ export default function ProductApprovalScreen() {
                   onDeactivate={handleDeactivate}
                 />
               </ScrollView>
-            ) : (
-              <ProductTable
-                products={products}
-                selected={selected}
-                onToggle={toggleSelect}
-                onToggleAll={toggleSelectAll}
-                actionBusyId={actionBusyId}
-                onActivate={handleActivate}
-                onDeactivate={handleDeactivate}
-              />
-            )
           ) : (
             <View style={styles.productList}>
               {products.map((product) => (
@@ -1494,7 +1482,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statsScrollWrapper: {
-    marginTop: -60,
+    marginTop: 0,
     zIndex: 10,
     marginBottom: 4,
     alignSelf: 'stretch',
@@ -1932,11 +1920,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: PALETTE.border,
-    overflow: 'hidden',
+    overflow: 'visible',
+    width: '100%',
   },
   table: {
     width: '100%',
-    minWidth: 960,
+    minWidth: 1100,
   },
   tableHeader: {
     flexDirection: 'row',
