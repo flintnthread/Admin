@@ -1210,9 +1210,9 @@ export default function DashboardScreen() {
                       onPress={card.action}
                       style={({ hovered }) => [
                         styles.kpiCard,
-                        screenW < 480
-                          ? { minWidth: "100%", flex: 0, width: "100%" }
-                          : (isMobile ? { minWidth: "47%", flex: 0, width: "47%" } : null),
+                        isMobile
+                          ? { minWidth: "47%", flex: 0, width: "47%" }
+                          : null,
                         {
                           borderLeftWidth: 4,
                           borderLeftColor: card.color,
@@ -2861,7 +2861,7 @@ const getStyles = (isDark: boolean, screenW: number) => {
     },
     kpiCard: {
       flex: 1,
-      minWidth: screenW < 480 ? "100%" : 220,
+      minWidth: screenW < 768 ? "47%" : 220,
       backgroundColor: C.surface,
       borderRadius: 16,
       padding: 18,

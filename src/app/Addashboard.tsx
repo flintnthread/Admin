@@ -698,26 +698,45 @@ function LineChart({ values, labels, color, width = 320, height = 180 }: {
 /* Donut                                                               */
 /* ------------------------------------------------------------------ */
 function Donut({ data, size = 150, strokeWidth = 20 }: { data: ChartDatum[]; size?: number; strokeWidth?: number }) {
-  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const sum = data.reduce((s, d) => s + d.value, 0);
+  const total = sum > 0 ? sum : 1;
   const r = (size - strokeWidth) / 2;
   const cx = size / 2; const cy = size / 2;
   const circ = 2 * Math.PI * r;
   let acc = 0;
   return (
     <Svg width={size} height={size}>
-      {data.map((d) => {
-        const frac = d.value / total;
-        const len = frac * circ;
-        const rotation = -90 + acc * 360;
-        acc += frac;
-        return (
-          <Circle key={d.label} cx={cx} cy={cy} r={r} fill="none"
-            stroke={d.color} strokeWidth={strokeWidth}
-            strokeDasharray={`${len} ${circ - len}`}
-            strokeLinecap="round" rotation={rotation} origin={`${cx}, ${cy}`}
-          />
-        );
-      })}
+      {sum <= 0 ? (
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#E5E7EB"
+          strokeWidth={strokeWidth}
+        />
+      ) : (
+        data.map((d) => {
+          const frac = d.value / total;
+          const len = Math.max(0, frac * circ);
+          const rotation = -90 + acc * 360;
+          acc += frac;
+          return (
+            <Circle
+              key={d.label}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={d.color}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${len} ${Math.max(0, circ - len)}`}
+              strokeLinecap="butt"
+              transform={`rotate(${rotation} ${cx} ${cy})`}
+            />
+          );
+        })
+      )}
     </Svg>
   );
 }
@@ -759,7 +778,7 @@ function Gauge({ pct, size = 150, strokeWidth = 16, color, trackColor = COLORS.p
         <Circle cx={cx} cy={cy} r={r} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
         <Circle cx={cx} cy={cy} r={r} stroke={color} strokeWidth={strokeWidth} fill="none"
           strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
-          rotation={-90} origin={`${cx}, ${cy}`}
+          transform={`rotate(-90 ${cx} ${cy})`}
         />
       </Svg>
     );
@@ -1111,19 +1130,14 @@ export default function AdsDashboardScreen() {
               </Tile>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              scrollEnabled={false}
-              contentContainerStyle={{ gap: gutter, marginBottom: gutter, flexDirection: 'row' }}
-            >
-              <Tile title="Orders by Ad Type" sub={period} style={{ width: halfWidth, minWidth: 240 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: gutter, marginBottom: gutter }}>
+              <Tile title="Orders by Ad Type" sub={period} style={{ flex: 1, minWidth: 240 }}>
                 <DonutTile data={adTypes} centerValue={String(totalAdOrders)} centerLabel="ORDERS" />
               </Tile>
-              <Tile title="Revenue by Category" sub={period} style={{ width: halfWidth, minWidth: 240 }}>
+              <Tile title="Revenue by Category" sub={period} style={{ flex: 1, minWidth: 240 }}>
                 <DonutTile data={revenueByCategory} centerValue={fmtINR(totalRevenueForDonut)} centerLabel="TOTAL" format={fmtINR} />
               </Tile>
-            </ScrollView>
+            </View>
           )}
 
           {/* ── Orders trend + top customers ── */}

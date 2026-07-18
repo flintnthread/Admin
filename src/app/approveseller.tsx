@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView
 import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
 import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { resolveSellerDocumentImageUrl } from "@/lib/api/media";
+import { resolveSellerDocumentImageUrl, isPdfMedia } from "@/lib/api/media";
 import { formatRupee, maskAccount } from "@/lib/format";
 import SellerDocumentImage from "@/components/SellerDocumentImage";
 
@@ -130,7 +130,7 @@ export default function ApprovedSellersScreen() {
   const [deleteReason, setDeleteReason] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   // --- DOCUMENT PREVIEW STATE ---
-  const [previewDoc, setPreviewDoc] = useState<{name: string, url: string} | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{name: string, url: string, path?: string | null} | null>(null);
 
   // --- TOAST SYSTEM STATE & HELPERS ---
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
@@ -329,10 +329,10 @@ export default function ApprovedSellersScreen() {
 
   const formatCompactRupee = (value: number) => {
     if (value >= 10000000) {
-      return `₹${(value / 10000000).toFixed(2)}Cr`;
+      return `?${(value / 10000000).toFixed(2)}Cr`;
     }
     if (value >= 100000) {
-      return `₹${(value / 100000).toFixed(2)}L`;
+      return `?${(value / 100000).toFixed(2)}L`;
     }
     return formatRupee(value);
   };
@@ -642,13 +642,19 @@ export default function ApprovedSellersScreen() {
         >
           {/* 1. Seller Profile Header Card */}
           <View style={stylesMobile.detailsProfileCard}>
-            {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (
-              <Image source={{ uri: seller.avatar }} style={stylesMobile.detailsLargeAvatar} />
-            ) : (
-              <View style={[stylesMobile.detailsLargeAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="user" size={40} color="#94A3B8" />
-              </View>
-            )}
+            {(() => {
+              const avatarUri =
+                resolveSellerDocumentImageUrl(null, sellerDetail?.profilePicUrl) ||
+                resolveSellerDocumentImageUrl(null, seller.avatar) ||
+                "";
+              return avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={stylesMobile.detailsLargeAvatar} />
+              ) : (
+                <View style={[stylesMobile.detailsLargeAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="user" size={40} color="#94A3B8" />
+                </View>
+              );
+            })()}
             <Text style={stylesMobile.detailsProfileName}>{seller.name}</Text>
             <Text style={stylesMobile.detailsProfileBusiness}>{seller.businessName}</Text>
             
@@ -798,10 +804,7 @@ export default function ApprovedSellersScreen() {
                     <TouchableOpacity
                       style={stylesMobile.docRedesignedViewBtn}
                       onPress={() =>
-                        setPreviewDoc({
-                          name: doc.name,
-                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                        })
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                       }
                     >
                       <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -817,10 +820,7 @@ export default function ApprovedSellersScreen() {
                   <TouchableOpacity
                     key={`${doc.name}-${doc.url}-${idx}`}
                     onPress={() =>
-                      setPreviewDoc({
-                        name: doc.name,
-                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                      })
+                      setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                     }
                   >
                     <SellerDocumentImage
@@ -840,10 +840,7 @@ export default function ApprovedSellersScreen() {
                     key={`${doc.name}-${doc.url}-${idx}`}
                     style={stylesMobile.selfieThumbWrapperMobile}
                     onPress={() =>
-                      setPreviewDoc({
-                        name: doc.name,
-                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                      })
+                      setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                     }
                   >
                     <SellerDocumentImage
@@ -875,11 +872,28 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                  <SellerDocumentImage
-                    url={previewDoc.url}
-                    resizeMode="contain"
-                    style={{ width: '100%', height: '100%' }}
-                  />
+                  {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                    <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                      <Feather name="file-text" size={40} color="#64748B" />
+                      <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                        onPress={() => {
+                          const href = previewDoc.url || previewDoc.path;
+                          if (href) void Linking.openURL(href);
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <SellerDocumentImage
+                      path={previewDoc.path}
+                      url={previewDoc.url}
+                      resizeMode="contain"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  )}
                 </View>
               </View>
             </View>
@@ -1970,11 +1984,28 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                  <SellerDocumentImage
-                    url={previewDoc.url}
-                    resizeMode="contain"
-                    style={{ width: '100%', height: '100%' }}
-                  />
+                  {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                    <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                      <Feather name="file-text" size={40} color="#64748B" />
+                      <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                        onPress={() => {
+                          const href = previewDoc.url || previewDoc.path;
+                          if (href) void Linking.openURL(href);
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <SellerDocumentImage
+                      path={previewDoc.path}
+                      url={previewDoc.url}
+                      resizeMode="contain"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  )}
                 </View>
               </View>
             </View>
@@ -2885,10 +2916,7 @@ export default function ApprovedSellersScreen() {
                               <TouchableOpacity
                                 style={styles.docViewBtn}
                                 onPress={() =>
-                        setPreviewDoc({
-                          name: doc.name,
-                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                        })
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                       }
                               >
                                 <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -2903,10 +2931,7 @@ export default function ApprovedSellersScreen() {
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
                               onPress={() =>
-                        setPreviewDoc({
-                          name: doc.name,
-                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                        })
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                       }
                             >
                               <SellerDocumentImage
@@ -2924,10 +2949,7 @@ export default function ApprovedSellersScreen() {
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
                               onPress={() =>
-                        setPreviewDoc({
-                          name: doc.name,
-                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
-                        })
+                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
                       }
                             >
                               <SellerDocumentImage
@@ -3380,7 +3402,7 @@ export default function ApprovedSellersScreen() {
             <View style={styles.insightsCard}>
               <View style={styles.insightsHeader}>
                 <Text style={styles.insightsTitle}>Insights</Text>
-                <Text style={styles.insightsSubtitle}>Top 10 by count • Filter-aware</Text>
+                <Text style={styles.insightsSubtitle}>Top 10 by count — Filter-aware</Text>
               </View>
 
               <View style={[styles.insightsContainer, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
@@ -3582,13 +3604,13 @@ export default function ApprovedSellersScreen() {
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Wallet Balance:</Text>
                         <Text style={styles.cardCurrency}>
-                          ₹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          ?{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                       <View style={styles.cardRow}>
                         <Text style={styles.cardLabel}>Revenue:</Text>
                         <Text style={styles.cardCurrency}>
-                          ₹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          ?{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </Text>
                       </View>
                     </View>
@@ -3682,7 +3704,7 @@ export default function ApprovedSellersScreen() {
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-            <Text style={styles.footerCopyrightText}>2026 © Flintnthread India Pvt. Ltd. Crafted by </Text>
+            <Text style={styles.footerCopyrightText}>2026 — Flintnthread India Pvt. Ltd. Crafted by </Text>
             <Feather name="heart" size={12} color="#EF4444" />
             <Text style={styles.footerCopyrightText}> Flintnthread India Pvt. Ltd.</Text>
           </View>
@@ -4034,11 +4056,28 @@ export default function ApprovedSellersScreen() {
                 </TouchableOpacity>
               </View>
               <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                <SellerDocumentImage
-                  url={previewDoc.url}
-                  resizeMode="contain"
-                  style={{ width: '100%', height: '100%' }}
-                />
+                {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                  <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                    <Feather name="file-text" size={40} color="#64748B" />
+                    <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                      onPress={() => {
+                        const href = previewDoc.url || previewDoc.path;
+                        if (href) void Linking.openURL(href);
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <SellerDocumentImage
+                    path={previewDoc.path}
+                    url={previewDoc.url}
+                    resizeMode="contain"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                )}
               </View>
             </View>
           </View>
