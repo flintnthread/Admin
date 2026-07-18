@@ -294,6 +294,7 @@ export default function SellerEmailsScreen() {
   const { isTablet, isLaptop, isDesktop } = useBreakpoint();
 
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [totalSellersCount, setTotalSellersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -307,6 +308,7 @@ export default function SellerEmailsScreen() {
         const page = await fetchSellers({ size: 200 });
         if (cancelled) return;
         setSellers((page.items ?? []).map(mapSellerRow));
+        setTotalSellersCount(Number(page.totalElements ?? page.items?.length ?? 0));
       } catch (e) {
         if (!cancelled) setLoadError(getApiErrorMessage(e, 'Failed to load sellers.'));
       } finally {
@@ -369,7 +371,7 @@ export default function SellerEmailsScreen() {
     }
   };
 
-  const totalSellers = sellers.length;
+  const totalSellers = totalSellersCount > 0 ? totalSellersCount : sellers.length;
 
   const activeCount = sellers.filter((s) => s.status === 'Active').length;
   const pendingCount = sellers.filter((s) => s.status === 'Email_pending').length;

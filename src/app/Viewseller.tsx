@@ -971,13 +971,18 @@ function mapDetailToSellerData(
       }
       return { active, inactive, pending };
     })(),
-    orderStatusDistribution: {
-      pending: Number(orderDist.pending ?? 0),
-      processing: Number(orderDist.processing ?? 0),
-      shipped: Number(orderDist.shipped ?? 0),
-      delivered: Number(orderDist.delivered ?? 0),
-      cancelled: Number(orderDist.cancelled ?? 0),
-    },
+    orderStatusDistribution: (() => {
+      const pending = Number(orderDist.pending ?? 0);
+      const processing = Number(orderDist.processing ?? 0);
+      const shipped = Number(orderDist.shipped ?? 0);
+      const delivered = Number(orderDist.delivered ?? 0);
+      const cancelled = Number(orderDist.cancelled ?? 0);
+      const sum = pending + processing + shipped + delivered + cancelled;
+      if (totalOrders > 0 && sum === 0) {
+        return { pending: totalOrders, processing: 0, shipped: 0, delivered: 0, cancelled: 0 };
+      }
+      return { pending, processing, shipped, delivered, cancelled };
+    })(),
     verificationDocuments: (() => {
       const defaultDocNames = [
         'Aadhaar Front',
@@ -1578,7 +1583,11 @@ export default function ViewSeller() {
                 <View style={styles.donutWrap}>
                   <DonutChart
                     segments={orderSegments}
-                    total={Math.max(seller.totalOrders, 1)}
+                    total={Math.max(
+                      orderSegments.reduce((s, x) => s + x.value, 0),
+                      seller.totalOrders,
+                      1,
+                    )}
                     size={width < 600 ? 120 : 150}
                   />
                 </View>

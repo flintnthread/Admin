@@ -137,16 +137,9 @@ export function buildMediaUrlCandidates(
   push(resolveMediaUrl(cdnUrl));
   push(resolveMediaUrl(path));
 
-  // Do not fall back to flintnthread.in / admin host for seller docs or product files —
-  // those hosts return 500 / HTML for /uploads/
-  const combined = `${path ?? ""} ${cdnUrl ?? ""}`;
-  const isUpload =
-    /\/uploads\/(seller_documents|sellers|kyc_images|products)\//i.test(combined) ||
-    SELLER_DOCUMENT_FILE.test((path ?? cdnUrl ?? "").split("/").pop() ?? "");
-  if (!isUpload) {
-    push(resolveAdminMediaUrl(path));
-    push(resolveAdminMediaUrl(cdnUrl));
-  }
+  // Seller docs / products: also try admin API origin when CDN path 404s.
+  push(resolveAdminMediaUrl(path));
+  push(resolveAdminMediaUrl(cdnUrl));
 
   return urls;
 }
@@ -268,10 +261,11 @@ export function resolveSellerDocumentImageUrl(
   path?: string | null,
   backendUrl?: string | null,
 ): string {
-  const fromPath = resolveMediaUrl(path);
-  if (fromPath) return fromPath;
+  // Prefer absolute backend/CDN URL from API over a bare DB path.
   const fromBackend = resolveMediaUrl(backendUrl);
   if (fromBackend) return fromBackend;
+  const fromPath = resolveMediaUrl(path);
+  if (fromPath) return fromPath;
   const candidates = buildMediaUrlCandidates(path, backendUrl);
   return candidates[0] || getSellerDocumentPlaceholderUrl();
 }

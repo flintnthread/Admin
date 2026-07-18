@@ -66,7 +66,7 @@ import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/format';
 import { sweetError, sweetSuccess } from '@/lib/sweetAlert';
 
-import { fetchCustomers } from '@/services/customerApi';
+import { fetchCustomers, fetchCustomerStats } from '@/services/customerApi';
 
 import { sendCustomerEmails } from '@/services/emailApi';
 
@@ -261,6 +261,7 @@ export default function CustomerEmailsScreen() {
     const { bp, width, isCompact } = useBreakpoint();
 
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [totalCustomersCount, setTotalCustomersCount] = useState(0);
 
     const [loading, setLoading] = useState(true);
 
@@ -324,11 +325,23 @@ export default function CustomerEmailsScreen() {
 
             try {
 
-                const page = await fetchCustomers(undefined, 0, 100);
+                const [page, stats] = await Promise.all([
+                    fetchCustomers(undefined, 0, 100),
+                    fetchCustomerStats().catch(() => ({} as Record<string, number>)),
+                ]);
 
                 if (cancelled) return;
 
                 setCustomers((page.items ?? []).map((c) => mapCustomerRow(c as Customer & { phone?: string; createdAt?: string; lastOrderAt?: string })));
+                setTotalCustomersCount(
+                    Number(
+                        stats.total ??
+                            stats.totalCustomers ??
+                            page.totalElements ??
+                            page.items?.length ??
+                            0,
+                    ),
+                );
 
             } catch (e) {
 
@@ -532,7 +545,7 @@ export default function CustomerEmailsScreen() {
 
                         <View style={styles.totalBadge}>
 
-                            <Text style={styles.totalBadgeText}>{filtered.length} Customers</Text>
+                            <Text style={styles.totalBadgeText}>{totalCustomersCount || filtered.length} Customers</Text>
 
                         </View>
 

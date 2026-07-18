@@ -337,12 +337,17 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
   const price = Number(item.price ?? 0);
   const productName = resolveItemProductName(item);
   const imageUrl = resolveItemImageUrl(item);
+  const raw = item as Record<string, unknown>;
+  const productIdRaw = item.productId ?? raw.product_id ?? raw.productID;
+  const productIdNum = Number(productIdRaw);
+  const productId =
+    Number.isFinite(productIdNum) && productIdNum > 0 ? productIdNum : undefined;
 
   return {
     id: item.id,
-    productId: item.productId,
+    productId,
     product: productName,
-    sku: String(item.sku ?? item.productId ?? item.id ?? "—"),
+    sku: String(item.sku ?? productId ?? item.id ?? "—"),
     seller: item.sellerName ?? "Seller",
     variant: buildVariantLabel(item),
     qty,
@@ -350,7 +355,7 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
     total: Number(item.total ?? qty * price),
     slug: productName
       ? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
-      : String(item.productId ?? item.id ?? ""),
+      : String(productId ?? item.id ?? ""),
     imageUrl,
   };
 }

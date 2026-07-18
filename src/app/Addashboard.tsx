@@ -178,14 +178,17 @@ function buildDatasetFromApi(
   recentOrders: AdsApiRow[],
   customers: AdsApiRow[],
 ): Dataset {
-  const orders = (dashboard.orders ?? {}) as Record<string, unknown>;
-  const payments = (dashboard.payments ?? {}) as Record<string, unknown>;
-  const customersBlock = (dashboard.customers ?? {}) as Record<string, unknown>;
+  const root = ((dashboard as AdsApiRow)?.data ?? dashboard) as AdsApiRow;
+  const orders = (root.orders ?? {}) as Record<string, unknown>;
+  const payments = (root.payments ?? {}) as Record<string, unknown>;
+  const customersBlock = (root.customers ?? {}) as Record<string, unknown>;
 
-  const totalOrders = Number(orders.total ?? 0);
-  const paidOrders = Number(orders.paid ?? 0);
-  const totalRevenue = Number(orders.paidAmountTotal ?? orders.paidAmountInPeriod ?? 0);
-  const totalCustomers = Number(customersBlock.total ?? 0);
+  const totalOrders = Number(orders.total ?? root.totalOrders ?? 0);
+  const paidOrders = Number(orders.paid ?? root.paidOrders ?? 0);
+  const totalRevenue = Number(
+    orders.paidAmountTotal ?? orders.paidAmountInPeriod ?? root.totalRevenue ?? 0,
+  );
+  const totalCustomers = Number(customersBlock.total ?? root.totalCustomers ?? 0);
   const inPeriod = Number(orders.inPeriod ?? 0);
   const labels = periodLabels(period);
   const revenueTrend = labels.map((_, i) => +((totalRevenue / 100000) * (0.15 + (i + 1) / labels.length)).toFixed(2));
@@ -948,7 +951,7 @@ export default function AdsDashboardScreen() {
       } catch (e) {
         if (!cancelled) {
           setError(getApiErrorMessage(e, 'Failed to load ads dashboard.'));
-          setDataset(emptyDataset(period));
+          // Keep last successful dataset — do not force all-zero KPIs on a transient error.
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -992,7 +995,11 @@ export default function AdsDashboardScreen() {
 
   const totalAdOrders = adTypes.reduce((s, d) => s + d.value, 0);
   const totalRevenueForDonut = revenueByCategory.reduce((s, d) => s + d.value, 0);
-  const activeAds = Math.max(4, Math.round(totalAdOrders * 0.05));
+  const activeAds = Math.max(
+    Number((dataset as { activeAds?: number }).activeAds ?? 0),
+    kpis.paidOrders > 0 ? Math.max(1, Math.round(kpis.paidOrders * 0.05)) : 0,
+    totalAdOrders > 0 ? Math.max(1, Math.round(totalAdOrders * 0.05)) : 0,
+  );
   const growthPct = ((revenueTrend[revenueTrend.length - 1] - revenueTrend[0]) / (revenueTrend[0] || 1)) * 100;
   const successRate = Math.round((kpis.paidOrders / Math.max(1, kpis.totalOrders)) * 100);
 
