@@ -135,6 +135,44 @@ function useLocalApiFallbacks(): boolean {
   return process.env.EXPO_PUBLIC_ADMIN_API_USE_LOCAL === "true";
 }
 
+/** Web app opened at localhost / 127.0.0.1 (Expo web dev). */
+export function isLocalWebDev(): boolean {
+  return (
+    Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  );
+}
+
+function pushLocalAdminCandidates(candidates: string[]): void {
+  if (Platform.OS === "web") {
+    const webOverride = process.env.EXPO_PUBLIC_ADMIN_API_WEB_BASE_URL?.trim().replace(/\/$/, "");
+    if (webOverride) candidates.push(webOverride);
+
+    const webLan = getWebLanHost();
+    if (webLan) candidates.push(buildLocalUrl(webLan));
+
+    candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
+  }
+
+  const devHost = getExpoDevLanHost();
+  if (devHost) candidates.push(buildLocalUrl(devHost));
+
+  if (Platform.OS === "android" && isAndroidEmulator()) {
+    candidates.push(buildLocalUrl("10.0.2.2"));
+  }
+
+  if (isIosSimulator()) {
+    candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
+  }
+
+  candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
+
+  if (Platform.OS === "android") {
+    candidates.push(buildLocalUrl("10.0.2.2"));
+  }
+}
+
 /** True when the browser opened the Admin UI on the API port (8082) — login will fail. */
 export function getWebDevPortConflict(): string | null {
   if (Platform.OS !== "web" || typeof window === "undefined") return null;
@@ -156,40 +194,15 @@ export function getAdminWebDevUrl(): string {
 /**
  * Candidate admin API base URLs (most likely first).
  * Defaults: https://flintnthread.online and https://flintnthread.in (VPS nginx → admin :8082).
- * Local fallbacks only when EXPO_PUBLIC_ADMIN_API_USE_LOCAL=true.
+ * On localhost web dev, http://localhost:8082 is tried before production.
  */
 export function getAdminApiBaseUrlCandidates(): string[] {
+  const productionUrls = getProductionApiUrlCandidates();
   const candidates: string[] = [];
 
-  if (useLocalApiFallbacks()) {
-    if (Platform.OS === "web") {
-      const webOverride = process.env.EXPO_PUBLIC_ADMIN_API_WEB_BASE_URL?.trim().replace(/\/$/, "");
-      if (webOverride) candidates.push(webOverride);
-
-      const webLan = getWebLanHost();
-      if (webLan) candidates.push(buildLocalUrl(webLan));
-
-      candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
-    }
-
-    const devHost = getExpoDevLanHost();
-    if (devHost) candidates.push(buildLocalUrl(devHost));
-
-    if (Platform.OS === "android" && isAndroidEmulator()) {
-      candidates.push(buildLocalUrl("10.0.2.2"));
-    }
-
-    if (isIosSimulator()) {
-      candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
-    }
-
-    candidates.push(buildLocalUrl("localhost"), buildLocalUrl("127.0.0.1"));
-
-    if (Platform.OS === "android") {
-      candidates.push(buildLocalUrl("10.0.2.2"));
-    }
-
-    candidates.push(...getProductionApiUrlCandidates());
+  if (useLocalApiFallbacks() || isLocalWebDev()) {
+    pushLocalAdminCandidates(candidates);
+    candidates.push(...productionUrls);
     return uniqueUrls(candidates);
   }
 
@@ -200,13 +213,15 @@ export function getAdminApiBaseUrlCandidates(): string[] {
       host === "flintnthread.online" ||
       host.endsWith(".flintnthread.online") ||
       host === "flintnthread.in" ||
-      host.endsWith(".flintnthread.in")
+      host.endsWith(".flintnthread.in") ||
+      host === "admin.flintnthread.in" ||
+      host.endsWith(".admin.flintnthread.in")
     ) {
       candidates.push(window.location.origin.replace(/\/$/, ""));
     }
   }
 
-  candidates.push(...getProductionApiUrlCandidates());
+  candidates.push(...productionUrls);
   return uniqueUrls(candidates);
 }
 
@@ -236,6 +251,10 @@ export async function ensureAdminApiReachable(): Promise<string> {
   const portConflict = getWebDevPortConflict();
   if (portConflict) {
     throw new Error(portConflict);
+  }
+
+  if (cachedWorkingBaseUrl && Date.now() < cacheExpiresAt) {
+    return cachedWorkingBaseUrl;
   }
 
   const candidates = getAdminApiBaseUrlCandidates();
@@ -279,11 +298,9 @@ export async function ensureAdminApiReachable(): Promise<string> {
   );
 }
 
-/** Public CDN / media host for uploads — matches backend app.media.public-base-url */
+/** Public CDN for ALL uploads (products + seller docs) — same host as product images. */
 export function resolvePublicMediaBaseUrl(): string {
-  const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  // Local Admin web → seller-service serves shared product files
+  // Local Admin web → seller-service serves shared files
   if (
     Platform.OS === "web" &&
     typeof window !== "undefined" &&
@@ -297,6 +314,15 @@ export function resolvePublicMediaBaseUrl(): string {
   if (useLocalApiFallbacks()) {
     const lan = getExpoDevLanHost();
     return `http://${lan || "localhost"}:8083`;
+  }
+  // Production: always flintnthread.com (ignore .in / .online env mistakes)
+  const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "") || "";
+  if (
+    fromEnv &&
+    !/flintnthread\.(in|online)/i.test(fromEnv) &&
+    !/localhost|127\.0\.0\.1/i.test(fromEnv)
+  ) {
+    return fromEnv;
   }
   return "https://flintnthread.com";
 }

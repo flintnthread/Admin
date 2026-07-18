@@ -1408,27 +1408,44 @@ export default function Subcategories() {
       const statusValue = data.status === "Active";
       const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
       const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
-      // Prefer multipart upload for new files. For data-URL fallback (no File), send image string.
-      const imagePayload =
-        !shouldUploadImage && typeof data.image === "string" && data.image.startsWith("data:image/")
-          ? data.image
-          : undefined;
+      let imageUploadFailed = false;
+
+      const uploadImageSafely = async (id: number, existing: SubcategoryRow): Promise<SubcategoryRow> => {
+        if (!shouldUploadImage || !data.imageFile) return existing;
+        try {
+          const { compressImageFile } = await import("@/lib/media/compressImage");
+          const compressed = await compressImageFile(data.imageFile, {
+            maxEdge: 1100,
+            maxBytes: 400_000,
+            fileName: data.imageFile instanceof File ? data.imageFile.name : "subcategory.jpg",
+          });
+          return await uploadSubcategoryImages(id, compressed.file);
+        } catch (uploadError) {
+          imageUploadFailed = true;
+          void sweetWarning(
+            "Subcategory saved without image",
+            getApiErrorMessage(
+              uploadError,
+              "Saved, but image upload failed (often 413). Edit and use a smaller JPG under 500KB."
+            )
+          );
+          return existing;
+        }
+      };
 
       if (data.id) {
         let saved = await updateSubcategory(
           data.id,
           data.categoryId,
           data.name,
-          imagePayload,
+          undefined,
           undefined,
           materialPayload,
           undefined,
           undefined,
           statusValue
         );
-        if (shouldUploadImage) {
-          saved = await uploadSubcategoryImages(data.id, data.imageFile);
-        }
+        saved = await uploadImageSafely(data.id, saved);
         const imageUrl = pickCategoryImageUrl(saved, "subcategories");
         setItems((prev) =>
           prev.map((c) =>
@@ -1451,15 +1468,15 @@ export default function Subcategories() {
         let newRow = await createSubcategory(
           data.categoryId,
           data.name,
-          imagePayload,
+          undefined,
           undefined,
           materialPayload,
           undefined,
           undefined,
           statusValue
         );
-        if (shouldUploadImage && newRow.id) {
-          newRow = await uploadSubcategoryImages(newRow.id, data.imageFile);
+        if (newRow.id) {
+          newRow = await uploadImageSafely(newRow.id, newRow);
         }
         const newCat: Subcategory = {
           id: newRow.id,
@@ -1495,10 +1512,12 @@ export default function Subcategories() {
       setEditCat(null);
       await loadSubcategories();
 
-      if (isUpdate) {
-        void sweetCrud.updated("Subcategory");
-      } else {
-        void sweetCrud.added("Subcategory");
+      if (!imageUploadFailed) {
+        if (isUpdate) {
+          void sweetCrud.updated("Subcategory");
+        } else {
+          void sweetCrud.added("Subcategory");
+        }
       }
     } catch (error) {
       console.error("Failed to save subcategory:", error);

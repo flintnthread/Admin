@@ -16,7 +16,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AdminLayout from "@/components/admin-layout";
 import { router, useLocalSearchParams } from "expo-router";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetWarning } from "@/lib/sweetAlert";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import { buildUpdateProductPayload } from "@/lib/product/buildCreateProductPayload";
 import { getHsnForMaterial, MATERIAL_TYPES } from "@/lib/product/materialHsn";
 import {
@@ -1545,10 +1545,11 @@ export default function EditProduct() {
   const handleUpdate = async () => {
     const errs = validate();
     if (errs.length > 0) {
-      errs.slice(0, 2).forEach((e, i) => setTimeout(() => showToast(e, 'error'), i * 200));
+      void sweetWarning('Missing required fields', errs.slice(0, 3).join('\n'));
       return;
     }
     if (isSaving) return;
+    if (!(await sweetCrud.confirmUpdate('Product', state.basic.name))) return;
     setIsSaving(true);
     try {
       const payload = await buildUpdateProductPayload({
@@ -1589,9 +1590,9 @@ export default function EditProduct() {
       await updateProduct(state.basic.id, payload);
       setState((s) => ({ ...s, isDirty: false }));
       setShowSuccess(true);
-      showToast('Product updated successfully.', 'success');
+      void sweetCrud.updated('Product');
     } catch (e) {
-      showToast(getApiErrorMessage(e, 'Failed to update product.'), 'error');
+      void sweetError('Error', getApiErrorMessage(e, 'Failed to update product.'));
     } finally {
       setIsSaving(false);
     }

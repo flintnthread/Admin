@@ -555,24 +555,23 @@ const AdsTypesDetails: React.FC = () => {
             requirements: form.requirements,
             status: toApiStatus(form.status),
         };
-        if (editingItem) {
-            if (!(await sweetCrud.confirmUpdate('Ad type', body.name))) return;
-        } else {
-            if (!(await sweetCrud.confirmAdd('Ad type', body.name))) return;
-        }
         setSaving(true);
         try {
             if (editingItem) {
                 await updateAdsType(editingItem.id, body);
-                showToast('✅ Ad Type updated successfully!');
-                void sweetCrud.updated('Ad type');
+                setFormVisible(false);
+                await loadItems();
+                setTimeout(() => {
+                    void sweetCrud.updated('Ad type');
+                }, 250);
             } else {
                 await createAdsType(body);
-                showToast('✅ Ad Type created successfully!');
-                void sweetCrud.added('Ad type');
+                setFormVisible(false);
+                await loadItems();
+                setTimeout(() => {
+                    void sweetCrud.added('Ad type');
+                }, 250);
             }
-            setFormVisible(false);
-            await loadItems();
         } catch (err) {
             void sweetError('Error', getApiErrorMessage(err, editingItem ? 'Could not update ad type.' : 'Could not create ad type.'));
         } finally {

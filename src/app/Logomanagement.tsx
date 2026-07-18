@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
   fetchSiteLogos,
   uploadSiteLogoFromDataUrl,
@@ -197,7 +198,7 @@ export default function LogoManagement() {
         },
       }));
     } catch (e) {
-      showToast("Couldn't open file browser");
+      void sweetWarning("File picker", "Couldn't open file browser");
     } finally {
       setPickingKey(null);
     }
@@ -205,6 +206,7 @@ export default function LogoManagement() {
 
   async function handleUpdate() {
     if (!hasPending || updating) return;
+    if (!(await sweetCrud.confirmUpdate("Site logos"))) return;
     setUpdating(true);
     try {
       const slotMap: Record<string, "dark" | "light" | "favicon"> = {
@@ -238,9 +240,9 @@ export default function LogoManagement() {
       setLogos(next);
       setPending({ dark: null, light: null, favicon: null });
       await loadLogos();
-      showToast("Logos updated successfully");
+      void sweetCrud.saved("Site logos");
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Failed to update logos."));
+      void sweetError("Error", getApiErrorMessage(err, "Failed to update logos."));
     } finally {
       setUpdating(false);
     }

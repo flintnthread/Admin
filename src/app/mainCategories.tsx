@@ -1,31 +1,32 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
-import { getApiErrorMessage } from "@/lib/api/client";
+import { AdminApiError, getApiErrorMessage } from "@/lib/api/client";
+import { compressImageFile } from "@/lib/media/compressImage";
 import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
-  createMainCategory,
-  createSubcategory,
-  deleteCategory,
-  fetchMainCategories,
-  fetchSubcategories,
-  updateCategory,
-  uploadCategoryImages,
-  type CategoryRow
+    createMainCategory,
+    createSubcategory,
+    deleteCategory,
+    fetchMainCategories,
+    fetchSubcategories,
+    updateCategory,
+    uploadCategoryImages,
+    type CategoryRow
 } from "@/services/categoryApi";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 
@@ -528,16 +529,19 @@ const ImagePickerField = ({
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/jpeg,image/png";
-      input.onchange = (e: any) => {
+      input.onchange = async (e: any) => {
         const file = e.target.files?.[0] as File | undefined;
-        if (file) {
-          if (file.size > 2 * 1024 * 1024) {
-            void sweetWarning("Image too large", "Please choose an image under 2MB.");
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = (ev) => onPick(ev.target?.result as string, file);
-          reader.readAsDataURL(file);
+        if (!file) return;
+        // Allow larger camera photos — we compress before upload (nginx often caps at 1MB).
+        if (file.size > 15 * 1024 * 1024) {
+          void sweetWarning("Image too large", "Please choose an image under 15MB.");
+          return;
+        }
+        try {
+          const compressed = await compressImageFile(file);
+          onPick(compressed.previewUrl, compressed.file);
+        } catch {
+          void sweetError("Error", "Could not process that image. Try another JPG or PNG.");
         }
       };
       input.click();
@@ -545,7 +549,7 @@ const ImagePickerField = ({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 1,
+        quality: 0.7,
       });
       if (!result.canceled) onPick(result.assets[0].uri, null);
     }
@@ -567,7 +571,7 @@ const ImagePickerField = ({
         <View style={styles.imagePickerInner}>
           <UploadIcon />
           <Text style={styles.imagePickerTitle}>Click to upload image</Text>
-          <Text style={styles.imagePickerSub}>JPG, PNG (Max 2MB)</Text>
+          <Text style={styles.imagePickerSub}>JPG, PNG · auto-resized for upload</Text>
           <Text style={styles.imagePickerDim}>1600 × 1600 (no crop)</Text>
         </View>
       )}
@@ -770,7 +774,7 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
                 Category Image <Text style={styles.required}>* Required</Text>
               </Text>
               <Text style={styles.fieldHint}>
-                1600 × 1600 (no crop) · JPG, PNG (Max 2MB)
+                1600 × 1600 (no crop) · JPG, PNG · auto-compressed
               </Text>
               <ImagePickerField
                 image={image}
@@ -1041,7 +1045,7 @@ const AddCategoryModal = ({
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>Category Image</Text>
               <Text style={styles.fieldHint}>
-                1600 × 1600 (no crop) · JPG, PNG (Max 2MB)
+                1600 × 1600 (no crop) · JPG, PNG · auto-compressed
               </Text>
               <ImagePickerField
                 image={image}
@@ -1624,24 +1628,41 @@ export default function MainCategories() {
   const handleSave = async (data: any) => {
     const entityLabel = data.type === "Main Category" ? "Main category" : "Category";
     const isUpdate = !!data.id;
-    if (isUpdate) {
-      if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) {
-        throw new Error("cancelled");
-      }
-    } else {
-      if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) {
-        throw new Error("cancelled");
-      }
-    }
     try {
       const gstValue = data.gst ? parseFloat(String(data.gst).replace("%", "")) : undefined;
       const statusValue = data.status === "Active";
       const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
-      // Prefer multipart upload for new files. For data-URL fallback (no File), send image string.
-      const imagePayload =
-        !shouldUploadImage && typeof data.image === "string" && data.image.startsWith("data:image/")
-          ? data.image
-          : undefined;
+
+      let imageUploadFailed = false;
+      const uploadImageSafely = async (categoryId: number, existing: CategoryRow): Promise<CategoryRow> => {
+        if (!shouldUploadImage || !data.imageFile) return existing;
+        try {
+          // Aggressive recompress right before upload (survives nginx ~1MB defaults).
+          const compressed = await compressImageFile(data.imageFile, {
+            maxEdge: 1100,
+            maxBytes: 400_000,
+            fileName: data.imageFile instanceof File ? data.imageFile.name : "category.jpg",
+          });
+          return await uploadCategoryImages(categoryId, compressed.file);
+        } catch (uploadError) {
+          imageUploadFailed = true;
+          const is413 =
+            uploadError instanceof AdminApiError && uploadError.status === 413;
+          void sweetWarning(
+            "Category saved without image",
+            is413
+              ? "The category was saved, but the image was rejected as too large (413). Edit the category and try a smaller JPG under 500KB."
+              : getApiErrorMessage(
+                  uploadError,
+                  "The category was saved, but the image upload failed. You can edit and retry the image."
+                )
+          );
+          return existing;
+        }
+      };
+
+      // Never send base64 image payloads in JSON create/update — that often triggers 413.
+      // Images go only through multipart /upload-images after the category row exists.
 
       if (data.id) {
         let saved = await updateCategory(
@@ -1649,14 +1670,12 @@ export default function MainCategories() {
           data.name,
           data.hsn,
           gstValue,
-          imagePayload,
+          undefined,
           undefined,
           undefined,
           statusValue
         );
-        if (shouldUploadImage) {
-          saved = await uploadCategoryImages(data.id, data.imageFile);
-        }
+        saved = await uploadImageSafely(data.id, saved);
         const imageUrl = pickCategoryImageUrl(saved, "categories");
         setCategories((prev) =>
           prev.map((c) =>
@@ -1680,7 +1699,7 @@ export default function MainCategories() {
             data.name,
             data.hsn,
             gstValue,
-            imagePayload,
+            undefined,
             undefined,
             undefined,
             statusValue
@@ -1694,14 +1713,14 @@ export default function MainCategories() {
             data.name,
             data.hsn,
             gstValue,
-            imagePayload,
+            undefined,
             undefined,
             undefined,
             statusValue
           );
         }
-        if (shouldUploadImage && newRow.id) {
-          newRow = await uploadCategoryImages(newRow.id, data.imageFile);
+        if (newRow.id) {
+          newRow = await uploadImageSafely(newRow.id, newRow);
         }
         const newCat: Category = {
           id: newRow.id,
@@ -1727,15 +1746,16 @@ export default function MainCategories() {
         setCurrentPage(1);
       }
       setEditCat(null);
-      if (isUpdate) {
-        void sweetCrud.updated(entityLabel);
-      } else {
-        void sweetCrud.added(entityLabel);
+      if (!imageUploadFailed) {
+        setTimeout(() => {
+          if (isUpdate) {
+            void sweetCrud.updated(entityLabel);
+          } else {
+            void sweetCrud.added(entityLabel);
+          }
+        }, 250);
       }
     } catch (error) {
-      if (error instanceof Error && error.message === "cancelled") {
-        throw error;
-      }
       console.error("Failed to save category:", error);
       void sweetError("Error", getApiErrorMessage(error, "Failed to save category. Please try again."));
       throw error;

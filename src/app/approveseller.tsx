@@ -39,6 +39,7 @@ import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView
 import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
 import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveSellerDocumentImageUrl } from "@/lib/api/media";
 import { formatRupee, maskAccount } from "@/lib/format";
 import SellerDocumentImage from "@/components/SellerDocumentImage";
 
@@ -796,7 +797,12 @@ export default function ApprovedSellersScreen() {
                     </View>
                     <TouchableOpacity
                       style={stylesMobile.docRedesignedViewBtn}
-                      onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                      onPress={() =>
+                        setPreviewDoc({
+                          name: doc.name,
+                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                        })
+                      }
                     >
                       <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
                       <Text style={stylesMobile.docRedesignedViewBtnText}>View</Text>
@@ -810,7 +816,12 @@ export default function ApprovedSellersScreen() {
                 {(sellerDetail?.businessProofDocuments ?? []).map((doc, idx) => (
                   <TouchableOpacity
                     key={`${doc.name}-${doc.url}-${idx}`}
-                    onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                    onPress={() =>
+                      setPreviewDoc({
+                        name: doc.name,
+                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                      })
+                    }
                   >
                     <SellerDocumentImage
                       path={doc.path}
@@ -828,7 +839,12 @@ export default function ApprovedSellersScreen() {
                   <TouchableOpacity
                     key={`${doc.name}-${doc.url}-${idx}`}
                     style={stylesMobile.selfieThumbWrapperMobile}
-                    onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                    onPress={() =>
+                      setPreviewDoc({
+                        name: doc.name,
+                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                      })
+                    }
                   >
                     <SellerDocumentImage
                       path={doc.path}
@@ -2552,7 +2568,10 @@ export default function ApprovedSellersScreen() {
               }
             };
 
-            const profileImage = detail?.profilePicUrl || seller.avatar;
+            const profileImage =
+              resolveSellerDocumentImageUrl(null, detail?.profilePicUrl) ||
+              resolveSellerDocumentImageUrl(null, seller.avatar) ||
+              seller.avatar;
             const kycStatusLabel = detail?.kycStatusLabel ?? "Not Completed";
             const kycBarColor = sellerKycBadgeColor(kycStatusLabel);
             const verificationBadge = detail?.kycVerificationBadge ?? "Pending";
@@ -2865,7 +2884,12 @@ export default function ApprovedSellersScreen() {
                               </View>
                               <TouchableOpacity
                                 style={styles.docViewBtn}
-                                onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                                onPress={() =>
+                        setPreviewDoc({
+                          name: doc.name,
+                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                        })
+                      }
                               >
                                 <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
                                 <Text style={styles.docViewBtnText}>View</Text>
@@ -2878,7 +2902,12 @@ export default function ApprovedSellersScreen() {
                           {businessProofDocs.map((doc, idx) => (
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
-                              onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                              onPress={() =>
+                        setPreviewDoc({
+                          name: doc.name,
+                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                        })
+                      }
                             >
                               <SellerDocumentImage
                                 path={doc.path}
@@ -2894,7 +2923,12 @@ export default function ApprovedSellersScreen() {
                           {liveSelfies.map((doc, idx) => (
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
-                              onPress={() => doc.url && setPreviewDoc({ name: doc.name, url: doc.url })}
+                              onPress={() =>
+                        setPreviewDoc({
+                          name: doc.name,
+                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                        })
+                      }
                             >
                               <SellerDocumentImage
                                 path={doc.path}

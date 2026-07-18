@@ -9,29 +9,30 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
-    createAdminUser,
-    deleteAdminUser,
-    fetchAdminUsers,
-    fromApiRole,
-    updateAdminUser,
+  createAdminUser,
+  deleteAdminUser,
+  fetchAdminUsers,
+  fromApiRole,
+  updateAdminUser,
 } from "@/services/adminUserApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Dimensions,
-    Modal,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 const Icon = Ionicons;
 
@@ -599,10 +600,13 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         password: form.password,
       });
-      await loadUsers();
       setAddVisible(false);
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.added("Admin user");
+      }, 250);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to add admin user."));
     }
   }
 
@@ -615,10 +619,13 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         ...(form.password ? { password: form.password } : {}),
       });
-      await loadUsers();
       setEditUser(null);
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.updated("Admin user");
+      }, 250);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to update admin user."));
     }
   }
 
@@ -628,8 +635,9 @@ export default function AdminUsersScreen() {
       await deleteAdminUser(deleteUser.id);
       await loadUsers();
       setDeleteUser(null);
+      void sweetCrud.deleted("Admin user");
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to delete admin user."));
     }
   }
 
@@ -1076,7 +1084,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 16,
     overflow: "hidden",
-    width: 340,
+    width: 393,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,

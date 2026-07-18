@@ -64,6 +64,7 @@ import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 
 import { formatDate } from '@/lib/format';
+import { sweetError, sweetSuccess } from '@/lib/sweetAlert';
 
 import { fetchCustomers } from '@/services/customerApi';
 
@@ -429,11 +430,11 @@ export default function CustomerEmailsScreen() {
 
             closeModals();
 
-            showToast('✅  Email sent successfully!');
+            void sweetSuccess('Sent!', 'Email sent successfully.');
 
         } catch (e) {
 
-            showToast(getApiErrorMessage(e, 'Failed to send email.'));
+            void sweetError('Error', getApiErrorMessage(e, 'Failed to send email.'));
 
         }
 

@@ -631,6 +631,9 @@ const SellerPaymentsScreen: React.FC = () => {
                 setRequestPage(page.totalPages);
             }
         } catch (e) {
+            setRequests([]);
+            setRequestTotalElements(0);
+            setRequestTotalPages(0);
             setRequestsError(getApiErrorMessage(e, "Failed to load payout requests."));
         } finally {
             setRequestsLoading(false);
@@ -670,6 +673,15 @@ const SellerPaymentsScreen: React.FC = () => {
         if (authLoading || !token || activeTab !== "requests") return;
         void loadRequests();
     }, [authLoading, token, activeTab, loadRequests]);
+
+    useEffect(() => {
+        if (authLoading || !token || activeTab !== "requests") return;
+        const timer = setInterval(() => {
+            void loadRequests();
+            void loadAlerts();
+        }, 30_000);
+        return () => clearInterval(timer);
+    }, [authLoading, token, activeTab, loadRequests, loadAlerts]);
 
     useEffect(() => {
         if (authLoading || !token) return;
@@ -1243,7 +1255,7 @@ const SellerPaymentsScreen: React.FC = () => {
                             <Feather name="inbox" size={44} color={TEXT_MUTED} />
                             <Text style={styles.emptyTitle}>No payout requests</Text>
                         </View>
-                    ) : (
+                    ) : !requestsError ? (
                         <View style={{ gap: 12 }}>
                             {requests.map((item) => (
                                 <PayoutRequestCard
@@ -1258,7 +1270,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 />
                             ))}
                         </View>
-                    )}
+                    ) : null}
 
                     {!requestsLoading && !requestsError && requests.length > 0 && (
                         <Pagination
