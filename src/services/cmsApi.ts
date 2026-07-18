@@ -8,8 +8,10 @@ function mediaUrl(path?: string | null): string {
   if (!path) return "";
   if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
   const base = resolveAdminApiBaseUrl().replace(/\/$/, "");
-  if (path.startsWith("/")) return `${base}${path}`;
-  return `${base}/uploads/cms/${path.replace(/^\/+/, "")}`;
+  let p = path.replace(/\\/g, "/").trim();
+  if (!p.startsWith("/")) p = `/${p}`;
+  if (p.startsWith("/uploads/")) return `${base}${p}`;
+  return `${base}/uploads/cms/${p.replace(/^\/+/, "")}`;
 }
 
 export function resolveCmsMediaUrl(path?: string | null): string {
