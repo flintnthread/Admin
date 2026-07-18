@@ -1259,14 +1259,8 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 14,
         color: COLORS.text,
-<<<<<<< HEAD
         borderWidth: 0,
         ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-=======
-
-        outlineStyle: 'none',
-
->>>>>>> e4558983a9ccfcc733d69bd83eb34030093049f4
     } as any,
 
     totalBadge: {
