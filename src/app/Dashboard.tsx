@@ -766,13 +766,32 @@ export default function DashboardScreen() {
   const revenueChartData = useMemo(() => {
     const maxVal = Number(revenueChart?.maxVal ?? 1000);
     let labels = revenueChart?.labels ?? [];
+    let revenue = (revenueChart?.revenue ?? []).map((v: any) => Number(v));
+    let orders = (revenueChart?.orders ?? []).map((v: any) => Number(v));
+    
     if (revenueTimeframe === "daily" && labels.length === 7) {
       labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     }
+
+    if (revenueTimeframe === "weekly") {
+      const paddedLabels = [...labels];
+      const paddedRevenue = [...revenue];
+      const paddedOrders = [...orders];
+      
+      while (paddedLabels.length < 4) {
+        paddedLabels.push(`Week ${paddedLabels.length + 1}`);
+        paddedRevenue.push(0);
+        paddedOrders.push(0);
+      }
+      labels = paddedLabels;
+      revenue = paddedRevenue;
+      orders = paddedOrders;
+    }
+
     return {
       labels,
-      revenue: (revenueChart?.revenue ?? []).map((v) => Number(v)),
-      orders: (revenueChart?.orders ?? []).map((v) => Number(v)),
+      revenue,
+      orders,
       yLabels: chartYLabels(maxVal),
       maxVal: maxVal === 0 ? 1 : maxVal,
     };
@@ -3288,9 +3307,9 @@ const getStyles = (isDark: boolean, screenW: number) => {
       marginTop: 2,
     },
     revenueHeaderActions: {
-      flexDirection: "row",
+      flexDirection: screenW < 768 ? "column" : "row",
       flexWrap: "wrap",
-      alignItems: "center",
+      alignItems: screenW < 768 ? "flex-start" : "center",
       gap: 12,
     },
     dateFilterContainer: {
