@@ -11,28 +11,28 @@ import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
-    createAdminUser,
-    deleteAdminUser,
-    fetchAdminUsers,
-    fromApiRole,
-    updateAdminUser,
+  createAdminUser,
+  deleteAdminUser,
+  fetchAdminUsers,
+  fromApiRole,
+  updateAdminUser,
 } from "@/services/adminUserApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Dimensions,
-    Modal,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 const Icon = Ionicons;
 
@@ -592,7 +592,6 @@ export default function AdminUsersScreen() {
   );
 
   async function handleAdd(form: UserForm) {
-    if (!(await sweetCrud.confirmAdd("Admin user", form.name || form.email))) return;
     try {
       await createAdminUser({
         email: form.email,
@@ -601,9 +600,11 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         password: form.password,
       });
-      await loadUsers();
       setAddVisible(false);
-      void sweetCrud.added("Admin user");
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.added("Admin user");
+      }, 250);
     } catch (e) {
       void sweetError("Error", getApiErrorMessage(e, "Failed to add admin user."));
     }
@@ -611,7 +612,6 @@ export default function AdminUsersScreen() {
 
   async function handleEdit(form: UserForm) {
     if (!editUser) return;
-    if (!(await sweetCrud.confirmUpdate("Admin user", form.name || form.email))) return;
     try {
       await updateAdminUser(editUser.id, {
         fullName: form.name,
@@ -619,9 +619,11 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         ...(form.password ? { password: form.password } : {}),
       });
-      await loadUsers();
       setEditUser(null);
-      void sweetCrud.updated("Admin user");
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.updated("Admin user");
+      }, 250);
     } catch (e) {
       void sweetError("Error", getApiErrorMessage(e, "Failed to update admin user."));
     }

@@ -1258,7 +1258,9 @@ const styles = StyleSheet.create({
 
         color: COLORS.text,
 
-    },
+        outlineStyle: 'none',
+
+    } as any,
 
     totalBadge: {
 
