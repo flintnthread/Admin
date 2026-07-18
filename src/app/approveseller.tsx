@@ -3452,42 +3452,42 @@ export default function ApprovedSellersScreen() {
               /* Desktop Table View */
               <View style={styles.tableCard}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
-                  <View style={{ minWidth: 1200, width: "100%" }}>
+                  <View style={{ minWidth: 1400, width: "100%" }}>
                     <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableTh, { flex: 2.2 }]}>Seller</Text>
-                      <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
-                  <Text style={[styles.tableTh, { flex: 1.8 }]}>Business Type</Text>
-                  <Text style={[styles.tableTh, { flex: 0.8, textAlign: "center" }]}>Products</Text>
-                  <Text style={[styles.tableTh, { flex: 1.2, textAlign: "right" }]}>Wallet Balance</Text>
-                  <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Join Date</Text>
-                  <Text style={[styles.tableTh, { flex: 1.2, textAlign: "right" }]}>Revenue</Text>
-                  <Text style={[styles.tableTh, { flex: 1.6, textAlign: "center" }]}>Action</Text>
-                </View>
+                      <Text style={[styles.tableTh, styles.colSeller]}>Seller</Text>
+                      <Text style={[styles.tableTh, styles.colBusiness]}>Business Name</Text>
+                      <Text style={[styles.tableTh, styles.colType]}>Business Type</Text>
+                      <Text style={[styles.tableTh, styles.colProducts, { textAlign: "center" }]}>Products</Text>
+                      <Text style={[styles.tableTh, styles.colWallet, { textAlign: "right" }]}>Wallet Balance</Text>
+                      <Text style={[styles.tableTh, styles.colJoin, { textAlign: "center" }]}>Join Date</Text>
+                      <Text style={[styles.tableTh, styles.colRevenue, { textAlign: "right" }]}>Revenue</Text>
+                      <Text style={[styles.tableTh, styles.colAction, { textAlign: "center" }]}>Action</Text>
+                    </View>
 
-                {paginatedSellers.map((seller) => (
-                  <View key={seller.id} style={[styles.tableRow, seller.status === "Inactive" && styles.rowBlocked]}>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[styles.tableCell, { flex: 2.2, flexDirection: "row", alignItems: "center" }]}
-                      onPress={() => openSellerDetail(seller.id, seller.status)}
-                    >
-                      {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
-                      <View style={styles.sellerMeta}>
-                        <Text style={styles.sellerName}>{seller.name}</Text>
-                        <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
-                      </View>
-                    </TouchableOpacity>
-                    <Text style={[styles.tableCellTextBold, { flex: 2 }]}>{seller.businessName}</Text>
-                    <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
-                    <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
-                    <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      {formatRupee(seller.walletBalance)}
-                    </Text>
-                    <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>{seller.joinDate}</Text>
-                    <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
-                      {formatRupee(seller.revenue)}
-                    </Text>
-                    <View style={[styles.tableCellActions, { flex: 1.6 }]}>
+                    {paginatedSellers.map((seller) => (
+                      <View key={seller.id} style={[styles.tableRow, seller.status === "Inactive" && styles.rowBlocked]}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          style={[styles.tableCell, styles.colSeller, { flexDirection: "row", alignItems: "center" }]}
+                          onPress={() => openSellerDetail(seller.id, seller.status)}
+                        >
+                          {(seller.avatar && typeof seller.avatar === 'string' && seller.avatar.trim() !== '' && seller.avatar !== 'null' && seller.avatar !== 'N/A' && seller.avatar !== 'undefined') ? (<Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />) : (<View style={[styles.sellerAvatar, { backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}><Feather name="user" size={16} color="#9CA3AF" /></View>)}
+                          <View style={styles.sellerMeta}>
+                            <Text style={styles.sellerName} numberOfLines={1}>{seller.name}</Text>
+                            <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
+                          </View>
+                        </TouchableOpacity>
+                        <Text style={[styles.tableCellTextBold, styles.colBusiness]} numberOfLines={1}>{seller.businessName}</Text>
+                        <Text style={[styles.tableCellText, styles.colType]} numberOfLines={1}>{seller.businessType}</Text>
+                        <Text style={[styles.tableCellText, styles.colProducts, { textAlign: "center" }]} numberOfLines={1}>{seller.products}</Text>
+                        <Text style={[styles.tableCellCurrency, styles.colWallet, { textAlign: "right" }]} numberOfLines={1}>
+                          {formatRupee(seller.walletBalance)}
+                        </Text>
+                        <Text style={[styles.tableCellText, styles.colJoin, { textAlign: "center" }]} numberOfLines={1}>{seller.joinDate}</Text>
+                        <Text style={[styles.tableCellCurrency, styles.colRevenue, { textAlign: "right" }]} numberOfLines={1}>
+                          {formatRupee(seller.revenue)}
+                        </Text>
+                        <View style={[styles.tableCellActions, styles.colAction]}>
                       <TouchableOpacity
                         style={styles.actionEyeBtn}
                         onPress={() => openSellerDetail(seller.id, seller.status)}
@@ -4569,7 +4569,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#4B5563",
+    minWidth: 0,
   },
+  colSeller: { flex: 2.2, minWidth: 180, paddingHorizontal: 6 },
+  colBusiness: { flex: 2, minWidth: 160, paddingHorizontal: 6 },
+  colType: { flex: 1.8, minWidth: 140, paddingHorizontal: 6 },
+  colProducts: { flex: 0.8, minWidth: 80, paddingHorizontal: 6 },
+  colWallet: { flex: 1.2, minWidth: 110, paddingHorizontal: 6 },
+  colJoin: { flex: 1.2, minWidth: 100, paddingHorizontal: 6 },
+  colRevenue: { flex: 1.2, minWidth: 110, paddingHorizontal: 6 },
+  colAction: { flex: 1.6, minWidth: 150, paddingHorizontal: 6, flexShrink: 0 },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4584,29 +4593,35 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     justifyContent: "center",
+    minWidth: 0,
   },
   tableCellText: {
     fontSize: 13,
     color: "#374151",
+    minWidth: 0,
   },
   tableCellTextBold: {
     fontSize: 13,
     fontWeight: "600",
     color: "#1E293B",
+    minWidth: 0,
   },
   tableCellCurrency: {
     fontSize: 13,
     fontWeight: "600",
     color: "#D97706",
+    minWidth: 0,
   },
   sellerAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
     marginRight: 12,
+    flexShrink: 0,
   },
   sellerMeta: {
     flex: 1,
+    minWidth: 0,
     justifyContent: "center",
   },
   sellerName: {
@@ -4624,6 +4639,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 6,
+    flexShrink: 0,
   },
   actionEyeBtn: {
     width: 28,
