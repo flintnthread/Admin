@@ -1,47 +1,45 @@
-﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+﻿import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
+import SellerDocumentImage from "@/components/SellerDocumentImage";
+import { useAuth } from "@/context/auth-context";
+import { useThemeContext } from "@/context/theme-context";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { resolveSellerDocumentImageUrl, isPdfMedia } from "@/lib/api/media";
+import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
+import { blurActiveElementOnWeb } from "@/lib/focus";
+import { formatRupee, maskAccount } from "@/lib/format";
+import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
+import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import {
-  View,
+  approveSellerProfile,
+  blockSeller,
+  fetchApprovedSellerLocationStats,
+  fetchApprovedSellers,
+  fetchPendingProfileDetail,
+  fetchPendingProfileSellers,
+  fetchSellerDetail,
+  rejectSellerProfile,
+  unblockSeller,
+  updateSellerStatus,
+} from "@/services/sellerApi";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Image,
   useWindowDimensions,
-  Alert,
-  Modal,
-  ActivityIndicator,
-  Platform,
-  SafeAreaView,
-  Linking,
-  Share,
+  View
 } from "react-native";
-import { Feather, Ionicons } from "@expo/vector-icons";
-import AdminLayout from "@/components/admin-layout";
-import { router, useLocalSearchParams } from "expo-router";
-import Pagination from "@/components/Pagination";
-import { useAuth } from "@/context/auth-context";
-import { useThemeContext } from "@/context/theme-context";
-import {
-  fetchApprovedSellers,
-  fetchApprovedSellerLocationStats,
-  blockSeller,
-  unblockSeller,
-  fetchSellerDetail,
-  updateSellerStatus,
-  fetchPendingProfileSellers,
-  fetchPendingProfileDetail,
-  approveSellerProfile,
-  rejectSellerProfile,
-} from "@/services/sellerApi";
-import { blurActiveElementOnWeb } from "@/lib/focus";
-import { mapPendingProfileRow, mapSellerDetailToApprovedRow, mapSellerDetailView, mapSellerToApprovedRow, sellerKycBadgeColor, type ApprovedSellerRow, type SellerDetailView } from "@/lib/mappers";
-import { buildApprovedSellersCsv } from "@/lib/exportApprovedSellersCsv";
-import { sweetConfirm, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { resolveSellerDocumentImageUrl, isPdfMedia, resolveSellerProfileImage } from "@/lib/api/media";
-import { formatRupee, maskAccount } from "@/lib/format";
-import SellerDocumentImage from "@/components/SellerDocumentImage";
 import SellerMediaImage from "@/components/SellerMediaImage";
 
 type Seller = ApprovedSellerRow;
@@ -131,7 +129,7 @@ export default function ApprovedSellersScreen() {
   const [deleteReason, setDeleteReason] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   // --- DOCUMENT PREVIEW STATE ---
-  const [previewDoc, setPreviewDoc] = useState<{name: string, url: string, path?: string | null} | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ name: string; path?: string | null; url: string } | null>(null);
 
   // --- TOAST SYSTEM STATE & HELPERS ---
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
@@ -330,10 +328,10 @@ export default function ApprovedSellersScreen() {
 
   const formatCompactRupee = (value: number) => {
     if (value >= 10000000) {
-      return `?${(value / 10000000).toFixed(2)}Cr`;
+      return `₹${(value / 10000000).toFixed(2)}Cr`;
     }
     if (value >= 100000) {
-      return `?${(value / 100000).toFixed(2)}L`;
+      return `₹${(value / 100000).toFixed(2)}L`;
     }
     return formatRupee(value);
   };
@@ -369,7 +367,7 @@ export default function ApprovedSellersScreen() {
     setAppliedMMinWallet("");
     setAppliedMMaxWallet("");
     setAppliedMJoinDateRange("All");
-    
+
     setMobileFilterVisible(false);
     setCurrentPage(1);
     showToast("Filters reset successfully!", "success");
@@ -436,7 +434,7 @@ export default function ApprovedSellersScreen() {
           {/* Header */}
           <View style={stylesMobile.detailsHeader}>
             <View style={stylesMobile.detailsHeaderRow}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={stylesMobile.detailsHeaderBack}
                 onPress={() => setMobileShowAdminActions(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -448,7 +446,7 @@ export default function ApprovedSellersScreen() {
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }}
             showsVerticalScrollIndicator={false}
@@ -547,7 +545,7 @@ export default function ApprovedSellersScreen() {
 
           {/* Sticky Bottom Actions */}
           <View style={stylesMobile.stickyBottomBarTwo}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.stickyBottomBtnBig, { backgroundColor: "#78350F" }]}
               onPress={async () => {
                 await handleSaveMobileEdit();
@@ -558,7 +556,7 @@ export default function ApprovedSellersScreen() {
               <Text style={stylesMobile.stickyBottomBtnBigText}>Update Status</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.stickyBottomBtnBig, { backgroundColor: "#1E293B" }]}
               onPress={() => setMobileShowAdminActions(false)}
             >
@@ -577,7 +575,7 @@ export default function ApprovedSellersScreen() {
           <TouchableOpacity onPress={() => setMobileMenuOpen(true)}>
             <Feather name="menu" size={22} color="#1E293B" />
           </TouchableOpacity>
-          
+
           <View style={stylesMobile.topBarSearchContainer}>
             <Feather name="search" size={16} color="#64748B" style={{ marginRight: 6 }} />
             <TextInput
@@ -636,32 +634,28 @@ export default function ApprovedSellersScreen() {
         </View>
         <Text style={stylesMobile.detailsHeaderSub}>ID: FNT-SELLER-0000{seller.id}</Text>
 
-        <ScrollView 
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
           showsVerticalScrollIndicator={false}
         >
           {/* 1. Seller Profile Header Card */}
           <View style={stylesMobile.detailsProfileCard}>
-            {(() => {
-              return (
-                <SellerMediaImage
-                  seller={{
-                    profilePicUrl: sellerDetail?.profilePicUrl,
-                    profilePicPath: sellerDetail?.profilePicPath,
-                    liveSelfiePath: sellerDetail?.liveSelfiePath,
-                    avatar: seller.avatar,
-                    name: seller.name,
-                  }}
-                  size={88}
-                  style={stylesMobile.detailsLargeAvatar}
-                  borderRadius={44}
-                />
-              );
-            })()}
+            <SellerMediaImage
+              seller={{
+                profilePicUrl: sellerDetail?.profilePicUrl,
+                profilePicPath: sellerDetail?.profilePicPath,
+                liveSelfiePath: sellerDetail?.liveSelfiePath,
+                avatar: seller.avatar,
+                name: seller.name,
+              }}
+              size={88}
+              style={stylesMobile.detailsLargeAvatar}
+              borderRadius={44}
+            />
             <Text style={stylesMobile.detailsProfileName}>{seller.name}</Text>
             <Text style={stylesMobile.detailsProfileBusiness}>{seller.businessName}</Text>
-            
+
             <View style={[stylesMobile.typeBadgeDetail, seller.businessType === "Partnership" ? stylesMobile.badgePurple : stylesMobile.badgeBlue]}>
               <Text style={[stylesMobile.typeBadgeText, seller.businessType === "Partnership" ? stylesMobile.badgeTextPurple : stylesMobile.badgeTextBlue]}>
                 {seller.businessType || "Unknown"}
@@ -671,7 +665,7 @@ export default function ApprovedSellersScreen() {
 
           {/* 2. Quick Actions (Placed directly below Seller Profile) */}
           <View style={stylesMobile.quickActionsCardMobile}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.quickActionBtnMobile, { backgroundColor: "#FFF7ED", borderColor: "#FFEDD5", borderWidth: 1 }]}
               onPress={() => {
                 setMEditStatus(seller.status);
@@ -686,7 +680,7 @@ export default function ApprovedSellersScreen() {
               <Text style={[stylesMobile.quickActionBtnTextMobile, { color: "#EA580C" }]}>Update Status</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.quickActionBtnMobile, { backgroundColor: "#EFF6FF", borderColor: "#DBEAFE", borderWidth: 1 }]}
               onPress={() => {
                 setMessageSeller(seller);
@@ -699,7 +693,7 @@ export default function ApprovedSellersScreen() {
               <Text style={[stylesMobile.quickActionBtnTextMobile, { color: "#3B82F6" }]}>Message</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.quickActionBtnMobile, { backgroundColor: "#ECFDF5", borderColor: "#D1FAE5", borderWidth: 1 }]}
               onPress={() => seller.mobile ? Linking.openURL(`tel:${seller.mobile}`) : undefined}
             >
@@ -808,7 +802,11 @@ export default function ApprovedSellersScreen() {
                     <TouchableOpacity
                       style={stylesMobile.docRedesignedViewBtn}
                       onPress={() =>
-                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
+                        setPreviewDoc({
+                          name: doc.name,
+                          path: doc.path,
+                          url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                        })
                       }
                     >
                       <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -824,7 +822,11 @@ export default function ApprovedSellersScreen() {
                   <TouchableOpacity
                     key={`${doc.name}-${doc.url}-${idx}`}
                     onPress={() =>
-                      setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
+                      setPreviewDoc({
+                        name: doc.name,
+                        path: doc.path,
+                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                      })
                     }
                   >
                     <SellerDocumentImage
@@ -844,7 +846,11 @@ export default function ApprovedSellersScreen() {
                     key={`${doc.name}-${doc.url}-${idx}`}
                     style={stylesMobile.selfieThumbWrapperMobile}
                     onPress={() =>
-                      setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
+                      setPreviewDoc({
+                        name: doc.name,
+                        path: doc.path,
+                        url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                      })
                     }
                   >
                     <SellerDocumentImage
@@ -1140,9 +1146,9 @@ export default function ApprovedSellersScreen() {
             animationType="fade"
             onRequestClose={() => setMobileMenuOpen(false)}
           >
-            <TouchableOpacity 
-              style={stylesMobile.drawerOverlay} 
-              activeOpacity={1} 
+            <TouchableOpacity
+              style={stylesMobile.drawerOverlay}
+              activeOpacity={1}
               onPress={() => setMobileMenuOpen(false)}
             >
               <View style={stylesMobile.drawerPanel}>
@@ -1153,42 +1159,42 @@ export default function ApprovedSellersScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={stylesMobile.drawerContent}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={stylesMobile.drawerItem}
                     onPress={() => { setMobileMenuOpen(false); router.push("/Dashboard"); }}
                   >
                     <Feather name="home" size={18} color="#64748B" style={{ marginRight: 12 }} />
                     <Text style={stylesMobile.drawerItemText}>Dashboard</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={stylesMobile.drawerItem}
                     onPress={() => { setMobileMenuOpen(false); router.push("/Products"); }}
                   >
                     <Feather name="box" size={18} color="#64748B" style={{ marginRight: 12 }} />
                     <Text style={stylesMobile.drawerItemText}>Catalog</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[stylesMobile.drawerItem, { backgroundColor: "#FFF7ED" }]}
                     onPress={() => { setMobileMenuOpen(false); router.push("/approveseller"); }}
                   >
                     <Feather name="users" size={18} color="#EA580C" style={{ marginRight: 12 }} />
                     <Text style={[stylesMobile.drawerItemText, { color: "#EA580C", fontWeight: "600" }]}>Sellers</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={stylesMobile.drawerItem}
                     onPress={() => { setMobileMenuOpen(false); router.push("/sellergraphs"); }}
                   >
                     <Feather name="bar-chart-2" size={18} color="#64748B" style={{ marginRight: 12 }} />
                     <Text style={stylesMobile.drawerItemText}>Analytics</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={stylesMobile.drawerItem}
                     onPress={() => { setMobileMenuOpen(false); router.push("/adminpanel"); }}
                   >
                     <Feather name="settings" size={18} color="#64748B" style={{ marginRight: 12 }} />
                     <Text style={stylesMobile.drawerItemText}>Settings</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={stylesMobile.drawerItem}
                     onPress={() => { setMobileMenuOpen(false); router.push("/profile"); }}
                   >
@@ -1213,7 +1219,7 @@ export default function ApprovedSellersScreen() {
         onRequestClose={() => setMobileFilterVisible(false)}
       >
         <View style={stylesMobile.filterOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ flex: 1 }}
             activeOpacity={1}
             onPress={() => setMobileFilterVisible(false)}
@@ -1230,13 +1236,13 @@ export default function ApprovedSellersScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
+            <ScrollView
               style={stylesMobile.filterBody}
               showsVerticalScrollIndicator={false}
             >
               {/* Business Type */}
               <Text style={stylesMobile.filterLabel}>Business Type</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={stylesMobile.filterSelectBox}
                 onPress={() => {
                   setMShowBusinessTypeDropdown(!mShowBusinessTypeDropdown);
@@ -1267,7 +1273,7 @@ export default function ApprovedSellersScreen() {
 
               {/* State */}
               <Text style={stylesMobile.filterLabel}>State</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={stylesMobile.filterSelectBox}
                 onPress={() => {
                   setMShowStateDropdown(!mShowStateDropdown);
@@ -1298,7 +1304,7 @@ export default function ApprovedSellersScreen() {
 
               {/* City */}
               <Text style={stylesMobile.filterLabel}>City</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={stylesMobile.filterSelectBox}
                 onPress={() => {
                   setMShowCityDropdown(!mShowCityDropdown);
@@ -1329,7 +1335,7 @@ export default function ApprovedSellersScreen() {
 
               {/* Join Date */}
               <Text style={stylesMobile.filterLabel}>Join Date</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={stylesMobile.filterSelectBox}
                 onPress={() => {
                   setMShowDateDropdown(!mShowDateDropdown);
@@ -1408,7 +1414,7 @@ export default function ApprovedSellersScreen() {
             </ScrollView>
 
             {/* Bottom Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={stylesMobile.filterApplyBtn}
               onPress={handleApplyMobileFilters}
             >
@@ -1432,7 +1438,7 @@ export default function ApprovedSellersScreen() {
         onRequestClose={() => setMobileEditModalVisible(false)}
       >
         <View style={stylesMobile.filterOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ flex: 1 }}
             activeOpacity={1}
             onPress={() => setMobileEditModalVisible(false)}
@@ -1449,7 +1455,7 @@ export default function ApprovedSellersScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
+            <ScrollView
               style={stylesMobile.filterBody}
               showsVerticalScrollIndicator={false}
             >
@@ -1515,7 +1521,7 @@ export default function ApprovedSellersScreen() {
             </ScrollView>
 
             {/* Save Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={stylesMobile.filterApplyBtn}
               onPress={handleSaveMobileEdit}
             >
@@ -1536,7 +1542,7 @@ export default function ApprovedSellersScreen() {
         onRequestClose={() => setShowAllStatesModal(false)}
       >
         <View style={stylesMobile.filterOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ flex: 1 }}
             activeOpacity={1}
             onPress={() => setShowAllStatesModal(false)}
@@ -1565,7 +1571,7 @@ export default function ApprovedSellersScreen() {
                 <Text style={stylesMobile.emptyInsightsText}>No state data available</Text>
               )}
             </ScrollView>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.filterApplyBtn, { marginTop: 16 }]}
               onPress={() => setShowAllStatesModal(false)}
             >
@@ -1586,7 +1592,7 @@ export default function ApprovedSellersScreen() {
         onRequestClose={() => setShowAllCitiesModal(false)}
       >
         <View style={stylesMobile.filterOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ flex: 1 }}
             activeOpacity={1}
             onPress={() => setShowAllCitiesModal(false)}
@@ -1615,7 +1621,7 @@ export default function ApprovedSellersScreen() {
                 <Text style={stylesMobile.emptyInsightsText}>No city data available</Text>
               )}
             </ScrollView>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[stylesMobile.filterApplyBtn, { marginTop: 16 }]}
               onPress={() => setShowAllCitiesModal(false)}
             >
@@ -1651,600 +1657,600 @@ export default function ApprovedSellersScreen() {
           </View>
 
           {/* --- SCROLLABLE BODY --- */}
-          <ScrollView 
+          <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: 0 }}
             showsVerticalScrollIndicator={false}
           >
-          {/* --- BREADCRUMB BANNER --- */}
-          <View style={stylesMobile.pageBannerCard}>
-            <Text style={stylesMobile.pageBannerTitle}>Approved Sellers</Text>
-            <Text style={stylesMobile.pageBannerSubtitle}>Manage and monitor verified merchant accounts</Text>
+            {/* --- BREADCRUMB BANNER --- */}
+            <View style={stylesMobile.pageBannerCard}>
+              <Text style={stylesMobile.pageBannerTitle}>Approved Sellers</Text>
+              <Text style={stylesMobile.pageBannerSubtitle}>Manage and monitor verified merchant accounts</Text>
 
-          </View>
-
-          <View style={stylesMobile.actionButtonsRow}>
-            <TouchableOpacity 
-              style={stylesMobile.actionOutlineBtn}
-              onPress={() => setMobileFilterVisible(true)}
-            >
-              <Feather name="filter" size={16} color="#EA580C" />
-              <Text style={stylesMobile.actionOutlineBtnText}>Filter</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[stylesMobile.actionOutlineBtn, exportLoading && { opacity: 0.6 }]}
-              onPress={() => void handleExportCSV()}
-              disabled={exportLoading}
-            >
-              {exportLoading ? (
-                <ActivityIndicator size="small" color="#EA580C" />
-              ) : (
-                <Feather name="download" size={16} color="#EA580C" />
-              )}
-              <Text style={stylesMobile.actionOutlineBtnText}>{exportLoading ? "Exporting..." : "Export CSV"}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* --- QUICK STATS --- */}
-          <View style={stylesMobile.sectionTitleRow}>
-            <Text style={stylesMobile.sectionTitle}>Quick Stats</Text>
-          </View>
-          <View style={stylesMobile.statsGrid}>
-            <View style={stylesMobile.statCard}>
-              <View style={[stylesMobile.statIconContainer, { backgroundColor: "#F5F3FF" }]}>
-                <Feather name="users" size={18} color="#8B5CF6" />
-              </View>
-              <View style={stylesMobile.statInfo}>
-                <Text style={stylesMobile.statValue}>{mobileStats.totalSellers}</Text>
-                <Text style={stylesMobile.statLabel}>Total Sellers</Text>
-              </View>
             </View>
-            <View style={stylesMobile.statCard}>
-              <View style={[stylesMobile.statIconContainer, { backgroundColor: "#ECFDF5" }]}>
-                <Feather name="trending-up" size={18} color="#10B981" />
-              </View>
-              <View style={stylesMobile.statInfo}>
-                <Text style={stylesMobile.statValue}>{formatCompactRupee(mobileStats.totalRevenue)}</Text>
-                <Text style={stylesMobile.statLabel}>Total Revenue</Text>
-              </View>
-            </View>
-            <View style={stylesMobile.statCard}>
-              <View style={[stylesMobile.statIconContainer, { backgroundColor: "#EFF6FF" }]}>
-                <Feather name="package" size={18} color="#3B82F6" />
-              </View>
-              <View style={stylesMobile.statInfo}>
-                <Text style={stylesMobile.statValue}>{mobileStats.totalProducts}</Text>
-                <Text style={stylesMobile.statLabel}>Total Products</Text>
-              </View>
-            </View>
-            <View style={stylesMobile.statCard}>
-              <View style={[stylesMobile.statIconContainer, { backgroundColor: "#FFF7ED" }]}>
-                <Feather name="credit-card" size={18} color="#F97316" />
-              </View>
-              <View style={stylesMobile.statInfo}>
-                <Text style={stylesMobile.statValue}>{formatRupee(mobileStats.totalWallet)}</Text>
-                <Text style={stylesMobile.statLabel}>Total Balance</Text>
-              </View>
-            </View>
-          </View>
 
-          {/* --- INSIGHTS --- */}
-          <View style={stylesMobile.sectionTitleRow}>
-            <Text style={stylesMobile.sectionTitle}>Insights</Text>
-          </View>
-
-          <View style={stylesMobile.insightsContainer}>
-            <View style={stylesMobile.insightsSubHeaderRow}>
-              <Text style={stylesMobile.insightsSubTitle}>State-wise Sellers</Text>
-              <TouchableOpacity 
-                onPress={() => setShowAllStatesModal(true)}
-                style={{ paddingVertical: 6, paddingHorizontal: 12, marginRight: -12 }}
+            <View style={stylesMobile.actionButtonsRow}>
+              <TouchableOpacity
+                style={stylesMobile.actionOutlineBtn}
+                onPress={() => setMobileFilterVisible(true)}
               >
-                <Text style={stylesMobile.insightsViewAll}>View All</Text>
+                <Feather name="filter" size={16} color="#EA580C" />
+                <Text style={stylesMobile.actionOutlineBtnText}>Filter</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[stylesMobile.actionOutlineBtn, exportLoading && { opacity: 0.6 }]}
+                onPress={() => void handleExportCSV()}
+                disabled={exportLoading}
+              >
+                {exportLoading ? (
+                  <ActivityIndicator size="small" color="#EA580C" />
+                ) : (
+                  <Feather name="download" size={16} color="#EA580C" />
+                )}
+                <Text style={stylesMobile.actionOutlineBtnText}>{exportLoading ? "Exporting..." : "Export CSV"}</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={stylesMobile.insightsScroll}
-            >
-              {stateCounts.map((item, idx) => {
-                const colorIdx = idx % bgColors.length;
-                return (
-                  <View key={item.name} style={stylesMobile.insightCard}>
-                    <View style={[stylesMobile.insightIconBox, { backgroundColor: bgColors[colorIdx] }]}>
-                      <Feather name="map-pin" size={16} color={iconColors[colorIdx]} />
-                    </View>
-                    <Text style={stylesMobile.insightCardName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={stylesMobile.insightCardCount}>{item.count} Sellers</Text>
-                  </View>
-                );
-              })}
-              {stateCounts.length === 0 && (
-                <Text style={stylesMobile.emptyInsightsText}>No state data available</Text>
-              )}
-            </ScrollView>
 
-            <View style={[stylesMobile.insightsSubHeaderRow, { marginTop: 16 }]}>
-              <Text style={stylesMobile.insightsSubTitle}>City-wise Sellers</Text>
-              <TouchableOpacity 
-                onPress={() => setShowAllCitiesModal(true)}
-                style={{ paddingVertical: 6, paddingHorizontal: 12, marginRight: -12 }}
-              >
-                <Text style={stylesMobile.insightsViewAll}>View All</Text>
-              </TouchableOpacity>
+            {/* --- QUICK STATS --- */}
+            <View style={stylesMobile.sectionTitleRow}>
+              <Text style={stylesMobile.sectionTitle}>Quick Stats</Text>
             </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={stylesMobile.insightsScroll}
-            >
-              {cityCounts.map((item, idx) => {
-                const colorIdx = (idx + 2) % bgColors.length;
-                return (
-                  <View key={item.name} style={stylesMobile.insightCard}>
-                    <View style={[stylesMobile.insightIconBox, { backgroundColor: bgColors[colorIdx] }]}>
-                      <Feather name="navigation" size={16} color={iconColors[colorIdx]} />
-                    </View>
-                    <Text style={stylesMobile.insightCardName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={stylesMobile.insightCardCount}>{item.count} Sellers</Text>
-                  </View>
-                );
-              })}
-              {cityCounts.length === 0 && (
-                <Text style={stylesMobile.emptyInsightsText}>No city data available</Text>
-              )}
-            </ScrollView>
-          </View>
+            <View style={stylesMobile.statsGrid}>
+              <View style={stylesMobile.statCard}>
+                <View style={[stylesMobile.statIconContainer, { backgroundColor: "#F5F3FF" }]}>
+                  <Feather name="users" size={18} color="#8B5CF6" />
+                </View>
+                <View style={stylesMobile.statInfo}>
+                  <Text style={stylesMobile.statValue}>{mobileStats.totalSellers}</Text>
+                  <Text style={stylesMobile.statLabel}>Total Sellers</Text>
+                </View>
+              </View>
+              <View style={stylesMobile.statCard}>
+                <View style={[stylesMobile.statIconContainer, { backgroundColor: "#ECFDF5" }]}>
+                  <Feather name="trending-up" size={18} color="#10B981" />
+                </View>
+                <View style={stylesMobile.statInfo}>
+                  <Text style={stylesMobile.statValue}>{formatCompactRupee(mobileStats.totalRevenue)}</Text>
+                  <Text style={stylesMobile.statLabel}>Total Revenue</Text>
+                </View>
+              </View>
+              <View style={stylesMobile.statCard}>
+                <View style={[stylesMobile.statIconContainer, { backgroundColor: "#EFF6FF" }]}>
+                  <Feather name="package" size={18} color="#3B82F6" />
+                </View>
+                <View style={stylesMobile.statInfo}>
+                  <Text style={stylesMobile.statValue}>{mobileStats.totalProducts}</Text>
+                  <Text style={stylesMobile.statLabel}>Total Products</Text>
+                </View>
+              </View>
+              <View style={stylesMobile.statCard}>
+                <View style={[stylesMobile.statIconContainer, { backgroundColor: "#FFF7ED" }]}>
+                  <Feather name="credit-card" size={18} color="#F97316" />
+                </View>
+                <View style={stylesMobile.statInfo}>
+                  <Text style={stylesMobile.statValue}>{formatRupee(mobileStats.totalWallet)}</Text>
+                  <Text style={stylesMobile.statLabel}>Total Balance</Text>
+                </View>
+              </View>
+            </View>
 
-          {/* --- SELLER LIST --- */}
-          <View style={stylesMobile.sectionTitleRow}>
-            <Text style={stylesMobile.sectionTitle}>Seller List</Text>
-            <TouchableOpacity 
-              style={stylesMobile.sortButtonRow}
-              onPress={() => setShowSortDropdown(!showSortDropdown)}
-            >
-              <Feather name="menu" size={14} color="#EA580C" />
-              <Text style={stylesMobile.sortButtonRowText}>Sort: {sortBy}</Text>
-            </TouchableOpacity>
-          </View>
+            {/* --- INSIGHTS --- */}
+            <View style={stylesMobile.sectionTitleRow}>
+              <Text style={stylesMobile.sectionTitle}>Insights</Text>
+            </View>
 
-          {/* Sort Dropdown overlay for mobile */}
-          {showSortDropdown && (
-            <View style={stylesMobile.mobileSortMenu}>
-              {["Name", "Revenue", "Join Date", "Products"].map((opt) => (
+            <View style={stylesMobile.insightsContainer}>
+              <View style={stylesMobile.insightsSubHeaderRow}>
+                <Text style={stylesMobile.insightsSubTitle}>State-wise Sellers</Text>
                 <TouchableOpacity
-                  key={opt}
-                  style={stylesMobile.mobileSortMenuItem}
-                  onPress={() => {
-                    setSortBy(opt);
-                    setShowSortDropdown(false);
-                  }}
+                  onPress={() => setShowAllStatesModal(true)}
+                  style={{ paddingVertical: 6, paddingHorizontal: 12, marginRight: -12 }}
                 >
-                  <Text style={[stylesMobile.mobileSortMenuText, sortBy === opt && stylesMobile.mobileSortMenuTextActive]}>
-                    {opt}
-                  </Text>
-                  {sortBy === opt && <Feather name="check" size={14} color="#EA580C" />}
+                  <Text style={stylesMobile.insightsViewAll}>View All</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          <View style={stylesMobile.sellerListContainer}>
-            {mobilePaginatedSellers.map((seller) => (
-              <View 
-                key={seller.id} 
-                style={[stylesMobile.sellerCard, seller.status === "Inactive" && stylesMobile.sellerCardBlocked]}
-              >
-                <View style={stylesMobile.sellerCardHeader}>
-                  <TouchableOpacity
-                    style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-                    onPress={() => {
-                      openSellerDetail(seller.id, seller.status);
-                    }}
-                  >
-                    <SellerMediaImage
-                      seller={{
-                        avatar: seller.avatar,
-                        profilePicUrl: seller.avatar,
-                        name: seller.name,
-                      }}
-                      size={40}
-                      style={stylesMobile.sellerCardAvatar}
-                    />
-                    <View style={stylesMobile.sellerCardMeta}>
-                      <Text style={stylesMobile.sellerCardName} numberOfLines={1}>{seller.name}</Text>
-                      <Text style={stylesMobile.sellerCardBusiness} numberOfLines={1}>{seller.businessName}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <View style={[
-                    stylesMobile.typeBadge,
-                    seller.businessType === "Partnership" ? stylesMobile.badgePurple : stylesMobile.badgeBlue
-                  ]}>
-                    <Text style={[
-                      stylesMobile.typeBadgeText,
-                      seller.businessType === "Partnership" ? stylesMobile.badgeTextPurple : stylesMobile.badgeTextBlue
-                    ]}>
-                      {seller.businessType || "Unknown"}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Stats */}
-                <View style={stylesMobile.sellerCardStatsRow}>
-                  <View style={stylesMobile.sellerCardStatItem}>
-                    <Text style={stylesMobile.sellerCardStatVal}>{seller.products}</Text>
-                    <Text style={stylesMobile.sellerCardStatLabel}>Products</Text>
-                  </View>
-                  <View style={stylesMobile.sellerCardStatItem}>
-                    <Text style={stylesMobile.sellerCardStatVal}>{formatRupee(seller.revenue)}</Text>
-                    <Text style={stylesMobile.sellerCardStatLabel}>Revenue</Text>
-                  </View>
-                  <View style={stylesMobile.sellerCardStatItem}>
-                    <Text style={stylesMobile.sellerCardStatVal}>{formatRupee(seller.walletBalance)}</Text>
-                    <Text style={stylesMobile.sellerCardStatLabel}>Wallet</Text>
-                  </View>
-                  <View style={stylesMobile.sellerCardStatItem}>
-                    <Text style={stylesMobile.sellerCardStatVal} numberOfLines={1}>{seller.joinDate}</Text>
-                    <Text style={stylesMobile.sellerCardStatLabel}>Joined</Text>
-                  </View>
-                </View>
-
-                {/* Action Buttons */}
-                <View style={stylesMobile.sellerCardActions}>
-                  <TouchableOpacity
-                    style={[stylesMobile.circleActionBtn, { backgroundColor: "#EFF6FF" }]}
-                    onPress={() => {
-                      openSellerDetail(seller.id, seller.status);
-                    }}
-                  >
-                    <Feather name="eye" size={15} color="#3B82F6" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[stylesMobile.circleActionBtn, { backgroundColor: "#FFF7ED" }]}
-                    onPress={() => {
-                      setMessageSeller(seller);
-                      setMessageModalVisible(true);
-                    }}
-                  >
-                    <Feather name="message-square" size={15} color="#EA580C" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[stylesMobile.circleActionBtn, { backgroundColor: "#ECFDF5" }]}
-                    onPress={() => {
-                      Linking.openURL(seller.mobile ? `tel:${seller.mobile}` : 'tel:');
-                    }}
-                  >
-                    <Feather name="phone" size={15} color="#10B981" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[stylesMobile.circleActionBtn, { backgroundColor: "#FEF2F2" }]}
-                    onPress={() => {
-                      setDeleteSeller(seller);
-                      setDeleteReason("");
-                      setDeleteModalVisible(true);
-                    }}
-                  >
-                    <Feather name="trash-2" size={15} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
               </View>
-            ))}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={stylesMobile.insightsScroll}
+              >
+                {stateCounts.map((item, idx) => {
+                  const colorIdx = idx % bgColors.length;
+                  return (
+                    <View key={item.name} style={stylesMobile.insightCard}>
+                      <View style={[stylesMobile.insightIconBox, { backgroundColor: bgColors[colorIdx] }]}>
+                        <Feather name="map-pin" size={16} color={iconColors[colorIdx]} />
+                      </View>
+                      <Text style={stylesMobile.insightCardName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={stylesMobile.insightCardCount}>{item.count} Sellers</Text>
+                    </View>
+                  );
+                })}
+                {stateCounts.length === 0 && (
+                  <Text style={stylesMobile.emptyInsightsText}>No state data available</Text>
+                )}
+              </ScrollView>
 
-            {mobileFilteredSellers.length === 0 && (
-              <View style={stylesMobile.emptyListContainer}>
-                <Feather name="alert-circle" size={40} color="#94A3B8" />
-                <Text style={stylesMobile.emptyListText}>No approved sellers found</Text>
+              <View style={[stylesMobile.insightsSubHeaderRow, { marginTop: 16 }]}>
+                <Text style={stylesMobile.insightsSubTitle}>City-wise Sellers</Text>
+                <TouchableOpacity
+                  onPress={() => setShowAllCitiesModal(true)}
+                  style={{ paddingVertical: 6, paddingHorizontal: 12, marginRight: -12 }}
+                >
+                  <Text style={stylesMobile.insightsViewAll}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={stylesMobile.insightsScroll}
+              >
+                {cityCounts.map((item, idx) => {
+                  const colorIdx = (idx + 2) % bgColors.length;
+                  return (
+                    <View key={item.name} style={stylesMobile.insightCard}>
+                      <View style={[stylesMobile.insightIconBox, { backgroundColor: bgColors[colorIdx] }]}>
+                        <Feather name="navigation" size={16} color={iconColors[colorIdx]} />
+                      </View>
+                      <Text style={stylesMobile.insightCardName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={stylesMobile.insightCardCount}>{item.count} Sellers</Text>
+                    </View>
+                  );
+                })}
+                {cityCounts.length === 0 && (
+                  <Text style={stylesMobile.emptyInsightsText}>No city data available</Text>
+                )}
+              </ScrollView>
+            </View>
+
+            {/* --- SELLER LIST --- */}
+            <View style={stylesMobile.sectionTitleRow}>
+              <Text style={stylesMobile.sectionTitle}>Seller List</Text>
+              <TouchableOpacity
+                style={stylesMobile.sortButtonRow}
+                onPress={() => setShowSortDropdown(!showSortDropdown)}
+              >
+                <Feather name="menu" size={14} color="#EA580C" />
+                <Text style={stylesMobile.sortButtonRowText}>Sort: {sortBy}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Sort Dropdown overlay for mobile */}
+            {showSortDropdown && (
+              <View style={stylesMobile.mobileSortMenu}>
+                {["Name", "Revenue", "Join Date", "Products"].map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={stylesMobile.mobileSortMenuItem}
+                    onPress={() => {
+                      setSortBy(opt);
+                      setShowSortDropdown(false);
+                    }}
+                  >
+                    <Text style={[stylesMobile.mobileSortMenuText, sortBy === opt && stylesMobile.mobileSortMenuTextActive]}>
+                      {opt}
+                    </Text>
+                    {sortBy === opt && <Feather name="check" size={14} color="#EA580C" />}
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
-          </View>
 
-          {/* Pagination for mobile */}
-          {mobileFilteredSellers.length > 0 && (
-            <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPagesMobile}
-                totalItems={mobileFilteredSellers.length}
-                itemsPerPage={itemsPerPage}
-                itemName="approved sellers"
-                onPageChange={setCurrentPage}
-              />
-            </View>
-          )}
-        </ScrollView>
-
-        {/* FAB REMOVED */}
-
-
-
-        {/* --- FILTER BOTTOM SHEET MODAL --- */}
-        {renderMobileFilterModal()}
-
-        {/* --- MOBILE EDIT STATUS/KYC MODAL --- */}
-        {renderMobileEditModal()}
-
-        {/* --- ALL STATES INSIGHTS MODAL --- */}
-        {renderAllStatesModal()}
-
-        {/* --- ALL CITIES INSIGHTS MODAL --- */}
-        {renderAllCitiesModal()}
-
-
-
-        {/* --- DYNAMIC MODALS FOR MOBILE LIST VIEW --- */}
-        {previewDoc && (
-          <Modal
-            visible={!!previewDoc}
-            onRequestClose={() => setPreviewDoc(null)}
-            transparent
-            animationType="fade"
-          >
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalContent, { width: isLargeScreen ? '80%' : '92%', maxWidth: 800, padding: 0 }]}>
-                <View style={[styles.modalHeader, { padding: isLargeScreen ? 20 : 16 }]}>
-                  <Text style={styles.modalTitle}>{previewDoc.name} Preview</Text>
-                  <TouchableOpacity onPress={() => setPreviewDoc(null)}>
-                    <Feather name="x" size={isLargeScreen ? 24 : 20} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-                <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
-                  {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
-                    <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
-                      <Feather name="file-text" size={40} color="#64748B" />
-                      <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
-                      <TouchableOpacity
-                        style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
-                        onPress={() => {
-                          const href = previewDoc.url || previewDoc.path;
-                          if (href) void Linking.openURL(href);
+            <View style={stylesMobile.sellerListContainer}>
+              {mobilePaginatedSellers.map((seller) => (
+                <View
+                  key={seller.id}
+                  style={[stylesMobile.sellerCard, seller.status === "Inactive" && stylesMobile.sellerCardBlocked]}
+                >
+                  <View style={stylesMobile.sellerCardHeader}>
+                    <TouchableOpacity
+                      style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                      onPress={() => {
+                        openSellerDetail(seller.id, seller.status);
+                      }}
+                    >
+                      <SellerMediaImage
+                        seller={{
+                          avatar: seller.avatar,
+                          profilePicUrl: seller.avatar,
+                          name: seller.name,
                         }}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
-                      </TouchableOpacity>
+                        size={40}
+                        style={stylesMobile.sellerCardAvatar}
+                      />
+                      <View style={stylesMobile.sellerCardMeta}>
+                        <Text style={stylesMobile.sellerCardName} numberOfLines={1}>{seller.name}</Text>
+                        <Text style={stylesMobile.sellerCardBusiness} numberOfLines={1}>{seller.businessName}</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    <View style={[
+                      stylesMobile.typeBadge,
+                      seller.businessType === "Partnership" ? stylesMobile.badgePurple : stylesMobile.badgeBlue
+                    ]}>
+                      <Text style={[
+                        stylesMobile.typeBadgeText,
+                        seller.businessType === "Partnership" ? stylesMobile.badgeTextPurple : stylesMobile.badgeTextBlue
+                      ]}>
+                        {seller.businessType || "Unknown"}
+                      </Text>
                     </View>
-                  ) : (
-                    <SellerDocumentImage
-                      path={previewDoc.path}
-                      url={previewDoc.url}
-                      resizeMode="contain"
-                      style={{ width: '100%', height: '100%' }}
+                  </View>
+
+                  {/* Stats */}
+                  <View style={stylesMobile.sellerCardStatsRow}>
+                    <View style={stylesMobile.sellerCardStatItem}>
+                      <Text style={stylesMobile.sellerCardStatVal}>{seller.products}</Text>
+                      <Text style={stylesMobile.sellerCardStatLabel}>Products</Text>
+                    </View>
+                    <View style={stylesMobile.sellerCardStatItem}>
+                      <Text style={stylesMobile.sellerCardStatVal}>{formatRupee(seller.revenue)}</Text>
+                      <Text style={stylesMobile.sellerCardStatLabel}>Revenue</Text>
+                    </View>
+                    <View style={stylesMobile.sellerCardStatItem}>
+                      <Text style={stylesMobile.sellerCardStatVal}>{formatRupee(seller.walletBalance)}</Text>
+                      <Text style={stylesMobile.sellerCardStatLabel}>Wallet</Text>
+                    </View>
+                    <View style={stylesMobile.sellerCardStatItem}>
+                      <Text style={stylesMobile.sellerCardStatVal} numberOfLines={1}>{seller.joinDate}</Text>
+                      <Text style={stylesMobile.sellerCardStatLabel}>Joined</Text>
+                    </View>
+                  </View>
+
+                  {/* Action Buttons */}
+                  <View style={stylesMobile.sellerCardActions}>
+                    <TouchableOpacity
+                      style={[stylesMobile.circleActionBtn, { backgroundColor: "#EFF6FF" }]}
+                      onPress={() => {
+                        openSellerDetail(seller.id, seller.status);
+                      }}
+                    >
+                      <Feather name="eye" size={15} color="#3B82F6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[stylesMobile.circleActionBtn, { backgroundColor: "#FFF7ED" }]}
+                      onPress={() => {
+                        setMessageSeller(seller);
+                        setMessageModalVisible(true);
+                      }}
+                    >
+                      <Feather name="message-square" size={15} color="#EA580C" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[stylesMobile.circleActionBtn, { backgroundColor: "#ECFDF5" }]}
+                      onPress={() => {
+                        Linking.openURL(seller.mobile ? `tel:${seller.mobile}` : 'tel:');
+                      }}
+                    >
+                      <Feather name="phone" size={15} color="#10B981" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[stylesMobile.circleActionBtn, { backgroundColor: "#FEF2F2" }]}
+                      onPress={() => {
+                        setDeleteSeller(seller);
+                        setDeleteReason("");
+                        setDeleteModalVisible(true);
+                      }}
+                    >
+                      <Feather name="trash-2" size={15} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {mobileFilteredSellers.length === 0 && (
+                <View style={stylesMobile.emptyListContainer}>
+                  <Feather name="alert-circle" size={40} color="#94A3B8" />
+                  <Text style={stylesMobile.emptyListText}>No approved sellers found</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Pagination for mobile */}
+            {mobileFilteredSellers.length > 0 && (
+              <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPagesMobile}
+                  totalItems={mobileFilteredSellers.length}
+                  itemsPerPage={itemsPerPage}
+                  itemName="approved sellers"
+                  onPageChange={setCurrentPage}
+                />
+              </View>
+            )}
+          </ScrollView>
+
+          {/* FAB REMOVED */}
+
+
+
+          {/* --- FILTER BOTTOM SHEET MODAL --- */}
+          {renderMobileFilterModal()}
+
+          {/* --- MOBILE EDIT STATUS/KYC MODAL --- */}
+          {renderMobileEditModal()}
+
+          {/* --- ALL STATES INSIGHTS MODAL --- */}
+          {renderAllStatesModal()}
+
+          {/* --- ALL CITIES INSIGHTS MODAL --- */}
+          {renderAllCitiesModal()}
+
+
+
+          {/* --- DYNAMIC MODALS FOR MOBILE LIST VIEW --- */}
+          {previewDoc && (
+            <Modal
+              visible={!!previewDoc}
+              onRequestClose={() => setPreviewDoc(null)}
+              transparent
+              animationType="fade"
+            >
+              <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, { width: isLargeScreen ? '80%' : '92%', maxWidth: 800, padding: 0 }]}>
+                  <View style={[styles.modalHeader, { padding: isLargeScreen ? 20 : 16 }]}>
+                    <Text style={styles.modalTitle}>{previewDoc.name} Preview</Text>
+                    <TouchableOpacity onPress={() => setPreviewDoc(null)}>
+                      <Feather name="x" size={isLargeScreen ? 24 : 20} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ width: '100%', height: isLargeScreen ? 500 : 360, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden' }}>
+                    {isPdfMedia(previewDoc.path) || isPdfMedia(previewDoc.url) ? (
+                      <View style={{ alignItems: 'center', gap: 12, padding: 24 }}>
+                        <Feather name="file-text" size={40} color="#64748B" />
+                        <Text style={{ color: '#475569', textAlign: 'center' }}>PDF document</Text>
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#1E2B6B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                          onPress={() => {
+                            const href = previewDoc.url || previewDoc.path;
+                            if (href) void Linking.openURL(href);
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '700' }}>Open PDF</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <SellerDocumentImage
+                        path={previewDoc.path}
+                        url={previewDoc.url}
+                        resizeMode="contain"
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    )}
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          )}
+
+          {messageModalVisible && messageSeller && (
+            <Modal
+              visible={messageModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setMessageModalVisible(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.messageModalContent}>
+                  {/* Header */}
+                  <View style={styles.messageModalHeader}>
+                    <View style={styles.messageHeaderLeft}>
+                      <View style={styles.messageIconContainer}>
+                        <Feather name="mail" size={20} color="#EA580C" />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={styles.messageTitle}>Send Message</Text>
+                        <Text style={styles.messageSubtitle}>to {messageSeller.name}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={() => setMessageModalVisible(false)}>
+                      <Feather name="x" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Body */}
+                  <View style={styles.messageModalBody}>
+                    <Text style={styles.messageFormLabel}>Subject</Text>
+                    <TextInput
+                      style={styles.messageFormInput}
+                      placeholder="Enter message subject..."
+                      placeholderTextColor="#9CA3AF"
+                      value={messageSubject}
+                      onChangeText={setMessageSubject}
                     />
-                  )}
+
+                    <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Message</Text>
+                    <TextInput
+                      style={styles.messageFormTextArea}
+                      placeholder="Type your message here..."
+                      placeholderTextColor="#9CA3AF"
+                      value={messageBody}
+                      onChangeText={setMessageBody}
+                      multiline
+                      numberOfLines={5}
+                    />
+                  </View>
+
+                  {/* Footer */}
+                  <View style={styles.messageModalFooter}>
+                    <TouchableOpacity
+                      style={styles.messageCancelBtn}
+                      onPress={() => setMessageModalVisible(false)}
+                    >
+                      <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.messageCancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.messageSendBtn}
+                      onPress={() => {
+                        if (!messageSubject.trim() || !messageBody.trim()) {
+                          showToast("Subject and message are required", "error");
+                          return;
+                        }
+                        setMessageModalVisible(false);
+                        setMessageSubject("");
+                        setMessageBody("");
+                        showToast("Message sent successfully!", "success");
+                      }}
+                    >
+                      <Feather name="send" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.messageSendBtnText}>Send Message</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Modal>
-        )}
+            </Modal>
+          )}
 
-        {messageModalVisible && messageSeller && (
-          <Modal
-            visible={messageModalVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setMessageModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.messageModalContent}>
-                {/* Header */}
-                <View style={styles.messageModalHeader}>
-                  <View style={styles.messageHeaderLeft}>
-                    <View style={styles.messageIconContainer}>
-                      <Feather name="mail" size={20} color="#EA580C" />
+          {/* --- DEACTIVATE SELLER MODAL FOR MOBILE LIST --- */}
+          {deactivateModalVisible && deactivateSeller && (
+            <Modal
+              visible={deactivateModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setDeactivateModalVisible(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.messageModalContent}>
+                  {/* Header */}
+                  <View style={[styles.messageModalHeader, { backgroundColor: "#DC2626" }]}>
+                    <View style={styles.messageHeaderLeft}>
+                      <View style={styles.messageIconContainer}>
+                        <Feather name="user-x" size={20} color="#DC2626" />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={styles.messageTitle}>Deactivate Seller</Text>
+                        <Text style={styles.messageSubtitle}>This action will deactivate the seller account</Text>
+                      </View>
                     </View>
-                    <View style={{ marginLeft: 12 }}>
-                      <Text style={styles.messageTitle}>Send Message</Text>
-                      <Text style={styles.messageSubtitle}>to {messageSeller.name}</Text>
-                    </View>
+                    <TouchableOpacity onPress={() => setDeactivateModalVisible(false)}>
+                      <Feather name="x" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => setMessageModalVisible(false)}>
-                    <Feather name="x" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
 
-                {/* Body */}
-                <View style={styles.messageModalBody}>
-                  <Text style={styles.messageFormLabel}>Subject</Text>
-                  <TextInput
-                    style={styles.messageFormInput}
-                    placeholder="Enter message subject..."
-                    placeholderTextColor="#9CA3AF"
-                    value={messageSubject}
-                    onChangeText={setMessageSubject}
-                  />
+                  {/* Body */}
+                  <View style={styles.messageModalBody}>
+                    {/* Warning Banner */}
+                    <View style={styles.warningBanner}>
+                      <Feather name="alert-triangle" size={24} color="#D97706" style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.warningBannerTitle}>Warning</Text>
+                        <Text style={styles.warningBannerText}>
+                          Are you sure you want to deactivate <Text style={{ fontWeight: '700' }}>{deactivateSeller.name}</Text>?
+                        </Text>
+                      </View>
+                    </View>
 
-                  <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Message</Text>
-                  <TextInput
-                    style={styles.messageFormTextArea}
-                    placeholder="Type your message here..."
-                    placeholderTextColor="#9CA3AF"
-                    value={messageBody}
-                    onChangeText={setMessageBody}
-                    multiline
-                    numberOfLines={5}
-                  />
-                </View>
+                    <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deactivation</Text>
+                    <TextInput
+                      style={styles.messageFormTextArea}
+                      placeholder="Please provide a reason for deactivating this seller..."
+                      placeholderTextColor="#9CA3AF"
+                      value={deactivateReason}
+                      onChangeText={setDeactivateReason}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  </View>
 
-                {/* Footer */}
-                <View style={styles.messageModalFooter}>
-                  <TouchableOpacity
-                    style={styles.messageCancelBtn}
-                    onPress={() => setMessageModalVisible(false)}
-                  >
-                    <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.messageCancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
+                  {/* Footer */}
+                  <View style={styles.messageModalFooter}>
+                    <TouchableOpacity
+                      style={styles.messageCancelBtn}
+                      onPress={() => setDeactivateModalVisible(false)}
+                    >
+                      <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.messageCancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.messageSendBtn}
-                    onPress={() => {
-                      if (!messageSubject.trim() || !messageBody.trim()) {
-                        showToast("Subject and message are required", "error");
-                        return;
-                      }
-                      setMessageModalVisible(false);
-                      setMessageSubject("");
-                      setMessageBody("");
-                      showToast("Message sent successfully!", "success");
-                    }}
-                  >
-                    <Feather name="send" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.messageSendBtnText}>Send Message</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
+                      onPress={handleConfirmDeactivate}
+                    >
+                      <Ionicons name="close-circle" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.messageSendBtnText}>Deactivate</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Modal>
-        )}
+            </Modal>
+          )}
 
-        {/* --- DEACTIVATE SELLER MODAL FOR MOBILE LIST --- */}
-        {deactivateModalVisible && deactivateSeller && (
-          <Modal
-            visible={deactivateModalVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setDeactivateModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.messageModalContent}>
-                {/* Header */}
-                <View style={[styles.messageModalHeader, { backgroundColor: "#DC2626" }]}>
-                  <View style={styles.messageHeaderLeft}>
-                    <View style={styles.messageIconContainer}>
-                      <Feather name="user-x" size={20} color="#DC2626" />
+          {/* --- DELETE SELLER MODAL FOR MOBILE LIST --- */}
+          {deleteModalVisible && deleteSeller && (
+            <Modal
+              visible={deleteModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setDeleteModalVisible(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.messageModalContent}>
+                  {/* Header */}
+                  <View style={[styles.messageModalHeader, { backgroundColor: "#991B1B" }]}>
+                    <View style={styles.messageHeaderLeft}>
+                      <View style={styles.messageIconContainer}>
+                        <Feather name="trash-2" size={20} color="#991B1B" />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={styles.messageTitle}>Delete Seller</Text>
+                        <Text style={styles.messageSubtitle}>This action cannot be undone</Text>
+                      </View>
                     </View>
-                    <View style={{ marginLeft: 12 }}>
-                      <Text style={styles.messageTitle}>Deactivate Seller</Text>
-                      <Text style={styles.messageSubtitle}>This action will deactivate the seller account</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity onPress={() => setDeactivateModalVisible(false)}>
-                    <Feather name="x" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Body */}
-                <View style={styles.messageModalBody}>
-                  {/* Warning Banner */}
-                  <View style={styles.warningBanner}>
-                    <Feather name="alert-triangle" size={24} color="#D97706" style={{ marginRight: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.warningBannerTitle}>Warning</Text>
-                      <Text style={styles.warningBannerText}>
-                        Are you sure you want to deactivate <Text style={{ fontWeight: '700' }}>{deactivateSeller.name}</Text>?
-                      </Text>
-                    </View>
+                    <TouchableOpacity onPress={() => setDeleteModalVisible(false)}>
+                      <Feather name="x" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
                   </View>
 
-                  <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deactivation</Text>
-                  <TextInput
-                    style={styles.messageFormTextArea}
-                    placeholder="Please provide a reason for deactivating this seller..."
-                    placeholderTextColor="#9CA3AF"
-                    value={deactivateReason}
-                    onChangeText={setDeactivateReason}
-                    multiline
-                    numberOfLines={4}
-                  />
-                </View>
+                  {/* Body */}
+                  <View style={styles.messageModalBody}>
+                    {/* Danger Zone Banner */}
+                    <View style={styles.dangerBanner}>
+                      <Feather name="alert-circle" size={24} color="#DC2626" style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.dangerBannerTitle}>Danger Zone</Text>
+                        <Text style={styles.dangerBannerText}>
+                          Are you sure you want to permanently delete <Text style={{ fontWeight: '700' }}>{deleteSeller.name}</Text>? This action cannot be undone and will remove all seller data.
+                        </Text>
+                      </View>
+                    </View>
 
-                {/* Footer */}
-                <View style={styles.messageModalFooter}>
-                  <TouchableOpacity
-                    style={styles.messageCancelBtn}
-                    onPress={() => setDeactivateModalVisible(false)}
-                  >
-                    <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.messageCancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
+                    <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deletion</Text>
+                    <TextInput
+                      style={styles.messageFormTextArea}
+                      placeholder="Please provide a reason for deleting this seller..."
+                      placeholderTextColor="#9CA3AF"
+                      value={deleteReason}
+                      onChangeText={setDeleteReason}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  </View>
 
-                  <TouchableOpacity
-                    style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
-                    onPress={handleConfirmDeactivate}
-                  >
-                    <Ionicons name="close-circle" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.messageSendBtnText}>Deactivate</Text>
-                  </TouchableOpacity>
+                  {/* Footer */}
+                  <View style={styles.messageModalFooter}>
+                    <TouchableOpacity
+                      style={styles.messageCancelBtn}
+                      onPress={() => setDeleteModalVisible(false)}
+                    >
+                      <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.messageCancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
+                      onPress={handleConfirmDelete}
+                    >
+                      <Feather name="trash-2" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.messageSendBtnText}>Delete Permanently</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Modal>
-        )}
-
-        {/* --- DELETE SELLER MODAL FOR MOBILE LIST --- */}
-        {deleteModalVisible && deleteSeller && (
-          <Modal
-            visible={deleteModalVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setDeleteModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.messageModalContent}>
-                {/* Header */}
-                <View style={[styles.messageModalHeader, { backgroundColor: "#991B1B" }]}>
-                  <View style={styles.messageHeaderLeft}>
-                    <View style={styles.messageIconContainer}>
-                      <Feather name="trash-2" size={20} color="#991B1B" />
-                    </View>
-                    <View style={{ marginLeft: 12 }}>
-                      <Text style={styles.messageTitle}>Delete Seller</Text>
-                      <Text style={styles.messageSubtitle}>This action cannot be undone</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity onPress={() => setDeleteModalVisible(false)}>
-                    <Feather name="x" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Body */}
-                <View style={styles.messageModalBody}>
-                  {/* Danger Zone Banner */}
-                  <View style={styles.dangerBanner}>
-                    <Feather name="alert-circle" size={24} color="#DC2626" style={{ marginRight: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.dangerBannerTitle}>Danger Zone</Text>
-                      <Text style={styles.dangerBannerText}>
-                        Are you sure you want to permanently delete <Text style={{ fontWeight: '700' }}>{deleteSeller.name}</Text>? This action cannot be undone and will remove all seller data.
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text style={[styles.messageFormLabel, { marginTop: 16 }]}>Reason for Deletion</Text>
-                  <TextInput
-                    style={styles.messageFormTextArea}
-                    placeholder="Please provide a reason for deleting this seller..."
-                    placeholderTextColor="#9CA3AF"
-                    value={deleteReason}
-                    onChangeText={setDeleteReason}
-                    multiline
-                    numberOfLines={4}
-                  />
-                </View>
-
-                {/* Footer */}
-                <View style={styles.messageModalFooter}>
-                  <TouchableOpacity
-                    style={styles.messageCancelBtn}
-                    onPress={() => setDeleteModalVisible(false)}
-                  >
-                    <Feather name="x" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.messageCancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.messageSendBtn, { backgroundColor: "#DC2626" }]}
-                    onPress={handleConfirmDelete}
-                  >
-                    <Feather name="trash-2" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.messageSendBtnText}>Delete Permanently</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-        )}
+            </Modal>
+          )}
         </View>
       </AdminLayout>
     );
@@ -2605,13 +2611,6 @@ export default function ApprovedSellersScreen() {
               }
             };
 
-            const profileImage =
-              resolveSellerProfileImage({
-                profilePicUrl: detail?.profilePicUrl,
-                profilePicPath: detail?.profilePicPath,
-                liveSelfiePath: detail?.liveSelfiePath,
-                avatar: seller.avatar,
-              }) || seller.avatar;
             const kycStatusLabel = detail?.kycStatusLabel ?? "Not Completed";
             const kycBarColor = sellerKycBadgeColor(kycStatusLabel);
             const verificationBadge = detail?.kycVerificationBadge ?? "Pending";
@@ -2946,8 +2945,12 @@ export default function ApprovedSellersScreen() {
                               <TouchableOpacity
                                 style={styles.docViewBtn}
                                 onPress={() =>
-                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
-                      }
+                                  setPreviewDoc({
+                                    name: doc.name,
+                                    path: doc.path,
+                                    url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                                  })
+                                }
                               >
                                 <Feather name="eye" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
                                 <Text style={styles.docViewBtnText}>View</Text>
@@ -2961,8 +2964,12 @@ export default function ApprovedSellersScreen() {
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
                               onPress={() =>
-                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
-                      }
+                                setPreviewDoc({
+                                  name: doc.name,
+                                  path: doc.path,
+                                  url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                                })
+                              }
                             >
                               <SellerDocumentImage
                                 path={doc.path}
@@ -2979,8 +2986,12 @@ export default function ApprovedSellersScreen() {
                             <TouchableOpacity
                               key={`${doc.name}-${doc.url}-${idx}`}
                               onPress={() =>
-                        setPreviewDoc({ name: doc.name, path: doc.path, url: resolveSellerDocumentImageUrl(doc.path, doc.url), })
-                      }
+                                setPreviewDoc({
+                                  name: doc.name,
+                                  path: doc.path,
+                                  url: resolveSellerDocumentImageUrl(doc.path, doc.url),
+                                })
+                              }
                             >
                               <SellerDocumentImage
                                 path={doc.path}
@@ -3234,46 +3245,46 @@ export default function ApprovedSellersScreen() {
                 <Text style={styles.emptyText}>Loading pending sellers...</Text>
               </View>
             ) : (
-            <View style={styles.tableCard}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.tableTh, { flex: 0.8 }]}>ID</Text>
-                <Text style={[styles.tableTh, { flex: 1.8 }]}>Name</Text>
-                <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
-                <Text style={[styles.tableTh, { flex: 2.2 }]}>Email</Text>
-                <Text style={[styles.tableTh, { flex: 1.6 }]}>Mobile</Text>
-                <Text style={[styles.tableTh, { flex: 1.4 }]}>Submitted On</Text>
-                <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Actions</Text>
-              </View>
+              <View style={styles.tableCard}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableTh, { flex: 0.8 }]}>ID</Text>
+                  <Text style={[styles.tableTh, { flex: 1.8 }]}>Name</Text>
+                  <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
+                  <Text style={[styles.tableTh, { flex: 2.2 }]}>Email</Text>
+                  <Text style={[styles.tableTh, { flex: 1.6 }]}>Mobile</Text>
+                  <Text style={[styles.tableTh, { flex: 1.4 }]}>Submitted On</Text>
+                  <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Actions</Text>
+                </View>
 
-              {filteredPendingSellers.slice((pendingCurrentPage - 1) * itemsPerPage, pendingCurrentPage * itemsPerPage).map((seller) => (
-                <View key={seller.id} style={styles.tableRow}>
-                  <View style={[styles.tableCell, { flex: 0.8 }]}>
-                    <View style={styles.idBadge}>
-                      <Text style={styles.idBadgeText}>{seller.id}</Text>
+                {filteredPendingSellers.slice((pendingCurrentPage - 1) * itemsPerPage, pendingCurrentPage * itemsPerPage).map((seller) => (
+                  <View key={seller.id} style={styles.tableRow}>
+                    <View style={[styles.tableCell, { flex: 0.8 }]}>
+                      <View style={styles.idBadge}>
+                        <Text style={styles.idBadgeText}>{seller.id}</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.tableCellTextBold, { flex: 1.8 }]}>{seller.name}</Text>
+                    <Text style={[styles.tableCellText, { flex: 2 }]}>{seller.businessName}</Text>
+                    <Text style={[styles.tableCellText, { flex: 2.2 }]} numberOfLines={1}>{seller.email}</Text>
+                    <Text style={[styles.tableCellText, { flex: 1.6 }]}>{seller.mobile}</Text>
+                    <Text style={[styles.tableCellText, { flex: 1.4 }]}>{seller.submittedOn}</Text>
+                    <View style={[styles.tableCellActions, { flex: 1.2, justifyContent: "center" }]}>
+                      <TouchableOpacity
+                        style={styles.pendingViewBtn}
+                        onPress={() => void openPendingDetail(seller)}
+                      >
+                        <Text style={styles.pendingViewBtnText}>View</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <Text style={[styles.tableCellTextBold, { flex: 1.8 }]}>{seller.name}</Text>
-                  <Text style={[styles.tableCellText, { flex: 2 }]}>{seller.businessName}</Text>
-                  <Text style={[styles.tableCellText, { flex: 2.2 }]} numberOfLines={1}>{seller.email}</Text>
-                  <Text style={[styles.tableCellText, { flex: 1.6 }]}>{seller.mobile}</Text>
-                  <Text style={[styles.tableCellText, { flex: 1.4 }]}>{seller.submittedOn}</Text>
-                  <View style={[styles.tableCellActions, { flex: 1.2, justifyContent: "center" }]}>
-                    <TouchableOpacity
-                      style={styles.pendingViewBtn}
-                      onPress={() => void openPendingDetail(seller)}
-                    >
-                      <Text style={styles.pendingViewBtnText}>View</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+                ))}
 
-              {filteredPendingSellers.length === 0 && !pendingLoading && (
-                <View style={styles.emptyTable}>
-                  <Text style={styles.emptyText}>No pending sellers found.</Text>
-                </View>
-              )}
-            </View>
+                {filteredPendingSellers.length === 0 && !pendingLoading && (
+                  <View style={styles.emptyTable}>
+                    <Text style={styles.emptyText}>No pending sellers found.</Text>
+                  </View>
+                )}
+              </View>
             )}
 
             {/* --- FOOTER PAGINATION --- */}
@@ -3329,420 +3340,420 @@ export default function ApprovedSellersScreen() {
 
             {!loading && !error ? (
               <>
-            <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-              {/* Search Box */}
-              <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput as any}
-                  placeholder="Search approved sellers..."
-                  placeholderTextColor="#9CA3AF"
-                  value={searchQuery}
-                  onChangeText={(text) => {
-                    setSearchQuery(text);
-                    setActiveSearch(text);
-                    setCurrentPage(1);
-                  }}
-                  onSubmitEditing={handleApplyFilter}
-                />
-                {searchQuery ? (
-                  <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchBtn}>
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              {/* Action Buttons Row */}
-              <View style={styles.toolbarActions}>
-                <TouchableOpacity style={styles.applyBtn} onPress={handleApplyFilter}>
-                  <Text style={styles.applyBtnText}>Apply</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.exportBtn, exportLoading && { opacity: 0.7 }]}
-                  onPress={() => void handleExportCSV()}
-                  disabled={exportLoading}
-                >
-                  {exportLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" style={styles.btnIcon} />
-                  ) : (
-                    <Feather name="download" size={16} color="#FFFFFF" style={styles.btnIcon} />
-                  )}
-                  <Text style={styles.exportBtnText}>{exportLoading ? "Exporting..." : "Export CSV"}</Text>
-                </TouchableOpacity>
-
-                {/* Sort Dropdown */}
-                <View style={styles.sortDropdownContainer}>
-                  <Text style={styles.sortLabel}>Sort By:</Text>
-                  <TouchableOpacity
-                    style={styles.sortDropdownButton}
-                    onPress={() => setShowSortDropdown(!showSortDropdown)}
-                  >
-                    <Text style={styles.sortButtonText}>{sortBy}</Text>
-                    <Ionicons name="chevron-down" size={14} color="#6B7280" />
-                  </TouchableOpacity>
-                  {showSortDropdown && (
-                    <View style={styles.sortMenu}>
-                      {["Name", "Revenue", "Join Date", "Products"].map((opt) => (
-                        <TouchableOpacity
-                          key={opt}
-                          style={styles.sortMenuItem}
-                          onPress={() => {
-                            setSortBy(opt);
-                            setShowSortDropdown(false);
-                          }}
-                        >
-                          <Text style={[styles.sortMenuText, sortBy === opt && styles.sortMenuTextActive]}>
-                            {opt}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
-                {/* Grid/List Toggle */}
-                <View style={styles.viewToggleGroup}>
-                  <Text style={styles.viewLabel}>View:</Text>
-                  <TouchableOpacity
-                    style={[styles.toggleBtn, viewMode === "grid" && styles.toggleBtnActive]}
-                    onPress={() => setViewMode("grid")}
-                  >
-                    <Ionicons
-                      name="grid-outline"
-                      size={16}
-                      color={viewMode === "grid" ? "#1d324e" : "#6B7280"}
+                <View style={[styles.toolbar, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                  {/* Search Box */}
+                  <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={20} color="#EA580C" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput as any}
+                      placeholder="Search approved sellers..."
+                      placeholderTextColor="#9CA3AF"
+                      value={searchQuery}
+                      onChangeText={(text) => {
+                        setSearchQuery(text);
+                        setActiveSearch(text);
+                        setCurrentPage(1);
+                      }}
+                      onSubmitEditing={handleApplyFilter}
                     />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
-                    onPress={() => setViewMode("list")}
-                  >
-                    <Ionicons
-                      name="list-outline"
-                      size={16}
-                      color={viewMode === "list" ? "#1d324e" : "#6B7280"}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {/* --- INSIGHTS SECTION --- */}
-            <View style={styles.insightsCard}>
-              <View style={styles.insightsHeader}>
-                <Text style={styles.insightsTitle}>Insights</Text>
-                <Text style={styles.insightsSubtitle}>Top 10 by count — Filter-aware</Text>
-              </View>
-
-              <View style={[styles.insightsContainer, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
-                {/* State-wise table */}
-                <View style={styles.insightsColumn}>
-                  <Text style={styles.insightsColTitle}>State-wise Approved Sellers</Text>
-                  <View style={styles.insightsTableHeader}>
-                    <Text style={styles.insightsTh}>State</Text>
-                    <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
-                  </View>
-                  {stateCounts.map((item, idx) => (
-                    <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
-                      <Text style={styles.insightsTdText}>{item.name}</Text>
-                      <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
-                    </View>
-                  ))}
-                  {stateCounts.length === 0 && (
-                    <Text style={styles.emptyInsights}>No state data available</Text>
-                  )}
-                </View>
-
-                {/* Divider for large screen */}
-                {isLargeScreen && <View style={styles.verticalDivider} />}
-
-                {/* City-wise table */}
-                <View style={styles.insightsColumn}>
-                  <Text style={styles.insightsColTitle}>City-wise Approved Sellers</Text>
-                  <View style={styles.insightsTableHeader}>
-                    <Text style={styles.insightsTh}>City</Text>
-                    <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
-                  </View>
-                  {cityCounts.map((item, idx) => (
-                    <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
-                      <Text style={styles.insightsTdText}>{item.name}</Text>
-                      <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
-                    </View>
-                  ))}
-                  {cityCounts.length === 0 && (
-                    <Text style={styles.emptyInsights}>No city data available</Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* --- SELLERS TABLE / CARDS --- */}
-            {viewMode === "list" && isLargeScreen ? (
-              /* Desktop Table View */
-              <View style={styles.tableCard}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
-                  <View style={{ minWidth: 1400, width: "100%" }}>
-                    <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableTh, styles.colSeller]}>Seller</Text>
-                      <Text style={[styles.tableTh, styles.colBusiness]}>Business Name</Text>
-                      <Text style={[styles.tableTh, styles.colType]}>Business Type</Text>
-                      <Text style={[styles.tableTh, styles.colProducts, { textAlign: "center" }]}>Products</Text>
-                      <Text style={[styles.tableTh, styles.colWallet, { textAlign: "right" }]}>Wallet Balance</Text>
-                      <Text style={[styles.tableTh, styles.colJoin, { textAlign: "center" }]}>Join Date</Text>
-                      <Text style={[styles.tableTh, styles.colRevenue, { textAlign: "right" }]}>Revenue</Text>
-                      <Text style={[styles.tableTh, styles.colAction, { textAlign: "center" }]}>Action</Text>
-                    </View>
-
-                    {paginatedSellers.map((seller) => (
-                      <View key={seller.id} style={[styles.tableRow, seller.status === "Inactive" && styles.rowBlocked]}>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          style={[styles.tableCell, styles.colSeller, { flexDirection: "row", alignItems: "center" }]}
-                          onPress={() => openSellerDetail(seller.id, seller.status)}
-                        >
-                          <SellerMediaImage
-                            seller={{
-                              avatar: seller.avatar,
-                              profilePicUrl: seller.avatar,
-                              name: seller.name,
-                            }}
-                            size={34}
-                            style={styles.sellerAvatar}
-                          />
-                          <View style={styles.sellerMeta}>
-                            <Text style={styles.sellerName} numberOfLines={1}>{seller.name}</Text>
-                            <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
-                          </View>
-                        </TouchableOpacity>
-                        <Text style={[styles.tableCellTextBold, styles.colBusiness]} numberOfLines={1}>{seller.businessName}</Text>
-                        <Text style={[styles.tableCellText, styles.colType]} numberOfLines={1}>{seller.businessType}</Text>
-                        <Text style={[styles.tableCellText, styles.colProducts, { textAlign: "center" }]} numberOfLines={1}>{seller.products}</Text>
-                        <Text style={[styles.tableCellCurrency, styles.colWallet, { textAlign: "right" }]} numberOfLines={1}>
-                          {formatRupee(seller.walletBalance)}
-                        </Text>
-                        <Text style={[styles.tableCellText, styles.colJoin, { textAlign: "center" }]} numberOfLines={1}>{seller.joinDate}</Text>
-                        <Text style={[styles.tableCellCurrency, styles.colRevenue, { textAlign: "right" }]} numberOfLines={1}>
-                          {formatRupee(seller.revenue)}
-                        </Text>
-                        <View style={[styles.tableCellActions, styles.colAction]}>
-                      <TouchableOpacity
-                        style={styles.actionEyeBtn}
-                        onPress={() => openSellerDetail(seller.id, seller.status)}
-                      >
-                        <Ionicons name="eye" size={15} color="#FFFFFF" />
+                    {searchQuery ? (
+                      <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchBtn}>
+                        <Ionicons name="close-circle" size={18} color="#9CA3AF" />
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionMessageBtn}
-                        onPress={() => {
-                          setMessageSeller(seller);
-                          setMessageModalVisible(true);
-                        }}
-                      >
-                        <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBlockBtn, seller.status === "Inactive" && styles.actionBlockBtnActive]}
-                        onPress={() => {
-                          if (seller.status === "Active") {
-                            setDeactivateSeller(seller);
-                            setDeactivateReason("");
-                            setDeactivateModalVisible(true);
-                          } else {
-                            void (async () => {
-                              try {
-                                await unblockSeller(seller.id);
-                                setData((prev) =>
-                                  prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
-                                );
-                                showToast("Seller successfully unblocked!", "success");
-                              } catch (e) {
-                                showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
-                              }
-                            })();
-                          }
-                        }}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={15}
-                          color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionDeleteBtn}
-                        onPress={() => {
-                          setDeleteSeller(seller);
-                          setDeleteReason("");
-                          setDeleteModalVisible(true);
-                        }}
-                      >
-                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
+                    ) : null}
                   </View>
-                ))}
 
-                {paginatedSellers.length === 0 && (
-                  <View style={styles.emptyTable}>
-                    <Text style={styles.emptyText}>No sellers found matching the query.</Text>
-                  </View>
-                )}
-                  </View>
-                </ScrollView>
-              </View>
-            ) : (
-              /* Mobile List / Grid Card View */
-              <View style={[styles.gridContainer, isLargeScreen && styles.gridRowContainer]}>
-                {paginatedSellers.map((seller) => (
-                  <View
-                    key={seller.id}
-                    style={[
-                      styles.gridCard,
-                      seller.status === "Inactive" && styles.rowBlocked,
-                      isLargeScreen ? styles.gridCardLarge : styles.gridCardMobile,
-                    ]}
-                  >
-                    <View style={styles.cardHeader}>
+                  {/* Action Buttons Row */}
+                  <View style={styles.toolbarActions}>
+                    <TouchableOpacity style={styles.applyBtn} onPress={handleApplyFilter}>
+                      <Text style={styles.applyBtnText}>Apply</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.exportBtn, exportLoading && { opacity: 0.7 }]}
+                      onPress={() => void handleExportCSV()}
+                      disabled={exportLoading}
+                    >
+                      {exportLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" style={styles.btnIcon} />
+                      ) : (
+                        <Feather name="download" size={16} color="#FFFFFF" style={styles.btnIcon} />
+                      )}
+                      <Text style={styles.exportBtnText}>{exportLoading ? "Exporting..." : "Export CSV"}</Text>
+                    </TouchableOpacity>
+
+                    {/* Sort Dropdown */}
+                    <View style={styles.sortDropdownContainer}>
+                      <Text style={styles.sortLabel}>Sort By:</Text>
                       <TouchableOpacity
-                        activeOpacity={0.7}
-                        style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-                        onPress={() => openSellerDetail(seller.id, seller.status)}
+                        style={styles.sortDropdownButton}
+                        onPress={() => setShowSortDropdown(!showSortDropdown)}
                       >
-                        <SellerMediaImage
-                          seller={{
-                            avatar: seller.avatar,
-                            profilePicUrl: seller.avatar,
-                            name: seller.name,
-                          }}
-                          size={44}
-                          style={styles.cardAvatar}
-                        />
-                        <View style={styles.cardTitleContainer}>
-                          <Text style={styles.cardName}>{seller.name}</Text>
-                          <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>
+                        <Text style={styles.sortButtonText}>{sortBy}</Text>
+                        <Ionicons name="chevron-down" size={14} color="#6B7280" />
+                      </TouchableOpacity>
+                      {showSortDropdown && (
+                        <View style={styles.sortMenu}>
+                          {["Name", "Revenue", "Join Date", "Products"].map((opt) => (
+                            <TouchableOpacity
+                              key={opt}
+                              style={styles.sortMenuItem}
+                              onPress={() => {
+                                setSortBy(opt);
+                                setShowSortDropdown(false);
+                              }}
+                            >
+                              <Text style={[styles.sortMenuText, sortBy === opt && styles.sortMenuTextActive]}>
+                                {opt}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
                         </View>
-                      </TouchableOpacity>
-                      <View style={[styles.statusBadge, seller.status === "Inactive" && styles.statusBadgeBlocked]}>
-                        <Text style={styles.statusBadgeText}>
-                          {seller.status}
-                        </Text>
-                      </View>
+                      )}
                     </View>
 
-                    <View style={styles.cardBody}>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardLabel}>Business Name:</Text>
-                        <Text style={styles.cardValBold}>{seller.businessName}</Text>
-                      </View>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardLabel}>Business Type:</Text>
-                        <Text style={styles.cardVal}>{seller.businessType}</Text>
-                      </View>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardLabel}>Products:</Text>
-                        <Text style={styles.cardVal}>{seller.products} items</Text>
-                      </View>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardLabel}>Join Date:</Text>
-                        <Text style={styles.cardVal}>{seller.joinDate}</Text>
-                      </View>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardLabel}>Wallet Balance:</Text>
-                        <Text style={styles.cardCurrency}>
-                          ?{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </Text>
-                      </View>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardLabel}>Revenue:</Text>
-                        <Text style={styles.cardCurrency}>
-                          ?{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.cardActions}>
+                    {/* Grid/List Toggle */}
+                    <View style={styles.viewToggleGroup}>
+                      <Text style={styles.viewLabel}>View:</Text>
                       <TouchableOpacity
-                        style={[styles.cardActionBtn, styles.actionEyeBtn]}
-                        onPress={() => openSellerDetail(seller.id, seller.status)}
-                      >
-                        <Ionicons name="eye" size={15} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.cardActionBtn, styles.actionMessageBtn]}
-                        onPress={() => {
-                          setMessageSeller(seller);
-                          setMessageModalVisible(true);
-                        }}
-                      >
-                        <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.cardActionBtn,
-                          styles.actionBlockBtn,
-                          seller.status === "Inactive" && styles.actionBlockBtnActive,
-                        ]}
-                        onPress={() => {
-                          if (seller.status === "Active") {
-                            setDeactivateSeller(seller);
-                            setDeactivateReason("");
-                            setDeactivateModalVisible(true);
-                          } else {
-                            void (async () => {
-                              try {
-                                await unblockSeller(seller.id);
-                                setData((prev) =>
-                                  prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
-                                );
-                                showToast("Seller successfully unblocked!", "success");
-                              } catch (e) {
-                                showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
-                              }
-                            })();
-                          }
-                        }}
+                        style={[styles.toggleBtn, viewMode === "grid" && styles.toggleBtnActive]}
+                        onPress={() => setViewMode("grid")}
                       >
                         <Ionicons
-                          name="close-circle"
-                          size={15}
-                          color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
+                          name="grid-outline"
+                          size={16}
+                          color={viewMode === "grid" ? "#1d324e" : "#6B7280"}
                         />
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[styles.cardActionBtn, styles.actionDeleteBtn]}
-                        onPress={() => {
-                          setDeleteSeller(seller);
-                          setDeleteReason("");
-                          setDeleteModalVisible(true);
-                        }}
+                        style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
+                        onPress={() => setViewMode("list")}
                       >
-                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                        <Ionicons
+                          name="list-outline"
+                          size={16}
+                          color={viewMode === "list" ? "#1d324e" : "#6B7280"}
+                        />
                       </TouchableOpacity>
                     </View>
                   </View>
-                ))}
+                </View>
 
-                {paginatedSellers.length === 0 && (
-                  <View style={styles.emptyTable}>
-                    <Text style={styles.emptyText}>No sellers found matching the query.</Text>
+                {/* --- INSIGHTS SECTION --- */}
+                <View style={styles.insightsCard}>
+                  <View style={styles.insightsHeader}>
+                    <Text style={styles.insightsTitle}>Insights</Text>
+                    <Text style={styles.insightsSubtitle}>Top 10 by count • Filter-aware</Text>
+                  </View>
+
+                  <View style={[styles.insightsContainer, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
+                    {/* State-wise table */}
+                    <View style={styles.insightsColumn}>
+                      <Text style={styles.insightsColTitle}>State-wise Approved Sellers</Text>
+                      <View style={styles.insightsTableHeader}>
+                        <Text style={styles.insightsTh}>State</Text>
+                        <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
+                      </View>
+                      {stateCounts.map((item, idx) => (
+                        <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                          <Text style={styles.insightsTdText}>{item.name}</Text>
+                          <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
+                        </View>
+                      ))}
+                      {stateCounts.length === 0 && (
+                        <Text style={styles.emptyInsights}>No state data available</Text>
+                      )}
+                    </View>
+
+                    {/* Divider for large screen */}
+                    {isLargeScreen && <View style={styles.verticalDivider} />}
+
+                    {/* City-wise table */}
+                    <View style={styles.insightsColumn}>
+                      <Text style={styles.insightsColTitle}>City-wise Approved Sellers</Text>
+                      <View style={styles.insightsTableHeader}>
+                        <Text style={styles.insightsTh}>City</Text>
+                        <Text style={[styles.insightsTh, styles.alignRight]}>Count</Text>
+                      </View>
+                      {cityCounts.map((item, idx) => (
+                        <View key={item.name} style={[styles.insightsTableRow, idx % 2 === 1 && styles.rowAltBg]}>
+                          <Text style={styles.insightsTdText}>{item.name}</Text>
+                          <Text style={[styles.insightsTdCount, styles.alignRight]}>{item.count}</Text>
+                        </View>
+                      ))}
+                      {cityCounts.length === 0 && (
+                        <Text style={styles.emptyInsights}>No city data available</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* --- SELLERS TABLE / CARDS --- */}
+                {viewMode === "list" && isLargeScreen ? (
+                  /* Desktop Table View */
+                  <View style={styles.tableCard}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
+                      <View style={{ minWidth: 1200, width: "100%" }}>
+                        <View style={styles.tableHeaderRow}>
+                          <Text style={[styles.tableTh, { flex: 2.2 }]}>Seller</Text>
+                          <Text style={[styles.tableTh, { flex: 2 }]}>Business Name</Text>
+                          <Text style={[styles.tableTh, { flex: 1.8 }]}>Business Type</Text>
+                          <Text style={[styles.tableTh, { flex: 0.8, textAlign: "center" }]}>Products</Text>
+                          <Text style={[styles.tableTh, { flex: 1.2, textAlign: "right" }]}>Wallet Balance</Text>
+                          <Text style={[styles.tableTh, { flex: 1.2, textAlign: "center" }]}>Join Date</Text>
+                          <Text style={[styles.tableTh, { flex: 1.2, textAlign: "right" }]}>Revenue</Text>
+                          <Text style={[styles.tableTh, { flex: 1.6, textAlign: "center" }]}>Action</Text>
+                        </View>
+
+                        {paginatedSellers.map((seller) => (
+                          <View key={seller.id} style={[styles.tableRow, seller.status === "Inactive" && styles.rowBlocked]}>
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              style={[styles.tableCell, { flex: 2.2, flexDirection: "row", alignItems: "center" }]}
+                              onPress={() => openSellerDetail(seller.id, seller.status)}
+                            >
+                              <SellerMediaImage
+                                seller={{
+                                  avatar: seller.avatar,
+                                  profilePicUrl: seller.avatar,
+                                  name: seller.name,
+                                }}
+                                size={34}
+                                style={styles.sellerAvatar}
+                              />
+                              <View style={styles.sellerMeta}>
+                                <Text style={styles.sellerName}>{seller.name}</Text>
+                                <Text style={styles.sellerEmail} numberOfLines={1}>{seller.email}</Text>
+                              </View>
+                            </TouchableOpacity>
+                            <Text style={[styles.tableCellTextBold, { flex: 2 }]}>{seller.businessName}</Text>
+                            <Text style={[styles.tableCellText, { flex: 1.8 }]}>{seller.businessType}</Text>
+                            <Text style={[styles.tableCellText, { flex: 0.8, textAlign: "center" }]}>{seller.products}</Text>
+                            <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
+                              {formatRupee(seller.walletBalance)}
+                            </Text>
+                            <Text style={[styles.tableCellText, { flex: 1.2, textAlign: "center" }]}>{seller.joinDate}</Text>
+                            <Text style={[styles.tableCellCurrency, { flex: 1.2, textAlign: "right" }]}>
+                              {formatRupee(seller.revenue)}
+                            </Text>
+                            <View style={[styles.tableCellActions, { flex: 1.6 }]}>
+                              <TouchableOpacity
+                                style={styles.actionEyeBtn}
+                                onPress={() => openSellerDetail(seller.id, seller.status)}
+                              >
+                                <Ionicons name="eye" size={15} color="#FFFFFF" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.actionMessageBtn}
+                                onPress={() => {
+                                  setMessageSeller(seller);
+                                  setMessageModalVisible(true);
+                                }}
+                              >
+                                <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.actionBlockBtn, seller.status === "Inactive" && styles.actionBlockBtnActive]}
+                                onPress={() => {
+                                  if (seller.status === "Active") {
+                                    setDeactivateSeller(seller);
+                                    setDeactivateReason("");
+                                    setDeactivateModalVisible(true);
+                                  } else {
+                                    void (async () => {
+                                      try {
+                                        await unblockSeller(seller.id);
+                                        setData((prev) =>
+                                          prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
+                                        );
+                                        showToast("Seller successfully unblocked!", "success");
+                                      } catch (e) {
+                                        showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
+                                      }
+                                    })();
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="close-circle"
+                                  size={15}
+                                  color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
+                                />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.actionDeleteBtn}
+                                onPress={() => {
+                                  setDeleteSeller(seller);
+                                  setDeleteReason("");
+                                  setDeleteModalVisible(true);
+                                }}
+                              >
+                                <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))}
+
+                        {paginatedSellers.length === 0 && (
+                          <View style={styles.emptyTable}>
+                            <Text style={styles.emptyText}>No sellers found matching the query.</Text>
+                          </View>
+                        )}
+                      </View>
+                    </ScrollView>
+                  </View>
+                ) : (
+                  /* Mobile List / Grid Card View */
+                  <View style={[styles.gridContainer, isLargeScreen && styles.gridRowContainer]}>
+                    {paginatedSellers.map((seller) => (
+                      <View
+                        key={seller.id}
+                        style={[
+                          styles.gridCard,
+                          seller.status === "Inactive" && styles.rowBlocked,
+                          isLargeScreen ? styles.gridCardLarge : styles.gridCardMobile,
+                        ]}
+                      >
+                        <View style={styles.cardHeader}>
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                            onPress={() => openSellerDetail(seller.id, seller.status)}
+                          >
+                            <SellerMediaImage
+                              seller={{
+                                avatar: seller.avatar,
+                                profilePicUrl: seller.avatar,
+                                name: seller.name,
+                              }}
+                              size={44}
+                              style={styles.cardAvatar}
+                            />
+                            <View style={styles.cardTitleContainer}>
+                              <Text style={styles.cardName}>{seller.name}</Text>
+                              <Text style={styles.cardEmail} numberOfLines={1}>{seller.email}</Text>
+                            </View>
+                          </TouchableOpacity>
+                          <View style={[styles.statusBadge, seller.status === "Inactive" && styles.statusBadgeBlocked]}>
+                            <Text style={styles.statusBadgeText}>
+                              {seller.status}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.cardBody}>
+                          <View style={styles.cardRow}>
+                            <Text style={styles.cardLabel}>Business Name:</Text>
+                            <Text style={styles.cardValBold}>{seller.businessName}</Text>
+                          </View>
+                          <View style={styles.cardRow}>
+                            <Text style={styles.cardLabel}>Business Type:</Text>
+                            <Text style={styles.cardVal}>{seller.businessType}</Text>
+                          </View>
+                          <View style={styles.cardRow}>
+                            <Text style={styles.cardLabel}>Products:</Text>
+                            <Text style={styles.cardVal}>{seller.products} items</Text>
+                          </View>
+                          <View style={styles.cardRow}>
+                            <Text style={styles.cardLabel}>Join Date:</Text>
+                            <Text style={styles.cardVal}>{seller.joinDate}</Text>
+                          </View>
+                          <View style={styles.cardRow}>
+                            <Text style={styles.cardLabel}>Wallet Balance:</Text>
+                            <Text style={styles.cardCurrency}>
+                              ₹{seller.walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+                          <View style={styles.cardRow}>
+                            <Text style={styles.cardLabel}>Revenue:</Text>
+                            <Text style={styles.cardCurrency}>
+                              ₹{seller.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity
+                            style={[styles.cardActionBtn, styles.actionEyeBtn]}
+                            onPress={() => openSellerDetail(seller.id, seller.status)}
+                          >
+                            <Ionicons name="eye" size={15} color="#FFFFFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.cardActionBtn, styles.actionMessageBtn]}
+                            onPress={() => {
+                              setMessageSeller(seller);
+                              setMessageModalVisible(true);
+                            }}
+                          >
+                            <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.cardActionBtn,
+                              styles.actionBlockBtn,
+                              seller.status === "Inactive" && styles.actionBlockBtnActive,
+                            ]}
+                            onPress={() => {
+                              if (seller.status === "Active") {
+                                setDeactivateSeller(seller);
+                                setDeactivateReason("");
+                                setDeactivateModalVisible(true);
+                              } else {
+                                void (async () => {
+                                  try {
+                                    await unblockSeller(seller.id);
+                                    setData((prev) =>
+                                      prev.map((s) => (s.id === seller.id ? { ...s, status: "Active" } : s))
+                                    );
+                                    showToast("Seller successfully unblocked!", "success");
+                                  } catch (e) {
+                                    showToast(getApiErrorMessage(e, "Failed to unblock seller."), "error");
+                                  }
+                                })();
+                              }
+                            }}
+                          >
+                            <Ionicons
+                              name="close-circle"
+                              size={15}
+                              color={seller.status === "Inactive" ? "#FFFFFF" : "#EF4444"}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.cardActionBtn, styles.actionDeleteBtn]}
+                            onPress={() => {
+                              setDeleteSeller(seller);
+                              setDeleteReason("");
+                              setDeleteModalVisible(true);
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+
+                    {paginatedSellers.length === 0 && (
+                      <View style={styles.emptyTable}>
+                        <Text style={styles.emptyText}>No sellers found matching the query.</Text>
+                      </View>
+                    )}
                   </View>
                 )}
-              </View>
-            )}
 
-            {/* --- PAGINATION FOOTER --- */}
-            {filteredSellers.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={Math.ceil(filteredSellers.length / itemsPerPage)}
-                totalItems={filteredSellers.length}
-                itemsPerPage={itemsPerPage}
-                itemName="approved sellers"
-                onPageChange={setCurrentPage}
-              />
-            )}
-          </>
+                {/* --- PAGINATION FOOTER --- */}
+                {filteredSellers.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(filteredSellers.length / itemsPerPage)}
+                    totalItems={filteredSellers.length}
+                    itemsPerPage={itemsPerPage}
+                    itemName="approved sellers"
+                    onPageChange={setCurrentPage}
+                  />
+                )}
+              </>
             ) : null}
           </>
         )}
@@ -3750,7 +3761,7 @@ export default function ApprovedSellersScreen() {
         {/* --- COPYRIGHT FOOTER --- */}
         <View style={styles.footerCopyright}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-            <Text style={styles.footerCopyrightText}>2026 — Flintnthread India Pvt. Ltd. Crafted by </Text>
+            <Text style={styles.footerCopyrightText}>2026 © Flintnthread India Pvt. Ltd. Crafted by </Text>
             <Feather name="heart" size={12} color="#EF4444" />
             <Text style={styles.footerCopyrightText}> Flintnthread India Pvt. Ltd.</Text>
           </View>
@@ -4085,7 +4096,7 @@ export default function ApprovedSellersScreen() {
         </Modal>
       )}
 
-            {/* --- DOCUMENT PREVIEW MODAL --- */}
+      {/* --- DOCUMENT PREVIEW MODAL --- */}
       {previewDoc && (
         <Modal
           visible={!!previewDoc}
@@ -4410,7 +4421,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  
+
   // Sort Dropdown
   sortDropdownContainer: {
     flexDirection: "row",
@@ -4471,7 +4482,7 @@ const styles = StyleSheet.create({
     color: "#EA580C",
     fontWeight: "600",
   },
-  
+
   // View Toggle Group
   viewToggleGroup: {
     flexDirection: "row",
@@ -4525,7 +4536,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#1E293B",
-  
+
   },
   insightsSubtitle: {
     fontSize: 12,
@@ -4615,16 +4626,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#4B5563",
-    minWidth: 0,
   },
-  colSeller: { flex: 2.2, minWidth: 180, paddingHorizontal: 6 },
-  colBusiness: { flex: 2, minWidth: 160, paddingHorizontal: 6 },
-  colType: { flex: 1.8, minWidth: 140, paddingHorizontal: 6 },
-  colProducts: { flex: 0.8, minWidth: 80, paddingHorizontal: 6 },
-  colWallet: { flex: 1.2, minWidth: 110, paddingHorizontal: 6 },
-  colJoin: { flex: 1.2, minWidth: 100, paddingHorizontal: 6 },
-  colRevenue: { flex: 1.2, minWidth: 110, paddingHorizontal: 6 },
-  colAction: { flex: 1.6, minWidth: 150, paddingHorizontal: 6, flexShrink: 0 },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4639,35 +4641,29 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     justifyContent: "center",
-    minWidth: 0,
   },
   tableCellText: {
     fontSize: 13,
     color: "#374151",
-    minWidth: 0,
   },
   tableCellTextBold: {
     fontSize: 13,
     fontWeight: "600",
     color: "#1E293B",
-    minWidth: 0,
   },
   tableCellCurrency: {
     fontSize: 13,
     fontWeight: "600",
     color: "#D97706",
-    minWidth: 0,
   },
   sellerAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
     marginRight: 12,
-    flexShrink: 0,
   },
   sellerMeta: {
     flex: 1,
-    minWidth: 0,
     justifyContent: "center",
   },
   sellerName: {
@@ -4685,7 +4681,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 6,
-    flexShrink: 0,
   },
   actionEyeBtn: {
     width: 28,
@@ -5949,7 +5944,7 @@ const stylesMobile = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    height:90,
+    height: 90,
   },
   headerRow: {
     flexDirection: "row",

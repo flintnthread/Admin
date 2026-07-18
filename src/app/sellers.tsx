@@ -840,16 +840,16 @@ export default function SellersScreen() {
               <Text style={{ color: '#FCA5A5', marginBottom: 8 }}>{loadError} — Tap to retry</Text>
             </TouchableOpacity>
           ) : null}
-          <View style={[SS.pageHeader, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 12 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={[SS.pageHeader, isMobile && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
               <View style={SS.headerIconBox}>
                 <IconPerson size={16} color="#FFF" />
               </View>
-              <Text style={SS.pageTitle}>Active Sellers</Text>
+              <Text style={[SS.pageTitle, isMobile && { fontSize: 16 }]}>Active Sellers</Text>
             </View>
-            <TouchableOpacity style={SS.exportBtn} onPress={() => router.push('/sellershiprocket')}>
-              <IconUpload size={13} color="#FFF" />
-              <Text style={SS.exportTxt}>  Export to Shiprocket</Text>
+            <TouchableOpacity style={[SS.exportBtn, isMobile && { paddingVertical: 6, paddingHorizontal: 10 }]} onPress={() => router.push('/sellershiprocket')}>
+              <IconUpload size={isMobile ? 11 : 13} color="#FFF" />
+              <Text style={[SS.exportTxt, isMobile && { fontSize: 11 }]}>  Export to Shiprocket</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -878,17 +878,15 @@ export default function SellersScreen() {
             ))}
           </View>
         ) : (
-          <View style={{ width: "100%", marginTop: -32, marginBottom: 16, overflow: "hidden" }}>
+          <View style={{ width: "100%", marginTop: -32, marginBottom: 16, overflow: "hidden", zIndex: 10 }}>
             <ScrollView
-              {...({ className: "orange-scrollbar" } as any)}
               horizontal={true}
               showsHorizontalScrollIndicator={false}
               style={{ width: "100%" }}
               contentContainerStyle={{
                 flexDirection: "row",
                 gap: 12,
-                paddingLeft: 22,
-                paddingRight: 32,
+                paddingHorizontal: 4,
                 paddingVertical: 6,
               }}
             >
@@ -904,18 +902,31 @@ export default function SellersScreen() {
                   key={c.label}
                   style={[
                     SS.statCard,
-                    SS.statCardCompact,
+                    {
+                      width: 135,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      gap: 6,
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      borderWidth: 1,
+                      borderColor: "#E8EDF5",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 6,
+                      elevation: 3,
+                    }
                   ]}
                 >
-                  <View style={[SS.statIconBoxCompact, { backgroundColor: c.iconBg }]}>
+                  <View style={[SS.statIconBoxCompact, { backgroundColor: c.iconBg, width: 30, height: 30 }]}>
                     {c.icon}
                   </View>
-                  <Text style={[SS.statValueCompact, { color: '#1C1C2E' }]} numberOfLines={1}>
-                    {c.value}
-                  </Text>
-                  <Text style={SS.statLabelCompact} numberOfLines={1}>
-                    {c.label}
-                  </Text>
+                  <View>
+                    <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{c.label}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{c.value}</Text>
+                    <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{c.sub}</Text>
+                  </View>
                 </View>
               ))}
             </ScrollView>
@@ -1179,7 +1190,7 @@ const SS = StyleSheet.create({
   exportBtn: { backgroundColor: C.green, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
   exportTxt: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
-  searchBox: { flex: 1, maxWidth: 1000, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 42 },
+  searchBox: { flex: 1, maxWidth: 1000, flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, height: 32 },
   searchInput: { flex: 1, fontSize: 14, color: C.text, height: 42, marginLeft: 8, outlineStyle: 'none' } as any,
   clearBtn: { padding: 4 },
   viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 14 },
