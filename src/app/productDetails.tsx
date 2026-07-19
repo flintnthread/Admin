@@ -1023,7 +1023,9 @@ function SectionCard({
 }
 
 export default function ProductDetailsScreen() {
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const params = useLocalSearchParams<{ id?: string | string[]; name?: string }>();
+  const idRaw = Array.isArray(params.id) ? params.id[0] : params.id;
+  const name = Array.isArray(params.name) ? params.name[0] : params.name;
   const { isWide, width } = useBreakpoint();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeImage, setActiveImage] = useState(0);
@@ -1049,10 +1051,11 @@ export default function ProductDetailsScreen() {
   };
 
   const loadProduct = useCallback(async () => {
-    const productId = Number(id);
-    if (!id || Number.isNaN(productId)) {
+    const productId = Number(idRaw);
+    if (!idRaw || Number.isNaN(productId)) {
       setLoading(false);
       setProduct(null);
+      setError('Product not found');
       return;
     }
 
@@ -1072,7 +1075,7 @@ export default function ProductDetailsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [idRaw]);
 
   useEffect(() => {
     loadProduct();
@@ -1094,7 +1097,7 @@ export default function ProductDetailsScreen() {
   };
 
   const handleApprove = async () => {
-    const productId = Number(id);
+    const productId = Number(idRaw);
     if (Number.isNaN(productId)) return;
 
     setActionLoading(true);
@@ -1115,7 +1118,7 @@ export default function ProductDetailsScreen() {
   };
 
   const handleReject = async () => {
-    const productId = Number(id);
+    const productId = Number(idRaw);
     if (Number.isNaN(productId)) return;
     setActionLoading(true);
     try {

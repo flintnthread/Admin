@@ -178,14 +178,17 @@ function buildDatasetFromApi(
   recentOrders: AdsApiRow[],
   customers: AdsApiRow[],
 ): Dataset {
-  const orders = (dashboard.orders ?? {}) as Record<string, unknown>;
-  const payments = (dashboard.payments ?? {}) as Record<string, unknown>;
-  const customersBlock = (dashboard.customers ?? {}) as Record<string, unknown>;
+  const root = ((dashboard as AdsApiRow)?.data ?? dashboard) as AdsApiRow;
+  const orders = (root.orders ?? {}) as Record<string, unknown>;
+  const payments = (root.payments ?? {}) as Record<string, unknown>;
+  const customersBlock = (root.customers ?? {}) as Record<string, unknown>;
 
-  const totalOrders = Number(orders.total ?? 0);
-  const paidOrders = Number(orders.paid ?? 0);
-  const totalRevenue = Number(orders.paidAmountTotal ?? orders.paidAmountInPeriod ?? 0);
-  const totalCustomers = Number(customersBlock.total ?? 0);
+  const totalOrders = Number(orders.total ?? root.totalOrders ?? 0);
+  const paidOrders = Number(orders.paid ?? root.paidOrders ?? 0);
+  const totalRevenue = Number(
+    orders.paidAmountTotal ?? orders.paidAmountInPeriod ?? root.totalRevenue ?? 0,
+  );
+  const totalCustomers = Number(customersBlock.total ?? root.totalCustomers ?? 0);
   const inPeriod = Number(orders.inPeriod ?? 0);
   const labels = periodLabels(period);
   const revenueTrend = labels.map((_, i) => +((totalRevenue / 100000) * (0.15 + (i + 1) / labels.length)).toFixed(2));
@@ -698,26 +701,45 @@ function LineChart({ values, labels, color, width = 320, height = 180 }: {
 /* Donut                                                               */
 /* ------------------------------------------------------------------ */
 function Donut({ data, size = 150, strokeWidth = 20 }: { data: ChartDatum[]; size?: number; strokeWidth?: number }) {
-  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const sum = data.reduce((s, d) => s + d.value, 0);
+  const total = sum > 0 ? sum : 1;
   const r = (size - strokeWidth) / 2;
   const cx = size / 2; const cy = size / 2;
   const circ = 2 * Math.PI * r;
   let acc = 0;
   return (
     <Svg width={size} height={size}>
-      {data.map((d) => {
-        const frac = d.value / total;
-        const len = frac * circ;
-        const rotation = -90 + acc * 360;
-        acc += frac;
-        return (
-          <Circle key={d.label} cx={cx} cy={cy} r={r} fill="none"
-            stroke={d.color} strokeWidth={strokeWidth}
-            strokeDasharray={`${len} ${circ - len}`}
-            strokeLinecap="round" rotation={rotation} origin={`${cx}, ${cy}`}
-          />
-        );
-      })}
+      {sum <= 0 ? (
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#E5E7EB"
+          strokeWidth={strokeWidth}
+        />
+      ) : (
+        data.map((d) => {
+          const frac = d.value / total;
+          const len = Math.max(0, frac * circ);
+          const rotation = -90 + acc * 360;
+          acc += frac;
+          return (
+            <Circle
+              key={d.label}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={d.color}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${len} ${Math.max(0, circ - len)}`}
+              strokeLinecap="butt"
+              transform={`rotate(${rotation} ${cx} ${cy})`}
+            />
+          );
+        })
+      )}
     </Svg>
   );
 }
@@ -759,7 +781,7 @@ function Gauge({ pct, size = 150, strokeWidth = 16, color, trackColor = COLORS.p
         <Circle cx={cx} cy={cy} r={r} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
         <Circle cx={cx} cy={cy} r={r} stroke={color} strokeWidth={strokeWidth} fill="none"
           strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
-          rotation={-90} origin={`${cx}, ${cy}`}
+          transform={`rotate(-90 ${cx} ${cy})`}
         />
       </Svg>
     );
@@ -929,7 +951,7 @@ export default function AdsDashboardScreen() {
       } catch (e) {
         if (!cancelled) {
           setError(getApiErrorMessage(e, 'Failed to load ads dashboard.'));
-          setDataset(emptyDataset(period));
+          // Keep last successful dataset — do not force all-zero KPIs on a transient error.
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -973,7 +995,11 @@ export default function AdsDashboardScreen() {
 
   const totalAdOrders = adTypes.reduce((s, d) => s + d.value, 0);
   const totalRevenueForDonut = revenueByCategory.reduce((s, d) => s + d.value, 0);
-  const activeAds = Math.max(4, Math.round(totalAdOrders * 0.05));
+  const activeAds = Math.max(
+    Number((dataset as { activeAds?: number }).activeAds ?? 0),
+    kpis.paidOrders > 0 ? Math.max(1, Math.round(kpis.paidOrders * 0.05)) : 0,
+    totalAdOrders > 0 ? Math.max(1, Math.round(totalAdOrders * 0.05)) : 0,
+  );
   const growthPct = ((revenueTrend[revenueTrend.length - 1] - revenueTrend[0]) / (revenueTrend[0] || 1)) * 100;
   const successRate = Math.round((kpis.paidOrders / Math.max(1, kpis.totalOrders)) * 100);
 
@@ -1111,19 +1137,14 @@ export default function AdsDashboardScreen() {
               </Tile>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              scrollEnabled={false}
-              contentContainerStyle={{ gap: gutter, marginBottom: gutter, flexDirection: 'row' }}
-            >
-              <Tile title="Orders by Ad Type" sub={period} style={{ width: halfWidth, minWidth: 240 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: gutter, marginBottom: gutter }}>
+              <Tile title="Orders by Ad Type" sub={period} style={{ flex: 1, minWidth: 240 }}>
                 <DonutTile data={adTypes} centerValue={String(totalAdOrders)} centerLabel="ORDERS" />
               </Tile>
-              <Tile title="Revenue by Category" sub={period} style={{ width: halfWidth, minWidth: 240 }}>
+              <Tile title="Revenue by Category" sub={period} style={{ flex: 1, minWidth: 240 }}>
                 <DonutTile data={revenueByCategory} centerValue={fmtINR(totalRevenueForDonut)} centerLabel="TOTAL" format={fmtINR} />
               </Tile>
-            </ScrollView>
+            </View>
           )}
 
           {/* ── Orders trend + top customers ── */}

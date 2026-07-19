@@ -434,9 +434,6 @@ const QuestionAccordionCard: React.FC<{
                             <Text style={accSt.toggleLabel}>For seller</Text>
                         </View>
                         <View style={{ flexDirection: "row", gap: 8 }}>
-                            <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: ACCENT_SKY + "15", borderColor: ACCENT_SKY + "40" }]} onPress={onView}>
-                                <Feather name="eye" size={13} color={ACCENT_SKY} />
-                            </TouchableOpacity>
                             <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: accent + "15", borderColor: accent + "40" }]} onPress={onEdit}>
                                 <Feather name="edit-2" size={13} color={accent} />
                             </TouchableOpacity>
@@ -483,9 +480,6 @@ const QuestionTileCard: React.FC<{
                 )}
             </View>
             <View style={tileSt.actions}>
-                <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: ACCENT_SKY + "15" }]} onPress={onView}>
-                    <Feather name="eye" size={13} color={ACCENT_SKY} />
-                </TouchableOpacity>
                 <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: accent + "15" }]} onPress={onEdit}>
                     <Feather name="edit-2" size={13} color={accent} />
                 </TouchableOpacity>

@@ -555,24 +555,23 @@ const AdsTypesDetails: React.FC = () => {
             requirements: form.requirements,
             status: toApiStatus(form.status),
         };
-        if (editingItem) {
-            if (!(await sweetCrud.confirmUpdate('Ad type', body.name))) return;
-        } else {
-            if (!(await sweetCrud.confirmAdd('Ad type', body.name))) return;
-        }
         setSaving(true);
         try {
             if (editingItem) {
                 await updateAdsType(editingItem.id, body);
-                showToast('✅ Ad Type updated successfully!');
-                void sweetCrud.updated('Ad type');
+                setFormVisible(false);
+                await loadItems();
+                setTimeout(() => {
+                    void sweetCrud.updated('Ad type');
+                }, 250);
             } else {
                 await createAdsType(body);
-                showToast('✅ Ad Type created successfully!');
-                void sweetCrud.added('Ad type');
+                setFormVisible(false);
+                await loadItems();
+                setTimeout(() => {
+                    void sweetCrud.added('Ad type');
+                }, 250);
             }
-            setFormVisible(false);
-            await loadItems();
         } catch (err) {
             void sweetError('Error', getApiErrorMessage(err, editingItem ? 'Could not update ad type.' : 'Could not create ad type.'));
         } finally {
@@ -790,8 +789,7 @@ const AdsTypesDetails: React.FC = () => {
                 </View>
 
                 {/* ---------- Management table ---------- */}
-                <View style={{ overflow: 'hidden' }}>
-                    <View style={styles.dataCard}>
+                <View style={styles.dataCard}>
                     <View style={styles.sectionTitleRow}>
                         <Text style={styles.sectionTitle}>Ad Types & Details Management</Text>
                     </View>
@@ -804,18 +802,18 @@ const AdsTypesDetails: React.FC = () => {
                             <ActivityIndicator size="large" color={COLORS.orange} />
                         </View>
                     ) : isPhone ? (
-                        <FlatList
-                            data={paginatedItems}
-                            keyExtractor={(i) => String(i.id)}
-                            renderItem={renderMobileCard}
-                            scrollEnabled={false}
-                            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-                        />
+                        <View style={{ gap: 10, paddingBottom: 8 }}>
+                            {paginatedItems.map((item) => (
+                                <View key={String(item.id)}>
+                                    {renderMobileCard({ item } as any)}
+                                </View>
+                            ))}
+                        </View>
                     ) : (
-                        <View style={{ flex: 1, width: '100%' }}>
+                        <View style={{ width: '100%' }}>
                             <ScrollView
                                 horizontal
-                                showsHorizontalScrollIndicator={false}
+                                showsHorizontalScrollIndicator={true}
                                 style={{ borderRadius: 8 }}
                                 contentContainerStyle={{ flexGrow: 1 }}
                             >
@@ -829,18 +827,18 @@ const AdsTypesDetails: React.FC = () => {
                                         <Text style={[styles.headCell, COL_STYLES.created]}>Created</Text>
                                         <Text style={[styles.headCell, COL_STYLES.action]}>Action</Text>
                                     </View>
-                                    <FlatList
-                                        data={paginatedItems}
-                                        keyExtractor={(i) => String(i.id)}
-                                        renderItem={renderTableRow}
-                                        scrollEnabled={false}
-                                    />
+                                    <View>
+                                        {paginatedItems.map((item) => (
+                                            <View key={String(item.id)}>
+                                                {renderTableRow({ item } as any)}
+                                            </View>
+                                        ))}
+                                    </View>
                                 </View>
                             </ScrollView>
                         </View>
                     )}
                     </View>
-                </View>
 
                 <Pagination
                     currentPage={safePage}

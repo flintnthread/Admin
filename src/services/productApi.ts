@@ -266,6 +266,7 @@ function mapCreateResult(row: ApiCreateProductResponse): CreateProductResult {
 export async function createProduct(payload: CreateProductPayload): Promise<CreateProductResult> {
   const row = await adminApiRequest<ApiCreateProductResponse>("/api/admin/products", {
     method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(payload),
   });
   return mapCreateResult(row);
@@ -277,6 +278,7 @@ export async function updateProduct(
 ): Promise<CreateProductResult> {
   const row = await adminApiRequest<ApiCreateProductResponse>(`/api/admin/products/${productId}`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(payload),
   });
   return mapCreateResult(row);

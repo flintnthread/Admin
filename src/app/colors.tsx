@@ -655,13 +655,14 @@ export default function ColorsScreen() {
   }, [loadColors]);
 
   const handleAdd = useCallback(async (data: { name: string; code: string; status: "Active" | "Inactive" }) => {
-    if (!(await sweetCrud.confirmAdd("Color", data.name))) return;
     setSaving(true);
     try {
       const created = await createColor(data);
-      setColors((prev) => [...prev, mapColorRow(created)]);
       setAddOpen(false);
-      void sweetCrud.added("Color");
+      setColors((prev) => [...prev, mapColorRow(created)]);
+      setTimeout(() => {
+        void sweetCrud.added("Color");
+      }, 250);
     } catch (error) {
       void sweetError("Error", getApiErrorMessage(error, "Could not add color."));
     } finally {
@@ -671,13 +672,14 @@ export default function ColorsScreen() {
 
   const handleEdit = useCallback(async (data: { name: string; code: string; status: "Active" | "Inactive" }) => {
     if (!editTarget) return;
-    if (!(await sweetCrud.confirmUpdate("Color", data.name))) return;
     setSaving(true);
     try {
       const updated = await updateColor(editTarget.id, data);
-      setColors((prev) => prev.map((c) => (c.id === editTarget.id ? mapColorRow(updated) : c)));
       setEditTarget(null);
-      void sweetCrud.updated("Color");
+      setColors((prev) => prev.map((c) => (c.id === editTarget.id ? mapColorRow(updated) : c)));
+      setTimeout(() => {
+        void sweetCrud.updated("Color");
+      }, 250);
     } catch (error) {
       void sweetError("Error", getApiErrorMessage(error, "Could not update color."));
     } finally {

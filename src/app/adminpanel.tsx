@@ -11,28 +11,28 @@ import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
-    createAdminUser,
-    deleteAdminUser,
-    fetchAdminUsers,
-    fromApiRole,
-    updateAdminUser,
+  createAdminUser,
+  deleteAdminUser,
+  fetchAdminUsers,
+  fromApiRole,
+  updateAdminUser,
 } from "@/services/adminUserApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Dimensions,
-    Modal,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 const Icon = Ionicons;
 
@@ -489,10 +489,22 @@ function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: 
 }
 
 // ─── Web Grid Card ────────────────────────────────────────────────────────────
-function GridCard({ user, index, onEdit, onDelete }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void }) {
+function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void; cardWidth?: number | string }) {
   const bg = AVATAR_BG[index % AVATAR_BG.length];
+  const { width: windowWidth } = useWindowDimensions();
+
+  let dynamicWidth = cardWidth;
+  if (!dynamicWidth && Platform.OS === 'web') {
+    if (windowWidth >= 1024) {
+      dynamicWidth = 'calc(33.33% - 14px)'; // 3 cards per row (1024px, 1440px, 2560px)
+    } else if (windowWidth >= 768) {
+      dynamicWidth = 'calc(50% - 10px)'; // 2 cards per row (768px tablet)
+    }
+    // Mobile (<768px): no changes, uses default StyleSheet width
+  }
+
   return (
-    <View style={styles.gridCard}>
+    <View style={[styles.gridCard, dynamicWidth && Platform.OS === 'web' ? { width: dynamicWidth } : null]}>
       {/* Coloured top banner */}
       <View style={[styles.gridBanner, { backgroundColor: bg }]}>
         <View style={styles.gridAvatarCircle}>
@@ -592,7 +604,6 @@ export default function AdminUsersScreen() {
   );
 
   async function handleAdd(form: UserForm) {
-    if (!(await sweetCrud.confirmAdd("Admin user", form.name || form.email))) return;
     try {
       await createAdminUser({
         email: form.email,
@@ -601,9 +612,11 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         password: form.password,
       });
-      await loadUsers();
       setAddVisible(false);
-      void sweetCrud.added("Admin user");
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.added("Admin user");
+      }, 250);
     } catch (e) {
       void sweetError("Error", getApiErrorMessage(e, "Failed to add admin user."));
     }
@@ -611,7 +624,6 @@ export default function AdminUsersScreen() {
 
   async function handleEdit(form: UserForm) {
     if (!editUser) return;
-    if (!(await sweetCrud.confirmUpdate("Admin user", form.name || form.email))) return;
     try {
       await updateAdminUser(editUser.id, {
         fullName: form.name,
@@ -619,9 +631,11 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         ...(form.password ? { password: form.password } : {}),
       });
-      await loadUsers();
       setEditUser(null);
-      void sweetCrud.updated("Admin user");
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.updated("Admin user");
+      }, 250);
     } catch (e) {
       void sweetError("Error", getApiErrorMessage(e, "Failed to update admin user."));
     }
@@ -1082,7 +1096,9 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 16,
     overflow: "hidden",
-    width: 393,
+    ...(Platform.select({
+      default: { width: 393 }
+    }) as any),
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,

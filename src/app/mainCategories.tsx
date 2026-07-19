@@ -5,28 +5,28 @@ import { AdminApiError, getApiErrorMessage } from "@/lib/api/client";
 import { compressImageFile } from "@/lib/media/compressImage";
 import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
-  createMainCategory,
-  createSubcategory,
-  deleteCategory,
-  fetchMainCategories,
-  fetchSubcategories,
-  updateCategory,
-  uploadCategoryImages,
-  type CategoryRow
+    createMainCategory,
+    createSubcategory,
+    deleteCategory,
+    fetchMainCategories,
+    fetchSubcategories,
+    updateCategory,
+    uploadCategoryImages,
+    type CategoryRow
 } from "@/services/categoryApi";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 
@@ -1628,15 +1628,6 @@ export default function MainCategories() {
   const handleSave = async (data: any) => {
     const entityLabel = data.type === "Main Category" ? "Main category" : "Category";
     const isUpdate = !!data.id;
-    if (isUpdate) {
-      if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) {
-        throw new Error("cancelled");
-      }
-    } else {
-      if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) {
-        throw new Error("cancelled");
-      }
-    }
     try {
       const gstValue = data.gst ? parseFloat(String(data.gst).replace("%", "")) : undefined;
       const statusValue = data.status === "Active";
@@ -1756,16 +1747,15 @@ export default function MainCategories() {
       }
       setEditCat(null);
       if (!imageUploadFailed) {
-        if (isUpdate) {
-          void sweetCrud.updated(entityLabel);
-        } else {
-          void sweetCrud.added(entityLabel);
-        }
+        setTimeout(() => {
+          if (isUpdate) {
+            void sweetCrud.updated(entityLabel);
+          } else {
+            void sweetCrud.added(entityLabel);
+          }
+        }, 250);
       }
     } catch (error) {
-      if (error instanceof Error && error.message === "cancelled") {
-        throw error;
-      }
       console.error("Failed to save category:", error);
       void sweetError("Error", getApiErrorMessage(error, "Failed to save category. Please try again."));
       throw error;

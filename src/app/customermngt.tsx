@@ -25,28 +25,27 @@
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { Ionicons } from '@expo/vector-icons';
-
+import { getApiErrorMessage } from '@/lib/api/client';
+import { deleteAdsCustomer, fetchAdsCustomers, fetchAdsOrders, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+import { sweetWarning } from '@/lib/sweetAlert';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
-import ArrowLeft from 'react-native-bootstrap-icons/icons/arrow-left';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
 import InfoCircleFill from 'react-native-bootstrap-icons/icons/info-circle-fill';
 import Search from 'react-native-bootstrap-icons/icons/search';
 import Svg, { Line, Rect } from 'react-native-svg';
-import { getApiErrorMessage } from '@/lib/api/client';
-import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 
 const GridIcon = ({ active }: { active: boolean }) => (
   <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -369,8 +368,44 @@ const CustomerManagement: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
-  const handleViewOrders = (customer?: Customer) => {
-    router.push('/ads-ordermanagement');
+  const handleViewOrders = async (customer?: Customer) => {
+    if (!customer) {
+      router.push('/ads-ordermanagement');
+      return;
+    }
+    try {
+      const page = await fetchAdsOrders({
+        search: customer.email || customer.name,
+        page: 0,
+        size: 20,
+      });
+      const items = page.items ?? [];
+      const match =
+        items.find((row) => String(row.customerEmail ?? '').toLowerCase() === customer.email.toLowerCase()) ??
+        items[0];
+      if (match) {
+        const internalId = Number(match.id ?? 0);
+        const orderCode = String(match.orderId ?? match.id ?? '');
+        if (internalId > 0) {
+          router.push({ pathname: '/order-details' as any, params: { id: String(internalId) } });
+          return;
+        }
+        if (orderCode) {
+          router.push({ pathname: '/order-details' as any, params: { orderId: orderCode } });
+          return;
+        }
+      }
+      router.push({
+        pathname: '/ads-ordermanagement' as any,
+        params: { customerEmail: customer.email, customerName: customer.name },
+      });
+    } catch (e) {
+      void sweetWarning('Orders', getApiErrorMessage(e, 'Could not open customer orders.'));
+      router.push({
+        pathname: '/ads-ordermanagement' as any,
+        params: { customerEmail: customer.email },
+      });
+    }
   };
 
   const requestDelete = (customer: Customer) => setDeleteTarget(customer);
@@ -523,8 +558,10 @@ const CustomerManagement: React.FC = () => {
         {/* ---------- Header ---------- */}
         <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-            <TouchableOpacity style={[styles.backBtn, isPhone && { padding: 6 }]} onPress={() => router.push('/Dashboard')}>
-              <ArrowLeft width={isPhone ? 16 : 22} height={isPhone ? 16 : 22} fill="#fff" />
+            <TouchableOpacity onPress={() => router.push('/Dashboard')}>
+              <View style={[styles.headerIconBox, isPhone && { width: 36, height: 36 }]}>
+                <Ionicons name="people" size={isPhone ? 18 : 24} color="#fff" />
+              </View>
             </TouchableOpacity>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
@@ -694,7 +731,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8, alignSelf: 'flex-start', marginTop: 2 },
   headerContent: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerIconBox: {
-    width: 44, height: 44, borderRadius: 10, backgroundColor: COLORS.amber,
+    width: 44, height: 44, borderRadius: 10, backgroundColor: '#F97316',
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },

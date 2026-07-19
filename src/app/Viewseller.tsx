@@ -2,7 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import SellerMediaImage from "@/components/SellerMediaImage";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
+import { isPdfMedia, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   exportSellerOrdersCsv, exportSellerProductsCsv, fetchSellerAnalyticsChart, fetchSellerDetail, normalizeSellerGraphChart,
@@ -582,11 +582,11 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
-  const candidates = React.useMemo(
-    () => buildMediaUrlCandidates(docUrl, docUrl),
-    [docUrl],
-  );
-  const imageUri = candidates[imageIndex] ?? "";
+  const candidates = React.useMemo(() => {
+    const uri = resolveSellerDocumentImageUrl(docUrl, docUrl);
+    return uri ? [uri] : [];
+  }, [docUrl]);
+  const imageUri = candidates[0] ?? "";
   const isPdf = isPdfMedia(docUrl);
 
   useEffect(() => {
@@ -971,13 +971,18 @@ function mapDetailToSellerData(
       }
       return { active, inactive, pending };
     })(),
-    orderStatusDistribution: {
-      pending: Number(orderDist.pending ?? 0),
-      processing: Number(orderDist.processing ?? 0),
-      shipped: Number(orderDist.shipped ?? 0),
-      delivered: Number(orderDist.delivered ?? 0),
-      cancelled: Number(orderDist.cancelled ?? 0),
-    },
+    orderStatusDistribution: (() => {
+      const pending = Number(orderDist.pending ?? 0);
+      const processing = Number(orderDist.processing ?? 0);
+      const shipped = Number(orderDist.shipped ?? 0);
+      const delivered = Number(orderDist.delivered ?? 0);
+      const cancelled = Number(orderDist.cancelled ?? 0);
+      const sum = pending + processing + shipped + delivered + cancelled;
+      if (totalOrders > 0 && sum === 0) {
+        return { pending: totalOrders, processing: 0, shipped: 0, delivered: 0, cancelled: 0 };
+      }
+      return { pending, processing, shipped, delivered, cancelled };
+    })(),
     verificationDocuments: (() => {
       const defaultDocNames = [
         'Aadhaar Front',
@@ -1002,7 +1007,7 @@ function mapDetailToSellerData(
             name,
             available: apiDoc.available !== false,
             path: rawPath || undefined,
-            url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+            url: resolveSellerDocumentImageUrl(rawPath, apiDoc.url) || undefined,
           });
           apiDocsByName.delete(name);
         } else {
@@ -1018,7 +1023,7 @@ function mapDetailToSellerData(
           name,
           available: apiDoc.available !== false,
           path: rawPath || undefined,
-          url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+          url: resolveSellerDocumentImageUrl(rawPath, apiDoc.url) || undefined,
         });
       });
       return finalDocs;
@@ -1308,7 +1313,8 @@ export default function ViewSeller() {
 
   const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
-    setSelectedDocUrl(path || url || '');
+    // Always resolve to flintnthread.com/uploads/seller_documents/... (never .in)
+    setSelectedDocUrl(resolveSellerDocumentImageUrl(path, url));
     setDocModalVisible(true);
   };
 
@@ -1577,7 +1583,11 @@ export default function ViewSeller() {
                 <View style={styles.donutWrap}>
                   <DonutChart
                     segments={orderSegments}
-                    total={Math.max(seller.totalOrders, 1)}
+                    total={Math.max(
+                      orderSegments.reduce((s, x) => s + x.value, 0),
+                      seller.totalOrders,
+                      1,
+                    )}
                     size={width < 600 ? 120 : 150}
                   />
                 </View>
@@ -1789,7 +1799,14 @@ export default function ViewSeller() {
           {seller.verificationDocuments.map((doc, i) => (
             <View key={i} style={styles.docRow}>
               <View style={styles.docLeft}>
-                <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                {doc.available && doc.url && !isPdfMedia(doc.url) ? (
+                  <Image
+                    source={{ uri: resolveSellerDocumentImageUrl(doc.path, doc.url) }}
+                    style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: COLORS.border }}
+                  />
+                ) : (
+                  <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                )}
                 <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
               </View>
               {doc.available && (

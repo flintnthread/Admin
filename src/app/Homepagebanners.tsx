@@ -600,7 +600,7 @@ export default function HomepageBannerManagement() {
                           <View style={styles.card}>
                             <View style={styles.cardImageWrap}>
                               <Image
-                                source={{ uri: resolveCmsMediaUrl(b.imagePath || b.image) }}
+                                source={{ uri: b.image || resolveCmsMediaUrl(b.imagePath) }}
                                 style={styles.cardImage}
                               />
                               <View style={styles.positionChip}>

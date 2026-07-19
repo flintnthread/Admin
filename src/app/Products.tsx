@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from "react"
 import { getApiErrorMessage } from "@/lib/api/client";
 import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { mapProductListRow } from "@/lib/mappers";
-import { deleteProduct, fetchAdminCatalogProducts } from "@/services/productApi";
+import { deleteProduct, fetchProducts } from "@/services/productApi";
 import AdminLayout from "@/components/admin-layout";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -768,7 +768,7 @@ const WebProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchAdminCatalogProducts({ size: 500 });
+            const res = await fetchProducts({ size: 500 });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1290,7 +1290,7 @@ const WebProductsScreen: React.FC = () => {
                                         <View style={wst.emptyState}>
                                             <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
                                             <Text style={wst.emptyTitle}>
-                                                {products.length === 0 ? "No admin products yet" : "No products found"}
+                                                {products.length === 0 ? "No products yet" : "No products found"}
                                             </Text>
                                             <Text style={wst.emptyDesc}>
                                                 {products.length === 0
@@ -1392,7 +1392,7 @@ const WebProductsScreen: React.FC = () => {
                                         <View style={wst.emptyState}>
                                             <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
                                             <Text style={wst.emptyTitle}>
-                                                {products.length === 0 ? "No admin products yet" : "No products found"}
+                                                {products.length === 0 ? "No products yet" : "No products found"}
                                             </Text>
                                             <Text style={wst.emptyDesc}>
                                                 {products.length === 0
@@ -1654,7 +1654,7 @@ const MobileProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchAdminCatalogProducts({ size: 500 });
+            const res = await fetchProducts({ size: 500 });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1973,7 +1973,7 @@ const MobileProductsScreen: React.FC = () => {
                         <View style={s.emptyState}>
                             <MaterialCommunityIcons name="package-variant-closed" size={52} color={C.textLight} />
                             <Text style={s.emptyTitle}>
-                                {products.length === 0 ? "No admin products yet" : "No products found"}
+                                {products.length === 0 ? "No products yet" : "No products found"}
                             </Text>
                             <Text style={s.emptyDesc}>
                                 {products.length === 0

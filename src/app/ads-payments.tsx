@@ -1109,7 +1109,7 @@ const styles = StyleSheet.create({
   },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   searchBox: { flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  searchInput: { flex: 1, fontSize: 13, color: COLORS.ink },
+  searchInput: { flex: 1, fontSize: 13, color: COLORS.ink, outlineStyle: 'none' } as any,
 
   statusDropdownWrap: { position: 'relative', zIndex: 20 },
   statusDropdownBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.rule, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 10, backgroundColor: COLORS.page },

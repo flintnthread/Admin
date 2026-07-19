@@ -169,15 +169,28 @@ const GridCard: React.FC<{
 }> = ({ cat, onEdit, onToggle, onDelete, onNavigate }) => {
     const isActive = cat.status === "Active";
     return (
-        <TouchableOpacity style={cSt.card} onPress={onNavigate} activeOpacity={0.8}>
+        <View style={cSt.card}>
             {/* Top row: action buttons */}
-            <View style={[cSt.topRow, { justifyContent: "flex-end" }]}>
+            <View style={cSt.topRow}>
+                <TouchableOpacity
+                    style={[cSt.iconWrap, { backgroundColor: (cat.color || "#000") + "15" }]}
+                    onPress={onNavigate}
+                    activeOpacity={0.8}
+                >
+                    <Feather name={safeIcon(cat.icon) as any} size={22} color={cat.color || "#000"} />
+                </TouchableOpacity>
                 <View style={cSt.actionBtns}>
+                    <TouchableOpacity
+                        style={[cSt.iconBtn, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18", borderColor: isActive ? ACCENT_TEAL + "40" : ACCENT_RED + "40" }]}
+                        onPress={onToggle}
+                        accessibilityLabel={isActive ? "Set inactive" : "Set active"}
+                    >
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: isActive ? ACCENT_TEAL : ACCENT_RED }}>
+                            {isActive ? "ON" : "OFF"}
+                        </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={cSt.iconBtn} onPress={onEdit}>
                         <Feather name="edit-2" size={13} color={TEXT_BODY} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[cSt.iconBtn, cSt.iconBtnRed]} onPress={onToggle}>
-                        <Feather name={isActive ? "eye-off" : "eye"} size={13} color={ACCENT_RED} />
                     </TouchableOpacity>
                     <TouchableOpacity style={[cSt.iconBtn, cSt.iconBtnRed]} onPress={onDelete}>
                         <Feather name="trash-2" size={13} color={ACCENT_RED} />
@@ -186,8 +199,10 @@ const GridCard: React.FC<{
             </View>
 
             {/* Name + description */}
-            <Text style={cSt.name} numberOfLines={1}>{cat.name}</Text>
-            <Text style={cSt.desc} numberOfLines={2}>{cat.description}</Text>
+            <TouchableOpacity onPress={onNavigate} activeOpacity={0.8}>
+                <Text style={cSt.name} numberOfLines={1}>{cat.name}</Text>
+                <Text style={cSt.desc} numberOfLines={2}>{cat.description}</Text>
+            </TouchableOpacity>
 
             {/* Divider */}
             <View style={cSt.divider} />
@@ -202,14 +217,14 @@ const GridCard: React.FC<{
                     <Feather name="calendar" size={11} color={TEXT_MUTED} />
                     <Text style={cSt.metaText}>{cat.createdAt}</Text>
                 </View>
-                <View style={cSt.metaItem}>
+                <TouchableOpacity style={cSt.metaItem} onPress={onToggle} activeOpacity={0.8}>
                     <View style={[cSt.statusDot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
                     <Text style={[cSt.statusLabel, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>
                         {cat.status.toUpperCase()}
                     </Text>
-                </View>
+                </TouchableOpacity>
             </View>
-        </TouchableOpacity>
+        </View>
     );
 };
 
@@ -223,13 +238,16 @@ const ListRow: React.FC<{
 }> = ({ cat, onEdit, onToggle, onDelete, onNavigate }) => {
     const isActive = cat.status === "Active";
     return (
-        <TouchableOpacity style={lSt.row} onPress={onNavigate} activeOpacity={0.8}>
-            <View style={{ flex: 1.5, flexDirection: "row", alignItems: "center", gap: 14 }}>
+        <View style={lSt.row}>
+            <TouchableOpacity style={{ flex: 1.5, flexDirection: "row", alignItems: "center", gap: 14 }} onPress={onNavigate} activeOpacity={0.8}>
+                <View style={[lSt.iconWrap, { backgroundColor: (cat.color || "#000") + "15" }]}>
+                    <Feather name={safeIcon(cat.icon) as any} size={20} color={cat.color || "#000"} />
+                </View>
                 <View style={lSt.info}>
                     <Text style={lSt.name} numberOfLines={1}>{cat.name}</Text>
                     <Text style={lSt.desc} numberOfLines={1}>{cat.description}</Text>
                 </View>
-            </View>
+            </TouchableOpacity>
             <View style={{ flex: 1, alignItems: "flex-start" }}>
                 <View style={lSt.countBox}>
                     <Text style={lSt.countNum}>{cat.faqCount}</Text>
@@ -237,26 +255,36 @@ const ListRow: React.FC<{
                 </View>
             </View>
             <View style={{ flex: 1, alignItems: "flex-start" }}>
-                <View style={[lSt.badge, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}>
+                <TouchableOpacity
+                    style={[lSt.badge, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}
+                    onPress={onToggle}
+                    activeOpacity={0.8}
+                >
                     <View style={[lSt.dot, { backgroundColor: isActive ? ACCENT_TEAL : ACCENT_RED }]} />
                     <Text style={[lSt.badgeText, { color: isActive ? ACCENT_TEAL : ACCENT_RED }]}>{cat.status}</Text>
-                </View>
+                </TouchableOpacity>
             </View>
             <View style={{ flex: 1, justifyContent: "center" }}>
                 <Text style={lSt.date}>{cat.createdAt}</Text>
             </View>
             <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <TouchableOpacity
+                    style={[lSt.btn, { backgroundColor: isActive ? ACCENT_TEAL + "18" : ACCENT_RED + "18" }]}
+                    onPress={onToggle}
+                    accessibilityLabel="Toggle active status"
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: isActive ? ACCENT_TEAL : ACCENT_RED }}>
+                        {isActive ? "Active" : "Inactive"}
+                    </Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={lSt.btn} onPress={onEdit}>
                     <Feather name="edit-2" size={14} color={PRIMARY} />
-                </TouchableOpacity>
-                <TouchableOpacity style={[lSt.btn, lSt.btnRed]} onPress={onToggle}>
-                    <Feather name={isActive ? "eye-off" : "eye"} size={14} color={ACCENT_RED} />
                 </TouchableOpacity>
                 <TouchableOpacity style={[lSt.btn, lSt.btnRed]} onPress={onDelete}>
                     <Feather name="trash-2" size={14} color={ACCENT_RED} />
                 </TouchableOpacity>
             </View>
-        </TouchableOpacity>
+        </View>
     );
 };
 
@@ -764,7 +792,7 @@ const st = StyleSheet.create({
     toolbarWrap: { flexWrap: "wrap" as any },
     searchWrap: { flex: 1, minWidth: 160, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: PRIMARY + "55", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: BG_PAGE },
     searchWrapFull: { flexBasis: "100%" as any, flex: 1, minWidth: 0 },
-    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, paddingVertical: 0 },
+    searchInput: { flex: 1, fontSize: 13, color: TEXT_HEAD, paddingVertical: 0, outlineStyle: 'none' } as any,
     // Wraps the filter chips + grid/list toggle as a single row so the toggle
     // always renders beside the chips (never on its own separate line).
     filterViewRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },

@@ -1018,13 +1018,13 @@ const DeliveryChargesScreen: React.FC = () => {
             contentContainerStyle={{ paddingBottom: 32 }}
           >
             {/* Mobile Header */}
-            <View style={[styles.mobileHeader, isSmallPhone && { paddingHorizontal: 14, paddingTop: 12 }]}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={[styles.mobileHeaderTitle, isSmallPhone && { fontSize: 18 }]} numberOfLines={1}>Delivery Charges</Text>
-                <Text style={styles.mobileHeaderSub} numberOfLines={1}>Manage weight slabs and charges</Text>
+            <View style={[styles.mobileHeader, isSmallPhone && { paddingHorizontal: 16, paddingTop: 18, gap: 10 }]}>
+              <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                <Text style={[styles.mobileHeaderTitle, isSmallPhone && { fontSize: 17 }]} numberOfLines={2}>Delivery Charges</Text>
+                <Text style={styles.mobileHeaderSub} numberOfLines={2}>Manage weight slabs and charges</Text>
               </View>
               <TouchableOpacity
-                style={[styles.mobileAddBtn, isSmallPhone && { paddingHorizontal: 10, paddingVertical: 8 }]}
+                style={[styles.mobileAddBtn, isSmallPhone && { paddingHorizontal: 12, paddingVertical: 10 }]}
                 activeOpacity={0.85}
                 onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
               >
@@ -1395,37 +1395,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     backgroundColor: "#151D4F",
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 44,
+    paddingTop: 20,
+    paddingBottom: 48,
     marginBottom: 0,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginTop: 12,
   },
   mobileHeaderTitle: {
     fontSize: 18,
-    fontWeight: "400",
+    fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: -0.3,
   },
   mobileHeaderSub: {
     fontSize: 12,
     color: "rgba(255,255,255,0.6)",
-    marginTop: 3,
+    marginTop: 4,
   },
   mobileAddBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 10,
+    flexShrink: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,

@@ -30,6 +30,7 @@ import {
     variantDimensionLabels,
     SWEETS_DEFAULT_COLOR,
 } from "@/lib/product/sweetsCategory";
+import { generateVariantSku } from "@/lib/product/generateVariantSku";
 
 const AppText = Text;
 
@@ -1992,7 +1993,7 @@ type Variant = {
     images: string[]; videoUrl: string;
 };
 
-const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar, categoryName = "", categorySubName = "", subcategoryName = "" }: any) => {
+const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar, categoryName = "", categorySubName = "", subcategoryName = "", productName = "" }: any) => {
     const sweetsProduct = isSweetsCategory(categoryName, categorySubName, subcategoryName);
     const dimLabels = variantDimensionLabels(sweetsProduct);
     const [clrPick, setClrPick] = useState<string | null>(null);
@@ -2048,6 +2049,16 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                 const mrp = parseFloat(String(mrpRaw ?? "")) || 0;
                 const sp = parseFloat(String(spRaw ?? "")) || 0;
                 if (mrp > 0 && sp > 0 && sp <= mrp) u.discount = String(Math.round(((mrp - sp) / mrp) * 100));
+            }
+            if (field === "color" || field === "size" || field === "colorId" || field === "sizeId") {
+                const colorName = String(field === "color" ? cleanVal : u.color ?? "");
+                const sizeName = String(field === "size" ? cleanVal : u.size ?? "");
+                if (colorName && sizeName) {
+                    const sizeMeta = catalog?.sizes?.find((s: { id?: number; name?: string; code?: string }) =>
+                        s.id === u.sizeId || s.name === sizeName
+                    );
+                    u.sku = generateVariantSku(String(productName || "PRD"), colorName, sizeName, undefined, sizeMeta?.code);
+                }
             }
             return u;
         }));
@@ -2925,9 +2936,23 @@ const AddNewProduct: React.FC = () => {
         if (isSaving) return;
         setIsSaving(true);
         try {
+            const variantsWithSku = variants.map((v, idx) => {
+                if (String(v.sku ?? "").trim()) return v;
+                if (!v.color || !v.size) return v;
+                const sizeMeta = catalog?.sizes?.find((s: { id?: number; name?: string; code?: string }) =>
+                    s.id === v.sizeId || s.name === v.size
+                );
+                return {
+                    ...v,
+                    sku: generateVariantSku(String(basicData.name || "PRD"), String(v.color), String(v.size), idx, sizeMeta?.code),
+                };
+            });
+            if (variantsWithSku.some((v, i) => v.sku !== variants[i]?.sku)) {
+                setVariants(variantsWithSku);
+            }
             const payload = await buildCreateProductPayload({
                 basic: basicData,
-                variants,
+                variants: variantsWithSku,
                 images: imagesData,
                 details: detailsData,
             });
@@ -3000,6 +3025,7 @@ const AddNewProduct: React.FC = () => {
                     categoryName={basicData.category}
                     categorySubName={basicData.categorySubName}
                     subcategoryName={basicData.subcategory}
+                    productName={basicData.name}
                 />
             )}
             {step === 2 && <StepImages data={imagesData} onChange={(k: string, v: any) => setImagesData((p) => ({ ...p, [k]: v }))} errors={imageErrors} isDesktop={isDesktop} actionBar={actionBar} />}
