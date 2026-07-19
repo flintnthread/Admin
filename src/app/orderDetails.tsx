@@ -104,6 +104,8 @@ type ApiOrderItem = {
   sku?: string;
   color?: string;
   size?: string;
+  variant?: string;
+  hsnCode?: string;
   quantity?: number;
   price?: number;
   total?: number;
@@ -118,6 +120,9 @@ type OrderItem = {
   sku: string;
   seller: string;
   variant: string;
+  color?: string;
+  size?: string;
+  hsnCode?: string;
   qty: number;
   price: number;
   total: number;
@@ -264,9 +269,15 @@ function isPaymentPaid(status?: string) {
 }
 
 function buildVariantLabel(item: ApiOrderItem) {
-  const parts = [item.color, item.size].filter(Boolean);
+  const parts = [item.color, item.size]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter((v) => v && v !== "—");
   if (parts.length > 0) return parts.join(" / ");
-  return item.status ?? "—";
+  const fromApi = typeof item.variant === "string" ? item.variant.trim() : "";
+  if (fromApi && fromApi !== "—" && !/processing|pending|cancelled|canceled|delivered/i.test(fromApi)) {
+    return fromApi;
+  }
+  return "—";
 }
 
 function uiStatusToBackend(status: OrderStatus): string {
@@ -337,6 +348,8 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
   const price = Number(item.price ?? 0);
   const productName = resolveItemProductName(item);
   const imageUrl = resolveItemImageUrl(item);
+  const color = item.color?.trim() || "";
+  const size = item.size?.trim() || "";
 
   return {
     id: item.id,
@@ -345,6 +358,9 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
     sku: String(item.sku ?? item.productId ?? item.id ?? "—"),
     seller: item.sellerName ?? "Seller",
     variant: buildVariantLabel(item),
+    ...(color ? { color } : {}),
+    ...(size ? { size } : {}),
+    ...(item.hsnCode?.trim() ? { hsnCode: item.hsnCode.trim() } : {}),
     qty,
     price,
     total: Number(item.total ?? qty * price),
@@ -1469,7 +1485,11 @@ export default function OrderDetailScreen() {
                         <View style={[s.tblCell, { flex: 1.5 }]}>
                           <Text style={s.tblCellTxt}>{item.seller}</Text>
                         </View>
-                        <View style={s.tblCell}><Text style={s.tblCellSub}>{item.variant}</Text></View>
+                        <View style={s.tblCell}>
+                          <Text style={s.tblCellSub}>{item.variant || "—"}</Text>
+                          {!!item.color && <Text style={[s.tblCellSub, { fontSize: 11 }]}>Color: {item.color}</Text>}
+                          {!!item.size && <Text style={[s.tblCellSub, { fontSize: 11 }]}>Size: {item.size}</Text>}
+                        </View>
                         <View style={s.tblCell}><Text style={s.tblCellTxt}>{item.qty}</Text></View>
                         <View style={s.tblCell}><Text style={s.tblCellTxt}>{rupee(item.price)}</Text></View>
                         <View style={s.tblCell}><Text style={[s.tblCellTxt, { fontWeight: "700", color: C.primary }]}>{rupee(item.price * item.qty)}</Text></View>
@@ -1493,7 +1513,9 @@ export default function OrderDetailScreen() {
                           {[
                             ["SKU", item.sku],
                             ["Seller", item.seller],
-                            ["Variant", item.variant],
+                            ["Color", item.color || "—"],
+                            ["Size", item.size || "—"],
+                            ["Variant", item.variant || "—"],
                             ["Qty", String(item.qty)],
                             ["Price", rupee(item.price)],
                             ["Total", rupee(item.price * item.qty)],
