@@ -1,20 +1,3 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Modal as RNModal,
-  Platform,
-  useWindowDimensions,
-  Animated as RNAnimated,
-  DimensionValue,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
@@ -29,6 +12,23 @@ import {
   updatePerformanceAd,
   type AdsApiRow,
 } from '@/services/adsApi';
+import { Feather } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  DimensionValue,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Animated as RNAnimated,
+  Modal as RNModal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 // NOTE: adjust the AdminLayout import path above to match your project structure
 // (kept consistent with other screens e.g. homepageSectionsSettings.tsx, customerManagement.tsx)
@@ -388,27 +388,52 @@ export default function PerformanceAdsScreen() {
       status: toApiStatus(form.status),
     };
 
-    if (editingId) {
-      if (!(await sweetCrud.confirmUpdate('Performance ad', body.name))) return;
+    // Store form data before closing modal
+    const savedForm = { ...form };
+    const savedEditingId = editingId;
+
+    // Close modal first before showing any dialogs
+    setModalVisible(false);
+    setEditingId(null);
+    resetForm();
+
+    // Wait for modal close animation to complete
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    // Now show confirmation dialog
+    if (savedEditingId) {
+      if (!(await sweetCrud.confirmUpdate('Performance ad', body.name))) {
+        // User cancelled - reopen modal with saved data
+        setForm(savedForm);
+        setEditingId(savedEditingId);
+        setModalVisible(true);
+        return;
+      }
     } else {
-      if (!(await sweetCrud.confirmAdd('Performance ad', body.name))) return;
+      if (!(await sweetCrud.confirmAdd('Performance ad', body.name))) {
+        // User cancelled - reopen modal with saved data
+        setForm(savedForm);
+        setModalVisible(true);
+        return;
+      }
     }
 
     setSaving(true);
     try {
-      if (editingId) {
-        await updatePerformanceAd(editingId, body);
+      if (savedEditingId) {
+        await updatePerformanceAd(savedEditingId, body);
         void sweetCrud.updated('Performance ad');
       } else {
         await createPerformanceAd(body);
         void sweetCrud.added('Performance ad');
       }
-      setModalVisible(false);
-      resetForm();
-      setEditingId(null);
       await loadAds();
     } catch (err) {
-      void sweetError('Error', getApiErrorMessage(err, editingId ? 'Could not update performance ad.' : 'Could not create performance ad.'));
+      // API failed - reopen modal with saved data and show error
+      setForm(savedForm);
+      setEditingId(savedEditingId);
+      setModalVisible(true);
+      void sweetError('Error', getApiErrorMessage(err, savedEditingId ? 'Could not update performance ad.' : 'Could not create performance ad.'));
     } finally {
       setSaving(false);
     }
