@@ -102,15 +102,11 @@ export default function AdsCustomerDetailsPage() {
       setCustomer(mapped);
 
       const orderPage = await fetchAdsOrders({
-        search: mapped.email !== '—' ? mapped.email : mapped.name,
+        userId: customerId,
         page: 0,
         size: 50,
       });
-      const filtered = (orderPage.items ?? []).filter(
-        (row) => Number(row.userId ?? 0) === customerId
-          || String(row.customerEmail ?? '').toLowerCase() === mapped.email.toLowerCase(),
-      );
-      setOrders(filtered);
+      setOrders(orderPage.items ?? []);
     } catch (e) {
       setError(getApiErrorMessage(e, 'Failed to load customer details.'));
       setCustomer(null);
