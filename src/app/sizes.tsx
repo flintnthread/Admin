@@ -15,29 +15,29 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 import { getApiErrorMessage } from "@/lib/api/client";
 import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
-    createSize,
-    deleteSize,
-    fetchSizes,
-    updateSize,
-    type CatalogSize,
+  createSize,
+  deleteSize,
+  fetchSizes,
+  updateSize,
+  type CatalogSize,
 } from "@/services/sizeApi";
 
 const SIZE_CATALOG_ALL = "all";
@@ -431,7 +431,7 @@ const ModalWrapper: React.FC<{
     >
       <View style={S.modalBox}>
         <LinearGradient
-          colors={["#e07820", "#c0601a"]}
+          colors={["#F97316", "#EA580C"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={S.modalHeader}
@@ -693,13 +693,13 @@ export default function SizesManagement() {
       catalogFilter === SIZE_CATALOG_ALL
         ? sizes
         : sizes.filter((s) => {
-            if (catalogFilter === UNASSIGNED_CATEGORY) {
-              return s.categories.length === 0;
-            }
-            return s.categories.some(
-              (c) => c.toLowerCase() === String(catalogFilter).toLowerCase()
-            );
-          });
+          if (catalogFilter === UNASSIGNED_CATEGORY) {
+            return s.categories.length === 0;
+          }
+          return s.categories.some(
+            (c) => c.toLowerCase() === String(catalogFilter).toLowerCase()
+          );
+        });
     const q = search.toLowerCase().trim();
     if (!q) return byGroup;
     return byGroup.filter(
@@ -829,16 +829,16 @@ export default function SizesManagement() {
                   <View style={[S.headerIconBox, { width: 28, height: 28, marginRight: 0, flexShrink: 0 }]}>
                     <BI name="grid-3x3" size={12} color="#fff" />
                   </View>
-                  <Text style={[S.webPageTitle, { fontSize: width < 360 ? 17 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1}>
+                  <Text style={[S.webPageTitle, { fontSize: width < 360 ? 15 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
                     Sizes Management
                   </Text>
                 </View>
                 <TouchableOpacity
-                  style={[S.addBtn, S.addBtnMobile, { paddingVertical: 6, paddingHorizontal: 10, marginLeft: 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]}
+                  style={[S.addBtn, S.addBtnMobile, { paddingVertical: 6, paddingHorizontal: width < 360 ? 8 : 10, marginLeft: width < 360 ? 4 : 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]}
                   onPress={() => setModal({ type: "add" })}
                 >
-                  <BI name="plus-lg" size={12} color="#fff" />
-                  <Text style={[S.addBtnText, { fontSize: 12, marginLeft: 4 }]}>Add Size</Text>
+                  <BI name="plus-lg" size={width < 360 ? 10 : 12} color="#fff" />
+                  <Text style={[S.addBtnText, { fontSize: width < 360 ? 11 : 12, marginLeft: 4 }]}>Add Size</Text>
                 </TouchableOpacity>
               </View>
 
@@ -983,27 +983,29 @@ export default function SizesManagement() {
               {/* @ts-ignore */}
               <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
                 <View style={{ width: Math.max(containerWidth, 800) }}>
-                  <View style={{ paddingHorizontal: PADDING, paddingTop: 12 }}>
-                    <View style={S.listHeader}>
-                      <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Category</Text>
-                      <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                      <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
-                      <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+                  <View style={{ paddingHorizontal: PADDING, paddingTop: 12, paddingBottom: 24 }}>
+                    <View style={{ borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#f0e8e0" }}>
+                      <View style={S.listHeader}>
+                        <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Category</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
+                        <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
+                        <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+                      </View>
+                      <View style={{ backgroundColor: "#fff" }}>
+                        {paginated.map((item, index) => (
+                          <ListRow
+                            key={item.id}
+                            item={item}
+                            idx={index}
+                            onEdit={s => setModal({ type: "edit", size: s })}
+                            onDelete={s => void handleDelete(s)}
+                          />
+                        ))}
+                      </View>
                     </View>
-                  </View>
-                  <View style={{ paddingHorizontal: PADDING, paddingBottom: 24 }}>
-                    {paginated.map((item, index) => (
-                      <ListRow
-                        key={item.id}
-                        item={item}
-                        idx={index}
-                        onEdit={s => setModal({ type: "edit", size: s })}
-                        onDelete={s => void handleDelete(s)}
-                      />
-                    ))}
                   </View>
                 </View>
               </ScrollView>
@@ -1040,7 +1042,7 @@ const S = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: "#151D4F",
+    backgroundColor: "#1D324E",
     borderRadius: 12,
     marginHorizontal: 16,
     marginTop: 16,
@@ -1056,15 +1058,15 @@ const S = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: "#e07820",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
   addBtn: {
-    backgroundColor: "#e07820",
+    backgroundColor: "#F97316",
     borderWidth: 1.2,
-    borderColor: "#e07820",
+    borderColor: "#F97316",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -1164,6 +1166,7 @@ const S = StyleSheet.create({
     borderColor: "#FED7AA",
     borderRadius: 10,
     padding: 12,
+    marginTop: 16,
     marginBottom: 14,
   },
   catalogMatchLabel: {
@@ -1199,9 +1202,9 @@ const S = StyleSheet.create({
 
   // List view
   listHeader: {
-    flexDirection: "row", backgroundColor: "#151D4F",
+    flexDirection: "row", backgroundColor: "#1D324E",
     paddingHorizontal: 12, paddingVertical: 12,
-    borderBottomWidth: 1.5, borderBottomColor: "#f0e8e0",
+    borderBottomWidth: 1.5, borderBottomColor: "#E8E0D8",
   },
   listHeaderCell: { fontSize: 13, fontWeight: "600", color: "#fff" },
   listRow: {
@@ -1256,7 +1259,7 @@ const S = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1, backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center", alignItems: "center", padding: 20,
+    justifyContent: "center", alignItems: "center", padding: 12,
   },
   modalBox: {
     backgroundColor: "#fff", borderRadius: 14, width: "100%", maxWidth: 460,
@@ -1271,7 +1274,7 @@ const S = StyleSheet.create({
   modalCloseBtn: { padding: 4 },
   modalBody: { padding: 20 },
   modalFooter: {
-    flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "flex-end",
+    flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "flex-end", flexWrap: "wrap",
   },
 
   // Form
@@ -1290,19 +1293,19 @@ const S = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     backgroundColor: "#fafafa",
   },
-  statusToggleBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  statusToggleBtnActive: { backgroundColor: "#F97316", borderColor: "#F97316" },
   statusToggleBtnText: { fontSize: 14, fontWeight: "600", color: "#555" },
 
   // Buttons
   cancelBtn: {
     backgroundColor: "#3a3f4a", borderRadius: 8,
-    paddingHorizontal: 18, paddingVertical: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: "row", alignItems: "center",
   },
   cancelBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
   confirmBtn: {
-    backgroundColor: "#e07820", borderRadius: 8,
-    paddingHorizontal: 18, paddingVertical: 10,
+    backgroundColor: "#F97316", borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: "row", alignItems: "center",
   },
   confirmBtnDisabled: { backgroundColor: "#ccc" },
@@ -1331,7 +1334,7 @@ const S = StyleSheet.create({
     backgroundColor: "#fafafa",
   },
   dropdownBtnOpen: {
-    borderColor: "#e07820",
+    borderColor: "#F97316",
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     borderBottomWidth: 0,
@@ -1342,7 +1345,7 @@ const S = StyleSheet.create({
     top: "100%" as any,
     left: 0, right: 0,
     backgroundColor: "#fff",
-    borderWidth: 1.5, borderColor: "#e07820", borderTopWidth: 0,
+    borderWidth: 1.5, borderColor: "#F97316", borderTopWidth: 0,
     borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
     overflow: "hidden", zIndex: 200,
     shadowColor: "#000", shadowOffset: { width: 0, height: 6 },

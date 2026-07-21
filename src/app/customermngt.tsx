@@ -25,7 +25,11 @@
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
+
 import { deleteAdsCustomer, fetchAdsCustomers, fetchAdsOrders, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+
+
+
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -367,11 +371,16 @@ const CustomerManagement: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
+  const handleViewCustomer = (customer: Customer) => {
+    router.push({ pathname: '/adsCustomerDetails' as any, params: { id: String(customer.id) } });
+  };
+
   const handleViewOrders = async (customer?: Customer) => {
     if (!customer) {
       router.push('/ads-ordermanagement');
       return;
     }
+
     try {
       const page = await fetchAdsOrders({
         search: customer.name || customer.email,
@@ -474,7 +483,7 @@ const CustomerManagement: React.FC = () => {
         <Text style={{ color: COLORS.sub, fontSize: 12, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.joined}</Text>
       </View>
       <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }, !isPhone && { marginLeft: 55 }]}>
-        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewOrders(item)}>
+        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewCustomer(item)}>
           <Ionicons name="eye" size={15} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
@@ -542,7 +551,7 @@ const CustomerManagement: React.FC = () => {
         </View>
 
         <View style={styles.gridActionsRow}>
-          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
+          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewCustomer(item)}>
             <Ionicons name="eye" size={14} color="#fff" />
             <Text style={styles.ordersBtnText}>View</Text>
           </TouchableOpacity>
