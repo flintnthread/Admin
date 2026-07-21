@@ -805,8 +805,8 @@ function GrowthDial({ growthPct }: { growthPct: number }) {
   const dialPct = Math.min(100, Math.abs(growthPct) * 2.2 + 12);
   return (
     <View style={styles.dialWrap}>
-      <Gauge pct={dialPct} size={160} strokeWidth={14} color={color} />
-      <View style={styles.dialLabelWrap} pointerEvents="none">
+      <Gauge pct={dialPct} size={160} strokeWidth={14} color={color} full />
+      <View style={[styles.dialLabelWrap, { bottom: 0, top: 0, left: 0, right: 0, justifyContent: 'center' }]} pointerEvents="none">
         <Text style={[styles.dialValue, { color }]}>{positive ? '+' : ''}{growthPct.toFixed(1)}%</Text>
         <Text style={styles.dialCaption}>GROWTH</Text>
       </View>

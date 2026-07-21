@@ -336,7 +336,7 @@ function ListIconGlyph({ color = COLORS.muted, size = 16 }: { color?: string; si
 /* ------------------------------------------------------------------ */
 function ScreenHeader() {
   return (
-    <View style={[styles.header, { paddingBottom: 64, paddingTop: 24 }]}>
+    <View style={[styles.header, { paddingBottom: 54, paddingTop: 16 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, gap: 14 }}>
         <View style={{ width: 48, height: 48, backgroundColor: COLORS.orange, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
           <ReceiptGlyph color="#fff" size={24} />
@@ -986,7 +986,7 @@ export default function AdsPaymentsScreen() {
       <View style={{ flex: 1, width: '100%' }} onLayout={onLayout}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: contentPad, paddingTop: 16, paddingBottom: 28, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <ScreenHeader />
-          <View style={{ marginTop: -36, paddingHorizontal: 16, zIndex: 10 }}>
+          <View style={{ marginTop: -52, paddingHorizontal: 16, zIndex: 10 }}>
             <StatCardsRow stats={stats} isPhone={bp === 'phone'} />
           </View>
 
