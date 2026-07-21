@@ -336,10 +336,10 @@ export default function CustomerEmailsScreen() {
                 setTotalCustomersCount(
                     Number(
                         stats.total ??
-                            stats.totalCustomers ??
-                            page.totalElements ??
-                            page.items?.length ??
-                            0,
+                        stats.totalCustomers ??
+                        page.totalElements ??
+                        page.items?.length ??
+                        0,
                     ),
                 );
 
