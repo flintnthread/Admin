@@ -25,7 +25,11 @@
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+
+import { deleteAdsCustomer, fetchAdsCustomers, fetchAdsOrders, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+
+
+
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -371,15 +375,48 @@ const CustomerManagement: React.FC = () => {
     router.push({ pathname: '/adsCustomerDetails' as any, params: { id: String(customer.id) } });
   };
 
-  const handleViewOrders = (customer?: Customer) => {
+  const handleViewOrders = async (customer?: Customer) => {
     if (!customer) {
       router.push('/ads-ordermanagement');
       return;
     }
-    router.push({
-      pathname: '/ads-ordermanagement' as any,
-      params: { customerEmail: customer.email, customerName: customer.name },
-    });
+
+    try {
+      const page = await fetchAdsOrders({
+        search: customer.name || customer.email,
+        page: 0,
+        size: 20,
+      });
+      const items = page.items ?? [];
+      const match =
+        items.find(
+          (row) =>
+            String(row.customerEmail ?? '').toLowerCase() === customer.email.toLowerCase() ||
+            String(row.customerName ?? '').toLowerCase() === customer.name.toLowerCase()
+        ) ?? items[0];
+
+      if (match) {
+        const internalId = Number(match.id ?? 0);
+        const orderCode = String(match.orderId ?? match.id ?? '');
+        if (internalId > 0) {
+          router.push({ pathname: '/order-details' as any, params: { id: String(internalId) } });
+          return;
+        }
+        if (orderCode) {
+          router.push({ pathname: '/order-details' as any, params: { orderId: orderCode } });
+          return;
+        }
+      }
+      router.push({
+        pathname: '/ads-ordermanagement' as any,
+        params: { customerEmail: customer.email, customerName: customer.name },
+      });
+    } catch (e) {
+      router.push({
+        pathname: '/ads-ordermanagement' as any,
+        params: { customerEmail: customer.email },
+      });
+    }
   };
 
   const requestDelete = (customer: Customer) => setDeleteTarget(customer);

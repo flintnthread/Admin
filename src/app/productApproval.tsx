@@ -254,7 +254,7 @@ function FilterDropdown({
       </Pressable>
       {isOpen && options && options.length > 0 && (
         <View style={styles.dropdownMenu}>
-          <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled>
+          <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
             {options.map((opt, i) => (
               <Pressable
                 key={i}
@@ -878,7 +878,7 @@ function filterStatusForApi(filter: FilterKey): string | undefined {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function ProductApprovalScreen() {
-  const { isMobile, isTablet, isWide, width } = useBreakpoint();
+  const { isMobile, isTablet, isWide, width, isLaptop } = useBreakpoint();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
@@ -1160,7 +1160,7 @@ export default function ProductApprovalScreen() {
               </Pressable>
             </View>
           ) : isWide ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 8, minWidth: '100%' }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={isLaptop} style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 8, minWidth: '100%' }}>
                 <ProductTable
                   products={products}
                   selected={selected}
@@ -1399,7 +1399,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mobileHeaderStats: {
-    marginTop: -42,
+    marginTop: -62,
     zIndex: 10,
     elevation: 10,
     marginBottom: 4,
@@ -1482,7 +1482,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statsScrollWrapper: {
-    marginTop: 0,
+    marginTop: -62,
     zIndex: 10,
     marginBottom: 4,
     alignSelf: 'stretch',
@@ -1925,7 +1925,7 @@ const styles = StyleSheet.create({
   },
   table: {
     width: '100%',
-    minWidth: 1100,
+    minWidth: 1000,
   },
   tableHeader: {
     flexDirection: 'row',
@@ -1956,38 +1956,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tableColProduct: {
-    flex: 1,
-    minWidth: 180,
+    flex: 1.2,
     paddingRight: 16,
   },
   tableColSeller: {
     flex: 1,
-    minWidth: 140,
     paddingRight: 16,
   },
   tableColCategory: {
     flex: 1.4,
-    minWidth: 160,
     paddingRight: 16,
   },
   tableColPrice: {
     flex: 0.9,
-    minWidth: 100,
     paddingRight: 16,
   },
   tableColStatus: {
     flex: 0.8,
-    minWidth: 100,
     paddingRight: 16,
   },
   tableColDate: {
     flex: 1,
-    minWidth: 120,
     paddingRight: 16,
   },
   tableColActions: {
     flex: 1.2,
-    minWidth: 160,
   },
   checkbox: {
     width: 18,

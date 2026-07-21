@@ -365,7 +365,7 @@ function ListIconGlyph({
 /* ------------------------------------------------------------------ */
 function ScreenHeader() {
   return (
-    <View style={[styles.header, { paddingBottom: 56, paddingTop: 24 }]}>
+    <View style={[styles.header, { paddingBottom: 48, paddingTop: 16 }]}>
       <View
         style={{
           flexDirection: "row",
@@ -1220,7 +1220,7 @@ export default function AdsOrderManagementScreen() {
 
           {/* Stat cards */}
           {bp === "phone" ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: -32, zIndex: 10 }} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingRight: 32 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: -48, zIndex: 10 }} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingRight: 32 }}>
               <StatCard
                 icon={<OrderGlyph color={COLORS.navyDeep} size={17} />}
                 label="TOTAL ORDERS"
@@ -1251,7 +1251,7 @@ export default function AdsOrderManagementScreen() {
               />
             </ScrollView>
           ) : (
-            <View style={[styles.statsRow, { marginTop: -32, paddingHorizontal: 16, zIndex: 10 }]}>
+            <View style={[styles.statsRow, { marginTop: -48, paddingHorizontal: 16, zIndex: 10 }]}>
               <StatCard
                 icon={<OrderGlyph color={COLORS.navyDeep} size={17} />}
                 label="TOTAL ORDERS"

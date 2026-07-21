@@ -1,4 +1,5 @@
-﻿import AdminLayout from "@/components/admin-layout";
+import AdminLayout from "@/components/admin-layout";
+import AdminSidebar from "@/components/admin-sidebar";
 import Pagination from "@/components/Pagination";
 import SellerDocumentImage from "@/components/SellerDocumentImage";
 import { useAuth } from "@/context/auth-context";
@@ -610,35 +611,33 @@ export default function ApprovedSellersScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Header */}
-        <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E" }]}>
-          <TouchableOpacity
-            style={stylesMobile.detailsHeaderBack}
-            onPress={() => setSelectedSellerId(null)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            activeOpacity={0.7}
-          >
-            <Feather name="arrow-left" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-          <View style={stylesMobile.headerCenterContainerMobile}>
-            <Text style={stylesMobile.headerSellerNameMobile} numberOfLines={1}>{seller.name}</Text>
-            <Text style={stylesMobile.headerSellerIdMobile}>ID: {sellerDetail?.sellerUniqueId ?? seller.sellerUniqueId ?? `Seller #${seller.id}`}</Text>
-          </View>
-          <View style={stylesMobile.headerRightContainerMobile}>
-            <View style={[stylesMobile.headerStatusBadgeMobile, seller.status === "Active" ? stylesMobile.headerStatusActiveMobile : stylesMobile.headerStatusBlockedMobile]}>
-              <Text style={[stylesMobile.headerStatusBadgeTextMobile, { color: seller.status === "Active" ? "#10B981" : "#EF4444" }]}>
-                {seller.status}
-              </Text>
-            </View>
-          </View>
-        </View>
-        <Text style={stylesMobile.detailsHeaderSub}>ID: FNT-SELLER-0000{seller.id}</Text>
-
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
+          contentContainerStyle={{ paddingBottom: 40, paddingTop: 0 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Header */}
+          <View style={[stylesMobile.detailsHeader, { backgroundColor: "#1D324E", marginBottom: 16 }]}>
+            <TouchableOpacity
+              style={stylesMobile.detailsHeaderBack}
+              onPress={() => setSelectedSellerId(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <Feather name="arrow-left" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+            <View style={stylesMobile.headerCenterContainerMobile}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={stylesMobile.headerSellerNameMobile} numberOfLines={1}>{seller.name}</Text>
+                <View style={[stylesMobile.headerStatusBadgeMobile, seller.status === "Active" ? stylesMobile.headerStatusActiveMobile : stylesMobile.headerStatusBlockedMobile]}>
+                  <Text style={[stylesMobile.headerStatusBadgeTextMobile, { color: seller.status === "Active" ? "#10B981" : "#EF4444" }]}>
+                    {seller.status}
+                  </Text>
+                </View>
+              </View>
+              <Text style={stylesMobile.headerSellerIdMobile}>ID: {sellerDetail?.sellerUniqueId ?? seller.sellerUniqueId ?? `Seller #${seller.id}`}</Text>
+            </View>
+          </View>
           {/* 1. Seller Profile Header Card */}
           <View style={stylesMobile.detailsProfileCard}>
             <SellerMediaImage
@@ -1151,57 +1150,14 @@ export default function ApprovedSellersScreen() {
               activeOpacity={1}
               onPress={() => setMobileMenuOpen(false)}
             >
-              <View style={stylesMobile.drawerPanel}>
-                <View style={stylesMobile.drawerHeader}>
+              <View style={[stylesMobile.drawerPanel, { padding: 0 }]}>
+                <View style={[stylesMobile.drawerHeader, { marginBottom: 0, paddingHorizontal: 16, paddingVertical: 12 }]}>
                   <Text style={stylesMobile.drawerHeaderText}>Navigation</Text>
                   <TouchableOpacity onPress={() => setMobileMenuOpen(false)}>
                     <Feather name="x" size={20} color="#1E293B" />
                   </TouchableOpacity>
                 </View>
-                <View style={stylesMobile.drawerContent}>
-                  <TouchableOpacity
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/Dashboard"); }}
-                  >
-                    <Feather name="home" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Dashboard</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/Products"); }}
-                  >
-                    <Feather name="box" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Catalog</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[stylesMobile.drawerItem, { backgroundColor: "#FFF7ED" }]}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/approveseller"); }}
-                  >
-                    <Feather name="users" size={18} color="#EA580C" style={{ marginRight: 12 }} />
-                    <Text style={[stylesMobile.drawerItemText, { color: "#EA580C", fontWeight: "600" }]}>Sellers</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/sellergraphs"); }}
-                  >
-                    <Feather name="bar-chart-2" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Analytics</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/adminpanel"); }}
-                  >
-                    <Feather name="settings" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Settings</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={stylesMobile.drawerItem}
-                    onPress={() => { setMobileMenuOpen(false); router.push("/profile"); }}
-                  >
-                    <Feather name="user" size={18} color="#64748B" style={{ marginRight: 12 }} />
-                    <Text style={stylesMobile.drawerItemText}>Profile</Text>
-                  </TouchableOpacity>
-                </View>
+                <AdminSidebar collapsed={false} onToggleCollapse={() => { }} isLargeScreen={false} />
               </View>
             </TouchableOpacity>
           </Modal>
@@ -1641,20 +1597,6 @@ export default function ApprovedSellersScreen() {
     return (
       <AdminLayout>
         <View style={stylesMobile.container}>
-          {/* Search bar inside content */}
-          <View style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 12, height: 42, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name="search" size={16} color="#64748B" style={{ marginRight: 6 }} />
-            <TextInput
-              style={{ flex: 1, fontSize: 14, color: '#1E293B' }}
-              placeholder="Search by name, email, business..."
-              placeholderTextColor="#94A3B8"
-              value={searchQuery}
-              onChangeText={(text) => {
-                setSearchQuery(text);
-                setCurrentPage(1);
-              }}
-            />
-          </View>
 
           {/* --- SCROLLABLE BODY --- */}
           <ScrollView
@@ -1666,8 +1608,23 @@ export default function ApprovedSellersScreen() {
             <View style={stylesMobile.pageBannerCard}>
               <Text style={stylesMobile.pageBannerTitle}>Approved Sellers</Text>
               <Text style={stylesMobile.pageBannerSubtitle}>Manage and monitor verified merchant accounts</Text>
-
             </View>
+
+            {/* Search bar inside content */}
+            <View style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 12, height: 42, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="search" size={16} color="#64748B" style={{ marginRight: 6 }} />
+              <TextInput
+                style={{ flex: 1, fontSize: 14, color: '#1E293B' }}
+                placeholder="Search by name, email, business..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={(text) => {
+                  setSearchQuery(text);
+                  setCurrentPage(1);
+                }}
+              />
+            </View>
+
 
             <View style={stylesMobile.actionButtonsRow}>
               <TouchableOpacity
@@ -6396,8 +6353,8 @@ const stylesMobile = StyleSheet.create({
   },
   detailsHeader: {
     backgroundColor: "#151D4F", // Deep navy blue
-    marginHorizontal: 2,
-    marginTop: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingTop: Platform.OS === "android" ? 16 : 10,
