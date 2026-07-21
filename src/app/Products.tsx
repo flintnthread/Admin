@@ -768,7 +768,7 @@ const WebProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchProducts({ size: 500 });
+            const res = await fetchProducts({ size: 500, adminOnly: true });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -1273,19 +1273,9 @@ const WebProductsScreen: React.FC = () => {
                                 </View>
                             </View>
 
-                            {/* LIST VIEW */}
+                            {/* LIST VIEW — card layout on mobile/tablet; full table on desktop */}
                             {viewType === "list" && (
                                 <ScrollView style={wst.tableScroll} showsVerticalScrollIndicator={false}>
-                                    <View style={wst.tableHead}>
-                                        <Text style={[wst.tableHeadCell, { flex: 2.7 }]}>Product</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 1.6 }]}>SKU</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 1.5 }]}>Category</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 0.7 }]}>Size</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 0.9 }]}>Price</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 0.7 }]}>Stock</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 1.0 }]}>Status</Text>
-                                        <Text style={[wst.tableHeadCell, { flex: 0.7, textAlign: "right" }]}>Actions</Text>
-                                    </View>
                                     {visibleProducts.length === 0 ? (
                                         <View style={wst.emptyState}>
                                             <MaterialCommunityIcons name="package-variant-closed" size={48} color={C.textLight} />
@@ -1307,71 +1297,127 @@ const WebProductsScreen: React.FC = () => {
                                                 </TouchableOpacity>
                                             )}
                                         </View>
-                                    ) : (
-                                        visibleProducts.map((product, idx) => {
-                                            const st = getStatusStyle(product.status);
-                                            const isLow = product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD;
-                                            return (
-                                                <TouchableOpacity
-                                                    key={product.id}
-                                                    style={[wst.tableRow, idx % 2 === 1 && wst.tableRowAlt]}
-                                                    onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
-                                                    activeOpacity={0.7}
-                                                >
-                                                    {/* Product */}
-                                                    <View style={[wst.tableCell, { flex: 2.7 }]}>
-                                                        {product.image ? (
-                                                            <Image source={{ uri: product.image }} style={wst.tableProductImg} />
-                                                        ) : (
-                                                            <View style={[wst.tableProductImg, { alignItems: "center", justifyContent: "center" }]}>
-                                                                <MaterialCommunityIcons name="package-variant" size={20} color={C.textLight} />
+                                    ) : !isDesktopWeb ? (
+                                        <View style={wst.mobileListContainer}>
+                                            {visibleProducts.map((product) => {
+                                                const st = getStatusStyle(product.status);
+                                                const isLow = product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={product.id}
+                                                        style={wst.mobileListCard}
+                                                        onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <View style={wst.mobileListTop}>
+                                                            {product.image ? (
+                                                                <Image source={{ uri: product.image }} style={wst.mobileListImg} />
+                                                            ) : (
+                                                                <View style={[wst.mobileListImg, { alignItems: "center", justifyContent: "center" }]}>
+                                                                    <MaterialCommunityIcons name="package-variant" size={28} color={C.textLight} />
+                                                                </View>
+                                                            )}
+                                                            <View style={wst.mobileListInfo}>
+                                                                <Text style={wst.mobileListName} numberOfLines={2}>{product.name}</Text>
+                                                                <Text style={wst.mobileListSku} numberOfLines={1}>SKU: {product.sku}</Text>
+                                                                <Text style={wst.mobileListCat} numberOfLines={1}>
+                                                                    {product.category}{product.subcategory ? ` · ${product.subcategory}` : ""}
+                                                                </Text>
                                                             </View>
-                                                        )}
-                                                        <View style={{ flex: 1 }}>
-                                                            <Text style={wst.tableProductName} numberOfLines={1}>{truncateTitle(product.name)}</Text>
-                                                            <Text style={wst.tableProductSub}>{product.color}</Text>
-                                                            <Text style={wst.tableProductUpdated}>Updated {product.updated}</Text>
+                                                            <TouchableOpacity
+                                                                style={wst.actionBtn}
+                                                                onPress={(e) => { e.stopPropagation(); setProductActionId(product.id); }}
+                                                                activeOpacity={0.75}
+                                                            >
+                                                                <MaterialCommunityIcons name="dots-vertical" size={16} color={C.textMid} />
+                                                            </TouchableOpacity>
                                                         </View>
-                                                    </View>
-                                                    {/* SKU */}
-                                                    <View style={[wst.tableCell, { flex: 1.6 }]}>
-                                                        <Text style={wst.tableCellSku}>{product.sku}</Text>
-                                                    </View>
-                                                    {/* Category */}
-                                                    <View style={[wst.tableCell, { flex: 1.5, flexDirection: "column", alignItems: "flex-start", gap: 3 }]}>
-                                                        <View style={wst.categoryTag}><Text style={wst.categoryTagTxt} numberOfLines={1}>{product.category}</Text></View>
-                                                        <Text style={wst.subcategoryTxt}>{product.subcategory}</Text>
-                                                    </View>
-                                                    {/* Size */}
-                                                    <View style={[wst.tableCell, { flex: 0.7, flexDirection: "column", alignItems: "flex-start" }]}>
-                                                        <View style={wst.sizePill}><Text style={wst.sizePillTxt}>{product.size}</Text></View>
-                                                    </View>
-                                                    {/* Price */}
-                                                    <View style={[wst.tableCell, { flex: 0.9 }]}>
-                                                        <Text style={wst.tablePriceVal}>₹{product.price.toLocaleString()}</Text>
-                                                    </View>
-                                                    {/* Stock */}
-                                                    <View style={[wst.tableCell, { flex: 0.7, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
-                                                        <Text style={[wst.tableStockVal, isLow && { color: C.orange }]}>{product.stock}</Text>
-                                                        {isLow && <Text style={wst.lowStockHint}>Low ⚠</Text>}
-                                                        {product.stock === 0 && <Text style={wst.outStockHint}>Out</Text>}
-                                                    </View>
-                                                    {/* Status */}
-                                                    <View style={[wst.tableCell, { flex: 1.0 }]}>
-                                                        <View style={[wst.statusPill, { backgroundColor: st.bg }]}>
-                                                            <View style={[wst.statusDot, { backgroundColor: st.dot }]} />
-                                                            <Text style={[wst.statusPillTxt, { color: st.color }]} numberOfLines={1}>{product.status}</Text>
+                                                        <View style={wst.mobileListMeta}>
+                                                            <Text style={wst.mobileListPrice}>₹{product.price.toLocaleString()}</Text>
+                                                            <Text style={[wst.mobileListStock, isLow && { color: C.orange }, product.stock === 0 && { color: C.red }]}>
+                                                                Stock: {product.stock}{isLow ? " ⚠" : ""}
+                                                            </Text>
+                                                            {product.size ? (
+                                                                <View style={wst.sizePill}><Text style={wst.sizePillTxt}>Size: {product.size}</Text></View>
+                                                            ) : null}
+                                                            <View style={[wst.statusPill, { backgroundColor: st.bg }]}>
+                                                                <View style={[wst.statusDot, { backgroundColor: st.dot }]} />
+                                                                <Text style={[wst.statusPillTxt, { color: st.color }]} numberOfLines={1}>{product.status}</Text>
+                                                            </View>
                                                         </View>
-                                                    </View>
-                                                    {/* Actions */}
-                                                    <View style={[wst.tableCell, { flex: 0.7, justifyContent: "flex-end" }]}>
-                                                        <TouchableOpacity style={wst.actionBtn} onPress={(e) => { e.stopPropagation(); setProductActionId(product.id); }} activeOpacity={0.75}>
-                                                            <MaterialCommunityIcons name="dots-horizontal" size={16} color={C.textMid} />
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </TouchableOpacity>
-                                            );
-                                        })
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <View style={wst.tableHead}>
+                                                <Text style={[wst.tableHeadCell, { flex: 2.7 }]}>Product</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 1.6 }]}>SKU</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 1.5 }]}>Category</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 0.7 }]}>Size</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 0.9 }]}>Price</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 0.7 }]}>Stock</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 1.0 }]}>Status</Text>
+                                                <Text style={[wst.tableHeadCell, { flex: 0.7, textAlign: "right" }]}>Actions</Text>
+                                            </View>
+                                            {visibleProducts.map((product, idx) => {
+                                                const st = getStatusStyle(product.status);
+                                                const isLow = product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={product.id}
+                                                        style={[wst.tableRow, idx % 2 === 1 && wst.tableRowAlt]}
+                                                        onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <View style={[wst.tableCell, { flex: 2.7, minWidth: 0 }]}>
+                                                            {product.image ? (
+                                                                <Image source={{ uri: product.image }} style={wst.tableProductImg} />
+                                                            ) : (
+                                                                <View style={[wst.tableProductImg, { alignItems: "center", justifyContent: "center" }]}>
+                                                                    <MaterialCommunityIcons name="package-variant" size={20} color={C.textLight} />
+                                                                </View>
+                                                            )}
+                                                            <View style={{ flex: 1, minWidth: 0 }}>
+                                                                <Text style={wst.tableProductName} numberOfLines={1}>{truncateTitle(product.name)}</Text>
+                                                                <Text style={wst.tableProductSub} numberOfLines={1}>{product.color}</Text>
+                                                                <Text style={wst.tableProductUpdated} numberOfLines={1}>Updated {product.updated}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 1.6, minWidth: 0 }]}>
+                                                            <Text style={wst.tableCellSku} numberOfLines={1}>{product.sku}</Text>
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 1.5, flexDirection: "column", alignItems: "flex-start", gap: 3, minWidth: 0 }]}>
+                                                            <View style={wst.categoryTag}><Text style={wst.categoryTagTxt} numberOfLines={1}>{product.category}</Text></View>
+                                                            <Text style={wst.subcategoryTxt} numberOfLines={1}>{product.subcategory}</Text>
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 0.7, flexDirection: "column", alignItems: "flex-start" }]}>
+                                                            <View style={wst.sizePill}><Text style={wst.sizePillTxt}>{product.size}</Text></View>
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 0.9 }]}>
+                                                            <Text style={wst.tablePriceVal}>₹{product.price.toLocaleString()}</Text>
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 0.7, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
+                                                            <Text style={[wst.tableStockVal, isLow && { color: C.orange }]}>{product.stock}</Text>
+                                                            {isLow && <Text style={wst.lowStockHint}>Low ⚠</Text>}
+                                                            {product.stock === 0 && <Text style={wst.outStockHint}>Out</Text>}
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 1.0, minWidth: 0 }]}>
+                                                            <View style={[wst.statusPill, { backgroundColor: st.bg }]}>
+                                                                <View style={[wst.statusDot, { backgroundColor: st.dot }]} />
+                                                                <Text style={[wst.statusPillTxt, { color: st.color }]} numberOfLines={1}>{product.status}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={[wst.tableCell, { flex: 0.7, justifyContent: "flex-end" }]}>
+                                                            <TouchableOpacity style={wst.actionBtn} onPress={(e) => { e.stopPropagation(); setProductActionId(product.id); }} activeOpacity={0.75}>
+                                                                <MaterialCommunityIcons name="dots-horizontal" size={16} color={C.textMid} />
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </>
                                     )}
                                     {hasMore && (
                                         <TouchableOpacity style={wst.loadMoreBtn} onPress={() => setVisibleCount(c => c + 20)} activeOpacity={0.8}>
@@ -1410,21 +1456,29 @@ const WebProductsScreen: React.FC = () => {
                                             )}
                                         </View>
                                     ) : (
-                                        <View style={wst.webGridContainer}>
+                                        <View style={[
+                                            wst.webGridContainer,
+                                            isMobileWeb && { gap: 12, padding: 12 },
+                                            isTabletWeb && { gap: 12, padding: 14 },
+                                        ]}>
                                             {visibleProducts.map(product => {
                                                 const st = getStatusStyle(product.status);
                                                 return (
                                                     <TouchableOpacity
                                                         key={product.id}
-                                                        style={wst.webGridCard}
+                                                        style={[
+                                                            wst.webGridCard,
+                                                            isMobileWeb && { width: "100%" as any, minWidth: 0 },
+                                                            isTabletWeb && { width: "47%" as any, minWidth: 0 },
+                                                        ]}
                                                         onPress={() => router.push({ pathname: '/productDetails', params: { id: product.id } })}
                                                         activeOpacity={0.75}
                                                     >
                                                         <View style={wst.webGridImgWrap}>
                                                             {product.image ? (
-                                                                <Image source={{ uri: product.image }} style={wst.webGridImg} resizeMode="contain" />
+                                                                <Image source={{ uri: product.image }} style={[wst.webGridImg, isMobileWeb && { height: 180 }]} resizeMode="contain" />
                                                             ) : (
-                                                                <View style={[wst.webGridImg, { alignItems: "center", justifyContent: "center" }]}>
+                                                                <View style={[wst.webGridImg, isMobileWeb && { height: 180 }, { alignItems: "center", justifyContent: "center" }]}>
                                                                     <MaterialCommunityIcons name="package-variant" size={48} color={C.textLight} />
                                                                 </View>
                                                             )}
@@ -1437,7 +1491,7 @@ const WebProductsScreen: React.FC = () => {
                                                             </TouchableOpacity>
                                                         </View>
                                                         <View style={wst.webGridInfo}>
-                                                            <Text style={wst.webGridName} numberOfLines={2}>{truncateTitle(product.name)}</Text>
+                                                            <Text style={wst.webGridName} numberOfLines={2}>{product.name}</Text>
                                                             <Text style={wst.webGridSku}>{product.sku}</Text>
                                                             <View style={wst.webGridMeta}>
                                                                 <Text style={wst.webGridPrice}>₹{product.price.toLocaleString()}</Text>
@@ -1597,11 +1651,11 @@ const wst = StyleSheet.create({
     tableRowAlt: { backgroundColor: "#FAFBFF" },
     tableCell: { flexDirection: "row", alignItems: "center", gap: 10 },
     tableProductImg: { width: 44, height: 44, borderRadius: 9, backgroundColor: C.bg },
-    tableProductName: { fontSize: 13, color: C.textDark, marginBottom: 2 },
-    tableProductSub: { fontSize: 11, color: C.textLight, marginBottom: 1 },
-    tableProductUpdated: { fontSize: 10.5, color: C.textLight },
-    tableCellSku: { fontSize: 12, color: C.purple, backgroundColor: C.purplePale, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-    categoryTag: { backgroundColor: "#EEF1FF", borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, alignSelf: "flex-start" },
+    tableProductName: { fontSize: 13, color: C.textDark, marginBottom: 2, flexShrink: 1 },
+    tableProductSub: { fontSize: 11, color: C.textLight, marginBottom: 1, flexShrink: 1 },
+    tableProductUpdated: { fontSize: 10.5, color: C.textLight, flexShrink: 1 },
+    tableCellSku: { fontSize: 12, color: C.purple, backgroundColor: C.purplePale, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, flexShrink: 1 },
+    categoryTag: { backgroundColor: "#EEF1FF", borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, alignSelf: "flex-start", maxWidth: "100%" },
     categoryTagTxt: { fontSize: 10.5, color: C.navy },
     subcategoryTxt: { fontSize: 10, color: C.textLight },
     subSubPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F0FDF8", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: "#CCFBEF", alignSelf: "flex-start" },
@@ -1612,22 +1666,34 @@ const wst = StyleSheet.create({
     tableStockVal: { fontSize: 13, color: C.textDark },
     lowStockHint: { fontSize: 10, color: C.orange },
     outStockHint: { fontSize: 10, color: C.red },
-    statusPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start" },
+    statusPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start", flexShrink: 0 },
     statusDot: { width: 5, height: 5, borderRadius: 2.5 },
     statusPillTxt: { fontSize: 11 },
-    actionBtn: { width: 30, height: 30, borderRadius: 7, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
+    actionBtn: { width: 30, height: 30, borderRadius: 7, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border, flexShrink: 0 },
+    // Mobile / tablet card list
+    mobileListContainer: { padding: 12, gap: 10 },
+    mobileListCard: { backgroundColor: C.white, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, gap: 10 },
+    mobileListTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+    mobileListImg: { width: 72, height: 72, borderRadius: 10, backgroundColor: C.bg, flexShrink: 0 },
+    mobileListInfo: { flex: 1, minWidth: 0, gap: 2 },
+    mobileListName: { fontSize: 14, color: C.textDark, lineHeight: 19, flexShrink: 1 },
+    mobileListSku: { fontSize: 11, color: C.textLight },
+    mobileListCat: { fontSize: 11, color: C.purple },
+    mobileListMeta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, paddingTop: 2 },
+    mobileListPrice: { fontSize: 15, color: C.navy },
+    mobileListStock: { fontSize: 12, color: C.textMid },
     // Grid
     webGridContainer: { flexDirection: "row", flexWrap: "wrap", gap: 14, padding: 16 },
     webGridCard: { width: "22%" as any, minWidth: 180, backgroundColor: C.white, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
     webGridImgWrap: { position: "relative" },
     webGridImg: { width: "100%", height: 200, backgroundColor: C.bg },
-    webGridStatusBadge: { position: "absolute", top: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+    webGridStatusBadge: { position: "absolute", top: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20, maxWidth: "70%" },
     webGridStatusTxt: { fontSize: 10 },
     webGridMoreBtn: { position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: 7, backgroundColor: "rgba(255,255,255,0.93)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.border },
     webGridInfo: { padding: 12, gap: 4 },
-    webGridName: { fontSize: 12.5, color: C.textDark, lineHeight: 17 },
+    webGridName: { fontSize: 12.5, color: C.textDark, lineHeight: 17, flexShrink: 1 },
     webGridSku: { fontSize: 10.5, color: C.textLight },
-    webGridMeta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+    webGridMeta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4, flexWrap: "wrap", gap: 4 },
     webGridPrice: { fontSize: 13.5, color: C.navy },
     webGridStock: { fontSize: 10.5, color: C.textLight },
     webGridCatRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap", marginTop: 2 },
@@ -1654,7 +1720,7 @@ const MobileProductsScreen: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetchProducts({ size: 500 });
+            const res = await fetchProducts({ size: 500, adminOnly: true });
             setProducts((res.items ?? []).map((p) => mapProductListRow(p as Record<string, unknown>)));
         } catch (e) {
             setError(getApiErrorMessage(e));
@@ -2208,13 +2274,13 @@ const s = StyleSheet.create({
     listContainer: { paddingHorizontal: 16, gap: 12, marginBottom: 10 },
     productRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.card, borderRadius: 16, padding: 14, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
     productImage: { width: 90, height: 90, borderRadius: 12, backgroundColor: C.bg },
-    productInfo: { flex: 1 },
-    productName: { fontSize: 14, color: C.textDark, marginBottom: 3 },
+    productInfo: { flex: 1, minWidth: 0 },
+    productName: { fontSize: 14, color: C.textDark, marginBottom: 3, flexShrink: 1 },
     productSku: { fontSize: 11, color: C.textLight, marginBottom: 2 },
     productCategory: { fontSize: 11, color: C.purple, marginBottom: 2 },
     productUpdated: { fontSize: 11, color: C.textLight, marginBottom: 6 },
     productPrice: { fontSize: 15, color: C.navy },
-    productRight: { alignItems: "flex-end", gap: 6 },
+    productRight: { alignItems: "flex-end", gap: 6, flexShrink: 0 },
     statusBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 7 },
     statusText: { fontSize: 10 },
     stockText: { fontSize: 11, color: C.textMid },
