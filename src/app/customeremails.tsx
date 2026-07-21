@@ -336,10 +336,10 @@ export default function CustomerEmailsScreen() {
                 setTotalCustomersCount(
                     Number(
                         stats.total ??
-                            stats.totalCustomers ??
-                            page.totalElements ??
-                            page.items?.length ??
-                            0,
+                        stats.totalCustomers ??
+                        page.totalElements ??
+                        page.items?.length ??
+                        0,
                     ),
                 );
 
@@ -428,29 +428,37 @@ export default function CustomerEmailsScreen() {
     };
 
     const handleSend = async () => {
+        // Store form data before closing modal
+        const savedSubject = subject;
+        const savedMessage = message;
+        const savedBulkOpen = bulkOpen;
+        const savedSingleTarget = singleTarget;
+
+        // Close modal first before showing any dialogs
+        closeModals();
+
+        // Wait for modal close animation to complete
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         try {
-
-            if (bulkOpen) {
-
-                await sendCustomerEmails({ subject, message, sendAll: true });
-
-            } else if (singleTarget) {
-
-                await sendCustomerEmails({ subject, message, recipients: [singleTarget.id] });
-
+            if (savedBulkOpen) {
+                await sendCustomerEmails({ subject: savedSubject, message: savedMessage, sendAll: true });
+            } else if (savedSingleTarget) {
+                await sendCustomerEmails({ subject: savedSubject, message: savedMessage, recipients: [savedSingleTarget.id] });
             }
 
-            closeModals();
-
             void sweetSuccess('Sent!', 'Email sent successfully.');
-
         } catch (e) {
-
+            // API failed - reopen modal with saved data and show error
+            setSubject(savedSubject);
+            setMessage(savedMessage);
+            if (savedBulkOpen) {
+                setBulkOpen(true);
+            } else if (savedSingleTarget) {
+                setSingleTarget(savedSingleTarget);
+            }
             void sweetError('Error', getApiErrorMessage(e, 'Failed to send email.'));
-
         }
-
     };
 
 

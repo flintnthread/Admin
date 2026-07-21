@@ -24,21 +24,21 @@
 
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
-import { Ionicons } from '@expo/vector-icons';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
@@ -528,7 +528,7 @@ const CustomerManagement: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {/* ---------- Header ---------- */}
         <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
