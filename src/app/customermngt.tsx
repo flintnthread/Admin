@@ -26,8 +26,7 @@ import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { Ionicons } from '@expo/vector-icons';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { deleteAdsCustomer, fetchAdsCustomers, fetchAdsOrders, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
-import { sweetWarning } from '@/lib/sweetAlert';
+import { deleteAdsCustomer, fetchAdsCustomers, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -368,44 +367,19 @@ const CustomerManagement: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
-  const handleViewOrders = async (customer?: Customer) => {
+  const handleViewCustomer = (customer: Customer) => {
+    router.push({ pathname: '/adsCustomerDetails' as any, params: { id: String(customer.id) } });
+  };
+
+  const handleViewOrders = (customer?: Customer) => {
     if (!customer) {
       router.push('/ads-ordermanagement');
       return;
     }
-    try {
-      const page = await fetchAdsOrders({
-        search: customer.email || customer.name,
-        page: 0,
-        size: 20,
-      });
-      const items = page.items ?? [];
-      const match =
-        items.find((row) => String(row.customerEmail ?? '').toLowerCase() === customer.email.toLowerCase()) ??
-        items[0];
-      if (match) {
-        const internalId = Number(match.id ?? 0);
-        const orderCode = String(match.orderId ?? match.id ?? '');
-        if (internalId > 0) {
-          router.push({ pathname: '/order-details' as any, params: { id: String(internalId) } });
-          return;
-        }
-        if (orderCode) {
-          router.push({ pathname: '/order-details' as any, params: { orderId: orderCode } });
-          return;
-        }
-      }
-      router.push({
-        pathname: '/ads-ordermanagement' as any,
-        params: { customerEmail: customer.email, customerName: customer.name },
-      });
-    } catch (e) {
-      void sweetWarning('Orders', getApiErrorMessage(e, 'Could not open customer orders.'));
-      router.push({
-        pathname: '/ads-ordermanagement' as any,
-        params: { customerEmail: customer.email },
-      });
-    }
+    router.push({
+      pathname: '/ads-ordermanagement' as any,
+      params: { customerEmail: customer.email, customerName: customer.name },
+    });
   };
 
   const requestDelete = (customer: Customer) => setDeleteTarget(customer);
@@ -472,7 +446,7 @@ const CustomerManagement: React.FC = () => {
         <Text style={{ color: COLORS.sub, fontSize: 12, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.joined}</Text>
       </View>
       <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }, !isPhone && { marginLeft: 55 }]}>
-        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewOrders(item)}>
+        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewCustomer(item)}>
           <Ionicons name="eye" size={15} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
@@ -540,7 +514,7 @@ const CustomerManagement: React.FC = () => {
         </View>
 
         <View style={styles.gridActionsRow}>
-          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
+          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewCustomer(item)}>
             <Ionicons name="eye" size={14} color="#fff" />
             <Text style={styles.ordersBtnText}>View</Text>
           </TouchableOpacity>
