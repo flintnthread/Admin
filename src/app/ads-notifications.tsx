@@ -86,9 +86,9 @@ function mapNotificationRow(row: AdsApiRow): AppNotification {
   return {
     id: Number(row.id ?? 0),
     orderId: String(row.orderId ?? ""),
-    customer: String(row.userName ?? "—"),
+    customer: String(row.userName ?? "â€”"),
     email: String(row.userEmail ?? ""),
-    detail: String(row.adName ?? "—"),
+    detail: String(row.adName ?? "â€”"),
     amount: Number(row.amount ?? 0) || 0,
     status: mapNotificationStatus(row.status),
     unread: !Boolean(row.isRead),
@@ -105,7 +105,7 @@ const STATUS_META: Record<NotificationStatus, { label: string; color: string; bg
 };
 
 function fmtINR(val: number) {
-  return "₹" + val.toLocaleString("en-IN");
+  return "â‚¹" + val.toLocaleString("en-IN");
 }
 
 /* ------------------------------------------------------------------ */
@@ -253,7 +253,7 @@ function ScreenHeader() {
   return (
     <View style={[styles.header, { paddingBottom: 56, paddingTop: 24 }]}>
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 24, gap: 14 }}>
-        <View style={{ width: 48, height: 48, backgroundColor: COLORS.orange, borderRadius: 12, alignItems: "center", justifyContent: "center" }}>
+        <View style={{ width: 44, height: 44, backgroundColor: COLORS.orange, borderRadius: 12, alignItems: "center", justifyContent: "center" }}>
           <BellGlyph color="#fff" size={24} />
         </View>
         <View style={{ flex: 1 }}>
@@ -951,7 +951,7 @@ export default function AdsNotificationsScreen() {
           <View style={{ marginTop: 8, zIndex: 1 }}>
             {loading ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Loading notifications…</Text>
+                <Text style={styles.emptyTitle}>Loading notificationsâ€¦</Text>
               </View>
             ) : error ? (
               <View style={styles.emptyState}>
@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: "700", color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  /* view toggle — pill container with navy active button */
+  /* view toggle â€” pill container with navy active button */
   viewToggleGroup: {
     flexDirection: "row",
     backgroundColor: "#E5E7EB",

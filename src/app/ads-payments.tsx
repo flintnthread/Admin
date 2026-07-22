@@ -1,9 +1,9 @@
 /**
  * AdsPaymentsScreen.tsx
  * ----------------------------------------------------------------
- * Ads Payments — React Native screen.
+ * Ads Payments â€” React Native screen.
  *
- * Companion screen to AdsOrdersScreen.tsx / AdsDashboardScreen.tsx —
+ * Companion screen to AdsOrdersScreen.tsx / AdsDashboardScreen.tsx â€”
  * same navy (#151D4F) + orange design tokens, same measured-width
  * responsive pattern. Deliberately NOT a re-skin of the Orders
  * table: payments are chronological events, so the signature here
@@ -30,14 +30,14 @@
  * were being visually covered by the results section (table / grid
  * / timeline) and by pagination underneath them. In React Native
  * (and RN Web), a child's zIndex only competes with its *siblings
- * under the same parent* — raising zIndex deep inside FilterBar
+ * under the same parent* â€” raising zIndex deep inside FilterBar
  * doesn't help it beat elements that are siblings of FilterBar's
  * own wrapper one level up. The fix is to give the wrapper around
  * <FilterBar/>, the wrapper around the results section, and the
  * wrapper around <Pagination/> explicit, descending zIndex values
  * (30 / 1 / 0) so the stacking order is correct at the level where
  * these sections are actually siblings. See the screen's render
- * below — that's the only functional change from the previous
+ * below â€” that's the only functional change from the previous
  * version; everything else (data, layout, styles) is unchanged.
  *
  * Breakpoints (measured container width):
@@ -70,7 +70,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { fetchAdsPayments, fetchAdsPaymentStats, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
 
 /* ------------------------------------------------------------------ */
-/* Design tokens — navy + orange only, shared across the Ads screens   */
+/* Design tokens â€” navy + orange only, shared across the Ads screens   */
 /* ------------------------------------------------------------------ */
 const COLORS = {
   bg: '#FFFFFF',
@@ -115,7 +115,7 @@ const FONT = {
   mono: Platform.select({ ios: 'Courier', android: 'monospace', default: '"IBM Plex Mono", Menlo, Consolas, monospace' }),
 };
 
-const fmtINR = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const fmtINR = (n: number) => 'â‚¹' + Math.round(n).toLocaleString('en-IN');
 
 /* ------------------------------------------------------------------ */
 /* Types + mock data                                                    */
@@ -159,10 +159,10 @@ function mapPaymentRow(row: AdsApiRow): Payment {
   const validDate = Number.isNaN(dateObj.getTime()) ? new Date() : dateObj;
   const contact = String(row.contact ?? '');
   const email = String(row.email ?? '');
-  const customerName = contact || email || '—';
+  const customerName = contact || email || 'â€”';
   return {
     paymentId: String(row.razorpayPaymentId ?? row.id ?? ''),
-    orderId: String(row.orderId ?? '—'),
+    orderId: String(row.orderId ?? 'â€”'),
     customerName,
     customerEmail: email || contact,
     amount: Number(row.amount ?? 0) || 0,
@@ -338,7 +338,7 @@ function ScreenHeader() {
   return (
     <View style={[styles.header, { paddingBottom: 54, paddingTop: 16 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, gap: 14 }}>
-        <View style={{ width: 48, height: 48, backgroundColor: COLORS.orange, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 44, height: 44, backgroundColor: COLORS.orange, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
           <ReceiptGlyph color="#fff" size={24} />
         </View>
         <View style={{ flex: 1 }}>
@@ -351,7 +351,7 @@ function ScreenHeader() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Stat cards — Total / Captured / Success Rate / Refunded, sitting     */
+/* Stat cards â€” Total / Captured / Success Rate / Refunded, sitting     */
 /* directly under the header. Shadow-only, no colored borders.          */
 /* ------------------------------------------------------------------ */
 function StatCard({
@@ -441,7 +441,7 @@ function StatCardsRow({
 }
 
 /* ------------------------------------------------------------------ */
-/* Filters — all in one row with dropdowns                              */
+/* Filters â€” all in one row with dropdowns                              */
 /* ------------------------------------------------------------------ */
 type MethodFilter = 'all' | PaymentMethod;
 type StatusFilter = 'all' | PaymentStatus;
@@ -628,7 +628,7 @@ function FilterBar({
               style={styles.searchInput}
             />
           </View>
-          {/* Controls — all in one row, no wrapping */}
+          {/* Controls â€” all in one row, no wrapping */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 6, zIndex: 100, overflow: 'visible' }}>
             <View style={{ flexShrink: 1, zIndex: openDropdown === 'status' ? 50 : 20, overflow: 'visible' }}>
               <StatusDropdown 
@@ -678,7 +678,7 @@ function DateRail({ label, count }: { label: string; count: number }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Ledger table — date-grouped, for tablet/desktop. Full width.         */
+/* Ledger table â€” date-grouped, for tablet/desktop. Full width.         */
 /* ------------------------------------------------------------------ */
 function PaymentsTable({ payments, onView }: { payments: Payment[]; onView: (p: Payment) => void }) {
   return (
@@ -732,7 +732,7 @@ function PaymentsTable({ payments, onView }: { payments: Payment[]; onView: (p: 
 }
 
 /* ------------------------------------------------------------------ */
-/* Grid card — for grid view                                            */
+/* Grid card â€” for grid view                                            */
 /* ------------------------------------------------------------------ */
 function PaymentGridCard({ payment, onView, cardWidth }: { payment: Payment; onView: (p: Payment) => void; cardWidth: number }) {
   const avaColor = avatarColor(payment.customerName);
@@ -777,7 +777,7 @@ function PaymentsGrid({ payments, onView, cardWidth }: { payments: Payment[]; on
 }
 
 /* ------------------------------------------------------------------ */
-/* Timeline — connected receipt cards, for phone                       */
+/* Timeline â€” connected receipt cards, for phone                       */
 /* ------------------------------------------------------------------ */
 function TimelineReceipt({ payment, isLast, onView }: { payment: Payment; isLast: boolean; onView: (p: Payment) => void }) {
   const meta = STATUS_META[payment.status];
@@ -830,7 +830,7 @@ function PaymentsTimeline({ payments, onView }: { payments: Payment[]; onView: (
 }
 
 /* ------------------------------------------------------------------ */
-/* Payment Details panel — orange header, 2-col grid, navy Close        */
+/* Payment Details panel â€” orange header, 2-col grid, navy Close        */
 /* ------------------------------------------------------------------ */
 function DetailField({ label, value }: { label: string; value: string }) {
   return (
@@ -852,7 +852,7 @@ function PaymentDetailsPanel({ payment, onClose, isTablet }: { payment: Payment;
             <XGlyph />
           </TouchableOpacity>
         </View>
-        {/* Body — ScrollView ensures content never collapses on small screens */}
+        {/* Body â€” ScrollView ensures content never collapses on small screens */}
         <ScrollView
           style={{ flexGrow: 0 }}
           contentContainerStyle={styles.modalBody}
@@ -866,7 +866,7 @@ function PaymentDetailsPanel({ payment, onClose, isTablet }: { payment: Payment;
             </View>
             <Text style={styles.modalAmtBig}>{fmtINR(payment.amount)}</Text>
           </View>
-          {/* All fields listed vertically — safe on any screen size */}
+          {/* All fields listed vertically â€” safe on any screen size */}
           <View style={styles.detailFieldsList}>
             <DetailField label="Payment ID" value={payment.paymentId} />
             <DetailField label="Order ID" value={payment.orderId} />
@@ -994,7 +994,7 @@ export default function AdsPaymentsScreen() {
             Z-INDEX FIX: this wrapper (around FilterBar, which owns the
             Status/Method dropdown menus) and the results wrapper below
             it are SIBLINGS. A zIndex set deep inside FilterBar only
-            outranks things inside FilterBar — it can't reach past this
+            outranks things inside FilterBar â€” it can't reach past this
             sibling boundary. So the stacking order has to be decided
             here, at the level where the filter section and the results
             section are actually adjacent: filter wrapper gets the
@@ -1018,7 +1018,7 @@ export default function AdsPaymentsScreen() {
           <View style={{ marginTop: 8, zIndex: 1 }}>
             {loading ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Loading payments…</Text>
+                <Text style={styles.emptyTitle}>Loading paymentsâ€¦</Text>
               </View>
             ) : error ? (
               <View style={styles.emptyState}>
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: '700', color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: COLORS.rule },
 
-  /* view toggle — pill container with navy active button */
+  /* view toggle â€” pill container with navy active button */
   viewToggleGroup: {
     flexDirection: 'row',
     backgroundColor: '#E5E7EB',
