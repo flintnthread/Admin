@@ -1831,16 +1831,14 @@ export default function SellersDashboard() {
             {/* ── Header ── */}
             <View style={styles.headerContainer}>
               <View style={styles.pageHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Ionicons name="bar-chart" size={20} color={ORANGE} />
+                    <View style={{ backgroundColor: ORANGE, borderRadius: 8, padding: 8 }}>
+                      <Ionicons name="bar-chart" size={18} color="#FFFFFF" />
+                    </View>
                     <Text style={styles.pageTitle}>Sellers Graph / Analysis</Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => router.push("/sellers")} style={styles.backBtn}>
-                  <Ionicons name="chevron-back" size={13} color="#475569" />
-                  <Text style={styles.backBtnText}>Back</Text>
-                </TouchableOpacity>
               </View>
             </View>
 
@@ -2160,16 +2158,14 @@ export default function SellersDashboard() {
           {/* ── Header Container (Dark Blue) ── */}
           <View style={[styles.headerContainer, { paddingHorizontal: 16, paddingBottom: 40 }]}>
             <View style={styles.pageHeader}>
-              <View style={{ flex: 1, marginRight: 8 }}>
+              <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Ionicons name="bar-chart" size={20} color={ORANGE} />
+                  <View style={{ backgroundColor: ORANGE, borderRadius: 8, padding: 8 }}>
+                    <Ionicons name="bar-chart" size={18} color="#FFFFFF" />
+                  </View>
                   <Text style={[styles.pageTitle, { flex: 1 }]} numberOfLines={2}>Sellers Graph / Analysis</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.push("/sellers")} style={styles.backBtn}>
-                <Ionicons name="chevron-back" size={13} color="#475569" />
-                <Text style={styles.backBtnText}>Back</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
