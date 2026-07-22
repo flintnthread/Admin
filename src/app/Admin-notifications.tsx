@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+﻿import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -18,14 +18,14 @@ import { usePayoutRequestAlerts } from "@/hooks/usePayoutRequestAlerts";
 import { useAuth } from "@/context/auth-context";
 
 /**
- * ── INTEGRATION NOTE ─────────────────────────────────────────────
+ * â”€â”€ INTEGRATION NOTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  * Assumes it's rendered inside your shared AdminLayout, same as
  * AddSellersScreen / AdPlacementsScreen:
  *
  *   <AdminLayout activeRoute="notifications">
  *     <NotificationsScreen />
  *   </AdminLayout>
- * ────────────────────────────────────────────────────────────────
+ * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  */
 
 const COLORS = {
@@ -68,7 +68,7 @@ const INITIAL_NOTIFICATIONS: Notification[] = [
   { id: 2, type: "Ticket", title: "New support ticket", message: "Sairamya raised a ticket about a delayed shipment.", time: "14m ago", unread: true },
   { id: 3, type: "Seller", title: "Seller pending approval", message: "Kusuma Adari submitted documents for seller verification.", time: "38m ago", unread: true },
   { id: 4, type: "Ad", title: "Ad placement expiring soon", message: "Homepage Main Banner placement expires in 2 days.", time: "1h ago", unread: false },
-  { id: 5, type: "Order", title: "Payment received", message: "₹1,331.85 payment confirmed for order #FNT202607106534.", time: "3h ago", unread: false },
+  { id: 5, type: "Order", title: "Payment received", message: "â‚¹1,331.85 payment confirmed for order #FNT202607106534.", time: "3h ago", unread: false },
   { id: 6, type: "Seller", title: "Seller reactivated", message: "Sravani Surampalli's account is now active again.", time: "5h ago", unread: false },
   { id: 7, type: "Ad", title: "New placement request", message: "A vendor requested a Category Sub-Banner slot for August.", time: "Yesterday", unread: false },
   { id: 8, type: "Ticket", title: "Ticket resolved", message: "Support ticket #TCK-2291 was marked as resolved.", time: "Yesterday", unread: false },
@@ -266,7 +266,7 @@ export default function NotificationsScreen() {
                   <Text style={styles.heroTitle}>Notifications Center</Text>
                   <Text style={styles.heroSubtitle}>
                     Payment requests, orders, sellers, ads & support
-                    {pendingCount > 0 ? ` · ${pendingCount} payment request(s)` : ""}
+                    {pendingCount > 0 ? ` Â· ${pendingCount} payment request(s)` : ""}
                   </Text>
                 </View>
               </View>
@@ -274,7 +274,7 @@ export default function NotificationsScreen() {
                 <Animated.View>
                   <Feather name="refresh-cw" size={14} color="#fff" />
                 </Animated.View>
-                <Text style={styles.refreshBtnText}>{refreshing ? "Refreshing…" : "Refresh"}</Text>
+                <Text style={styles.refreshBtnText}>{refreshing ? "Refreshingâ€¦" : "Refresh"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -294,7 +294,7 @@ export default function NotificationsScreen() {
                 <Feather name="search" size={14} color={COLORS.textFaint} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search notifications…"
+                  placeholder="Search notificationsâ€¦"
                   placeholderTextColor={COLORS.textFaint}
                   value={query}
                   onChangeText={setQuery}

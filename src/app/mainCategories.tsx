@@ -5,28 +5,28 @@ import { AdminApiError, getApiErrorMessage } from "@/lib/api/client";
 import { compressImageFile } from "@/lib/media/compressImage";
 import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
-    createMainCategory,
-    createSubcategory,
-    deleteCategory,
-    fetchMainCategories,
-    fetchSubcategories,
-    updateCategory,
-    uploadCategoryImages,
-    type CategoryRow
+  createMainCategory,
+  createSubcategory,
+  deleteCategory,
+  fetchMainCategories,
+  fetchSubcategories,
+  updateCategory,
+  uploadCategoryImages,
+  type CategoryRow
 } from "@/services/categoryApi";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Image,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 
@@ -1653,9 +1653,9 @@ export default function MainCategories() {
             is413
               ? "The category was saved, but the image was rejected as too large (413). Edit the category and try a smaller JPG under 500KB."
               : getApiErrorMessage(
-                  uploadError,
-                  "The category was saved, but the image upload failed. You can edit and retry the image."
-                )
+                uploadError,
+                "The category was saved, but the image upload failed. You can edit and retry the image."
+              )
           );
           return existing;
         }
@@ -1681,14 +1681,14 @@ export default function MainCategories() {
           prev.map((c) =>
             c.id === data.id
               ? {
-                  ...c,
-                  ...data,
-                  name: saved.categoryName || data.name,
-                  hsn: saved.hsnCode || data.hsn || "—",
-                  gst: saved.gstPercentage != null ? `${saved.gstPercentage}%` : data.gst,
-                  status: saved.status ? "Active" : "Inactive",
-                  image: imageUrl || data.image || c.image,
-                }
+                ...c,
+                ...data,
+                name: saved.categoryName || data.name,
+                hsn: saved.hsnCode || data.hsn || "—",
+                gst: saved.gstPercentage != null ? `${saved.gstPercentage}%` : data.gst,
+                status: saved.status ? "Active" : "Inactive",
+                image: imageUrl || data.image || c.image,
+              }
               : c
           )
         );
@@ -1997,14 +1997,17 @@ export default function MainCategories() {
 
         {/* ── Pagination ── */}
         {filtered.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-            totalItems={filtered.length}
-            itemsPerPage={ITEMS_PER_PAGE}
-            itemName="categories"
-            onPageChange={setCurrentPage}
-          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%", justifyContent: "center" }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+              totalItems={filtered.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              itemName="categories"
+              onPageChange={setCurrentPage}
+              compactMode={!isWeb}
+            />
+          </ScrollView>
         )}
       </ScrollView>
 
