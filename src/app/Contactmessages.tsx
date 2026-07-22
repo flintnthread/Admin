@@ -20,7 +20,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type MessageStatus = "Read" | "Unread";
 type ViewMode = "grid" | "list";
 type FilterType = "All" | "Unread" | "Read";
@@ -53,7 +53,7 @@ function toUiContact(row: ReturnType<typeof mapContactRow>, index: number): Cont
     id: row.id,
     name: row.name,
     email: row.email,
-    phone: row.phone || "—",
+    phone: row.phone || "â€”",
     subject: row.subject,
     content: row.message,
     date: row.date,
@@ -67,7 +67,7 @@ function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
 
-// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
+// â”€â”€â”€ SUB-COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AvatarIcon: React.FC<{ color: string; bg: string; name: string }> = ({ color, bg, name }) => (
   <View style={[styles.avatarWrapper, { backgroundColor: bg }]}>
     <Text style={[styles.avatarText, { color }]}>{getInitials(name)}</Text>
@@ -77,12 +77,12 @@ const AvatarIcon: React.FC<{ color: string; bg: string; name: string }> = ({ col
 const StatusBadge: React.FC<{ status: MessageStatus }> = ({ status }) => (
   <View style={[styles.statusBadge, { backgroundColor: status === "Read" ? "#D1FAE5" : "#FEF3C7" }]}>
     <Text style={[styles.statusText, { color: status === "Read" ? "#059669" : "#D97706" }]}>
-      {status === "Read" ? "✓  Read" : "⏳  Unread"}
+      {status === "Read" ? "âœ“  Read" : "â³  Unread"}
     </Text>
   </View>
 );
 
-// ─── MESSAGE CARD (Grid) ──────────────────────────────────────────────────────
+// â”€â”€â”€ MESSAGE CARD (Grid) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MessageCard: React.FC<{
   msg: ContactMessage;
   onView: (msg: ContactMessage) => void;
@@ -125,7 +125,7 @@ const MessageCard: React.FC<{
   </View>
 );
 
-// ─── STATS HEADER ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ STATS HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: number } }> = ({ stats }) => {
   const { total, replied, pending } = stats;
   const statsData = [
@@ -151,7 +151,7 @@ const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: 
   );
 };
 
-// ─── MOBILE STATS ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ MOBILE STATS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pending: number } }> = ({ stats }) => {
   const { total, replied, pending } = stats;
   const cards = [
@@ -182,7 +182,7 @@ const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pe
   );
 };
 
-// ─── VIEW DETAIL MODAL ────────────────────────────────────────────────────────
+// â”€â”€â”€ VIEW DETAIL MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ViewDetailModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -243,7 +243,7 @@ const ViewDetailModal: React.FC<{
   );
 };
 
-// ─── REPLY MESSAGE MODAL ──────────────────────────────────────────────────────
+// â”€â”€â”€ REPLY MESSAGE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ReplyMessageModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -304,7 +304,7 @@ const ReplyMessageModal: React.FC<{
   );
 };
 
-// ─── ADD MESSAGE MODAL ────────────────────────────────────────────────────────
+// â”€â”€â”€ ADD MESSAGE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AddMessageModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -388,7 +388,7 @@ const AddMessageModal: React.FC<{
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnUpdate} onPress={handleSave} disabled={saving}>
           <Feather name="save" size={14} color="#FFFFFF" />
-          <Text style={styles.btnUpdateText}>{saving ? " Saving…" : " Save Message"}</Text>
+          <Text style={styles.btnUpdateText}>{saving ? " Savingâ€¦" : " Save Message"}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -400,7 +400,7 @@ const AddMessageModal: React.FC<{
   );
 };
 
-// ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ContactMessagesScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
@@ -506,7 +506,7 @@ const ContactMessagesScreen: React.FC = () => {
     }
   };
 
-  // ── Mobile Layout ──────────────────────────────────────────────────────────
+  // â”€â”€ Mobile Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (isMobile) {
     return (
       <AdminLayout>
@@ -515,10 +515,10 @@ const ContactMessagesScreen: React.FC = () => {
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-            {/* ── Mobile Header ── */}
+            {/* â”€â”€ Mobile Header â”€â”€ */}
             <View style={mSt.header}>
               <View style={mSt.headerIconWrap}>
-                <Feather name="message-square" size={22} color="#fff" />
+                <Feather name="message-square" size={16} color="#fff" />
               </View>
               <View style={mSt.headerTextWrap}>
                 <Text style={mSt.headerTitle}>Contact Messages</Text>
@@ -533,10 +533,10 @@ const ContactMessagesScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {/* ── Mobile Stat Cards (overlapping header) ── */}
+            {/* â”€â”€ Mobile Stat Cards (overlapping header) â”€â”€ */}
             <MobileStatsSection stats={contactStats} />
 
-            {/* ── Search & View Switcher ── */}
+            {/* â”€â”€ Search & View Switcher â”€â”€ */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, marginBottom: 12 }}>
               <View style={[mSt.searchWrap, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}>
                 <Feather name="search" size={16} color={TEXT_MUTED} style={{ marginRight: 8 }} />
@@ -566,7 +566,7 @@ const ContactMessagesScreen: React.FC = () => {
               )}
             </View>
 
-            {/* ── Filter pills (All / New / Replied / Pending) ── */}
+            {/* â”€â”€ Filter pills (All / New / Replied / Pending) â”€â”€ */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -600,9 +600,9 @@ const ContactMessagesScreen: React.FC = () => {
 
 
 
-            {/* ── Content ── */}
+            {/* â”€â”€ Content â”€â”€ */}
             {loading ? (
-              <Text style={{ color: TEXT_MUTED, textAlign: "center", padding: 40 }}>Loading messages…</Text>
+              <Text style={{ color: TEXT_MUTED, textAlign: "center", padding: 40 }}>Loading messagesâ€¦</Text>
             ) : filtered.length === 0 ? (
               <View style={mSt.emptyWrap}>
                 <View style={mSt.emptyIconWrap}>
@@ -666,7 +666,7 @@ const ContactMessagesScreen: React.FC = () => {
               </View>
             )}
 
-            {/* ── Pagination ── */}
+            {/* â”€â”€ Pagination â”€â”€ */}
             {!loading && !loadError && filtered.length > 0 && (
               <View style={{ paddingHorizontal: 16 }}>
                 <Pagination
@@ -689,7 +689,7 @@ const ContactMessagesScreen: React.FC = () => {
     );
   }
 
-  // ── Web / Tablet Layout ─────────────────────────────────────────────────────
+  // â”€â”€ Web / Tablet Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Whole screen now scrolls as a single ScrollView (header + stats + toolbar +
   // cards/table + pagination all inside it), and the white rounded wrapper
   // container has been removed so content sits directly on the page background.
@@ -699,11 +699,11 @@ const ContactMessagesScreen: React.FC = () => {
       contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <View style={[styles.header, isWeb && styles.webHeader, !isWeb && { borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
         <View style={[styles.headerTextContainer, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
-          <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="message-square" size={26} color="#FFF" />
+          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="message-square" size={24} color="#FFF" />
           </View>
           <View>
             <Text style={[styles.headerTitle, { color: "#FFFFFF" }]}>Contact Messages</Text>
@@ -731,7 +731,7 @@ const ContactMessagesScreen: React.FC = () => {
       </View>
 
       <View style={styles.listContent}>
-        {/* ── Web Toolbar ── */}
+        {/* â”€â”€ Web Toolbar â”€â”€ */}
         {isWeb && (
           <View style={styles.webToolbar}>
             <View style={styles.searchContainerWeb}>
@@ -759,7 +759,7 @@ const ContactMessagesScreen: React.FC = () => {
         )}
 
         {loading ? (
-          <Text style={styles.resultCount}>Loading contact messages…</Text>
+          <Text style={styles.resultCount}>Loading contact messagesâ€¦</Text>
         ) : (
           <>
             <Text style={styles.resultCount}>{filtered.length} message{filtered.length !== 1 ? "s" : ""} found</Text>
@@ -840,14 +840,14 @@ const ContactMessagesScreen: React.FC = () => {
 
 export default ContactMessagesScreen;
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PRIMARY = "#1d4ed8";
 const PRIMARY_LIGHT = "#bfdbfe";
 const BORDER = "#E5E7EB";
 const TEXT_PRIMARY = "#1e293b";
 const TEXT_MUTED = "#64748b";
 
-// ─── MOBILE-ONLY STYLES ───────────────────────────────────────────────────────
+// â”€â”€â”€ MOBILE-ONLY STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const mSt = StyleSheet.create({
   // Header
   header: {
@@ -1119,7 +1119,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
-  // ── Web Layout ──
+  // â”€â”€ Web Layout â”€â”€
   webLayout: {
     flex: 1,
     flexDirection: "row",
@@ -1143,7 +1143,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
 
-  // ── Header ──
+  // â”€â”€ Header â”€â”€
   header: {
     marginHorizontal: 2,
     marginTop: 12,
@@ -1229,7 +1229,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E2B6B",
   },
 
-  // ── Mobile Controls ──
+  // â”€â”€ Mobile Controls â”€â”€
   mobileControlsContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -1285,7 +1285,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // ── Web Toolbar ──
+  // â”€â”€ Web Toolbar â”€â”€
   webToolbar: {
     flexDirection: "row",
     alignItems: "center",
@@ -1333,7 +1333,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ── List ──
+  // â”€â”€ List â”€â”€
   listContent: {
     paddingHorizontal: 14,
     paddingTop: 14,
@@ -1350,7 +1350,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // ── Card Grid ──
+  // â”€â”€ Card Grid â”€â”€
   cardGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1363,7 +1363,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
 
-  // ── Card ──
+  // â”€â”€ Card â”€â”€
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1457,7 +1457,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 14,
   },
 
-  // ── Status Badge ──
+  // â”€â”€ Status Badge â”€â”€
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1468,7 +1468,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ── Action Buttons ──
+  // â”€â”€ Action Buttons â”€â”€
   actionRow: {
     flexDirection: "row",
     gap: 12,
@@ -1544,7 +1544,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  // ── Stats (Web) ──
+  // â”€â”€ Stats (Web) â”€â”€
   statsRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1607,7 +1607,7 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
   },
 
-  // ── Table ──
+  // â”€â”€ Table â”€â”€
   tableContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1696,7 +1696,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // ── Modal ──
+  // â”€â”€ Modal â”€â”€
   modalOverlayWeb: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
