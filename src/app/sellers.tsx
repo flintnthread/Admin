@@ -834,22 +834,22 @@ export default function SellersScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#1d324e" />
 
         {/* ── Header Container (Dark Blue) ── */}
-        <View style={SS.headerContainer}>
+        <View style={[SS.headerContainer, isMobile && { marginHorizontal: 12, paddingHorizontal: 12, paddingTop: 14, paddingBottom: 36, borderRadius: 16 }]}>
           {loadError ? (
             <TouchableOpacity onPress={() => void loadSellers()}>
               <Text style={{ color: '#FCA5A5', marginBottom: 8 }}>{loadError} — Tap to retry</Text>
             </TouchableOpacity>
           ) : null}
-          <View style={[SS.pageHeader, isMobile && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <View style={SS.headerIconBox}>
-                <IconPerson size={16} color="#FFF" />
+          <View style={[SS.pageHeader, isMobile && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, paddingRight: 4 }}>
+              <View style={[SS.headerIconBox, isMobile && { width: 26, height: 26, borderRadius: 6, marginRight: 6 }]}>
+                <IconPerson size={isMobile ? 13 : 16} color="#FFF" />
               </View>
-              <Text style={[SS.pageTitle, isMobile && { fontSize: 16 }]}>Active Sellers</Text>
+              <Text style={[SS.pageTitle, isMobile && { fontSize: 14, flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">Active Sellers</Text>
             </View>
-            <TouchableOpacity style={[SS.exportBtn, isMobile && { paddingVertical: 6, paddingHorizontal: 10 }]} onPress={() => router.push('/sellershiprocket')}>
+            <TouchableOpacity style={[SS.exportBtn, isMobile && { paddingVertical: 5, paddingHorizontal: 8, borderRadius: 6 }]} onPress={() => router.push('/sellershiprocket')}>
               <IconUpload size={isMobile ? 11 : 13} color="#FFF" />
-              <Text style={[SS.exportTxt, isMobile && { fontSize: 11 }]}>  Export to Shiprocket</Text>
+              <Text style={[SS.exportTxt, isMobile && { fontSize: 10.5 }]} numberOfLines={1}> Export to Shiprocket</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -878,35 +878,35 @@ export default function SellersScreen() {
             ))}
           </View>
         ) : (
-          <View style={{ width: "100%", marginTop: -32, marginBottom: 16, overflow: "hidden", zIndex: 10 }}>
+          <View style={{ width: "100%", marginTop: isMobile ? -24 : -32, marginBottom: 14, overflow: "hidden", zIndex: 10 }}>
             <ScrollView
               horizontal={true}
               showsHorizontalScrollIndicator={false}
               style={{ width: "100%" }}
               contentContainerStyle={{
                 flexDirection: "row",
-                gap: 12,
-                paddingHorizontal: 4,
-                paddingVertical: 6,
+                gap: isMobile ? 8 : 12,
+                paddingHorizontal: isMobile ? 10 : 16,
+                paddingVertical: 4,
               }}
             >
               {[
-                { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
-                { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
-                { label: "Approved Sellers", value: summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#16A34A" />, iconBg: "#DCFCE7", sub: "Approved profiles" },
-                { label: "Rejected Sellers", value: summary.rejected ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.approved ?? 0) - (summary.pending ?? summary.profileCompleted ?? 0)), icon: <IconCloseCircle size={16} color="#DC2626" />, iconBg: "#FEE2E2", sub: "Rejected profiles" },
-                { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
-                { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
+                { label: "Total Sellers", value: summary.total ?? summary.registered ?? 0, icon: <IconPerson size={isMobile ? 14 : 20} color="#3B82F6" />, iconBg: "#EFF6FF", sub: "Total signups" },
+                { label: "Pending Sellers", value: summary.pending ?? summary.profileCompleted ?? 0, icon: <IconDash size={isMobile ? 12 : 16} color="#D97706" />, iconBg: "#FEF3C7", sub: "Pending approval" },
+                { label: "Approved Sellers", value: summary.approved ?? 0, icon: <IconCheckCircle size={isMobile ? 12 : 16} color="#16A34A" />, iconBg: "#DCFCE7", sub: "Approved profiles" },
+                { label: "Rejected Sellers", value: summary.rejected ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.approved ?? 0) - (summary.pending ?? summary.profileCompleted ?? 0)), icon: <IconCloseCircle size={isMobile ? 12 : 16} color="#DC2626" />, iconBg: "#FEE2E2", sub: "Rejected profiles" },
+                { label: "Active Sellers", value: summary.active ?? summary.approved ?? 0, icon: <IconCheckCircle size={isMobile ? 12 : 16} color="#059669" />, iconBg: "#E6F4EA", sub: "Active on platform" },
+                { label: "Inactive Sellers", value: summary.inactive ?? Math.max(0, (summary.total ?? summary.registered ?? 0) - (summary.active ?? summary.approved ?? 0)), icon: <IconCloseCircle size={isMobile ? 12 : 16} color="#94A3B8" />, iconBg: "#F1F5F9", sub: "Blocked/suspended" },
               ].map((c) => (
                 <View
                   key={c.label}
                   style={[
                     SS.statCard,
                     {
-                      width: 135,
-                      paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      gap: 6,
+                      width: isMobile ? 110 : 135,
+                      paddingVertical: isMobile ? 8 : 10,
+                      paddingHorizontal: isMobile ? 8 : 12,
+                      gap: isMobile ? 4 : 6,
                       flexDirection: "column",
                       alignItems: "flex-start",
                       borderWidth: 1,
@@ -919,13 +919,13 @@ export default function SellersScreen() {
                     }
                   ]}
                 >
-                  <View style={[SS.statIconBoxCompact, { backgroundColor: c.iconBg, width: 30, height: 30 }]}>
+                  <View style={[SS.statIconBoxCompact, { backgroundColor: c.iconBg, width: isMobile ? 24 : 30, height: isMobile ? 24 : 30, borderRadius: isMobile ? 6 : 8 }]}>
                     {c.icon}
                   </View>
-                  <View>
-                    <Text style={{ fontSize: 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{c.label}</Text>
-                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#1a2332", lineHeight: 15 }} numberOfLines={1}>{c.value}</Text>
-                    <Text style={{ fontSize: 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{c.sub}</Text>
+                  <View style={{ width: '100%' }}>
+                    <Text style={{ fontSize: isMobile ? 8.5 : 9.5, color: "#888", fontWeight: "600", marginBottom: 2 }} numberOfLines={1}>{c.label}</Text>
+                    <Text style={{ fontSize: isMobile ? 13 : 15, fontWeight: "800", color: "#1a2332", lineHeight: isMobile ? 14 : 15 }} numberOfLines={1}>{c.value}</Text>
+                    <Text style={{ fontSize: isMobile ? 8 : 8.5, color: "#aaa", marginTop: 2 }} numberOfLines={1}>{c.sub}</Text>
                   </View>
                 </View>
               ))}
