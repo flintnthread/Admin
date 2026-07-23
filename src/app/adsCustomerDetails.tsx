@@ -158,7 +158,7 @@ export default function AdsCustomerDetailsPage() {
 
   return (
     <AdminLayout>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 28 }}>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, isPhone && { paddingHorizontal: 12, paddingVertical: 14 }]}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
