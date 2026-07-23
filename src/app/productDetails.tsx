@@ -412,7 +412,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     categoryLabel,
     subcategory: String(data.subcategoryName ?? `Subcategory #${data.subcategoryId ?? '—'}`),
     fullTitle: cleanText(String(data.name ?? 'Product')),
-    price: displayPrice,
+    price: displayPrice as unknown as ProductDetail['price'],
     mrp: displayMrp,
     gst,
     material: dash(data.productMaterialType),
@@ -1455,7 +1455,7 @@ export default function ProductDetailsScreen() {
                     {product.category} · SKU: {product.sku}
                   </Text>
 
-                  <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.price}>₹{Number(product.price).toLocaleString('en-IN')}</Text>
                   <Text style={styles.priceSub}>
                     Selling + GST + {commissionLabel}% commission + highest delivery (₹{(firstVariant?.highestDeliveryCharge ?? 0).toLocaleString('en-IN')})
                   </Text>
