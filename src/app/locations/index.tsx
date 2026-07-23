@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError } from '@/lib/sweetAlert';
 import {
   fetchAreas,
   fetchAreasPage,
@@ -1393,15 +1394,24 @@ export default function LocationsScreen() {
 
   const handleSave = async (data: { name: string; code: string; status: RowStatus; parentId?: number }) => {
     const active = data.status === 'Active';
+    const entityLabel =
+      detailTab === 'countries' ? 'Country'
+        : detailTab === 'states' ? 'State'
+          : detailTab === 'cities' ? 'City'
+            : detailTab === 'areas' ? 'Area'
+              : 'Pincode';
     try {
       if (modalMode === 'edit' && activeRow) {
+        if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) return;
         if (detailTab === 'countries') await updateCountry(activeRow.id, data.name, data.code, active);
         else if (detailTab === 'states') await updateState(activeRow.id, data.name, active);
         else if (detailTab === 'cities') await updateCity(activeRow.id, data.name, active);
         else if (detailTab === 'areas') await updateArea(activeRow.id, data.name, active);
         else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name, active);
         setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, name: data.name, status: data.status, code: data.code } : r));
+        void sweetCrud.updated(entityLabel);
       } else {
+        if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) return;
         let newRow: LocationRow;
         if (detailTab === 'countries') newRow = await createCountry(data.name, data.code, active);
         else if (detailTab === 'states') {
@@ -1425,6 +1435,7 @@ export default function LocationsScreen() {
           iconBg: theme.bg,
           iconColor: theme.color,
         }, ...prev]);
+        void sweetCrud.added(entityLabel);
       }
       closeModal();
       await loadRows();
@@ -1433,13 +1444,19 @@ export default function LocationsScreen() {
         setLocationCounts(counts);
       } catch { /* keep previous counts */ }
     } catch (e: unknown) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError('Error', getApiErrorMessage(e));
       throw new Error(getApiErrorMessage(e));
     }
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    const entityLabel =
+      detailTab === 'countries' ? 'Country'
+        : detailTab === 'states' ? 'State'
+          : detailTab === 'cities' ? 'City'
+            : detailTab === 'areas' ? 'Area'
+              : 'Pincode';
     try {
       if (detailTab === 'countries') await deleteCountry(deleteTarget.id);
       else if (detailTab === 'states') await deleteState(deleteTarget.id);
@@ -1450,8 +1467,9 @@ export default function LocationsScreen() {
       await loadRows();
       const counts = await fetchLocationCounts();
       setLocationCounts(counts);
+      void sweetCrud.deleted(entityLabel);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError('Error', getApiErrorMessage(e, `Failed to delete ${entityLabel.toLowerCase()}.`));
       setDeleteTarget(null);
     }
   };

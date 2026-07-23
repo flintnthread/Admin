@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { mapFaqCategoryRow, mapFaqQuestionRow } from "@/lib/mappers";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
     createFaq,
     deleteFaq,
@@ -433,9 +434,6 @@ const QuestionAccordionCard: React.FC<{
                             <Text style={accSt.toggleLabel}>For seller</Text>
                         </View>
                         <View style={{ flexDirection: "row", gap: 8 }}>
-                            <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: ACCENT_SKY + "15", borderColor: ACCENT_SKY + "40" }]} onPress={onView}>
-                                <Feather name="eye" size={13} color={ACCENT_SKY} />
-                            </TouchableOpacity>
                             <TouchableOpacity style={[accSt.actionBtn, { backgroundColor: accent + "15", borderColor: accent + "40" }]} onPress={onEdit}>
                                 <Feather name="edit-2" size={13} color={accent} />
                             </TouchableOpacity>
@@ -482,9 +480,6 @@ const QuestionTileCard: React.FC<{
                 )}
             </View>
             <View style={tileSt.actions}>
-                <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: ACCENT_SKY + "15" }]} onPress={onView}>
-                    <Feather name="eye" size={13} color={ACCENT_SKY} />
-                </TouchableOpacity>
                 <TouchableOpacity style={[tileSt.actionBtn, { backgroundColor: accent + "15" }]} onPress={onEdit}>
                     <Feather name="edit-2" size={13} color={accent} />
                 </TouchableOpacity>
@@ -585,6 +580,13 @@ const FaqQuestionsScreen: React.FC = () => {
 
     const handleSave = (data: Partial<FaqQuestion> & { categoryId: number }) => {
         void (async () => {
+            const label = "FAQ";
+            const name = data.question?.trim();
+            if (editModal) {
+                if (!(await sweetCrud.confirmUpdate(label, name))) return;
+            } else if (!(await sweetCrud.confirmAdd(label, name))) {
+                return;
+            }
             try {
                 const payload = {
                     question: data.question,
@@ -595,13 +597,17 @@ const FaqQuestionsScreen: React.FC = () => {
                 };
                 if (editModal) {
                     await updateFaq(data.categoryId, editModal.id, payload);
+                    void sweetCrud.updated(label);
                 } else {
                     await createFaq(data.categoryId, payload);
+                    void sweetCrud.added(label);
                 }
                 await loadQuestions(data.categoryId);
                 await loadCategories();
             } catch (e) {
-                setLoadError(getApiErrorMessage(e));
+                const msg = getApiErrorMessage(e, "Failed to save FAQ.");
+                setLoadError(msg);
+                void sweetError("Error", msg);
             } finally {
                 setEditModal(null);
                 setAddModal(false);
@@ -616,8 +622,11 @@ const FaqQuestionsScreen: React.FC = () => {
                 await deleteFaq(deleteModal.categoryId, deleteModal.id);
                 await loadQuestions(deleteModal.categoryId);
                 await loadCategories();
+                void sweetCrud.deleted("FAQ");
             } catch (e) {
-                setLoadError(getApiErrorMessage(e));
+                const msg = getApiErrorMessage(e, "Failed to delete FAQ.");
+                setLoadError(msg);
+                void sweetError("Error", msg);
             } finally {
                 setDeleteModal(null);
             }

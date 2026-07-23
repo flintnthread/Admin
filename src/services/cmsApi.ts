@@ -1,15 +1,31 @@
 import { adminApiRequest } from "@/lib/api/client";
-import { resolveAdminApiBaseUrl } from "@/lib/api/config";
 import { getAdminToken } from "@/lib/api/session";
 
 export type CmsRow = Record<string, unknown>;
 
 function mediaUrl(path?: string | null): string {
   if (!path) return "";
-  if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
-  const base = resolveAdminApiBaseUrl().replace(/\/$/, "");
-  if (path.startsWith("/")) return `${base}${path}`;
-  return `${base}/uploads/cms/${path.replace(/^\/+/, "")}`;
+  let raw = String(path).trim();
+  if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
+  // Normalize absolute URLs onto the public CDN host and collapse doubled cms prefixes.
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      if (/flintnthread\.(in|online|com)$/i.test(u.hostname) && u.pathname.includes("/uploads/")) {
+        const cleaned = u.pathname.replace(/\/(?:uploads\/cms\/)+/gi, "/uploads/cms/");
+        return `https://flintnthread.com${cleaned}${u.search || ""}`;
+      }
+    } catch {
+      /* keep raw */
+    }
+    return raw;
+  }
+  const base = "https://flintnthread.com";
+  let p = raw.replace(/\\/g, "/").trim();
+  p = p.replace(/^(?:\/?uploads\/cms\/)+/i, "uploads/cms/");
+  if (!p.startsWith("/")) p = `/${p}`;
+  if (p.startsWith("/uploads/")) return `${base}${p}`;
+  return `${base}/uploads/cms/${p.replace(/^\/+/, "")}`;
 }
 
 export function resolveCmsMediaUrl(path?: string | null): string {

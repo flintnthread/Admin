@@ -71,7 +71,7 @@ const COLORS = {
   avatarPalette: ["#ef7b1a", "#1C2B4A", "#10B981", "#8B5CF6", "#F59E0B", "#3B82F6"],
 };
 
-const fmtINR = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+const fmtINR = (n: number) => "â‚¹" + Math.round(n).toLocaleString("en-IN");
 
 /* ------------------------------------------------------------------ */
 /* Types + mock data                                                    */

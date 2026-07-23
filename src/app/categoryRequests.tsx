@@ -1,7 +1,7 @@
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { sweetConfirm } from '@/lib/sweetAlert';
+import { sweetConfirm, sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { mapCategoryRequestRow } from '@/lib/mappers';
 import {
   approveCategoryRequest,
@@ -368,12 +368,16 @@ export default function CategoryRequests() {
       try {
         if (status === 'Approved') {
           await approveCategoryRequest(row.numericId, reason);
+          void sweetSuccess('Approved!', 'Category request approved successfully.');
         } else {
           await rejectCategoryRequest(row.numericId, reason);
+          void sweetSuccess('Rejected!', 'Category request rejected.');
         }
         await loadData();
       } catch (e) {
-        setLoadError(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e, 'Failed to update category request.');
+        setLoadError(msg);
+        void sweetError('Error', msg);
       }
     })();
   };

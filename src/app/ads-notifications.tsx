@@ -105,7 +105,7 @@ const STATUS_META: Record<NotificationStatus, { label: string; color: string; bg
 };
 
 function fmtINR(val: number) {
-  return "₹" + val.toLocaleString("en-IN");
+  return "â‚¹" + val.toLocaleString("en-IN");
 }
 
 /* ------------------------------------------------------------------ */

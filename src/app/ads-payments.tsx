@@ -115,7 +115,7 @@ const FONT = {
   mono: Platform.select({ ios: 'Courier', android: 'monospace', default: '"IBM Plex Mono", Menlo, Consolas, monospace' }),
 };
 
-const fmtINR = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const fmtINR = (n: number) => 'â‚¹' + Math.round(n).toLocaleString('en-IN');
 
 /* ------------------------------------------------------------------ */
 /* Types + mock data                                                    */

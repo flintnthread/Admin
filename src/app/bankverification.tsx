@@ -61,13 +61,19 @@ const COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4"
 
 function mapSellerToVerification(s: SellerSummary & { verificationStatus?: string; attempts?: number }, index: number): Verification {
   const rawStatus = String(s.verificationStatus ?? (s.bankVerified ? "Verified" : "Pending")).trim();
-  const normalized = (rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase()) as StatusKey;
-  const valid: StatusKey[] = ["Pending", "Processing", "Verified", "Failed", "Expired"];
-  const status: StatusKey = valid.includes(normalized)
-    ? normalized
-    : s.bankVerified
-      ? "Verified"
-      : "Pending";
+  const key = rawStatus.toLowerCase().replace(/[\s_-]+/g, "");
+  const statusMap: Record<string, StatusKey> = {
+    pending: "Pending",
+    pendingreview: "Pending",
+    processing: "Processing",
+    inprogress: "Processing",
+    verified: "Verified",
+    approved: "Verified",
+    failed: "Failed",
+    rejected: "Failed",
+    expired: "Expired",
+  };
+  const status: StatusKey = statusMap[key] ?? (s.bankVerified ? "Verified" : "Pending");
   const created = s.updatedAt ?? s.createdAt;
   return {
     id: `#S${s.id}`,
@@ -453,11 +459,15 @@ export default function BankVerifications() {
     router.push({ pathname: "/viewbankdetails", params: { sellerId: String(sellerId) } });
   };
 
-  /* Counts from backend stats API, with list fallback when a key is missing */
+  /* Counts from backend stats API, with list fallback when stats claim empty */
   const listCount = (status: StatusKey) => verifications.filter(v => v.status === status).length;
   const statOr = (key: string, fallback: number) => {
     const raw = bankStats[key];
-    return raw == null || Number.isNaN(Number(raw)) ? fallback : Number(raw);
+    if (raw == null || Number.isNaN(Number(raw))) return fallback;
+    const n = Number(raw);
+    // Prefer list when stats claim empty but the merged list has rows
+    if (n === 0 && fallback > 0) return fallback;
+    return n;
   };
   const counts = {
     total: statOr("total", verifications.length),

@@ -8,12 +8,12 @@ import {
   StatusBar,
   Platform,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { fetchCommissionRates, updateCommissionRates } from "@/services/settingsApi";
 
 const PRIMARY_ORANGE = "#ef7b1a";
@@ -53,26 +53,14 @@ const CommissionRatesScreen: React.FC = () => {
     };
   }, []);
 
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" }>({
-    visible: false,
-    message: "",
-    type: "success",
-  });
-
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast((t) => ({ ...t, visible: false }));
-    }, 3000);
-  };
-
   const handleSave = async () => {
+    if (!(await sweetCrud.confirmUpdate("Commission rates"))) return;
     setSaving(true);
     try {
       await updateCommissionRates(b2cCommission, b2bCommission);
-      showToast("Commission rates saved successfully!", "success");
+      void sweetCrud.saved("Commission rates");
     } catch (e) {
-      showToast(getApiErrorMessage(e), "error");
+      void sweetError("Error", getApiErrorMessage(e, "Failed to save commission rates."));
     } finally {
       setSaving(false);
     }
@@ -84,7 +72,7 @@ const CommissionRatesScreen: React.FC = () => {
       <View style={[styles.header, !isWeb && { marginBottom: 16 }]}>
         <View style={styles.headerTopRow}>
           <View style={styles.headerIconContainer}>
-            <Feather name="percent" size={22} color="#FFFFFF" />
+            <Feather name="percent" size={16} color="#FFFFFF" />
           </View>
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Platform commission rates</Text>
@@ -153,18 +141,6 @@ const CommissionRatesScreen: React.FC = () => {
           {MainContent}
         </View>
       </View>
-      {toast.visible && (
-        <View style={styles.toastContainer} pointerEvents="none">
-          <View style={[styles.toast, toast.type === "success" ? styles.toastSuccess : styles.toastError]}>
-            <Feather
-              name={toast.type === "success" ? "check-circle" : "alert-circle"}
-              size={16}
-              color="#FFFFFF"
-            />
-            <Text style={styles.toastText}>{toast.message}</Text>
-          </View>
-        </View>
-      )}
     </AdminLayout>
   );
 };
@@ -231,9 +207,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: PRIMARY_ORANGE,
     alignItems: "center",
     justifyContent: "center",
@@ -329,39 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#DC2626",
     marginBottom: 16,
-  },
-  toastContainer: {
-    position: "absolute",
-    top: Platform.OS === "web" ? 24 : 50,
-    left: Platform.OS === "web" ? undefined : 20,
-    right: Platform.OS === "web" ? 24 : 20,
-    alignItems: Platform.OS === "web" ? "flex-end" : "center",
-    zIndex: 9999,
-  },
-  toast: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 260,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  toastSuccess: {
-    backgroundColor: "#10B981",
-  },
-  toastError: {
-    backgroundColor: "#EF4444",
-  },
-  toastText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
-    marginLeft: 8,
   },
 });
 

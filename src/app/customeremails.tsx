@@ -64,8 +64,9 @@ import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 
 import { formatDate } from '@/lib/format';
+import { sweetError, sweetSuccess } from '@/lib/sweetAlert';
 
-import { fetchCustomers } from '@/services/customerApi';
+import { fetchCustomers, fetchCustomerStats } from '@/services/customerApi';
 
 import { sendCustomerEmails } from '@/services/emailApi';
 
@@ -260,6 +261,7 @@ export default function CustomerEmailsScreen() {
     const { bp, width, isCompact } = useBreakpoint();
 
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [totalCustomersCount, setTotalCustomersCount] = useState(0);
 
     const [loading, setLoading] = useState(true);
 
@@ -323,11 +325,23 @@ export default function CustomerEmailsScreen() {
 
             try {
 
-                const page = await fetchCustomers(undefined, 0, 100);
+                const [page, stats] = await Promise.all([
+                    fetchCustomers(undefined, 0, 100),
+                    fetchCustomerStats().catch(() => ({} as Record<string, number>)),
+                ]);
 
                 if (cancelled) return;
 
                 setCustomers((page.items ?? []).map((c) => mapCustomerRow(c as Customer & { phone?: string; createdAt?: string; lastOrderAt?: string })));
+                setTotalCustomersCount(
+                    Number(
+                        stats.total ??
+                        stats.totalCustomers ??
+                        page.totalElements ??
+                        page.items?.length ??
+                        0,
+                    ),
+                );
 
             } catch (e) {
 
@@ -414,29 +428,37 @@ export default function CustomerEmailsScreen() {
     };
 
     const handleSend = async () => {
+        // Store form data before closing modal
+        const savedSubject = subject;
+        const savedMessage = message;
+        const savedBulkOpen = bulkOpen;
+        const savedSingleTarget = singleTarget;
+
+        // Close modal first before showing any dialogs
+        closeModals();
+
+        // Wait for modal close animation to complete
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         try {
-
-            if (bulkOpen) {
-
-                await sendCustomerEmails({ subject, message, sendAll: true });
-
-            } else if (singleTarget) {
-
-                await sendCustomerEmails({ subject, message, recipients: [singleTarget.id] });
-
+            if (savedBulkOpen) {
+                await sendCustomerEmails({ subject: savedSubject, message: savedMessage, sendAll: true });
+            } else if (savedSingleTarget) {
+                await sendCustomerEmails({ subject: savedSubject, message: savedMessage, recipients: [savedSingleTarget.id] });
             }
 
-            closeModals();
-
-            showToast('✅  Email sent successfully!');
-
+            void sweetSuccess('Sent!', 'Email sent successfully.');
         } catch (e) {
-
-            showToast(getApiErrorMessage(e, 'Failed to send email.'));
-
+            // API failed - reopen modal with saved data and show error
+            setSubject(savedSubject);
+            setMessage(savedMessage);
+            if (savedBulkOpen) {
+                setBulkOpen(true);
+            } else if (savedSingleTarget) {
+                setSingleTarget(savedSingleTarget);
+            }
+            void sweetError('Error', getApiErrorMessage(e, 'Failed to send email.'));
         }
-
     };
 
 
@@ -513,9 +535,9 @@ export default function CustomerEmailsScreen() {
 
                             <TextInput
 
-                                style={styles.searchInput}
+                                style={Platform.OS === 'web' ? [styles.searchInput, { outlineStyle: 'none' }] : styles.searchInput}
 
-                                placeholder="Search customers..."
+                                placeholder={width === 320 ? "" : "Search customers..."}
 
                                 placeholderTextColor={COLORS.textFaint}
 
@@ -523,13 +545,15 @@ export default function CustomerEmailsScreen() {
 
                                 onChangeText={setQuery}
 
+                                numberOfLines={1}
+
                             />
 
                         </View>
 
                         <View style={styles.totalBadge}>
 
-                            <Text style={styles.totalBadgeText}>{filtered.length} Customers</Text>
+                            <Text style={styles.totalBadgeText}>{totalCustomersCount || filtered.length} Customers</Text>
 
                         </View>
 
@@ -1205,9 +1229,9 @@ const styles = StyleSheet.create({
 
     searchStripMobile: {
 
-        flexDirection: 'column',
+        flexDirection: 'row',
 
-        alignItems: 'stretch',
+        alignItems: 'center',
 
         gap: 10,
 
@@ -1229,7 +1253,7 @@ const styles = StyleSheet.create({
 
         borderWidth: 1,
 
-        borderColor: "#F1F5F9",
+        borderColor: "#E5E7EB",
 
         borderRadius: 14,
 
@@ -1237,27 +1261,15 @@ const styles = StyleSheet.create({
 
         paddingVertical: Platform.OS === 'web' ? 12 : 10,
 
-        shadowColor: "#0F172A",
-
-        shadowOpacity: 0.1,
-
-        shadowRadius: 10,
-
-        shadowOffset: { width: 0, height: 5 },
-
-        elevation: 3,
-
     },
 
     searchInput: {
-
         flex: 1,
-
         fontSize: 14,
-
         color: COLORS.text,
-
-    },
+        borderWidth: 0,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    } as any,
 
     totalBadge: {
 
@@ -1275,7 +1287,7 @@ const styles = StyleSheet.create({
 
         paddingHorizontal: 14,
 
-        paddingVertical: 12,
+        paddingVertical: Platform.OS === 'web' ? 12 : 10,
 
         borderRadius: 14,
 
@@ -1654,8 +1666,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
 
         alignItems: 'center',
-
-        shadowColor: '#000',
 
         shadowOffset: { width: 0, height: 4 },
 

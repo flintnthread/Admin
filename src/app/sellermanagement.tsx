@@ -466,6 +466,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
     alignItems: "center",
+    zIndex: 100,
   },
   searchBox: {
     flex: 1,
@@ -481,7 +482,7 @@ const styles = StyleSheet.create({
     height: 42,
   },
   searchInput: { flex: 1, fontSize: 14, color: "#1E293B" },
-  toolbarRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  toolbarRight: { flexDirection: "row", alignItems: "center", gap: 10, zIndex: 100 },
   filterWrap: { position: "relative", zIndex: 20 },
   filterBtn: {
     flexDirection: "row",

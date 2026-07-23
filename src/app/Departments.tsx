@@ -3,6 +3,7 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { Department as ApiDepartment } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
     createDepartment,
     deleteDepartment,
@@ -802,7 +803,6 @@ const DepartmentsScreen: React.FC = () => {
     const ITEMS_PER_PAGE = 10;
 
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type?: 'success' | 'error' }>({ visible: false, title: "", message: "", type: 'success' });
 
     const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
     const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
@@ -840,25 +840,50 @@ const DepartmentsScreen: React.FC = () => {
     const inactiveCount = departments.length - activeCount;
 
     const handleSave = async (updated: Department) => {
+        const isEdit = !!departments.find((d) => d.id === updated.id);
+        
+        // Close modal first before showing any dialogs
+        setEditTarget(null);
+        setAddOpen(false);
+        
+        // Wait for modal close animation to complete
+        await new Promise(resolve => setTimeout(resolve, 250));
+        
+        // Now show confirmation dialog
+        if (isEdit) {
+            if (!(await sweetCrud.confirmUpdate("Department", updated.name))) {
+                // User cancelled - reopen modal
+                setEditTarget(updated);
+                return;
+            }
+        } else if (!(await sweetCrud.confirmAdd("Department", updated.name))) {
+            // User cancelled - reopen modal
+            setAddOpen(true);
+            return;
+        }
+        
         try {
             const payload = {
                 name: updated.name,
                 description: updated.description,
                 active: updated.status === "Active",
             };
-            if (departments.find((d) => d.id === updated.id)) {
+            if (isEdit) {
                 await updateDepartment(updated.id, payload);
-                setAlertConfig({ visible: true, title: "Updated!", message: "Department updated successfully.", type: 'success' });
+                void sweetCrud.updated("Department");
             } else {
                 await createDepartment(payload);
-                setAlertConfig({ visible: true, title: "Added!", message: "Department added successfully.", type: 'success' });
+                void sweetCrud.added("Department");
             }
             await loadDepartments();
-            setEditTarget(null);
-            setAddOpen(false);
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e), type: 'error' });
+            // API failed - reopen modal and show error
+            if (isEdit) {
+                setEditTarget(updated);
+            } else {
+                setAddOpen(true);
+            }
+            void sweetError("Error", getApiErrorMessage(e, "Failed to save department."));
         }
     };
 
@@ -868,9 +893,9 @@ const DepartmentsScreen: React.FC = () => {
             await deleteDepartment(deleteTarget.id);
             await loadDepartments();
             setDeleteTarget(null);
+            void sweetCrud.deleted("Department");
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e), type: 'error' });
+            void sweetError("Error", getApiErrorMessage(e, "Failed to delete department."));
         }
     };
 
@@ -1238,22 +1263,6 @@ const DepartmentsScreen: React.FC = () => {
                 onCancel={() => { releaseModalFocus(); setDeleteTarget(null); }}
                 onConfirm={handleDelete}
             />
-
-            {/* ── SWEET ALERT ── */}
-            <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => { releaseModalFocus(); setAlertConfig({ ...alertConfig, visible: false }); }}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: alertConfig.type === 'error' ? '#fee2e2' : '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                            <Feather name={alertConfig.type === 'error' ? "alert-triangle" : "check"} size={32} color={alertConfig.type === 'error' ? "#ef4444" : "#10b981"} />
-                        </View>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1f2937', marginBottom: 8, textAlign: 'center' }}>{alertConfig.title}</Text>
-                        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{alertConfig.message}</Text>
-                        <TouchableOpacity style={{ backgroundColor: alertConfig.type === 'error' ? '#ef4444' : T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => { releaseModalFocus(); setAlertConfig({ ...alertConfig, visible: false }); }}>
-                            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </Container>
     );
 

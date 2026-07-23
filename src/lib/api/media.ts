@@ -1,5 +1,11 @@
 import { resolveAdminApiBaseUrl, resolvePublicMediaBaseUrl } from "@/lib/api/config";
 
+/** Seller profile + KYC docs CDN — ONLY host for /uploads/seller_documents/. */
+export const SELLER_MEDIA_CDN = "https://flintnthread.com";
+
+/** Product images CDN — ONLY host for /uploads/products/. */
+export const PRODUCT_MEDIA_CDN = "https://flintnthread.com";
+
 const SELLER_DOCUMENT_FILE =
   /^\d+_(profile_pic|aadhar_front|aadhar_back|pan_card|business_proof|bank_proof|cancelled_cheque|live_selfie|company_pan_doc|incorporation_certificate|partnership_deed|msme_certificate|iec_certificate)(_|\.)/i;
 
@@ -11,6 +17,20 @@ function isSellerDocumentFileName(fileName: string): boolean {
 function sellerDocumentPath(fileName: string): string {
   const base = fileName.replace(/\\/g, "/").trim().split("/").pop() ?? "";
   return `/uploads/seller_documents/${base}`;
+}
+
+function isSellerDocUploadPath(pathname: string): boolean {
+  return (
+    pathname.includes("/uploads/seller_documents/") ||
+    pathname.includes("/uploads/sellers/") ||
+    pathname.includes("/uploads/kyc_images/")
+  );
+}
+
+/** Force seller docs onto flintnthread.com (rewrite .in / .online). */
+function toSellerMediaCdnUrl(pathname: string): string {
+  const path = normalizeMediaPath(pathname);
+  return `${SELLER_MEDIA_CDN}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 /** Normalize DB/media paths to a URL path segment (always starts with /). */
@@ -48,8 +68,9 @@ export function normalizeMediaPath(value: string): string {
 }
 
 /**
- * Resolve to CDN URL (app.media.public-base-url = https://flintnthread.in).
- * Seller docs/profile → https://flintnthread.in/uploads/seller_documents/...
+ * Resolve to CDN URL.
+ * Seller docs/profile → https://flintnthread.com/uploads/seller_documents/...
+ * Products → https://flintnthread.com/uploads/products/...
  */
 export function resolveMediaUrl(path?: string | null): string {
   if (!path?.trim()) return "";
@@ -60,13 +81,16 @@ export function resolveMediaUrl(path?: string | null): string {
   }
 
   if (/^https?:\/\//i.test(value)) {
-    if (/res\.cloudinary\.com|cloudinary\.com/i.test(value)) {
+    if (/res\.cloudinary\.com/i.test(value)) {
       return value;
     }
     try {
       const pathname = new URL(value).pathname || "";
-      if (pathname.includes("/uploads/")) {
-        return `${resolvePublicMediaBaseUrl()}${normalizeMediaPath(pathname)}`;
+      if (pathname.includes("/uploads/products/")) {
+        return `${PRODUCT_MEDIA_CDN}${normalizeMediaPath(pathname)}`;
+      }
+      if (isSellerDocUploadPath(pathname) || pathname.includes("/uploads/")) {
+        return toSellerMediaCdnUrl(pathname);
       }
     } catch {
       return value;
@@ -74,7 +98,14 @@ export function resolveMediaUrl(path?: string | null): string {
     return value;
   }
 
-  return `${resolvePublicMediaBaseUrl()}${normalizeMediaPath(value)}`;
+  const normalized = normalizeMediaPath(value);
+  if (normalized.includes("/uploads/products/")) {
+    return `${PRODUCT_MEDIA_CDN}${normalized}`;
+  }
+  if (isSellerDocUploadPath(normalized) || normalized.includes("/uploads/")) {
+    return toSellerMediaCdnUrl(normalized);
+  }
+  return `${SELLER_MEDIA_CDN}${normalized}`;
 }
 
 /** Local admin-backend fallback (redirects to CDN when file missing on disk). */
@@ -92,7 +123,7 @@ export function resolveAdminMediaUrl(path?: string | null): string {
   return `${resolveAdminApiBaseUrl()}${normalizeMediaPath(value)}`;
 }
 
-/** CDN first (production), admin-backend fallback (local dev). */
+/** CDN only for seller docs/products — no admin .in/.online fallbacks. */
 export function buildMediaUrlCandidates(
   path?: string | null,
   cdnUrl?: string | null,
@@ -102,10 +133,23 @@ export function buildMediaUrlCandidates(
     if (url && !urls.includes(url)) urls.push(url);
   };
 
+  // Always prefer flintnthread.com for /uploads/... (products + seller docs)
   push(resolveMediaUrl(cdnUrl));
   push(resolveMediaUrl(path));
-  push(resolveAdminMediaUrl(path));
-  push(resolveAdminMediaUrl(cdnUrl));
+
+  const combined = `${path ?? ""} ${cdnUrl ?? ""}`;
+  const isSellerOrProductUpload =
+    /\/uploads\/(seller_documents|sellers|kyc_images|products)\//i.test(combined) ||
+    SELLER_DOCUMENT_FILE.test((path ?? cdnUrl ?? "").split("/").pop() ?? "") ||
+    /^\d+_(profile_pic|aadhar|aadhaar|pan|bank|business|live_selfie)/i.test(
+      (path ?? cdnUrl ?? "").split("/").pop() ?? "",
+    );
+
+  // Catalog/CMS and other non-CDN assets may still need admin origin.
+  if (!isSellerOrProductUpload) {
+    push(resolveAdminMediaUrl(path));
+    push(resolveAdminMediaUrl(cdnUrl));
+  }
 
   return urls;
 }
@@ -115,6 +159,7 @@ export function buildSellerImageCandidates(seller: {
   profilePicUrl?: string | null;
   profilePicPath?: string | null;
   liveSelfiePath?: string | null;
+  avatar?: string | null;
 }): string[] {
   const urls: string[] = [];
   const push = (url: string) => {
@@ -127,6 +172,8 @@ export function buildSellerImageCandidates(seller: {
   for (const entry of buildMediaUrlCandidates(seller.liveSelfiePath, null)) {
     push(entry);
   }
+  const avatarUrl = resolveMediaUrl(seller.avatar);
+  if (avatarUrl) push(avatarUrl);
 
   return urls;
 }
@@ -136,11 +183,13 @@ export function resolveSellerProfileImage(seller: {
   profilePicUrl?: string | null;
   profilePicPath?: string | null;
   liveSelfiePath?: string | null;
+  avatar?: string | null;
 }): string {
   return (
     resolveMediaUrl(seller.profilePicUrl) ||
     resolveMediaUrl(seller.profilePicPath) ||
     resolveMediaUrl(seller.liveSelfiePath) ||
+    resolveMediaUrl(seller.avatar) ||
     buildSellerImageCandidates(seller)[0] ||
     ""
   );
@@ -155,9 +204,27 @@ export function getPublicMediaBaseUrl(): string {
   return resolvePublicMediaBaseUrl();
 }
 
+/** Cloudinary thumbnails for faster admin product grids. */
+export function optimizeProductImageUrl(url: string, width = 420): string {
+  const trimmed = String(url ?? "").trim();
+  if (!trimmed || !/res\.cloudinary\.com/i.test(trimmed)) return trimmed;
+
+  const match = trimmed.match(
+    /^(https?:\/\/res\.cloudinary\.com\/[^/]+\/(?:image|video)\/upload\/)(.*)$/i
+  );
+  if (!match) return trimmed;
+
+  const [, prefix, rest] = match;
+  if (/^(w_|c_|q_|f_|h_|ar_|g_)/i.test(rest)) return trimmed;
+
+  const transform = `w_${width},q_auto,f_auto`;
+  return `${prefix}${transform}/${rest}`;
+}
+
 /**
  * Product approval / catalog images.
- * Cloudinary absolute URLs are used as-is; relative /uploads paths go through admin media.
+ * Product files ALWAYS use https://flintnthread.com/uploads/products/...
+ * Cloudinary absolute URLs are used as-is.
  */
 export function resolveProductImageUrl(path?: string | null): string {
   if (!path?.trim()) return "";
@@ -167,23 +234,17 @@ export function resolveProductImageUrl(path?: string | null): string {
     return value;
   }
 
-  // Cloudinary (or any absolute https without /uploads) — never rewrite
   if (/^https?:\/\//i.test(value)) {
-    if (/res\.cloudinary\.com|cloudinary\.com/i.test(value) || !/\/uploads\//i.test(value)) {
-      return value;
+    if (/res\.cloudinary\.com/i.test(value)) {
+      return optimizeProductImageUrl(value);
     }
     try {
       const pathname = new URL(value).pathname || "";
       if (pathname.includes("/uploads/products/")) {
-        return `${resolveAdminApiBaseUrl()}${normalizeMediaPath(pathname)}`;
+        return `${PRODUCT_MEDIA_CDN}${normalizeMediaPath(pathname)}`;
       }
-      // Seller docs / profile still use CDN
-      if (
-        pathname.includes("/uploads/seller_documents/") ||
-        pathname.includes("/uploads/sellers/") ||
-        pathname.includes("/uploads/kyc_images/")
-      ) {
-        return `${resolvePublicMediaBaseUrl()}${normalizeMediaPath(pathname)}`;
+      if (isSellerDocUploadPath(pathname)) {
+        return toSellerMediaCdnUrl(pathname);
       }
     } catch {
       return value;
@@ -193,7 +254,7 @@ export function resolveProductImageUrl(path?: string | null): string {
 
   const pathname = normalizeMediaPath(value);
   if (pathname.includes("/uploads/products/")) {
-    return `${resolveAdminApiBaseUrl()}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+    return `${PRODUCT_MEDIA_CDN}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
   }
 
   return resolveMediaUrl(value);
@@ -203,18 +264,25 @@ export function resolveProductImageUrl(path?: string | null): string {
 export function getSellerDocumentPlaceholderUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_SELLER_DOCUMENT_PLACEHOLDER_URL?.trim();
   if (fromEnv) return fromEnv;
-  return `${resolvePublicMediaBaseUrl()}/uploads/seller_documents/document_placeholder.png`;
+  return `${SELLER_MEDIA_CDN}/uploads/seller_documents/document_placeholder.png`;
 }
 
 /**
- * Resolve seller KYC / document image to CDN URL
- * (https://flintnthread.in/uploads/seller_documents/...).
- * Falls back to placeholder when path and backend URL are empty.
+ * Resolve seller KYC / document / profile image to CDN URL
+ * (https://flintnthread.com/uploads/seller_documents/...).
  */
 export function resolveSellerDocumentImageUrl(
   path?: string | null,
   backendUrl?: string | null,
 ): string {
-  const resolved = buildMediaUrlCandidates(path, backendUrl)[0];
-  return resolved || getSellerDocumentPlaceholderUrl();
+  // Prefer absolute backend/CDN URL from API over a bare DB path.
+  const fromBackend = resolveMediaUrl(backendUrl);
+  if (fromBackend) return fromBackend;
+  const fromPath = resolveMediaUrl(path);
+  if (fromPath) return fromPath;
+  // CDN-only candidates — never admin .in/.online (those 404 as "Page not found").
+  const candidates = buildMediaUrlCandidates(path, backendUrl).filter((u) =>
+    /flintnthread\.com/i.test(u),
+  );
+  return candidates[0] || "";
 }

@@ -1,48 +1,47 @@
-import React, { useState } from "react";
+import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
+import {
+  createHomepageBanner,
+  deleteHomepageBanner,
+  fetchHomepageBanners,
+  resolveCmsMediaUrl,
+  updateHomepageBanner,
+  uploadGeneralBannerImage,
+} from "@/services/cmsApi";
 import * as ImagePicker from "expo-image-picker";
 import {
-  View,
+  ChevronDown,
+  Grid2x2,
+  Grid3x3,
+  Image as ImageIcon,
+  Info,
+  Layers,
+  Megaphone,
+  PanelBottom,
+  PanelTop,
+  Pencil,
+  Plus,
+  Power,
+  Save,
+  Trash2,
+  X
+} from "lucide-react-native";
+import React from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Modal,
-  Image,
-  StyleSheet,
   useWindowDimensions,
-  Platform,
-  ActivityIndicator,
+  View,
 } from "react-native";
-import { getApiErrorMessage } from "@/lib/api/client";
-import {
-  fetchHomepageBanners,
-  createHomepageBanner,
-  updateHomepageBanner,
-  deleteHomepageBanner,
-  uploadGeneralBannerImage,
-  resolveCmsMediaUrl,
-} from "@/services/cmsApi";
-import {
-  PanelTop,
-  PanelBottom,
-  Layers,
-  Megaphone,
-  Image as ImageIcon,
-  Grid3x3,
-  Grid2x2,
-  Plus,
-  Pencil,
-  Trash2,
-  X,
-  Save,
-  Info,
-  Power,
-  Link as LinkIcon,
-  Hash,
-  ChevronDown,
-} from "lucide-react-native";
-import AdminLayout from "@/components/admin-layout";
-import Pagination from "@/components/Pagination";
 
 // npm install lucide-react-native react-native-svg
 
@@ -312,30 +311,60 @@ export default function HomepageBannerManagement() {
       return;
     }
 
+    // Store form data before closing modal
+    const savedForm = { ...form };
+    const savedEditingId = editingId;
+
+    // Close modal first before showing any dialogs
+    setModalVisible(false);
+    setEditingId(null);
+    setForm(emptyForm);
+    setErrors({});
+
+    // Wait for modal close animation to complete
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    // Now show confirmation dialog
+    const label = "Banner";
+    if (savedEditingId) {
+      if (!(await sweetCrud.confirmUpdate(label, savedForm.title.trim()))) {
+        // User cancelled - reopen modal with saved data
+        setEditingId(savedEditingId);
+        setForm(savedForm);
+        setModalVisible(true);
+        return;
+      }
+    } else if (!(await sweetCrud.confirmAdd(label, savedForm.title.trim()))) {
+      // User cancelled - reopen modal with saved data
+      setForm(savedForm);
+      setModalVisible(true);
+      return;
+    }
+
     setSaving(true);
     try {
-      const imagePath = await resolveImagePath(form.image, form.imagePath);
+      const imagePath = await resolveImagePath(savedForm.image, savedForm.imagePath);
       const body = {
         section: activeKey,
-        position: Number(form.position) || 1,
-        title: form.title.trim(),
-        altText: form.subtitle.trim() || form.title.trim(),
+        position: Number(savedForm.position) || 1,
+        title: savedForm.title.trim(),
+        altText: savedForm.subtitle.trim() || savedForm.title.trim(),
         imagePath,
-        linkUrl: form.link.trim() || "shop-grid.php",
-        isActive: form.status === "Active",
-        sortOrder: Number(form.position) || 1,
+        linkUrl: savedForm.link.trim() || "shop-grid.php",
+        isActive: savedForm.status === "Active",
+        sortOrder: Number(savedForm.position) || 1,
       };
 
-      if (editingId) {
-        const updated = await updateHomepageBanner(Number(editingId), body);
+      if (savedEditingId) {
+        const updated = await updateHomepageBanner(Number(savedEditingId), body);
         const mapped = mapRowToBanner(updated);
         setData((prev) => ({
           ...prev,
           [activeKey]: prev[activeKey].map((b: any) =>
-            String(b.id) === String(editingId) ? mapped : b,
+            String(b.id) === String(savedEditingId) ? mapped : b,
           ),
         }));
-        showToast("Banner updated");
+        void sweetCrud.updated(label);
       } else {
         const created = await createHomepageBanner(body);
         const mapped = mapRowToBanner(created);
@@ -343,17 +372,20 @@ export default function HomepageBannerManagement() {
           ...prev,
           [activeKey]: [...prev[activeKey], mapped],
         }));
-        showToast("Banner added");
+        void sweetCrud.added(label);
       }
-      closeModal();
     } catch (err) {
+      // API failed - reopen modal with saved data and show error
+      setEditingId(savedEditingId);
+      setForm(savedForm);
+      setModalVisible(true);
+      
       const conflict = positionConflictMessage(err);
       if (conflict) {
         setErrors({ position: conflict });
-        showToast(conflict);
+        void sweetWarning("Position conflict", conflict);
       } else {
-        const msg = getApiErrorMessage(err, "Failed to save banner.");
-        showToast(msg);
+        void sweetError("Error", getApiErrorMessage(err, "Failed to save banner."));
       }
     } finally {
       setSaving(false);
@@ -373,9 +405,9 @@ export default function HomepageBannerManagement() {
           String(b.id) === String(id) ? mapped : b,
         ),
       }));
-      showToast("Status updated");
+      void sweetSuccess("Status updated", nextActive ? "Banner is now active." : "Banner is now inactive.");
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Failed to update status."));
+      void sweetError("Error", getApiErrorMessage(err, "Failed to update status."));
     }
   }
 
@@ -389,9 +421,9 @@ export default function HomepageBannerManagement() {
         [sectionKey]: prev[sectionKey].filter((b: any) => String(b.id) !== String(id)),
       }));
       setConfirmDelete(null);
-      showToast("Banner deleted");
+      void sweetCrud.deleted("Banner");
     } catch (err) {
-      showToast(getApiErrorMessage(err, "Failed to delete banner."));
+      void sweetError("Error", getApiErrorMessage(err, "Failed to delete banner."));
     }
   }
 
@@ -593,7 +625,7 @@ export default function HomepageBannerManagement() {
                           <View style={styles.card}>
                             <View style={styles.cardImageWrap}>
                               <Image
-                                source={{ uri: resolveCmsMediaUrl(b.imagePath || b.image) }}
+                                source={{ uri: b.image || resolveCmsMediaUrl(b.imagePath) }}
                                 style={styles.cardImage}
                               />
                               <View style={styles.positionChip}>

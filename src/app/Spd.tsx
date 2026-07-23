@@ -11,6 +11,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    useWindowDimensions
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
@@ -675,6 +676,8 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
     onPrint, onRegenerate, regenLoading,
 }) => {
     const isWeb = Platform.OS === "web";
+    const { width } = useWindowDimensions();
+    const isMobile = width < 768;
     const fmtInv = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const lineItems = (order.items?.length
         ? order.items
@@ -748,7 +751,7 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
 
                             <View style={invStyles.divider} />
 
-                            <View style={[invStyles.twoColRow, !isWeb && { flexDirection: "column", alignItems: "stretch" }]}>
+                            <View style={[invStyles.twoColRow, isMobile && { flexDirection: "column", alignItems: "stretch" }]}>
                                 <View style={invStyles.infoCard}>
                                     <Text style={invStyles.infoCardTitle}>BENEFICIARY DETAILS</Text>
                                     <Text style={invStyles.beneficiaryName}>{order.sellerName}</Text>
@@ -792,7 +795,7 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                 ))}
                             </View>
 
-                            <View style={[invStyles.twoColRow, !isWeb && { flexDirection: "column", alignItems: "stretch" }]}>
+                            <View style={[invStyles.twoColRow, isMobile && { flexDirection: "column", alignItems: "stretch" }]}>
                                 <View style={invStyles.wordsBlock}>
                                     <Text style={invStyles.wordsLabel}>Amount Payable (in words):</Text>
                                     <Text style={invStyles.wordsValue}>{amountInWords(sellerEarning)}</Text>
@@ -841,6 +844,8 @@ interface SellerPaymentDetailScreenProps {
 
 const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps>> = ({ order: propOrder, onBack: propOnBack }) => {
     const isWeb = Platform.OS === "web";
+    const { width: screenWidth } = useWindowDimensions();
+    const isLargeScreen = isWeb && screenWidth > 1024;
     const [regenLoading, setRegenLoading] = useState(false);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
     const [invoiceVisible, setInvoiceVisible] = useState(false);
@@ -994,7 +999,7 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
         const lineItems = order.items && order.items.length > 0
             ? order.items
             : [{ productName: "Settlement for Order", hsn: "9983", sku: "SETTLE", qty: 1, basePrice: sellerEarning, total: sellerEarning }];
-        
+
         const safeName = (invoiceNo ?? `payout-${order.id}`).replace(/[^\w.-]+/g, "_");
         const fileName = `${safeName}.pdf`;
 
@@ -1133,15 +1138,15 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
         <View style={styles.card}>
             <SectionHeader icon="zap" title="Actions" accent="#d97706" />
             <View style={styles.actionsGrid}>
-                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={() => void handleInvoice()} flex={isWeb} width={!isWeb ? "48%" : undefined} />
-                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={() => void handleRegen()} flex={isWeb} width={!isWeb ? "48%" : undefined} />
-                <ActionButton icon="printer" label="Print Invoice" color="#3b82f6" onPress={handlePrint} flex={isWeb} width={!isWeb ? "48%" : undefined} />
+                <ActionButton icon="file-text" label={invoiceLoading ? "Generating…" : "Generate Invoice"} color="#f59e0b" onPress={() => void handleInvoice()} flex={screenWidth > 1200} width={screenWidth > 1200 ? undefined : screenWidth > 600 ? "48%" : "100%"} />
+                <ActionButton icon="refresh-cw" label={regenLoading ? "Regenerating…" : "Regenerate Invoice"} color="#64748b" onPress={() => void handleRegen()} flex={screenWidth > 1200} width={screenWidth > 1200 ? undefined : screenWidth > 600 ? "48%" : "100%"} />
+                <ActionButton icon="printer" label="Print Invoice" color="#3b82f6" onPress={handlePrint} flex={screenWidth > 1200} width={screenWidth > 1200 ? undefined : screenWidth > 600 ? "48%" : "100%"} />
                 {order.paymentStatus === "Pending" && (
                     <ActionButton icon="dollar-sign" label="Mark as Paid" color="#10b981" onPress={() => {
                         setTransactionRef(order.transactionRef ?? "");
                         setAdminNote(order.adminNote ?? "");
                         setPayModalVisible(true);
-                    }} flex={isWeb} width={!isWeb ? "48%" : undefined} />
+                    }} flex={screenWidth > 1200} width={screenWidth > 1200 ? undefined : screenWidth > 600 ? "48%" : "100%"} />
                 )}
             </View>
         </View>
@@ -1162,7 +1167,7 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
                         <View style={styles.headerMid}>
                             <Text style={styles.headerTitle}>Order Details</Text>
                             <Text style={styles.headerSub}>
-                                Dashboard › Seller Payments › <Text style={{ color: PRIMARY }}>{order.orderId}</Text>
+                                <Text style={{ color: PRIMARY }}>{order.orderId}</Text>
                             </Text>
                         </View>
                         <View style={styles.headerRight}>
@@ -1173,7 +1178,7 @@ const SellerPaymentDetailScreen: React.FC<Partial<SellerPaymentDetailScreenProps
                         </View>
                     </View>
 
-                    {isWeb ? (
+                    {isLargeScreen ? (
                         // ── WEB: 2-column grid ──────────────────────────────
                         <View style={styles.grid}>
                             {/* LEFT */}

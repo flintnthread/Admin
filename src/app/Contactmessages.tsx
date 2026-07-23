@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
+import { sweetCrud, sweetError, sweetWarning, sweetSuccess } from "@/lib/sweetAlert";
 import { mapContactRow } from "@/lib/mappers";
-import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact } from "@/services/contactApi";
+import { fetchContacts, fetchContactStats, replyContact, updateContactStatus, deleteContact, createContact } from "@/services/contactApi";
 import {
   View,
   Text,
@@ -20,10 +20,10 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
-type MessageStatus = "Replied" | "Not Replied";
+// â”€â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+type MessageStatus = "Read" | "Unread";
 type ViewMode = "grid" | "list";
-type FilterType = "All" | "Not Replied" | "Replied";
+type FilterType = "All" | "Unread" | "Read";
 
 interface ContactMessage {
   id: number;
@@ -53,11 +53,11 @@ function toUiContact(row: ReturnType<typeof mapContactRow>, index: number): Cont
     id: row.id,
     name: row.name,
     email: row.email,
-    phone: row.phone || "—",
+    phone: row.phone || "â€”",
     subject: row.subject,
     content: row.message,
     date: row.date,
-    status: row.status === "read" ? "Replied" : "Not Replied",
+    status: row.status === "read" ? "Read" : "Unread",
     avatarColor: av.color,
     avatarBg: av.bg,
   };
@@ -67,7 +67,7 @@ function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
 
-// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
+// â”€â”€â”€ SUB-COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AvatarIcon: React.FC<{ color: string; bg: string; name: string }> = ({ color, bg, name }) => (
   <View style={[styles.avatarWrapper, { backgroundColor: bg }]}>
     <Text style={[styles.avatarText, { color }]}>{getInitials(name)}</Text>
@@ -75,14 +75,14 @@ const AvatarIcon: React.FC<{ color: string; bg: string; name: string }> = ({ col
 );
 
 const StatusBadge: React.FC<{ status: MessageStatus }> = ({ status }) => (
-  <View style={[styles.statusBadge, { backgroundColor: status === "Replied" ? "#D1FAE5" : "#FEF3C7" }]}>
-    <Text style={[styles.statusText, { color: status === "Replied" ? "#059669" : "#D97706" }]}>
-      {status === "Replied" ? "✓  Replied" : "⏳  Pending"}
+  <View style={[styles.statusBadge, { backgroundColor: status === "Read" ? "#D1FAE5" : "#FEF3C7" }]}>
+    <Text style={[styles.statusText, { color: status === "Read" ? "#059669" : "#D97706" }]}>
+      {status === "Read" ? "âœ“  Read" : "â³  Unread"}
     </Text>
   </View>
 );
 
-// ─── MESSAGE CARD (Grid) ──────────────────────────────────────────────────────
+// â”€â”€â”€ MESSAGE CARD (Grid) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MessageCard: React.FC<{
   msg: ContactMessage;
   onView: (msg: ContactMessage) => void;
@@ -110,7 +110,7 @@ const MessageCard: React.FC<{
         <Feather name="eye" size={14} color={msg.isRead ? "#3B82F6" : PRIMARY} />
         <Text style={[styles.btnViewText, { color: msg.isRead ? "#3B82F6" : PRIMARY }]}>View</Text>
       </TouchableOpacity>
-      {msg.status !== "Replied" && (
+      {msg.status !== "Read" && (
         <TouchableOpacity style={styles.btnMark} onPress={() => onMarkReplied(msg.id)} activeOpacity={0.75}>
           <Feather name="check" size={13} color="#059669" />
         </TouchableOpacity>
@@ -125,13 +125,13 @@ const MessageCard: React.FC<{
   </View>
 );
 
-// ─── STATS HEADER ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ STATS HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: number } }> = ({ stats }) => {
   const { total, replied, pending } = stats;
   const statsData = [
     { icon: "message-square" as const, value: String(total), label: "New Messages", sub: "This Month", tint: "#EDE9FE", textColor: "#7C3AED" },
-    { icon: "corner-up-left" as const, value: String(replied), label: "Replied", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
-    { icon: "clock" as const, value: String(pending), label: "Pending", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
+    { icon: "corner-up-left" as const, value: String(replied), label: "Read", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
+    { icon: "clock" as const, value: String(pending), label: "Unread", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
   ];
   return (
     <View style={styles.statsRow}>
@@ -151,13 +151,13 @@ const StatsHeader: React.FC<{ stats: { total: number; replied: number; pending: 
   );
 };
 
-// ─── MOBILE STATS ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ MOBILE STATS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pending: number } }> = ({ stats }) => {
   const { total, replied, pending } = stats;
   const cards = [
     { icon: "message-square" as const, value: String(total), label: "New Messages", sub: "This Month", tint: "#EDE9FE", textColor: "#7C3AED" },
-    { icon: "corner-up-left" as const, value: String(replied), label: "Replied", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
-    { icon: "clock" as const, value: String(pending), label: "Pending", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
+    { icon: "corner-up-left" as const, value: String(replied), label: "Read", sub: "This Month", tint: "#D1FAE5", textColor: "#059669" },
+    { icon: "clock" as const, value: String(pending), label: "Unread", sub: "This Month", tint: "#FEF3C7", textColor: "#D97706" },
   ];
   return (
     <ScrollView
@@ -182,7 +182,7 @@ const MobileStatsSection: React.FC<{ stats: { total: number; replied: number; pe
   );
 };
 
-// ─── VIEW DETAIL MODAL ────────────────────────────────────────────────────────
+// â”€â”€â”€ VIEW DETAIL MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ViewDetailModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -223,10 +223,10 @@ const ViewDetailModal: React.FC<{
           <Feather name="x" size={14} color="#FFFFFF" />
           <Text style={styles.btnCancelText}> Close</Text>
         </TouchableOpacity>
-        {msg.status !== "Replied" && (
+        {msg.status !== "Read" && (
           <TouchableOpacity style={styles.btnMarkModal} onPress={handleMarkReplied}>
             <Feather name="check" size={14} color="#FFFFFF" />
-            <Text style={styles.btnUpdateText}> Mark as Replied</Text>
+            <Text style={styles.btnUpdateText}> Mark as Read</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.btnUpdate} onPress={() => { onClose(); onReply(msg); }}>
@@ -243,7 +243,7 @@ const ViewDetailModal: React.FC<{
   );
 };
 
-// ─── REPLY MESSAGE MODAL ──────────────────────────────────────────────────────
+// â”€â”€â”€ REPLY MESSAGE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ReplyMessageModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -304,11 +304,11 @@ const ReplyMessageModal: React.FC<{
   );
 };
 
-// ─── ADD MESSAGE MODAL ────────────────────────────────────────────────────────
+// â”€â”€â”€ ADD MESSAGE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AddMessageModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-  onSave: (msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">) => void;
+  onSave: (msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">) => void | Promise<void>;
   isWeb: boolean;
 }> = ({ visible, onClose, onSave, isWeb }) => {
   const [name, setName] = useState("");
@@ -316,9 +316,10 @@ const AddMessageModal: React.FC<{
   const [phone, setPhone] = useState("");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
-  const [status, setStatus] = useState<MessageStatus>("Not Replied");
+  const [status, setStatus] = useState<MessageStatus>("Unread");
+  const [saving, setSaving] = useState(false);
   if (!visible) return null;
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim() || !email.trim() || !subject.trim() || !content.trim()) {
       const msg = "Please fill all required fields.";
       void sweetWarning("Validation", msg);
@@ -326,9 +327,13 @@ const AddMessageModal: React.FC<{
     }
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + " " + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    onSave({ name, email, phone: phone || "N/A", subject, content, date: dateStr, status });
-    setName(""); setEmail(""); setPhone(""); setSubject(""); setContent(""); setStatus("Not Replied");
-    onClose();
+    setSaving(true);
+    try {
+      await onSave({ name, email, phone: phone || "N/A", subject, content, date: dateStr, status });
+      setName(""); setEmail(""); setPhone(""); setSubject(""); setContent(""); setStatus("Unread");
+    } finally {
+      setSaving(false);
+    }
   };
   const content_el = (
     <View style={[styles.modalContainer, isWeb && styles.modalContainerWeb]}>
@@ -358,11 +363,11 @@ const AddMessageModal: React.FC<{
           <View style={[styles.inputGroup, { flex: 1 }]}>
             <Text style={styles.inputLabel}>Status</Text>
             <View style={styles.statusSelector}>
-              <TouchableOpacity style={[styles.statusOption, status === "Not Replied" && styles.statusOptionActive]} onPress={() => setStatus("Not Replied")} activeOpacity={0.8}>
-                <Text style={[styles.statusOptionText, status === "Not Replied" && styles.statusOptionTextActive]}>Not Replied</Text>
+              <TouchableOpacity style={[styles.statusOption, status === "Unread" && styles.statusOptionActive]} onPress={() => setStatus("Unread")} activeOpacity={0.8}>
+                <Text style={[styles.statusOptionText, status === "Unread" && styles.statusOptionTextActive]}>Not Replied</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.statusOption, status === "Replied" && styles.statusOptionRepliedActive]} onPress={() => setStatus("Replied")} activeOpacity={0.8}>
-                <Text style={[styles.statusOptionText, status === "Replied" && styles.statusOptionRepliedText]}>Replied</Text>
+              <TouchableOpacity style={[styles.statusOption, status === "Read" && styles.statusOptionRepliedActive]} onPress={() => setStatus("Read")} activeOpacity={0.8}>
+                <Text style={[styles.statusOptionText, status === "Read" && styles.statusOptionRepliedText]}>Replied</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -381,9 +386,9 @@ const AddMessageModal: React.FC<{
           <Feather name="x" size={14} color="#FFFFFF" />
           <Text style={styles.btnCancelText}> Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnUpdate} onPress={handleSave}>
+        <TouchableOpacity style={styles.btnUpdate} onPress={handleSave} disabled={saving}>
           <Feather name="save" size={14} color="#FFFFFF" />
-          <Text style={styles.btnUpdateText}> Save Message</Text>
+          <Text style={styles.btnUpdateText}>{saving ? " Savingâ€¦" : " Save Message"}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -395,7 +400,7 @@ const AddMessageModal: React.FC<{
   );
 };
 
-// ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ContactMessagesScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
@@ -427,6 +432,7 @@ const ContactMessagesScreen: React.FC = () => {
   const [search, setSearch] = useState("");
   const [viewMsg, setViewMsg] = useState<ContactMessage | null>(null);
   const [replyMsg, setReplyMsg] = useState<ContactMessage | null>(null);
+  const [addModalVisible, setAddModalVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const filtered = messages.filter((m) => {
@@ -447,7 +453,7 @@ const ContactMessagesScreen: React.FC = () => {
   const markReplied = async (id: number) => {
     try {
       await updateContactStatus(id, true);
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, status: "Replied" } : m)));
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, status: "Read" } : m)));
     } catch (e) {
       const msg = getApiErrorMessage(e);
       void sweetError("Error", msg);
@@ -468,6 +474,27 @@ const ContactMessagesScreen: React.FC = () => {
     }
   };
 
+  const handleAddMessage = async (msg: Omit<ContactMessage, "id" | "avatarColor" | "avatarBg">) => {
+    try {
+      await createContact({
+        name: msg.name,
+        email: msg.email,
+        phone: msg.phone,
+        subject: msg.subject,
+        message: msg.content,
+        status: msg.status,
+      });
+      setAddModalVisible(false);
+      setCurrentPage(1);
+      setFilter("All");
+      setSearch("");
+      await loadMessages();
+      void sweetSuccess("Success", "Contact message added successfully.");
+    } catch (e) {
+      void sweetError("Error", getApiErrorMessage(e, "Could not add message."));
+    }
+  };
+
   const deleteMessage = async (id: number) => {
     if (!(await sweetCrud.confirmDelete("Message"))) return;
     try {
@@ -479,7 +506,7 @@ const ContactMessagesScreen: React.FC = () => {
     }
   };
 
-  // ── Mobile Layout ──────────────────────────────────────────────────────────
+  // â”€â”€ Mobile Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (isMobile) {
     return (
       <AdminLayout>
@@ -488,38 +515,58 @@ const ContactMessagesScreen: React.FC = () => {
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-            {/* ── Mobile Header ── */}
+            {/* â”€â”€ Mobile Header â”€â”€ */}
             <View style={mSt.header}>
               <View style={mSt.headerIconWrap}>
-                <Feather name="message-square" size={22} color="#fff" />
+                <Feather name="message-square" size={16} color="#fff" />
               </View>
               <View style={mSt.headerTextWrap}>
                 <Text style={mSt.headerTitle}>Contact Messages</Text>
                 <Text style={mSt.headerSubtitle}>Manage all support & feedback conversations</Text>
               </View>
+              <TouchableOpacity
+                style={{ backgroundColor: "#F97316", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 4 }}
+                onPress={() => setAddModalVisible(true)}
+              >
+                <Feather name="plus" size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 11 }}>Add</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* ── Mobile Stat Cards (overlapping header) ── */}
+            {/* â”€â”€ Mobile Stat Cards (overlapping header) â”€â”€ */}
             <MobileStatsSection stats={contactStats} />
 
-            {/* ── Search bar ── */}
-            <View style={mSt.searchWrap}>
-              <Feather name="search" size={16} color={TEXT_MUTED} style={{ marginRight: 8 }} />
-              <TextInput
-                style={mSt.searchInput}
-                placeholder="Search by name, subject or email..."
-                placeholderTextColor={TEXT_MUTED}
-                value={search}
-                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                  <Feather name="x" size={14} color={TEXT_MUTED} />
-                </TouchableOpacity>
+            {/* â”€â”€ Search & View Switcher â”€â”€ */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, marginBottom: 12 }}>
+              <View style={[mSt.searchWrap, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}>
+                <Feather name="search" size={16} color={TEXT_MUTED} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={mSt.searchInput}
+                  placeholder="Search by name, subject or email..."
+                  placeholderTextColor={TEXT_MUTED}
+                  value={search}
+                  onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
+                    <Feather name="x" size={14} color={TEXT_MUTED} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {!loading && filtered.length > 0 && (
+                <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
+                  <TouchableOpacity onPress={() => setViewMode("grid")} style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]}>
+                    <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setViewMode("list")} style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]}>
+                    <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
 
-            {/* ── Filter pills (All / New / Replied / Pending) ── */}
+            {/* â”€â”€ Filter pills (All / New / Replied / Pending) â”€â”€ */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -527,15 +574,10 @@ const ContactMessagesScreen: React.FC = () => {
             >
               {([
                 { label: "All", count: messages.length, filterVal: "All" as FilterType },
-                { label: "New", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
-                { label: "Replied", count: contactStats.replied, filterVal: "Replied" as FilterType },
-                { label: "Pending", count: contactStats.pending, filterVal: "Not Replied" as FilterType },
+                { label: "Unread", count: contactStats.pending, filterVal: "Unread" as FilterType },
+                { label: "Read", count: contactStats.replied, filterVal: "Read" as FilterType },
               ]).map((f) => {
-                const activeMatch =
-                  f.label === "All" ? filter === "All"
-                    : f.label === "Replied" ? filter === "Replied"
-                      : f.label === "New" ? filter === "Not Replied"
-                        : filter === "Not Replied" && f.label === "Pending";
+                const activeMatch = f.filterVal === filter;
                 return (
                   <TouchableOpacity
                     key={f.label}
@@ -556,21 +598,11 @@ const ContactMessagesScreen: React.FC = () => {
               <Text style={{ color: "#DC2626", paddingHorizontal: 16, marginBottom: 8 }}>{loadError}</Text>
             ) : null}
 
-            {/* ── View Switcher Mobile ── */}
-            {!loading && filtered.length > 0 && (
-              <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
-                <TouchableOpacity onPress={() => setViewMode("grid")} style={[styles.viewButton, viewMode === "grid" && styles.viewButtonActive]}>
-                  <Feather name="grid" size={16} color={viewMode === "grid" ? "#FFFFFF" : "#374151"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setViewMode("list")} style={[styles.viewButton, viewMode === "list" && styles.viewButtonActive]}>
-                  <Feather name="list" size={16} color={viewMode === "list" ? "#FFFFFF" : "#374151"} />
-                </TouchableOpacity>
-              </View>
-            )}
 
-            {/* ── Content ── */}
+
+            {/* â”€â”€ Content â”€â”€ */}
             {loading ? (
-              <Text style={{ color: TEXT_MUTED, textAlign: "center", padding: 40 }}>Loading messages…</Text>
+              <Text style={{ color: TEXT_MUTED, textAlign: "center", padding: 40 }}>Loading messagesâ€¦</Text>
             ) : filtered.length === 0 ? (
               <View style={mSt.emptyWrap}>
                 <View style={mSt.emptyIconWrap}>
@@ -620,7 +652,7 @@ const ContactMessagesScreen: React.FC = () => {
                           <View style={{ width: 100 }}><StatusBadge status={msg.status} /></View>
                           <View style={{ width: 130, flexDirection: "row", justifyContent: "center", gap: 6 }}>
                             <TouchableOpacity style={styles.tableBtnView} onPress={() => handleView(msg)}><Feather name="eye" size={13} color="#FFFFFF" /></TouchableOpacity>
-                            {msg.status !== "Replied" && (
+                            {msg.status !== "Read" && (
                               <TouchableOpacity style={styles.tableBtnMark} onPress={() => markReplied(msg.id)}><Feather name="check" size={13} color="#FFFFFF" /></TouchableOpacity>
                             )}
                             <TouchableOpacity style={[styles.tableBtnView, { backgroundColor: "#2563EB", borderColor: "#2563EB" }]} onPress={() => setReplyMsg(msg)}><Feather name="corner-up-left" size={13} color="#FFFFFF" /></TouchableOpacity>
@@ -634,7 +666,7 @@ const ContactMessagesScreen: React.FC = () => {
               </View>
             )}
 
-            {/* ── Pagination ── */}
+            {/* â”€â”€ Pagination â”€â”€ */}
             {!loading && !loadError && filtered.length > 0 && (
               <View style={{ paddingHorizontal: 16 }}>
                 <Pagination
@@ -651,12 +683,13 @@ const ContactMessagesScreen: React.FC = () => {
 
           <ViewDetailModal visible={!!viewMsg} onClose={() => setViewMsg(null)} msg={viewMsg} onMarkReplied={markReplied} onReply={setReplyMsg} isWeb={false} />
           <ReplyMessageModal visible={!!replyMsg} onClose={() => setReplyMsg(null)} onSend={handleSendReply} msg={replyMsg} isWeb={false} />
+          <AddMessageModal visible={addModalVisible} onClose={() => setAddModalVisible(false)} onSave={handleAddMessage} isWeb={false} />
         </View>
       </AdminLayout>
     );
   }
 
-  // ── Web / Tablet Layout ─────────────────────────────────────────────────────
+  // â”€â”€ Web / Tablet Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Whole screen now scrolls as a single ScrollView (header + stats + toolbar +
   // cards/table + pagination all inside it), and the white rounded wrapper
   // container has been removed so content sits directly on the page background.
@@ -666,18 +699,27 @@ const ContactMessagesScreen: React.FC = () => {
       contentContainerStyle={isWeb ? styles.webListContent : { paddingBottom: 80 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <View style={[styles.header, isWeb && styles.webHeader, !isWeb && { borderRadius: 16, marginHorizontal: 8, marginTop: 8, marginBottom: 12 }]}>
         <View style={[styles.headerTextContainer, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
-          <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="message-square" size={26} color="#FFF" />
+          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="message-square" size={24} color="#FFF" />
           </View>
           <View>
             <Text style={[styles.headerTitle, { color: "#FFFFFF" }]}>Contact Messages</Text>
             <Text style={[styles.headerSubtitle, { color: "#D1D5DB" }]}>Manage and respond to incoming contact messages.</Text>
           </View>
         </View>
-        <View style={styles.headerActions} />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F97316", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 }}
+            onPress={() => setAddModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Feather name="plus" size={16} color="#FFFFFF" />
+            <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 13 }}>Add Message</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loadError ? (
@@ -689,7 +731,7 @@ const ContactMessagesScreen: React.FC = () => {
       </View>
 
       <View style={styles.listContent}>
-        {/* ── Web Toolbar ── */}
+        {/* â”€â”€ Web Toolbar â”€â”€ */}
         {isWeb && (
           <View style={styles.webToolbar}>
             <View style={styles.searchContainerWeb}>
@@ -707,7 +749,7 @@ const ContactMessagesScreen: React.FC = () => {
               </View>
             </View>
             <View style={styles.filterPills}>
-              {(["All", "Not Replied", "Replied"] as FilterType[]).map((f) => (
+              {(["All", "Unread", "Read"] as FilterType[]).map((f) => (
                 <TouchableOpacity key={f} style={[styles.pill, filter === f && styles.pillActive]} onPress={() => { setFilter(f); setCurrentPage(1); }} activeOpacity={0.8}>
                   <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>{f}</Text>
                 </TouchableOpacity>
@@ -717,7 +759,7 @@ const ContactMessagesScreen: React.FC = () => {
         )}
 
         {loading ? (
-          <Text style={styles.resultCount}>Loading contact messages…</Text>
+          <Text style={styles.resultCount}>Loading contact messagesâ€¦</Text>
         ) : (
           <>
             <Text style={styles.resultCount}>{filtered.length} message{filtered.length !== 1 ? "s" : ""} found</Text>
@@ -725,7 +767,7 @@ const ContactMessagesScreen: React.FC = () => {
             {viewMode === "grid" && (
               <View style={[styles.cardGrid, !isWeb && { marginHorizontal: 0 }]}>
                 {paginatedMessages.map((item) => (
-                  <View key={item.id} style={[styles.cardGridItem, !isWeb && { flexBasis: "100%", maxWidth: "100%", marginHorizontal: 0 }]}>
+                  <View key={item.id} style={styles.cardGridItem}>
                     <MessageCard msg={item} onView={handleView} onMarkReplied={markReplied} onReply={setReplyMsg} onDelete={deleteMessage} />
                   </View>
                 ))}
@@ -760,7 +802,7 @@ const ContactMessagesScreen: React.FC = () => {
                       <View style={{ width: "10%" }}><StatusBadge status={msg.status} /></View>
                       <View style={{ width: 140, flexDirection: "row", justifyContent: "flex-start", gap: 6 }}>
                         <TouchableOpacity style={styles.tableBtnView} onPress={() => handleView(msg)}><Feather name="eye" size={13} color="#FFFFFF" /></TouchableOpacity>
-                        {msg.status !== "Replied" && (
+                        {msg.status !== "Read" && (
                           <TouchableOpacity style={styles.tableBtnMark} onPress={() => markReplied(msg.id)}><Feather name="check" size={13} color="#FFFFFF" /></TouchableOpacity>
                         )}
                         <TouchableOpacity style={[styles.tableBtnView, { backgroundColor: "#2563EB", borderColor: "#2563EB" }]} onPress={() => setReplyMsg(msg)}><Feather name="corner-up-left" size={13} color="#FFFFFF" /></TouchableOpacity>
@@ -790,6 +832,7 @@ const ContactMessagesScreen: React.FC = () => {
         </View>
         <ViewDetailModal visible={!!viewMsg} onClose={() => setViewMsg(null)} msg={viewMsg} onMarkReplied={markReplied} onReply={setReplyMsg} isWeb={isWeb} />
         <ReplyMessageModal visible={!!replyMsg} onClose={() => setReplyMsg(null)} onSend={handleSendReply} msg={replyMsg} isWeb={isWeb} />
+        <AddMessageModal visible={addModalVisible} onClose={() => setAddModalVisible(false)} onSave={handleAddMessage} isWeb={isWeb} />
       </View>
     </AdminLayout>
   );
@@ -797,14 +840,14 @@ const ContactMessagesScreen: React.FC = () => {
 
 export default ContactMessagesScreen;
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PRIMARY = "#1d4ed8";
 const PRIMARY_LIGHT = "#bfdbfe";
 const BORDER = "#E5E7EB";
 const TEXT_PRIMARY = "#1e293b";
 const TEXT_MUTED = "#64748b";
 
-// ─── MOBILE-ONLY STYLES ───────────────────────────────────────────────────────
+// â”€â”€â”€ MOBILE-ONLY STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const mSt = StyleSheet.create({
   // Header
   header: {
@@ -927,7 +970,8 @@ const mSt = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: TEXT_PRIMARY,
-  },
+    outlineStyle: 'none',
+  } as any,
 
   // Filter pills
   filterRow: {
@@ -1075,7 +1119,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
-  // ── Web Layout ──
+  // â”€â”€ Web Layout â”€â”€
   webLayout: {
     flex: 1,
     flexDirection: "row",
@@ -1099,7 +1143,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
 
-  // ── Header ──
+  // â”€â”€ Header â”€â”€
   header: {
     marginHorizontal: 2,
     marginTop: 12,
@@ -1185,7 +1229,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E2B6B",
   },
 
-  // ── Mobile Controls ──
+  // â”€â”€ Mobile Controls â”€â”€
   mobileControlsContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -1222,7 +1266,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 13,
     color: TEXT_PRIMARY,
-  },
+    outlineStyle: 'none',
+  } as any,
   viewSwitcherMobile: {
     flexDirection: "row",
     alignItems: "center",
@@ -1240,7 +1285,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // ── Web Toolbar ──
+  // â”€â”€ Web Toolbar â”€â”€
   webToolbar: {
     flexDirection: "row",
     alignItems: "center",
@@ -1288,7 +1333,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ── List ──
+  // â”€â”€ List â”€â”€
   listContent: {
     paddingHorizontal: 14,
     paddingTop: 14,
@@ -1305,7 +1350,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // ── Card Grid ──
+  // â”€â”€ Card Grid â”€â”€
   cardGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1313,12 +1358,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   cardGridItem: {
-    flexBasis: "23.5%",
-    maxWidth: "24%",
+    flexBasis: "31.5%",
+    maxWidth: "32%",
     marginHorizontal: 0,
   },
 
-  // ── Card ──
+  // â”€â”€ Card â”€â”€
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1412,7 +1457,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 14,
   },
 
-  // ── Status Badge ──
+  // â”€â”€ Status Badge â”€â”€
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1423,7 +1468,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ── Action Buttons ──
+  // â”€â”€ Action Buttons â”€â”€
   actionRow: {
     flexDirection: "row",
     gap: 12,
@@ -1499,7 +1544,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  // ── Stats (Web) ──
+  // â”€â”€ Stats (Web) â”€â”€
   statsRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1562,7 +1607,7 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
   },
 
-  // ── Table ──
+  // â”€â”€ Table â”€â”€
   tableContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1651,7 +1696,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // ── Modal ──
+  // â”€â”€ Modal â”€â”€
   modalOverlayWeb: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
