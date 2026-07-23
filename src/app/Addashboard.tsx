@@ -514,7 +514,7 @@ function DashboardHeader() {
 interface StatCardProps {
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   iconNode: React.ReactNode;
   accentColor: string;
   trend?: string;
@@ -533,11 +533,13 @@ function StatCard({
 }: StatCardProps & { isPhone?: boolean }) {
   return (
     <View style={styles.statCard}>
-      <View style={[styles.statIconBox, { backgroundColor: accentColor + '18', borderColor: accentColor + '30', borderWidth: 1 }]}>
-        {iconNode}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+        <View style={[styles.statIconBox, { backgroundColor: accentColor + '18', borderColor: accentColor + '30', borderWidth: 1, marginBottom: 0, marginRight: 8 }]}>
+          {iconNode}
+        </View>
+        <Text style={[styles.statValue, { marginBottom: 0 }]}>{value}</Text>
       </View>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
       <View style={styles.statSubRow}>
         {trend !== undefined && (
           <View style={[styles.trendBadge, { backgroundColor: trendUp ? COLORS.greenTint : COLORS.coralTint }]}>
@@ -856,7 +858,36 @@ function SideRow({ rank, rankColor, name, meta, value }: { rank: number; rankCol
 /* ------------------------------------------------------------------ */
 const PERIODS: Period[] = ['Daily', 'Weekly', 'Monthly', 'Yearly', 'Custom'];
 
-function PeriodSelector({ period, onSelect }: { period: Period; onSelect: (p: Period) => void }) {
+function PeriodSelector({ period, onSelect, isPhone }: { period: Period; onSelect: (p: Period) => void; isPhone?: boolean }) {
+  if (isPhone && Platform.OS === 'web') {
+    return (
+      <View style={{ flex: 1, minWidth: 100, maxWidth: 140 }}>
+        <select
+          value={period}
+          onChange={(e: any) => onSelect(e.target.value as Period)}
+          style={{
+            height: 36,
+            border: '1px solid #E5E7EB',
+            borderRadius: 8,
+            background: '#FFFFFF',
+            fontSize: 14,
+            color: '#111827',
+            outline: 'none',
+            paddingLeft: 12,
+            paddingRight: 12,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            width: '100%',
+          }}
+        >
+          {PERIODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.periodTrack}>
       {PERIODS.map((p) => {
@@ -1021,42 +1052,30 @@ export default function AdsDashboardScreen() {
     {
       label: 'Total Orders',
       value: String(kpis.totalOrders),
-      sub: rangeLabel,
       iconNode: <IconBox size={20} color={COLORS.indigo} />,
       accentColor: COLORS.indigo,
-      trend: `${successRate}% success`,
-      trendUp: successRate >= 70,
     },
     {
       label: 'Paid Orders',
       value: String(kpis.paidOrders),
-      sub: `${successRate}% of total`,
       iconNode: <IconCheckCircle size={20} color={COLORS.teal} />,
       accentColor: COLORS.teal,
-      trend: `${kpis.totalOrders - kpis.paidOrders} pending`,
-      trendUp: successRate >= 70,
     },
     {
       label: 'Total Revenue',
       value: fmtINR(kpis.totalRevenue),
-      sub: `${fmtINR(kpis.avgOrder)} avg`,
       iconNode: <IconCurrencyRupee size={20} color={COLORS.amber} />,
       accentColor: COLORS.amber,
-      trend: `${growthPct >= 0 ? '+' : ''}${growthPct.toFixed(1)}%`,
-      trendUp: growthPct >= 0,
     },
     {
       label: 'Total Customers',
       value: String(kpis.totalCustomers),
-      sub: `${(kpis.totalOrders / Math.max(1, kpis.totalCustomers)).toFixed(1)} orders/cust`,
       iconNode: <IconPeople size={20} color={COLORS.coral} />,
       accentColor: COLORS.coral,
-      trend: undefined,
     },
     {
       label: 'Active Ads',
       value: String(activeAds),
-      sub: `${adTypes.length} ad types`,
       iconNode: <IconMegaphone size={20} color={COLORS.violet} />,
       accentColor: COLORS.violet,
     },
@@ -1106,7 +1125,7 @@ export default function AdsDashboardScreen() {
                 <Text style={styles.tileTitle}>Revenue Trend</Text>
                 <Text style={styles.tileSub}>₹ lakhs · {rangeLabel}</Text>
               </View>
-              <PeriodSelector period={period} onSelect={handlePeriodSelect} />
+              <PeriodSelector period={period} onSelect={handlePeriodSelect} isPhone={isPhone} />
             </View>
 
             <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, alignItems: isDesktop ? 'center' : 'stretch' }}>
