@@ -1,30 +1,30 @@
-import React, { useCallback, useEffect, useState } from "react";
+import AdminLayout from "@/components/admin-layout";
+import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { mapFaqCategoryRow } from "@/lib/mappers";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
     createFaqCategory,
     deleteFaqCategory,
     fetchFaqCategories,
     updateFaqCategory,
 } from "@/services/faqApi";
-import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    TextInput,
-    Platform,
-    Modal,
-    StatusBar,
-    useWindowDimensions,
-    DimensionValue,
-} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AdminLayout from "@/components/admin-layout";
-import Pagination from "@/components/Pagination";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+    DimensionValue,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from "react-native";
 
 // ─── THEME — Light / White ────────────────────────────────────────────────────
 const PRIMARY = "#ef7b1a";
@@ -679,7 +679,7 @@ const st = StyleSheet.create({
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#151D4F", paddingHorizontal: 18, paddingVertical: 16, borderRadius: 22 },
     headerWeb: { marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 32, paddingVertical: 14, paddingBottom: 40, shadowColor: DARK_NAVY, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
-    headerIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
+    headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center", shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#ffffff", letterSpacing: -0.3 },
     headerBreadcrumb: { fontSize: 12, color: "#cbd5e1", marginTop: 2 },
     addBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: PRIMARY, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
@@ -750,9 +750,9 @@ const st = StyleSheet.create({
         marginBottom: 10,
     },
     statIconMobile: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -783,7 +783,7 @@ const st = StyleSheet.create({
     // `statColumns` / `statWidthMap` above instead of relying on flex-wrap.
     statsRow: { flexDirection: "row", flexWrap: "wrap" as any, rowGap: 12, columnGap: 12, marginBottom: 4, marginTop: -46, marginHorizontal: 16, zIndex: 10, justifyContent: "center" },
     statCard: { backgroundColor: BG_CARD, borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: BORDER, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2 },
-    statIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    statIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
     statValue: { fontSize: 22, fontWeight: "800" },
     statLabel: { fontSize: 10, color: TEXT_MUTED, marginTop: 2, fontWeight: "700", letterSpacing: 0.5 },
 
@@ -842,7 +842,7 @@ const cSt = StyleSheet.create({
         elevation: 3,
     },
     topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
-    iconWrap: { width: 52, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     actionBtns: { flexDirection: "row", gap: 8 },
     iconBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: BG_PAGE, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: BORDER },
     iconBtnRed: { backgroundColor: ACCENT_RED + "10", borderColor: ACCENT_RED + "40" },
@@ -865,7 +865,7 @@ const lSt = StyleSheet.create({
     headerCell: { fontSize: 10, fontWeight: "800", color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 0.5 },
 
     row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER, gap: 14 },
-    iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
     info: { flex: 1 },
     name: { fontSize: 14, fontWeight: "700", color: TEXT_HEAD, marginBottom: 2 },
     desc: { fontSize: 12, color: TEXT_BODY },

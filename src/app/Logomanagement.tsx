@@ -1,38 +1,37 @@
-import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  StyleSheet,
-  useWindowDimensions,
-  ActivityIndicator,
-} from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
   fetchSiteLogos,
-  uploadSiteLogoFromDataUrl,
-  uploadSiteLogo,
   resolveCmsMediaUrl,
+  uploadSiteLogo,
+  uploadSiteLogoFromDataUrl,
 } from "@/services/cmsApi";
 import {
-  Moon,
-  Sun,
   Bookmark,
-  FolderOpen,
-  UploadCloud,
   CheckCircle2,
-  RefreshCw,
-  X,
-  Image as ImageIcon,
   Clock,
+  Image as ImageIcon,
+  Moon,
+  RefreshCw,
+  Sun,
+  UploadCloud,
+  X
 } from "lucide-react-native";
+import React from "react";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
-import * as DocumentPicker from "expo-document-picker";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import * as DocumentPicker from "expo-document-picker";
 
 // npm install lucide-react-native react-native-svg expo-document-picker
 
@@ -258,8 +257,8 @@ export default function LogoManagement() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.headerIcon}>
-              <ImageIcon size={24} color="#fff" />
+            <View style={[styles.headerIcon, { width: width < 520 ? 36 : 42, height: width < 520 ? 36 : 42, borderRadius: width < 520 ? 10 : 12 }]}>
+              <ImageIcon size={width < 520 ? 18 : 20} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle}>Logo Management</Text>
@@ -278,8 +277,8 @@ export default function LogoManagement() {
               const Icon = t.icon;
               return (
                 <View key={t.key} style={styles.statusChipCard}>
-                  <View style={[styles.statusChipIcon, { backgroundColor: t.color }]}>
-                    <Icon size={14} color="#fff" />
+                  <View style={[styles.statusChipIcon, { backgroundColor: t.color, width: width < 520 ? 24 : 28, height: width < 520 ? 24 : 28, borderRadius: width < 520 ? 7 : 8 }]}>
+                    <Icon size={width < 520 ? 10 : 12} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.statusChipLabel} numberOfLines={1}>
@@ -313,8 +312,8 @@ export default function LogoManagement() {
                 <View key={t.key} style={[styles.logoCardWrap, { width: `${cardWidthPct}%` }]}>
                   <View style={styles.logoCard}>
                     <View style={styles.logoCardHeader}>
-                      <View style={[styles.logoCardIcon, { backgroundColor: t.color }]}>
-                        <Icon size={17} color="#fff" />
+                      <View style={[styles.logoCardIcon, { backgroundColor: t.color, width: width < 520 ? 28 : 32, height: width < 520 ? 28 : 32, borderRadius: width < 520 ? 8 : 9 }]}>
+                        <Icon size={width < 520 ? 13 : 15} color="#fff" />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.logoCardTitle}>{t.label}</Text>
@@ -424,9 +423,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   headerIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
     backgroundColor: "#f97316",
     alignItems: "center",
     justifyContent: "center",
@@ -471,9 +467,6 @@ const styles = StyleSheet.create({
     padding: 11,
   },
   statusChipIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -493,9 +486,6 @@ const styles = StyleSheet.create({
   },
   logoCardHeader: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 14 },
   logoCardIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
