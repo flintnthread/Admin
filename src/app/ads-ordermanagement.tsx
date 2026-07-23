@@ -1,7 +1,7 @@
 /**
  * AdsOrderManagementScreen.tsx
  * ----------------------------------------------------------------
- * Ads Order Management — redesigned to match ads-payments.tsx
+ * Ads Order Management â€” redesigned to match ads-payments.tsx
  * design system and layout patterns exactly.
  *
  * Changes vs. old version:
@@ -12,10 +12,10 @@
  *   - List view: table on tablet/desktop, card list on phone
  *   - Grid view: card grid on all breakpoints
  *   - Two action buttons per row/card:
- *       • Eye (View Order) -> /order-details
- *       • Receipt (Payments) -> /ads-payments (filtered by customer)
+ *       â€¢ Eye (View Order) -> /order-details
+ *       â€¢ Receipt (Payments) -> /ads-payments (filtered by customer)
  *   - No fontFamily references anywhere
- *   - No colored card borders — shadows only
+ *   - No colored card borders â€” shadows only
  *
  * Breakpoints (measured container width):
  *   phone   : width < 640
@@ -35,7 +35,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Path, Circle, Rect } from "react-native-svg";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
@@ -47,7 +47,7 @@ import {
 } from "@/services/adsApi";
 
 /* ------------------------------------------------------------------ */
-/* Design tokens — same as ads-payments.tsx                             */
+/* Design tokens â€” same as ads-payments.tsx                             */
 /* ------------------------------------------------------------------ */
 const COLORS = {
   surface: "#FFFFFF",
@@ -115,9 +115,9 @@ function mapOrderRow(row: AdsApiRow): Order {
   return {
     id: String(row.orderId ?? row.id ?? ""),
     internalId: Number(row.id ?? 0),
-    customerName: String(row.customerName ?? "—"),
+    customerName: String(row.customerName ?? "â€”"),
     customerEmail: String(row.customerEmail ?? ""),
-    adTitle: String(row.adName ?? "—"),
+    adTitle: String(row.adName ?? "â€”"),
     adType: mapAdType(row.adType),
     billingType,
     dailyAmt: billingType === "Daily" ? dailyRate : undefined,
@@ -361,11 +361,11 @@ function ListIconGlyph({
 }
 
 /* ------------------------------------------------------------------ */
-/* Header — matches ads-payments.tsx style                              */
+/* Header â€” matches ads-payments.tsx style                              */
 /* ------------------------------------------------------------------ */
 function ScreenHeader() {
   return (
-    <View style={[styles.header, { paddingBottom: 56, paddingTop: 24 }]}>
+    <View style={[styles.header, { paddingBottom: 48, paddingTop: 16 }]}>
       <View
         style={{
           flexDirection: "row",
@@ -376,8 +376,8 @@ function ScreenHeader() {
       >
         <View
           style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             backgroundColor: COLORS.orange,
             borderRadius: 12,
             alignItems: "center",
@@ -523,7 +523,7 @@ function ActionButtons({
 }
 
 /* ------------------------------------------------------------------ */
-/* Filter bar — same pattern as ads-payments.tsx                        */
+/* Filter bar â€” same pattern as ads-payments.tsx                        */
 /* ------------------------------------------------------------------ */
 type StatusFilter = "all" | "paid" | "pending";
 type BillingFilter = "all" | "Daily" | "Monthly";
@@ -775,15 +775,14 @@ function FilterBar({
               flexDirection: "row",
               alignItems: "center",
               flexWrap: "nowrap",
-              gap: 8,
+              gap: 6,
               zIndex: 100,
               overflow: "visible",
             }}
           >
             <View
               style={{
-                flex: 1,
-                minWidth: 0,
+                flexShrink: 1,
                 zIndex: openDropdown === "status" ? 50 : 20,
                 overflow: "visible",
               }}
@@ -799,8 +798,7 @@ function FilterBar({
             </View>
             <View
               style={{
-                flex: 1,
-                minWidth: 0,
+                flexShrink: 1,
                 zIndex: openDropdown === "billing" ? 50 : 10,
                 overflow: "visible",
               }}
@@ -823,7 +821,7 @@ function FilterBar({
 }
 
 /* ------------------------------------------------------------------ */
-/* Table view — tablet/desktop list                                     */
+/* Table view â€” tablet/desktop list                                     */
 /* ------------------------------------------------------------------ */
 function OrdersTable({
   orders,
@@ -836,7 +834,9 @@ function OrdersTable({
 }) {
   return (
     <View style={styles.tableCard}>
-      <View style={styles.tableHeadRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
+        <View style={{ width: "100%", minWidth: 960 }}>
+          <View style={styles.tableHeadRow}>
         <Text style={[styles.tableHeadCell, { flex: 0.9 }]}>Order ID</Text>
         <Text style={[styles.tableHeadCell, { flex: 1.5 }]}>Customer</Text>
         <Text style={[styles.tableHeadCell, { flex: 1.6 }]}>Ad Details</Text>
@@ -907,12 +907,14 @@ function OrdersTable({
           </View>
         );
       })}
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Phone list card — used on mobile in list view                        */
+/* Phone list card â€” used on mobile in list view                        */
 /* ------------------------------------------------------------------ */
 function OrderListCard({
   order,
@@ -996,7 +998,7 @@ function OrderListCard({
 }
 
 /* ------------------------------------------------------------------ */
-/* Grid view — cards on all breakpoints                                 */
+/* Grid view â€” cards on all breakpoints                                 */
 /* ------------------------------------------------------------------ */
 function OrderGridCard({
   order,
@@ -1095,10 +1097,12 @@ const PAGE_SIZE = 8;
 
 export default function AdsOrderManagementScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ customerEmail?: string; customerName?: string }>();
   const { width: windowWidth } = useWindowDimensions();
   const { measuredWidth, onLayout } = useMeasuredWidth(windowWidth);
 
-  const [search, setSearch] = useState("");
+  const initialSearch = String(params.customerEmail || params.customerName || "").trim();
+  const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [billing, setBilling] = useState<BillingFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -1131,6 +1135,14 @@ export default function AdsOrderManagementScreen() {
   const gridCardWidth = (fullWidth - gridGap * (gridCols - 1)) / gridCols;
 
   useEffect(() => setPage(1), [search, status, billing, viewMode]);
+
+  useEffect(() => {
+    const seeded = String(params.customerEmail || params.customerName || "").trim();
+    if (seeded && seeded !== search) {
+      setSearch(seeded);
+      setPage(1);
+    }
+  }, [params.customerEmail, params.customerName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1208,7 +1220,7 @@ export default function AdsOrderManagementScreen() {
 
           {/* Stat cards */}
           {bp === "phone" ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: -32, zIndex: 10 }} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingRight: 32 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: -48, zIndex: 10 }} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingRight: 32 }}>
               <StatCard
                 icon={<OrderGlyph color={COLORS.navyDeep} size={17} />}
                 label="TOTAL ORDERS"
@@ -1239,7 +1251,7 @@ export default function AdsOrderManagementScreen() {
               />
             </ScrollView>
           ) : (
-            <View style={[styles.statsRow, { marginTop: -32, paddingHorizontal: 16, zIndex: 10 }]}>
+            <View style={[styles.statsRow, { marginTop: -48, paddingHorizontal: 16, zIndex: 10 }]}>
               <StatCard
                 icon={<OrderGlyph color={COLORS.navyDeep} size={17} />}
                 label="TOTAL ORDERS"
@@ -1290,7 +1302,7 @@ export default function AdsOrderManagementScreen() {
           <View style={{ marginTop: 8, zIndex: 1 }}>
             {loading ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Loading orders…</Text>
+                <Text style={styles.emptyTitle}>Loading ordersâ€¦</Text>
               </View>
             ) : error ? (
               <View style={styles.emptyState}>
@@ -1353,7 +1365,7 @@ export default function AdsOrderManagementScreen() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Styles — no fontFamily, no colored borders, shadows only            */
+/* Styles â€” no fontFamily, no colored borders, shadows only            */
 /* ------------------------------------------------------------------ */
 const styles = StyleSheet.create({
   /* header */
@@ -1430,7 +1442,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, color: COLORS.ink, outlineStyle: "none" } as any,
 
   /* dropdowns */
-  dropdownWrap: { position: "relative", zIndex: 20, width: 140 },
+  dropdownWrap: { position: "relative", zIndex: 20 },
   dropdownBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1438,14 +1450,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.rule,
     borderRadius: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     backgroundColor: COLORS.page,
     minWidth: 0,
     flexShrink: 1,
   },
   dropdownBtnText: {
-    flex: 1,
     flexShrink: 1,
     minWidth: 0,
     fontWeight: "600",
@@ -1484,25 +1495,26 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: "700", color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  /* view toggle — two separate boxed icon buttons */
+  /* view toggle â€” two separate boxed icon buttons */
   viewToggleGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    padding: 4,
+    gap: 0,
   },
   viewToggleBoxBtn: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.rule,
+    backgroundColor: "transparent",
+    borderWidth: 0,
   },
   viewToggleBoxBtnActive: {
     backgroundColor: COLORS.navyDeep,
-    borderColor: COLORS.navyDeep,
   },
 
   /* shared bits */

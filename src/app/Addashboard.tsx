@@ -178,14 +178,17 @@ function buildDatasetFromApi(
   recentOrders: AdsApiRow[],
   customers: AdsApiRow[],
 ): Dataset {
-  const orders = (dashboard.orders ?? {}) as Record<string, unknown>;
-  const payments = (dashboard.payments ?? {}) as Record<string, unknown>;
-  const customersBlock = (dashboard.customers ?? {}) as Record<string, unknown>;
+  const root = ((dashboard as AdsApiRow)?.data ?? dashboard) as AdsApiRow;
+  const orders = (root.orders ?? {}) as Record<string, unknown>;
+  const payments = (root.payments ?? {}) as Record<string, unknown>;
+  const customersBlock = (root.customers ?? {}) as Record<string, unknown>;
 
-  const totalOrders = Number(orders.total ?? 0);
-  const paidOrders = Number(orders.paid ?? 0);
-  const totalRevenue = Number(orders.paidAmountTotal ?? orders.paidAmountInPeriod ?? 0);
-  const totalCustomers = Number(customersBlock.total ?? 0);
+  const totalOrders = Number(orders.total ?? root.totalOrders ?? 0);
+  const paidOrders = Number(orders.paid ?? root.paidOrders ?? 0);
+  const totalRevenue = Number(
+    orders.paidAmountTotal ?? orders.paidAmountInPeriod ?? root.totalRevenue ?? 0,
+  );
+  const totalCustomers = Number(customersBlock.total ?? root.totalCustomers ?? 0);
   const inPeriod = Number(orders.inPeriod ?? 0);
   const labels = periodLabels(period);
   const revenueTrend = labels.map((_, i) => +((totalRevenue / 100000) * (0.15 + (i + 1) / labels.length)).toFixed(2));
@@ -511,7 +514,7 @@ function DashboardHeader() {
 interface StatCardProps {
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   iconNode: React.ReactNode;
   accentColor: string;
   trend?: string;
@@ -530,11 +533,13 @@ function StatCard({
 }: StatCardProps & { isPhone?: boolean }) {
   return (
     <View style={styles.statCard}>
-      <View style={[styles.statIconBox, { backgroundColor: accentColor + '18', borderColor: accentColor + '30', borderWidth: 1 }]}>
-        {iconNode}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+        <View style={[styles.statIconBox, { backgroundColor: accentColor + '18', borderColor: accentColor + '30', borderWidth: 1, marginBottom: 0, marginRight: 8 }]}>
+          {iconNode}
+        </View>
+        <Text style={[styles.statValue, { marginBottom: 0 }]}>{value}</Text>
       </View>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
       <View style={styles.statSubRow}>
         {trend !== undefined && (
           <View style={[styles.trendBadge, { backgroundColor: trendUp ? COLORS.greenTint : COLORS.coralTint }]}>
@@ -698,26 +703,45 @@ function LineChart({ values, labels, color, width = 320, height = 180 }: {
 /* Donut                                                               */
 /* ------------------------------------------------------------------ */
 function Donut({ data, size = 150, strokeWidth = 20 }: { data: ChartDatum[]; size?: number; strokeWidth?: number }) {
-  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const sum = data.reduce((s, d) => s + d.value, 0);
+  const total = sum > 0 ? sum : 1;
   const r = (size - strokeWidth) / 2;
   const cx = size / 2; const cy = size / 2;
   const circ = 2 * Math.PI * r;
   let acc = 0;
   return (
     <Svg width={size} height={size}>
-      {data.map((d) => {
-        const frac = d.value / total;
-        const len = frac * circ;
-        const rotation = -90 + acc * 360;
-        acc += frac;
-        return (
-          <Circle key={d.label} cx={cx} cy={cy} r={r} fill="none"
-            stroke={d.color} strokeWidth={strokeWidth}
-            strokeDasharray={`${len} ${circ - len}`}
-            strokeLinecap="round" rotation={rotation} origin={`${cx}, ${cy}`}
-          />
-        );
-      })}
+      {sum <= 0 ? (
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#E5E7EB"
+          strokeWidth={strokeWidth}
+        />
+      ) : (
+        data.map((d) => {
+          const frac = d.value / total;
+          const len = Math.max(0, frac * circ);
+          const rotation = -90 + acc * 360;
+          acc += frac;
+          return (
+            <Circle
+              key={d.label}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={d.color}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${len} ${Math.max(0, circ - len)}`}
+              strokeLinecap="butt"
+              transform={`rotate(${rotation} ${cx} ${cy})`}
+            />
+          );
+        })
+      )}
     </Svg>
   );
 }
@@ -759,7 +783,7 @@ function Gauge({ pct, size = 150, strokeWidth = 16, color, trackColor = COLORS.p
         <Circle cx={cx} cy={cy} r={r} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
         <Circle cx={cx} cy={cy} r={r} stroke={color} strokeWidth={strokeWidth} fill="none"
           strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
-          rotation={-90} origin={`${cx}, ${cy}`}
+          transform={`rotate(-90 ${cx} ${cy})`}
         />
       </Svg>
     );
@@ -783,8 +807,8 @@ function GrowthDial({ growthPct }: { growthPct: number }) {
   const dialPct = Math.min(100, Math.abs(growthPct) * 2.2 + 12);
   return (
     <View style={styles.dialWrap}>
-      <Gauge pct={dialPct} size={160} strokeWidth={14} color={color} />
-      <View style={styles.dialLabelWrap} pointerEvents="none">
+      <Gauge pct={dialPct} size={160} strokeWidth={14} color={color} full />
+      <View style={[styles.dialLabelWrap, { bottom: 0, top: 0, left: 0, right: 0, justifyContent: 'center' }]} pointerEvents="none">
         <Text style={[styles.dialValue, { color }]}>{positive ? '+' : ''}{growthPct.toFixed(1)}%</Text>
         <Text style={styles.dialCaption}>GROWTH</Text>
       </View>
@@ -834,7 +858,36 @@ function SideRow({ rank, rankColor, name, meta, value }: { rank: number; rankCol
 /* ------------------------------------------------------------------ */
 const PERIODS: Period[] = ['Daily', 'Weekly', 'Monthly', 'Yearly', 'Custom'];
 
-function PeriodSelector({ period, onSelect }: { period: Period; onSelect: (p: Period) => void }) {
+function PeriodSelector({ period, onSelect, isPhone }: { period: Period; onSelect: (p: Period) => void; isPhone?: boolean }) {
+  if (isPhone && Platform.OS === 'web') {
+    return (
+      <View style={{ flex: 1, minWidth: 100, maxWidth: 140 }}>
+        <select
+          value={period}
+          onChange={(e: any) => onSelect(e.target.value as Period)}
+          style={{
+            height: 36,
+            border: '1px solid #E5E7EB',
+            borderRadius: 8,
+            background: '#FFFFFF',
+            fontSize: 14,
+            color: '#111827',
+            outline: 'none',
+            paddingLeft: 12,
+            paddingRight: 12,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            width: '100%',
+          }}
+        >
+          {PERIODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.periodTrack}>
       {PERIODS.map((p) => {
@@ -929,7 +982,7 @@ export default function AdsDashboardScreen() {
       } catch (e) {
         if (!cancelled) {
           setError(getApiErrorMessage(e, 'Failed to load ads dashboard.'));
-          setDataset(emptyDataset(period));
+          // Keep last successful dataset — do not force all-zero KPIs on a transient error.
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -973,7 +1026,11 @@ export default function AdsDashboardScreen() {
 
   const totalAdOrders = adTypes.reduce((s, d) => s + d.value, 0);
   const totalRevenueForDonut = revenueByCategory.reduce((s, d) => s + d.value, 0);
-  const activeAds = Math.max(4, Math.round(totalAdOrders * 0.05));
+  const activeAds = Math.max(
+    Number((dataset as { activeAds?: number }).activeAds ?? 0),
+    kpis.paidOrders > 0 ? Math.max(1, Math.round(kpis.paidOrders * 0.05)) : 0,
+    totalAdOrders > 0 ? Math.max(1, Math.round(totalAdOrders * 0.05)) : 0,
+  );
   const growthPct = ((revenueTrend[revenueTrend.length - 1] - revenueTrend[0]) / (revenueTrend[0] || 1)) * 100;
   const successRate = Math.round((kpis.paidOrders / Math.max(1, kpis.totalOrders)) * 100);
 
@@ -995,42 +1052,30 @@ export default function AdsDashboardScreen() {
     {
       label: 'Total Orders',
       value: String(kpis.totalOrders),
-      sub: rangeLabel,
       iconNode: <IconBox size={20} color={COLORS.indigo} />,
       accentColor: COLORS.indigo,
-      trend: `${successRate}% success`,
-      trendUp: successRate >= 70,
     },
     {
       label: 'Paid Orders',
       value: String(kpis.paidOrders),
-      sub: `${successRate}% of total`,
       iconNode: <IconCheckCircle size={20} color={COLORS.teal} />,
       accentColor: COLORS.teal,
-      trend: `${kpis.totalOrders - kpis.paidOrders} pending`,
-      trendUp: successRate >= 70,
     },
     {
       label: 'Total Revenue',
       value: fmtINR(kpis.totalRevenue),
-      sub: `${fmtINR(kpis.avgOrder)} avg`,
       iconNode: <IconCurrencyRupee size={20} color={COLORS.amber} />,
       accentColor: COLORS.amber,
-      trend: `${growthPct >= 0 ? '+' : ''}${growthPct.toFixed(1)}%`,
-      trendUp: growthPct >= 0,
     },
     {
       label: 'Total Customers',
       value: String(kpis.totalCustomers),
-      sub: `${(kpis.totalOrders / Math.max(1, kpis.totalCustomers)).toFixed(1)} orders/cust`,
       iconNode: <IconPeople size={20} color={COLORS.coral} />,
       accentColor: COLORS.coral,
-      trend: undefined,
     },
     {
       label: 'Active Ads',
       value: String(activeAds),
-      sub: `${adTypes.length} ad types`,
       iconNode: <IconMegaphone size={20} color={COLORS.violet} />,
       accentColor: COLORS.violet,
     },
@@ -1080,7 +1125,7 @@ export default function AdsDashboardScreen() {
                 <Text style={styles.tileTitle}>Revenue Trend</Text>
                 <Text style={styles.tileSub}>₹ lakhs · {rangeLabel}</Text>
               </View>
-              <PeriodSelector period={period} onSelect={handlePeriodSelect} />
+              <PeriodSelector period={period} onSelect={handlePeriodSelect} isPhone={isPhone} />
             </View>
 
             <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, alignItems: isDesktop ? 'center' : 'stretch' }}>
@@ -1111,19 +1156,14 @@ export default function AdsDashboardScreen() {
               </Tile>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              scrollEnabled={false}
-              contentContainerStyle={{ gap: gutter, marginBottom: gutter, flexDirection: 'row' }}
-            >
-              <Tile title="Orders by Ad Type" sub={period} style={{ width: halfWidth, minWidth: 240 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: gutter, marginBottom: gutter }}>
+              <Tile title="Orders by Ad Type" sub={period} style={{ flex: 1, minWidth: 240 }}>
                 <DonutTile data={adTypes} centerValue={String(totalAdOrders)} centerLabel="ORDERS" />
               </Tile>
-              <Tile title="Revenue by Category" sub={period} style={{ width: halfWidth, minWidth: 240 }}>
+              <Tile title="Revenue by Category" sub={period} style={{ flex: 1, minWidth: 240 }}>
                 <DonutTile data={revenueByCategory} centerValue={fmtINR(totalRevenueForDonut)} centerLabel="TOTAL" format={fmtINR} />
               </Tile>
-            </ScrollView>
+            </View>
           )}
 
           {/* ── Orders trend + top customers ── */}

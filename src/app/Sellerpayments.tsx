@@ -204,12 +204,12 @@ const PayModal: React.FC<{
                     {/* Modal Header */}
                     <View style={styles.modalHeader}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
                                 <Feather name="credit-card" size={16} color="#fff" />
                             </View>
                             <Text style={styles.modalTitle}>Process Payment</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
+                        <TouchableOpacity onPress={onClose} style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
                             <Feather name="x" size={16} color="#fff" />
                         </TouchableOpacity>
                     </View>
@@ -631,6 +631,9 @@ const SellerPaymentsScreen: React.FC = () => {
                 setRequestPage(page.totalPages);
             }
         } catch (e) {
+            setRequests([]);
+            setRequestTotalElements(0);
+            setRequestTotalPages(0);
             setRequestsError(getApiErrorMessage(e, "Failed to load payout requests."));
         } finally {
             setRequestsLoading(false);
@@ -670,6 +673,15 @@ const SellerPaymentsScreen: React.FC = () => {
         if (authLoading || !token || activeTab !== "requests") return;
         void loadRequests();
     }, [authLoading, token, activeTab, loadRequests]);
+
+    useEffect(() => {
+        if (authLoading || !token || activeTab !== "requests") return;
+        const timer = setInterval(() => {
+            void loadRequests();
+            void loadAlerts();
+        }, 30_000);
+        return () => clearInterval(timer);
+    }, [authLoading, token, activeTab, loadRequests, loadAlerts]);
 
     useEffect(() => {
         if (authLoading || !token) return;
@@ -815,10 +827,10 @@ const SellerPaymentsScreen: React.FC = () => {
             <View style={[styles.header, isWeb && styles.headerWeb]}>
                 <View style={styles.headerLeft}>
                     <View style={styles.headerIcon}>
-                        <Feather name="credit-card" size={22} color="#fff" />
+                        <Feather name="credit-card" size={24} color="#fff" />
                     </View>
                     <View>
-                        <Text style={styles.headerTitle}>Seller Payments</Text>
+                        <Text style={[styles.headerTitle, windowWidth <= 350 && { fontWeight: "600" }]}>Seller Payments</Text>
                         <Text style={styles.headerSubtitle}>Manage & process seller payouts</Text>
                     </View>
                 </View>
@@ -878,7 +890,7 @@ const SellerPaymentsScreen: React.FC = () => {
                 isUltraWide && { justifyContent: "space-between", flexDirection: "row", alignItems: "center" }
             ]}>
                 <View style={[
-                    { gap: isUltraWide ? 24 : 16, flex: isUltraWide ? 1 : undefined },
+                    { gap: isUltraWide ? 24 : (windowWidth <= 350 ? 12 : 16), flex: isUltraWide ? 1 : undefined },
                     isUltraWide ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
                 ]}>
                     {[
@@ -888,13 +900,13 @@ const SellerPaymentsScreen: React.FC = () => {
                         { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
                     ].map((s, i) => (
                         <React.Fragment key={i}>
-                            <View style={[styles.statBlockSingle, windowWidth < 600 && { width: "47%" }]}>
-                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
-                                    <Feather name={s.icon as any} size={20} color="#ffffff" />
+                            <View style={[styles.statBlockSingle, windowWidth < 600 && { width: windowWidth <= 350 ? "100%" : "47%" }]}>
+                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }, windowWidth <= 350 && { width: 36, height: 36 }]}>
+                                    <Feather name={s.icon as any} size={windowWidth <= 350 ? 16 : 20} color="#ffffff" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.statValueSingle} numberOfLines={1}>{s.value}</Text>
-                                    <Text style={styles.statLabelSingle} numberOfLines={1}>{s.label}</Text>
+                                    <Text style={[styles.statValueSingle, windowWidth <= 350 && { fontWeight: "600", fontSize: 16 }]} numberOfLines={windowWidth <= 350 ? undefined : 1}>{s.value}</Text>
+                                    <Text style={[styles.statLabelSingle, windowWidth <= 350 && { fontWeight: "500", fontSize: 11 }]} numberOfLines={windowWidth <= 350 ? undefined : 1}>{s.label}</Text>
                                 </View>
                             </View>
                             {i < 3 && isUltraWide && <View style={styles.statDividerSingle} />}
@@ -1243,7 +1255,7 @@ const SellerPaymentsScreen: React.FC = () => {
                             <Feather name="inbox" size={44} color={TEXT_MUTED} />
                             <Text style={styles.emptyTitle}>No payout requests</Text>
                         </View>
-                    ) : (
+                    ) : !requestsError ? (
                         <View style={{ gap: 12 }}>
                             {requests.map((item) => (
                                 <PayoutRequestCard
@@ -1258,7 +1270,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 />
                             ))}
                         </View>
-                    )}
+                    ) : null}
 
                     {!requestsLoading && !requestsError && requests.length > 0 && (
                         <Pagination
@@ -1350,7 +1362,7 @@ const styles = StyleSheet.create({
     headerWeb: { marginHorizontal: 2, marginTop: 12 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: {
-        width: 50, height: 50, borderRadius: 16,
+        width: 44, height: 44, borderRadius: 12,
         backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center",
         shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5
     },
