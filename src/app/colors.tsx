@@ -65,9 +65,9 @@ const BI = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-const BRAND = "#e8651a";
-const DARK_BTN = "#1E2A45";
-const HEADER_BG = "#1d324e";
+const BRAND = "#F97316";
+const DARK_BTN = "#1D324E";
+const HEADER_BG = "#1D324E";
 const PAGE_SIZE = 12;
 
 // Responsive breakpoints
@@ -727,7 +727,7 @@ export default function ColorsScreen() {
   // ── Shared header + toolbar + footer sections ──────────────────────────────
   const HeaderSection = (() => {
     const isMobileHeader = width < 450;
-    const isMobileSmall = width < 360;
+    const isMobileSmall = width <= 375;
     return (
       <>
         <View style={[
@@ -747,17 +747,17 @@ export default function ColorsScreen() {
             <View style={{ flexDirection: "column", gap: 10 }}>
               {/* Row 1: Icon & Title on Left & Add Button on Right */}
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                  <View style={[styles.headerIconBox, { width: 34, height: 34, marginRight: 0, flexShrink: 0 }]}>
-                    <Ionicons name={BI.palette as any} size={18} color="#fff" />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                  <View style={[styles.headerIconBox, { width: 28, height: 28, marginRight: 0, flexShrink: 0 }]}>
+                    <Ionicons name={BI.palette as any} size={14} color="#fff" />
                   </View>
-                  <Text style={[styles.webPageTitle, { fontSize: isMobileSmall ? 17 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1}>
+                  <Text style={[styles.webPageTitle, { fontSize: width <= 360 ? 14 : isMobileSmall ? 16 : 18, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
                     Colors Management
                   </Text>
                 </View>
-                <TouchableOpacity style={[styles.addBtn, { paddingVertical: 6, paddingHorizontal: 10, marginLeft: 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]} onPress={() => setAddOpen(true)}>
-                  <Ionicons name={BI.plus as any} size={14} color="#fff" style={{ marginRight: 4 }} />
-                  <Text style={[styles.addBtnText, { fontSize: 12 }]}>Add Color</Text>
+                <TouchableOpacity style={[styles.addBtn, { paddingVertical: 5, paddingHorizontal: isMobileSmall ? 6 : 10, marginLeft: isMobileSmall ? 4 : 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]} onPress={() => setAddOpen(true)}>
+                  <Ionicons name={BI.plus as any} size={isMobileSmall ? 10 : 14} color="#fff" style={{ marginRight: 2 }} />
+                  <Text style={[styles.addBtnText, { fontSize: isMobileSmall ? 10 : 12 }]}>Add Color</Text>
                 </TouchableOpacity>
               </View>
 
@@ -833,7 +833,6 @@ export default function ColorsScreen() {
 
   const FooterSection = (
     <View style={{ paddingHorizontal: PADDING }}>
-      {viewMode === "list" && <View style={styles.tableCardBottom} />}
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(filtered.length / PAGE_SIZE)}
@@ -875,24 +874,22 @@ export default function ColorsScreen() {
               {/* @ts-ignore */}
               <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
                 <View style={{ width: Math.max(containerWidth, 950) }}>
-                  <View style={{ paddingHorizontal: PADDING }}>
-                    <View style={styles.tableCard}>
+                  <View style={{ paddingHorizontal: PADDING, paddingBottom: 24 }}>
+                    <View style={{ borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#E8E0D8" }}>
                       <ListHeader screenWidth={Math.max(containerWidth, 950)} />
-                    </View>
-                  </View>
-                  <View style={{ paddingHorizontal: PADDING }}>
-                    <View style={styles.tableCardRows}>
-                      {pageItems.map((item, index) => (
-                        <ListRow
-                          key={item.id}
-                          item={item}
-                          isLast={index === pageItems.length - 1}
-                          isEven={index % 2 === 0}
-                          screenWidth={Math.max(containerWidth, 950)}
-                          onEdit={() => setEditTarget(item)}
-                          onDelete={() => void handleDelete(item)}
-                        />
-                      ))}
+                      <View style={{ backgroundColor: "#fff" }}>
+                        {pageItems.map((item, index) => (
+                          <ListRow
+                            key={item.id}
+                            item={item}
+                            isLast={index === pageItems.length - 1}
+                            isEven={index % 2 === 0}
+                            screenWidth={Math.max(containerWidth, 950)}
+                            onEdit={() => setEditTarget(item)}
+                            onDelete={() => void handleDelete(item)}
+                          />
+                        ))}
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -982,8 +979,8 @@ const styles = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: "#151D4F",
-    borderRadius: 22,
+    backgroundColor: "#1D324E",
+    borderRadius: 12,
     marginHorizontal: 16,
     marginTop: 16,
   },
@@ -1044,7 +1041,7 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#151D4F",
+    backgroundColor: "#1D324E",
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -1186,7 +1183,7 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1, backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center", alignItems: "center", padding: 20,
+    justifyContent: "center", alignItems: "center", padding: 12,
   },
   modalCard: {
     width: "100%", maxWidth: 480, backgroundColor: "#fff",
@@ -1218,12 +1215,12 @@ const styles = StyleSheet.create({
     marginTop: 24, marginBottom: 8, flexWrap: "wrap",
   },
   cancelBtn: {
-    paddingHorizontal: 18, paddingVertical: 10, backgroundColor: DARK_BTN,
+    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: DARK_BTN,
     borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 6,
   },
   cancelBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
   saveBtn: {
-    paddingHorizontal: 18, paddingVertical: 10, backgroundColor: BRAND,
+    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: BRAND,
     borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 6,
   },
   saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
@@ -1256,7 +1253,7 @@ const styles = StyleSheet.create({
     top: "100%" as any,
     left: 0, right: 0,
     backgroundColor: "#fff",
-    
+
     borderWidth: 1.5, borderColor: BRAND, borderTopWidth: 0,
     borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
     overflow: "hidden", zIndex: 200,

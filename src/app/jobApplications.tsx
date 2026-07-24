@@ -1,9 +1,9 @@
 /**
  * JobApplicationsScreen.jsx
- * React Native — works on iOS, Android, and React Native Web
+ * React Native â€” works on iOS, Android, and React Native Web
  *
  * Dependencies (add to your project if not present):
- *   npm install @react-navigation/native  (optional – for breadcrumb nav)
+ *   npm install @react-navigation/native  (optional â€“ for breadcrumb nav)
  *   All other imports are from react-native core.
  */
 
@@ -28,7 +28,7 @@ import {
   View
 } from 'react-native';
 
-// ─── Palette ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const C = {
   bg: '#F4F6FB',
   card: '#FFFFFF',
@@ -47,7 +47,7 @@ const C = {
   white: '#FFFFFF',
 };
 
-// ─── Feather Icons mapping ────────
+// â”€â”€â”€ Feather Icons mapping â”€â”€â”€â”€â”€â”€â”€â”€
 const BI_MAP: Record<string, any> = {
   "file-earmark-text": "file-text",
   "hourglass-split": "clock",
@@ -98,18 +98,18 @@ function mapApplication(a: import('@/lib/api/types').JobApplication, index: numb
     id: String(a.id ?? index),
     jobId: a.jobId,
     name: a.name ?? 'Applicant',
-    email: a.email ?? '—',
-    phone: a.phone ?? '—',
-    role: a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : '—'),
-    department: a.departmentName ?? '—',
+    email: a.email ?? 'â€”',
+    phone: a.phone ?? 'â€”',
+    role: a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : 'â€”'),
+    department: a.departmentName ?? 'â€”',
     applied: formatDate(a.appliedAt),
     avatar: initialsFromName(a.name),
     avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
     status,
-    experience: expYears != null && !Number.isNaN(expYears) ? `${expYears} yr${expYears === 1 ? '' : 's'}` : '—',
+    experience: expYears != null && !Number.isNaN(expYears) ? `${expYears} yr${expYears === 1 ? '' : 's'}` : 'â€”',
     resumePath: a.resumePath ?? '',
     coverLetter: a.coverLetter ?? '',
-    location: a.location?.trim() || '—',
+    location: a.location?.trim() || 'â€”',
     currentCompany: a.currentCompany ?? '',
     currentDesignation: a.currentDesignation ?? '',
   };
@@ -136,17 +136,17 @@ const STAT_CARDS = [
 const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'];
 const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'] as const;
 
-// ─── Helper components ───────────────────────────────────────────────────────
+// â”€â”€â”€ Helper components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: C.sub, bg: C.bg, icon: '•' };
-  const isBI = cfg.icon !== '•';
+  const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: C.sub, bg: C.bg, icon: 'â€¢' };
+  const isBI = cfg.icon !== 'â€¢';
   return (
     <View style={[styles.badge, { backgroundColor: cfg.bg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
       {isBI ? (
         <BI name={cfg.icon} size={11} color={cfg.color} />
       ) : (
-        <Text style={{ color: cfg.color }}>•</Text>
+        <Text style={{ color: cfg.color }}>â€¢</Text>
       )}
       <Text style={[styles.badgeText, { color: cfg.color }]}>
         {status}
@@ -209,7 +209,7 @@ function ApplicationCard({
                 activeOpacity={0.8}
                 disabled={updating}
               >
-                <StatusBadge status={updating ? 'Updating…' : item.status} />
+                <StatusBadge status={updating ? 'Updatingâ€¦' : item.status} />
               </TouchableOpacity>
               {statusOpen && (
                 <View style={styles.statusMenu}>
@@ -293,7 +293,7 @@ function ApplicationCard({
             activeOpacity={0.8}
             disabled={updating}
           >
-            <StatusBadge status={updating ? 'Updating…' : item.status} />
+            <StatusBadge status={updating ? 'Updatingâ€¦' : item.status} />
           </TouchableOpacity>
           {statusOpen && (
             <View style={styles.statusMenu}>
@@ -325,7 +325,7 @@ function ApplicationCard({
   );
 }
 
-// ─── Dropdown (lightweight native) ───────────────────────────────────────────
+// â”€â”€â”€ Dropdown (lightweight native) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Dropdown({ value, options, onSelect, placeholder }: { value: string, options: string[], onSelect: (val: string) => void, placeholder: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -351,7 +351,7 @@ function Dropdown({ value, options, onSelect, placeholder }: { value: string, op
   );
 }
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function JobApplicationsScreen() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
@@ -442,17 +442,17 @@ export default function JobApplicationsScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
         <ScrollView style={styles.root} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
-          {/* ── Header ── */}
+          {/* â”€â”€ Header â”€â”€ */}
           <View style={[styles.header, isWeb && styles.headerWeb]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-              <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
-                <Feather name="file-text" size={26} color="#FFF" />
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="file-text" size={24} color="#FFF" />
               </View>
               <Text style={styles.pageTitle}>Job Applications</Text>
             </View>
           </View>
 
-          {/* ── Stat Cards ── */}
+          {/* â”€â”€ Stat Cards â”€â”€ */}
           <View style={{ marginTop: isWeb ? -42 : -28, zIndex: 10, marginBottom: 14 }}>
             {isWeb ? (
               <ScrollView
@@ -516,7 +516,7 @@ export default function JobApplicationsScreen() {
             )}
           </View>
 
-          {/* ── Filters ── */}
+          {/* â”€â”€ Filters â”€â”€ */}
           <View style={[styles.filterRow, isWeb && styles.filterRowWeb, !isWeb && { marginTop: 16 }]}>
             <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
               <BI name="search" size={14} color={C.sub} style={{ marginRight: 8 }} />
@@ -574,7 +574,7 @@ export default function JobApplicationsScreen() {
             )}
           </View>
 
-          {/* ── Results info ── */}
+          {/* â”€â”€ Results info â”€â”€ */}
           <View style={styles.resultsRow}>
             <Text style={styles.resultsText}>
               Showing <Text style={{ color: C.primary, fontWeight: '700' }}>{filtered.length}</Text> of{' '}
@@ -582,10 +582,10 @@ export default function JobApplicationsScreen() {
             </Text>
           </View>
 
-          {/* ── Application List ── */}
+          {/* â”€â”€ Application List â”€â”€ */}
           {loading ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>Loading applications…</Text>
+              <Text style={styles.emptyTitle}>Loading applicationsâ€¦</Text>
             </View>
           ) : error ? (
             <View style={styles.emptyBox}>
@@ -643,7 +643,7 @@ export default function JobApplicationsScreen() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const styles = StyleSheet.create({
   safe: {
     flex: 1,

@@ -24,22 +24,25 @@
 
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
-import { Ionicons } from '@expo/vector-icons';
 import { getApiErrorMessage } from '@/lib/api/client';
+
 import { deleteAdsCustomer, fetchAdsCustomers, fetchAdsOrders, formatAdsDate, type AdsApiRow } from '@/services/adsApi';
-import { sweetWarning } from '@/lib/sweetAlert';
+
+
+
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import BagCheckFill from 'react-native-bootstrap-icons/icons/bag-check-fill';
 import ExclamationTriangleFill from 'react-native-bootstrap-icons/icons/exclamation-triangle-fill';
@@ -368,21 +371,30 @@ const CustomerManagement: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
 
+  const handleViewCustomer = (customer: Customer) => {
+    router.push({ pathname: '/adsCustomerDetails' as any, params: { id: String(customer.id) } });
+  };
+
   const handleViewOrders = async (customer?: Customer) => {
     if (!customer) {
       router.push('/ads-ordermanagement');
       return;
     }
+
     try {
       const page = await fetchAdsOrders({
-        search: customer.email || customer.name,
+        search: customer.name || customer.email,
         page: 0,
         size: 20,
       });
       const items = page.items ?? [];
       const match =
-        items.find((row) => String(row.customerEmail ?? '').toLowerCase() === customer.email.toLowerCase()) ??
-        items[0];
+        items.find(
+          (row) =>
+            String(row.customerEmail ?? '').toLowerCase() === customer.email.toLowerCase() ||
+            String(row.customerName ?? '').toLowerCase() === customer.name.toLowerCase()
+        ) ?? items[0];
+
       if (match) {
         const internalId = Number(match.id ?? 0);
         const orderCode = String(match.orderId ?? match.id ?? '');
@@ -400,7 +412,6 @@ const CustomerManagement: React.FC = () => {
         params: { customerEmail: customer.email, customerName: customer.name },
       });
     } catch (e) {
-      void sweetWarning('Orders', getApiErrorMessage(e, 'Could not open customer orders.'));
       router.push({
         pathname: '/ads-ordermanagement' as any,
         params: { customerEmail: customer.email },
@@ -472,7 +483,7 @@ const CustomerManagement: React.FC = () => {
         <Text style={{ color: COLORS.sub, fontSize: 12, width: '100%' }} numberOfLines={1} ellipsizeMode="tail">{item.joined}</Text>
       </View>
       <View style={[styles.cell, colStyle('action'), { flexDirection: 'row', gap: 8, alignItems: 'center' }, !isPhone && { marginLeft: 55 }]}>
-        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewOrders(item)}>
+        <TouchableOpacity style={styles.ordersIconBtn} onPress={() => handleViewCustomer(item)}>
           <Ionicons name="eye" size={15} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => requestDelete(item)}>
@@ -540,7 +551,7 @@ const CustomerManagement: React.FC = () => {
         </View>
 
         <View style={styles.gridActionsRow}>
-          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewOrders(item)}>
+          <TouchableOpacity style={styles.ordersBtnWide} onPress={() => handleViewCustomer(item)}>
             <Ionicons name="eye" size={14} color="#fff" />
             <Text style={styles.ordersBtnText}>View</Text>
           </TouchableOpacity>
@@ -554,7 +565,7 @@ const CustomerManagement: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {/* ---------- Header ---------- */}
         <View style={[styles.header, isPhone && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>

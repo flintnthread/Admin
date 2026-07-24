@@ -362,3 +362,23 @@ export async function downloadOrderShippingLabelPdf(
     "application/pdf"
   );
 }
+
+export type ShiprocketActionResponse = {
+  success?: boolean;
+  message?: string;
+  alreadyExists?: boolean;
+  shiprocket?: Record<string, unknown>;
+  order?: Record<string, unknown>;
+};
+
+export async function pushOrderToShiprocket(id: number): Promise<ShiprocketActionResponse> {
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/push`, {
+    method: "POST",
+  });
+}
+
+export async function syncOrderFromShiprocket(id: number): Promise<ShiprocketActionResponse> {
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/sync`, {
+    method: "POST",
+  });
+}

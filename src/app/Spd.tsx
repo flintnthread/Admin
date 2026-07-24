@@ -676,6 +676,8 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
     onPrint, onRegenerate, regenLoading,
 }) => {
     const isWeb = Platform.OS === "web";
+    const { width } = useWindowDimensions();
+    const isMobile = width < 768;
     const fmtInv = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const lineItems = (order.items?.length
         ? order.items
@@ -749,7 +751,7 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
 
                             <View style={invStyles.divider} />
 
-                            <View style={[invStyles.twoColRow, !isWeb && { flexDirection: "column", alignItems: "stretch" }]}>
+                            <View style={[invStyles.twoColRow, isMobile && { flexDirection: "column", alignItems: "stretch" }]}>
                                 <View style={invStyles.infoCard}>
                                     <Text style={invStyles.infoCardTitle}>BENEFICIARY DETAILS</Text>
                                     <Text style={invStyles.beneficiaryName}>{order.sellerName}</Text>
@@ -793,7 +795,7 @@ const InvoiceModalView: React.FC<InvoiceModalProps> = ({
                                 ))}
                             </View>
 
-                            <View style={[invStyles.twoColRow, !isWeb && { flexDirection: "column", alignItems: "stretch" }]}>
+                            <View style={[invStyles.twoColRow, isMobile && { flexDirection: "column", alignItems: "stretch" }]}>
                                 <View style={invStyles.wordsBlock}>
                                     <Text style={invStyles.wordsLabel}>Amount Payable (in words):</Text>
                                     <Text style={invStyles.wordsValue}>{amountInWords(sellerEarning)}</Text>

@@ -1,8 +1,8 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetConfirm, sweetError, sweetSuccess } from "@/lib/sweetAlert";
 import { formatDateTime, initialsFromName } from "@/lib/format";
+import { sweetConfirm, sweetError, sweetSuccess } from "@/lib/sweetAlert";
 import {
   approveSellerProfile,
   fetchPendingProfileSellers,
@@ -10,19 +10,18 @@ import {
   type PendingProfileSeller,
 } from "@/services/sellerApi";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 
 
@@ -32,9 +31,11 @@ const MUTED = "#69798c";
 const BORDER = "#e5e7eb";
 
 export default function PendingSellersScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
   const isMobile = width < 768;
+  const isLaptop = width >= 1024 && width < 1440;
 
   const [sellers, setSellers] = useState<PendingProfileSeller[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,13 @@ export default function PendingSellersScreen() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
+
+  const openSellerView = useCallback((seller: PendingProfileSeller) => {
+    router.push({
+      pathname: "/Viewseller",
+      params: { sellerId: String(seller.sellerId) },
+    });
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,10 +128,12 @@ export default function PendingSellersScreen() {
           {isMobile ? (
             <View style={{ flexDirection: "column", gap: 2 }}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-
-                <Text style={[styles.title, { flex: 1, fontSize: 18 }]}>Pending seller profiles</Text>
+                <View style={styles.headerIconBox}>
+                  <Feather name="users" size={20} color="#fff" />
+                </View>
+                <Text style={[styles.title, { flex: 1, fontSize: 17 }]} numberOfLines={1}>Pending seller profiles</Text>
               </View>
-              <Text style={[styles.subtitle, { marginLeft: 42, marginTop: 0 }]}>
+              <Text style={[styles.subtitle, { marginLeft: 0, marginTop: 0 }]}>
                 Sellers who completed KYC and are waiting for admin approval
               </Text>
             </View>
@@ -182,50 +192,105 @@ export default function PendingSellersScreen() {
             <Text style={styles.muted}>All submitted seller profiles have been reviewed.</Text>
           </View>
         ) : isWide ? (
-          <View style={styles.table}>
-            <View style={styles.tableHead}>
-              <Text style={[styles.th, { flex: 2 }]}>Seller</Text>
-              <Text style={[styles.th, { flex: 1.2 }]}>Mobile</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Status</Text>
-              <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Actions</Text>
-            </View>
-            {filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
-              <View key={s.sellerId} style={styles.tableRow}>
-                <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initialsFromName(s.fullName)}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.name}>{s.fullName}</Text>
-                    <Text style={styles.email}>{s.email}</Text>
-                  </View>
+          isLaptop ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
+              <View style={[styles.table, { minWidth: 980 }]}>
+                <View style={styles.tableHead}>
+                  <Text style={[styles.th, { flex: 2 }]}>Seller</Text>
+                  <Text style={[styles.th, { flex: 1.2 }]}>Mobile</Text>
+                  <Text style={[styles.th, { flex: 1 }]}>Status</Text>
+                  <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
+                  <Text style={[styles.th, { flex: 2.2 }]}>Actions</Text>
                 </View>
-                <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>
-                <Text style={[styles.td, { flex: 1 }]}>{s.status}</Text>
-                <Text style={[styles.td, { flex: 1.2 }]}>{formatDateTime(s.profileUpdatedAt)}</Text>
-                <View style={[styles.actions, { flex: 1 }]}>
-                  <TouchableOpacity
-                    style={styles.approveBtn}
-                    disabled={actionId === s.sellerId}
-                    onPress={() => handleApprove(s)}
-                  >
-                    <Text style={styles.approveText}>Approve</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.rejectBtn}
-                    disabled={actionId === s.sellerId}
-                    onPress={() => {
-                      setRejectTarget(s);
-                      setRejectReason("");
-                    }}
-                  >
-                    <Text style={styles.rejectText}>Reject</Text>
-                  </TouchableOpacity>
-                </View>
+                {filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
+                  <View key={s.sellerId} style={styles.tableRow}>
+                    <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{initialsFromName(s.fullName)}</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.name}>{s.fullName}</Text>
+                        <Text style={styles.email}>{s.email}</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>
+                    <Text style={[styles.td, { flex: 1 }]}>{s.status}</Text>
+                    <Text style={[styles.td, { flex: 1.2 }]}>{formatDateTime(s.profileUpdatedAt)}</Text>
+                    <View style={[styles.actions, { flex: 2.2 }]}>
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => openSellerView(s)}>
+                        <Text style={styles.viewText}>View</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.approveBtn}
+                        disabled={actionId === s.sellerId}
+                        onPress={() => handleApprove(s)}
+                      >
+                        <Text style={styles.approveText}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.rejectBtn}
+                        disabled={actionId === s.sellerId}
+                        onPress={() => {
+                          setRejectTarget(s);
+                          setRejectReason("");
+                        }}
+                      >
+                        <Text style={styles.rejectText}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.table}>
+              <View style={styles.tableHead}>
+                <Text style={[styles.th, { flex: 2 }]}>Seller</Text>
+                <Text style={[styles.th, { flex: 1.2 }]}>Mobile</Text>
+                <Text style={[styles.th, { flex: 1 }]}>Status</Text>
+                <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
+                <Text style={[styles.th, { flex: 2.2 }]}>Actions</Text>
+              </View>
+              {filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
+                <View key={s.sellerId} style={styles.tableRow}>
+                  <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{initialsFromName(s.fullName)}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.name}>{s.fullName}</Text>
+                      <Text style={styles.email}>{s.email}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>{s.status}</Text>
+                  <Text style={[styles.td, { flex: 1.2 }]}>{formatDateTime(s.profileUpdatedAt)}</Text>
+                  <View style={[styles.actions, { flex: 2.2 }]}>
+                    <TouchableOpacity style={styles.viewBtn} onPress={() => openSellerView(s)}>
+                      <Text style={styles.viewText}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.approveBtn}
+                      disabled={actionId === s.sellerId}
+                      onPress={() => handleApprove(s)}
+                    >
+                      <Text style={styles.approveText}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.rejectBtn}
+                      disabled={actionId === s.sellerId}
+                      onPress={() => {
+                        setRejectTarget(s);
+                        setRejectReason("");
+                      }}
+                    >
+                      <Text style={styles.rejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
         ) : (
           filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
             <View key={s.sellerId} style={styles.card}>
@@ -241,6 +306,12 @@ export default function PendingSellersScreen() {
               </View>
               <Text style={styles.muted}>Submitted: {formatDateTime(s.profileUpdatedAt)}</Text>
               <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.viewBtn, { flex: 1 }]}
+                  onPress={() => openSellerView(s)}
+                >
+                  <Text style={styles.viewText}>View</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.approveBtn, { flex: 1 }]}
                   disabled={actionId === s.sellerId}
@@ -401,7 +472,17 @@ const styles = StyleSheet.create({
   avatarText: { color: ORANGE, fontWeight: "800", fontSize: 14 },
   name: { fontSize: 15, fontWeight: "700", color: NAVY },
   email: { fontSize: 12, color: MUTED },
-  actions: { flexDirection: "row", gap: 8 },
+  actions: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  viewBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#93c5fd",
+    alignItems: "center",
+  },
+  viewText: { color: "#1d4ed8", fontWeight: "700", fontSize: 12 },
   approveBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,

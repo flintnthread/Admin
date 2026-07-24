@@ -24,7 +24,7 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import Svg, { Path, Polygon, Polyline } from 'react-native-svg';
+import Svg, { Circle, Path, Polygon, Polyline } from 'react-native-svg';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
 let BootstrapIcon: React.FC<{ name: string; size: number; color: string }>;
@@ -328,7 +328,11 @@ const SparklineChart: React.FC<{
     );
   }
 
-  const maxVal = Math.max(...data.map(d => d.value), 1);
+  let maxDataVal = Math.max(...data.map(d => d.value), 0);
+  let chartMax = Math.max(2, maxDataVal);
+  if (chartMax > 2 && chartMax % 2 !== 0) chartMax += 1;
+
+  const maxVal = chartMax;
   const minVal = 0;
 
   const getX = (i: number) => {
@@ -345,7 +349,7 @@ const SparklineChart: React.FC<{
     { x: getX(data.length - 1), y: padding.top + chartH },
   ];
 
-  const yLabels = [0, 1, 2].filter(v => v <= maxVal + 0);
+  const yLabels = [0, maxVal / 2, maxVal];
 
   // Calculate label thinning to avoid overlap on small screens
   const approxLabelWidth = 44; // px
@@ -505,19 +509,25 @@ const DonutChart: React.FC<{
   segments: { value: number; color: string; label: string }[];
   total: number;
   size: number;
-}> = ({ segments, total, size }) => {
-  const r = size / 2 - 8;
+  label?: string;
+}> = ({ segments, total, size, label }) => {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const strokeW = Math.max(12, size * 0.12);
+  const r = size / 2 - strokeW / 2;
   const cx = size / 2;
   const cy = size / 2;
-  const strokeW = 20;
 
   let startAngle = -90;
+  const gapAngle = segments.filter(s => s.value > 0).length > 1 ? 2 : 0;
+
   const arcs = segments.map(seg => {
     const pct = total > 0 ? seg.value / total : 0;
     const angle = pct * 360;
+    const adjustedAngle = angle > gapAngle ? angle - gapAngle : angle;
     const sa = startAngle;
     startAngle += angle;
-    return { ...seg, pct, startAngle: sa, angle };
+    return { ...seg, pct, startAngle: sa, angle: adjustedAngle };
   });
 
   const polarToCartesian = (cx: number, cy: number, r: number, angleDeg: number) => {
@@ -532,36 +542,60 @@ const DonutChart: React.FC<{
     return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 0 ${e.x} ${e.y}`;
   };
 
-  if (total === 0) {
-    return (
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <View
-          style={{
-            width: r * 2,
-            height: r * 2,
-            borderRadius: r,
-            borderWidth: strokeW,
-            borderColor: COLORS.success,
-          }}
-        />
-      </View>
-    );
-  }
+  const hasData = total > 0 && segments.some(s => s.value > 0);
+  const activeArc = activeIndex !== null ? arcs[activeIndex] : null;
 
   return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size}>
-        {arcs.map((arc, i) => (
-          <Path
-            key={i}
-            d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.angle)}
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {!hasData ? (
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
             fill="none"
-            stroke={arc.color}
+            stroke={COLORS.success}
             strokeWidth={strokeW}
-            strokeLinecap="butt"
           />
-        ))}
+        ) : (
+          arcs.map((arc, i) => {
+            if (arc.value === 0) return null;
+            const isSelected = activeIndex === i;
+            const currentStrokeW = isSelected ? strokeW * 1.15 : strokeW;
+            if (arc.angle >= 359) {
+              return (
+                <Circle
+                  key={i}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth={currentStrokeW}
+                  onPress={() => setActiveIndex(isSelected ? null : i)}
+                />
+              )
+            }
+            return (
+              <Path
+                key={i}
+                d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.angle)}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={currentStrokeW}
+                strokeLinecap="round"
+                onPress={() => setActiveIndex(isSelected ? null : i)}
+              />
+            );
+          })
+        )}
       </Svg>
+      {activeArc && (
+        <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: size - strokeW * 2, height: size - strokeW * 2, borderRadius: size }} pointerEvents="none">
+          <Text style={{ fontSize: size * 0.15, fontWeight: '800', color: COLORS.text }}>{activeArc.value}</Text>
+          <Text style={{ fontSize: size * 0.08, color: COLORS.textSecondary, textAlign: 'center', marginTop: 2, paddingHorizontal: 4 }} numberOfLines={2} adjustsFontSizeToFit>{activeArc.label}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -573,6 +607,114 @@ interface DocModalProps {
   docUrl?: string;
   onClose: () => void;
 }
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  box: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  header: {
+    backgroundColor: '#2C3A4F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  headerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  headerSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  imgContainer: {
+    backgroundColor: COLORS.white,
+    margin: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  imgScrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  btnRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 4,
+    gap: 8,
+    justifyContent: 'center',
+  },
+  actionOutlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+  },
+  actionOutlineBtnText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  downloadBtn: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  downloadBtnText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
 
 const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl, onClose }) => {
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -1548,17 +1690,17 @@ export default function ViewSeller() {
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.statsRow, width < 1024 && { flexDirection: 'column' }]}>
-            <View style={[styles.statCard, width < 1024 && { width: '100%', marginBottom: 12 }]}>
+          <View style={[styles.statsRow, width <= 1024 && { flexDirection: 'column' }]}>
+            <View style={[styles.statCard, width <= 1024 && { width: '100%', marginBottom: 12 }]}>
               <Text style={styles.statCardTitle}>Product Status Distribution</Text>
-              <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
               <Text style={styles.statCardTotalLabel}>Total Products</Text>
-              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
-                <View style={styles.donutWrap}>
+              <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
+              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center', gap: 8 } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
+                <View style={[styles.donutWrap, { width: Math.min(260, Math.max(150, width * 0.35)), height: Math.min(260, Math.max(150, width * 0.35)) }]}>
                   <DonutChart
                     segments={productSegments}
                     total={seller.totalProducts}
-                    size={width < 600 ? 120 : 150}
+                    size={Math.min(260, Math.max(150, width * 0.35))}
                   />
                 </View>
                 <View style={[styles.legendList, width >= 600 && { flex: 1, maxWidth: 220 }]}>
@@ -1575,12 +1717,12 @@ export default function ViewSeller() {
               </View>
             </View>
 
-            <View style={[styles.statCard, width < 1024 && { width: '100%' }]}>
+            <View style={[styles.statCard, width <= 1024 && { width: '100%' }]}>
               <Text style={styles.statCardTitle}>Order Status Distribution</Text>
-              <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
               <Text style={styles.statCardTotalLabel}>Total Orders</Text>
-              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
-                <View style={styles.donutWrap}>
+              <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
+              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center', gap: 8 } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
+                <View style={[styles.donutWrap, { width: Math.min(260, Math.max(150, width * 0.35)), height: Math.min(260, Math.max(150, width * 0.35)) }]}>
                   <DonutChart
                     segments={orderSegments}
                     total={Math.max(
@@ -1588,7 +1730,7 @@ export default function ViewSeller() {
                       seller.totalOrders,
                       1,
                     )}
-                    size={width < 600 ? 120 : 150}
+                    size={Math.min(260, Math.max(150, width * 0.35))}
                   />
                 </View>
                 <View style={[styles.legendList, width >= 600 && { flex: 1, maxWidth: 220 }]}>
@@ -1842,7 +1984,7 @@ export default function ViewSeller() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F5F0EB',
+    backgroundColor: COLORS.white,
   },
   container: {
     paddingBottom: 24,
@@ -1851,7 +1993,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F0EB',
+    backgroundColor: COLORS.white,
   },
 
   // ── Page header container — dark blue background ──────────────────────────
@@ -2105,13 +2247,18 @@ const styles = StyleSheet.create({
   statCardTotalLabel: {
     fontSize: 12,
     color: COLORS.textMuted,
-    marginBottom: 8,
   },
   donutWrap: {
-    marginVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 250,
+    aspectRatio: 1,
   },
+
   chartAndLegendContainer: {
-    marginTop: 12,
+    width: '100%',
   },
   legendList: {
     width: '100%',
@@ -2269,113 +2416,102 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-});
 
-// ─── Modal Styles ─────────────────────────────────────────────────────────────
-const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  box: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    overflow: 'hidden',
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  header: {
-    backgroundColor: '#2C3A4F',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  headerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  headerSub: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  imgContainer: {
-    backgroundColor: COLORS.white,
-    margin: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  imgScrollContent: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 4,
-    gap: 8,
-    justifyContent: 'center',
-  },
-  actionOutlineBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    borderRadius: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: COLORS.white,
-  },
-  actionOutlineBtnText: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  downloadBtn: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  downloadBtnText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+
+  //     borderRadius: 12,
+  //     overflow: 'hidden',
+  //     maxHeight: '90%',
+  //     shadowColor: '#000',
+  //     shadowOffset: { width: 0, height: 8 },
+  //     shadowOpacity: 0.3,
+  //     shadowRadius: 20,
+  //     elevation: 20,
+  //   },
+  //   header: {
+  //     backgroundColor: '#2C3A4F',
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     justifyContent: 'space-between',
+  //     paddingHorizontal: 18,
+  //     paddingVertical: 14,
+  //   },
+  //   headerLeft: {
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     gap: 12,
+  //     flex: 1,
+  //   },
+  //   headerIconWrap: {
+  //     width: 40,
+  //     height: 40,
+  //     borderRadius: 8,
+  //     backgroundColor: 'rgba(255,255,255,0.15)',
+  //     alignItems: 'center',
+  //     justifyContent: 'center',
+  //   },
+  //   headerTitle: {
+  //     color: COLORS.white,
+  //     fontSize: 16,
+  //     fontWeight: '700',
+  //   },
+  //   headerSub: {
+  //     color: 'rgba(255,255,255,0.7)',
+  //     fontSize: 12,
+  //     marginTop: 2,
+  //   },
+  //   closeBtn: {
+  //     width: 32,
+  //     height: 32,
+  //     borderRadius: 16,
+  //     backgroundColor: 'rgba(255,255,255,0.15)',
+  //     alignItems: 'center',
+  //     justifyContent: 'center',
+  //     marginLeft: 8,
+  //   },
+  //   imgContainer: {
+  //     backgroundColor: COLORS.white,
+  //     margin: 16,
+  //     borderRadius: 8,
+  //     overflow: 'hidden',
+  //     borderWidth: 1,
+  //     borderColor: COLORS.border,
+  //   },
+  //   imgScrollContent: {
+  //     flexGrow: 1,
+  //     alignItems: 'center',
+  //     justifyContent: 'center',
+  //     padding: 8,
+  //   },
+  //   btnRow: {
+  //     flexDirection: 'row',
+  //     paddingHorizontal: 16,
+  //     paddingBottom: 20,
+  //     paddingTop: 4,
+  //     gap: 8,
+  //     justifyContent: 'center',
+  //   },
+  //   actionOutlineBtn: {
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     borderWidth: 1.5,
+  //     borderColor: COLORS.primary,
+  //     borderRadius: 6,
+  //     paddingHorizontal: 14,
+  //     paddingVertical: 8,
+  //     backgroundColor: COLORS.white,
+  //   },
+  //   actionOutlineBtnText: {
+  //     color: COLORS.primary,
+  //     fontSize: 13,
+  //     fontWeight: '600',
+  //   },
+  //   downloadBtn: {
+  //     backgroundColor: COLORS.primary,
+  //     borderColor: COLORS.primary,
+  //   },
+  //   downloadBtnText: {
+  //     color: COLORS.white,
+  //     fontSize: 13,
+  //     fontWeight: '600',
+  //   },
 });

@@ -351,7 +351,12 @@ export default function BankApproval() {
             {showDesktopHeader && (
               <View style={styles.desktopHeader}>
                 <View style={styles.desktopHeaderLeft}>
-                  <Text style={[styles.desktopTitle, { fontSize: desktopTitleFontSize }]}>Seller Bank Approval</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ backgroundColor: "#F97316", borderRadius: 8, padding: 8 }}>
+                      <Ionicons name="business-outline" size={18} color="#FFFFFF" />
+                    </View>
+                    <Text style={[styles.desktopTitle, { fontSize: desktopTitleFontSize }]}>Seller Bank Approval</Text>
+                  </View>
                 </View>
                 <View style={styles.desktopHeaderTabs}>
                   <TouchableOpacity style={styles.desktopTabActive} onPress={() => router.push('/bankverification')}>
@@ -373,7 +378,12 @@ export default function BankApproval() {
                 paddingBottom: headerPaddingBottom,
                 borderRadius: 12
               }}>
-                <Text style={{ fontSize: width < 375 ? 18 : 20, fontWeight: "700", color: "#fff", marginBottom: 12 }}>Seller Bank Approval</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                  <View style={{ backgroundColor: "#F97316", borderRadius: 6, padding: 5 }}>
+                    <Ionicons name="business-outline" size={14} color="#FFFFFF" />
+                  </View>
+                  <Text style={{ fontSize: width < 375 ? 18 : 20, fontWeight: "700", color: "#fff" }}>Seller Bank Approval</Text>
+                </View>
                 <View style={{ flexDirection: "row", gap: width < 375 ? 6 : 10 }}>
                   <TouchableOpacity style={[styles.btnOutline, { flex: 1, paddingVertical: headerBtnPaddingV, paddingHorizontal: headerBtnPaddingH, justifyContent: "center" }]} onPress={() => router.push('/bankverification')}>
                     <Text style={[styles.btnOutlineText, { fontSize: headerBtnFontSize, textAlign: "center" }]}>Bank Verifications</Text>

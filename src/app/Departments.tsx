@@ -841,11 +841,27 @@ const DepartmentsScreen: React.FC = () => {
 
     const handleSave = async (updated: Department) => {
         const isEdit = !!departments.find((d) => d.id === updated.id);
+        
+        // Close modal first before showing any dialogs
+        setEditTarget(null);
+        setAddOpen(false);
+        
+        // Wait for modal close animation to complete
+        await new Promise(resolve => setTimeout(resolve, 250));
+        
+        // Now show confirmation dialog
         if (isEdit) {
-            if (!(await sweetCrud.confirmUpdate("Department", updated.name))) return;
+            if (!(await sweetCrud.confirmUpdate("Department", updated.name))) {
+                // User cancelled - reopen modal
+                setEditTarget(updated);
+                return;
+            }
         } else if (!(await sweetCrud.confirmAdd("Department", updated.name))) {
+            // User cancelled - reopen modal
+            setAddOpen(true);
             return;
         }
+        
         try {
             const payload = {
                 name: updated.name,
@@ -860,9 +876,13 @@ const DepartmentsScreen: React.FC = () => {
                 void sweetCrud.added("Department");
             }
             await loadDepartments();
-            setEditTarget(null);
-            setAddOpen(false);
         } catch (e) {
+            // API failed - reopen modal and show error
+            if (isEdit) {
+                setEditTarget(updated);
+            } else {
+                setAddOpen(true);
+            }
             void sweetError("Error", getApiErrorMessage(e, "Failed to save department."));
         }
     };

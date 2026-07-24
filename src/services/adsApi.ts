@@ -102,6 +102,7 @@ export async function fetchAdsOrders(params?: {
   search?: string;
   status?: string;
   billingType?: string;
+  userId?: number;
   page?: number;
   size?: number;
 }): Promise<PageResponse<AdsApiRow>> {
@@ -109,6 +110,7 @@ export async function fetchAdsOrders(params?: {
   if (params?.search) q.set("search", params.search);
   if (params?.status) q.set("status", params.status);
   if (params?.billingType) q.set("billingType", params.billingType);
+  if (params?.userId != null && params.userId > 0) q.set("userId", String(params.userId));
   q.set("page", String(params?.page ?? 0));
   q.set("size", String(params?.size ?? 50));
   const raw = await adminApiRequest<unknown>(`/api/admin/ads/orders?${q}`);

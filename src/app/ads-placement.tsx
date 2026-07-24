@@ -1,21 +1,3 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  Modal,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  ActivityIndicator,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Feather, Ionicons } from "@expo/vector-icons";
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
@@ -30,6 +12,23 @@ import {
   updateAdPlacement,
   type AdsApiRow,
 } from '@/services/adsApi';
+import { Feather } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 /**
  * ── INTEGRATION NOTE ─────────────────────────────────────────────
@@ -584,15 +583,38 @@ export default function AdPlacementsScreen() {
       monthlyRate: Number(form.monthlyRate) || 0,
       status: toApiStatus(form.status),
     };
-    if (editingPlacement) {
-      if (!(await sweetCrud.confirmUpdate('Placement', body.name))) return;
+
+    // Store form data before closing modal
+    const savedForm = { ...form };
+    const savedEditingPlacement = editingPlacement;
+
+    // Close modal first before showing any dialogs
+    setModalOpen(false);
+    setEditingPlacement(null);
+
+    // Wait for modal close animation to complete
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    // Now show confirmation dialog
+    if (savedEditingPlacement) {
+      if (!(await sweetCrud.confirmUpdate('Placement', body.name))) {
+        // User cancelled - reopen modal with saved data
+        setEditingPlacement(savedEditingPlacement);
+        setModalOpen(true);
+        return;
+      }
     } else {
-      if (!(await sweetCrud.confirmAdd('Placement', body.name))) return;
+      if (!(await sweetCrud.confirmAdd('Placement', body.name))) {
+        // User cancelled - reopen modal with saved data
+        setModalOpen(true);
+        return;
+      }
     }
+
     setSaving(true);
     try {
-      if (editingPlacement) {
-        await updateAdPlacement(editingPlacement.id, body);
+      if (savedEditingPlacement) {
+        await updateAdPlacement(savedEditingPlacement.id, body);
         setToast({ visible: true, message: "Placement updated successfully!" });
         void sweetCrud.updated('Placement');
       } else {
@@ -600,11 +622,12 @@ export default function AdPlacementsScreen() {
         setToast({ visible: true, message: "Placement added successfully!" });
         void sweetCrud.added('Placement');
       }
-      setModalOpen(false);
-      setEditingPlacement(null);
       await loadPlacements();
     } catch (err) {
-      void sweetError('Error', getApiErrorMessage(err, editingPlacement ? 'Could not update placement.' : 'Could not add placement.'));
+      // API failed - reopen modal with saved data and show error
+      setEditingPlacement(savedEditingPlacement);
+      setModalOpen(true);
+      void sweetError('Error', getApiErrorMessage(err, savedEditingPlacement ? 'Could not update placement.' : 'Could not add placement.'));
     } finally {
       setSaving(false);
     }

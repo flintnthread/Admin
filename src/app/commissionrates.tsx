@@ -72,7 +72,7 @@ const CommissionRatesScreen: React.FC = () => {
       <View style={[styles.header, !isWeb && { marginBottom: 16 }]}>
         <View style={styles.headerTopRow}>
           <View style={styles.headerIconContainer}>
-            <Feather name="percent" size={22} color="#FFFFFF" />
+            <Feather name="percent" size={16} color="#FFFFFF" />
           </View>
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Platform commission rates</Text>
@@ -207,9 +207,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: PRIMARY_ORANGE,
     alignItems: "center",
     justifyContent: "center",

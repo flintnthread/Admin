@@ -14,7 +14,7 @@ export type ApprovalProduct = {
   isNew?: boolean;
 };
 
-export type ProductDetail = ApprovalProduct & {
+export type ProductDetail = Omit<ApprovalProduct, 'price'> & {
   sku: string;
   lastUpdated: string;
   categoryLabel: string;
