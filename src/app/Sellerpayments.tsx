@@ -204,12 +204,12 @@ const PayModal: React.FC<{
                     {/* Modal Header */}
                     <View style={styles.modalHeader}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
                                 <Feather name="credit-card" size={16} color="#fff" />
                             </View>
                             <Text style={styles.modalTitle}>Process Payment</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
+                        <TouchableOpacity onPress={onClose} style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
                             <Feather name="x" size={16} color="#fff" />
                         </TouchableOpacity>
                     </View>
@@ -827,7 +827,7 @@ const SellerPaymentsScreen: React.FC = () => {
             <View style={[styles.header, isWeb && styles.headerWeb]}>
                 <View style={styles.headerLeft}>
                     <View style={styles.headerIcon}>
-                        <Feather name="credit-card" size={22} color="#fff" />
+                        <Feather name="credit-card" size={24} color="#fff" />
                     </View>
                     <View>
                         <Text style={[styles.headerTitle, windowWidth <= 350 && { fontWeight: "600" }]}>Seller Payments</Text>
@@ -1362,7 +1362,7 @@ const styles = StyleSheet.create({
     headerWeb: { marginHorizontal: 2, marginTop: 12 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: {
-        width: 50, height: 50, borderRadius: 16,
+        width: 44, height: 44, borderRadius: 12,
         backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center",
         shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5
     },

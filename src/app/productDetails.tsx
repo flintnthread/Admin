@@ -412,7 +412,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     categoryLabel,
     subcategory: String(data.subcategoryName ?? `Subcategory #${data.subcategoryId ?? '—'}`),
     fullTitle: cleanText(String(data.name ?? 'Product')),
-    price: displayPrice,
+    price: displayPrice as unknown as ProductDetail['price'],
     mrp: displayMrp,
     gst,
     material: dash(data.productMaterialType),
@@ -570,6 +570,7 @@ function VariantsTab({
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.variantTable}>
               <View style={styles.variantTableHeader}>
+                {dimLabels.showColor && <Text style={[styles.vth, styles.vcolColor]}>{dimLabels.colorLabel}</Text>}
                 <Text style={[styles.vth, styles.vcolSize]}>{dimLabels.sizeLabel}</Text>
                 <Text style={[styles.vth, styles.vcolSku]}>SKU</Text>
                 <Text style={[styles.vth, styles.vcolStock]}>Stock</Text>
@@ -590,7 +591,7 @@ function VariantsTab({
                 </View>
               </View>
               {variants.map((v) => (
-                <VariantTableRow key={v.id} variant={v} />
+                <VariantTableRow key={v.id} variant={v} showColor={dimLabels.showColor} />
               ))}
             </View>
           </ScrollView>
@@ -606,12 +607,20 @@ function VariantsTab({
   );
 }
 
-function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
+function VariantTableRow({ variant: v, showColor }: { variant: ProductVariant; showColor: boolean }) {
   const intraCityTotal = v.totalPriceIntraCity;
   const metroMetroTotal = v.totalPriceMetroMetro;
 
   return (
     <View style={styles.variantTableRow}>
+      {showColor && (
+        <View style={[styles.vcolColor, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: v.colorHex }} />
+          <Text style={{ fontSize: 12, color: PALETTE.textPrimary, fontWeight: '500' }} numberOfLines={1}>
+            {v.colorName}
+          </Text>
+        </View>
+      )}
       <View style={styles.vcolSize}>
         <View style={styles.vSizePill}>
           <Text style={styles.vSizeText}>{v.size}</Text>
@@ -1194,7 +1203,6 @@ export default function ProductDetailsScreen() {
               <Text style={styles.approveModalLabel}>Select Template (Optional)</Text>
               {Platform.OS === 'web' ? (
                 <View style={styles.approveSelectWrap}>
-                  {/* @ts-expect-error web-only select */}
                   <select
                     value={approveTemplateId}
                     onChange={(e: { target: { value: string } }) =>
@@ -1313,7 +1321,7 @@ export default function ProductDetailsScreen() {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax, alignSelf: 'center', width: '100%' }]}
+          contentContainerStyle={[styles.scrollContent, { width: '100%', paddingHorizontal: isWide ? 32 : 16 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Header */}
@@ -1447,7 +1455,7 @@ export default function ProductDetailsScreen() {
                     {product.category} · SKU: {product.sku}
                   </Text>
 
-                  <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.price}>₹{Number(product.price).toLocaleString('en-IN')}</Text>
                   <Text style={styles.priceSub}>
                     Selling + GST + {commissionLabel}% commission + highest delivery (₹{(firstVariant?.highestDeliveryCharge ?? 0).toLocaleString('en-IN')})
                   </Text>
@@ -1618,10 +1626,10 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: PALETTE.pageBg },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
-  scrollBody: { padding: 16, gap: 16 },
+  scrollBody: { gap: 16, paddingTop: 16 },
 
   header: {
-    marginHorizontal: 2, marginTop: 12, borderRadius: 22,
+    marginHorizontal: 0, marginTop: 16, borderRadius: 16,
     backgroundColor: "#151D4F",
     paddingHorizontal: 16,
     paddingVertical: 14,

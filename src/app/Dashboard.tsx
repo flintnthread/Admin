@@ -1254,7 +1254,7 @@ export default function DashboardScreen() {
                       style={({ hovered }) => [
                         styles.kpiCard,
                         isMobile
-                          ? { minWidth: "47%", flex: 0, width: "47%" }
+                          ? { minWidth: screenW < 425 ? "100%" : "47%", flex: 0, width: screenW < 425 ? "100%" : "47%" }
                           : null,
                         {
                           borderLeftWidth: 4,
@@ -2898,8 +2898,8 @@ const getStyles = (isDark: boolean, screenW: number) => {
       padding: screenW < 480 ? 12 : 20,
       borderWidth: 1,
       borderColor: "#2a4365",
-      flexDirection: screenW < 1024 ? "column" : "row",
-      alignItems: screenW < 1024 ? "stretch" : "center",
+      flexDirection: screenW < 1200 ? "column" : "row",
+      alignItems: screenW < 1200 ? "stretch" : "center",
       justifyContent: "space-between",
       gap: 12,
       shadowColor: "#000",
@@ -3008,7 +3008,7 @@ const getStyles = (isDark: boolean, screenW: number) => {
     },
     kpiCard: {
       flex: 1,
-      minWidth: screenW < 768 ? "47%" : 220,
+      minWidth: screenW < 768 ? (screenW < 425 ? "100%" : "47%") : 220,
       backgroundColor: C.surface,
       borderRadius: 16,
       padding: 18,

@@ -21,7 +21,7 @@ import {
     View
 } from "react-native";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ THEME â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const T = {
     orange: "#E8631A",
     orangeLight: "#FEF0E6",
@@ -54,7 +54,7 @@ const WebStyles = Platform.OS === 'web' ? (
     `}</style>
 ) : null;
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type JobStatus = "Active" | "Paused" | "Closed";
 type JobType = "Full Time" | "Part Time" | "Contract" | "Internship";
 
@@ -88,8 +88,8 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
     return {
         id: j.id,
         title: j.title ?? "Job",
-        department: j.departmentId != null ? (deptNames[j.departmentId] ?? `Dept #${j.departmentId}`) : "—",
-        location: j.location ?? "—",
+        department: j.departmentId != null ? (deptNames[j.departmentId] ?? `Dept #${j.departmentId}`) : "â€”",
+        location: j.location ?? "â€”",
         type,
         positions: Number(j.vacancies ?? 1),
         applications: Number(j.applicationCount ?? 0),
@@ -105,7 +105,7 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
 const DEFAULT_DEPARTMENTS = ["All Departments"];
 const STATUSES: ("All Status" | JobStatus)[] = ["All Status", "Active", "Paused", "Closed"];
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
 const DEPT_ICONS: Record<string, FeatherName> = {
@@ -132,7 +132,7 @@ const TYPE_COLOR: Record<JobType, { bg: string; fg: string }> = {
     Internship: { bg: T.navyLight, fg: T.navy },
 };
 
-// ─── STAT PILL ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ STAT PILL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const StatPill: React.FC<{
     icon: FeatherName;
     value: number;
@@ -197,7 +197,7 @@ const sp = StyleSheet.create({
     },
 });
 
-// ─── DROPDOWN MODAL ───────────────────────────────────────────────────────────
+// â”€â”€â”€ DROPDOWN MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DropdownModal: React.FC<{
     visible: boolean;
     options: string[];
@@ -287,7 +287,7 @@ const dm = StyleSheet.create({
     },
 });
 
-// ─── JOB CARD ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ JOB CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobCard: React.FC<{
     job: Job;
     onPress?: () => void;
@@ -311,7 +311,7 @@ const JobCard: React.FC<{
                 {/* Top row: dept icon + status */}
                 <View style={jc.bannerTop}>
                     <View style={[jc.deptIconWrap, isWeb && { backgroundColor: T.orangeLight, borderWidth: 1, borderColor: T.orangeMid }]}>
-                        <Feather name={deptIcon} size={18} color={T.orange} />
+                        <Feather name={deptIcon} size={16} color={T.orange} />
                     </View>
                     <View style={[jc.statusPill, { backgroundColor: statusStyle.bg }]}>
                         <View style={[jc.statusDot, { backgroundColor: statusStyle.fg }]} />
@@ -597,7 +597,7 @@ const jc = StyleSheet.create({
     },
 });
 
-// ─── WEB SELECT (for web dropdowns) ──────────────────────────────────────────
+// â”€â”€â”€ WEB SELECT (for web dropdowns) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const WebSelect: React.FC<{
     value: string;
     options: string[];
@@ -606,7 +606,7 @@ const WebSelect: React.FC<{
 }> = ({ value, options, onChange, placeholder }) => (
     <View style={ws.wrap}>
         <Feather name="chevron-down" size={14} color={T.textHint} style={ws.chevron} />
-        {/* @ts-ignore – web-only select */}
+        {/* @ts-ignore â€“ web-only select */}
         <select
             value={value}
             onChange={(e: any) => onChange(e.target.value)}
@@ -655,7 +655,7 @@ const ws = StyleSheet.create({
     } as any,
 });
 
-// ─── VIEW TOGGLE ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ VIEW TOGGLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ViewToggle: React.FC<{
     view: "grid" | "list";
     onToggle: (v: "grid" | "list") => void;
@@ -695,7 +695,7 @@ const vt = StyleSheet.create({
     },
 });
 
-// ─── LIST ROW CARD (list view) ────────────────────────────────────────────────
+// â”€â”€â”€ LIST ROW CARD (list view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobRow: React.FC<{ job: Job }> = ({ job }) => {
     const statusStyle = STATUS_COLOR[job.status];
     const typeStyle = TYPE_COLOR[job.type];
@@ -783,7 +783,7 @@ const jr = StyleSheet.create({
     appsTxt: { fontSize: 10, fontWeight: "700" },
 });
 
-// ─── EDIT JOB MODAL ──────────────────────────────────────────────────────────
+// â”€â”€â”€ EDIT JOB MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const EditJobModal: React.FC<{
     visible: boolean;
     job: Job | null;
@@ -965,8 +965,8 @@ const EditJobModal: React.FC<{
                             </TouchableOpacity>
                             <TouchableOpacity style={em.saveBtn} onPress={() => {
                                 const trimTitle = title.trim() || "New Job Opening";
-                                const dept = department || departments[0] || "—";
-                                const trimLoc = location.trim() || "—";
+                                const dept = department || departments[0] || "â€”";
+                                const trimLoc = location.trim() || "â€”";
                                 const trimDesc = description.trim();
                                 const trimReq = requirements.trim();
                                 const trimExp = experience.trim();
@@ -1168,7 +1168,7 @@ const em = StyleSheet.create({
     },
 });
 
-// ─── CONFIRM MODAL ───────────────────────────────────────────────────────────
+// â”€â”€â”€ CONFIRM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ConfirmModal: React.FC<{
     visible: boolean;
     job: Job | null;
@@ -1223,9 +1223,9 @@ const cm = StyleSheet.create({
         maxWidth: 380,
     },
     iconWrap: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         backgroundColor: T.redBg,
         alignItems: "center",
         justifyContent: "center",
@@ -1283,9 +1283,9 @@ const cm = StyleSheet.create({
     },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobOpeningsScreen: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [deptOptions, setDeptOptions] = useState<string[]>(DEFAULT_DEPARTMENTS);
@@ -1439,14 +1439,14 @@ const JobOpeningsScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* ── PAGE HEADER (Mobile) ── */}
+                {/* â”€â”€ PAGE HEADER (Mobile) â”€â”€ */}
                 {isMobileScreen ? (
                     <>
                         {/* Curved dark header card with icon + title + add button */}
                         <View style={s.mobileHeader}>
                             <View style={s.mobileHeaderLeft}>
                                 <View style={s.mobileHeaderIcon}>
-                                    <Feather name="briefcase" size={22} color="#fff" />
+                                    <Feather name="briefcase" size={16} color="#fff" />
                                 </View>
                                 <View>
                                     <Text style={s.mobileHeaderTitle}>Open Positions</Text>
@@ -1511,7 +1511,7 @@ const JobOpeningsScreen: React.FC = () => {
                     </>
                 ) : (
                     <>
-                        {/* ── PAGE HEADER (Web) ── */}
+                        {/* â”€â”€ PAGE HEADER (Web) â”€â”€ */}
                         <View style={s.pageHead}>
                             <View style={{
                                 flexDirection: "row",
@@ -1521,8 +1521,8 @@ const JobOpeningsScreen: React.FC = () => {
                                 gap: 10,
                             }}>
                                 <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 14 }}>
-                                    <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
-                                        <Feather name="briefcase" size={26} color="#FFF" />
+                                    <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                                        <Feather name="briefcase" size={24} color="#FFF" />
                                     </View>
                                     <View>
                                         <Text style={s.pageTitle}>Open Positions</Text>
@@ -1540,7 +1540,7 @@ const JobOpeningsScreen: React.FC = () => {
                             </View>
                         </View>
 
-                        {/* ── STATS (Web — centered row) ── */}
+                        {/* â”€â”€ STATS (Web â€” centered row) â”€â”€ */}
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
@@ -1584,7 +1584,7 @@ const JobOpeningsScreen: React.FC = () => {
                     </>
                 )}
 
-                {/* ── SEARCH + FILTERS ── */}
+                {/* â”€â”€ SEARCH + FILTERS â”€â”€ */}
                 {isMobileScreen ? (
                     <View style={{ gap: 10, paddingHorizontal: 16 }}>
                         <View style={s.searchRow}>
@@ -1592,7 +1592,7 @@ const JobOpeningsScreen: React.FC = () => {
                                 <Feather name="search" size={15} color="#000000" />
                                 <TextInput
                                     style={[s.searchInput, { color: "#000000" }]}
-                                    placeholder="Search jobs, departments, locations…"
+                                    placeholder="Search jobs, departments, locationsâ€¦"
                                     placeholderTextColor="#000000"
                                     value={search}
                                     onChangeText={setSearch}
@@ -1702,7 +1702,7 @@ const JobOpeningsScreen: React.FC = () => {
                             <Feather name="search" size={15} color="#000000" />
                             <TextInput
                                 style={[s.searchInput, { color: "#000000" }]}
-                                placeholder="Search jobs, departments, locations…"
+                                placeholder="Search jobs, departments, locationsâ€¦"
                                 placeholderTextColor="#000000"
                                 value={search}
                                 onChangeText={setSearch}
@@ -1800,16 +1800,16 @@ const JobOpeningsScreen: React.FC = () => {
                     </View>
                 )}
 
-                {/* ── COUNT LINE ── */}
+                {/* â”€â”€ COUNT LINE â”€â”€ */}
                 <Text style={[s.countLine, isMobileScreen && { paddingHorizontal: 16 }]}>
                     <Text style={{ color: T.orange, fontWeight: "700" }}>{filtered.length}</Text>
                     {" "}of {jobs.length} positions
                 </Text>
 
-                {/* ── JOB CARDS ── */}
+                {/* â”€â”€ JOB CARDS â”€â”€ */}
                 {loading ? (
                     <View style={s.empty}>
-                        <Text style={s.emptyTitle}>Loading job openings…</Text>
+                        <Text style={s.emptyTitle}>Loading job openingsâ€¦</Text>
                     </View>
                 ) : error ? (
                     <View style={s.empty}>
@@ -1850,7 +1850,7 @@ const JobOpeningsScreen: React.FC = () => {
                     </View>
                 )}
 
-                {/* ── PAGINATION CONTROLS ── */}
+                {/* â”€â”€ PAGINATION CONTROLS â”€â”€ */}
                 {filtered.length > 0 && (
                     <View style={isMobileScreen ? { paddingHorizontal: 16 } : {}}>
                         <Pagination
@@ -1867,7 +1867,7 @@ const JobOpeningsScreen: React.FC = () => {
 
 
 
-            {/* ── EDIT MODAL ── */}
+            {/* â”€â”€ EDIT MODAL â”€â”€ */}
             <EditJobModal
                 visible={editModalVisible}
                 job={editingJob}
@@ -1876,7 +1876,7 @@ const JobOpeningsScreen: React.FC = () => {
                 onSave={handleSave}
             />
 
-            {/* ── CONFIRM MODAL ── */}
+            {/* â”€â”€ CONFIRM MODAL â”€â”€ */}
             <ConfirmModal
                 visible={!!deleteTarget}
                 job={deleteTarget}
@@ -1892,7 +1892,7 @@ const JobOpeningsScreen: React.FC = () => {
 
 export default JobOpeningsScreen;
 
-// ─── MAIN STYLES ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const s = StyleSheet.create({
     safe: {
         flex: 1,

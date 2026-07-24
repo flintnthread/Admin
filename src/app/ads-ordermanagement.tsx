@@ -1,7 +1,7 @@
 /**
  * AdsOrderManagementScreen.tsx
  * ----------------------------------------------------------------
- * Ads Order Management — redesigned to match ads-payments.tsx
+ * Ads Order Management â€” redesigned to match ads-payments.tsx
  * design system and layout patterns exactly.
  *
  * Changes vs. old version:
@@ -12,10 +12,10 @@
  *   - List view: table on tablet/desktop, card list on phone
  *   - Grid view: card grid on all breakpoints
  *   - Two action buttons per row/card:
- *       • Eye (View Order) -> /order-details
- *       • Receipt (Payments) -> /ads-payments (filtered by customer)
+ *       â€¢ Eye (View Order) -> /order-details
+ *       â€¢ Receipt (Payments) -> /ads-payments (filtered by customer)
  *   - No fontFamily references anywhere
- *   - No colored card borders — shadows only
+ *   - No colored card borders â€” shadows only
  *
  * Breakpoints (measured container width):
  *   phone   : width < 640
@@ -47,7 +47,7 @@ import {
 } from "@/services/adsApi";
 
 /* ------------------------------------------------------------------ */
-/* Design tokens — same as ads-payments.tsx                             */
+/* Design tokens â€” same as ads-payments.tsx                             */
 /* ------------------------------------------------------------------ */
 const COLORS = {
   surface: "#FFFFFF",
@@ -71,7 +71,7 @@ const COLORS = {
   avatarPalette: ["#ef7b1a", "#1C2B4A", "#10B981", "#8B5CF6", "#F59E0B", "#3B82F6"],
 };
 
-const fmtINR = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+const fmtINR = (n: number) => "â‚¹" + Math.round(n).toLocaleString("en-IN");
 
 /* ------------------------------------------------------------------ */
 /* Types + mock data                                                    */
@@ -115,9 +115,9 @@ function mapOrderRow(row: AdsApiRow): Order {
   return {
     id: String(row.orderId ?? row.id ?? ""),
     internalId: Number(row.id ?? 0),
-    customerName: String(row.customerName ?? "—"),
+    customerName: String(row.customerName ?? "â€”"),
     customerEmail: String(row.customerEmail ?? ""),
-    adTitle: String(row.adName ?? "—"),
+    adTitle: String(row.adName ?? "â€”"),
     adType: mapAdType(row.adType),
     billingType,
     dailyAmt: billingType === "Daily" ? dailyRate : undefined,
@@ -361,11 +361,11 @@ function ListIconGlyph({
 }
 
 /* ------------------------------------------------------------------ */
-/* Header — matches ads-payments.tsx style                              */
+/* Header â€” matches ads-payments.tsx style                              */
 /* ------------------------------------------------------------------ */
 function ScreenHeader() {
   return (
-    <View style={[styles.header, { paddingBottom: 56, paddingTop: 24 }]}>
+    <View style={[styles.header, { paddingBottom: 48, paddingTop: 16 }]}>
       <View
         style={{
           flexDirection: "row",
@@ -376,8 +376,8 @@ function ScreenHeader() {
       >
         <View
           style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             backgroundColor: COLORS.orange,
             borderRadius: 12,
             alignItems: "center",
@@ -523,7 +523,7 @@ function ActionButtons({
 }
 
 /* ------------------------------------------------------------------ */
-/* Filter bar — same pattern as ads-payments.tsx                        */
+/* Filter bar â€” same pattern as ads-payments.tsx                        */
 /* ------------------------------------------------------------------ */
 type StatusFilter = "all" | "paid" | "pending";
 type BillingFilter = "all" | "Daily" | "Monthly";
@@ -821,7 +821,7 @@ function FilterBar({
 }
 
 /* ------------------------------------------------------------------ */
-/* Table view — tablet/desktop list                                     */
+/* Table view â€” tablet/desktop list                                     */
 /* ------------------------------------------------------------------ */
 function OrdersTable({
   orders,
@@ -914,7 +914,7 @@ function OrdersTable({
 }
 
 /* ------------------------------------------------------------------ */
-/* Phone list card — used on mobile in list view                        */
+/* Phone list card â€” used on mobile in list view                        */
 /* ------------------------------------------------------------------ */
 function OrderListCard({
   order,
@@ -998,7 +998,7 @@ function OrderListCard({
 }
 
 /* ------------------------------------------------------------------ */
-/* Grid view — cards on all breakpoints                                 */
+/* Grid view â€” cards on all breakpoints                                 */
 /* ------------------------------------------------------------------ */
 function OrderGridCard({
   order,
@@ -1220,7 +1220,7 @@ export default function AdsOrderManagementScreen() {
 
           {/* Stat cards */}
           {bp === "phone" ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: -32, zIndex: 10 }} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingRight: 32 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: -48, zIndex: 10 }} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingRight: 32 }}>
               <StatCard
                 icon={<OrderGlyph color={COLORS.navyDeep} size={17} />}
                 label="TOTAL ORDERS"
@@ -1251,7 +1251,7 @@ export default function AdsOrderManagementScreen() {
               />
             </ScrollView>
           ) : (
-            <View style={[styles.statsRow, { marginTop: -32, paddingHorizontal: 16, zIndex: 10 }]}>
+            <View style={[styles.statsRow, { marginTop: -48, paddingHorizontal: 16, zIndex: 10 }]}>
               <StatCard
                 icon={<OrderGlyph color={COLORS.navyDeep} size={17} />}
                 label="TOTAL ORDERS"
@@ -1302,7 +1302,7 @@ export default function AdsOrderManagementScreen() {
           <View style={{ marginTop: 8, zIndex: 1 }}>
             {loading ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Loading orders…</Text>
+                <Text style={styles.emptyTitle}>Loading ordersâ€¦</Text>
               </View>
             ) : error ? (
               <View style={styles.emptyState}>
@@ -1365,7 +1365,7 @@ export default function AdsOrderManagementScreen() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Styles — no fontFamily, no colored borders, shadows only            */
+/* Styles â€” no fontFamily, no colored borders, shadows only            */
 /* ------------------------------------------------------------------ */
 const styles = StyleSheet.create({
   /* header */
@@ -1495,7 +1495,7 @@ const styles = StyleSheet.create({
   dropdownOptionTextActive: { fontWeight: "700", color: COLORS.navyDeep },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
 
-  /* view toggle — two separate boxed icon buttons */
+  /* view toggle â€” two separate boxed icon buttons */
   viewToggleGroup: {
     flexDirection: "row",
     alignItems: "center",

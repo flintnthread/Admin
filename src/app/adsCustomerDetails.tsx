@@ -104,7 +104,7 @@ export default function AdsCustomerDetailsPage() {
       const orderPage = await fetchAdsOrders({
         userId: customerId,
         page: 0,
-        size: 50,
+        size: 1000,
       });
       setOrders(orderPage.items ?? []);
     } catch (e) {
@@ -199,7 +199,7 @@ export default function AdsCustomerDetailsPage() {
             <TouchableOpacity
               style={styles.viewAllBtn}
               onPress={() => router.push({
-                pathname: '/ads-ordermanagement' as any,
+                pathname: '/order-details' as any,
                 params: { customerEmail: customer.email, customerName: customer.name },
               })}
             >
