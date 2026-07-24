@@ -348,13 +348,16 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
   const price = Number(item.price ?? 0);
   const productName = resolveItemProductName(item);
   const imageUrl = resolveItemImageUrl(item);
+<<<<<<< HEAD
   const color = item.color?.trim() || "";
   const size = item.size?.trim() || "";
+=======
   const raw = item as Record<string, unknown>;
   const productIdRaw = item.productId ?? raw.product_id ?? raw.productID;
   const productIdNum = Number(productIdRaw);
   const productId =
     Number.isFinite(productIdNum) && productIdNum > 0 ? productIdNum : undefined;
+>>>>>>> f99aabc1e9b12d0241655f1e2f7c008635424968
 
   return {
     id: item.id,
