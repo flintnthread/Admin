@@ -350,7 +350,7 @@ export default function AdminSidebar({
       >
         {!collapsed && (
           <Image
-            source={require("../../assets/images/logo.jpg")}
+            source={require("../../assets/images/logo.png")}
             style={styles.logo}
             resizeMode="contain"
           />

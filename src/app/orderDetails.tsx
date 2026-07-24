@@ -30,7 +30,15 @@ import {
 } from "react-native";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { resolveMediaUrl } from "@/lib/api/media";
-import { fetchOrderDetail, updateOrderStatus } from "@/services/orderApi";
+import { sweetConfirm, sweetError, sweetSuccess } from "@/lib/sweetAlert";
+import {
+  downloadOrderInvoicePdf,
+  downloadOrderShippingLabelPdf,
+  fetchOrderDetail,
+  pushOrderToShiprocket,
+  syncOrderFromShiprocket,
+  updateOrderStatus,
+} from "@/services/orderApi";
 
 import Svg, { Circle, Path } from "react-native-svg";
 
@@ -159,7 +167,17 @@ type ShiprocketInfo = {
   courier?: string;
   status?: string;
   synced?: string;
+  pushed?: string;
   url?: string;
+  shipmentId?: string;
+  orderId?: string;
+  pickupStatus?: string;
+  trackingStatus?: string;
+  labelUrl?: string;
+  invoiceUrl?: string;
+  manifestUrl?: string;
+  dashboardUrl?: string;
+  alreadyPushed?: boolean;
 };
 
 type UIOrder = {
@@ -230,6 +248,12 @@ type OrderDetail = Record<string, unknown> & {
   shiprocketCourierName?: string;
   shiprocketPushedAt?: string;
   shiprocketSyncedAt?: string;
+  shiprocketOrderId?: string;
+  shiprocketShipmentId?: string;
+  shiprocketLabelUrl?: string;
+  shiprocketInvoiceUrl?: string;
+  shiprocketManifestUrl?: string;
+  shiprocketDashboardUrl?: string;
   items?: ApiOrderItem[];
   statusHistory?: Array<{
     id?: number;
@@ -469,22 +493,58 @@ function resolveShiprocketData(detail?: OrderDetail) {
 
   const status = resolveStringValue(detail?.shiprocketStatus)
     ?? resolveStringValue(shiprocketObject?.status)
+    ?? resolveStringValue(shiprocketObject?.shippingStatus)
     ?? resolveStringValue(shipmentObject?.status)
     ?? resolveStringValue(trackingObject?.status);
 
   const syncedAt = resolveStringValue(detail?.shiprocketSyncedAt)
-    ?? resolveStringValue(detail?.shiprocketPushedAt)
     ?? resolveStringValue(shiprocketObject?.syncedAt)
-    ?? resolveStringValue(shiprocketObject?.updatedAt)
     ?? resolveStringValue(shipmentObject?.syncedAt)
     ?? resolveStringValue(trackingObject?.updatedAt);
+
+  const pushedAt = resolveStringValue(detail?.shiprocketPushedAt)
+    ?? resolveStringValue(shiprocketObject?.pushedAt);
+
+  const shipmentId = resolveStringValue(detail?.shiprocketShipmentId)
+    ?? resolveStringValue(shiprocketObject?.shipmentId);
+
+  const srOrderId = resolveStringValue(detail?.shiprocketOrderId)
+    ?? resolveStringValue(shiprocketObject?.orderId);
+
+  const pickupStatus = resolveStringValue(shiprocketObject?.pickupStatus);
+  const trackingStatus = resolveStringValue(shiprocketObject?.trackingStatus) ?? status;
+
+  const labelUrl = resolveStringValue(detail?.shiprocketLabelUrl)
+    ?? resolveStringValue(shiprocketObject?.labelUrl);
+  const invoiceUrl = resolveStringValue(detail?.shiprocketInvoiceUrl)
+    ?? resolveStringValue(shiprocketObject?.invoiceUrl);
+  const manifestUrl = resolveStringValue(detail?.shiprocketManifestUrl)
+    ?? resolveStringValue(shiprocketObject?.manifestUrl);
+  const dashboardUrl = resolveStringValue(detail?.shiprocketDashboardUrl)
+    ?? resolveStringValue(shiprocketObject?.dashboardUrl)
+    ?? "https://app.shiprocket.in/seller/home";
+
+  const alreadyPushed = Boolean(
+    srOrderId
+    || shiprocketObject?.alreadyPushed === true
+  );
 
   return {
     awb: awb || "—",
     courier: courier || "—",
     status: status || "—",
     synced: formatDateTimeWithTime(syncedAt),
+    pushed: formatDateTimeWithTime(pushedAt),
     url: trackingUrl,
+    shipmentId: shipmentId || "—",
+    orderId: srOrderId || "—",
+    pickupStatus: pickupStatus || "—",
+    trackingStatus: trackingStatus || "—",
+    labelUrl,
+    invoiceUrl,
+    manifestUrl,
+    dashboardUrl,
+    alreadyPushed,
   };
 }
 
@@ -601,7 +661,17 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
       courier: shiprocket.courier,
       status: shiprocket.status,
       synced: shiprocket.synced,
+      pushed: shiprocket.pushed,
       url: shiprocket.url,
+      shipmentId: shiprocket.shipmentId,
+      orderId: shiprocket.orderId,
+      pickupStatus: shiprocket.pickupStatus,
+      trackingStatus: shiprocket.trackingStatus,
+      labelUrl: shiprocket.labelUrl,
+      invoiceUrl: shiprocket.invoiceUrl,
+      manifestUrl: shiprocket.manifestUrl,
+      dashboardUrl: shiprocket.dashboardUrl,
+      alreadyPushed: shiprocket.alreadyPushed,
     },
     tracking: buildTrackingTimeline(history, detail),
     items,
@@ -629,7 +699,20 @@ const INITIAL_ORDER: UIOrder = {
   customer: { name: "—", email: "", phone: "", notes: "" },
   billing: { line1: "", line2: "", city: "", state: "", pincode: "", country: "India" },
   shipping: { line1: "", line2: "", city: "", state: "", pincode: "", country: "India" },
-  shiprocket: { awb: "", courier: "—", status: "—", synced: "—", url: "" },
+  shiprocket: {
+    awb: "",
+    courier: "—",
+    status: "—",
+    synced: "—",
+    pushed: "—",
+    url: "",
+    shipmentId: "—",
+    orderId: "—",
+    pickupStatus: "—",
+    trackingStatus: "—",
+    dashboardUrl: "https://app.shiprocket.in/seller/home",
+    alreadyPushed: false,
+  },
   tracking: [],
   items: [],
   subtotal: 0,
@@ -1144,6 +1227,7 @@ export default function OrderDetailScreen() {
   const [notifyCustomer, setNotifyCustomer] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [trackingExpanded, setTrackingExpanded] = useState(false);
   const px = isMobile ? 14 : isTablet ? 20 : 28;
@@ -1221,7 +1305,10 @@ export default function OrderDetailScreen() {
   );
 
   const handleSync = useCallback(async () => {
-    if (syncing) return;
+    if (syncing || pushing || !orderId) return;
+    const id = Number(orderId);
+    if (Number.isNaN(id)) return;
+
     setSyncing(true);
     Animated.loop(
       Animated.timing(syncSpinAnim, {
@@ -1233,18 +1320,121 @@ export default function OrderDetailScreen() {
     ).start();
 
     try {
-      await loadOrder(false);
+      const result = await syncOrderFromShiprocket(id);
+      if (result.order) {
+        const uiOrder = mapApiOrderToUi(result.order as OrderDetail, sellerName, productIds);
+        setOrder(uiOrder);
+        setStatus(uiOrder.status);
+      } else {
+        await loadOrder(false);
+      }
+      await sweetSuccess("Synced", typeof result.message === "string" ? result.message : "Shipment details refreshed from Shiprocket.");
+    } catch (err) {
+      await sweetError("Shiprocket Sync Failed", getApiErrorMessage(err));
     } finally {
       syncSpinAnim.stopAnimation();
       syncSpinAnim.setValue(0);
       setSyncing(false);
     }
-  }, [loadOrder, syncing, syncSpinAnim]);
+  }, [loadOrder, orderId, productIds, pushing, sellerName, syncing, syncSpinAnim]);
 
-  const spin = syncSpinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
+  const handlePushToShiprocket = useCallback(async () => {
+    if (pushing || syncing || !orderId) return;
+    const id = Number(orderId);
+    if (Number.isNaN(id)) return;
+
+    const alreadyLinked = Boolean(order.shiprocket.alreadyPushed && order.shiprocket.awb && order.shiprocket.awb !== "—");
+    const confirmed = await sweetConfirm({
+      title: alreadyLinked ? "Shipment Already Exists" : "Push to Shiprocket",
+      text: alreadyLinked
+        ? "This order already has an AWB. Sync instead to refresh details?"
+        : "Create shipment, assign AWB/courier, and generate label documents in Shiprocket?",
+      confirmText: alreadyLinked ? "Sync Now" : "Push",
+      cancelText: "Cancel",
+    });
+    if (!confirmed) return;
+
+    if (alreadyLinked) {
+      await handleSync();
+      return;
+    }
+
+    setPushing(true);
+    try {
+      const result = await pushOrderToShiprocket(id);
+      if (result.order) {
+        const uiOrder = mapApiOrderToUi(result.order as OrderDetail, sellerName, productIds);
+        setOrder(uiOrder);
+        setStatus(uiOrder.status);
+      } else {
+        await loadOrder(false);
+      }
+      const msg = typeof result.message === "string"
+        ? result.message
+        : "Shipment created on Shiprocket.";
+      await sweetSuccess(result.alreadyExists ? "Already Pushed" : "Pushed to Shiprocket", msg);
+    } catch (err) {
+      await sweetError("Shiprocket Push Failed", getApiErrorMessage(err));
+      await loadOrder(false);
+    } finally {
+      setPushing(false);
+    }
+  }, [handleSync, loadOrder, order.shiprocket.alreadyPushed, order.shiprocket.awb, orderId, productIds, pushing, sellerName, syncing]);
+
+  const openUrl = useCallback(async (url?: string) => {
+    if (!url) return;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      await sweetError("Unable to Open", "Could not open the link.");
+    }
+  }, []);
+
+  const handleOpenShiprocket = useCallback(async () => {
+    const base = order.shiprocket.dashboardUrl || "https://app.shiprocket.in/seller/home";
+    await openUrl(base);
+  }, [openUrl, order.shiprocket.dashboardUrl]);
+
+  const handleDownloadShiprocketDoc = useCallback(async (
+    kind: "label" | "invoice" | "manifest"
+  ) => {
+    if (!orderId) return;
+    const id = Number(orderId);
+    if (Number.isNaN(id)) return;
+
+    const remoteUrl =
+      kind === "label" ? order.shiprocket.labelUrl
+        : kind === "invoice" ? order.shiprocket.invoiceUrl
+          : order.shiprocket.manifestUrl;
+
+    if (remoteUrl) {
+      await openUrl(remoteUrl);
+      return;
+    }
+
+    try {
+      if (kind === "label") {
+        await downloadOrderShippingLabelPdf(id);
+        await sweetSuccess("Downloaded", "Shipping label PDF downloaded.");
+        return;
+      }
+      if (kind === "invoice") {
+        await downloadOrderInvoicePdf(id);
+        await sweetSuccess("Downloaded", "Invoice PDF downloaded.");
+        return;
+      }
+      await sweetInfoOrOpenManifest();
+    } catch (err) {
+      await sweetError("Download Failed", getApiErrorMessage(err));
+    }
+
+    async function sweetInfoOrOpenManifest() {
+      await sweetError(
+        "Manifest Not Available",
+        "Manifest URL is not available yet. Push/Sync the order or open Shiprocket to generate the manifest."
+      );
+    }
+  }, [openUrl, order.shiprocket.invoiceUrl, order.shiprocket.labelUrl, order.shiprocket.manifestUrl, orderId]);
 
   return (
     <AdminLayout>
@@ -1384,27 +1574,67 @@ export default function OrderDetailScreen() {
 
                   {/* ShipRocket Information */}
                   <Card style={(!isMobile) ? s.col6 : s.col12}>
-                <CardHeader icon={<ShiprocketIcon size={16} color={C.purple} />} title="ShipRocket Information" 
+                <CardHeader icon={<ShiprocketIcon size={16} color={C.purple} />} title="ShipRocket Information"
                   right={
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={handleSync}>
-                      <Text style={s.smBtnTxt}>Sync Now</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <TouchableOpacity
+                        style={[s.smBtn, { backgroundColor: C.primary }]}
+                        onPress={handlePushToShiprocket}
+                        disabled={pushing || syncing}
+                      >
+                        {pushing ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={s.smBtnTxt}>Push to Shiprocket</Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[s.smBtn, { backgroundColor: C.navy }]}
+                        onPress={handleSync}
+                        disabled={syncing || pushing}
+                      >
+                        {syncing ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={s.smBtnTxt}>Sync Now</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   }
                 />
                 <View style={s.cardBodyCompact}>
+                  <InfoRow label="Shiprocket Order ID" value={order.shiprocket.orderId} />
+                  <InfoRow label="Shipment ID" value={order.shiprocket.shipmentId} />
                   <InfoRow label="AWB / Tracking #" value={order.shiprocket.awb !== "—" ? order.shiprocket.awb : "Shiprocket pending"} />
                   <InfoRow label="Courier Partner" value={order.shiprocket.courier} />
-                  <InfoRow label="Shipment Status" value={
+                  <InfoRow label="Shipping Status" value={
                     <View style={[s.badge, { backgroundColor: C.blueLight }]}>
                       <Text style={[s.badgeTxt, { color: C.blue }]}>{order.shiprocket.status}</Text>
                     </View>
                   } />
-                  <InfoRow label="Last Synced" value={order.shiprocket.synced} />
+                  <InfoRow label="Pickup Status" value={order.shiprocket.pickupStatus || "—"} />
+                  <InfoRow label="Tracking Status" value={order.shiprocket.trackingStatus || "—"} />
+                  <InfoRow label="Push Date & Time" value={order.shiprocket.pushed || "—"} />
+                  <InfoRow label="Last Sync Time" value={order.shiprocket.synced} />
                   {order.shiprocket.url ? (
-                    <TouchableOpacity style={[s.trackBtn, { marginTop: 8 }]} onPress={() => { if (order.shiprocket.url) Linking.openURL(order.shiprocket.url); }}>
-                      <Text style={s.trackBtnTxt}>Track on ShipRocket</Text>
+                    <TouchableOpacity style={[s.trackBtn, { marginTop: 8 }]} onPress={() => openUrl(order.shiprocket.url)}>
+                      <Text style={s.trackBtnTxt}>Open Tracking URL</Text>
                     </TouchableOpacity>
                   ) : null}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("label")}>
+                      <Text style={s.smBtnTxt}>Shipping Label</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("invoice")}>
+                      <Text style={s.smBtnTxt}>Invoice</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("manifest")}>
+                      <Text style={s.smBtnTxt}>Manifest</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.smBtn, { backgroundColor: "#0F766E" }]} onPress={handleOpenShiprocket}>
+                      <Text style={s.smBtnTxt}>Open in Shiprocket</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </Card>
             </View>

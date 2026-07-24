@@ -104,7 +104,7 @@ function MobileLoginScreen() {
             {/* Logo Section */}
             <View style={stylesMobile.logoContainer}>
               <Image
-                source={require("../../assets/images/logo.jpg")}
+                source={require("../../assets/images/logo.png")}
                 style={stylesMobile.logo}
                 resizeMode="contain"
               />
@@ -360,7 +360,7 @@ function WebLoginScreen() {
               {/* Top Logo Section */}
               <View style={stylesWeb.webLogoContainer}>
                 <Image
-                  source={require("../../assets/images/logo.jpg")}
+                  source={require("../../assets/images/logo.png")}
                   style={stylesWeb.webLogo}
                   resizeMode="contain"
                 />
