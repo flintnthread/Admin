@@ -173,9 +173,6 @@ type ShiprocketInfo = {
   orderId?: string;
   pickupStatus?: string;
   trackingStatus?: string;
-  labelUrl?: string;
-  invoiceUrl?: string;
-  manifestUrl?: string;
   dashboardUrl?: string;
   alreadyPushed?: boolean;
 };
@@ -250,9 +247,6 @@ type OrderDetail = Record<string, unknown> & {
   shiprocketSyncedAt?: string;
   shiprocketOrderId?: string;
   shiprocketShipmentId?: string;
-  shiprocketLabelUrl?: string;
-  shiprocketInvoiceUrl?: string;
-  shiprocketManifestUrl?: string;
   shiprocketDashboardUrl?: string;
   items?: ApiOrderItem[];
   statusHistory?: Array<{
@@ -514,12 +508,6 @@ function resolveShiprocketData(detail?: OrderDetail) {
   const pickupStatus = resolveStringValue(shiprocketObject?.pickupStatus);
   const trackingStatus = resolveStringValue(shiprocketObject?.trackingStatus) ?? status;
 
-  const labelUrl = resolveStringValue(detail?.shiprocketLabelUrl)
-    ?? resolveStringValue(shiprocketObject?.labelUrl);
-  const invoiceUrl = resolveStringValue(detail?.shiprocketInvoiceUrl)
-    ?? resolveStringValue(shiprocketObject?.invoiceUrl);
-  const manifestUrl = resolveStringValue(detail?.shiprocketManifestUrl)
-    ?? resolveStringValue(shiprocketObject?.manifestUrl);
   const dashboardUrl = resolveStringValue(detail?.shiprocketDashboardUrl)
     ?? resolveStringValue(shiprocketObject?.dashboardUrl)
     ?? "https://app.shiprocket.in/seller/home";
@@ -540,9 +528,6 @@ function resolveShiprocketData(detail?: OrderDetail) {
     orderId: srOrderId || "—",
     pickupStatus: pickupStatus || "—",
     trackingStatus: trackingStatus || "—",
-    labelUrl,
-    invoiceUrl,
-    manifestUrl,
     dashboardUrl,
     alreadyPushed,
   };
@@ -667,9 +652,6 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
       orderId: shiprocket.orderId,
       pickupStatus: shiprocket.pickupStatus,
       trackingStatus: shiprocket.trackingStatus,
-      labelUrl: shiprocket.labelUrl,
-      invoiceUrl: shiprocket.invoiceUrl,
-      manifestUrl: shiprocket.manifestUrl,
       dashboardUrl: shiprocket.dashboardUrl,
       alreadyPushed: shiprocket.alreadyPushed,
     },
@@ -1402,16 +1384,6 @@ export default function OrderDetailScreen() {
     const id = Number(orderId);
     if (Number.isNaN(id)) return;
 
-    const remoteUrl =
-      kind === "label" ? order.shiprocket.labelUrl
-        : kind === "invoice" ? order.shiprocket.invoiceUrl
-          : order.shiprocket.manifestUrl;
-
-    if (remoteUrl) {
-      await openUrl(remoteUrl);
-      return;
-    }
-
     try {
       if (kind === "label") {
         await downloadOrderShippingLabelPdf(id);
@@ -1423,18 +1395,14 @@ export default function OrderDetailScreen() {
         await sweetSuccess("Downloaded", "Invoice PDF downloaded.");
         return;
       }
-      await sweetInfoOrOpenManifest();
+      await sweetError(
+        "Manifest Not Available",
+        "Manifest is managed in Shiprocket. Use Open in Shiprocket to generate or download it."
+      );
     } catch (err) {
       await sweetError("Download Failed", getApiErrorMessage(err));
     }
-
-    async function sweetInfoOrOpenManifest() {
-      await sweetError(
-        "Manifest Not Available",
-        "Manifest URL is not available yet. Push/Sync the order or open Shiprocket to generate the manifest."
-      );
-    }
-  }, [openUrl, order.shiprocket.invoiceUrl, order.shiprocket.labelUrl, order.shiprocket.manifestUrl, orderId]);
+  }, [orderId]);
 
   return (
     <AdminLayout>
