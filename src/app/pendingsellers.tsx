@@ -10,6 +10,7 @@ import {
   type PendingProfileSeller,
 } from "@/services/sellerApi";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -30,6 +31,7 @@ const MUTED = "#69798c";
 const BORDER = "#e5e7eb";
 
 export default function PendingSellersScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
   const isMobile = width < 768;
@@ -45,6 +47,13 @@ export default function PendingSellersScreen() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
+
+  const openSellerView = useCallback((seller: PendingProfileSeller) => {
+    router.push({
+      pathname: "/Viewseller",
+      params: { sellerId: String(seller.sellerId) },
+    });
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -185,13 +194,13 @@ export default function PendingSellersScreen() {
         ) : isWide ? (
           isLaptop ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }}>
-              <View style={[styles.table, { minWidth: 900 }]}>
+              <View style={[styles.table, { minWidth: 980 }]}>
                 <View style={styles.tableHead}>
                   <Text style={[styles.th, { flex: 2 }]}>Seller</Text>
                   <Text style={[styles.th, { flex: 1.2 }]}>Mobile</Text>
                   <Text style={[styles.th, { flex: 1 }]}>Status</Text>
                   <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
-                  <Text style={[styles.th, { flex: 1.5 }]}>Actions</Text>
+                  <Text style={[styles.th, { flex: 2.2 }]}>Actions</Text>
                 </View>
                 {filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
                   <View key={s.sellerId} style={styles.tableRow}>
@@ -207,7 +216,10 @@ export default function PendingSellersScreen() {
                     <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>
                     <Text style={[styles.td, { flex: 1 }]}>{s.status}</Text>
                     <Text style={[styles.td, { flex: 1.2 }]}>{formatDateTime(s.profileUpdatedAt)}</Text>
-                    <View style={[styles.actions, { flex: 1.5 }]}>
+                    <View style={[styles.actions, { flex: 2.2 }]}>
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => openSellerView(s)}>
+                        <Text style={styles.viewText}>View</Text>
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.approveBtn}
                         disabled={actionId === s.sellerId}
@@ -237,7 +249,7 @@ export default function PendingSellersScreen() {
                 <Text style={[styles.th, { flex: 1.2 }]}>Mobile</Text>
                 <Text style={[styles.th, { flex: 1 }]}>Status</Text>
                 <Text style={[styles.th, { flex: 1.2 }]}>Submitted</Text>
-                <Text style={[styles.th, { flex: 1.5 }]}>Actions</Text>
+                <Text style={[styles.th, { flex: 2.2 }]}>Actions</Text>
               </View>
               {filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((s) => (
                 <View key={s.sellerId} style={styles.tableRow}>
@@ -253,7 +265,10 @@ export default function PendingSellersScreen() {
                   <Text style={[styles.td, { flex: 1.2 }]}>{s.mobile ?? "—"}</Text>
                   <Text style={[styles.td, { flex: 1 }]}>{s.status}</Text>
                   <Text style={[styles.td, { flex: 1.2 }]}>{formatDateTime(s.profileUpdatedAt)}</Text>
-                  <View style={[styles.actions, { flex: 1.5 }]}>
+                  <View style={[styles.actions, { flex: 2.2 }]}>
+                    <TouchableOpacity style={styles.viewBtn} onPress={() => openSellerView(s)}>
+                      <Text style={styles.viewText}>View</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.approveBtn}
                       disabled={actionId === s.sellerId}
@@ -291,6 +306,12 @@ export default function PendingSellersScreen() {
               </View>
               <Text style={styles.muted}>Submitted: {formatDateTime(s.profileUpdatedAt)}</Text>
               <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.viewBtn, { flex: 1 }]}
+                  onPress={() => openSellerView(s)}
+                >
+                  <Text style={styles.viewText}>View</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.approveBtn, { flex: 1 }]}
                   disabled={actionId === s.sellerId}
@@ -451,7 +472,17 @@ const styles = StyleSheet.create({
   avatarText: { color: ORANGE, fontWeight: "800", fontSize: 14 },
   name: { fontSize: 15, fontWeight: "700", color: NAVY },
   email: { fontSize: 12, color: MUTED },
-  actions: { flexDirection: "row", gap: 8 },
+  actions: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  viewBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#93c5fd",
+    alignItems: "center",
+  },
+  viewText: { color: "#1d4ed8", fontWeight: "700", fontSize: 12 },
   approveBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
