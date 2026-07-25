@@ -129,6 +129,8 @@ export type OrderSellerPreview = {
 };
 
 export type OrderSellerGroupPreview = {
+  subOrderId?: string | number;
+  trackingId?: string;
   seller?: {
     name?: string;
     email?: string;
@@ -349,8 +351,17 @@ export type JobApplication = {
   name?: string;
   email?: string;
   phone?: string;
+  location?: string;
+  experienceYears?: number;
+  currentCompany?: string;
+  currentDesignation?: string;
+  expectedSalary?: string;
+  noticePeriod?: string;
   resumePath?: string;
   coverLetter?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  adminNotes?: string;
   status?: string;
   appliedAt?: string;
 };

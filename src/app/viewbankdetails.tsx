@@ -244,6 +244,7 @@ export default function BankApprovalHistory() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sellerId?: string }>();
   const sellerId = Number(params.sellerId);
+  const { width } = useWindowDimensions();
   const bp = useBreakpoint();
   const isMobile = bp === "mobile";
   const isDesktopWide = bp === "laptop" || bp === "desktop";
@@ -314,7 +315,7 @@ export default function BankApprovalHistory() {
   };
 
   const contentMaxWidth =
-    bp === "desktop" ? 1200 : bp === "laptop" ? 960 : bp === "tablet" ? 700 : "100%";
+    width >= 1200 ? "100%" : (bp === "desktop" ? 1200 : bp === "laptop" ? 960 : bp === "tablet" ? 700 : "100%");
 
   return (
     <AdminLayout>
@@ -432,7 +433,7 @@ export default function BankApprovalHistory() {
                     setRejectModalVisible(true);
                   }}
                 />
-                
+
                 {error ? (
                   <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
                     <Text style={{ color: "#DC2626", marginBottom: 8 }}>{error}</Text>
@@ -444,7 +445,7 @@ export default function BankApprovalHistory() {
 
                 <View style={{ height: 1, backgroundColor: "#E5E7EB", marginHorizontal: 20, marginVertical: 12 }} />
                 <CurrentBankDetails data={data} isMobile={true} />
-                
+
                 <View style={{ height: 1, backgroundColor: "#E5E7EB", marginHorizontal: 20, marginVertical: 8 }} />
                 <HistoryTimeline compact={true} data={data} isMobile={true} />
               </View>

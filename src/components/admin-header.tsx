@@ -6,14 +6,46 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   Modal,
+
+  Platform,
+  useWindowDimensions,
+
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useThemeContext } from "@/context/theme-context";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/context/auth-context";
+import { NAV_ITEMS } from "./admin-sidebar";
+import { usePayoutRequestAlerts } from "@/hooks/usePayoutRequestAlerts";
+import { unlockAlertAudio } from "@/lib/playAlertBeep";
+
+// Flatten NAV_ITEMS to get a searchable list of routes
+const searchableRoutes: { label: string; path: string; icon?: string }[] = [];
+Object.values(NAV_ITEMS).forEach((section: any) => {
+  if (Array.isArray(section)) {
+    section.forEach((item: any) => {
+      if (item.path) searchableRoutes.push({ label: item.label, path: item.path, icon: item.icon });
+      if (item.children) {
+        item.children.forEach((child: any) => {
+          if (child.path) searchableRoutes.push({ label: child.label, path: child.path, icon: child.icon });
+        });
+      }
+    });
+  } else if (section && typeof section === 'object') {
+    if (section.children) {
+      section.children.forEach((child: any) => {
+        if (child.path) searchableRoutes.push({ label: child.label, path: child.path, icon: child.icon });
+      });
+    }
+    if (section.standalone) {
+      section.standalone.forEach((child: any) => {
+        if (child.path) searchableRoutes.push({ label: child.label, path: child.path, icon: child.icon });
+      });
+    }
+  }
+});
 
 type Props = {
   /** Called when the hamburger icon is tapped (mobile only) */
@@ -26,7 +58,9 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   const { theme, toggleTheme } = useThemeContext();
   const colors = useTheme();
   const isDark = theme === "dark";
-  const { user, signOut } = useAuth();
+  const { user, signOut, token } = useAuth();
+  const router = useRouter();
+  const { notifications: payoutNotifications, pendingCount } = usePayoutRequestAlerts(!!token);
 
   // Dropdown states
   const [notifOpen, setNotifOpen] = useState(false);
@@ -38,17 +72,15 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
 
-  // Notifications state
-  const [notifications, setNotifications] = useState([
-    { id: "1", text: "New seller request pending approval", time: "5 mins ago" },
-    { id: "2", text: "Low stock alert: Silk Saree (only 3 left)", time: "1 hour ago" },
-    { id: "3", text: "New support ticket #1042 created", time: "2 hours ago" },
-  ]);
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const toggleNotif = () => {
-    setNotifOpen(!notifOpen);
+    unlockAlertAudio();
     setSettingsOpen(false);
     setProfileOpen(false);
+    setNotifOpen((v) => !v);
   };
 
   const toggleSettings = () => {
@@ -62,12 +94,6 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
     setNotifOpen(false);
     setSettingsOpen(false);
   };
-
-  const handleClearNotifications = () => {
-    setNotifications([]);
-  };
-
-  const router = useRouter();
 
   const handleProfileClick = () => {
     setProfileOpen(false);
@@ -85,9 +111,14 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
     router.replace("/login");
   };
 
+  const openRequestsTab = () => {
+    setNotifOpen(false);
+    router.push({ pathname: "/Sellerpayments", params: { tab: "requests" } } as any);
+  };
+
   return (
     <View style={[
-      styles.header, 
+      styles.header,
       { backgroundColor: colors.surface, borderBottomColor: colors.border }
     ]}>
       {/* Hamburger – shown on mobile only */}
@@ -98,13 +129,75 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
       )}
 
       {/* Search box */}
-      <View style={[styles.searchContainer, { backgroundColor: isDark ? "#2A2B2D" : "#F3F4F6" }]}>
+      <View style={[styles.searchContainer, { backgroundColor: isDark ? "#2A2B2D" : "#F3F4F6", position: 'relative', zIndex: 100 }]}>
         <Feather name="search" size={16} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search..."
+          placeholder="Search pages..."
           placeholderTextColor={colors.textSecondary}
+          value={searchQuery}
+          onChangeText={(text) => {
+            setSearchQuery(text);
+            setShowSearchResults(text.length > 0);
+          }}
+          onFocus={() => {
+            if (searchQuery.length > 0) setShowSearchResults(true);
+          }}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => { setSearchQuery(""); setShowSearchResults(false); }} style={{ padding: 4 }}>
+            <Feather name="x" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        {/* Search Results Dropdown */}
+        {showSearchResults && (
+          <View
+            style={[
+              styles.dropdownCard,
+              {
+                top: 45,
+                left: 0,
+                right: 0,
+                width: '100%',
+                maxHeight: 300,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                zIndex: 999,
+              },
+            ]}
+            {...(Platform.OS === "web"
+              ? ({ onMouseLeave: () => setShowSearchResults(false) } as object)
+              : {})}
+          >
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {(() => {
+                const results = searchableRoutes.filter(route => route.label.toLowerCase().includes(searchQuery.toLowerCase()));
+                if (results.length === 0) {
+                  return (
+                    <View style={{ padding: 16, alignItems: "center" }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No pages found</Text>
+                    </View>
+                  );
+                }
+                return results.map((item, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.dropdownOption, { borderBottomWidth: idx === results.length - 1 ? 0 : 1, borderBottomColor: colors.border }]}
+                    onPress={() => {
+                      setShowSearchResults(false);
+                      setSearchQuery("");
+                      router.push(item.path as any);
+                    }}
+                  >
+                    <Feather name={item.icon as any} size={14} color={colors.text} style={{ marginRight: 8 }} />
+                    <Text style={[styles.dropdownOptionText, { color: colors.text }]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ));
+              })()}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Right-hand actions */}
@@ -115,53 +208,143 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
         </TouchableOpacity>
 
         {/* Notifications */}
-        <TouchableOpacity onPress={toggleNotif} style={styles.actionBtn}>
-          <Feather name="bell" size={18} color={isDark ? "#FFFFFF" : "#374151"} />
-          {notifications.length > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{notifications.length}</Text>
+        <View style={{ position: "relative" }}>
+          <TouchableOpacity onPress={toggleNotif} style={styles.actionBtn}>
+            <Feather name="bell" size={18} color={isDark ? "#FFFFFF" : "#374151"} />
+            {pendingCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{pendingCount > 99 ? "99+" : pendingCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {notifOpen && (
+            <View
+              style={[
+                styles.dropdownCard,
+                {
+                  right: 0,
+                  width: 340,
+                  maxWidth: 360,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  zIndex: 1000,
+                },
+              ]}
+              {...(Platform.OS === "web"
+                ? ({ onMouseLeave: () => setNotifOpen(false) } as object)
+                : {})}
+            >
+              <View style={[styles.dropdownHeader, { borderBottomColor: colors.border, justifyContent: "space-between" }]}>
+                <Text style={[styles.dropdownTitle, { color: colors.text }]}>Payment Requests</Text>
+                {pendingCount > 0 && (
+                  <View style={[styles.notifBadge, { position: "relative", top: 0, right: 0 }]}>
+                    <Text style={styles.notifBadgeText}>{pendingCount}</Text>
+                  </View>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} keyboardShouldPersistTaps="handled">
+                {payoutNotifications.length === 0 ? (
+                  <View style={{ padding: 16, alignItems: "center" }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No pending payment requests</Text>
+                  </View>
+                ) : (
+                  payoutNotifications.map((n, idx) => (
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[
+                        styles.dropdownOption,
+                        {
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          gap: 2,
+                          borderBottomWidth: idx === payoutNotifications.length - 1 ? 0 : 1,
+                          borderBottomColor: colors.border,
+                        },
+                      ]}
+                      onPress={openRequestsTab}
+                    >
+                      <Text style={[styles.dropdownOptionText, { color: colors.text, fontWeight: "700" }]} numberOfLines={2}>
+                        {n.text}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
+                        {n.detail}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: "#ef7b1a", marginTop: 2 }}>{n.time}</Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+              <View style={{ padding: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <TouchableOpacity
+                  onPress={openRequestsTab}
+                  style={[styles.dropdownOption, { justifyContent: "center" }]}
+                >
+                  <Text style={[styles.dropdownOptionText, { color: "#ef7b1a", fontWeight: "700" }]}>
+                    Open Seller Payments → Requests
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setNotifOpen(false);
+                    router.push("/Admin-notifications" as any);
+                  }}
+                  style={[styles.dropdownOption, { justifyContent: "center" }]}
+                >
+                  <Text style={[styles.dropdownOptionText, { color: colors.textSecondary }]}>
+                    All notifications
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-        </TouchableOpacity>
+        </View>
 
         {/* Settings */}
         <TouchableOpacity onPress={toggleSettings} style={styles.actionBtn}>
           <Feather name="settings" size={18} color={isDark ? "#FFFFFF" : "#374151"} />
         </TouchableOpacity>
 
-        {/* Avatar */}
-        <TouchableOpacity onPress={toggleProfile} style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : "FL"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        {/* Avatar + Profile Dropdown */}
+        <View style={{ position: "relative" }}>
+          <TouchableOpacity onPress={toggleProfile} style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : "FL"}
+            </Text>
+          </TouchableOpacity>
 
-      {/* Notifications Dropdown */}
-      {notifOpen && (
-        <View style={[styles.dropdownCard, { right: 108, width: 280, backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.dropdownHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.dropdownTitle, { color: colors.text }]}>Notifications</Text>
-            <TouchableOpacity onPress={handleClearNotifications}>
-              <Text style={{ fontSize: 11, color: "#e8731a", fontWeight: "600" }}>Clear All</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
-            {notifications.length === 0 ? (
-              <View style={{ padding: 16, alignItems: "center" }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No new notifications</Text>
+          {/* Profile Dropdown — closes when mouse leaves the dropdown card */}
+          {profileOpen && (
+            <View
+              style={[styles.dropdownCard, { right: 0, width: 200, backgroundColor: colors.surface, borderColor: colors.border }]}
+              {...(Platform.OS === "web"
+                ? ({ onMouseLeave: () => setProfileOpen(false) } as object)
+                : {})}
+            >
+              <View style={[styles.dropdownHeader, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
+                <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
+                  {user?.fullName || "Flint Admin"}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
+                  {user?.email || "admin@flintandthread.com"}
+                </Text>
               </View>
-            ) : (
-              notifications.map((item) => (
-                <View key={item.id} style={[styles.notifItem, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.notifText, { color: colors.text }]}>{item.text}</Text>
-                  <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>{item.time}</Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
+              <View style={{ padding: 6 }}>
+                <TouchableOpacity onPress={handleProfileClick} style={styles.dropdownOption}>
+                  <Feather name="user" size={14} color={colors.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.dropdownOptionText, { color: colors.text }]}>My Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleLogoutClick} style={[styles.dropdownOption, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4, paddingTop: 8 }]}>
+                  <Feather name="log-out" size={14} color="#EF4444" style={{ marginRight: 8 }} />
+                  <Text style={[styles.dropdownOptionText, { color: "#EF4444" }]}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
-      )}
+
+
+      </View>
 
       {/* Settings Dropdown */}
       {settingsOpen && (
@@ -186,30 +369,6 @@ export default function AdminHeader({ onMenuPress, showMenuButton }: Props) {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      )}
-
-      {/* Profile Dropdown */}
-      {profileOpen && (
-        <View style={[styles.dropdownCard, { right: 20, width: 200, backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.dropdownHeader, { borderBottomColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
-            <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
-              {user?.fullName || "Flint Admin"}
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
-              {user?.email || "admin@flintandthread.com"}
-            </Text>
-          </View>
-          <View style={{ padding: 6 }}>
-            <TouchableOpacity onPress={handleProfileClick} style={styles.dropdownOption}>
-              <Feather name="user" size={14} color={colors.text} style={{ marginRight: 8 }} />
-              <Text style={[styles.dropdownOptionText, { color: colors.text }]}>My Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogoutClick} style={[styles.dropdownOption, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4, paddingTop: 8 }]}>
-              <Feather name="log-out" size={14} color="#EF4444" style={{ marginRight: 8 }} />
-              <Text style={[styles.dropdownOptionText, { color: "#EF4444" }]}>Logout</Text>
-            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -273,17 +432,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: 38,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     maxWidth: 280,
     backgroundColor: "#F3F4F6",
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginRight: "auto",
+    marginRight: 8,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 13,
     color: "#1F2937",
     padding: 0,
@@ -295,7 +458,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 6,
+    flexShrink: 0,
   },
   actionBtn: {
     width: 36,

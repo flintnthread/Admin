@@ -2,7 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import SellerMediaImage from "@/components/SellerMediaImage";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
-import { buildMediaUrlCandidates, isPdfMedia, resolveSellerProfileImage } from '@/lib/api/media';
+import { isPdfMedia, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from '@/lib/api/media';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   exportSellerOrdersCsv, exportSellerProductsCsv, fetchSellerAnalyticsChart, fetchSellerDetail, normalizeSellerGraphChart,
@@ -24,7 +24,7 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import Svg, { Path, Polygon, Polyline } from 'react-native-svg';
+import Svg, { Circle, Path, Polygon, Polyline } from 'react-native-svg';
 
 // ─── Bootstrap Icon component (via @expo/vector-icons or react-native-vector-icons)
 let BootstrapIcon: React.FC<{ name: string; size: number; color: string }>;
@@ -285,12 +285,12 @@ const MOCK_SELLER: SellerData = {
 
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
 const COLORS = {
-  primary: '#B85C00',
-  primaryLight: '#E07B30',
+  primary: '#F97316',
+  primaryLight: '#FFA55C',
   primaryBg: '#FFF5EE',
-  headerBg: '#1E2A45',          // ← dark blue for page header container
-  headerBgDeep: '#16213A',      // ← slightly deeper for subtle depth
-  sectionHeader: '#A0522D',
+  headerBg: '#1D324E',          // ← dark blue for page header container
+  headerBgDeep: '#152540',      // ← slightly deeper for subtle depth
+  sectionHeader: '#FFFFFF',
   white: '#FFFFFF',
   text: '#1A1A1A',
   textSecondary: '#666666',
@@ -314,14 +314,31 @@ const SparklineChart: React.FC<{
   tooltipIndex: number | null;
   onPointPress: (index: number | null) => void;
   tooltipLabel?: string;
-}> = ({ data, width, height, color, tooltipIndex, onPointPress, tooltipLabel = 'Products Listed' }) => {
+  period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+}> = ({ data, width, height, color, tooltipIndex, onPointPress, tooltipLabel = 'Products Listed', period = 'daily' }) => {
   const padding = { top: 20, bottom: 30, left: 36, right: 16 };
-  const chartW = width - padding.left - padding.right;
+  const chartW = Math.max(0, width - padding.left - padding.right);
   const chartH = height - padding.top - padding.bottom;
-  const maxVal = Math.max(...data.map(d => d.value), 1);
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 13, color: COLORS.textMuted }}>No data available</Text>
+      </View>
+    );
+  }
+
+  let maxDataVal = Math.max(...data.map(d => d.value), 0);
+  let chartMax = Math.max(2, maxDataVal);
+  if (chartMax > 2 && chartMax % 2 !== 0) chartMax += 1;
+
+  const maxVal = chartMax;
   const minVal = 0;
 
-  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartW;
+  const getX = (i: number) => {
+    if (data.length <= 1) return padding.left;
+    return padding.left + (i / (data.length - 1)) * chartW;
+  };
   const getY = (v: number) =>
     padding.top + chartH - ((v - minVal) / (maxVal - minVal)) * chartH;
 
@@ -332,10 +349,34 @@ const SparklineChart: React.FC<{
     { x: getX(data.length - 1), y: padding.top + chartH },
   ];
 
-  const yLabels = [0, 1, 2].filter(v => v <= maxVal + 0);
+  const yLabels = [0, maxVal / 2, maxVal];
 
+  // Calculate label thinning to avoid overlap on small screens
+  const approxLabelWidth = 44; // px
+  const availablePerLabel = chartW / Math.max(1, data.length - 1);
+  let step = Math.max(1, Math.ceil(approxLabelWidth / Math.max(1, availablePerLabel)));
+
+  const isSmall = width <= 360;
+  // On very small screens show all labels but rotate and compact them for readability
+  const rotateLabels = isSmall;
+  if (rotateLabels) {
+    step = 1; // show every label but rotate/compact them
+  }
+
+  // On tablet and larger widths, always show all labels (no hiding) and allow slightly larger label space
+  const isLarge = width >= 768;
+  if (isLarge) {
+    step = 1;
+  }
+
+  const abbreviate = (lbl: string) => {
+    if (width < 380 && lbl.length > 6) return lbl.substring(0, 4) + '..';
+    return lbl;
+  };
+
+  // allow rotated labels to be visible inside container
   return (
-    <View style={{ width, height }}>
+    <View style={{ width, height, overflow: 'visible' }}>
       {yLabels.map(v => (
         <View
           key={v}
@@ -363,8 +404,8 @@ const SparklineChart: React.FC<{
           }}
         />
       ))}
-      <View style={{ position: 'absolute', top: 0, left: 0 }}>
-        <Svg width={width} height={height} style={{ overflow: 'visible' }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height }}>
+        <Svg width={width} height={height} style={{ overflow: 'hidden' }}>
           <Polygon
             points={fillPoints.map(p => `${p.x},${p.y}`).join(' ')}
             fill={color + '22'}
@@ -383,8 +424,8 @@ const SparklineChart: React.FC<{
           onPress={() => onPointPress(tooltipIndex === i ? null : i)}
           style={{
             position: 'absolute',
-            left: getX(i) - 10,
-            top: getY(d.value) - 10,
+            left: Math.min(Math.max(getX(i) - 10, 0), width - 20),
+            top: Math.min(Math.max(getY(d.value) - 10, 0), height - 24),
             width: 20,
             height: 20,
             borderRadius: 10,
@@ -405,11 +446,11 @@ const SparklineChart: React.FC<{
           />
         </TouchableOpacity>
       ))}
-      {tooltipIndex !== null && (
+      {tooltipIndex !== null && data[tooltipIndex] && (
         <View
           style={{
             position: 'absolute',
-            left: Math.min(Math.max(getX(tooltipIndex) - 60, 0), width - 130),
+            left: Math.min(Math.max(getX(tooltipIndex) - 60, 4), width - 130),
             top: getY(data[tooltipIndex].value) < 60 ? getY(data[tooltipIndex].value) + 15 : getY(data[tooltipIndex].value) - 52,
             backgroundColor: '#1A1A1A',
             borderRadius: 6,
@@ -429,20 +470,36 @@ const SparklineChart: React.FC<{
           </View>
         </View>
       )}
-      {data.map((d, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: getX(i) - 16,
-            top: padding.top + chartH + 4,
-            width: 32,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 8, color: COLORS.textMuted }}>{d.label}</Text>
-        </View>
-      ))}
+      {data.map((d, i) => {
+        // Only render some labels to avoid overlap, unless rotateLabels is enabled
+        if (!rotateLabels && i !== data.length - 1 && (i % step !== 0 || data.length - 1 - i < step)) return null;
+        const labelContainerWidth = rotateLabels ? 56 : Math.max(60, Math.min(140, chartW / Math.max(1, data.length) - 4));
+        const x = Math.min(
+          Math.max(getX(i) - labelContainerWidth / 2, padding.left - labelContainerWidth / 2),
+          width - labelContainerWidth - 4,
+        );
+        const labelTop = rotateLabels ? padding.top + chartH + 12 : padding.top + chartH + 4;
+        const labelFont = isLarge ? 11 : (rotateLabels ? Math.max(7, Math.round(width / 48)) : 9);
+        const labelStyle: any = rotateLabels
+          ? { fontSize: labelFont, color: COLORS.textMuted, transform: [{ rotate: '-45deg' }], textAlign: 'left' }
+          : { fontSize: labelFont, color: COLORS.textMuted, textAlign: 'center' };
+        return (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: Math.max(x, 2),
+              top: labelTop,
+              width: labelContainerWidth,
+              alignItems: rotateLabels ? 'flex-start' : 'center',
+            }}
+          >
+            <Text numberOfLines={isLarge ? 2 : 1} ellipsizeMode="tail" style={labelStyle}>
+              {isLarge ? String(d.label || '') : abbreviate(String(d.label || ''))}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -452,19 +509,25 @@ const DonutChart: React.FC<{
   segments: { value: number; color: string; label: string }[];
   total: number;
   size: number;
-}> = ({ segments, total, size }) => {
-  const r = size / 2 - 8;
+  label?: string;
+}> = ({ segments, total, size, label }) => {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const strokeW = Math.max(12, size * 0.12);
+  const r = size / 2 - strokeW / 2;
   const cx = size / 2;
   const cy = size / 2;
-  const strokeW = 20;
 
   let startAngle = -90;
+  const gapAngle = segments.filter(s => s.value > 0).length > 1 ? 2 : 0;
+
   const arcs = segments.map(seg => {
     const pct = total > 0 ? seg.value / total : 0;
     const angle = pct * 360;
+    const adjustedAngle = angle > gapAngle ? angle - gapAngle : angle;
     const sa = startAngle;
     startAngle += angle;
-    return { ...seg, pct, startAngle: sa, angle };
+    return { ...seg, pct, startAngle: sa, angle: adjustedAngle };
   });
 
   const polarToCartesian = (cx: number, cy: number, r: number, angleDeg: number) => {
@@ -479,36 +542,60 @@ const DonutChart: React.FC<{
     return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 0 ${e.x} ${e.y}`;
   };
 
-  if (total === 0) {
-    return (
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <View
-          style={{
-            width: r * 2,
-            height: r * 2,
-            borderRadius: r,
-            borderWidth: strokeW,
-            borderColor: COLORS.success,
-          }}
-        />
-      </View>
-    );
-  }
+  const hasData = total > 0 && segments.some(s => s.value > 0);
+  const activeArc = activeIndex !== null ? arcs[activeIndex] : null;
 
   return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size}>
-        {arcs.map((arc, i) => (
-          <Path
-            key={i}
-            d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.angle)}
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {!hasData ? (
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
             fill="none"
-            stroke={arc.color}
+            stroke={COLORS.success}
             strokeWidth={strokeW}
-            strokeLinecap="butt"
           />
-        ))}
+        ) : (
+          arcs.map((arc, i) => {
+            if (arc.value === 0) return null;
+            const isSelected = activeIndex === i;
+            const currentStrokeW = isSelected ? strokeW * 1.15 : strokeW;
+            if (arc.angle >= 359) {
+              return (
+                <Circle
+                  key={i}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth={currentStrokeW}
+                  onPress={() => setActiveIndex(isSelected ? null : i)}
+                />
+              )
+            }
+            return (
+              <Path
+                key={i}
+                d={describeArc(cx, cy, r, arc.startAngle, arc.startAngle + arc.angle)}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={currentStrokeW}
+                strokeLinecap="round"
+                onPress={() => setActiveIndex(isSelected ? null : i)}
+              />
+            );
+          })
+        )}
       </Svg>
+      {activeArc && (
+        <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: size - strokeW * 2, height: size - strokeW * 2, borderRadius: size }} pointerEvents="none">
+          <Text style={{ fontSize: size * 0.15, fontWeight: '800', color: COLORS.text }}>{activeArc.value}</Text>
+          <Text style={{ fontSize: size * 0.08, color: COLORS.textSecondary, textAlign: 'center', marginTop: 2, paddingHorizontal: 4 }} numberOfLines={2} adjustsFontSizeToFit>{activeArc.label}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -521,6 +608,114 @@ interface DocModalProps {
   onClose: () => void;
 }
 
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  box: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  header: {
+    backgroundColor: '#2C3A4F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  headerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  headerSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  imgContainer: {
+    backgroundColor: COLORS.white,
+    margin: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  imgScrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  btnRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 4,
+    gap: 8,
+    justifyContent: 'center',
+  },
+  actionOutlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+  },
+  actionOutlineBtnText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  downloadBtn: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  downloadBtnText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
+
 const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl, onClose }) => {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isMobile = screenW < 600;
@@ -529,11 +724,11 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
-  const candidates = React.useMemo(
-    () => buildMediaUrlCandidates(docUrl, docUrl),
-    [docUrl],
-  );
-  const imageUri = candidates[imageIndex] ?? "";
+  const candidates = React.useMemo(() => {
+    const uri = resolveSellerDocumentImageUrl(docUrl, docUrl);
+    return uri ? [uri] : [];
+  }, [docUrl]);
+  const imageUri = candidates[0] ?? "";
   const isPdf = isPdfMedia(docUrl);
 
   useEffect(() => {
@@ -682,7 +877,7 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
 // ─── Section Header ───────────────────────────────────────────────────────────
 const SectionHeader: React.FC<{ icon: string; title: string }> = ({ icon, title }) => (
   <View style={styles.sectionHeader}>
-    <BootstrapIcon name={icon} size={16} color={COLORS.white} />
+    <BootstrapIcon name={icon} size={16} color={COLORS.primary} />
     <Text style={[styles.sectionHeaderText, { marginLeft: 8 }]}>{title}</Text>
   </View>
 );
@@ -828,7 +1023,7 @@ function splitSellerName(d: Record<string, unknown>) {
   };
 }
 
-function chartToSeries(raw: unknown, valueKey: 'productsAdded' | 'registered'): ChartDataPoint[] {
+function chartToSeries(raw: unknown, valueKey: 'productsAdded' | 'ordersPlaced' | 'registered'): ChartDataPoint[] {
   const chart = normalizeSellerGraphChart(raw);
   return chart.labels.map((label, i) => ({
     label,
@@ -857,8 +1052,8 @@ function mapDetailToSellerData(
   };
   const monthlyProducts = chartToSeries(charts?.monthly, 'productsAdded');
   const yearlyProducts = chartToSeries(charts?.yearly, 'productsAdded');
-  const monthlyOrders = chartToSeries(charts?.monthly, 'registered');
-  const yearlyOrders = chartToSeries(charts?.yearly, 'registered');
+  const monthlyOrders = chartToSeries(charts?.monthly, 'ordersPlaced');
+  const yearlyOrders = chartToSeries(charts?.yearly, 'ordersPlaced');
 
   return {
     id: String(d.id ?? ''),
@@ -909,18 +1104,27 @@ function mapDetailToSellerData(
     kycRemarks: String(d.kycRemarks ?? '—'),
     productsListingStatus: productCount > 0 ? 'Live' : 'Inactive',
     totalProducts: productCount,
-    productStatusDistribution: {
-      active: Number(productDist.active ?? productCount),
-      inactive: Number(productDist.inactive ?? 0),
-      pending: Number(productDist.pending ?? 0),
-    },
-    orderStatusDistribution: {
-      pending: Number(orderDist.pending ?? 0),
-      processing: Number(orderDist.processing ?? 0),
-      shipped: Number(orderDist.shipped ?? 0),
-      delivered: Number(orderDist.delivered ?? 0),
-      cancelled: Number(orderDist.cancelled ?? 0),
-    },
+    productStatusDistribution: (() => {
+      const active = Number(productDist.active ?? 0);
+      const inactive = Number(productDist.inactive ?? 0);
+      const pending = Number(productDist.pending ?? 0);
+      if (productCount > 0 && active + inactive + pending === 0) {
+        return { active: productCount, inactive: 0, pending: 0 };
+      }
+      return { active, inactive, pending };
+    })(),
+    orderStatusDistribution: (() => {
+      const pending = Number(orderDist.pending ?? 0);
+      const processing = Number(orderDist.processing ?? 0);
+      const shipped = Number(orderDist.shipped ?? 0);
+      const delivered = Number(orderDist.delivered ?? 0);
+      const cancelled = Number(orderDist.cancelled ?? 0);
+      const sum = pending + processing + shipped + delivered + cancelled;
+      if (totalOrders > 0 && sum === 0) {
+        return { pending: totalOrders, processing: 0, shipped: 0, delivered: 0, cancelled: 0 };
+      }
+      return { pending, processing, shipped, delivered, cancelled };
+    })(),
     verificationDocuments: (() => {
       const defaultDocNames = [
         'Aadhaar Front',
@@ -945,7 +1149,7 @@ function mapDetailToSellerData(
             name,
             available: apiDoc.available !== false,
             path: rawPath || undefined,
-            url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+            url: resolveSellerDocumentImageUrl(rawPath, apiDoc.url) || undefined,
           });
           apiDocsByName.delete(name);
         } else {
@@ -961,7 +1165,7 @@ function mapDetailToSellerData(
           name,
           available: apiDoc.available !== false,
           path: rawPath || undefined,
-          url: buildMediaUrlCandidates(rawPath, apiDoc.url)[0] || undefined,
+          url: resolveSellerDocumentImageUrl(rawPath, apiDoc.url) || undefined,
         });
       });
       return finalDocs;
@@ -979,6 +1183,76 @@ function mapDetailToSellerData(
       yearly: yearlyOrders,
     },
   };
+}
+
+function formatChartData(dataPoints: any[], period: 'daily' | 'weekly' | 'monthly' | 'yearly', forceDesktopLabels = false): ChartDataPoint[] {
+  if (!Array.isArray(dataPoints)) return [];
+
+  if (period === 'daily') {
+    const targetLabels = forceDesktopLabels
+      ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const sourceData = dataPoints.length >= 7 ? dataPoints.slice(-7) : dataPoints;
+    return targetLabels.map((label, idx) => {
+      const val = sourceData[idx]?.value ?? 0;
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  if (period === 'weekly') {
+    const targetLabels = forceDesktopLabels
+      ? Array.from({ length: 12 }, (_, i) => `Week ${i + 1}`)
+      : Array.from({ length: Math.max(dataPoints.length, 4) }, (_, i) => `Week ${i + 1}`);
+    return targetLabels.map((label, idx) => {
+      const val = dataPoints[idx]?.value ?? 0;
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  if (period === 'monthly') {
+    const targetLabels = forceDesktopLabels
+      ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dataMap = new Map();
+    dataPoints.forEach((d) => {
+      if (d && d.label) {
+        const cleanLabel = String(d.label).substring(0, 3);
+        dataMap.set(cleanLabel, d.value);
+      }
+    });
+    return targetLabels.map((label, idx) => {
+      let val: any;
+      if (forceDesktopLabels) {
+        const shortLabel = label.substring(0, 3);
+        val = dataMap.get(shortLabel);
+      } else {
+        val = dataMap.get(label);
+      }
+      if (val === undefined) {
+        val = dataPoints[idx]?.value ?? 0;
+      }
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  if (period === 'yearly') {
+    const targetLabels = ['2021', '2022', '2023', '2024', '2025', '2026'];
+    const dataMap = new Map();
+    dataPoints.forEach((d) => {
+      if (d && d.label) {
+        dataMap.set(String(d.label), d.value);
+      }
+    });
+    return targetLabels.map((label, idx) => {
+      let val = dataMap.get(label);
+      if (val === undefined) {
+        val = dataPoints[idx]?.value ?? 0;
+      }
+      return { label, value: Number(val) || 0 };
+    });
+  }
+
+  return dataPoints;
 }
 
 export default function ViewSeller() {
@@ -1181,7 +1455,8 @@ export default function ViewSeller() {
 
   const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
-    setSelectedDocUrl(path || url || '');
+    // Always resolve to flintnthread.com/uploads/seller_documents/... (never .in)
+    setSelectedDocUrl(resolveSellerDocumentImageUrl(path, url));
     setDocModalVisible(true);
   };
 
@@ -1191,7 +1466,7 @@ export default function ViewSeller() {
     try {
       setCsvLoading(true);
       const csv = await exportSellerProductsCsv(sellerId);
-      downloadCsv(csv, `products_seller_${sellerId}.csv`);
+      await downloadCsv(csv, `products_seller_${sellerId}.csv`);
     } catch (e) {
       alert(getApiErrorMessage(e));
     } finally {
@@ -1205,7 +1480,7 @@ export default function ViewSeller() {
     try {
       setCsvLoading(true);
       const csv = await exportSellerOrdersCsv(sellerId);
-      downloadCsv(csv, `orders_seller_${sellerId}.csv`);
+      await downloadCsv(csv, `orders_seller_${sellerId}.csv`);
     } catch (e) {
       alert(getApiErrorMessage(e));
     } finally {
@@ -1213,34 +1488,42 @@ export default function ViewSeller() {
     }
   };
 
-  const downloadCsv = (csvContent: string, filename: string) => {
-    // Create a Blob with the CSV content
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    // Create a download link
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    
-    // Append to document, click, and remove
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    URL.revokeObjectURL(url);
+  const downloadCsv = async (csvContent: string, filename: string) => {
+    try {
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return;
+      }
+      await Share.share({
+        message: csvContent,
+        title: filename,
+      });
+    } catch (error) {
+      console.error("CSV download error:", error);
+      Alert.alert("Export Error", "Unable to save or share the CSV file.");
+    }
   };
 
   const isMobile = width < 600;
   const isTablet = width >= 600 && width < 1024;
-  const chartWidth = width - (isMobile ? 32 : isTablet ? 48 : 64);
+  const isDesktopWide = width >= 1024;
+  const sidebarWidth = isDesktopWide ? 250 : 0;
+  const chartWidth = width - sidebarWidth - (isMobile ? 32 : isTablet ? 48 : 64);
 
   const currentChart = chartData[periodTab];
-  const currentData = currentChart
-    ? chartToSeries(currentChart, analyticsTab === 'products' ? 'productsAdded' : 'registered')
+  const rawData = currentChart
+    ? chartToSeries(currentChart, analyticsTab === 'products' ? 'productsAdded' : 'ordersPlaced')
     : (analyticsTab === 'products' ? seller.analyticsData[periodTab] : seller.ordersAnalyticsData[periodTab]);
+  const currentData = formatChartData(rawData, periodTab, isDesktopWide);
 
   const productSegments = [
     { value: seller.productStatusDistribution.active, color: COLORS.success, label: 'Active' },
@@ -1266,7 +1549,7 @@ export default function ViewSeller() {
 
   return (
     <AdminLayout>
-      <ScrollView style={styles.root} contentContainerStyle={styles.container}>
+      <ScrollView style={styles.root} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         {/* ── Page Header — dark blue container (matches approveseller) ── */}
         <View style={[styles.pageHeaderContainer, { marginHorizontal: isMobile ? 12 : 20 }]}>
@@ -1283,7 +1566,7 @@ export default function ViewSeller() {
                 styles.pageHeaderStatusBadge,
                 seller.status === 'Active' ? styles.pageHeaderStatusActive
                   : seller.status === 'Pending' ? styles.pageHeaderStatusPending
-                  : styles.pageHeaderStatusInactive
+                    : styles.pageHeaderStatusInactive
               ]}>
                 <Text style={[
                   styles.pageHeaderStatusText,
@@ -1306,57 +1589,78 @@ export default function ViewSeller() {
         <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
           <SectionHeader icon="bar-chart-line" title="Analytics Dashboard" />
 
-          <View style={styles.tabRow}>
+          <View style={[styles.tabRow, isMobile && { justifyContent: 'center' }]}>
             <TouchableOpacity
-              style={[styles.tab, analyticsTab === 'products' && styles.tabActive]}
+              style={[styles.tab, analyticsTab === 'products' && styles.tabActive, isMobile && styles.tabMobile]}
               onPress={() => { setAnalyticsTab('products'); setTooltipIndex(null); }}
             >
               <BootstrapIcon name="box-seam" size={14} color={analyticsTab === 'products' ? COLORS.primary : COLORS.textSecondary} />
-              <Text style={[styles.tabText, analyticsTab === 'products' && styles.tabTextActive, { marginLeft: 5 }]}>
+              <Text style={[styles.tabText, analyticsTab === 'products' && styles.tabTextActive, isMobile && styles.tabTextMobile, { marginLeft: 5 }]}>
                 Products Analytics
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.tab, analyticsTab === 'orders' && styles.tabActive]}
+              style={[styles.tab, analyticsTab === 'orders' && styles.tabActive, isMobile && styles.tabMobile]}
               onPress={() => { setAnalyticsTab('orders'); setTooltipIndex(null); }}
             >
               <BootstrapIcon name="cart3" size={14} color={analyticsTab === 'orders' ? COLORS.primary : COLORS.textSecondary} />
-              <Text style={[styles.tabText, analyticsTab === 'orders' && styles.tabTextActive, { marginLeft: 5 }]}>
+              <Text style={[styles.tabText, analyticsTab === 'orders' && styles.tabTextActive, isMobile && styles.tabTextMobile, { marginLeft: 5 }]}>
                 Orders Analytics
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.periodRow}>
-            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
-              <TouchableOpacity
-                key={p}
-                style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
-                onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
-              >
-                <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {isMobile ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.periodRow, { paddingHorizontal: 12 }]}
+            >
+              {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
+                  onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
+                >
+                  <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.periodRow}>
+              {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(p => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.periodBtn, periodTab === p && styles.periodBtnActive]}
+                  onPress={() => { setPeriodTab(p); setTooltipIndex(null); }}
+                >
+                  <Text style={[styles.periodBtnText, periodTab === p && styles.periodBtnTextActive]}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-          <View style={styles.legendRow}>
+          <View style={[styles.legendRow, isMobile && { justifyContent: 'center' }]}>
             <View style={[styles.legendDot, { backgroundColor: COLORS.primaryLight }]} />
-            <Text style={styles.legendText}>
+            <Text style={[styles.legendText, isMobile && { textAlign: 'center' }]}>
               {analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
             </Text>
           </View>
 
           <View style={{ marginTop: 8, zIndex: 10 }}>
             <SparklineChart
-              data={currentData}
+              data={formatChartData(currentData, periodTab)}
               width={chartWidth}
               height={isMobile ? 180 : 220}
               color={COLORS.primaryLight}
               tooltipIndex={tooltipIndex}
               onPointPress={setTooltipIndex}
               tooltipLabel={analyticsTab === 'products' ? 'Products Listed' : 'Orders Placed'}
+              period={periodTab}
             />
           </View>
         </View>
@@ -1386,47 +1690,57 @@ export default function ViewSeller() {
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.statsRow, width < 1024 && { flexDirection: 'column' }]}>
-            <View style={[styles.statCard, width < 1024 && { width: '100%', marginBottom: 12 }]}>
+          <View style={[styles.statsRow, width <= 1024 && { flexDirection: 'column' }]}>
+            <View style={[styles.statCard, width <= 1024 && { width: '100%', marginBottom: 12 }]}>
               <Text style={styles.statCardTitle}>Product Status Distribution</Text>
-              <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
               <Text style={styles.statCardTotalLabel}>Total Products</Text>
-              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
-                <View style={styles.donutWrap}>
+              <Text style={styles.statCardTotal}>{seller.totalProducts}</Text>
+              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center', gap: 8 } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
+                <View style={[styles.donutWrap, { width: Math.min(260, Math.max(150, width * 0.35)), height: Math.min(260, Math.max(150, width * 0.35)) }]}>
                   <DonutChart
                     segments={productSegments}
                     total={seller.totalProducts}
-                    size={width < 600 ? 120 : 150}
+                    size={Math.min(260, Math.max(150, width * 0.35))}
                   />
                 </View>
                 <View style={[styles.legendList, width >= 600 && { flex: 1, maxWidth: 220 }]}>
                   {productSegments.map(s => (
                     <View key={s.label} style={styles.statLegendRow}>
                       <Text style={styles.statLegendLabel}>{s.label}</Text>
-                      <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[styles.statLegendLabel, { fontWeight: '600', color: COLORS.text }]}>{s.value}</Text>
+                        <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      </View>
                     </View>
                   ))}
                 </View>
               </View>
             </View>
 
-            <View style={[styles.statCard, width < 1024 && { width: '100%' }]}>
+            <View style={[styles.statCard, width <= 1024 && { width: '100%' }]}>
               <Text style={styles.statCardTitle}>Order Status Distribution</Text>
-              <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
               <Text style={styles.statCardTotalLabel}>Total Orders</Text>
-              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
-                <View style={styles.donutWrap}>
+              <Text style={styles.statCardTotal}>{seller.totalOrders}</Text>
+              <View style={[styles.chartAndLegendContainer, width < 600 ? { flexDirection: 'column', alignItems: 'center', gap: 8 } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, width: '100%' }]}>
+                <View style={[styles.donutWrap, { width: Math.min(260, Math.max(150, width * 0.35)), height: Math.min(260, Math.max(150, width * 0.35)) }]}>
                   <DonutChart
                     segments={orderSegments}
-                    total={Math.max(seller.totalOrders, 1)}
-                    size={width < 600 ? 120 : 150}
+                    total={Math.max(
+                      orderSegments.reduce((s, x) => s + x.value, 0),
+                      seller.totalOrders,
+                      1,
+                    )}
+                    size={Math.min(260, Math.max(150, width * 0.35))}
                   />
                 </View>
                 <View style={[styles.legendList, width >= 600 && { flex: 1, maxWidth: 220 }]}>
                   {orderSegments.map(s => (
                     <View key={s.label} style={styles.statLegendRow}>
                       <Text style={styles.statLegendLabel}>{s.label}</Text>
-                      <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[styles.statLegendLabel, { fontWeight: '600', color: COLORS.text }]}>{s.value}</Text>
+                        <View style={[styles.statLegendDot, { backgroundColor: s.color }]} />
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -1513,48 +1827,49 @@ export default function ViewSeller() {
           </View>
         </View>
 
-        {/* ── Warehouse Information ──────────────────────────────────────── */}
-        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-          <SectionHeader icon="geo-alt" title="Warehouse / Pickup Address" />
-          <View style={styles.infoGrid}>
-            <InfoRow label="Address" value={seller.warehouseAddress} isHalf width={width} />
-            <InfoRow label="Area" value={seller.warehouseArea} isHalf width={width} />
-            <InfoRow label="City" value={seller.warehouseCity} isHalf width={width} />
-            <InfoRow label="State" value={seller.warehouseState} isHalf width={width} />
-            <InfoRow label="Country" value={seller.warehouseCountry} isHalf width={width} />
+        {/* ── Warehouse Information & Verification Status ─────────────────── */}
+        <View style={[styles.rowCards, { marginHorizontal: isMobile ? 12 : 20 }]}>
+          <View style={[styles.card, styles.halfCard]}>
+            <SectionHeader icon="geo-alt" title="Warehouse / Pickup Address" />
+            <View style={styles.infoGrid}>
+              <InfoRow label="Address" value={seller.warehouseAddress} isHalf width={width} />
+              <InfoRow label="Area" value={seller.warehouseArea} isHalf width={width} />
+              <InfoRow label="City" value={seller.warehouseCity} isHalf width={width} />
+              <InfoRow label="State" value={seller.warehouseState} isHalf width={width} />
+              <InfoRow label="Country" value={seller.warehouseCountry} isHalf width={width} />
+            </View>
           </View>
-        </View>
 
-        {/* ── Verification Status ────────────────────────────────────────── */}
-        <View style={[styles.card, { marginHorizontal: isMobile ? 12 : 20 }]}>
-          <SectionHeader icon="shield-check" title="Verification Status" />
-          <View style={styles.infoGrid}>
-            <InfoRow
-              label="Profile Completed"
-              value={<StatusBadge label={seller.profileCompleted ? 'Yes' : 'No'} color={seller.profileCompleted ? COLORS.success : COLORS.danger} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow
-              label="KYC Verified"
-              value={<StatusBadge label={seller.kycVerified ? 'Verified' : 'Pending'} color={seller.kycVerified ? COLORS.success : COLORS.warning} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow
-              label="Bank Verified"
-              value={<StatusBadge label={seller.bankVerified ? 'Verified' : 'Pending'} color={seller.bankVerified ? COLORS.success : COLORS.warning} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow
-              label="Mobile Verified"
-              value={<StatusBadge label={seller.mobileVerified ? 'Verified' : 'Not Verified'} color={seller.mobileVerified ? COLORS.success : COLORS.danger} />}
-              isHalf
-              width={width}
-            />
-            <InfoRow label="KYC Remarks" value={seller.kycRemarks} isHalf width={width} />
-            <InfoRow label="Admin Remarks" value={seller.adminRemarks} isHalf width={width} />
+          <View style={[styles.card, styles.halfCard]}>
+            <SectionHeader icon="shield-check" title="Verification Status" />
+            <View style={styles.infoGrid}>
+              <InfoRow
+                label="Profile Completed"
+                value={<StatusBadge label={seller.profileCompleted ? 'Yes' : 'No'} color={seller.profileCompleted ? COLORS.success : COLORS.danger} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow
+                label="KYC Verified"
+                value={<StatusBadge label={seller.kycVerified ? 'Verified' : 'Pending'} color={seller.kycVerified ? COLORS.success : COLORS.warning} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow
+                label="Bank Verified"
+                value={<StatusBadge label={seller.bankVerified ? 'Verified' : 'Pending'} color={seller.bankVerified ? COLORS.success : COLORS.warning} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow
+                label="Mobile Verified"
+                value={<StatusBadge label={seller.mobileVerified ? 'Verified' : 'Not Verified'} color={seller.mobileVerified ? COLORS.success : COLORS.danger} />}
+                isHalf
+                width={width}
+              />
+              <InfoRow label="KYC Remarks" value={seller.kycRemarks} isHalf width={width} />
+              <InfoRow label="Admin Remarks" value={seller.adminRemarks} isHalf width={width} />
+            </View>
           </View>
         </View>
 
@@ -1626,7 +1941,14 @@ export default function ViewSeller() {
           {seller.verificationDocuments.map((doc, i) => (
             <View key={i} style={styles.docRow}>
               <View style={styles.docLeft}>
-                <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                {doc.available && doc.url && !isPdfMedia(doc.url) ? (
+                  <Image
+                    source={{ uri: resolveSellerDocumentImageUrl(doc.path, doc.url) }}
+                    style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: COLORS.border }}
+                  />
+                ) : (
+                  <BootstrapIcon name="file-earmark-text" size={18} color={COLORS.primary} />
+                )}
                 <Text style={[styles.docName, { marginLeft: 8 }]}>{doc.name}</Text>
               </View>
               {doc.available && (
@@ -1662,7 +1984,7 @@ export default function ViewSeller() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F5F0EB',
+    backgroundColor: COLORS.white,
   },
   container: {
     paddingBottom: 24,
@@ -1671,7 +1993,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F0EB',
+    backgroundColor: COLORS.white,
   },
 
   // ── Page header container — dark blue background ──────────────────────────
@@ -1687,6 +2009,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
+  },
+  rowCards: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfCard: {
+    flex: 1,
   },
   pageHeader: {
     flexDirection: 'row',
@@ -1777,7 +2106,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionHeaderText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.2,
@@ -1800,6 +2129,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
+  tabMobile: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 88,
+    marginHorizontal: 6,
+  },
   tabActive: {
     borderBottomColor: COLORS.primary,
   },
@@ -1807,6 +2142,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
     fontWeight: '500',
+  },
+  tabTextMobile: {
+    fontSize: 12,
   },
   tabTextActive: {
     color: COLORS.primary,
@@ -1909,13 +2247,18 @@ const styles = StyleSheet.create({
   statCardTotalLabel: {
     fontSize: 12,
     color: COLORS.textMuted,
-    marginBottom: 8,
   },
   donutWrap: {
-    marginVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 250,
+    aspectRatio: 1,
   },
+
   chartAndLegendContainer: {
-    marginTop: 12,
+    width: '100%',
   },
   legendList: {
     width: '100%',
@@ -2073,113 +2416,102 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-});
 
-// ─── Modal Styles ─────────────────────────────────────────────────────────────
-const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  box: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    overflow: 'hidden',
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  header: {
-    backgroundColor: '#2C3A4F',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  headerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  headerSub: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  imgContainer: {
-    backgroundColor: COLORS.white,
-    margin: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  imgScrollContent: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 4,
-    gap: 8,
-    justifyContent: 'center',
-  },
-  actionOutlineBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    borderRadius: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: COLORS.white,
-  },
-  actionOutlineBtnText: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  downloadBtn: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  downloadBtnText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+
+  //     borderRadius: 12,
+  //     overflow: 'hidden',
+  //     maxHeight: '90%',
+  //     shadowColor: '#000',
+  //     shadowOffset: { width: 0, height: 8 },
+  //     shadowOpacity: 0.3,
+  //     shadowRadius: 20,
+  //     elevation: 20,
+  //   },
+  //   header: {
+  //     backgroundColor: '#2C3A4F',
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     justifyContent: 'space-between',
+  //     paddingHorizontal: 18,
+  //     paddingVertical: 14,
+  //   },
+  //   headerLeft: {
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     gap: 12,
+  //     flex: 1,
+  //   },
+  //   headerIconWrap: {
+  //     width: 40,
+  //     height: 40,
+  //     borderRadius: 8,
+  //     backgroundColor: 'rgba(255,255,255,0.15)',
+  //     alignItems: 'center',
+  //     justifyContent: 'center',
+  //   },
+  //   headerTitle: {
+  //     color: COLORS.white,
+  //     fontSize: 16,
+  //     fontWeight: '700',
+  //   },
+  //   headerSub: {
+  //     color: 'rgba(255,255,255,0.7)',
+  //     fontSize: 12,
+  //     marginTop: 2,
+  //   },
+  //   closeBtn: {
+  //     width: 32,
+  //     height: 32,
+  //     borderRadius: 16,
+  //     backgroundColor: 'rgba(255,255,255,0.15)',
+  //     alignItems: 'center',
+  //     justifyContent: 'center',
+  //     marginLeft: 8,
+  //   },
+  //   imgContainer: {
+  //     backgroundColor: COLORS.white,
+  //     margin: 16,
+  //     borderRadius: 8,
+  //     overflow: 'hidden',
+  //     borderWidth: 1,
+  //     borderColor: COLORS.border,
+  //   },
+  //   imgScrollContent: {
+  //     flexGrow: 1,
+  //     alignItems: 'center',
+  //     justifyContent: 'center',
+  //     padding: 8,
+  //   },
+  //   btnRow: {
+  //     flexDirection: 'row',
+  //     paddingHorizontal: 16,
+  //     paddingBottom: 20,
+  //     paddingTop: 4,
+  //     gap: 8,
+  //     justifyContent: 'center',
+  //   },
+  //   actionOutlineBtn: {
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     borderWidth: 1.5,
+  //     borderColor: COLORS.primary,
+  //     borderRadius: 6,
+  //     paddingHorizontal: 14,
+  //     paddingVertical: 8,
+  //     backgroundColor: COLORS.white,
+  //   },
+  //   actionOutlineBtnText: {
+  //     color: COLORS.primary,
+  //     fontSize: 13,
+  //     fontWeight: '600',
+  //   },
+  //   downloadBtn: {
+  //     backgroundColor: COLORS.primary,
+  //     borderColor: COLORS.primary,
+  //   },
+  //   downloadBtnText: {
+  //     color: COLORS.white,
+  //     fontSize: 13,
+  //     fontWeight: '600',
+  //   },
 });

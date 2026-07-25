@@ -3,6 +3,7 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { JobOpening as ApiJob } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { createJob, deleteJob, fetchDepartments, fetchJobs, updateJob } from "@/services/hrApi";
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
@@ -16,10 +17,11 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from "react-native";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ THEME â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const T = {
     orange: "#E8631A",
     orangeLight: "#FEF0E6",
@@ -52,7 +54,7 @@ const WebStyles = Platform.OS === 'web' ? (
     `}</style>
 ) : null;
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type JobStatus = "Active" | "Paused" | "Closed";
 type JobType = "Full Time" | "Part Time" | "Contract" | "Internship";
 
@@ -86,8 +88,8 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
     return {
         id: j.id,
         title: j.title ?? "Job",
-        department: j.departmentId != null ? (deptNames[j.departmentId] ?? `Dept #${j.departmentId}`) : "—",
-        location: j.location ?? "—",
+        department: j.departmentId != null ? (deptNames[j.departmentId] ?? `Dept #${j.departmentId}`) : "â€”",
+        location: j.location ?? "â€”",
         type,
         positions: Number(j.vacancies ?? 1),
         applications: Number(j.applicationCount ?? 0),
@@ -103,7 +105,7 @@ function mapApiJob(j: ApiJob, deptNames: Record<number, string>): Job {
 const DEFAULT_DEPARTMENTS = ["All Departments"];
 const STATUSES: ("All Status" | JobStatus)[] = ["All Status", "Active", "Paused", "Closed"];
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type FeatherName = React.ComponentProps<typeof Feather>["name"];
 
 const DEPT_ICONS: Record<string, FeatherName> = {
@@ -130,21 +132,33 @@ const TYPE_COLOR: Record<JobType, { bg: string; fg: string }> = {
     Internship: { bg: T.navyLight, fg: T.navy },
 };
 
-// ─── STAT PILL ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ STAT PILL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const StatPill: React.FC<{
     icon: FeatherName;
     value: number;
     label: string;
     iconBg: string;
     iconFg: string;
-}> = ({ icon, value, label, iconBg, iconFg }) => (
-    <View style={sp.card}>
-        <View style={[sp.iconBox, { backgroundColor: iconBg }]}>
-            <Feather name={icon} size={15} color={iconFg} />
+    isMobile?: boolean;
+}> = ({ icon, value, label, iconBg, iconFg, isMobile }) => (
+    <View style={[
+        sp.card,
+        isMobile && {
+            padding: 8,
+            gap: 6,
+            alignItems: "center",
+        }
+    ]}>
+        <View style={[
+            sp.iconBox,
+            { backgroundColor: iconBg },
+            isMobile && { width: 28, height: 28, borderRadius: 8 }
+        ]}>
+            <Feather name={icon} size={isMobile ? 12 : 15} color={iconFg} />
         </View>
-        <View>
-            <Text style={sp.val}>{value}</Text>
-            <Text style={sp.lbl}>{label}</Text>
+        <View style={isMobile && { flex: 1 }}>
+            <Text style={[sp.val, isMobile && { fontSize: 15, lineHeight: 17 }]}>{value}</Text>
+            <Text style={[sp.lbl, isMobile && { fontSize: 8, letterSpacing: 0.2 }]} numberOfLines={1}>{label}</Text>
         </View>
     </View>
 );
@@ -183,7 +197,7 @@ const sp = StyleSheet.create({
     },
 });
 
-// ─── DROPDOWN MODAL ───────────────────────────────────────────────────────────
+// â”€â”€â”€ DROPDOWN MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DropdownModal: React.FC<{
     visible: boolean;
     options: string[];
@@ -273,7 +287,7 @@ const dm = StyleSheet.create({
     },
 });
 
-// ─── JOB CARD ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ JOB CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobCard: React.FC<{
     job: Job;
     onPress?: () => void;
@@ -297,7 +311,7 @@ const JobCard: React.FC<{
                 {/* Top row: dept icon + status */}
                 <View style={jc.bannerTop}>
                     <View style={[jc.deptIconWrap, isWeb && { backgroundColor: T.orangeLight, borderWidth: 1, borderColor: T.orangeMid }]}>
-                        <Feather name={deptIcon} size={18} color={T.orange} />
+                        <Feather name={deptIcon} size={16} color={T.orange} />
                     </View>
                     <View style={[jc.statusPill, { backgroundColor: statusStyle.bg }]}>
                         <View style={[jc.statusDot, { backgroundColor: statusStyle.fg }]} />
@@ -583,7 +597,7 @@ const jc = StyleSheet.create({
     },
 });
 
-// ─── WEB SELECT (for web dropdowns) ──────────────────────────────────────────
+// â”€â”€â”€ WEB SELECT (for web dropdowns) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const WebSelect: React.FC<{
     value: string;
     options: string[];
@@ -592,7 +606,7 @@ const WebSelect: React.FC<{
 }> = ({ value, options, onChange, placeholder }) => (
     <View style={ws.wrap}>
         <Feather name="chevron-down" size={14} color={T.textHint} style={ws.chevron} />
-        {/* @ts-ignore – web-only select */}
+        {/* @ts-ignore â€“ web-only select */}
         <select
             value={value}
             onChange={(e: any) => onChange(e.target.value)}
@@ -601,7 +615,7 @@ const WebSelect: React.FC<{
                 height: "100%",
                 border: "none",
                 background: "transparent",
-                fontSize: 13,
+                fontSize: 15,
                 color: value.startsWith("All") ? T.textHint : T.textH,
                 outline: "none",
                 fontFamily: "inherit",
@@ -621,7 +635,7 @@ const WebSelect: React.FC<{
 
 const ws = StyleSheet.create({
     wrap: {
-        flex: 1,
+        width: "100%",
         height: 42,
         backgroundColor: T.card,
         borderRadius: 11,
@@ -641,7 +655,7 @@ const ws = StyleSheet.create({
     } as any,
 });
 
-// ─── VIEW TOGGLE ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ VIEW TOGGLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ViewToggle: React.FC<{
     view: "grid" | "list";
     onToggle: (v: "grid" | "list") => void;
@@ -651,13 +665,13 @@ const ViewToggle: React.FC<{
             style={[vt.btn, view === "grid" && vt.active]}
             onPress={() => onToggle("grid")}
         >
-            <Feather name="grid" size={14} color={view === "grid" ? T.orange : T.textHint} />
+            <Feather name="grid" size={16} color={view === "grid" ? "#fff" : "#374151"} />
         </TouchableOpacity>
         <TouchableOpacity
             style={[vt.btn, view === "list" && vt.active]}
             onPress={() => onToggle("list")}
         >
-            <Feather name="list" size={14} color={view === "list" ? T.orange : T.textHint} />
+            <Feather name="list" size={16} color={view === "list" ? "#fff" : "#374151"} />
         </TouchableOpacity>
     </View>
 );
@@ -665,31 +679,23 @@ const ViewToggle: React.FC<{
 const vt = StyleSheet.create({
     wrap: {
         flexDirection: "row",
-        backgroundColor: T.bg,
-        borderRadius: 9,
-        borderWidth: 1,
-        borderColor: T.border,
+        backgroundColor: "#E5E7EB",
+        borderRadius: 10,
         padding: 3,
-        gap: 2,
     },
     btn: {
-        width: 30,
-        height: 30,
-        borderRadius: 7,
+        width: 36,
+        height: 36,
+        borderRadius: 8,
         alignItems: "center",
         justifyContent: "center",
     },
     active: {
-        backgroundColor: T.card,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 1,
+        backgroundColor: "#1E2B6B",
     },
 });
 
-// ─── LIST ROW CARD (list view) ────────────────────────────────────────────────
+// â”€â”€â”€ LIST ROW CARD (list view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobRow: React.FC<{ job: Job }> = ({ job }) => {
     const statusStyle = STATUS_COLOR[job.status];
     const typeStyle = TYPE_COLOR[job.type];
@@ -777,7 +783,7 @@ const jr = StyleSheet.create({
     appsTxt: { fontSize: 10, fontWeight: "700" },
 });
 
-// ─── EDIT JOB MODAL ──────────────────────────────────────────────────────────
+// â”€â”€â”€ EDIT JOB MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const EditJobModal: React.FC<{
     visible: boolean;
     job: Job | null;
@@ -959,8 +965,8 @@ const EditJobModal: React.FC<{
                             </TouchableOpacity>
                             <TouchableOpacity style={em.saveBtn} onPress={() => {
                                 const trimTitle = title.trim() || "New Job Opening";
-                                const dept = department || departments[0] || "—";
-                                const trimLoc = location.trim() || "—";
+                                const dept = department || departments[0] || "â€”";
+                                const trimLoc = location.trim() || "â€”";
                                 const trimDesc = description.trim();
                                 const trimReq = requirements.trim();
                                 const trimExp = experience.trim();
@@ -1162,7 +1168,7 @@ const em = StyleSheet.create({
     },
 });
 
-// ─── CONFIRM MODAL ───────────────────────────────────────────────────────────
+// â”€â”€â”€ CONFIRM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ConfirmModal: React.FC<{
     visible: boolean;
     job: Job | null;
@@ -1217,9 +1223,9 @@ const cm = StyleSheet.create({
         maxWidth: 380,
     },
     iconWrap: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         backgroundColor: T.redBg,
         alignItems: "center",
         justifyContent: "center",
@@ -1277,9 +1283,9 @@ const cm = StyleSheet.create({
     },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const JobOpeningsScreen: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [deptOptions, setDeptOptions] = useState<string[]>(DEFAULT_DEPARTMENTS);
@@ -1296,12 +1302,28 @@ const JobOpeningsScreen: React.FC = () => {
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingJob, setEditingJob] = useState<Job | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
-    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: "", message: "" });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const { width } = useWindowDimensions();
+    const isMobileScreen = width < 768;
+    const isSmallMobile = width < 480;
+
     const isWeb = Platform.OS === "web";
     const departmentNames = deptOptions.filter((d) => d !== "All Departments");
+
+    let cardWidth: any = "100%";
+    if (isWeb) {
+        if (width >= 1024) {
+            cardWidth = "calc(33.33% - 11px)";
+        } else if (width >= 640) {
+            cardWidth = "calc(50% - 8px)";
+        } else {
+            cardWidth = "100%";
+        }
+    } else {
+        cardWidth = "100%";
+    }
 
     const filtered = jobs.filter(j => {
         const matchSearch =
@@ -1373,16 +1395,16 @@ const JobOpeningsScreen: React.FC = () => {
             };
             if (updated.id > 0 && jobs.find((j) => j.id === updated.id)) {
                 await updateJob(updated.id, payload);
-                setAlertConfig({ visible: true, title: "Updated!", message: "Job opening updated successfully." });
+                void sweetCrud.updated("Job opening");
             } else {
                 await createJob(payload);
-                setAlertConfig({ visible: true, title: "Added!", message: "New job opening added successfully." });
+                void sweetCrud.added("Job opening");
             }
             await loadJobs();
             setEditModalVisible(false);
             setEditingJob(null);
         } catch (e) {
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e, "Failed to save job opening.") });
+            void sweetError("Error", getApiErrorMessage(e, "Failed to save job opening."));
         }
     };
 
@@ -1391,10 +1413,10 @@ const JobOpeningsScreen: React.FC = () => {
         try {
             await deleteJob(deleteTarget.id);
             await loadJobs();
-            setAlertConfig({ visible: true, title: "Deleted!", message: "Job opening has been deleted." });
+            void sweetCrud.deleted("Job opening");
             setDeleteTarget(null);
         } catch (e) {
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e, "Failed to delete job opening.") });
+            void sweetError("Error", getApiErrorMessage(e, "Failed to delete job opening."));
         }
     };
 
@@ -1403,7 +1425,7 @@ const JobOpeningsScreen: React.FC = () => {
     const totalApps = jobs.reduce((s, j) => s + j.applications, 0);
     const urgentCount = jobs.filter(j => j.urgent).length;
 
-    const Container = isWeb ? View : SafeAreaView;
+    const Container = View;
 
     const MainContent = (
         <Container style={s.safe}>
@@ -1413,210 +1435,381 @@ const JobOpeningsScreen: React.FC = () => {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 12 }]}
+                contentContainerStyle={[s.scroll, !isWeb && { paddingTop: 0, paddingHorizontal: 0, marginTop: 0 }]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* ── PAGE HEADER ── */}
-                <View style={[s.pageHead, !isWeb && { flexDirection: 'column', alignItems: 'stretch', padding: 16, paddingTop: 18, paddingBottom: 48, marginTop: 4 }]}>
-                    {!isWeb ? (
-                        <>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[s.pageTitle, { fontSize: 20 }]}>Open Positions</Text>
-                                    <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                {/* â”€â”€ PAGE HEADER (Mobile) â”€â”€ */}
+                {isMobileScreen ? (
+                    <>
+                        {/* Curved dark header card with icon + title + add button */}
+                        <View style={s.mobileHeader}>
+                            <View style={s.mobileHeaderLeft}>
+                                <View style={s.mobileHeaderIcon}>
+                                    <Feather name="briefcase" size={16} color="#fff" />
                                 </View>
-                                <TouchableOpacity style={[s.addBtn, { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }]} onPress={() => { setEditingJob(null); setEditModalVisible(true); }} activeOpacity={0.85}>
+                                <View>
+                                    <Text style={s.mobileHeaderTitle}>Open Positions</Text>
+                                    {!isSmallMobile && (
+                                        <Text style={s.mobileHeaderSub}>Manage all job listings</Text>
+                                    )}
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={s.mobileAddBtn}
+                                onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
+                                activeOpacity={0.85}
+                            >
+                                <Feather name="plus" size={16} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Stat cards: horizontally scrollable on mobile */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={s.mobileStatsGrid}
+                            contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+                        >
+                            <View style={[s.mobileStatCard, { borderTopColor: T.orange }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.orangeLight }]}>
+                                        <Feather name="briefcase" size={18} color={T.orange} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.orange }]}>{totalJobs}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Total Jobs</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.green }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.greenBg }]}>
+                                        <Feather name="check-circle" size={18} color={T.green} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.green }]}>{activeCount}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Active</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.navy }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.navyLight }]}>
+                                        <Feather name="file-text" size={18} color={T.navy} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.navy }]}>{totalApps}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Applications</Text>
+                            </View>
+                            <View style={[s.mobileStatCard, { borderTopColor: T.red }]}>
+                                <View style={s.mobileStatTopRow}>
+                                    <View style={[s.mobileStatIcon, { backgroundColor: T.redBg }]}>
+                                        <Feather name="zap" size={18} color={T.red} />
+                                    </View>
+                                    <Text style={[s.mobileStatValue, { color: T.red }]}>{urgentCount}</Text>
+                                </View>
+                                <Text style={s.mobileStatLabel}>Urgent</Text>
+                            </View>
+                        </ScrollView>
+                    </>
+                ) : (
+                    <>
+                        {/* â”€â”€ PAGE HEADER (Web) â”€â”€ */}
+                        <View style={s.pageHead}>
+                            <View style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                width: "100%",
+                                gap: 10,
+                            }}>
+                                <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 14 }}>
+                                    <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                                        <Feather name="briefcase" size={24} color="#FFF" />
+                                    </View>
+                                    <View>
+                                        <Text style={s.pageTitle}>Open Positions</Text>
+                                        <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity
+                                    style={s.addBtn}
+                                    onPress={() => { setEditingJob(null); setEditModalVisible(true); }}
+                                    activeOpacity={0.85}
+                                >
                                     <Feather name="plus" size={14} color="#fff" />
-                                    <Text style={[s.addBtnTxt, { fontSize: 12 }]}>Add</Text>
+                                    <Text style={s.addBtnTxt}>Add New Job</Text>
                                 </TouchableOpacity>
                             </View>
-                        </>
-                    ) : (
-                        <>
-                            <View style={s.pageHeadLeft}>
+                        </View>
 
-                                <Text style={s.pageTitle}>Open Positions</Text>
-                                <Text style={s.pageSub}>Manage and track all active job listings</Text>
+                        {/* â”€â”€ STATS (Web â€” centered row) â”€â”€ */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={s.statsRow}
+                            contentContainerStyle={{
+                                flexDirection: "row",
+                                gap: 8,
+                                flexGrow: 1,
+                                justifyContent: "center"
+                            }}
+                        >
+                            <StatPill
+                                icon="briefcase"
+                                value={totalJobs}
+                                label="Total Jobs"
+                                iconBg={T.orangeLight}
+                                iconFg={T.orange}
+                            />
+                            <StatPill
+                                icon="check-circle"
+                                value={activeCount}
+                                label="Active"
+                                iconBg={T.greenBg}
+                                iconFg={T.green}
+                            />
+                            <StatPill
+                                icon="file-text"
+                                value={totalApps}
+                                label="Applications"
+                                iconBg={T.navyLight}
+                                iconFg={T.navy}
+                            />
+                            <StatPill
+                                icon="zap"
+                                value={urgentCount}
+                                label="Urgent"
+                                iconBg={T.redBg}
+                                iconFg={T.red}
+                            />
+                        </ScrollView>
+                    </>
+                )}
+
+                {/* â”€â”€ SEARCH + FILTERS â”€â”€ */}
+                {isMobileScreen ? (
+                    <View style={{ gap: 10, paddingHorizontal: 16 }}>
+                        <View style={s.searchRow}>
+                            <View style={s.searchBox}>
+                                <Feather name="search" size={15} color="#000000" />
+                                <TextInput
+                                    style={[s.searchInput, { color: "#000000" }]}
+                                    placeholder="Search jobs, departments, locationsâ€¦"
+                                    placeholderTextColor="#000000"
+                                    value={search}
+                                    onChangeText={setSearch}
+                                />
+                                {search.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearch("")}>
+                                        <Feather name="x-circle" size={15} color="#000000" />
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                            <TouchableOpacity style={s.addBtn} onPress={() => { setEditingJob(null); setEditModalVisible(true); }} activeOpacity={0.85}>
-                                <Feather name="plus" size={15} color="#fff" />
-                                <Text style={s.addBtnTxt}>Add New Job</Text>
-                            </TouchableOpacity>
-                        </>
-                    )}
-                </View>
-
-                {/* ── STATS ── */}
-                <View style={[s.statsRow, !isWeb && s.statsRowMobile]}>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="briefcase"
-                            value={totalJobs}
-                            label="Total Jobs"
-                            iconBg={T.orangeLight}
-                            iconFg={T.orange}
-                        />
-                    </View>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="check-circle"
-                            value={activeCount}
-                            label="Active"
-                            iconBg={T.greenBg}
-                            iconFg={T.green}
-                        />
-                    </View>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="file-text"
-                            value={totalApps}
-                            label="Applications"
-                            iconBg={T.navyLight}
-                            iconFg={T.navy}
-                        />
-                    </View>
-                    <View style={!isWeb ? { width: "48%" as any } : { flex: 1 }}>
-                        <StatPill
-                            icon="zap"
-                            value={urgentCount}
-                            label="Urgent"
-                            iconBg={T.redBg}
-                            iconFg={T.red}
-                        />
-                    </View>
-                </View>
-
-                {/* ── SEARCH + FILTERS ── */}
-                <View style={s.searchRow}>
-                    <View style={s.searchBox}>
-                        <Feather name="search" size={15} color="#000000" />
-                        <TextInput
-                            style={[s.searchInput, { color: "#000000" }]}
-                            placeholder="Search jobs, departments, locations…"
-                            placeholderTextColor="#000000"
-                            value={search}
-                            onChangeText={setSearch}
-                        />
-                        {search.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearch("")}>
-                                <Feather name="x-circle" size={15} color="#000000" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                    {!isWeb && (
-                        <View style={s.viewToggleInline}>
-                            <TouchableOpacity
-                                style={[s.viewToggleBtn, viewMode === "grid" && s.viewToggleBtnActive]}
-                                onPress={() => setViewMode("grid")}
-                                activeOpacity={0.8}
-                            >
-                                <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : T.textHint} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[s.viewToggleBtn, viewMode === "list" && s.viewToggleBtnActive]}
-                                onPress={() => setViewMode("list")}
-                                activeOpacity={0.8}
-                            >
-                                <Feather name="list" size={15} color={viewMode === "list" ? T.orange : T.textHint} />
-                            </TouchableOpacity>
                         </View>
-                    )}
-                </View>
+                        {/* Row 1: All Departments & All Status in one row */}
+                        <View style={{ flexDirection: "row", gap: 10, zIndex: 100 }}>
+                            {/* Department filter */}
+                            <View style={{ flex: 1, position: "relative", zIndex: deptDropdownOpen ? 999 : 1 }}>
+                                {isWeb ? (
+                                    <WebSelect
+                                        value={deptFilter}
+                                        options={deptOptions}
+                                        onChange={setDeptFilter}
+                                    />
+                                ) : (
+                                    <>
+                                        <TouchableOpacity
+                                            style={[s.filterSelect, { width: "100%", marginHorizontal: 0 }]}
+                                            onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
+                                        >
+                                            <Feather name="grid" size={13} color={T.textHint} />
+                                            <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
+                                                {deptFilter}
+                                            </Text>
+                                            <Feather name="chevron-down" size={13} color={T.textHint} />
+                                        </TouchableOpacity>
+                                        {deptDropdownOpen && (
+                                            <View style={[em.dropdown, { marginTop: 0 }]}>
+                                                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                    {deptOptions.map((opt) => (
+                                                        <TouchableOpacity
+                                                            key={opt}
+                                                            style={em.dropItem}
+                                                            onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
+                                                        >
+                                                            <Text style={em.dropItemText}>{opt}</Text>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </ScrollView>
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+                            </View>
 
-                <View style={s.filterRow}>
-                    {/* Department filter */}
-                    {isWeb ? (
-                        <WebSelect
-                            value={deptFilter}
-                            options={deptOptions}
-                            onChange={setDeptFilter}
-                        />
-                    ) : (
-                        <View style={{ flex: 1, position: "relative", zIndex: deptDropdownOpen ? 999 : 1, minWidth: 120 }}>
-                            <TouchableOpacity
-                                style={[s.filterSelect, { width: "100%" }]}
-                                onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
-                            >
-                                <Feather name="grid" size={13} color={T.textHint} />
-                                <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
-                                    {deptFilter}
-                                </Text>
-                                <Feather name="chevron-down" size={13} color={T.textHint} />
+                            {/* Status filter */}
+                            <View style={{ flex: 1, position: "relative", zIndex: statusDropdownOpen ? 999 : 1 }}>
+                                {isWeb ? (
+                                    <WebSelect
+                                        value={statusFilter}
+                                        options={STATUSES}
+                                        onChange={(v) => setStatusFilter(v as any)}
+                                    />
+                                ) : (
+                                    <>
+                                        <TouchableOpacity
+                                            style={[s.filterSelect, { width: "100%", marginHorizontal: 0 }]}
+                                            onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
+                                        >
+                                            <Feather name="activity" size={13} color={T.textHint} />
+                                            <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
+                                                {statusFilter}
+                                            </Text>
+                                            <Feather name="chevron-down" size={13} color={T.textHint} />
+                                        </TouchableOpacity>
+                                        {statusDropdownOpen && (
+                                            <View style={[em.dropdown, { marginTop: 0 }]}>
+                                                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                    {STATUSES.map((opt) => (
+                                                        <TouchableOpacity
+                                                            key={opt}
+                                                            style={em.dropItem}
+                                                            onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
+                                                        >
+                                                            <Text style={em.dropItemText}>{opt}</Text>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </ScrollView>
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+                            </View>
+                        </View>
+
+                        {/* Row 2: Filter Button & List/Grid View in another row */}
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, zIndex: 10 }}>
+                            <TouchableOpacity style={[s.filterBtn, { flex: 1, justifyContent: "center" }]}>
+                                <Feather name="sliders" size={14} color={T.orange} />
+                                <Text style={s.filterBtnTxt}>Filter</Text>
                             </TouchableOpacity>
-                            {deptDropdownOpen && (
-                                <View style={[em.dropdown, { marginTop: 0 }]}>
-                                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                                        {deptOptions.map((opt) => (
-                                            <TouchableOpacity
-                                                key={opt}
-                                                style={em.dropItem}
-                                                onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
-                                            >
-                                                <Text style={em.dropItemText}>{opt}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+
+                            <ViewToggle view={viewMode} onToggle={setViewMode} />
+                        </View>
+                    </View>
+                ) : (
+                    <View style={s.filterRow}>
+                        {/* Search on desktop shares the row with filters */}
+                        <View style={s.searchBox}>
+                            <Feather name="search" size={15} color="#000000" />
+                            <TextInput
+                                style={[s.searchInput, { color: "#000000" }]}
+                                placeholder="Search jobs, departments, locationsâ€¦"
+                                placeholderTextColor="#000000"
+                                value={search}
+                                onChangeText={setSearch}
+                            />
+                            {search.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearch("")}>
+                                    <Feather name="x-circle" size={15} color="#000000" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        {/* Department filter */}
+                        <View style={{ width: 140 }}>
+                            {isWeb ? (
+                                <WebSelect
+                                    value={deptFilter}
+                                    options={deptOptions}
+                                    onChange={setDeptFilter}
+                                />
+                            ) : (
+                                <View style={{ position: "relative", zIndex: deptDropdownOpen ? 999 : 1 }}>
+                                    <TouchableOpacity
+                                        style={[s.filterSelect, { width: "100%" }]}
+                                        onPress={() => { setDeptDropdownOpen(!deptDropdownOpen); setStatusDropdownOpen(false); }}
+                                    >
+                                        <Feather name="grid" size={13} color={T.textHint} />
+                                        <Text style={[s.filterSelectTxt, deptFilter !== "All Departments" && { color: T.orange }]} numberOfLines={1}>
+                                            {deptFilter}
+                                        </Text>
+                                        <Feather name="chevron-down" size={13} color={T.textHint} />
+                                    </TouchableOpacity>
+                                    {deptDropdownOpen && (
+                                        <View style={[em.dropdown, { marginTop: 0 }]}>
+                                            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                {deptOptions.map((opt) => (
+                                                    <TouchableOpacity
+                                                        key={opt}
+                                                        style={em.dropItem}
+                                                        onPress={() => { setDeptFilter(opt); setDeptDropdownOpen(false); }}
+                                                    >
+                                                        <Text style={em.dropItemText}>{opt}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>
-                    )}
 
-                    {/* Status filter */}
-                    {isWeb ? (
-                        <WebSelect
-                            value={statusFilter}
-                            options={STATUSES}
-                            onChange={(v) => setStatusFilter(v as any)}
-                        />
-                    ) : (
-                        <View style={{ flex: 1, position: "relative", zIndex: statusDropdownOpen ? 999 : 1, minWidth: 120 }}>
-                            <TouchableOpacity
-                                style={[s.filterSelect, { width: "100%" }]}
-                                onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
-                            >
-                                <Feather name="activity" size={13} color={T.textHint} />
-                                <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
-                                    {statusFilter}
-                                </Text>
-                                <Feather name="chevron-down" size={13} color={T.textHint} />
-                            </TouchableOpacity>
-                            {statusDropdownOpen && (
-                                <View style={[em.dropdown, { marginTop: 0 }]}>
-                                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                                        {STATUSES.map((opt) => (
-                                            <TouchableOpacity
-                                                key={opt}
-                                                style={em.dropItem}
-                                                onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
-                                            >
-                                                <Text style={em.dropItemText}>{opt}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+                        {/* Status filter */}
+                        <View style={{ width: 140 }}>
+                            {isWeb ? (
+                                <WebSelect
+                                    value={statusFilter}
+                                    options={STATUSES}
+                                    onChange={(v) => setStatusFilter(v as any)}
+                                />
+                            ) : (
+                                <View style={{ position: "relative", zIndex: statusDropdownOpen ? 999 : 1 }}>
+                                    <TouchableOpacity
+                                        style={[s.filterSelect, { width: "100%" }]}
+                                        onPress={() => { setStatusDropdownOpen(!statusDropdownOpen); setDeptDropdownOpen(false); }}
+                                    >
+                                        <Feather name="activity" size={13} color={T.textHint} />
+                                        <Text style={[s.filterSelectTxt, statusFilter !== "All Status" && { color: T.orange }]} numberOfLines={1}>
+                                            {statusFilter}
+                                        </Text>
+                                        <Feather name="chevron-down" size={13} color={T.textHint} />
+                                    </TouchableOpacity>
+                                    {statusDropdownOpen && (
+                                        <View style={[em.dropdown, { marginTop: 0 }]}>
+                                            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                                                {STATUSES.map((opt) => (
+                                                    <TouchableOpacity
+                                                        key={opt}
+                                                        style={em.dropItem}
+                                                        onPress={() => { setStatusFilter(opt as any); setStatusDropdownOpen(false); }}
+                                                    >
+                                                        <Text style={em.dropItemText}>{opt}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>
-                    )}
 
-                    <TouchableOpacity style={s.filterBtn}>
-                        <Feather name="sliders" size={14} color={T.orange} />
-                        <Text style={s.filterBtnTxt}>Filter</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity style={s.filterBtn}>
+                            <Feather name="sliders" size={14} color={T.orange} />
+                            <Text style={s.filterBtnTxt}>Filter</Text>
+                        </TouchableOpacity>
 
-                    {isWeb && <ViewToggle view={viewMode} onToggle={setViewMode} />}
-                </View>
+                        <ViewToggle view={viewMode} onToggle={setViewMode} />
+                    </View>
+                )}
 
-                {/* ── COUNT LINE ── */}
-                <Text style={s.countLine}>
+                {/* â”€â”€ COUNT LINE â”€â”€ */}
+                <Text style={[s.countLine, isMobileScreen && { paddingHorizontal: 16 }]}>
                     <Text style={{ color: T.orange, fontWeight: "700" }}>{filtered.length}</Text>
                     {" "}of {jobs.length} positions
                 </Text>
 
-                {/* ── JOB CARDS ── */}
+                {/* â”€â”€ JOB CARDS â”€â”€ */}
                 {loading ? (
                     <View style={s.empty}>
-                        <Text style={s.emptyTitle}>Loading job openings…</Text>
+                        <Text style={s.emptyTitle}>Loading job openingsâ€¦</Text>
                     </View>
                 ) : error ? (
                     <View style={s.empty}>
@@ -1634,43 +1827,47 @@ const JobOpeningsScreen: React.FC = () => {
                         <Text style={s.emptySub}>Try adjusting your search or filters</Text>
                     </View>
                 ) : viewMode === "grid" ? (
-                    <View style={isWeb
-                        ? { flexDirection: "row", flexWrap: "wrap", gap: 16 }
-                        : { flexDirection: "row", flexWrap: "wrap", gap: 12 }
-                    }>
+                    <View style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: isMobileScreen ? 12 : 16,
+                        ...(isMobileScreen ? { paddingHorizontal: 16 } : {}),
+                    }}>
                         {paginated.map(job => (
                             <View
                                 key={job.id}
-                                style={isWeb ? { width: "calc(33.33% - 11px)" as any } : { width: "100%" as any }}
+                                style={{ width: cardWidth }}
                             >
                                 <JobCard job={job} onEdit={handleEdit} onDelete={() => setDeleteTarget(job)} />
                             </View>
                         ))}
                     </View>
                 ) : (
-                    <View style={{ gap: 8 }}>
+                    <View style={{ gap: 8, ...(isMobileScreen ? { paddingHorizontal: 16 } : {}) }}>
                         {paginated.map(job => (
                             <JobRow key={job.id} job={job} />
                         ))}
                     </View>
                 )}
 
-                {/* ── PAGINATION CONTROLS ── */}
+                {/* â”€â”€ PAGINATION CONTROLS â”€â”€ */}
                 {filtered.length > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={filtered.length}
-                        itemsPerPage={ITEMS_PER_PAGE}
-                        itemName="job openings"
-                        onPageChange={setCurrentPage}
-                    />
+                    <View style={isMobileScreen ? { paddingHorizontal: 16 } : {}}>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={filtered.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            itemName="job openings"
+                            onPageChange={setCurrentPage}
+                        />
+                    </View>
                 )}
             </ScrollView>
 
 
 
-            {/* ── EDIT MODAL ── */}
+            {/* â”€â”€ EDIT MODAL â”€â”€ */}
             <EditJobModal
                 visible={editModalVisible}
                 job={editingJob}
@@ -1679,7 +1876,7 @@ const JobOpeningsScreen: React.FC = () => {
                 onSave={handleSave}
             />
 
-            {/* ── CONFIRM MODAL ── */}
+            {/* â”€â”€ CONFIRM MODAL â”€â”€ */}
             <ConfirmModal
                 visible={!!deleteTarget}
                 job={deleteTarget}
@@ -1687,21 +1884,6 @@ const JobOpeningsScreen: React.FC = () => {
                 onConfirm={handleDelete}
             />
 
-            {/* ── SWEET ALERT ── */}
-            <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                            <Feather name="check" size={32} color="#10b981" />
-                        </View>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1f2937', marginBottom: 8, textAlign: 'center' }}>{alertConfig.title}</Text>
-                        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{alertConfig.message}</Text>
-                        <TouchableOpacity style={{ backgroundColor: T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
-                            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </Container>
     );
 
@@ -1710,13 +1892,12 @@ const JobOpeningsScreen: React.FC = () => {
 
 export default JobOpeningsScreen;
 
-// ─── MAIN STYLES ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const s = StyleSheet.create({
     safe: {
         flex: 1,
         height: "100%",
         backgroundColor: T.bg,
-        paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
 
     // TopBar
@@ -1825,15 +2006,121 @@ const s = StyleSheet.create({
         letterSpacing: -0.2,
     },
 
-    // Stats
-    statsRow: {
+    // Mobile-specific header (curved card with icon + title + add button)
+    mobileHeader: {
         flexDirection: "row",
-        gap: 8,
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: "#151D4F",
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 46,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 22,
+        shadowColor: "#151D4F",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    mobileHeaderLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        flex: 1,
+    },
+    mobileHeaderIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: T.orange,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: T.orange,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    mobileHeaderTitle: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: "#FFFFFF",
+        letterSpacing: -0.3,
+    },
+    mobileHeaderSub: {
+        fontSize: 12,
+        color: "#D1D5DB",
+        marginTop: 2,
+    },
+    mobileAddBtn: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        backgroundColor: T.orange,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: T.orange,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+
+    // Mobile stat cards horizontally scrollable
+    mobileStatsGrid: {
+        marginTop: -32,
+        marginHorizontal: 16,
+        zIndex: 10,
+        marginBottom: 4,
+    },
+    mobileStatCard: {
+        backgroundColor: T.card,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderTopWidth: 3,
+        borderColor: T.border,
+        padding: 14,
+        width: 155,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    mobileStatTopRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+    },
+    mobileStatIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    mobileStatValue: {
+        fontSize: 22,
+        fontWeight: "800",
+        letterSpacing: -0.4,
+    },
+    mobileStatLabel: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: T.textHint,
+    },
+
+    // Stats (web)
+    statsRow: {
         marginTop: -32,
         zIndex: 10,
         maxWidth: 900,
         alignSelf: "center",
         width: "100%",
+        marginBottom: 14,
     },
     statsRowMobile: {
         flexWrap: "wrap" as any,
@@ -1876,11 +2163,13 @@ const s = StyleSheet.create({
         height: 42,
         borderWidth: 1.5,
         borderColor: T.border,
+        minWidth: 0,
+        overflow: "hidden",
     },
     searchInput: {
-        flex:
-            1,
-        fontSize: 13,
+        flex: 1,
+        minWidth: 0,
+        fontSize: 15,
         color: T.textH,
         borderWidth: 0,
         outline: "none" as any,
@@ -1894,7 +2183,7 @@ const s = StyleSheet.create({
         flexWrap: "wrap",
     },
     filterSelect: {
-        flex: 1,
+        width: 140,
         flexDirection: "row",
         alignItems: "center",
         gap: 7,
@@ -1903,28 +2192,28 @@ const s = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: T.border,
         paddingHorizontal: 12,
-        paddingVertical: 10,
-        minWidth: 120,
+        height: 54,
     },
     filterSelectTxt: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 15,
         color: T.textHint,
         fontWeight: "500",
     },
     filterBtn: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center",
         gap: 6,
         backgroundColor: T.orangeLight,
         paddingHorizontal: 14,
-        paddingVertical: 10,
+        height: 42,
         borderRadius: 11,
         borderWidth: 1,
         borderColor: T.orangeMid,
     },
     filterBtnTxt: {
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: "700",
         color: T.orange,
     },

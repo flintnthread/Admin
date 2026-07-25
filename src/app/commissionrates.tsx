@@ -8,12 +8,12 @@ import {
   StatusBar,
   Platform,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AdminLayout from "@/components/admin-layout";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import { fetchCommissionRates, updateCommissionRates } from "@/services/settingsApi";
 
 const PRIMARY_ORANGE = "#ef7b1a";
@@ -54,16 +54,13 @@ const CommissionRatesScreen: React.FC = () => {
   }, []);
 
   const handleSave = async () => {
+    if (!(await sweetCrud.confirmUpdate("Commission rates"))) return;
     setSaving(true);
     try {
       await updateCommissionRates(b2cCommission, b2bCommission);
-      const msg = "Commission rates saved successfully!";
-      if (isWeb) window.alert(msg);
-      else Alert.alert("Success", msg);
+      void sweetCrud.saved("Commission rates");
     } catch (e) {
-      const msg = getApiErrorMessage(e);
-      if (isWeb) window.alert(msg);
-      else Alert.alert("Error", msg);
+      void sweetError("Error", getApiErrorMessage(e, "Failed to save commission rates."));
     } finally {
       setSaving(false);
     }
@@ -73,11 +70,14 @@ const CommissionRatesScreen: React.FC = () => {
     <ScrollView style={styles.mainContainer} contentContainerStyle={isWeb ? styles.webMainContent : styles.mobileMainContent}>
       {/* Header */}
       <View style={[styles.header, !isWeb && { marginBottom: 16 }]}>
-        <Text style={styles.headerTitle}>Platform commission rates</Text>
-        <View style={styles.breadcrumb}>
-          <Text style={styles.breadcrumbLink}>Dashboard</Text>
-          <Feather name="chevron-right" size={14} color={TEXT_MUTED} style={{ marginHorizontal: 4 }} />
-          <Text style={styles.breadcrumbCurrent}>Commission (B2B / B2C)</Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerIconContainer}>
+            <Feather name="percent" size={16} color="#FFFFFF" />
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Platform commission rates</Text>
+            <Text style={styles.headerSubtitle}>Manage global commission rates for B2B and B2C sales</Text>
+          </View>
         </View>
       </View>
 
@@ -195,7 +195,28 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     color: "#FFFFFF",
-    marginBottom: 6,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    fontWeight: "500",
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: PRIMARY_ORANGE,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   breadcrumb: {
     flexDirection: "row",

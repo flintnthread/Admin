@@ -1,4 +1,5 @@
-import { buildMediaUrlCandidates, resolveMediaUrl } from "@/lib/api/media";
+import { resolveAdminApiBaseUrl } from "@/lib/api/config";
+import { buildMediaUrlCandidates } from "@/lib/api/media";
 
 export type CategoryImageFields = {
   mobileImage?: string | null;
@@ -19,17 +20,15 @@ export function resolveCatalogMediaUrl(
   if (/^(https?:\/\/|data:|blob:)/i.test(value)) return value;
 
   let normalized = value.replace(/\\/g, "/");
-  if (normalized.startsWith("/uploads/") || /^uploads\//i.test(normalized)) {
-    if (!normalized.startsWith("/")) normalized = `/${normalized}`;
-    return resolveMediaUrl(normalized);
+  if (!normalized.startsWith("/")) normalized = `/${normalized}`;
+  if (!normalized.startsWith("/uploads/")) {
+    const bare = normalized.replace(/^\/+/, "");
+    normalized = bare.includes("/")
+      ? `/${bare}`
+      : `/uploads/${folder}/${bare}`;
   }
-
-  const bare = normalized.replace(/^\/+/, "");
-  if (!bare.includes("/")) {
-    return resolveMediaUrl(`/uploads/${folder}/${bare}`);
-  }
-
-  return resolveMediaUrl(`/${bare}`);
+  // Catalog images live on admin media (:8082), not the seller CDN host.
+  return `${resolveAdminApiBaseUrl().replace(/\/$/, "")}${normalized}`;
 }
 
 /** Pick the best display URL — mobile (Cloudinary) first, then desktop/banner. */

@@ -5,12 +5,12 @@ import { router, usePathname } from "expo-router";
 import React from "react";
 import {
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-    Platform,
 } from "react-native";
 
 type Props = {
@@ -23,13 +23,15 @@ type Props = {
 };
 
 // Navigation items definition
-const NAV_ITEMS = {
+export const NAV_ITEMS = {
   GENERAL: [
 
 
     { label: "Dashboard", icon: "home", path: "/Dashboard", color: "#3B82F6" },
+
     { label: "Settings", icon: "settings", path: "/settings", color: "#64748B" },
-    { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
+    // { label: "SEO Engine", icon: "globe", path: null, color: "#10B981" },
+
 
   ],
   "EMPLOYEE MANAGEMENT": [
@@ -135,8 +137,8 @@ const NAV_ITEMS = {
     ],
   },
   "EMAIL MANAGEMENT": [
-    { label: "Customer Emails", icon: "mail", path: null, color: "#F43F5E" },
-    { label: "Seller Emails", icon: "mail", path: null, color: "#F97316" },
+    { label: "Customer Emails", icon: "mail", path: "/customeremails", color: "#F43F5E" },
+    { label: "Seller Emails", icon: "mail", path: "/seller-emails", color: "#F97316" },
   ],
   "PAYMENTS & PRODUCTS": [
     {
@@ -157,8 +159,8 @@ const NAV_ITEMS = {
       path: "/productApproval",
       color: "#22C55E",
     },
-    { label: "Add Sellers", icon: "user-plus", path: null, color: "#10B981" },
-    { label: "Ads Admin Users", icon: "user", path: null, color: "#14B8A6" },
+    { label: "Add Sellers", icon: "user-plus", path: "/add-seller", color: "#10B981" },
+    { label: "Ads Admin Users", icon: "user", path: "/adsadminusers", color: "#14B8A6" },
     {
       label: "Admin Panel Users",
       icon: "shield",
@@ -173,15 +175,15 @@ const NAV_ITEMS = {
       color: "#3B82F6",
       path: null,
       children: [
-        { label: "Ads Dashboard", icon: "pie-chart", path: null, color: "#3B82F6" },
-        { label: "Ad Placements", icon: "layout", path: null, color: "#10B981" },
-        { label: "Performance Ads", icon: "activity", path: null, color: "#F59E0B" },
-        { label: "Campaigns & Packages", icon: "package", path: null, color: "#8B5CF6" },
-        { label: "Ads Types & Details", icon: "layers", path: null, color: "#EC4899" },
-        { label: "Orders Management", icon: "shopping-cart", path: null, color: "#14B8A6" },
-        { label: "Payments Management", icon: "credit-card", path: null, color: "#F97316" },
-        { label: "Customers Management", icon: "users", path: null, color: "#06B6D4" },
-        { label: "Notifications", icon: "bell", path: null, color: "#EAB308" },
+        { label: "Ads Dashboard", icon: "pie-chart", path: "/Addashboard", color: "#3B82F6" },
+        { label: "Ad Placements", icon: "layout", path: "/ads-placement", color: "#10B981" },
+        { label: "Performance Ads", icon: "activity", path: "/Performance-ads", color: "#F59E0B" },
+        { label: "Campaigns & Packages", icon: "package", path: "/campaigns-packages", color: "#8B5CF6" },
+        { label: "Ads Types & Details", icon: "layers", path: "/ads-types-details", color: "#EC4899" },
+        { label: "Orders Management", icon: "shopping-cart", path: "/ads-ordermanagement", color: "#14B8A6" },
+        { label: "Payments Management", icon: "credit-card", path: "/ads-payments", color: "#F97316" },
+        { label: "Customers Management", icon: "users", path: "/customermngt", color: "#06B6D4" },
+        { label: "Notifications", icon: "bell", path: "/ads-notifications", color: "#EAB308" },
       ],
     },
   ],
@@ -229,19 +231,21 @@ const NAV_ITEMS = {
       ],
     },
     {
-      label: "Contact Messages",
+      label: "Message Center",
       icon: "mail",
       path: "/Contactmessages",
       color: "#3B82F6",
     },
-    { label: "Logos", icon: "image", path: null, color: "#0EA5E9" },
+    { label: "Logos", icon: "image", path: "/Logomanagement", color: "#0EA5E9" },
     {
       label: "Banners",
       icon: "image",
       color: "#06B6D4",
       path: null,
       children: [
-        { label: "Banner List", icon: "list", path: null, color: "#14B8A6" },
+        { label: "Homepage Banners", icon: "home", path: "/Homepagebanners", color: "#14B8A6" },
+        { label: "Homepage Sections On/Off", icon: "toggle-left", path: "/homepage-Sections-Settings", color: "#14B8A6" },
+        { label: "General Banners", icon: "image", path: "/Generalbanners", color: "#14B8A6" },
       ],
     },
     {
@@ -279,6 +283,8 @@ const NAV_ITEMS = {
   ],
 } as const;
 
+let globalSidebarScrollY = 0;
+
 export default function AdminSidebar({
   collapsed,
   onToggleCollapse,
@@ -309,12 +315,21 @@ export default function AdminSidebar({
   });
 
   const toggleExpanded = (label: string) => {
-    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+    setExpandedItems((prev) => (prev[label] ? {} : { [label]: true }));
+    setEcommerceExpanded(false);
   };
 
   const navigate = (path: string | null) => {
     if (path) router.push(path as never);
   };
+
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: globalSidebarScrollY, animated: false });
+    }, 10);
+    return () => clearTimeout(timer);
+  }, []);
 
   const colors = useTheme();
   const { theme } = useThemeContext();
@@ -325,6 +340,7 @@ export default function AdminSidebar({
       style={[
         styles.sidebar,
         collapsed && styles.sidebarCollapsed,
+        !isLargeScreen && { flex: 1, height: undefined }, // Fix mobile drawer overflow
         { backgroundColor: colors.surface, borderRightColor: colors.border },
       ]}
     >
@@ -334,7 +350,7 @@ export default function AdminSidebar({
       >
         {!collapsed && (
           <Image
-            source={require("../../assets/images/logo.jpg")}
+            source={require("../../assets/images/logo.png")}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -361,9 +377,15 @@ export default function AdminSidebar({
 
       {/* Scrollable nav items */}
       <ScrollView
+        ref={scrollRef}
         style={styles.navScroll}
         contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 20 : 60 }}
         showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: globalSidebarScrollY }}
+        onScroll={(e) => {
+          globalSidebarScrollY = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
       >
         {/* GENERAL */}
         <View style={styles.section}>
@@ -400,8 +422,8 @@ export default function AdminSidebar({
           ))}
         </View>
 
-        {/* EMPLOYEE MANAGEMENT */}
-        <View style={styles.section}>
+        {/* EMPLOYEE MANAGEMENT - Hidden per request */}
+        <View style={[styles.section, { display: 'none' }]}>
           {!collapsed && (
             <Text style={styles.sectionTitle}>EMPLOYEE MANAGEMENT</Text>
           )}
@@ -442,7 +464,11 @@ export default function AdminSidebar({
           {!collapsed && <Text style={styles.sectionTitle}>APPS</Text>}
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => setEcommerceExpanded(!ecommerceExpanded)}
+            onPress={() => {
+              const nextState = !ecommerceExpanded;
+              setEcommerceExpanded(nextState);
+              if (nextState) setExpandedItems({});
+            }}
           >
             <Feather
               name="shopping-bag"
@@ -621,8 +647,8 @@ export default function AdminSidebar({
                   style={[
                     styles.menuItem,
                     !hasChildren &&
-                      isActive((item as any).path) &&
-                      styles.menuItemActive,
+                    isActive((item as any).path) &&
+                    styles.menuItemActive,
                     isExpanded && { backgroundColor: "#F5F3FF" },
                   ]}
                   onPress={() => {
@@ -648,8 +674,8 @@ export default function AdminSidebar({
                         style={[
                           styles.menuItemText,
                           !hasChildren &&
-                            isActive((item as any).path) &&
-                            styles.menuItemTextActive,
+                          isActive((item as any).path) &&
+                          styles.menuItemTextActive,
                         ]}
                       >
                         {item.label}
@@ -696,7 +722,7 @@ export default function AdminSidebar({
                             style={[
                               styles.subMenuItemText,
                               isActive(child.path) &&
-                                styles.subMenuItemTextActive,
+                              styles.subMenuItemTextActive,
                             ]}
                           >
                             {child.label}
@@ -726,8 +752,8 @@ export default function AdminSidebar({
                   style={[
                     styles.menuItem,
                     !hasChildren &&
-                      isActive((item as any).path) &&
-                      styles.menuItemActive,
+                    isActive((item as any).path) &&
+                    styles.menuItemActive,
                   ]}
                   onPress={() => {
                     if (hasChildren) {
@@ -752,8 +778,8 @@ export default function AdminSidebar({
                         style={[
                           styles.menuItemText,
                           !hasChildren &&
-                            isActive((item as any).path) &&
-                            styles.menuItemTextActive,
+                          isActive((item as any).path) &&
+                          styles.menuItemTextActive,
                           !isActive((item as any).path) && {
                             color: isDark ? "#D1D5DB" : "#4B5563",
                           },
@@ -803,7 +829,7 @@ export default function AdminSidebar({
                             style={[
                               styles.subMenuItemText,
                               isActive(child.path) &&
-                                styles.subMenuItemTextActive,
+                              styles.subMenuItemTextActive,
                               !isActive(child.path) && {
                                 color: isDark ? "#9CA3AF" : "#4B5563",
                               },

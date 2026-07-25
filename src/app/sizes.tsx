@@ -16,7 +16,6 @@ import Pagination from "@/components/Pagination";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -32,6 +31,7 @@ import {
 } from "react-native";
 
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
   createSize,
   deleteSize,
@@ -39,6 +39,10 @@ import {
   updateSize,
   type CatalogSize,
 } from "@/services/sizeApi";
+
+const SIZE_CATALOG_ALL = "all";
+const UNASSIGNED_CATEGORY = "Unassigned";
+type SizeCatalogFilterId = typeof SIZE_CATALOG_ALL | string;
 
 // ── Linear Gradient ──────────────────────────────────────────
 // Expo:  import { LinearGradient } from "expo-linear-gradient";
@@ -84,19 +88,29 @@ interface SizeItem {
   code: string;
   createdDate: string;
   status: "Active" | "Inactive";
+  categories: string[];
+  primaryCategory: string;
 }
 
 function mapSizeRow(row: CatalogSize): SizeItem {
+  const categories = Array.isArray(row.categories)
+    ? row.categories.map((c) => String(c).trim()).filter(Boolean)
+    : [];
+  const primaryCategory =
+    String(row.primaryCategory ?? "").trim() ||
+    (categories[0] ?? UNASSIGNED_CATEGORY);
   return {
-    id: row.id,
-    name: row.name,
-    code: row.code,
-    status: row.status,
+    id: Number(row.id),
+    name: String(row.name ?? "").trim() || "—",
+    code: String(row.code ?? "").trim() || "—",
+    status: row.status === "Inactive" ? "Inactive" : "Active",
     createdDate: row.createdDate ?? todayStr(),
+    categories,
+    primaryCategory,
   };
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 48;
 
 const CARD_GRADIENTS: [string, string][] = [
   ["#1d324e", "#101d2e"],
@@ -270,20 +284,18 @@ const GridCard: React.FC<{
   idx: number;
   onEdit: (s: SizeItem) => void;
   onDelete: (s: SizeItem) => void;
-  cardWidth: number;
+  cardWidth: number | string;
 }> = ({ item, idx, onEdit, onDelete, cardWidth }) => {
   const dims = useWindowDimensions();
   const isMobile = dims.width < 768;
-  const [showActions, setShowActions] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const colors = CARD_GRADIENTS[idx % CARD_GRADIENTS.length];
 
-  const visibleActions = showActions || isHovered;
+  const visibleActions = isHovered;
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => !isMobile && setShowActions(p => !p)}
       onMouseEnter={() => !isMobile && setIsHovered(true)}
       onMouseLeave={() => !isMobile && setIsHovered(false)}
       style={[S.gridCard, { width: cardWidth }]}
@@ -298,14 +310,14 @@ const GridCard: React.FC<{
           <View style={S.gridCardActions}>
             <TouchableOpacity
               style={S.cardActionBtn}
-              onPress={() => { setShowActions(false); setIsHovered(false); onEdit(item); }}
+              onPress={() => { setIsHovered(false); onEdit(item); }}
             >
               {/* Bootstrap: pencil-square */}
               <BI name="pencil-square" size={17} color="#444" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[S.cardActionBtn, { marginLeft: 10 }]}
-              onPress={() => { setShowActions(false); setIsHovered(false); onDelete(item); }}
+              onPress={() => { setIsHovered(false); onDelete(item); }}
             >
               {/* Bootstrap: trash3 */}
               <BI name="trash3" size={17} color="#e53935" />
@@ -324,6 +336,9 @@ const GridCard: React.FC<{
 
       <View style={S.gridCardBottom}>
         <Text style={S.gridCardName} numberOfLines={1}>{item.name}</Text>
+        <Text style={S.gridCardCatalog} numberOfLines={1}>
+          {item.primaryCategory}
+        </Text>
         <View style={S.gridCardMeta}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {/* Bootstrap: calendar3 */}
@@ -365,6 +380,9 @@ const ListRow: React.FC<{
     </Text>
     <Text style={[S.listCell, { flex: 1.2, color: "#555" }]} numberOfLines={1}>
       {item.code}
+    </Text>
+    <Text style={[S.listCell, { flex: 1.2, color: "#8b3e0f", fontWeight: "600" }]} numberOfLines={1}>
+      {item.primaryCategory}
     </Text>
     <View style={[S.listCell, { flex: 1.4, flexDirection: "row", alignItems: "center" }]}>
       {/* Bootstrap: calendar3 */}
@@ -413,7 +431,7 @@ const ModalWrapper: React.FC<{
     >
       <View style={S.modalBox}>
         <LinearGradient
-          colors={["#e07820", "#c0601a"]}
+          colors={["#F97316", "#EA580C"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={S.modalHeader}
@@ -454,7 +472,7 @@ const SizeForm: React.FC<{
         style={S.input}
         value={name}
         onChangeText={setName}
-        placeholder="Enter size name"
+        placeholder="e.g. M, UK 8, 32, 2-3Y, Free Size"
         placeholderTextColor="#bbb"
       />
 
@@ -463,9 +481,17 @@ const SizeForm: React.FC<{
         style={S.input}
         value={code}
         onChangeText={setCode}
-        placeholder="Enter size code"
+        placeholder="e.g. M, UK-8, 32, 2-3Y, FS"
         placeholderTextColor="#bbb"
       />
+
+      <View style={S.catalogMatchBox}>
+        <Text style={S.catalogMatchLabel}>Category assignment</Text>
+        <Text style={S.catalogMatchValue}>From product usage</Text>
+        <Text style={S.catalogMatchHint}>
+          Tabs group sizes by product main categories (via product variants). Unused sizes appear under Unassigned.
+        </Text>
+      </View>
 
       <Text style={S.label}>Status</Text>
       {isMobile ? (
@@ -598,39 +624,11 @@ const EditSizeModal: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────
-// DELETE CONFIRM MODAL
-// ─────────────────────────────────────────────────────────────
-const DeleteModal: React.FC<{
-  visible: boolean;
-  onClose: () => void;
-  onDelete: () => void;
-}> = ({ visible, onClose, onDelete }) => (
-  <ModalWrapper visible={visible} title="Confirm Delete" onClose={onClose}>
-    <View style={{ alignItems: "center", paddingVertical: 16 }}>
-      {/* Bootstrap: trash3 large */}
-      <BI name="trash3" size={52} color="#e07820" />
-      <Text style={[S.deleteTitle, { marginTop: 12 }]}>Are you sure?</Text>
-      <Text style={S.deleteSubtitle}>
-        {"You won't be able to revert this action.\nThis will permanently delete the size."}
-      </Text>
-    </View>
-    <ModalFooter
-      onCancel={onClose}
-      onConfirm={onDelete}
-      confirmLabel="Delete"
-      confirmIcon="trash3"         // Bootstrap: trash3
-      danger
-    />
-  </ModalWrapper>
-);
-
-// ─────────────────────────────────────────────────────────────
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────
 type ModalState =
   | { type: "add" }
   | { type: "edit"; size: SizeItem }
-  | { type: "delete"; size: SizeItem }
   | null;
 
 export default function SizesManagement() {
@@ -639,7 +637,12 @@ export default function SizesManagement() {
   const isTablet = width >= 600;
   const isDesktop = width >= 960;
 
-  const numCols = isDesktop ? 4 : isTablet ? 3 : 2;
+  const contentWidth = width - 16 * 2;
+  const numCols =
+    contentWidth >= 1248 ? 6 :
+      contentWidth >= 960 ? 5 :
+        contentWidth >= 700 ? 4 :
+          contentWidth >= 600 ? 3 : 2;
   const PADDING = 16;
   const GAP = 12;
 
@@ -649,25 +652,74 @@ export default function SizesManagement() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
+  const [catalogFilter, setCatalogFilter] = useState<SizeCatalogFilterId>(SIZE_CATALOG_ALL);
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState<ModalState>(null);
   const [containerWidth, setContainerWidth] = useState(width);
 
   const cardWidth = Math.max(0, (containerWidth - PADDING * 2 - GAP * (numCols - 1)) / numCols);
+  const cardWidthPct = `${(100 / numCols).toFixed(4)}%` as any;
 
-  const filtered = useMemo(
-    () => sizes.filter(s =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.code.toLowerCase().includes(search.toLowerCase())
-    ),
-    [sizes, search]
-  );
+  const catalogTabs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of sizes) {
+      const cats = s.categories.length > 0 ? s.categories : [UNASSIGNED_CATEGORY];
+      const unique = [...new Set(cats)];
+      for (const cat of unique) {
+        counts.set(cat, (counts.get(cat) ?? 0) + 1);
+      }
+    }
+    const named = [...counts.entries()]
+      .filter(([name]) => name !== UNASSIGNED_CATEGORY)
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
+      .map(([name, count]) => ({ id: name, label: name, count }));
+    const unassignedCount = counts.get(UNASSIGNED_CATEGORY) ?? 0;
+    if (unassignedCount > 0) {
+      named.push({ id: UNASSIGNED_CATEGORY, label: UNASSIGNED_CATEGORY, count: unassignedCount });
+    }
+    return named;
+  }, [sizes]);
+
+  const catalogCounts = useMemo(() => {
+    const result: Record<string, number> = { [SIZE_CATALOG_ALL]: sizes.length };
+    for (const tab of catalogTabs) {
+      result[tab.id] = tab.count;
+    }
+    return result;
+  }, [sizes.length, catalogTabs]);
+
+  const filtered = useMemo(() => {
+    const byGroup =
+      catalogFilter === SIZE_CATALOG_ALL
+        ? sizes
+        : sizes.filter((s) => {
+          if (catalogFilter === UNASSIGNED_CATEGORY) {
+            return s.categories.length === 0;
+          }
+          return s.categories.some(
+            (c) => c.toLowerCase() === String(catalogFilter).toLowerCase()
+          );
+        });
+    const q = search.toLowerCase().trim();
+    if (!q) return byGroup;
+    return byGroup.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        s.primaryCategory.toLowerCase().includes(q) ||
+        s.categories.some((c) => c.toLowerCase().includes(q))
+    );
+  }, [sizes, search, catalogFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
+  function handleCatalogFilter(id: SizeCatalogFilterId) {
+    setCatalogFilter(id);
+    setPage(1);
+  }
 
   const loadSizes = useCallback(async () => {
     setLoading(true);
@@ -687,19 +739,28 @@ export default function SizesManagement() {
   }, [loadSizes]);
 
   async function handleAdd(d: { name: string; code: string; status: "Active" | "Inactive" }) {
+    if (!(await sweetCrud.confirmAdd("Size", d.name))) return;
     setSaving(true);
     try {
       const created = await createSize(d);
-      setSizes((prev) => [...prev, mapSizeRow(created)]);
+      const mapped = mapSizeRow(created);
+      setSizes((prev) => [...prev, mapped]);
+      setCatalogFilter(
+        mapped.categories[0] ?? mapped.primaryCategory ?? SIZE_CATALOG_ALL
+      );
+      setPage(1);
+      setSearch("");
       setModal(null);
+      void sweetCrud.added("Size");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not add size."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not add size."));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleUpdate(updated: SizeItem) {
+    if (!(await sweetCrud.confirmUpdate("Size", updated.name))) return;
     setSaving(true);
     try {
       const saved = await updateSize(updated.id, {
@@ -707,23 +768,31 @@ export default function SizesManagement() {
         code: updated.code,
         status: updated.status,
       });
-      setSizes((prev) => prev.map((s) => (s.id === updated.id ? mapSizeRow(saved) : s)));
+      const mapped = mapSizeRow(saved);
+      setSizes((prev) => prev.map((s) => (s.id === updated.id ? mapped : s)));
+      setCatalogFilter(
+        mapped.categories[0] ?? mapped.primaryCategory ?? SIZE_CATALOG_ALL
+      );
+      setPage(1);
       setModal(null);
+      void sweetCrud.updated("Size");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not update size."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not update size."));
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(size: SizeItem) {
+    if (!(await sweetCrud.confirmDelete("Size", size.name))) return;
     setSaving(true);
     try {
-      await deleteSize(id);
-      setSizes((prev) => prev.filter((s) => s.id !== id));
+      await deleteSize(size.id);
+      setSizes((prev) => prev.filter((s) => s.id !== size.id));
       setModal(null);
+      void sweetCrud.deleted("Size");
     } catch (error) {
-      Alert.alert("Error", getApiErrorMessage(error, "Could not delete size."));
+      void sweetError("Error", getApiErrorMessage(error, "Could not delete size."));
     } finally {
       setSaving(false);
     }
@@ -743,27 +812,61 @@ export default function SizesManagement() {
 
   return (
     <AdminLayout>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={{ flex: 1, minHeight: Dimensions.get('window').height }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, width: "100%" }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1, width: "100%" }} onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
           <StatusBar barStyle="light-content" backgroundColor="#8b3e0f" />
 
           {/* ── WEB PAGE HEADER — Mobile: Border Radius Added ── */}
-          <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
-            <View style={S.headerIconBox}>
-              <BI name="grid-3x3" size={18} color="#fff" />
+          {width < 450 ? (
+            <View style={[
+              S.webPageHeader,
+              S.webPageHeaderMobile,
+              { flexDirection: "column", alignItems: "stretch", gap: 10 }
+            ]}>
+              {/* Row 1: Icon & Title on Left & Add Button on Right */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <View style={[S.headerIconBox, { width: 28, height: 28, marginRight: 0, flexShrink: 0 }]}>
+                    <BI name="grid-3x3" size={12} color="#fff" />
+                  </View>
+                  <Text style={[S.webPageTitle, { fontSize: width < 360 ? 15 : 19, fontWeight: "800", flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit>
+                    Sizes Management
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[S.addBtn, S.addBtnMobile, { paddingVertical: 6, paddingHorizontal: width < 360 ? 8 : 10, marginLeft: width < 360 ? 4 : 8, flexShrink: 0, flexDirection: "row", alignItems: "center" }]}
+                  onPress={() => setModal({ type: "add" })}
+                >
+                  <BI name="plus-lg" size={width < 360 ? 10 : 12} color="#fff" />
+                  <Text style={[S.addBtnText, { fontSize: width < 360 ? 11 : 12, marginLeft: 4 }]}>Add Size</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Subtitle Row */}
+              <Text style={S.webPageSubtitle}>
+                Manage catalog size variants and status settings
+              </Text>
             </View>
-            <View style={{ flex: 1, marginRight: isMobile ? 8 : 16 }}>
-              <Text style={S.webPageTitle}>Sizes Management</Text>
-              {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+          ) : (
+            <View style={[S.webPageHeader, isMobile && S.webPageHeaderMobile]}>
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: isMobile ? 8 : 16 }}>
+                <View style={[S.headerIconBox, { width: 34, height: 34, marginRight: 10 }]}>
+                  <BI name="grid-3x3" size={15} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.webPageTitle}>Sizes Management</Text>
+                  {!isMobile && <Text style={S.webPageSubtitle}>Manage catalog size variants and status settings</Text>}
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[S.addBtn, isMobile && S.addBtnMobile]}
+                onPress={() => setModal({ type: "add" })}
+              >
+                <BI name="plus-lg" size={15} color="#fff" />
+                <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[S.addBtn, isMobile && S.addBtnMobile]}
-              onPress={() => setModal({ type: "add" })}
-            >
-              <BI name="plus-lg" size={15} color="#fff" />
-              <Text style={[S.addBtnText, { marginLeft: 6 }]}>Add New Size</Text>
-            </TouchableOpacity>
-          </View>
+          )}
 
           {/* ── CONTROL BAR ── */}
           {loadError ? (
@@ -811,6 +914,36 @@ export default function SizesManagement() {
             </View>
           </View>
 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: PADDING, marginTop: 10 }}
+            contentContainerStyle={S.catalogTabsRow}
+          >
+            <TouchableOpacity
+              style={[S.catalogTab, catalogFilter === SIZE_CATALOG_ALL && S.catalogTabActive]}
+              onPress={() => handleCatalogFilter(SIZE_CATALOG_ALL)}
+            >
+              <Text style={[S.catalogTabText, catalogFilter === SIZE_CATALOG_ALL && S.catalogTabTextActive]}>
+                All ({catalogCounts.all})
+              </Text>
+            </TouchableOpacity>
+            {catalogTabs.map((g) => {
+              const active = catalogFilter === g.id;
+              return (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[S.catalogTab, active && S.catalogTabActive]}
+                  onPress={() => handleCatalogFilter(g.id)}
+                >
+                  <Text style={[S.catalogTabText, active && S.catalogTabTextActive]}>
+                    {g.label} ({g.count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           {/* ── LIST / GRID ── */}
           {paginated.length === 0 ? (
             <View style={S.emptyBox}>
@@ -827,43 +960,56 @@ export default function SizesManagement() {
               marginHorizontal: -GAP / 2
             }}>
               {paginated.map((item, index) => (
-                <View key={item.id} style={{ paddingHorizontal: GAP / 2, paddingBottom: GAP }}>
+                <View
+                  key={item.id}
+                  style={{
+                    width: cardWidthPct,
+                    paddingHorizontal: GAP / 2,
+                    paddingBottom: GAP
+                  }}
+                >
                   <GridCard
                     item={item}
                     idx={(safePage - 1) * PAGE_SIZE + index}
                     onEdit={s => setModal({ type: "edit", size: s })}
-                    onDelete={s => setModal({ type: "delete", size: s })}
-                    cardWidth={cardWidth}
+                    onDelete={s => void handleDelete(s)}
+                    cardWidth="100%"
                   />
                 </View>
               ))}
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ width: Math.max(containerWidth, 800) }}>
-                <View style={{ paddingHorizontal: PADDING, paddingTop: 12 }}>
-                  <View style={S.listHeader}>
-                    <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
-                    <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
-                    <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
-                    <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+            <View style={{ width: "100%" }}>
+              {/* @ts-ignore */}
+              <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
+                <View style={{ width: Math.max(containerWidth, 800) }}>
+                  <View style={{ paddingHorizontal: PADDING, paddingTop: 12, paddingBottom: 24 }}>
+                    <View style={{ borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#f0e8e0" }}>
+                      <View style={S.listHeader}>
+                        <Text style={[S.listHeaderCell, { width: 95 }]}>ID</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.5 }]}>Size Name</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Size Code</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.2 }]}>Category</Text>
+                        <Text style={[S.listHeaderCell, { flex: 1.4 }]}>Created Date</Text>
+                        <Text style={[S.listHeaderCell, { width: 150 }]}>Status</Text>
+                        <Text style={[S.listHeaderCell, { width: 80, textAlign: "center" }]}>Action</Text>
+                      </View>
+                      <View style={{ backgroundColor: "#fff" }}>
+                        {paginated.map((item, index) => (
+                          <ListRow
+                            key={item.id}
+                            item={item}
+                            idx={index}
+                            onEdit={s => setModal({ type: "edit", size: s })}
+                            onDelete={s => void handleDelete(s)}
+                          />
+                        ))}
+                      </View>
+                    </View>
                   </View>
                 </View>
-                <View style={{ paddingHorizontal: PADDING, paddingBottom: 24 }}>
-                  {paginated.map((item, index) => (
-                    <ListRow
-                      key={item.id}
-                      item={item}
-                      idx={index}
-                      onEdit={s => setModal({ type: "edit", size: s })}
-                      onDelete={s => setModal({ type: "delete", size: s })}
-                    />
-                  ))}
-                </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           )}
 
           {Footer}
@@ -882,11 +1028,6 @@ export default function SizesManagement() {
         onClose={() => setModal(null)}
         onUpdate={handleUpdate}
       />
-      <DeleteModal
-        visible={modal?.type === "delete"}
-        onClose={() => setModal(null)}
-        onDelete={() => modal?.type === "delete" && handleDelete(modal.size.id)}
-      />
     </AdminLayout>
   );
 }
@@ -901,7 +1042,7 @@ const S = StyleSheet.create({
   webPageHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 24, paddingVertical: 20,
-    backgroundColor: "#151D4F",
+    backgroundColor: "#1D324E",
     borderRadius: 12,
     marginHorizontal: 16,
     marginTop: 16,
@@ -917,15 +1058,15 @@ const S = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: "#e07820",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
   addBtn: {
-    backgroundColor: "#e07820",
+    backgroundColor: "#F97316",
     borderWidth: 1.2,
-    borderColor: "#e07820",
+    borderColor: "#F97316",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -960,7 +1101,7 @@ const S = StyleSheet.create({
     borderWidth: 1.5, borderColor: "#ddd", backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center",
   },
-  viewBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  viewBtnActive: { backgroundColor: "#1d324e", borderColor: "#1d324e" },
 
   // Grid card
   gridCard: {
@@ -985,7 +1126,66 @@ const S = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
   gridCardBottom: { backgroundColor: "#fff", padding: 10 },
-  gridCardName: { fontSize: 13, fontWeight: "600", color: "#222", marginBottom: 4 },
+  gridCardName: { fontSize: 13, fontWeight: "600", color: "#222", marginBottom: 2 },
+  gridCardCatalog: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#8b3e0f",
+    marginBottom: 6,
+  },
+  catalogTabsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  catalogTab: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#e5d5c8",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  catalogTabActive: {
+    backgroundColor: "#8b3e0f",
+    borderColor: "#8b3e0f",
+  },
+  catalogTabText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6b5a4e",
+  },
+  catalogTabTextActive: {
+    color: "#fff",
+  },
+  catalogMatchBox: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 16,
+    marginBottom: 14,
+  },
+  catalogMatchLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#9A3412",
+    marginBottom: 2,
+  },
+  catalogMatchValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#C2410C",
+  },
+  catalogMatchHint: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "#9A3412",
+    lineHeight: 15,
+  },
   gridCardMeta: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between", flexWrap: "wrap", gap: 4,
@@ -1002,9 +1202,9 @@ const S = StyleSheet.create({
 
   // List view
   listHeader: {
-    flexDirection: "row", backgroundColor: "#151D4F",
+    flexDirection: "row", backgroundColor: "#1D324E",
     paddingHorizontal: 12, paddingVertical: 12,
-    borderBottomWidth: 1.5, borderBottomColor: "#f0e8e0",
+    borderBottomWidth: 1.5, borderBottomColor: "#E8E0D8",
   },
   listHeaderCell: { fontSize: 13, fontWeight: "600", color: "#fff" },
   listRow: {
@@ -1059,7 +1259,7 @@ const S = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1, backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center", alignItems: "center", padding: 20,
+    justifyContent: "center", alignItems: "center", padding: 12,
   },
   modalBox: {
     backgroundColor: "#fff", borderRadius: 14, width: "100%", maxWidth: 460,
@@ -1074,7 +1274,7 @@ const S = StyleSheet.create({
   modalCloseBtn: { padding: 4 },
   modalBody: { padding: 20 },
   modalFooter: {
-    flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "flex-end",
+    flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "flex-end", flexWrap: "wrap",
   },
 
   // Form
@@ -1093,19 +1293,19 @@ const S = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     backgroundColor: "#fafafa",
   },
-  statusToggleBtnActive: { backgroundColor: "#e07820", borderColor: "#e07820" },
+  statusToggleBtnActive: { backgroundColor: "#F97316", borderColor: "#F97316" },
   statusToggleBtnText: { fontSize: 14, fontWeight: "600", color: "#555" },
 
   // Buttons
   cancelBtn: {
     backgroundColor: "#3a3f4a", borderRadius: 8,
-    paddingHorizontal: 18, paddingVertical: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: "row", alignItems: "center",
   },
   cancelBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
   confirmBtn: {
-    backgroundColor: "#e07820", borderRadius: 8,
-    paddingHorizontal: 18, paddingVertical: 10,
+    backgroundColor: "#F97316", borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: "row", alignItems: "center",
   },
   confirmBtnDisabled: { backgroundColor: "#ccc" },
@@ -1134,7 +1334,7 @@ const S = StyleSheet.create({
     backgroundColor: "#fafafa",
   },
   dropdownBtnOpen: {
-    borderColor: "#e07820",
+    borderColor: "#F97316",
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     borderBottomWidth: 0,
@@ -1145,7 +1345,7 @@ const S = StyleSheet.create({
     top: "100%" as any,
     left: 0, right: 0,
     backgroundColor: "#fff",
-    borderWidth: 1.5, borderColor: "#e07820", borderTopWidth: 0,
+    borderWidth: 1.5, borderColor: "#F97316", borderTopWidth: 0,
     borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
     overflow: "hidden", zIndex: 200,
     shadowColor: "#000", shadowOffset: { width: 0, height: 6 },

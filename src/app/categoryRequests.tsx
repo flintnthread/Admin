@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import AdminLayout from '@/components/admin-layout';
+import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetConfirm, sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { mapCategoryRequestRow } from '@/lib/mappers';
 import {
   approveCategoryRequest,
@@ -7,20 +9,18 @@ import {
   fetchCategoryRequestStats,
   rejectCategoryRequest,
 } from '@/services/categoryRequestApi';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
   Modal,
+  ScrollView,
   StyleSheet,
-  useWindowDimensions,
+  Text,
   TextInput,
-  Platform,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
 } from 'react-native';
-import AdminLayout from '@/components/admin-layout';
-import Pagination from '@/components/Pagination';
-import Svg, { Path, Circle, Rect, G, Polyline } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -153,8 +153,15 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
 
   const isPending = request.status === 'Pending';
 
-  const handleAction = (action: 'Approved' | 'Rejected') => {
+  const handleAction = async (action: 'Approved' | 'Rejected') => {
     if (!adminReason.trim()) return;
+    const confirmed = await sweetConfirm({
+      title: `${action === 'Approved' ? 'Approve' : 'Reject'} Category Request?`,
+      text: `Are you sure you want to ${action.toLowerCase()} this category request?`,
+      confirmText: `Yes, ${action === 'Approved' ? 'Approve' : 'Reject'}`,
+      danger: action === 'Rejected',
+    });
+    if (!confirmed) return;
     onUpdate(request.id, action, adminReason);
     onClose();
   };
@@ -295,6 +302,9 @@ const ViewModal = ({ request, onClose, onUpdate, isWeb }: ViewModalProps) => {
 
 export default function CategoryRequests() {
   const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const isTablet = width >= 768 && width < 1024;
+  const isLaptop = width >= 1024;
   const isWeb = width >= 768;
 
   const [requests, setRequests] = useState<CategoryRequest[]>([]);
@@ -358,12 +368,16 @@ export default function CategoryRequests() {
       try {
         if (status === 'Approved') {
           await approveCategoryRequest(row.numericId, reason);
+          void sweetSuccess('Approved!', 'Category request approved successfully.');
         } else {
           await rejectCategoryRequest(row.numericId, reason);
+          void sweetSuccess('Rejected!', 'Category request rejected.');
         }
         await loadData();
       } catch (e) {
-        setLoadError(getApiErrorMessage(e));
+        const msg = getApiErrorMessage(e, 'Failed to update category request.');
+        setLoadError(msg);
+        void sweetError('Error', msg);
       }
     })();
   };
@@ -380,7 +394,7 @@ export default function CategoryRequests() {
     }
   };
 
-  const cardWidth = isWeb ? undefined : (width - 32 - 8) / 2;
+  const cardWidth = isLaptop ? undefined : isTablet ? (width - 32 - 12) / 2 : width - 32;
 
   const filterTabsMobile = FILTERS.map((f) => {
     const count = getFilterCount(f);
@@ -407,36 +421,33 @@ export default function CategoryRequests() {
 
   const filterTabsWeb = (
     <View style={styles.filterContainerWeb}>
-      {FILTERS.map((f, i) => {
-        const count = getFilterCount(f);
-        const isActive = filter === f;
-        
-        // Only show divider if neither this tab nor the next tab is active, and it's not the last tab
-        const isNextActive = i < FILTERS.length - 1 && filter === FILTERS[i + 1];
-        const showDivider = !isActive && !isNextActive && i !== FILTERS.length - 1;
-
-        return (
-          <React.Fragment key={f}>
-            <TouchableOpacity
-              style={[styles.filterTabWeb, isActive && styles.filterTabWebActive]}
-              onPress={() => {
-                setFilter(f);
-                setCurrentPage(1);
-              }}
-            >
-              <Text style={[styles.filterTabTextWeb, isActive && styles.filterTabTextWebActive]}>
-                {f}
-              </Text>
-              <View style={[styles.filterCountWeb, isActive && styles.filterCountWebActive]}>
-                <Text style={[styles.filterCountTextWeb, isActive && styles.filterCountTextWebActive]}>
-                  {count}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 10 }}>
+        {FILTERS.map((f, i) => {
+          const count = getFilterCount(f);
+          const isActive = filter === f;
+          
+          return (
+            <React.Fragment key={f}>
+              <TouchableOpacity
+                style={[styles.filterTabWeb, isActive && styles.filterTabWebActive]}
+                onPress={() => {
+                  setFilter(f);
+                  setCurrentPage(1);
+                }}
+              >
+                <Text style={[styles.filterTabTextWeb, isActive && styles.filterTabTextWebActive]}>
+                  {f}
                 </Text>
-              </View>
-            </TouchableOpacity>
-            {showDivider && <View style={styles.filterDividerWeb} />}
-          </React.Fragment>
-        );
-      })}
+                <View style={[styles.filterCountWeb, isActive && styles.filterCountWebActive]}>
+                  <Text style={[styles.filterCountTextWeb, isActive && styles.filterCountTextWebActive]}>
+                    {count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </React.Fragment>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 
@@ -444,7 +455,7 @@ export default function CategoryRequests() {
     <AdminLayout>
       <ScrollView
         style={styles.root}
-        contentContainerStyle={[styles.rootContent, !isWeb && styles.rootContentMobile]}
+        contentContainerStyle={[styles.rootContent, !isLaptop && styles.rootContentMobile]}
         showsVerticalScrollIndicator={false}
       >
         {loadError ? (
@@ -455,6 +466,13 @@ export default function CategoryRequests() {
       <Modal visible={statusModalOpen} transparent animationType="fade" onRequestClose={() => setStatusModalOpen(false)}>
         <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setStatusModalOpen(false)}>
           <View style={styles.dropdownMenu}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#1E3A5F' }}>Select Status</Text>
+              <TouchableOpacity onPress={() => setStatusModalOpen(false)} style={{ padding: 4 }}>
+                <XIcon color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginBottom: 8 }} />
             {FILTERS.map(f => {
               const count = getFilterCount(f);
               const isActive = filter === f;
@@ -540,7 +558,7 @@ export default function CategoryRequests() {
 
         {/* ── Toolbar ── */}
         <View style={[styles.toolbarRow, isWeb && styles.toolbarRowWeb]}>
-          <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
+          <View style={[styles.searchBox, isWeb && styles.searchBoxWeb, isTablet && { flex: 1 }]}>
             <SearchIcon />
             <TextInput
               style={styles.searchInput as any}
@@ -557,7 +575,7 @@ export default function CategoryRequests() {
           </View>
           
           {isWeb ? (
-            <View style={styles.filterRowWeb}>
+            <View style={[styles.filterRowWeb, isTablet && { flex: 1.2, marginLeft: 10 }]}>
               {filterTabsWeb}
             </View>
           ) : (
@@ -571,61 +589,67 @@ export default function CategoryRequests() {
           )}
         </View>
 
-        {/* ── Web Table / Mobile Cards ── */}
-        {isWeb ? (
+        {/* ── Laptop Table / Mobile+Tablet Cards ── */}
+        {isLaptop ? (
           <View style={styles.tableWrapper}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.th, { width: 80 }]}>ID</Text>
-              <Text style={[styles.th, { width: 130 }]}>Category</Text>
-              <Text style={[styles.th, { flex: 1.4 }]}>Seller</Text>
-              <Text style={[styles.th, { flex: 2 }]}>Description</Text>
-              <Text style={[styles.th, { flex: 1.5 }]}>Reason</Text>
-              <Text style={[styles.th, { width: 100 }]}>Status</Text>
-              <Text style={[styles.th, { width: 120 }]}>Submitted</Text>
-              <Text style={[styles.th, { width: 80, textAlign: 'center' }]}>Actions</Text>
+            <View style={{ width: '100%' }}>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <Text style={[styles.th, { width: 80 }]}>ID</Text>
+                <Text style={[styles.th, { width: '12%' }]}>CATEGORY</Text>
+                <Text style={[styles.th, { width: '16%' }]}>SELLER</Text>
+                <Text style={[styles.th, { flex: 1.2 }]}>DESCRIPTION</Text>
+                <Text style={[styles.th, { flex: 1 }]}>REASON</Text>
+                <Text style={[styles.th, { width: 100 }]}>STATUS</Text>
+                <Text style={[styles.th, { width: 100 }]}>SUBMITTED</Text>
+                <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>ACTIONS</Text>
+              </View>
+
+              {/* Table Rows */}
+              {paginated.map((req, idx) => (
+                <View key={req.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
+                  <Text style={[styles.td, { width: 80 }, styles.tdId]} numberOfLines={1}>{req.id}</Text>
+                  <View style={{ width: '12%', paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <Text style={styles.tdCategoryName} numberOfLines={1}>{req.categoryName}</Text>
+                  </View>
+                  <View style={{ width: '16%', paddingVertical: 14, paddingHorizontal: 12 }}>
+                    <Text style={styles.tdSellerName} numberOfLines={1}>{req.sellerName}</Text>
+                    <Text style={styles.tdSellerEmail} numberOfLines={1}>{req.sellerEmail}</Text>
+                  </View>
+                  <View style={{ flex: 1.2, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.description}</Text>
+                  </View>
+                  <View style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }} numberOfLines={3}>{req.reason}</Text>
+                  </View>
+                  <View style={{ width: 100, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
+                    <StatusBadge status={req.status} />
+                  </View>
+                  <Text style={[styles.td, { width: 100 }, styles.tdMuted]} numberOfLines={1}>{req.submitted}</Text>
+                  <View style={{ width: 90, alignItems: 'center', justifyContent: 'center' }}>
+                    <TouchableOpacity
+                      style={styles.viewBtn}
+                      onPress={() => setSelectedRequest(req)}
+                    >
+                      <EyeIcon />
+                      <Text style={styles.viewBtnText}>View</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {filtered.length === 0 && (
+                <View style={styles.emptyRow}>
+                  <Text style={styles.emptyText}>No requests match this filter</Text>
+                </View>
+              )}
             </View>
-
-            {/* Table Rows */}
-            {paginated.map((req, idx) => (
-              <View key={req.id} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
-                <Text style={[styles.td, { width: 80 }, styles.tdId]}>{req.id}</Text>
-                <View style={{ width: 130, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                  <Text style={styles.tdCategoryName}>{req.categoryName}</Text>
-                </View>
-                <View style={{ flex: 1.4, paddingVertical: 14, paddingHorizontal: 12 }}>
-                  <Text style={styles.tdSellerName}>{req.sellerName}</Text>
-                  <Text style={styles.tdSellerEmail} numberOfLines={1}>{req.sellerEmail}</Text>
-                </View>
-                <Text style={[styles.td, { flex: 2 }]}>{req.description}</Text>
-                <Text style={[styles.td, { flex: 1.5 }]}>{req.reason}</Text>
-                <View style={{ width: 100, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'center' }}>
-                  <StatusBadge status={req.status} />
-                </View>
-                <Text style={[styles.td, { width: 120 }, styles.tdMuted]}>{req.submitted}</Text>
-                <View style={{ width: 80, alignItems: 'center', justifyContent: 'center' }}>
-                  <TouchableOpacity
-                    style={styles.viewBtn}
-                    onPress={() => setSelectedRequest(req)}
-                  >
-                    <EyeIcon />
-                    <Text style={styles.viewBtnText}>View</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-
-            {filtered.length === 0 && (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No requests match this filter</Text>
-              </View>
-            )}
           </View>
         ) : (
-          /* Mobile Cards */
-          <View style={[styles.cardList, !isWeb && styles.cardListMobile]}>
+          /* Mobile + Tablet Cards */
+          <View style={[styles.cardList, styles.cardListMobile, isTablet && { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }]}>
             {paginated.map((req) => (
-              <View key={req.id} style={[styles.card, !isWeb && styles.cardMobile]}>
+              <View key={req.id} style={[styles.card, styles.cardMobile, isTablet && { width: '48.5%' }]}>
                 <View style={styles.cardTop}>
                   <View style={styles.cardTopLeft}>
                     <Text style={styles.cardId}>{req.id}</Text>
@@ -637,11 +661,11 @@ export default function CategoryRequests() {
                   <StatusBadge status={req.status} />
                 </View>
 
-                <Text style={[styles.cardDesc, !isWeb && styles.cardDescMobile]} numberOfLines={2}>{req.description}</Text>
+                <Text style={[styles.cardDesc, styles.cardDescMobile]} numberOfLines={2}>{req.description}</Text>
 
-                <View style={[styles.cardDivider, !isWeb && styles.cardDividerMobile]} />
+                <View style={[styles.cardDivider, styles.cardDividerMobile]} />
 
-                <View style={[styles.cardMeta, !isWeb && styles.cardMetaMobile]}>
+                <View style={[styles.cardMeta, styles.cardMetaMobile]}>
                   <View style={styles.cardMetaRow}>
                     <Text style={styles.cardMetaLabel}>Seller</Text>
                     <Text style={styles.cardMetaValue}>{req.sellerName}</Text>
@@ -653,7 +677,7 @@ export default function CategoryRequests() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.cardViewBtn, !isWeb && styles.cardViewBtnMobile]}
+                  style={[styles.cardViewBtn, styles.cardViewBtnMobile]}
                   onPress={() => setSelectedRequest(req)}
                 >
                   <EyeIcon />
@@ -763,7 +787,7 @@ const styles = StyleSheet.create({
   // Web desktop stat cards row
   statsRowWeb: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'center',
     gap: 8,
     marginTop: -32,
@@ -773,8 +797,8 @@ const styles = StyleSheet.create({
   },
   statCardWeb: {
     flex: 1,
-    minWidth: 130,
-    maxWidth: 240,
+    minWidth: 120,
+    maxWidth: 200,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 12,
@@ -964,13 +988,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   filterTabWeb: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     borderRadius: 10,
   },
   filterTabWebActive: {
@@ -1125,8 +1148,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     alignItems: 'center',
-    paddingBottom: 16,
-    marginBottom: 8,
   },
   tableRowAlt: {
     backgroundColor: '#FAFAFA',

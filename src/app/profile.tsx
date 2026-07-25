@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   useWindowDimensions,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
+import { sweetSuccess, sweetWarning } from "@/lib/sweetAlert";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -29,18 +29,18 @@ export default function ProfileScreen() {
 
   const handleUpdatePassword = () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert("Error", "Please fill in all password fields.");
+      void sweetWarning("Error", "Please fill in all password fields.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert("Error", "New password and confirmation do not match.");
+      void sweetWarning("Error", "New password and confirmation do not match.");
       return;
     }
 
     setIsUpdating(true);
     setTimeout(() => {
       setIsUpdating(false);
-      Alert.alert("Success", "Password updated successfully (mock).");
+      void sweetSuccess("Success", "Password updated successfully (mock).");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

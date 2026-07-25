@@ -1,9 +1,9 @@
 /**
  * JobApplicationsScreen.jsx
- * React Native — works on iOS, Android, and React Native Web
+ * React Native â€” works on iOS, Android, and React Native Web
  *
  * Dependencies (add to your project if not present):
- *   npm install @react-navigation/native  (optional – for breadcrumb nav)
+ *   npm install @react-navigation/native  (optional â€“ for breadcrumb nav)
  *   All other imports are from react-native core.
  */
 
@@ -11,6 +11,7 @@ import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { formatDate, initialsFromName } from '@/lib/format';
+import { sweetError } from '@/lib/sweetAlert';
 import { fetchJobApplications, fetchJobs, updateJobApplicationStatus } from '@/services/hrApi';
 import { Feather } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -27,7 +28,7 @@ import {
   View
 } from 'react-native';
 
-// ─── Palette ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const C = {
   bg: '#F4F6FB',
   card: '#FFFFFF',
@@ -46,7 +47,7 @@ const C = {
   white: '#FFFFFF',
 };
 
-// ─── Feather Icons mapping ────────
+// â”€â”€â”€ Feather Icons mapping â”€â”€â”€â”€â”€â”€â”€â”€
 const BI_MAP: Record<string, any> = {
   "file-earmark-text": "file-text",
   "hourglass-split": "clock",
@@ -84,29 +85,33 @@ const BI: React.FC<{ name: BIName; size?: number; color?: string; style?: object
 const AVATAR_COLORS = ['#5B4EFF', '#8B5CF6', '#06B6D4', '#F97316', '#EF4444', '#10B981', '#F59E0B', '#EC4899'];
 
 function mapApplication(a: import('@/lib/api/types').JobApplication, index: number) {
-  const statusRaw = (a.status ?? 'pending').toLowerCase();
+  const statusRaw = String(a.status ?? 'pending').toLowerCase();
   const status =
     statusRaw === 'reviewed' ? 'Reviewed' :
-      statusRaw === 'shortlisted' ? 'Shortlisted' :
-        statusRaw === 'interviewed' ? 'Interviewed' :
-          statusRaw === 'rejected' ? 'Rejected' : 'Pending';
-  const jobTitle = a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : '—');
+    statusRaw === 'shortlisted' ? 'Shortlisted' :
+    statusRaw === 'interviewed' ? 'Interviewed' :
+    statusRaw === 'rejected' ? 'Rejected' :
+    statusRaw === 'hired' ? 'Hired' :
+    'Pending';
+  const expYears = a.experienceYears != null ? Number(a.experienceYears) : null;
   return {
-    id: String(a.id),
+    id: String(a.id ?? index),
     jobId: a.jobId,
     name: a.name ?? 'Applicant',
-    role: jobTitle,
-    department: a.departmentName ?? '—',
+    email: a.email ?? 'â€”',
+    phone: a.phone ?? 'â€”',
+    role: a.jobTitle ?? (a.jobId != null ? `Job #${a.jobId}` : 'â€”'),
+    department: a.departmentName ?? 'â€”',
     applied: formatDate(a.appliedAt),
-    status,
     avatar: initialsFromName(a.name),
     avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
-    experience: '—',
-    email: a.email ?? '—',
-    phone: a.phone ?? '—',
+    status,
+    experience: expYears != null && !Number.isNaN(expYears) ? `${expYears} yr${expYears === 1 ? '' : 's'}` : 'â€”',
     resumePath: a.resumePath ?? '',
     coverLetter: a.coverLetter ?? '',
-    location: '—',
+    location: a.location?.trim() || 'â€”',
+    currentCompany: a.currentCompany ?? '',
+    currentDesignation: a.currentDesignation ?? '',
   };
 }
 
@@ -116,6 +121,7 @@ const STATUS_CONFIG = {
   Shortlisted: { color: C.shortlisted, bg: '#ECFDF5', icon: 'star-fill' },
   Interviewed: { color: C.interviewed, bg: '#F5F3FF', icon: 'mic-fill' },
   Rejected: { color: C.rejected, bg: '#FEF2F2', icon: 'x-circle-fill' },
+  Hired: { color: C.shortlisted, bg: '#ECFDF5', icon: 'check-circle-fill' },
 };
 
 const STAT_CARDS = [
@@ -127,20 +133,20 @@ const STAT_CARDS = [
   { key: 'Rejected', label: 'Rejected', color: C.rejected, icon: 'x-circle-fill' },
 ];
 
-const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'];
-const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected'] as const;
+const STATUSES = ['All Status', 'Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'];
+const STATUS_UPDATE_OPTIONS = ['Pending', 'Reviewed', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'] as const;
 
-// ─── Helper components ───────────────────────────────────────────────────────
+// â”€â”€â”€ Helper components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: C.sub, bg: C.bg, icon: '•' };
-  const isBI = cfg.icon !== '•';
+  const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: C.sub, bg: C.bg, icon: 'â€¢' };
+  const isBI = cfg.icon !== 'â€¢';
   return (
     <View style={[styles.badge, { backgroundColor: cfg.bg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
       {isBI ? (
         <BI name={cfg.icon} size={11} color={cfg.color} />
       ) : (
-        <Text style={{ color: cfg.color }}>•</Text>
+        <Text style={{ color: cfg.color }}>â€¢</Text>
       )}
       <Text style={[styles.badgeText, { color: cfg.color }]}>
         {status}
@@ -159,13 +165,13 @@ function Avatar({ initials, color, size = 44 }: { initials: string, color: strin
 
 function StatCard({ label, count, color, icon, isWeb }: { label: string, count: number | string, color: string, icon: string, isWeb: boolean }) {
   return (
-    <View style={[styles.statCard, isWeb && styles.statCardWeb, { borderTopColor: color }]}>
+    <View style={[styles.statCard, { borderTopColor: color }]}>
       <View style={[styles.statIcon, { backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center' }]}>
         <BI name={icon} size={16} color={color} />
       </View>
-      <View>
-        <Text style={[styles.statCount, { color }]}>{count}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.statCount, { color }]} numberOfLines={1}>{count}</Text>
+        <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
       </View>
     </View>
   );
@@ -203,7 +209,7 @@ function ApplicationCard({
                 activeOpacity={0.8}
                 disabled={updating}
               >
-                <StatusBadge status={updating ? 'Updating…' : item.status} />
+                <StatusBadge status={updating ? 'Updatingâ€¦' : item.status} />
               </TouchableOpacity>
               {statusOpen && (
                 <View style={styles.statusMenu}>
@@ -287,7 +293,7 @@ function ApplicationCard({
             activeOpacity={0.8}
             disabled={updating}
           >
-            <StatusBadge status={updating ? 'Updating…' : item.status} />
+            <StatusBadge status={updating ? 'Updatingâ€¦' : item.status} />
           </TouchableOpacity>
           {statusOpen && (
             <View style={styles.statusMenu}>
@@ -319,7 +325,7 @@ function ApplicationCard({
   );
 }
 
-// ─── Dropdown (lightweight native) ───────────────────────────────────────────
+// â”€â”€â”€ Dropdown (lightweight native) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Dropdown({ value, options, onSelect, placeholder }: { value: string, options: string[], onSelect: (val: string) => void, placeholder: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -345,7 +351,7 @@ function Dropdown({ value, options, onSelect, placeholder }: { value: string, op
   );
 }
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function JobApplicationsScreen() {
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
@@ -371,7 +377,7 @@ export default function JobApplicationsScreen() {
       );
     } catch (e) {
       const msg = getApiErrorMessage(e, 'Failed to update status.');
-      if (Platform.OS === 'web') window.alert(msg);
+      void sweetError('Error', msg);
     } finally {
       setUpdatingId(null);
     }
@@ -436,58 +442,81 @@ export default function JobApplicationsScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#151D4F" />
         <ScrollView style={styles.root} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
-          {/* ── Header ── */}
+          {/* â”€â”€ Header â”€â”€ */}
           <View style={[styles.header, isWeb && styles.headerWeb]}>
-            <View>
-
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="file-text" size={24} color="#FFF" />
+              </View>
               <Text style={styles.pageTitle}>Job Applications</Text>
             </View>
           </View>
 
-          {/* ── Stat Cards ── */}
-          {isWeb ? (
-            <View style={{ width: '100%', alignItems: 'center', zIndex: 10, elevation: 10, marginTop: -42 }}>
+          {/* â”€â”€ Stat Cards â”€â”€ */}
+          <View style={{ marginTop: isWeb ? -42 : -28, zIndex: 10, marginBottom: 14 }}>
+            {isWeb ? (
               <ScrollView
-                style={{ overflow: 'visible', maxWidth: '100%' }}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.statRowWeb}
+                style={{ width: "100%", maxWidth: 900, alignSelf: "center" }}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  gap: 8,
+                  flexGrow: 1,
+                  justifyContent: "center"
+                }}
               >
                 {STAT_CARDS.map(s => (
-                  <StatCard
+                  <View
                     key={s.key}
-                    label={s.label}
-                    count={counts[s.key] ?? 0}
-                    color={s.color}
-                    icon={s.icon}
-                    isWeb={isWeb}
-                  />
+                    style={[
+                      styles.statCardWrapper,
+                      { width: 143 }
+                    ]}
+                  >
+                    <StatCard
+                      label={s.label}
+                      count={counts[s.key] ?? 0}
+                      color={s.color}
+                      icon={s.icon}
+                      isWeb={isWeb}
+                    />
+                  </View>
                 ))}
               </ScrollView>
-            </View>
-          ) : (
-            <View style={{ zIndex: 10, elevation: 10, marginTop: -28, width: '100%' }}>
+            ) : (
               <ScrollView
-                style={{ overflow: 'visible', width: '100%' }}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 8 }}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  gap: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 6,
+                }}
               >
                 {STAT_CARDS.map(s => (
-                  <StatCard
+                  <View
                     key={s.key}
-                    label={s.label}
-                    count={counts[s.key] ?? 0}
-                    color={s.color}
-                    icon={s.icon}
-                    isWeb={isWeb}
-                  />
+                    style={[
+                      styles.statCardWrapper,
+                      { width: 143 }
+                    ]}
+                  >
+                    <StatCard
+                      label={s.label}
+                      count={counts[s.key] ?? 0}
+                      color={s.color}
+                      icon={s.icon}
+                      isWeb={isWeb}
+                    />
+                  </View>
                 ))}
               </ScrollView>
-            </View>
-          )}
+            )}
+          </View>
 
-          {/* ── Filters ── */}
+          {/* â”€â”€ Filters â”€â”€ */}
           <View style={[styles.filterRow, isWeb && styles.filterRowWeb, !isWeb && { marginTop: 16 }]}>
             <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
               <BI name="search" size={14} color={C.sub} style={{ marginRight: 8 }} />
@@ -510,6 +539,7 @@ export default function JobApplicationsScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ gap: 8, paddingRight: 16, alignItems: 'center' }}
                 style={{ overflow: 'visible', zIndex: 2000, elevation: 2000 }}
+                {...(Platform.OS === 'web' ? { className: "smooth-scroll-x" } : {})}
               >
                 <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
                 <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
@@ -523,7 +553,13 @@ export default function JobApplicationsScreen() {
                 </TouchableOpacity>
               </ScrollView>
             ) : (
-              <View style={[styles.filterDropdowns, styles.filterDropdownsWeb]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.filterDropdowns, styles.filterDropdownsWeb]}
+                style={{ overflow: 'visible', zIndex: 2000, elevation: 2000 }}
+                {...(Platform.OS === 'web' ? { className: "smooth-scroll-x" } : {})}
+              >
                 <Dropdown value={selectedJob} options={jobOptions} onSelect={(v) => { setSelectedJob(v); setCurrentPage(1); }} placeholder="All Jobs" />
                 <Dropdown value={selectedStatus} options={STATUSES} onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }} placeholder="All Status" />
                 <TouchableOpacity
@@ -534,11 +570,11 @@ export default function JobApplicationsScreen() {
                   <BI name="arrow-counterclockwise" size={13} color={C.primary} />
                   <Text style={styles.resetBtnText}>Reset</Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
             )}
           </View>
 
-          {/* ── Results info ── */}
+          {/* â”€â”€ Results info â”€â”€ */}
           <View style={styles.resultsRow}>
             <Text style={styles.resultsText}>
               Showing <Text style={{ color: C.primary, fontWeight: '700' }}>{filtered.length}</Text> of{' '}
@@ -546,10 +582,10 @@ export default function JobApplicationsScreen() {
             </Text>
           </View>
 
-          {/* ── Application List ── */}
+          {/* â”€â”€ Application List â”€â”€ */}
           {loading ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>Loading applications…</Text>
+              <Text style={styles.emptyTitle}>Loading applicationsâ€¦</Text>
             </View>
           ) : error ? (
             <View style={styles.emptyBox}>
@@ -607,7 +643,7 @@ export default function JobApplicationsScreen() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -654,27 +690,18 @@ const styles = StyleSheet.create({
 
   // Stat Cards
   statRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    gap: 10,
+    paddingHorizontal: 16,
     flexDirection: 'row',
-    alignSelf: 'center',
+    gap: 12,
+    paddingBottom: 8,
   },
-  statRowWeb: {
-    paddingHorizontal: 28,
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    maxWidth: 1000,
-    alignSelf: 'center',
-    flexGrow: 1,
-    gap: 16,
-    justifyContent: 'center',
+  statCardWrapper: {
+    flexGrow: 0,
   },
   statCard: {
     backgroundColor: C.white,
     borderRadius: 14,
     padding: 14,
-    minWidth: 120,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -684,15 +711,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
-  },
-  // statCardWeb: {
-  //   flex: 1,
-  //   minWidth: 0,
-  //},
-  statCardWeb: {
-    flex: 0,
-    width: 143,      // Increase to 180 or 200 as needed
-    minWidth: 143,
+    width: '100%',
   },
   statIcon: {
     width: 38,
@@ -702,9 +721,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statCount: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '900',
-    lineHeight: 30,
+    lineHeight: 26,
   },
   statLabel: {
     fontSize: 11,

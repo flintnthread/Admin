@@ -235,7 +235,10 @@ export function patchComponents() {
       return React.createElement(OriginalTextInput, {
         ...props,
         ref,
-        style: newStyle,
+        style: [
+          RN.Platform?.OS === "web" ? { paddingVertical: 0, paddingHorizontal: 0 } : null,
+          newStyle,
+        ],
         placeholderTextColor,
       });
     });

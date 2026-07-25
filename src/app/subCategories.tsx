@@ -2,9 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import * as ImagePicker from "expo-image-picker";
 import React, { useRef, useState, useEffect } from "react";
-import Swal from "sweetalert2";
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -22,6 +20,7 @@ import {
   createSubcategory,
   updateSubcategory,
   deleteSubcategory,
+  uploadSubcategoryImages,
   parseMaterialSlabs,
   serializeMaterialSlabs,
   type SubcategoryRow,
@@ -29,6 +28,7 @@ import {
 } from "@/services/subcategoryApi";
 import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
 import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
@@ -642,6 +642,8 @@ const AddModal = ({
   const [childCategories, setChildCategories] = useState<CategoryRow[]>([]);
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | Blob | null>(null);
+  const [imageChanged, setImageChanged] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [status, setStatus] = useState("Active");
 
@@ -651,6 +653,8 @@ const AddModal = ({
     setChildCategories([]);
     setName("");
     setImage(null);
+    setImageFile(null);
+    setImageChanged(false);
     setMaterials([]);
     setStatus("Active");
   };
@@ -683,6 +687,8 @@ const AddModal = ({
             resolveCatalogMediaUrl(editData.subcategoryImage || editData.image || "", "subcategories") ||
             null
         );
+        setImageFile(null);
+        setImageChanged(false);
         setMaterials(editData.materials || []);
         setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
@@ -705,10 +711,12 @@ const AddModal = ({
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = "image/jpeg,image/png";
+      input.accept = "image/jpeg,image/png,image/webp";
       input.onchange = (e: any) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0] as File | undefined;
         if (file) {
+          setImageFile(file);
+          setImageChanged(true);
           const r = new FileReader();
           r.onload = (ev) => setImage(ev.target?.result as string);
           r.readAsDataURL(file);
@@ -720,7 +728,18 @@ const AddModal = ({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 1,
       });
-      if (!res.canceled) setImage(res.assets[0].uri);
+      if (!res.canceled) {
+        const asset = res.assets[0];
+        setImage(asset.uri);
+        setImageChanged(true);
+        try {
+          const response = await fetch(asset.uri);
+          const blob = await response.blob();
+          setImageFile(blob);
+        } catch {
+          setImageFile(null);
+        }
+      }
     }
   };
 
@@ -736,15 +755,15 @@ const AddModal = ({
 
   const handleSave = () => {
     if (!mainCategoryId) {
-      Alert.alert("Required", "Please select a main category.");
+      void sweetWarning("Required", "Please select a main category.");
       return;
     }
     if (!categoryId) {
-      Alert.alert("Required", "Please select a category.");
+      void sweetWarning("Required", "Please select a category.");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a subcategory name.");
+      void sweetWarning("Required", "Please enter a subcategory name.");
       return;
     }
     onSave({
@@ -752,7 +771,10 @@ const AddModal = ({
       categoryId: parseInt(categoryId, 10),
       name,
       image,
-      mobileImage: null,
+      imageFile,
+      imageChanged,
+      // Keep existing mobile image unless a dedicated mobile picker is added.
+      mobileImage: undefined,
       materials,
       status,
     });
@@ -1336,7 +1358,7 @@ export default function Subcategories() {
       const message = getApiErrorMessage(error, "Failed to load subcategories.");
       setLoadError(message);
       console.error("Failed to load subcategories:", error);
-      Alert.alert("Error", message);
+      void sweetError("Error", message);
     } finally {
       setLoading(false);
     }
@@ -1376,38 +1398,86 @@ export default function Subcategories() {
   };
 
   const handleSave = async (data: any) => {
+    const isUpdate = !!data.id;
+    if (isUpdate) {
+      if (!(await sweetCrud.confirmUpdate("Subcategory", data.name))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd("Subcategory", data.name))) return;
+    }
     try {
-      let successMsg = "";
       const statusValue = data.status === "Active";
       const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
+      const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
+      let imageUploadFailed = false;
+
+      const uploadImageSafely = async (id: number, existing: SubcategoryRow): Promise<SubcategoryRow> => {
+        if (!shouldUploadImage || !data.imageFile) return existing;
+        try {
+          const { compressImageFile } = await import("@/lib/media/compressImage");
+          const compressed = await compressImageFile(data.imageFile, {
+            maxEdge: 1100,
+            maxBytes: 400_000,
+            fileName: data.imageFile instanceof File ? data.imageFile.name : "subcategory.jpg",
+          });
+          return await uploadSubcategoryImages(id, compressed.file);
+        } catch (uploadError) {
+          imageUploadFailed = true;
+          void sweetWarning(
+            "Subcategory saved without image",
+            getApiErrorMessage(
+              uploadError,
+              "Saved, but image upload failed (often 413). Edit and use a smaller JPG under 500KB."
+            )
+          );
+          return existing;
+        }
+      };
 
       if (data.id) {
-        await updateSubcategory(
+        let saved = await updateSubcategory(
           data.id,
           data.categoryId,
           data.name,
-          data.image,
-          data.mobileImage,
+          undefined,
+          undefined,
           materialPayload,
           undefined,
           undefined,
           statusValue
         );
+        saved = await uploadImageSafely(data.id, saved);
+        const imageUrl = pickCategoryImageUrl(saved, "subcategories");
         setItems((prev) =>
-          prev.map((c) => (c.id === data.id ? { ...c, ...data, statusText: data.status } : c))
+          prev.map((c) =>
+            c.id === data.id
+              ? {
+                  ...c,
+                  ...data,
+                  subcategoryName: saved.subcategoryName,
+                  subcategoryImage: saved.subcategoryImage,
+                  mobileImage: saved.mobileImage,
+                  image: imageUrl || c.image,
+                  status: saved.status,
+                  statusText: saved.status ? "Active" : "Inactive",
+                  materials: data.materials,
+                }
+              : c
+          )
         );
-        successMsg = "Subcategory updated successfully!";
       } else {
-        const newRow = await createSubcategory(
+        let newRow = await createSubcategory(
           data.categoryId,
           data.name,
-          data.image,
-          data.mobileImage,
+          undefined,
+          undefined,
           materialPayload,
           undefined,
           undefined,
           statusValue
         );
+        if (newRow.id) {
+          newRow = await uploadImageSafely(newRow.id, newRow);
+        }
         const newCat: Subcategory = {
           id: newRow.id,
           categoryId: newRow.categoryId,
@@ -1421,9 +1491,10 @@ export default function Subcategories() {
           statusText: newRow.status ? "Active" : "Inactive",
           createdAt: newRow.createdAt,
           sellerId: newRow.sellerId,
-          // UI fields
+          mainCat: newRow.mainCat,
+          category: newRow.category,
           name: newRow.subcategoryName,
-          image: pickCategoryImageUrl(newRow, "subcategories") || data.image,
+          image: pickCategoryImageUrl(newRow, "subcategories") || undefined,
           created: newRow.createdAt ? new Date(newRow.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -1437,80 +1508,39 @@ export default function Subcategories() {
         };
         setItems((prev) => [newCat, ...prev]);
         setCurrentPage(1);
-        successMsg = "Subcategory added successfully!";
       }
       setEditCat(null);
+      await loadSubcategories();
 
-      if (Platform.OS === "web") {
-        setTimeout(() => {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "success",
-            title: successMsg,
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-          });
-        }, 300);
-      } else {
-        Alert.alert("Success", successMsg);
+      if (!imageUploadFailed) {
+        if (isUpdate) {
+          void sweetCrud.updated("Subcategory");
+        } else {
+          void sweetCrud.added("Subcategory");
+        }
       }
     } catch (error) {
       console.error("Failed to save subcategory:", error);
-      Alert.alert("Error", "Failed to save subcategory. Please try again.");
+      void sweetError("Error", "Failed to save subcategory. Please try again.");
     }
   };
 
   const handleDelete = async (id: number) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteSubcategory(id);
-        setItems((prev) => prev.filter((i) => i.id !== id));
-        if (Platform.OS === "web") {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "success",
-            title: "Subcategory deleted successfully!",
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-          });
-        } else {
-          Alert.alert("Success", "Subcategory deleted successfully!");
-        }
-      } catch (error) {
-        console.error("Failed to delete subcategory:", error);
-        Alert.alert("Error", "Failed to delete subcategory. Please try again.");
-      }
-    };
-
-    if (Platform.OS === "web") {
-      Swal.fire({
-        title: "Are you sure?",
-        text: `You won't be able to revert this!`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#151D4F",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!"
-      }).then((result) => {
-        if (result.isConfirmed) {
-          confirmDelete();
-        }
-      });
-    } else {
-      Alert.alert("Delete", "Delete this subcategory?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: confirmDelete },
-      ]);
+    const item = items.find((i) => i.id === id);
+    if (!(await sweetCrud.confirmDelete("Subcategory", item?.name))) return;
+    try {
+      await deleteSubcategory(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      void sweetCrud.deleted("Subcategory");
+    } catch (error) {
+      console.error("Failed to delete subcategory:", error);
+      void sweetError("Error", "Failed to delete subcategory. Please try again.");
     }
   };
 
   const handleExport = () => {
     if (Platform.OS !== "web") {
-      Alert.alert("Export", "CSV export is supported on web.");
+      void sweetInfo("Export", "CSV export is supported on web.");
       return;
     }
     const headers = ["ID", "Main Category", "Category", "Subcategory", "Materials", "Status", "Created"];
@@ -1553,8 +1583,8 @@ export default function Subcategories() {
               <LayersIcon color="#FFF" />
             </View>
             <View style={{ flex: 1, flexShrink: 1 }}>
-              <Text style={[S.pageTitle, !isWeb && { fontSize: 17 }]} numberOfLines={1}>Subcategories</Text>
-              <Text style={[S.pageSub, !isWeb && { fontSize: 11 }]} numberOfLines={1}>Manage product subcategories</Text>
+              <Text style={[S.pageTitle, !isWeb && { fontSize: 17 }]}>Subcategories</Text>
+              <Text style={[S.pageSub, !isWeb && { fontSize: 11 }]}>Manage product subcategories</Text>
             </View>
           </View>
           <TouchableOpacity style={[S.exportBtn, !isWeb && { paddingHorizontal: 12, paddingVertical: 10, gap: 0 }]} onPress={handleExport}>
@@ -1588,7 +1618,7 @@ export default function Subcategories() {
               }}
             />
           </View>
-          <View style={[S.toolbarRight, !isWeb && { width: "100%", justifyContent: "space-between" }]}>
+          <View style={[S.toolbarRight, !isWeb && { width: "100%", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: !isWeb ? 1 : undefined, marginRight: !isWeb ? 8 : 0 }}>
               {/* View Toggle */}
               <View style={S.viewToggle}>
@@ -1620,7 +1650,7 @@ export default function Subcategories() {
             </View>
             {/* Add Button */}
             <TouchableOpacity
-              style={S.addBtn}
+              style={[S.addBtn, !isWeb && { paddingHorizontal: 10, gap: 4 }]}
               onPress={() => setModalOpen(true)}
             >
               <PlusIcon />
@@ -1642,7 +1672,13 @@ export default function Subcategories() {
             {paginated.map((item) => (
               <View
                 key={item.id}
-                style={isWeb ? S.gridCardWrapper : S.gridCardWrapperMobile}
+                style={
+                  width >= 1024
+                    ? { flexBasis: "31%", flexGrow: 1, flexShrink: 1, minWidth: 200, maxWidth: "33%" }
+                    : width >= 768
+                    ? { flexBasis: "47%", flexGrow: 1, flexShrink: 1, minWidth: 240, maxWidth: "49%" }
+                    : S.gridCardWrapperMobile
+                }
               >
                 <GridCard
                   item={item}
@@ -1653,7 +1689,9 @@ export default function Subcategories() {
             ))}
           </View>
         ) : isWeb ? (
-          <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }} contentContainerStyle={{ minWidth: "100%" }}>
+            <ListTable items={paginated} onEdit={handleEdit} onDelete={handleDelete} />
+          </ScrollView>
         ) : (
           // Mobile list view: responsive card layout, no horizontal scroll
           <View style={S.mlList}>
@@ -1913,6 +1951,7 @@ const S = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     width: "100%",
+    minWidth: 920,
     overflow: "hidden",
   },
   tHead: {

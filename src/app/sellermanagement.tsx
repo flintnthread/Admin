@@ -2,6 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetConfirm, sweetError, sweetSuccess } from "@/lib/sweetAlert";
 import type { SellerSummary } from "@/lib/api/types";
 import { blurActiveElementOnWeb } from "@/lib/focus";
 import { formatDate } from "@/lib/format";
@@ -11,7 +12,6 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -187,30 +187,18 @@ export default function SellerManagementScreen() {
   };
 
   const handleResend = async (seller: SellerRow) => {
-    const run = async () => {
-      setResendingId(seller.id);
-      try {
-        const result = await resendSellerVerification(seller.id);
-        const msg = result.message || "Verification email sent.";
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Success", msg);
-      } catch (e) {
-        const msg = getApiErrorMessage(e, "Failed to resend verification email.");
-        if (Platform.OS === "web") window.alert(msg);
-        else Alert.alert("Error", msg);
-      } finally {
-        setResendingId(null);
-      }
-    };
-
     const prompt = `Resend verification email to ${seller.email}?`;
-    if (Platform.OS === "web") {
-      if (window.confirm(prompt)) void run();
-    } else {
-      Alert.alert("Resend verification", prompt, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Send", onPress: () => void run() },
-      ]);
+    if (!(await sweetConfirm({ title: "Resend verification", text: prompt, confirmText: "Send" }))) return;
+    setResendingId(seller.id);
+    try {
+      const result = await resendSellerVerification(seller.id);
+      const msg = result.message || "Verification email sent.";
+      void sweetSuccess("Success", msg);
+    } catch (e) {
+      const msg = getApiErrorMessage(e, "Failed to resend verification email.");
+      void sweetError("Error", msg);
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -478,6 +466,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
     alignItems: "center",
+    zIndex: 100,
   },
   searchBox: {
     flex: 1,
@@ -493,7 +482,7 @@ const styles = StyleSheet.create({
     height: 42,
   },
   searchInput: { flex: 1, fontSize: 14, color: "#1E293B" },
-  toolbarRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  toolbarRight: { flexDirection: "row", alignItems: "center", gap: 10, zIndex: 100 },
   filterWrap: { position: "relative", zIndex: 20 },
   filterBtn: {
     flexDirection: "row",

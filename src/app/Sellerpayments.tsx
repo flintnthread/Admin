@@ -1,15 +1,15 @@
 import AdminLayout from "@/components/admin-layout";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetError, sweetInfo, sweetSuccess } from "@/lib/sweetAlert";
 import { mapPayoutToPaymentRow } from "@/lib/mappers";
-import { fetchPayoutStats, fetchPayouts, markPayoutPaid, fetchPayoutDetail, fetchPayoutExportCsv } from "@/services/payoutApi";
+import { fetchPayoutStats, fetchPayouts, markPayoutPaid, fetchPayoutDetail, fetchPayoutExportCsv, fetchPayoutRequests, closePayoutRequest, fetchPayoutAlerts, type PayoutRequestItem, type PayoutAlerts } from "@/services/payoutApi";
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import Pagination from "@/components/Pagination";
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     Platform,
     ScrollView,
@@ -18,12 +18,15 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from "react-native";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type PaymentStatus = "Pending" | "Paid" | "Cancelled";
 type ReminderBucket = "green" | "orange" | "red";
+type PageTab = "payments" | "requests";
+const REQUESTS_PAGE_SIZE = 10;
 
 interface SellerOrder {
     id: number;
@@ -201,12 +204,12 @@ const PayModal: React.FC<{
                     {/* Modal Header */}
                     <View style={styles.modalHeader}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
                                 <Feather name="credit-card" size={16} color="#fff" />
                             </View>
                             <Text style={styles.modalTitle}>Process Payment</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
+                        <TouchableOpacity onPress={onClose} style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
                             <Feather name="x" size={16} color="#fff" />
                         </TouchableOpacity>
                     </View>
@@ -440,11 +443,106 @@ const ExportDropdown: React.FC<{
     );
 };
 
+const formatMoney = (value?: number | string | null) => {
+    const num = typeof value === "number" ? value : Number(value ?? 0);
+    if (Number.isNaN(num)) return "₹0.00";
+    return `₹${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const formatDateTime = (value?: string | null) => {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+const PayoutRequestCard: React.FC<{
+    item: PayoutRequestItem;
+    statusDraft: string;
+    onStatusChange: (text: string) => void;
+    onClose: () => void;
+    closing: boolean;
+}> = ({ item, statusDraft, onStatusChange, onClose, closing }) => {
+    const isPending = (item.status ?? "").toLowerCase() === "pending";
+    const statusLabel = (item.status ?? "pending").replace(/^\w/, (c) => c.toUpperCase());
+    const statusStyle = isPending
+        ? { bg: PRIMARY_LIGHT, color: PRIMARY }
+        : (item.status ?? "").toLowerCase() === "closed"
+            ? { bg: "#e8f7ee", color: "#1a7a45" }
+            : { bg: "#f1f5f9", color: TEXT_BODY };
+
+    return (
+        <View style={styles.requestCard}>
+            <View style={styles.requestCardTop}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.requestOrder}>{item.orderNumber || `Order #${item.orderId}`}</Text>
+                    <Text style={styles.requestSeller}>{item.sellerName || "Seller"}</Text>
+                    <Text style={styles.requestMeta}>{item.sellerEmail || "—"}{item.sellerPhone ? ` · ${item.sellerPhone}` : ""}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 6 }}>
+                    <Text style={styles.requestAmount}>{formatMoney(item.requestedAmount)}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                        <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusLabel}</Text>
+                    </View>
+                </View>
+            </View>
+            <Text style={styles.requestMeta}>Requested: {formatDateTime(item.requestedAt)}</Text>
+            {!!item.sellerNote && (
+                <Text style={styles.requestNote}>Seller note: {item.sellerNote}</Text>
+            )}
+            {isPending ? (
+                <View style={styles.requestCloseRow}>
+                    <TextInput
+                        style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                        placeholder="Enter payment status for seller..."
+                        placeholderTextColor={TEXT_MUTED}
+                        value={statusDraft}
+                        onChangeText={onStatusChange}
+                        editable={!closing}
+                    />
+                    <TouchableOpacity
+                        style={[styles.closeRequestBtn, closing && { opacity: 0.6 }]}
+                        onPress={onClose}
+                        disabled={closing}
+                    >
+                        {closing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Feather name="check-circle" size={14} color="#fff" />
+                                <Text style={styles.closeRequestBtnText}>Close</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <View style={styles.closedStatusBox}>
+                    <Text style={styles.closedStatusLabel}>Payment status sent to seller</Text>
+                    <Text style={styles.closedStatusText}>{item.adminNote || item.paymentStatus || "—"}</Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
 
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 const SellerPaymentsScreen: React.FC = () => {
     const { token, isLoading: authLoading } = useAuth();
+    const params = useLocalSearchParams<{ tab?: string }>();
     const isWeb = Platform.OS === "web";
+    const { width: windowWidth } = useWindowDimensions();
+    // The multi-column desktop layout (data table, inline filter bar, row-based
+    // stats/legend) only makes sense once there's enough horizontal room. Below
+    // 1024px — whether that's a phone, a tablet, or a browser window/devtools
+    // device-toolbar resized down on a laptop — we fall back to the same
+    // mobile-style stacked/card layout. This makes the page respond correctly
+    // to resizing instead of only reacting to Platform.OS.
+    const isWideWeb = isWeb && windowWidth >= 1024;
+    const isUltraWide = isWeb && windowWidth >= 1200;
+    const [activeTab, setActiveTab] = useState<PageTab>(
+        params.tab === "requests" ? "requests" : "payments",
+    );
     const [orders, setOrders] = useState<SellerOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -458,6 +556,25 @@ const SellerPaymentsScreen: React.FC = () => {
     const [sortPriority, setSortPriority] = useState<"Priority (Red first)" | "Date: Newest First" | "Date: Oldest First">("Priority (Red first)");
     const [openDropdown, setOpenDropdown] = useState<"payment" | "reminder" | "priority" | "export" | null>(null);
     const [payModalOrder, setPayModalOrder] = useState<SellerOrder | null>(null);
+
+    const [requests, setRequests] = useState<PayoutRequestItem[]>([]);
+    const [requestsLoading, setRequestsLoading] = useState(false);
+    const [requestsError, setRequestsError] = useState<string | null>(null);
+    const [requestPage, setRequestPage] = useState(1);
+    const [requestTotalPages, setRequestTotalPages] = useState(0);
+    const [requestTotalElements, setRequestTotalElements] = useState(0);
+    const [requestFilter, setRequestFilter] = useState<"All" | "Pending" | "Closed">("All");
+    const [requestStatusDrafts, setRequestStatusDrafts] = useState<Record<number, string>>({});
+    const [closingRequestId, setClosingRequestId] = useState<number | null>(null);
+    const [alerts, setAlerts] = useState<PayoutAlerts | null>(null);
+    const alertedNewRef = useRef(false);
+    const alertedOverdueRef = useRef(false);
+
+    useEffect(() => {
+        if (params.tab === "requests") {
+            setActiveTab("requests");
+        }
+    }, [params.tab]);
 
     const apiStatus =
         filterPayment === "Pending" ? "pending" :
@@ -496,14 +613,115 @@ const SellerPaymentsScreen: React.FC = () => {
         }
     }, [apiStatus, currentPage, token]);
 
+    const requestApiStatus =
+        requestFilter === "Pending" ? "pending" :
+            requestFilter === "Closed" ? "closed" :
+                undefined;
+
+    const loadRequests = useCallback(async () => {
+        if (!token) return;
+        setRequestsLoading(true);
+        setRequestsError(null);
+        try {
+            const page = await fetchPayoutRequests(requestApiStatus, requestPage - 1, REQUESTS_PAGE_SIZE);
+            setRequests(page.items ?? []);
+            setRequestTotalElements(page.totalElements);
+            setRequestTotalPages(page.totalPages);
+            if (requestPage > page.totalPages && page.totalPages > 0) {
+                setRequestPage(page.totalPages);
+            }
+        } catch (e) {
+            setRequests([]);
+            setRequestTotalElements(0);
+            setRequestTotalPages(0);
+            setRequestsError(getApiErrorMessage(e, "Failed to load payout requests."));
+        } finally {
+            setRequestsLoading(false);
+        }
+    }, [requestApiStatus, requestPage, token]);
+
+    const loadAlerts = useCallback(async () => {
+        if (!token) return;
+        try {
+            const data = await fetchPayoutAlerts();
+            setAlerts(data);
+            if (!alertedNewRef.current && Number(data.newRequestCount ?? 0) > 0) {
+                alertedNewRef.current = true;
+                void sweetInfo(
+                    "New payment request",
+                    `You have ${data.newRequestCount} new seller payment request(s). Check the Requests tab.`,
+                );
+            }
+            if (!alertedOverdueRef.current && Number(data.overduePaymentCount ?? 0) > 0) {
+                alertedOverdueRef.current = true;
+                void sweetInfo(
+                    "Seller payment reminder",
+                    `${data.overduePaymentCount} payment(s) need to be sent to sellers (customer paid ${data.overdueDays}+ days ago).`,
+                );
+            }
+        } catch {
+            // Alerts are non-blocking
+        }
+    }, [token]);
+
     useEffect(() => {
         if (authLoading || !token) return;
         void loadPayments();
     }, [authLoading, token, loadPayments]);
 
     useEffect(() => {
+        if (authLoading || !token || activeTab !== "requests") return;
+        void loadRequests();
+    }, [authLoading, token, activeTab, loadRequests]);
+
+    useEffect(() => {
+        if (authLoading || !token || activeTab !== "requests") return;
+        const timer = setInterval(() => {
+            void loadRequests();
+            void loadAlerts();
+        }, 30_000);
+        return () => clearInterval(timer);
+    }, [authLoading, token, activeTab, loadRequests, loadAlerts]);
+
+    useEffect(() => {
+        if (authLoading || !token) return;
+        void loadAlerts();
+        const timer = setInterval(() => {
+            void loadAlerts();
+        }, 60_000);
+        return () => clearInterval(timer);
+    }, [authLoading, token, loadAlerts]);
+
+    useEffect(() => {
         setCurrentPage(1);
     }, [filterPayment]);
+
+    useEffect(() => {
+        setRequestPage(1);
+    }, [requestFilter]);
+
+    const handleCloseRequest = async (id: number) => {
+        const paymentStatus = (requestStatusDrafts[id] ?? "").trim();
+        if (!paymentStatus) {
+            void sweetError("Required", "Please enter the payment status before closing.");
+            return;
+        }
+        setClosingRequestId(id);
+        try {
+            await closePayoutRequest(id, paymentStatus);
+            setRequestStatusDrafts((prev) => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
+            void sweetSuccess("Closed", "Request closed and seller emailed with payment status.");
+            await Promise.all([loadRequests(), loadAlerts()]);
+        } catch (e) {
+            void sweetError("Error", getApiErrorMessage(e, "Failed to close request."));
+        } finally {
+            setClosingRequestId(null);
+        }
+    };
 
     const filtered = orders.filter((o) => {
         const ms = o.orderId.toLowerCase().includes(search.toLowerCase()) || o.sellerName.toLowerCase().includes(search.toLowerCase());
@@ -526,13 +744,11 @@ const SellerPaymentsScreen: React.FC = () => {
             await markPayoutPaid(id, transactionRef || undefined, adminNote || undefined, apiStatus);
             setPayModalOrder(null);
             const msg = `Payment marked as ${status}!`;
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Success", msg);
+            void sweetSuccess("Success", msg);
             await loadPayments();
         } catch (e) {
             const msg = getApiErrorMessage(e);
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Error", msg);
+            void sweetError("Error", msg);
         }
     };
 
@@ -546,8 +762,7 @@ const SellerPaymentsScreen: React.FC = () => {
             if (existing) setPayModalOrder(existing);
             else {
                 const msg = getApiErrorMessage(e);
-                if (Platform.OS === "web") window.alert(msg);
-                else Alert.alert("Error", msg);
+                void sweetError("Error", msg);
             }
         }
     };
@@ -563,7 +778,7 @@ const SellerPaymentsScreen: React.FC = () => {
     // ─── CSV EXPORT (backend) ────────────────────────────────────────────────
     const downloadCsv = (content: string, suffix: string) => {
         if (Platform.OS !== "web") {
-            Alert.alert("Export", "CSV export is currently supported on web only.");
+            void sweetInfo("Export", "CSV export is currently supported on web only.");
             return;
         }
         const fileName = `seller_payments_${suffix}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
@@ -580,7 +795,7 @@ const SellerPaymentsScreen: React.FC = () => {
 
     const downloadBackendExport = async (status?: string, minReminderDays?: number) => {
         if (Platform.OS !== "web") {
-            Alert.alert("Export", "CSV export is currently supported on web only.");
+            void sweetInfo("Export", "CSV export is currently supported on web only.");
             return;
         }
         try {
@@ -591,8 +806,7 @@ const SellerPaymentsScreen: React.FC = () => {
             downloadCsv(csv, suffix);
         } catch (e) {
             const msg = getApiErrorMessage(e, "Failed to export payouts.");
-            if (Platform.OS === "web") window.alert(msg);
-            else Alert.alert("Error", msg);
+            void sweetError("Error", msg);
         }
     };
 
@@ -613,24 +827,71 @@ const SellerPaymentsScreen: React.FC = () => {
             <View style={[styles.header, isWeb && styles.headerWeb]}>
                 <View style={styles.headerLeft}>
                     <View style={styles.headerIcon}>
-                        <Feather name="credit-card" size={22} color="#fff" />
+                        <Feather name="credit-card" size={24} color="#fff" />
                     </View>
                     <View>
-                        <Text style={styles.headerTitle}>Seller Payments</Text>
+                        <Text style={[styles.headerTitle, windowWidth <= 350 && { fontWeight: "600" }]}>Seller Payments</Text>
                         <Text style={styles.headerSubtitle}>Manage & process seller payouts</Text>
                     </View>
                 </View>
             </View>
 
+            {/* Tabs */}
+            <View style={styles.tabBar}>
+                <TouchableOpacity
+                    style={[styles.tabBtn, activeTab === "payments" && styles.tabBtnActive]}
+                    onPress={() => setActiveTab("payments")}
+                >
+                    <Feather name="list" size={14} color={activeTab === "payments" ? PRIMARY : TEXT_MUTED} />
+                    <Text style={[styles.tabBtnText, activeTab === "payments" && styles.tabBtnTextActive]}>Payments</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tabBtn, activeTab === "requests" && styles.tabBtnActive]}
+                    onPress={() => setActiveTab("requests")}
+                >
+                    <Feather name="inbox" size={14} color={activeTab === "requests" ? PRIMARY : TEXT_MUTED} />
+                    <Text style={[styles.tabBtnText, activeTab === "requests" && styles.tabBtnTextActive]}>Requests</Text>
+                    {Number(alerts?.pendingRequestCount ?? 0) > 0 && (
+                        <View style={styles.tabBadge}>
+                            <Text style={styles.tabBadgeText}>{alerts?.pendingRequestCount}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            {/* Alert banners */}
+            {(Number(alerts?.newRequestCount ?? 0) > 0 || Number(alerts?.overduePaymentCount ?? 0) > 0) && (
+                <View style={styles.alertStack}>
+                    {Number(alerts?.newRequestCount ?? 0) > 0 && (
+                        <TouchableOpacity style={[styles.alertBanner, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]} onPress={() => setActiveTab("requests")}>
+                            <Feather name="bell" size={16} color="#1d4ed8" />
+                            <Text style={[styles.alertBannerText, { color: "#1e3a8a" }]}>
+                                You have {alerts?.newRequestCount} new payment request(s). Open Requests to review.
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                    {Number(alerts?.overduePaymentCount ?? 0) > 0 && (
+                        <TouchableOpacity style={[styles.alertBanner, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]} onPress={() => setActiveTab("payments")}>
+                            <Feather name="alert-triangle" size={16} color="#b91c1c" />
+                            <Text style={[styles.alertBannerText, { color: "#7f1d1d" }]}>
+                                Payment needs to be sent to {alerts?.overduePaymentCount} seller(s) — customer paid {alerts?.overdueDays}+ days ago.
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            )}
+
+            {activeTab === "payments" ? (
+            <>
             {/* Stats Card */}
             <View style={[
                 styles.statsCardSingle,
-                !isWeb && { flexDirection: "column", gap: 16 },
-                isWeb && { justifyContent: "space-between" }
+                !isUltraWide && { flexDirection: "column", gap: 16 },
+                isUltraWide && { justifyContent: "space-between", flexDirection: "row", alignItems: "center" }
             ]}>
                 <View style={[
-                    { gap: isWeb ? 24 : 16, flex: isWeb ? 1 : undefined },
-                    isWeb ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
+                    { gap: isUltraWide ? 24 : (windowWidth <= 350 ? 12 : 16), flex: isUltraWide ? 1 : undefined },
+                    isUltraWide ? { flexDirection: "row", alignItems: "center" } : { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }
                 ]}>
                     {[
                         { icon: "list", label: "All Payouts", value: String(stats.total), color: "#a78bfa" },
@@ -639,24 +900,24 @@ const SellerPaymentsScreen: React.FC = () => {
                         { icon: "dollar-sign", label: "Total Paid", value: `₹${stats.totalPaidAmount.toLocaleString("en-IN")}`, color: "#6ee7b7" },
                     ].map((s, i) => (
                         <React.Fragment key={i}>
-                            <View style={[styles.statBlockSingle, !isWeb && { width: "47%" }]}>
-                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }]}>
-                                    <Feather name={s.icon as any} size={20} color="#ffffff" />
+                            <View style={[styles.statBlockSingle, windowWidth < 600 && { width: windowWidth <= 350 ? "100%" : "47%" }]}>
+                                <View style={[styles.statIconWrapperSingle, { backgroundColor: s.color }, windowWidth <= 350 && { width: 36, height: 36 }]}>
+                                    <Feather name={s.icon as any} size={windowWidth <= 350 ? 16 : 20} color="#ffffff" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.statValueSingle} numberOfLines={1}>{s.value}</Text>
-                                    <Text style={styles.statLabelSingle} numberOfLines={1}>{s.label}</Text>
+                                    <Text style={[styles.statValueSingle, windowWidth <= 350 && { fontWeight: "600", fontSize: 16 }]} numberOfLines={windowWidth <= 350 ? undefined : 1}>{s.value}</Text>
+                                    <Text style={[styles.statLabelSingle, windowWidth <= 350 && { fontWeight: "500", fontSize: 11 }]} numberOfLines={windowWidth <= 350 ? undefined : 1}>{s.label}</Text>
                                 </View>
                             </View>
-                            {i < 3 && isWeb && <View style={styles.statDividerSingle} />}
+                            {i < 3 && isUltraWide && <View style={styles.statDividerSingle} />}
                         </React.Fragment>
                     ))}
                 </View>
 
                 {/* Legend */}
-                <View style={{ flexDirection: isWeb ? "row" : "column", alignItems: isWeb ? "center" : "stretch", gap: isWeb ? 24 : 12, flexShrink: 0, paddingLeft: isWeb ? 12 : 0, marginTop: isWeb ? 0 : 16 }}>
-                    {isWeb && <View style={styles.statDividerSingle} />}
-                    <View style={{ gap: 6, justifyContent: "center", width: isWeb ? 300 : "100%" }}>
+                <View style={{ flexDirection: isUltraWide ? "row" : "column", alignItems: isUltraWide ? "center" : "stretch", gap: isUltraWide ? 24 : 12, flexShrink: 0, paddingLeft: isUltraWide ? 12 : 0, marginTop: isUltraWide ? 0 : 16 }}>
+                    {isUltraWide && <View style={styles.statDividerSingle} />}
+                    <View style={{ gap: 6, justifyContent: "center", width: isUltraWide ? 300 : "100%" }}>
                         <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                             <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
                                 <Text style={[styles.legendText, { textAlign: "center" }]}>Green (0-2d): {stats.greenCount}</Text>
@@ -692,10 +953,10 @@ const SellerPaymentsScreen: React.FC = () => {
                     <View style={[styles.webFilterSection, { zIndex: 999 }]}>
                         <View style={[
                             styles.webFilterBar,
-                            !isWeb && { flexDirection: "column", gap: 10 }
+                            !isUltraWide && { flexDirection: "column", gap: 10, alignItems: "stretch" }
                         ]}>
                             {/* Search */}
-                            <View style={[styles.webSearchInputWrapper, !isWeb && { width: "100%" }]}>
+                            <View style={[styles.webSearchInputWrapper, !isUltraWide && { width: "100%" }]}>
                                 <Feather name="search" size={14} color={PRIMARY} />
                                 <TextInput
                                     style={styles.webSearchInput}
@@ -714,10 +975,10 @@ const SellerPaymentsScreen: React.FC = () => {
                             {/* Mobile: row of filters */}
                             <View style={[
                                 { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
-                                !isWeb && { width: "100%" }
+                                !isUltraWide && { width: "100%" }
                             ]}>
                                 {/* Payment filter */}
-                                <View style={[{ position: "relative", zIndex: 1000 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ position: "relative", zIndex: 1000 }, windowWidth < 550 && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "payment" ? null : "payment")}
@@ -726,7 +987,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "payment" && (
-                                        <View style={[styles.webDropdownMenu, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
+                                        <View style={[styles.webDropdownMenu, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {(["All", "Pending", "Paid", "Cancelled"] as const).map(option => (
                                                 <TouchableOpacity
                                                     key={option}
@@ -743,7 +1004,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Reminder filter */}
-                                <View style={[{ position: "relative", zIndex: 999 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ position: "relative", zIndex: 999 }, windowWidth < 550 && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "reminder" ? null : "reminder")}
@@ -756,7 +1017,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "reminder" && (
-                                        <View style={[styles.webDropdownMenu, { width: 180 }, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
+                                        <View style={[styles.webDropdownMenu, { width: 180 }, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {[
                                                 { label: "All Buckets", value: "All" },
                                                 { label: "Green (0-2 days)", value: "green" },
@@ -778,7 +1039,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Sort */}
-                                <View style={[{ position: "relative", zIndex: 998 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ position: "relative", zIndex: 998 }, windowWidth < 550 && { width: "100%" }]}>
                                     <TouchableOpacity
                                         style={styles.webSelectBox}
                                         onPress={() => setOpenDropdown(openDropdown === "priority" ? null : "priority")}
@@ -787,7 +1048,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "priority" && (
-                                        <View style={[styles.webDropdownMenu, { width: 170 }, !isWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
+                                        <View style={[styles.webDropdownMenu, { width: 170 }, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {["Priority (Red first)", "Date: Newest First", "Date: Oldest First"].map(option => (
                                                 <TouchableOpacity
                                                     key={option}
@@ -802,11 +1063,11 @@ const SellerPaymentsScreen: React.FC = () => {
                                 </View>
 
                                 {/* Export Buttons Container */}
-                                <View style={[{ flexDirection: "column", gap: 8 }, !isWeb && { width: "100%" }]}>
+                                <View style={[{ flexDirection: "column", gap: 8 }, windowWidth < 550 && { width: "100%" }]}>
                                     {/* Export row: button + >=4d side by side */}
                                     <View style={{ flexDirection: "row", gap: 8 }}>
                                         {/* Export All Dropdown trigger only (fixed width, not flex) */}
-                                        <ExportDropdown onExport={handleExport} isWeb={isWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
+                                        <ExportDropdown onExport={handleExport} isWeb={isWideWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
 
                                         {/* Export >=4d button */}
                                         <TouchableOpacity
@@ -832,19 +1093,19 @@ const SellerPaymentsScreen: React.FC = () => {
                             <Feather name="inbox" size={44} color={TEXT_MUTED} />
                             <Text style={styles.emptyTitle}>No orders found</Text>
                         </View>
-                    ) : isWeb ? (
+                    ) : isWideWeb ? (
                         <View style={{ width: "100%" }}>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%" }}>
                                 <View style={styles.tableContainer}>
                                     <View style={styles.tableHeaderRow}>
-                                        <Text style={[styles.tableHeaderCell, { width: 140 }]}>Order</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 220 }]}>Seller</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 140 }]}>Customer Paid{"\n"}<Text style={{ fontSize: 9, textTransform: "none", fontWeight: "500" }}>(order+total_amount)</Text></Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 130 }]}>Delivery Date</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 110 }]}>Reminder</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 120 }]}>Payment Status</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 100 }]}>Wallet Balance</Text>
-                                        <Text style={[styles.tableHeaderCell, { width: 180 }]}>Actions</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Order</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>Seller</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Customer Paid{"\n"}<Text style={{ fontSize: 9, textTransform: "none", fontWeight: "500" }}>(order+total_amount)</Text></Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Delivery Date</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.1 }]}>Reminder</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Payment Status</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.0 }]}>Wallet Balance</Text>
+                                        <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>Actions</Text>
                                     </View>
                                     {filtered.map(order => {
                                         const payStyle = getPaymentStyle(order.paymentStatus);
@@ -855,7 +1116,7 @@ const SellerPaymentsScreen: React.FC = () => {
                                         return (
                                             <View key={order.id} style={[styles.tableRow, { alignItems: "center" }]}>
                                                 {/* Order */}
-                                                <View style={{ width: 140 }}>
+                                                <View style={{ flex: 1.4 }}>
                                                     <Text style={{ fontWeight: "700", color: PRIMARY, fontSize: 13 }}>{order.orderId}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2, marginBottom: 4 }}>{order.orderDate}</Text>
                                                     <View style={{ backgroundColor: "#2dd4bf", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: "flex-start" }}>
@@ -863,40 +1124,40 @@ const SellerPaymentsScreen: React.FC = () => {
                                                     </View>
                                                 </View>
                                                 {/* Seller */}
-                                                <View style={{ width: 220 }}>
+                                                <View style={{ flex: 2.2 }}>
                                                     <Text style={{ fontWeight: "700", color: TEXT_HEAD, fontSize: 13 }} numberOfLines={1}>{order.sellerName}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>{order.sellerEmail}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11 }}>{order.sellerPhone}</Text>
                                                 </View>
                                                 {/* Customer Paid */}
-                                                <View style={{ width: 140 }}>
+                                                <View style={{ flex: 1.4 }}>
                                                     <Text style={{ fontWeight: "700", color: DARK, fontSize: 14 }}>{order.customerPaid}</Text>
                                                 </View>
                                                 {/* Delivery Date */}
-                                                <View style={{ width: 130 }}>
+                                                <View style={{ flex: 1.3 }}>
                                                     <Text style={{ color: TEXT_HEAD, fontSize: 13 }}>{order.deliveryDate}</Text>
                                                     <Text style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>{order.deliveryTime}</Text>
                                                 </View>
                                                 {/* Reminder */}
-                                                <View style={{ width: 110 }}>
+                                                <View style={{ flex: 1.1 }}>
                                                     <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: remBg, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4, alignSelf: "flex-start", gap: 4 }}>
                                                         <Feather name="clock" size={10} color="#fff" />
                                                         <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{order.reminderLabel}</Text>
                                                     </View>
                                                 </View>
                                                 {/* Payment Status */}
-                                                <View style={{ width: 120 }}>
+                                                <View style={{ flex: 1.2 }}>
                                                     <View style={[styles.statusBadge, { backgroundColor: payStyle.bg, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 6 }]}>
                                                         <Feather name="clock" size={10} color={payStyle.color} />
                                                         <Text style={[styles.statusText, { color: payStyle.color }]}>{order.paymentStatus}</Text>
                                                     </View>
                                                 </View>
                                                 {/* Wallet Balance */}
-                                                <View style={{ width: 100 }}>
+                                                <View style={{ flex: 1.0 }}>
                                                     <Text style={{ fontWeight: "700", color: TEXT_HEAD, fontSize: 13 }}>{order.walletBalance}</Text>
                                                 </View>
                                                 {/* Actions */}
-                                                <View style={{ width: 180, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                                <View style={{ flex: 1.8, flexDirection: "row", alignItems: "center", gap: 6 }}>
                                                     <TouchableOpacity
                                                         style={[styles.actionBtn, { backgroundColor: "#10b981" }]}
                                                         onPress={() => void openPayModal(order.id)}
@@ -945,6 +1206,85 @@ const SellerPaymentsScreen: React.FC = () => {
                     )}
                 </View>
             </View>
+            </>
+            ) : (
+            <View style={[styles.main, isWeb && styles.mainWeb]}>
+                <View style={[styles.scrollArea, styles.scrollContent, !isWeb && { paddingBottom: 20 }]}>
+                    <View style={[styles.webFilterSection, { zIndex: 10 }]}>
+                        <View style={[styles.webFilterBar, { justifyContent: "space-between" }]}>
+                            <Text style={{ fontSize: 14, fontWeight: "700", color: TEXT_HEAD }}>
+                                Seller payout requests
+                            </Text>
+                            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                                {(["All", "Pending", "Closed"] as const).map((option) => (
+                                    <TouchableOpacity
+                                        key={option}
+                                        style={[
+                                            styles.webSelectBox,
+                                            requestFilter === option && { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+                                        ]}
+                                        onPress={() => setRequestFilter(option)}
+                                    >
+                                        <Text style={[styles.webSelectText, requestFilter === option && { color: PRIMARY, fontWeight: "700" }]}>
+                                            {option}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </View>
+
+                    {(requestsLoading || authLoading) && (
+                        <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 24 }} />
+                    )}
+                    {requestsError && (
+                        <View style={{ marginBottom: 12, gap: 8 }}>
+                            <Text style={{ color: "#DC2626", fontSize: 13 }}>{requestsError}</Text>
+                            <TouchableOpacity style={styles.exportBtn} onPress={() => void loadRequests()}>
+                                <Text style={styles.exportBtnText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    <Text style={styles.resultCount}>
+                        Showing <Text style={{ color: PRIMARY, fontWeight: "700" }}>{requests.length}</Text> of {requestTotalElements} requests
+                    </Text>
+
+                    {!requestsLoading && !requestsError && requests.length === 0 ? (
+                        <View style={styles.empty}>
+                            <Feather name="inbox" size={44} color={TEXT_MUTED} />
+                            <Text style={styles.emptyTitle}>No payout requests</Text>
+                        </View>
+                    ) : !requestsError ? (
+                        <View style={{ gap: 12 }}>
+                            {requests.map((item) => (
+                                <PayoutRequestCard
+                                    key={item.id}
+                                    item={item}
+                                    statusDraft={requestStatusDrafts[item.id] ?? ""}
+                                    onStatusChange={(text) =>
+                                        setRequestStatusDrafts((prev) => ({ ...prev, [item.id]: text }))
+                                    }
+                                    onClose={() => void handleCloseRequest(item.id)}
+                                    closing={closingRequestId === item.id}
+                                />
+                            ))}
+                        </View>
+                    ) : null}
+
+                    {!requestsLoading && !requestsError && requests.length > 0 && (
+                        <Pagination
+                            currentPage={requestPage}
+                            totalPages={requestTotalPages}
+                            totalItems={requestTotalElements}
+                            itemsPerPage={REQUESTS_PAGE_SIZE}
+                            itemName="requests"
+                            onPageChange={setRequestPage}
+                        />
+                    )}
+                </View>
+            </View>
+            )}
         </>
     );
 
@@ -969,7 +1309,7 @@ const SellerPaymentsScreen: React.FC = () => {
                     order={payModalOrder}
                     onClose={() => setPayModalOrder(null)}
                     onConfirm={handleConfirmPay}
-                    isWeb={isWeb}
+                    isWeb={isWideWeb}
                 />
             </View>
         </AdminLayout>
@@ -1022,12 +1362,103 @@ const styles = StyleSheet.create({
     headerWeb: { marginHorizontal: 2, marginTop: 12 },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
     headerIcon: {
-        width: 50, height: 50, borderRadius: 16,
+        width: 44, height: 44, borderRadius: 12,
         backgroundColor: PRIMARY, alignItems: "center", justifyContent: "center",
         shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5
     },
     headerTitle: { fontSize: 20, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
     headerSubtitle: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
+
+    tabBar: {
+        flexDirection: "row",
+        gap: 8,
+        marginHorizontal: 16,
+        marginTop: -36,
+        marginBottom: 12,
+        zIndex: 20,
+        backgroundColor: BG_CARD,
+        borderRadius: 12,
+        padding: 6,
+        borderWidth: 1,
+        borderColor: BORDER,
+        alignSelf: "flex-start",
+        shadowColor: DARK,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    tabBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 8,
+    },
+    tabBtnActive: { backgroundColor: PRIMARY_LIGHT },
+    tabBtnText: { fontSize: 13, fontWeight: "600", color: TEXT_MUTED },
+    tabBtnTextActive: { color: PRIMARY, fontWeight: "800" },
+    tabBadge: {
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: "#ef4444",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 4,
+    },
+    tabBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+    alertStack: { gap: 8, marginHorizontal: 16, marginBottom: 8 },
+    alertBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    alertBannerText: { flex: 1, fontSize: 12, fontWeight: "600" },
+    requestCard: {
+        backgroundColor: BG_CARD,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: BORDER,
+        padding: 14,
+        gap: 8,
+    },
+    requestCardTop: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+    requestOrder: { fontSize: 14, fontWeight: "800", color: PRIMARY },
+    requestSeller: { fontSize: 14, fontWeight: "700", color: TEXT_HEAD, marginTop: 2 },
+    requestMeta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
+    requestAmount: { fontSize: 16, fontWeight: "800", color: DARK },
+    requestNote: { fontSize: 12, color: TEXT_BODY, fontStyle: "italic" },
+    requestCloseRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 6 },
+    closeRequestBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: "#1a7a45",
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        borderRadius: 10,
+        minWidth: 96,
+        justifyContent: "center",
+    },
+    closeRequestBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+    closedStatusBox: {
+        marginTop: 4,
+        backgroundColor: "#f8fafc",
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: BORDER,
+        padding: 12,
+        gap: 4,
+    },
+    closedStatusLabel: { fontSize: 10, fontWeight: "800", color: TEXT_MUTED, textTransform: "uppercase" },
+    closedStatusText: { fontSize: 13, fontWeight: "600", color: TEXT_HEAD },
+
     exportBtn: {
         flexDirection: "row", alignItems: "center", gap: 6,
         paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10,
@@ -1054,7 +1485,7 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 2,
         marginBottom: 0,
-        marginTop: -40,
+        marginTop: 0,
         marginHorizontal: 16,
         zIndex: 10
     },
@@ -1374,6 +1805,7 @@ const styles = StyleSheet.create({
     // Table
     tableContainer: {
         minWidth: 1200,
+        width: "100%",
         backgroundColor: BG_CARD,
         borderRadius: 16,
         overflow: "hidden",

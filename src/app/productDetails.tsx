@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -25,11 +24,49 @@ import {
   type ProductVariant,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { resolveMediaUrl } from '@/lib/api/media';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
+import {
+  isSweetsCategory,
+  isSweetsPlaceholderColor,
+  variantDimensionLabels,
+} from '@/lib/product/sweetsCategory';
 
 const PLACEHOLDER_IMAGE = '';
+
+/** Approve-modal templates — selecting one auto-fills Admin Notes. */
+const APPROVE_NOTE_TEMPLATES: { id: string; label: string; note: string }[] = [
+  {
+    id: '1',
+    label: '1. Approved – Clean & Simple',
+    note: 'Product reviewed and approved. All details and images meet the required quality standards.',
+  },
+  {
+    id: '2',
+    label: '2. Approved with Minor Changes',
+    note:
+      'Product approved. Minor adjustments suggested for future listings (image clarity, description format, pricing alignment).',
+  },
+  {
+    id: '9',
+    label: '9. Verified Stock & Pricing',
+    note: 'Product verified. Stock quantity and pricing validated. Approved for listing.',
+  },
+  {
+    id: '5',
+    label: '5. Needs Revision',
+    note:
+      'Product review pending revisions. Update the product specifications and correct formatting issues to proceed with approval.',
+  },
+  {
+    id: '10',
+    label: '10. Flagged for Further Review',
+    note:
+      'Product held for additional verification. Team will contact for supporting documents if required.',
+  },
+];
 
 type ApiImage = { url?: string; variantId?: number };
 type ApiSizeChartRow = { size?: string; chest?: string; waist?: string; hip?: string; length?: string };
@@ -57,6 +94,11 @@ type ApiVariant = {
   metroMetroDeliveryCharge?: number;
   totalPriceIntraCity?: number;
   totalPriceMetroMetro?: number;
+  priceWithCommission?: number;
+  highestDeliveryCharge?: number;
+  displayPrice?: number;
+  customerPrice?: number;
+  sellingPriceWithGst?: number;
   weight?: number;
 };
 
@@ -282,11 +324,13 @@ function mapApiProductDetail(data: Record<string, unknown>): {
   const status: ProductStatus =
     statusRaw === 'approved' || statusRaw === 'active'
       ? 'approved'
-      : statusRaw === 'rejected'
-        ? 'rejected'
-        : statusRaw === 'review' || statusRaw === 'under_review'
-          ? 'review'
-          : 'pending';
+      : statusRaw === 'inactive' || statusRaw === 'disabled'
+        ? 'inactive'
+        : statusRaw === 'rejected'
+          ? 'rejected'
+          : statusRaw === 'review' || statusRaw === 'under_review'
+            ? 'review'
+            : 'pending';
 
   const variants: ProductVariant[] = variantsRaw.map((v) => {
     const sellingWith = toNum(v.finalPrice ?? v.mrpPrice ?? v.sellingPrice);
@@ -309,11 +353,32 @@ function mapApiProductDetail(data: Record<string, unknown>): {
       sellingPriceExclGst: sellingExcl,
       gstPercent: taxPct,
       gstAmount: taxAmt,
-      sellingPriceWithGst: sellingWith,
+      sellingPriceWithGst: toNum(v.sellingPriceWithGst, sellingWith),
       commissionPercent: toNum(v.commissionPercentage),
       commissionAmount: toNum(v.commissionAmount),
       intraCityDelivery: toNum(v.intraCityDeliveryCharge),
       metroDelivery: toNum(v.metroMetroDeliveryCharge),
+      priceWithCommission: toNum(
+        v.priceWithCommission,
+        toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount),
+      ),
+      highestDeliveryCharge: toNum(
+        v.highestDeliveryCharge,
+        Math.max(toNum(v.intraCityDeliveryCharge), toNum(v.metroMetroDeliveryCharge)),
+      ),
+      displayPrice: toNum(
+        v.displayPrice ?? v.customerPrice,
+        toNum(v.priceWithCommission, toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount))
+          + Math.max(toNum(v.intraCityDeliveryCharge), toNum(v.metroMetroDeliveryCharge)),
+      ),
+      totalPriceIntraCity: toNum(
+        v.totalPriceIntraCity,
+        toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount) + toNum(v.intraCityDeliveryCharge),
+      ),
+      totalPriceMetroMetro: toNum(
+        v.totalPriceMetroMetro ?? v.customerPrice,
+        toNum(v.sellingPriceWithGst, sellingWith) + toNum(v.commissionAmount) + toNum(v.metroMetroDeliveryCharge),
+      ),
     };
   });
 
@@ -328,8 +393,9 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     ? 'Admin Catalog'
     : String(data.sellerName ?? `Seller #${data.sellerId ?? '—'}`);
   const discount = firstVariant?.discountPercent ?? 0;
-  const displayPrice = firstVariant?.sellingPriceWithGst ?? 0;
+  const displayPrice = firstVariant?.displayPrice ?? firstVariant?.sellingPriceWithGst ?? 0;
   const displayMrp = firstVariant?.mrp ?? displayPrice;
+  const commissionLabel = firstVariant?.commissionPercent ?? 0;
 
   const product: ProductDetail = {
     id: String(data.id ?? ''),
@@ -346,7 +412,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     categoryLabel,
     subcategory: String(data.subcategoryName ?? `Subcategory #${data.subcategoryId ?? '—'}`),
     fullTitle: cleanText(String(data.name ?? 'Product')),
-    price: displayPrice,
+    price: displayPrice as unknown as ProductDetail['price'],
     mrp: displayMrp,
     gst,
     material: dash(data.productMaterialType),
@@ -419,7 +485,7 @@ type TabKey = (typeof TABS)[number]['key'];
 
 function useBreakpoint() {
   const { width } = useWindowDimensions();
-  return { width, isWide: width >= 1024 };
+  return { width, isWide: width >= 1024, isTablet: width >= 480 && width < 1024 };
 }
 
 function InfoRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
@@ -434,12 +500,16 @@ function InfoRow({ label, value, valueColor }: { label: string; value: string; v
 function VariantsTab({
   isWide,
   variants,
+  sweetsProduct,
 }: {
   isWide: boolean;
   variants: ProductVariant[];
+  sweetsProduct: boolean;
 }) {
   const stats = getVariantStats(variants);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const commissionLabel = variants[0]?.commissionPercent ?? 0;
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
   return (
     <View style={styles.tabContent}>
@@ -456,10 +526,11 @@ function VariantsTab({
           </Text>
         </View>
         <View style={[styles.variantStatBox, isWide && styles.variantStatBoxLast]}>
-          <Text style={styles.variantStatLabel}>Avg. Selling Price</Text>
+          <Text style={styles.variantStatLabel}>Avg. Total Price</Text>
           <Text style={[styles.variantStatValue, { color: PALETTE.navy }]}>
             ₹{stats.avgSellingPrice.toFixed(2)}
           </Text>
+          <Text style={{ fontSize: 10, color: PALETTE.textMuted, marginTop: 2 }}>incl. GST + commission + delivery</Text>
         </View>
       </View>
 
@@ -487,6 +558,10 @@ function VariantsTab({
               />
             </Pressable>
           </View>
+          <Pressable style={styles.variantAddBtn}>
+            <MaterialCommunityIcons name="plus" size={16} color="#FFF" />
+            <Text style={styles.variantAddText}>Add</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -495,16 +570,17 @@ function VariantsTab({
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.variantTable}>
               <View style={styles.variantTableHeader}>
-                <Text style={[styles.vth, styles.vcolColor]}>Color</Text>
-                <Text style={[styles.vth, styles.vcolSize]}>Size</Text>
+                {dimLabels.showColor && <Text style={[styles.vth, styles.vcolColor]}>{dimLabels.colorLabel}</Text>}
+                <Text style={[styles.vth, styles.vcolSize]}>{dimLabels.sizeLabel}</Text>
                 <Text style={[styles.vth, styles.vcolSku]}>SKU</Text>
                 <Text style={[styles.vth, styles.vcolStock]}>Stock</Text>
+                <Text style={[styles.vth, styles.vcolMinQty]}>Min{'\n'}Qty</Text>
                 <Text style={[styles.vth, styles.vcolMrp]}>MRP{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
                 <Text style={[styles.vth, styles.vcolDisc]}>Discount{'\n'}<Text style={{ fontSize: 9 }}>(%)</Text></Text>
                 <Text style={[styles.vth, styles.vcolSell]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(Excl. GST)</Text></Text>
                 <Text style={[styles.vth, styles.vcolGst]}>GST{'\n'}<Text style={{ fontSize: 9 }}>(%)</Text></Text>
                 <Text style={[styles.vth, styles.vcolSellGst]}>Selling{'\n'}Price{'\n'}<Text style={{ fontSize: 9 }}>(With GST)</Text></Text>
-                <Text style={[styles.vth, styles.vcolComm]}>Commission{'\n'}<Text style={{ fontSize: 9 }}>(15%)</Text></Text>
+                <Text style={[styles.vth, styles.vcolComm]}>Commission{'\n'}<Text style={{ fontSize: 9 }}>({commissionLabel}%)</Text></Text>
                 <Text style={[styles.vth, styles.vcolDel]}>Intra-{'\n'}City{'\n'}<Text style={{ fontSize: 9 }}>Delivery</Text></Text>
                 <Text style={[styles.vth, styles.vcolDel]}>Metro-{'\n'}Metro{'\n'}<Text style={{ fontSize: 9 }}>Delivery</Text></Text>
                 <View style={styles.vcolTotalIntraHeader}>
@@ -515,7 +591,7 @@ function VariantsTab({
                 </View>
               </View>
               {variants.map((v) => (
-                <VariantTableRow key={v.id} variant={v} />
+                <VariantTableRow key={v.id} variant={v} showColor={dimLabels.showColor} />
               ))}
             </View>
           </ScrollView>
@@ -523,7 +599,7 @@ function VariantsTab({
       ) : (
         <View style={styles.variantGrid}>
           {variants.map((v) => (
-            <VariantCard key={v.id} variant={v} compact={false} />
+            <VariantCard key={v.id} variant={v} compact={false} sweetsProduct={sweetsProduct} />
           ))}
         </View>
       )}
@@ -531,17 +607,20 @@ function VariantsTab({
   );
 }
 
-function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
-  const intraCityTotal = v.sellingPriceWithGst + v.commissionAmount + v.intraCityDelivery;
-  const metroMetroTotal = v.sellingPriceWithGst + v.commissionAmount + v.metroDelivery;
+function VariantTableRow({ variant: v, showColor }: { variant: ProductVariant; showColor: boolean }) {
+  const intraCityTotal = v.totalPriceIntraCity;
+  const metroMetroTotal = v.totalPriceMetroMetro;
 
   return (
     <View style={styles.variantTableRow}>
-      <View style={[styles.vcolColor, styles.vcellColor]}>
-        <Image source={{ uri: v.image }} style={styles.vColorImg} contentFit="cover" />
-        <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
-        <Text style={styles.vColorName}>{v.colorName}</Text>
-      </View>
+      {showColor && (
+        <View style={[styles.vcolColor, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: v.colorHex }} />
+          <Text style={{ fontSize: 12, color: PALETTE.textPrimary, fontWeight: '500' }} numberOfLines={1}>
+            {v.colorName}
+          </Text>
+        </View>
+      )}
       <View style={styles.vcolSize}>
         <View style={styles.vSizePill}>
           <Text style={styles.vSizeText}>{v.size}</Text>
@@ -556,6 +635,9 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
         <View style={styles.vStockPill}>
           <Text style={styles.vStockText}>{v.stock} units</Text>
         </View>
+      </View>
+      <View style={styles.vcolMinQty}>
+        <Text style={styles.vcellText}>—</Text>
       </View>
       <View style={styles.vcolMrp}>
         <Text style={styles.vMrpText}>₹{v.mrp.toFixed(2)}</Text>
@@ -595,19 +677,31 @@ function VariantTableRow({ variant: v }: { variant: ProductVariant }) {
   );
 }
 
-
-function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact?: boolean }) {
+function VariantCard({
+  variant: v,
+  compact,
+  sweetsProduct,
+}: {
+  variant: ProductVariant;
+  compact?: boolean;
+  sweetsProduct?: boolean;
+}) {
+  const dimLabels = variantDimensionLabels(!!sweetsProduct);
   return (
     <View style={[styles.variantCard, compact && styles.variantCardCompact]}>
       <View style={styles.variantCardTop}>
         <Image source={{ uri: v.image }} style={styles.variantCardImg} contentFit="cover" />
         <View style={styles.variantCardInfo}>
-          <View style={styles.vcellColor}>
-            <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
-            <Text style={styles.vColorName}>{v.colorName}</Text>
-          </View>
+          {dimLabels.showColor && !isSweetsPlaceholderColor(v.colorName) ? (
+            <View style={styles.vcellColor}>
+              <View style={[styles.vColorDot, { backgroundColor: v.colorHex }]} />
+              <Text style={styles.vColorName}>{v.colorName}</Text>
+            </View>
+          ) : null}
           <View style={styles.vSizePill}>
-            <Text style={styles.vSizeText}>Size {v.size}</Text>
+            <Text style={styles.vSizeText}>
+              {dimLabels.sizeLabel} {v.size}
+            </Text>
           </View>
           <Text style={styles.vSkuText}>{v.sku}</Text>
         </View>
@@ -629,8 +723,8 @@ function VariantCard({ variant: v, compact }: { variant: ProductVariant; compact
           <Text style={styles.vSellGstText}>₹{v.sellingPriceWithGst.toFixed(2)}</Text>
         </View>
         <View style={styles.variantPriceItem}>
-          <Text style={styles.variantPriceLabel}>Commission</Text>
-          <Text style={styles.vCommAmount}>+ ₹{v.commissionAmount.toFixed(2)}</Text>
+          <Text style={styles.variantPriceLabel}>Total Price</Text>
+          <Text style={styles.vSellGstText}>₹{v.displayPrice.toFixed(2)}</Text>
         </View>
       </View>
       <View style={styles.variantCardDelivery}>
@@ -938,7 +1032,9 @@ function SectionCard({
 }
 
 export default function ProductDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id?: string | string[]; name?: string }>();
+  const idRaw = Array.isArray(params.id) ? params.id[0] : params.id;
+  const name = Array.isArray(params.name) ? params.name[0] : params.name;
   const { isWide, width } = useBreakpoint();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeImage, setActiveImage] = useState(0);
@@ -951,6 +1047,10 @@ export default function ProductDetailsScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveTemplateId, setApproveTemplateId] = useState('');
+  const [approveNote, setApproveNote] = useState('');
+  const fallbackName = typeof name === 'string' && name.trim() ? name.trim() : 'Product';
   const handleBack = () => {
     if (product?.status === 'pending' || product?.status === 'review') {
       router.push('/productApproval');
@@ -960,10 +1060,11 @@ export default function ProductDetailsScreen() {
   };
 
   const loadProduct = useCallback(async () => {
-    const productId = Number(id);
-    if (!id || Number.isNaN(productId)) {
+    const productId = Number(idRaw);
+    if (!idRaw || Number.isNaN(productId)) {
       setLoading(false);
       setProduct(null);
+      setError('Product not found');
       return;
     }
 
@@ -983,7 +1084,7 @@ export default function ProductDetailsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [idRaw]);
 
   useEffect(() => {
     loadProduct();
@@ -992,51 +1093,52 @@ export default function ProductDetailsScreen() {
   const canReview =
     product?.status === 'pending' || product?.status === 'review' || product?.dbStatus === 'pending';
 
+  const openApproveModal = () => {
+    setApproveTemplateId('');
+    setApproveNote('');
+    setShowApproveModal(true);
+  };
+
+  const handleApproveTemplateChange = (templateId: string) => {
+    setApproveTemplateId(templateId);
+    const matched = APPROVE_NOTE_TEMPLATES.find((t) => t.id === templateId);
+    setApproveNote(matched?.note ?? '');
+  };
+
   const handleApprove = async () => {
-    const productId = Number(id);
+    const productId = Number(idRaw);
     if (Number.isNaN(productId)) return;
 
-    const run = async () => {
-      setActionLoading(true);
-      try {
-        await approveProduct(productId);
-        if (Platform.OS === 'web') window.alert('Product approved.');
-        else Alert.alert('Success', 'Product approved.');
-        handleBack();
-      } catch (err) {
-        const msg = getApiErrorMessage(err, 'Failed to approve product.');
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Error', msg);
-      } finally {
-        setActionLoading(false);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Approve this product?')) void run();
-    } else {
-      Alert.alert('Approve product', 'Approve this product for listing?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Approve', onPress: () => void run() },
-      ]);
+    setActionLoading(true);
+    try {
+      const note = approveNote.trim();
+      await approveProduct(productId, note || undefined);
+      setShowApproveModal(false);
+      setApproveTemplateId('');
+      setApproveNote('');
+      void sweetSuccess('Product approved.');
+      handleBack();
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to approve product.');
+      void sweetError('Error', msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleReject = async () => {
-    const productId = Number(id);
+    const productId = Number(idRaw);
     if (Number.isNaN(productId)) return;
     setActionLoading(true);
     try {
       await rejectProduct(productId, rejectNote.trim() || 'Product rejected.');
       setShowRejectModal(false);
       setRejectNote('');
-      if (Platform.OS === 'web') window.alert('Product rejected.');
-      else Alert.alert('Done', 'Product rejected.');
+      void sweetSuccess('Product rejected.');
       handleBack();
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to reject product.');
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      void sweetError('Error', msg);
     } finally {
       setActionLoading(false);
     }
@@ -1060,6 +1162,7 @@ export default function ProductDetailsScreen() {
       <AdminLayout>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.notFound}>
+            <Text style={styles.notFoundTitle} numberOfLines={2}>{fallbackName}</Text>
             <Text style={styles.notFoundText}>{error ?? 'Product not found'}</Text>
             <Pressable style={styles.backBtnLight} onPress={() => (error ? loadProduct() : handleBack())}>
               <Text style={styles.backBtnLightText}>{error ? 'Retry' : 'Go Back'}</Text>
@@ -1071,10 +1174,122 @@ export default function ProductDetailsScreen() {
   }
 
   const contentMax = isWide ? Math.min(width, 1200) : width;
+  const firstVariant = variants[0];
+  const commissionLabel = firstVariant?.commissionPercent ?? 0;
+  const sweetsProduct =
+    isSweetsCategory(product.categoryLabel, product.subcategory, product.category) ||
+    isSweetsPlaceholderColor(product.color);
+  const dimLabels = variantDimensionLabels(sweetsProduct);
 
   return (
     <AdminLayout>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <Modal visible={showApproveModal} transparent animationType="fade">
+          <View style={styles.rejectModalBackdrop}>
+            <View style={[styles.rejectModalCard, styles.approveModalCard]}>
+              <View style={styles.approveModalHeader}>
+                <Text style={styles.rejectModalTitle}>Approve Product</Text>
+                <Pressable
+                  onPress={() => {
+                    if (actionLoading) return;
+                    setShowApproveModal(false);
+                  }}
+                  hitSlop={8}
+                >
+                  <MaterialCommunityIcons name="close" size={22} color={PALETTE.textSecondary} />
+                </Pressable>
+              </View>
+
+              <Text style={styles.approveModalLabel}>Select Template (Optional)</Text>
+              {Platform.OS === 'web' ? (
+                <View style={styles.approveSelectWrap}>
+                  <select
+                    value={approveTemplateId}
+                    onChange={(e: { target: { value: string } }) =>
+                      handleApproveTemplateChange(e.target.value)
+                    }
+                    style={{
+                      width: '100%',
+                      height: 42,
+                      border: '1px solid #E5E7EB',
+                      borderRadius: 8,
+                      background: '#FFFFFF',
+                      fontSize: 14,
+                      color: '#111827',
+                      outline: 'none',
+                      paddingLeft: 12,
+                      paddingRight: 12,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="">-- Select a template --</option>
+                    {APPROVE_NOTE_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </View>
+              ) : (
+                <View style={styles.approveTemplateList}>
+                  {APPROVE_NOTE_TEMPLATES.map((t) => {
+                    const active = approveTemplateId === t.id;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        style={[styles.approveTemplateOption, active && styles.approveTemplateOptionActive]}
+                        onPress={() => handleApproveTemplateChange(t.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.approveTemplateOptionText,
+                            active && styles.approveTemplateOptionTextActive,
+                          ]}
+                        >
+                          {t.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              <Text style={styles.approveModalHint}>
+                Select a template to auto-fill notes, or write custom notes below
+              </Text>
+
+              <Text style={styles.approveModalLabel}>Admin Notes (Optional)</Text>
+              <TextInput
+                style={styles.rejectModalInput}
+                placeholder="Admin notes for this approval"
+                placeholderTextColor={PALETTE.textMuted}
+                value={approveNote}
+                onChangeText={setApproveNote}
+                multiline
+              />
+
+              <View style={styles.approveModalActions}>
+                <Pressable
+                  style={styles.rejectActionBtn}
+                  disabled={actionLoading}
+                  onPress={() => setShowApproveModal(false)}
+                >
+                  <Text style={styles.rejectActionText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => void handleApprove()}
+                >
+                  <Text style={styles.approveActionText}>
+                    {actionLoading ? 'Approving…' : 'Approve Product'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         <Modal visible={showRejectModal} transparent animationType="fade">
           <View style={styles.rejectModalBackdrop}>
             <View style={styles.rejectModalCard}>
@@ -1106,7 +1321,7 @@ export default function ProductDetailsScreen() {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { maxWidth: contentMax, alignSelf: 'center', width: '100%' }]}
+          contentContainerStyle={[styles.scrollContent, { width: '100%', paddingHorizontal: isWide ? 32 : 16 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Header */}
@@ -1116,18 +1331,23 @@ export default function ProductDetailsScreen() {
                 <MaterialCommunityIcons name="arrow-left" size={18} color="#FFF" />
                 <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
-              <View>
-                <Text style={styles.headerTitle} numberOfLines={2}>
-                  Product Detail
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  Product Details
+                </Text>
+                <Text style={styles.headerSub} numberOfLines={1}>
+                  SKU: {product.sku} - Last updated: {product.lastUpdated || '17 May 2026'}
                 </Text>
               </View>
             </View>
+
+            {/* Desktop (isWide): filled Approve/Reject next to title */}
             {canReview && isWide ? (
               <View style={styles.headerActions}>
                 <Pressable
                   style={[styles.approveActionBtn, actionLoading && { opacity: 0.6 }]}
                   disabled={actionLoading}
-                  onPress={() => void handleApprove()}
+                  onPress={openApproveModal}
                 >
                   <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
                   <Text style={styles.approveActionText}>Approve</Text>
@@ -1142,30 +1362,33 @@ export default function ProductDetailsScreen() {
                 </Pressable>
               </View>
             ) : null}
+
+            {/* All non-wide (tablet + mobile): single row, same filled style as desktop. No duplicate bottom buttons. */}
+            {canReview && !isWide ? (
+              <View style={styles.mobileHeaderBtns}>
+                <Pressable
+                  style={[styles.approveActionBtn, styles.mobileActionBtnFlex, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={openApproveModal}
+                >
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.approveActionText}>Approve</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.rejectActionBtn, styles.mobileActionBtnFlex, actionLoading && { opacity: 0.6 }]}
+                  disabled={actionLoading}
+                  onPress={() => setShowRejectModal(true)}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.rejectActionText}>Reject</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
-          {canReview && !isWide ? (
-            <View style={styles.mobileHeaderActions}>
-              <Pressable
-                style={[styles.approveActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-                disabled={actionLoading}
-                onPress={() => void handleApprove()}
-              >
-                <Text style={styles.approveActionText}>Approve</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.rejectActionBtn, { flex: 1 }, actionLoading && { opacity: 0.6 }]}
-                disabled={actionLoading}
-                onPress={() => setShowRejectModal(true)}
-              >
-                <Text style={styles.rejectActionText}>Reject</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          <View style={styles.scrollBody}>
-            {/* Hero card */}
-            <View style={styles.heroCard}>
+          <View style={[styles.scrollBody, !isWide && styles.scrollBodyMobile]}>
+            {/* Hero card: overlaps header bottom on mobile */}
+            <View style={[styles.heroCard, !isWide && styles.heroCardMobile]}>
               <View style={[styles.heroLayout, !isWide && styles.heroLayoutMobile]}>
                 {/* Gallery */}
                 <View style={[styles.galleryCol, !isWide && styles.galleryColMobile]}>
@@ -1173,7 +1396,7 @@ export default function ProductDetailsScreen() {
                     <Image
                       source={{ uri: product.gallery[activeImage] || product.image }}
                       style={[styles.mainImage, !isWide && styles.mainImageMobile]}
-                      contentFit="cover"
+                      contentFit="contain"
                     />
                     {product.discount > 0 ? (
                       <View style={styles.discountBadge}>
@@ -1185,7 +1408,7 @@ export default function ProductDetailsScreen() {
                       <Text style={styles.stockBadgeText}>{product.stock} units</Text>
                     </View>
                   </View>
-                  <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 10 }]}>
+                  <View style={[styles.thumbRow, !isWide && { paddingHorizontal: 14, marginTop: 6, marginBottom: 2 }]}>
                     <Pressable
                       style={styles.thumbNav}
                       onPress={() => setActiveImage(prev => Math.max(0, prev - 1))}
@@ -1198,7 +1421,7 @@ export default function ProductDetailsScreen() {
                           <Image
                             source={{ uri }}
                             style={[styles.thumb, activeImage === index && styles.thumbActive]}
-                            contentFit="cover"
+                            contentFit="contain"
                             pointerEvents="none"
                           />
                         </Pressable>
@@ -1232,9 +1455,9 @@ export default function ProductDetailsScreen() {
                     {product.category} · SKU: {product.sku}
                   </Text>
 
-                  <Text style={styles.price}>₹{product.price.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.price}>₹{Number(product.price).toLocaleString('en-IN')}</Text>
                   <Text style={styles.priceSub}>
-                    MRP Excl. GST ₹{product.mrp.toLocaleString('en-IN')} · GST {product.gst}%
+                    Selling + GST + {commissionLabel}% commission + highest delivery (₹{(firstVariant?.highestDeliveryCharge ?? 0).toLocaleString('en-IN')})
                   </Text>
 
                   <View style={[styles.attrGrid, !isWide && styles.attrGridMobile]}>
@@ -1263,7 +1486,9 @@ export default function ProductDetailsScreen() {
 
                   <View style={styles.footerTags}>
                     <View style={styles.footerTag}>
-                      <Text style={styles.footerTagText}>Size: {product.size}</Text>
+                      <Text style={styles.footerTagText}>
+                        {dimLabels.sizeLabel}: {product.size}
+                      </Text>
                     </View>
                     <View style={styles.footerTag}>
                       <Text style={[styles.footerTagText, { color: PALETTE.blue }]}>
@@ -1347,8 +1572,10 @@ export default function ProductDetailsScreen() {
                     <InfoRow label="Seller" value={product.seller} />
                     {product.email ? <InfoRow label="Seller Email" value={product.email} /> : null}
                     {sellerPhone ? <InfoRow label="Seller Phone" value={sellerPhone} /> : null}
-                    <InfoRow label="Color" value={product.color} />
-                    <InfoRow label="Size" value={product.size} />
+                    {dimLabels.showColor && !isSweetsPlaceholderColor(product.color) ? (
+                      <InfoRow label={dimLabels.colorLabel} value={product.color} />
+                    ) : null}
+                    <InfoRow label={dimLabels.sizeLabel} value={product.size} />
                     <InfoRow label="HSN Code" value={product.hsnCode} />
                     <InfoRow label="GST" value={`${product.gst}%`} valueColor={PALETTE.orange} />
                     <InfoRow label="Material" value={product.material} />
@@ -1375,7 +1602,7 @@ export default function ProductDetailsScreen() {
             )}
 
             {activeTab === 'variants' && (
-              <VariantsTab isWide={isWide} variants={variants} />
+              <VariantsTab isWide={isWide} variants={variants} sweetsProduct={sweetsProduct} />
             )}
 
             {activeTab === 'specifications' && extras && (
@@ -1399,10 +1626,10 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: PALETTE.pageBg },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
-  scrollBody: { padding: 16, gap: 16 },
+  scrollBody: { gap: 16, paddingTop: 16 },
 
   header: {
-    marginHorizontal: 2, marginTop: 12, borderRadius: 22,
+    marginHorizontal: 0, marginTop: 16, borderRadius: 16,
     backgroundColor: "#151D4F",
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1415,6 +1642,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     marginTop: 0,
     borderRadius: 22,
+    paddingBottom: 18,
+    flexDirection: 'column',
+    gap: 10,
+    alignItems: 'stretch',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   backBtn: {
@@ -1430,15 +1661,11 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#FFF', fontSize: 18, fontWeight: '800' },
   headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 10 },
-  mobileHeaderActions: {
+  mobileHeaderBtns: {
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: PALETTE.navy,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
   },
+  mobileActionBtnFlex: { flex: 1 },
   addVariantBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1512,6 +1739,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: PALETTE.textPrimary,
   },
+  approveModalCard: {
+    maxWidth: 520,
+    gap: 10,
+  },
+  approveModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  approveModalLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.textPrimary,
+    marginTop: 4,
+  },
+  approveModalHint: {
+    fontSize: 12,
+    color: PALETTE.textMuted,
+    marginTop: -2,
+  },
+  approveSelectWrap: {
+    width: '100%',
+  },
+  approveTemplateList: {
+    gap: 6,
+  },
+  approveTemplateOption: {
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FAFAFA',
+  },
+  approveTemplateOptionActive: {
+    borderColor: PALETTE.orange,
+    backgroundColor: '#FFF7ED',
+  },
+  approveTemplateOptionText: {
+    fontSize: 13,
+    color: PALETTE.textPrimary,
+  },
+  approveTemplateOptionTextActive: {
+    fontWeight: '700',
+    color: PALETTE.orange,
+  },
+  approveModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 8,
+  },
 
   heroCard: {
     backgroundColor: PALETTE.cardBg,
@@ -1522,15 +1802,18 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' } : {}),
   },
   heroLayout: { flexDirection: 'row', gap: 24, padding: 16 },
-  heroLayoutMobile: { flexDirection: 'column', padding: 0 },
+  heroLayoutMobile: { flexDirection: 'column', padding: 0, gap: 0 },
   galleryCol: { flex: 1, minWidth: 0 },
   galleryColMobile: { width: '100%' },
   infoCol: { flex: 1, minWidth: 0, gap: 10 },
   infoColMobile: { padding: 14, gap: 10 },
 
+  scrollBodyMobile: { paddingHorizontal: 0, paddingTop: 0 },
+  heroCardMobile: { borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0, borderTopWidth: 0 },
+
   mainImageWrap: { position: 'relative', overflow: 'hidden' },
   mainImage: { width: '100%', height: 280, backgroundColor: PALETTE.pageBg },
-  mainImageMobile: { height: 240, borderRadius: 0 },
+  mainImageMobile: { height: 300, borderRadius: 0 },
   discountBadge: {
     position: 'absolute',
     top: 12,
@@ -1569,10 +1852,10 @@ const styles = StyleSheet.create({
   thumb: { width: 56, height: 56, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
   thumbActive: { borderColor: PALETTE.purple },
 
-  infoTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  categoryPill: { backgroundColor: PALETTE.purpleLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  infoTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  categoryPill: { backgroundColor: PALETTE.purpleLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, flexShrink: 1 },
   categoryPillText: { color: PALETTE.purple, fontSize: 11, fontWeight: '600' },
-  stockStatus: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  stockStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
   stockDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PALETTE.red },
   stockStatusText: { color: PALETTE.red, fontSize: 12, fontWeight: '700' },
 
@@ -1603,7 +1886,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   returnLabel: { fontSize: 11, color: PALETTE.textMuted, fontWeight: '600' },
-  returnText: { fontSize: 12, color: PALETTE.green, fontWeight: '600', lineHeight: 18 },
+  returnText: { fontSize: 12, color: PALETTE.green, fontWeight: '600', lineHeight: 18, flexWrap: 'wrap', flexShrink: 1 },
 
   footerTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   footerTag: { backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
@@ -1733,6 +2016,7 @@ const styles = StyleSheet.create({
   vcolSize: { width: 64, alignItems: 'center', paddingHorizontal: 4 },
   vcolSku: { width: 120, paddingHorizontal: 8 },
   vcolStock: { width: 90, alignItems: 'center', paddingHorizontal: 4 },
+  vcolMinQty: { width: 70, alignItems: 'center', paddingHorizontal: 4 },
   vcolMrp: { width: 100, paddingHorizontal: 8 },
   vcolDisc: { width: 88, paddingHorizontal: 8 },
   vcolSell: { width: 110, paddingHorizontal: 8 },
@@ -2062,6 +2346,7 @@ const styles = StyleSheet.create({
   sizeChartFooterText: { fontSize: 13, color: PALETTE.blue, fontWeight: '600', flex: 1 },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  notFoundTitle: { fontSize: 18, fontWeight: '800', color: PALETTE.textPrimary, textAlign: 'center', maxWidth: 320 },
   notFoundText: { fontSize: 16, fontWeight: '600', color: PALETTE.textSecondary },
   backBtnLight: {
     backgroundColor: PALETTE.purple,

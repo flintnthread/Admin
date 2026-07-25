@@ -9,7 +9,28 @@ import {
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AdminLayout from "@/components/admin-layout";
-import { fetchProductCatalog } from "@/services/productApi";
+import { buildCreateProductPayload } from "@/lib/product/buildCreateProductPayload";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { getHsnForMaterial, MATERIAL_TYPES } from "@/lib/product/materialHsn";
+import {
+    buildCategoryPathOptions,
+    buildLeafSubcategoryOptions,
+    formatCategoryPath,
+    materialsForSelection,
+    resolveCategoryPathSelection,
+    resolveGstForMaterial,
+    resolveLeafSubcategory,
+    resolveMaterialOption,
+    resolveWeightSlab,
+    type AdminProductFormCatalog,
+} from "@/lib/product/catalogHelpers";
+import { createProduct, fetchDeliveryChargesForWeight, fetchProductCatalog } from "@/services/productApi";
+import {
+    isSweetsCategory,
+    variantDimensionLabels,
+    SWEETS_DEFAULT_COLOR,
+} from "@/lib/product/sweetsCategory";
+import { generateVariantSku } from "@/lib/product/generateVariantSku";
 
 const AppText = Text;
 
@@ -40,9 +61,9 @@ const useResponsive = () => {
     return { isDesktop };
 };
 
-type ProductFormCatalog = {
-    categories: Array<{ id: string; name: string; subcategories: Array<{ id: string; name: string }> }>;
-    materials: Array<{ id: string; name: string }>;
+type ProductFormCatalog = AdminProductFormCatalog & {
+    colors?: Array<{ id: number; name: string; code?: string }>;
+    sizes?: Array<{ id: number; name: string; code?: string }>;
 };
 
 type ImagePickerAsset = { uri: string; type?: string; width?: number; height?: number };
@@ -85,36 +106,25 @@ const ImagePicker = {
     },
 } as const;
 
-const buildCreateProductPayload = async (data: any) => data;
-const getHsnForMaterial = (_material: string) => "000000";
-const MATERIAL_TYPES: string[] = ["Cotton", "Polyester", "Silk", "Linen", "Wool", "Blend"];
 const uniquePickerOptions = (options: string[]) => Array.from(new Set(options));
 
 const fetchProductFormCatalog = async (): Promise<ProductFormCatalog> => {
     const data = await fetchProductCatalog();
     return {
-        categories: (data.categories ?? []).map((c) => ({
-            id: String(c.id),
+        categories: data.categories ?? [],
+        colors: (data.colors ?? []).map((c) => ({
+            id: Number(c.id),
             name: c.name,
-            subcategories: (c.subcategories ?? []).map((s) => ({
-                id: String(s.id),
-                name: s.name,
-            })),
+            code: c.code,
         })),
-        materials: MATERIAL_TYPES.map((m, i) => ({ id: `m${i}`, name: m })),
+        sizes: (data.sizes ?? []).map((s) => ({
+            id: Number(s.id),
+            name: s.name,
+            code: s.code ?? s.name,
+        })),
+        deliverySlabs: data.deliverySlabs ?? [],
     };
 };
-
-const createProduct = async (_payload: any): Promise<{ productId: string }> => ({
-    productId: "new-product-id",
-});
-
-class ApiError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "ApiError";
-    }
-}
 
 const applyDeliverySelection = (value: string, onChange: (field: string, value: any) => void) => {
     onChange("deliveryOption", value);
@@ -950,12 +960,14 @@ const validateBasicInfo = (data: any): string[] => {
     return e;
 };
 
-const validateVariants = (variants: any[]): string[] => {
+const validateVariants = (variants: any[], opts?: { sweets?: boolean }): string[] => {
     const e: string[] = [];
+    const sweets = opts?.sweets === true;
+    const sizeWord = sweets ? "Weight" : "Size";
     variants.forEach((v, i) => {
         const n = i + 1;
-        if (!v.color) e.push(`Variant #${n}: Color is required`);
-        if (!v.size) e.push(`Variant #${n}: Size is required`);
+        if (!sweets && !v.color) e.push(`Variant #${n}: Color is required`);
+        if (!v.size) e.push(`Variant #${n}: ${sizeWord} is required`);
         if (!v.stock?.trim()) e.push(`Variant #${n}: Stock Qty is required`);
         if (!v.mrp?.trim()) e.push(`Variant #${n}: MRP is required`);
         if (!v.sellingPrice?.trim()) e.push(`Variant #${n}: Selling Price is required`);
@@ -1615,16 +1627,72 @@ const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isD
         }
     }, [errors, validationTrigger]);
 
-    const categoryOptions = uniquePickerOptions(
-        catalog?.categories?.map((c: { name: string }) => c.name) ?? CATEGORIES
+    const categoryPathOptions = uniquePickerOptions(buildCategoryPathOptions(catalog));
+    const categoryDisplay = formatCategoryPath(data.category, data.categorySubName ?? "");
+    const leafSubcats = uniquePickerOptions(
+        buildLeafSubcategoryOptions(catalog, data.category, data.categorySubName ?? ""),
     );
-    const selectedCategory = catalog?.categories?.find(
-        (c: { name: string }) => c.name === data.category
+    const materialCatalog = materialsForSelection(
+        catalog,
+        data.category,
+        data.categorySubName ?? "",
+        data.subcategory ?? "",
     );
-    const subcats = uniquePickerOptions(
-        selectedCategory?.subcategories?.map((s: { name: string }) => s.name) ??
-        (data.category ? SUBCATEGORIES[data.category] || [] : [])
-    );
+    const materialOptions = materialCatalog.length > 0
+        ? materialCatalog.map((m) => m.material)
+        : MATERIAL_TYPES;
+
+    const selectCategoryPath = (label: string) => {
+        const resolved = resolveCategoryPathSelection(label, catalog);
+        onChange("category", resolved.category);
+        onChange("categoryId", resolved.categoryId);
+        onChange("categorySubId", resolved.categorySubId);
+        onChange("categorySubName", resolved.categorySubName);
+        onChange("materialType", "");
+        onChange("hsnCode", "");
+        onChange("gstPercentage", "");
+        const mid = catalog?.categories
+            ?.find((c: { name: string }) => c.name === resolved.category)
+            ?.subcategories?.find((s: { name: string }) => s.name === resolved.categorySubName);
+        const children = mid?.children ?? [];
+        if (children.length === 0) {
+            const leaf = resolveLeafSubcategory(
+                catalog,
+                resolved.category,
+                resolved.categorySubName,
+                resolved.categorySubName,
+            );
+            onChange("subcategory", leaf.name);
+            onChange("subcategoryId", leaf.id);
+        } else {
+            onChange("subcategory", "");
+            onChange("subcategoryId", null);
+        }
+    };
+
+    const selectSubcategory = (leafName: string) => {
+        const leaf = resolveLeafSubcategory(
+            catalog,
+            data.category,
+            data.categorySubName ?? "",
+            leafName,
+        );
+        onChange("subcategory", leaf.name);
+        onChange("subcategoryId", leaf.id);
+        onChange("materialType", "");
+        onChange("hsnCode", "");
+        onChange("gstPercentage", "");
+    };
+
+    const applyMaterial = (materialName: string) => {
+        onChange("materialType", materialName);
+        const option = resolveMaterialOption(materialCatalog, materialName);
+        const hsn = option?.hsnCode || getHsnForMaterial(materialName);
+        if (hsn) onChange("hsnCode", hsn);
+        const gst = resolveGstForMaterial(materialCatalog, materialName);
+        if (gst != null) onChange("gstPercentage", String(gst));
+    };
+
     const hasErr = (field: string) => errors.some((e: string) => e.toLowerCase().includes(field.toLowerCase()));
 
     return (
@@ -1643,11 +1711,11 @@ const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isD
                 }}>
                     <View ref={el => { fieldRefs.current['category'] = el; }} style={{ flex: 1 }}>
                         <Lbl text="Category" required />
-                        <Drop placeholder="Select category" value={data.category} onPress={() => setCatPick(true)} hasError={hasErr("category")} options={categoryOptions} onSelect={(v: string) => { const cat = catalog?.categories?.find((c: { name: string }) => c.name === v); onChange("category", v); onChange("categoryId", cat?.id ?? null); onChange("subcategory", ""); onChange("subcategoryId", null); }} />
+                        <Drop placeholder="Select category" value={categoryDisplay} onPress={() => setCatPick(true)} hasError={hasErr("category")} options={categoryPathOptions} onSelect={selectCategoryPath} />
                     </View>
                     <View ref={el => { fieldRefs.current['subcategory'] = el; }} style={{ flex: 1 }}>
                         <Lbl text="Subcategory" required />
-                        <Drop placeholder="Select sub" value={data.subcategory} onPress={() => data.category && setSubPick(true)} hasError={hasErr("subcategory")} options={subcats} onSelect={(v: string) => { const sub = selectedCategory?.subcategories?.find((s: { name: string }) => s.name === v); onChange("subcategory", v); onChange("subcategoryId", sub?.id ?? null); }} />
+                        <Drop placeholder="Select sub" value={data.subcategory} onPress={() => data.category && data.categorySubName && setSubPick(true)} hasError={hasErr("subcategory")} options={leafSubcats} onSelect={selectSubcategory} />
                     </View>
                 </View>
                 <View style={[at.row2, Platform.OS === 'web' && { zIndex: 10 }]} onLayout={(e: LayoutChangeEvent) => {
@@ -1657,7 +1725,7 @@ const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isD
                 }}>
                     <View ref={el => { fieldRefs.current['materialType'] = el; }} style={{ flex: 1 }}>
                         <Lbl text="Material Type" required />
-                        <Drop placeholder="Select material" value={data.materialType} onPress={() => setMatPick(true)} hasError={hasErr("material")} options={MATERIAL_TYPES} onSelect={(v: string) => { onChange("materialType", v); const hsn = getHsnForMaterial(v); if (hsn) onChange("hsnCode", hsn); }} />
+                        <Drop placeholder="Select material" value={data.materialType} onPress={() => setMatPick(true)} hasError={hasErr("material")} options={materialOptions} onSelect={applyMaterial} />
                         <Hint text="Primary material of the product" />
                     </View>
                     <View ref={el => { fieldRefs.current['hsnCode'] = el; }} style={{ flex: 1 }}>
@@ -1720,6 +1788,11 @@ const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isD
                         <Hint text="Based on entered weight" />
                     </View>
                 </View>
+                {(data.intraCityCharge || data.metroMetroCharge) ? (
+                    <AppText style={[at.cardHint, { marginTop: 6 }]}>
+                        Intra-city ₹{data.intraCityCharge || "—"} · Metro–metro ₹{data.metroMetroCharge || "—"}
+                    </AppText>
+                ) : null}
                 <Divider />
                 <Lbl text="Fragile Item?" required />
                 <View style={at.radioRow}>
@@ -1823,14 +1896,14 @@ const StepBasicInfo = ({ data, onChange, errors, validationTrigger, catalog, isD
                 )}
             </Card>
 
-            <PM visible={catPick} title="Select Category" options={categoryOptions} selected={data.category}
-                onSelect={(v: string) => { const cat = catalog?.categories?.find((c: { name: string }) => c.name === v); onChange("category", v); onChange("categoryId", cat?.id ?? null); onChange("subcategory", ""); onChange("subcategoryId", null); }}
+            <PM visible={catPick} title="Select Category" options={categoryPathOptions} selected={categoryDisplay}
+                onSelect={selectCategoryPath}
                 onClose={() => setCatPick(false)} />
-            <PM visible={subPick} title="Select Subcategory" options={subcats} selected={data.subcategory}
-                onSelect={(v: string) => { const sub = selectedCategory?.subcategories?.find((s: { name: string }) => s.name === v); onChange("subcategory", v); onChange("subcategoryId", sub?.id ?? null); }}
+            <PM visible={subPick} title="Select Subcategory" options={leafSubcats} selected={data.subcategory}
+                onSelect={selectSubcategory}
                 onClose={() => setSubPick(false)} />
-            <PM visible={matPick} title="Select Material" options={MATERIAL_TYPES} selected={data.materialType}
-                onSelect={(v: string) => { onChange("materialType", v); const hsn = getHsnForMaterial(v); if (hsn) onChange("hsnCode", hsn); }}
+            <PM visible={matPick} title="Select Material" options={materialOptions} selected={data.materialType}
+                onSelect={applyMaterial}
                 onClose={() => setMatPick(false)} />
             {actionBar}
         </ScrollView>
@@ -1920,7 +1993,9 @@ type Variant = {
     images: string[]; videoUrl: string;
 };
 
-const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar }: any) => {
+const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDesktop = false, actionBar, categoryName = "", categorySubName = "", subcategoryName = "", productName = "" }: any) => {
+    const sweetsProduct = isSweetsCategory(categoryName, categorySubName, subcategoryName);
+    const dimLabels = variantDimensionLabels(sweetsProduct);
     const [clrPick, setClrPick] = useState<string | null>(null);
     const [szPick, setSzPick] = useState<string | null>(null);
 
@@ -1932,7 +2007,21 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
 
     const addVariant = () => {
         const id = Date.now().toString();
-        setVariants((p: Variant[]) => [...p, { id, color: "", size: "", sku: "", stock: "", mrp: "", sellingPrice: "", discount: "0", images: [], videoUrl: "" }]);
+        setVariants((p: Variant[]) => [
+            ...p,
+            {
+                id,
+                color: sweetsProduct ? SWEETS_DEFAULT_COLOR : "",
+                size: "",
+                sku: "",
+                stock: "",
+                mrp: "",
+                sellingPrice: "",
+                discount: "0",
+                images: [],
+                videoUrl: "",
+            },
+        ]);
     };
 
     const addVariantImage = (id: string, uris: string[]) => {
@@ -1961,6 +2050,16 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                 const sp = parseFloat(String(spRaw ?? "")) || 0;
                 if (mrp > 0 && sp > 0 && sp <= mrp) u.discount = String(Math.round(((mrp - sp) / mrp) * 100));
             }
+            if (field === "color" || field === "size" || field === "colorId" || field === "sizeId") {
+                const colorName = String(field === "color" ? cleanVal : u.color ?? "");
+                const sizeName = String(field === "size" ? cleanVal : u.size ?? "");
+                if (colorName && sizeName) {
+                    const sizeMeta = catalog?.sizes?.find((s: { id?: number; name?: string; code?: string }) =>
+                        s.id === u.sizeId || s.name === sizeName
+                    );
+                    u.sku = generateVariantSku(String(productName || "PRD"), colorName, sizeName, undefined, sizeMeta?.code);
+                }
+            }
             return u;
         }));
     };
@@ -1981,13 +2080,24 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                     </View>
                     <Divider />
                     <View style={[at.row2, Platform.OS === 'web' && { zIndex: 20 }]}>
+                        {dimLabels.showColor ? (
+                            <View style={{ flex: 1 }}>
+                                <Lbl text={dimLabels.colorLabel} required />
+                                <Drop placeholder="Select color" value={v.color} onPress={() => setClrPick(v.id)} hasError={hasErr(v.id, "color")} options={colorOptions} onSelect={(val: string) => {
+                                    const color = catalog?.colors?.find((c: { name: string }) => c.name === val);
+                                    upVariant(v.id, "color", val);
+                                    upVariant(v.id, "colorId", color?.id);
+                                }} />
+                            </View>
+                        ) : null}
                         <View style={{ flex: 1 }}>
-                            <Lbl text="Color" required />
-                            <Drop placeholder="Select color" value={v.color} onPress={() => setClrPick(v.id)} hasError={hasErr(v.id, "color")} options={colorOptions} onSelect={(val: string) => upVariant(v.id, "color", val)} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Lbl text="Size" required />
-                            <Drop placeholder="Select size" value={v.size} onPress={() => setSzPick(v.id)} hasError={hasErr(v.id, "size")} options={sizeOptions} onSelect={(val: string) => upVariant(v.id, "size", val)} />
+                            <Lbl text={dimLabels.sizeLabel} required />
+                            <Drop placeholder={dimLabels.sizePlaceholder} value={v.size} onPress={() => setSzPick(v.id)} hasError={hasErr(v.id, "size") || hasErr(v.id, "weight")} options={sizeOptions} onSelect={(val: string) => {
+                                const size = catalog?.sizes?.find((s: { name: string; code: string }) => s.name === val || `${s.name} (${s.code})` === val || s.code === val);
+                                upVariant(v.id, "size", size?.name ?? val);
+                                upVariant(v.id, "sizeId", size?.id);
+                                if (sweetsProduct) upVariant(v.id, "color", SWEETS_DEFAULT_COLOR);
+                            }} />
                         </View>
                     </View>
                     <View style={at.row2}>
@@ -2039,7 +2149,7 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                 <AppText style={vt.infoTxt}>Each variant can have its own price, stock, and images. At least one variant is required.</AppText>
             </View>
 
-            <PM visible={!!clrPick} title="Select Color" options={colorOptions} selected={variants.find((v: Variant) => v.id === clrPick)?.color || ""}
+            <PM visible={dimLabels.showColor && !!clrPick} title="Select Color" options={colorOptions} selected={variants.find((v: Variant) => v.id === clrPick)?.color || ""}
                 onSelect={(val: string) => {
                     if (!clrPick) return;
                     const color = catalog?.colors?.find((c: { name: string }) => c.name === val);
@@ -2047,7 +2157,7 @@ const StepVariants = ({ variants, setVariants, rmVariant, errors, catalog, isDes
                     upVariant(clrPick, "colorId", color?.id);
                 }}
                 onClose={() => setClrPick(null)} />
-            <PM visible={!!szPick} title="Select Size" options={sizeOptions} selected={variants.find((v: Variant) => v.id === szPick)?.size || ""}
+            <PM visible={!!szPick} title={dimLabels.sizeSelectTitle} options={sizeOptions} selected={variants.find((v: Variant) => v.id === szPick)?.size || ""}
                 onSelect={(val: string) => {
                     if (!szPick) return;
                     const size = catalog?.sizes?.find((s: { name: string; code: string }) => s.name === val || `${s.name} (${s.code})` === val || s.code === val);
@@ -2564,24 +2674,29 @@ const sp = StyleSheet.create({
 const initBasicData = () => {
     if (!PREFILL_WITH_DUMMY) {
         return {
-            name: "", category: "", subcategory: "",
-            categoryId: undefined as string | undefined,
-            subcategoryId: undefined as string | undefined,
-            materialType: "", hsnCode: "",
+            name: "", category: "", categorySubName: "", subcategory: "",
+            categoryId: undefined as string | number | null | undefined,
+            categorySubId: undefined as string | number | null | undefined,
+            subcategoryId: undefined as string | number | null | undefined,
+            materialType: "", hsnCode: "", gstPercentage: "",
             shortDesc: "", fullDesc: "", length: "", width: "", height: "",
-            weight: "", weightSlab: "", fragile: "No", customized: false,
+            weight: "", weightSlab: "", intraCityCharge: "", metroMetroCharge: "",
+            fragile: "No", customized: false,
             custTitle: "", custInstructions: "", custLeadDays: "", custCharge: "",
             custAllowPhoto: false, custImageLabel: "", custPickedImage: null as string | null,
             custAllowText: false, custTextLabel: "",
         };
     }
     return {
-        name: "Premium Cotton Crew Neck T-Shirt", category: "", subcategory: "",
-        categoryId: undefined as string | undefined, subcategoryId: undefined as string | undefined,
-        materialType: "Cotton", hsnCode: "61091000",
+        name: "Premium Cotton Crew Neck T-Shirt", category: "", categorySubName: "", subcategory: "",
+        categoryId: undefined as string | number | null | undefined,
+        categorySubId: undefined as string | number | null | undefined,
+        subcategoryId: undefined as string | number | null | undefined,
+        materialType: "Cotton", hsnCode: "61091000", gstPercentage: "",
         shortDesc: "Soft, breathable cotton tee with a relaxed fit — ideal for everyday wear and easy styling.",
         fullDesc: "Crafted from 100% combed cotton with reinforced stitching at stress points. Pre-shrunk fabric, colour-fast dye, and comfortable round neck.",
         length: "30", width: "25", height: "5", weight: "0.35", weightSlab: "0–1 kg",
+        intraCityCharge: "", metroMetroCharge: "",
         fragile: "No", customized: true,
         custTitle: "Personalized print",
         custInstructions: "Share the exact text or design reference. We begin production after you approve the preview.",
@@ -2651,6 +2766,7 @@ const AddNewProduct: React.FC = () => {
     const [savedProductId, setSavedProductId] = useState<string | null>(null);
     const [catalog, setCatalog] = useState<ProductFormCatalog | null>(null);
     const [validationTrigger, setValidationTrigger] = useState(0);
+    const weightDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { toasts, showErrors, showToast, removeToast } = useToast();
 
@@ -2663,15 +2779,26 @@ const AddNewProduct: React.FC = () => {
                 if (!PREFILL_WITH_DUMMY) return;
                 setBasicData((prev) => {
                     if (prev.categoryId) return prev;
-                    const cat = data.categories.find((c) => c.subcategories.length > 0) ?? data.categories[0];
-                    const sub = cat?.subcategories[0];
-                    if (!cat || !sub) return prev;
-                    return { ...prev, category: cat.name, categoryId: cat.id, subcategory: sub.name, subcategoryId: sub.id };
+                    const cat = data.categories?.find((c) => (c.subcategories?.length ?? 0) > 0) ?? data.categories?.[0];
+                    const mid = cat?.subcategories?.[0];
+                    if (!cat || !mid) return prev;
+                    const children = mid.children ?? [];
+                    const leaf = children.length === 0
+                        ? resolveLeafSubcategory(data, cat.name, mid.name, mid.name)
+                        : resolveLeafSubcategory(data, cat.name, mid.name, children[0].name);
+                    return {
+                        ...prev,
+                        category: cat.name,
+                        categoryId: cat.id,
+                        categorySubName: mid.name,
+                        categorySubId: mid.id,
+                        subcategory: leaf.name,
+                        subcategoryId: leaf.id,
+                    };
                 });
             })
             .catch((err: unknown) => {
-                const msg = err instanceof ApiError ? err.message : "Failed to load catalog.";
-                showToast(msg, "error");
+                showToast(getApiErrorMessage(err, "Failed to load catalog."), "error");
             });
         return () => { cancelled = true; };
     }, [showToast]);
@@ -2695,7 +2822,43 @@ const AddNewProduct: React.FC = () => {
         if (["weight", "length", "width", "height"].includes(k)) {
             cleanVal = v.replace(/[^0-9.]/g, "").replace(/(\..*?)\..*/g, "$1");
         }
-        setBasicData(p => ({ ...p, [k]: cleanVal }));
+        setBasicData(p => {
+            const next = { ...p, [k]: cleanVal };
+            if (k === "weight") {
+                const slab = resolveWeightSlab(cleanVal, catalog?.deliverySlabs);
+                next.weightSlab = slab.label;
+                if (slab.custom) {
+                    next.intraCityCharge = "";
+                    next.metroMetroCharge = "";
+                } else if (slab.label) {
+                    next.intraCityCharge = String(slab.intraCityCharge);
+                    next.metroMetroCharge = String(slab.metroMetroCharge);
+                } else {
+                    next.intraCityCharge = "";
+                    next.metroMetroCharge = "";
+                }
+            }
+            return next;
+        });
+        if (k === "weight") {
+            if (weightDebounceRef.current) clearTimeout(weightDebounceRef.current);
+            const weightKg = parseFloat(cleanVal);
+            if (Number.isFinite(weightKg) && weightKg > 0) {
+                weightDebounceRef.current = setTimeout(() => {
+                    fetchDeliveryChargesForWeight(weightKg)
+                        .then((slab) => {
+                            if (!slab) return;
+                            setBasicData((p) => ({
+                                ...p,
+                                weightSlab: slab.label,
+                                intraCityCharge: slab.custom ? "" : String(slab.intraCityCharge),
+                                metroMetroCharge: slab.custom ? "" : String(slab.metroMetroCharge),
+                            }));
+                        })
+                        .catch(() => { /* keep client slab */ });
+                }, 350);
+            }
+        }
         setBasicErrors(prev => prev.filter(e => !e.toLowerCase().includes(k.toLowerCase())));
     };
     const upDetails = (k: string, v: any) => {
@@ -2718,7 +2881,13 @@ const AddNewProduct: React.FC = () => {
             setBasicErrors([]);
         }
         if (step === 1) {
-            const errors = validateVariants(variants);
+            const errors = validateVariants(variants, {
+                sweets: isSweetsCategory(
+                    basicData.category,
+                    basicData.categorySubName,
+                    basicData.subcategory
+                ),
+            });
             setVariantErrors(errors);
             if (errors.length > 0) { showErrors(errors); return; }
             setVariantErrors([]);
@@ -2736,7 +2905,13 @@ const AddNewProduct: React.FC = () => {
 
     const handleSave = () => {
         const basicErrs = validateBasicInfo(basicData);
-        const variantErrs = validateVariants(variants);
+        const variantErrs = validateVariants(variants, {
+            sweets: isSweetsCategory(
+                basicData.category,
+                basicData.categorySubName,
+                basicData.subcategory
+            ),
+        });
         const imageErrs = validateImages(imagesData);
         const detailErrs = validateDetails(detailsData);
         const allErrors = [...basicErrs, ...variantErrs, ...imageErrs, ...detailErrs];
@@ -2761,9 +2936,23 @@ const AddNewProduct: React.FC = () => {
         if (isSaving) return;
         setIsSaving(true);
         try {
+            const variantsWithSku = variants.map((v, idx) => {
+                if (String(v.sku ?? "").trim()) return v;
+                if (!v.color || !v.size) return v;
+                const sizeMeta = catalog?.sizes?.find((s: { id?: number; name?: string; code?: string }) =>
+                    s.id === v.sizeId || s.name === v.size
+                );
+                return {
+                    ...v,
+                    sku: generateVariantSku(String(basicData.name || "PRD"), String(v.color), String(v.size), idx, sizeMeta?.code),
+                };
+            });
+            if (variantsWithSku.some((v, i) => v.sku !== variants[i]?.sku)) {
+                setVariants(variantsWithSku);
+            }
             const payload = await buildCreateProductPayload({
                 basic: basicData,
-                variants,
+                variants: variantsWithSku,
                 images: imagesData,
                 details: detailsData,
             });
@@ -2772,8 +2961,7 @@ const AddNewProduct: React.FC = () => {
             setSweetAlertStage("success");
             showToast(`Product saved (ID ${result.productId})`, "success");
         } catch (err: unknown) {
-            const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to save product.";
-            showToast(msg, "error");
+            showToast(getApiErrorMessage(err, "Failed to save product."), "error");
             setSweetAlertVisible(false);
         } finally {
             setIsSaving(false);
@@ -2825,7 +3013,21 @@ const AddNewProduct: React.FC = () => {
     const stepContent = (
         <>
             {step === 0 && <StepBasicInfo data={basicData} onChange={upBasic} errors={basicErrors} validationTrigger={validationTrigger} catalog={catalog} isDesktop={isDesktop} actionBar={actionBar} />}
-            {step === 1 && <StepVariants variants={variants} setVariants={setVariants} rmVariant={rmVariant} errors={variantErrors} catalog={catalog} isDesktop={isDesktop} actionBar={actionBar} />}
+            {step === 1 && (
+                <StepVariants
+                    variants={variants}
+                    setVariants={setVariants}
+                    rmVariant={rmVariant}
+                    errors={variantErrors}
+                    catalog={catalog}
+                    isDesktop={isDesktop}
+                    actionBar={actionBar}
+                    categoryName={basicData.category}
+                    categorySubName={basicData.categorySubName}
+                    subcategoryName={basicData.subcategory}
+                    productName={basicData.name}
+                />
+            )}
             {step === 2 && <StepImages data={imagesData} onChange={(k: string, v: any) => setImagesData((p) => ({ ...p, [k]: v }))} errors={imageErrors} isDesktop={isDesktop} actionBar={actionBar} />}
             {step === 3 && <StepDetails data={detailsData} onChange={upDetails} errors={detailErrors} validationTrigger={validationTrigger} isDesktop={isDesktop} actionBar={actionBar} />}
         </>

@@ -284,7 +284,7 @@ async function downloadAdminBinaryFile(
   throw new AdminApiError("Sharing is not available on this device.");
 }
 
-export async function downloadOrderExportCsv(
+export async function downloadOrderExportExcel(
   params?: {
     status?: string;
     paymentStatus?: string;
@@ -300,20 +300,39 @@ export async function downloadOrderExportCsv(
   if (params?.paymentMethod) q.set("paymentMethod", params.paymentMethod);
   if (params?.search) q.set("search", params.search);
   if (params?.sort) q.set("sort", params.sort);
-  const qs = q.toString();
-  const path = `/api/admin/orders/export${qs ? `?${qs}` : ""}`;
-  const fileName = preferredFileName ?? `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+  
+  const csv = await fetchOrderExportCsv(params);
+  
+  const XLSX = require("xlsx");
+  const workbook = XLSX.read(csv, { type: "string" });
+  const fileName = preferredFileName ?? `orders_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-  if (typeof document !== "undefined") {
-    const csv = await fetchOrderExportCsv(params);
-    const blob = new Blob([csv.startsWith("\uFEFF") ? csv : `\uFEFF${csv}`], {
-      type: "text/csv;charset=utf-8;",
-    });
-    triggerBrowserFileDownload(blob, fileName);
+  if (typeof document !== "undefined" && typeof navigator !== "undefined" && navigator.product !== "ReactNative") {
+    XLSX.writeFile(workbook, fileName);
     return;
   }
 
-  await downloadAdminBinaryFile(path, fileName, "text/csv");
+  const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+  const FileSystem = await import("expo-file-system/legacy");
+  const Sharing = await import("expo-sharing");
+
+  const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!directory) throw new AdminApiError("Unable to access local storage for download.");
+  
+  const fileUri = `${directory}${fileName}`;
+  await FileSystem.writeAsStringAsync(fileUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      dialogTitle: fileName,
+      UTI: "com.microsoft.excel.xls",
+    });
+  } else {
+    throw new AdminApiError("Sharing is not available on this device.");
+  }
 }
 
 export async function fetchOrderInvoice(id: number): Promise<OrderInvoice> {
@@ -346,4 +365,24 @@ export async function downloadOrderShippingLabelPdf(
     fileName,
     "application/pdf"
   );
+}
+
+export type ShiprocketActionResponse = {
+  success?: boolean;
+  message?: string;
+  alreadyExists?: boolean;
+  shiprocket?: Record<string, unknown>;
+  order?: Record<string, unknown>;
+};
+
+export async function pushOrderToShiprocket(id: number): Promise<ShiprocketActionResponse> {
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/push`, {
+    method: "POST",
+  });
+}
+
+export async function syncOrderFromShiprocket(id: number): Promise<ShiprocketActionResponse> {
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/sync`, {
+    method: "POST",
+  });
 }

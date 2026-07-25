@@ -3,6 +3,7 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { Department as ApiDepartment } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
     createDepartment,
     deleteDepartment,
@@ -22,6 +23,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    useWindowDimensions,
 } from "react-native";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -518,17 +520,36 @@ const StatCard: React.FC<{
     label: string;
     iconBg: string;
     iconFg: string;
-}> = ({ icon, value, label, iconBg, iconFg }) => (
-    <View style={sc.card}>
-        <View style={[sc.iconWrap, { backgroundColor: iconBg }]}>
-            <Feather name={icon} size={16} color={iconFg} />
+}> = ({ icon, value, label, iconBg, iconFg }) => {
+    const { width } = useWindowDimensions();
+    const isMobile = width < 768;
+
+    return (
+        <View style={[
+            sc.card,
+            isMobile && {
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 10,
+                gap: 6,
+                height: 90,
+            }
+        ]}>
+            <View style={[
+                sc.iconWrap,
+                { backgroundColor: iconBg },
+                isMobile && { width: 28, height: 28, borderRadius: 8 }
+            ]}>
+                <Feather name={icon} size={isMobile ? 12 : 16} color={iconFg} />
+            </View>
+            <View style={isMobile && { alignItems: "center" }}>
+                <Text style={[sc.value, isMobile && { fontSize: 16, lineHeight: 18 }]}>{value}</Text>
+                <Text style={[sc.label, isMobile && { fontSize: 8, marginTop: 1, textAlign: "center" }]}>{label}</Text>
+            </View>
         </View>
-        <View>
-            <Text style={sc.value}>{value}</Text>
-            <Text style={sc.label}>{label}</Text>
-        </View>
-    </View>
-);
+    );
+};
 
 const sc = StyleSheet.create({
     card: {
@@ -749,6 +770,10 @@ const dc = StyleSheet.create({
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 const DepartmentsScreen: React.FC = () => {
+    const { width } = useWindowDimensions();
+    const isMobileScreen = width < 768;
+    const isSmallMobile = width < 480;
+
     const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -778,12 +803,22 @@ const DepartmentsScreen: React.FC = () => {
     const ITEMS_PER_PAGE = 10;
 
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type?: 'success' | 'error' }>({ visible: false, title: "", message: "", type: 'success' });
 
     const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
     const [filterStatus, setFilterStatus] = useState<"All" | "Active" | "Inactive">("All");
 
     const isWeb = Platform.OS === "web";
+
+    let cardWidth: any = undefined;
+    if (isWeb) {
+        if (width >= 1024) {
+            cardWidth = "calc(25% - 11px)";
+        } else if (width >= 640) {
+            cardWidth = "calc(50% - 7px)";
+        } else {
+            cardWidth = "100%";
+        }
+    }
 
     let filtered = departments.filter(d =>
         (d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -805,25 +840,50 @@ const DepartmentsScreen: React.FC = () => {
     const inactiveCount = departments.length - activeCount;
 
     const handleSave = async (updated: Department) => {
+        const isEdit = !!departments.find((d) => d.id === updated.id);
+        
+        // Close modal first before showing any dialogs
+        setEditTarget(null);
+        setAddOpen(false);
+        
+        // Wait for modal close animation to complete
+        await new Promise(resolve => setTimeout(resolve, 250));
+        
+        // Now show confirmation dialog
+        if (isEdit) {
+            if (!(await sweetCrud.confirmUpdate("Department", updated.name))) {
+                // User cancelled - reopen modal
+                setEditTarget(updated);
+                return;
+            }
+        } else if (!(await sweetCrud.confirmAdd("Department", updated.name))) {
+            // User cancelled - reopen modal
+            setAddOpen(true);
+            return;
+        }
+        
         try {
             const payload = {
                 name: updated.name,
                 description: updated.description,
                 active: updated.status === "Active",
             };
-            if (departments.find((d) => d.id === updated.id)) {
+            if (isEdit) {
                 await updateDepartment(updated.id, payload);
-                setAlertConfig({ visible: true, title: "Updated!", message: "Department updated successfully.", type: 'success' });
+                void sweetCrud.updated("Department");
             } else {
                 await createDepartment(payload);
-                setAlertConfig({ visible: true, title: "Added!", message: "Department added successfully.", type: 'success' });
+                void sweetCrud.added("Department");
             }
             await loadDepartments();
-            setEditTarget(null);
-            setAddOpen(false);
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e), type: 'error' });
+            // API failed - reopen modal and show error
+            if (isEdit) {
+                setEditTarget(updated);
+            } else {
+                setAddOpen(true);
+            }
+            void sweetError("Error", getApiErrorMessage(e, "Failed to save department."));
         }
     };
 
@@ -833,9 +893,9 @@ const DepartmentsScreen: React.FC = () => {
             await deleteDepartment(deleteTarget.id);
             await loadDepartments();
             setDeleteTarget(null);
+            void sweetCrud.deleted("Department");
         } catch (e) {
-            console.warn(getApiErrorMessage(e));
-            setAlertConfig({ visible: true, title: "Error", message: getApiErrorMessage(e), type: 'error' });
+            void sweetError("Error", getApiErrorMessage(e, "Failed to delete department."));
         }
     };
 
@@ -854,11 +914,13 @@ const DepartmentsScreen: React.FC = () => {
                 {/* ── PAGE HEADER ── */}
                 {!isWeb ? (
                     // ── MOBILE PAGE HEADER (title + add only) ──
-                    <View style={mob.headerCard}>
+                    <View style={[mob.headerCard, isMobileScreen && { paddingHorizontal: 12, paddingBottom: 40 }]}>
                         <View style={mob.headerTopRow}>
                             <View style={mob.headerTitleBlock}>
-                                <Text style={mob.headerTitle}>Manage Departments</Text>
-                                <Text style={mob.headerSub}>Organize your workforce by department structure</Text>
+                                <Text style={[mob.headerTitle, isSmallMobile && { fontSize: 20 }]}>Manage Departments</Text>
+                                {!isSmallMobile && (
+                                    <Text style={mob.headerSub}>Organize your workforce by department structure</Text>
+                                )}
                             </View>
                             <TouchableOpacity
                                 style={mob.addBtn}
@@ -872,14 +934,39 @@ const DepartmentsScreen: React.FC = () => {
                     </View>
                 ) : (
                     // ── WEB PAGE HEADER (unchanged) ──
-                    <View style={s.pageHead}>
-                        <View style={s.pageHeadLeft}>
-                            <Text style={s.pageTitle}>Manage Departments</Text>
-                            <Text style={s.pageSub}>Organize your workforce by department structure</Text>
+                    <View style={[
+                        s.pageHead,
+                        isMobileScreen && { padding: 16, paddingBottom: 40, borderRadius: 16 }
+                    ]}>
+                        <View style={[s.pageHeadLeft, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+                            <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                                <Feather name="briefcase" size={26} color="#FFF" />
+                            </View>
+                            <View>
+                                <Text style={[
+                                    s.pageTitle,
+                                    isMobileScreen && { fontSize: 18, lineHeight: 22 }
+                                ]}>Manage Departments</Text>
+                                {!isSmallMobile && (
+                                    <Text style={s.pageSub}>Organize your workforce by department structure</Text>
+                                )}
+                            </View>
                         </View>
-                        <TouchableOpacity style={s.addBtn} onPress={() => setAddOpen(true)} activeOpacity={0.85}>
+                        <TouchableOpacity
+                            style={[
+                                s.addBtn,
+                                isMobileScreen && { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }
+                            ]}
+                            onPress={() => setAddOpen(true)}
+                            activeOpacity={0.85}
+                        >
                             <Feather name="plus" size={15} color="#fff" />
-                            <Text style={s.addBtnTxt}>Add Department</Text>
+                            <Text style={[
+                                s.addBtnTxt,
+                                isMobileScreen && { fontSize: 12 }
+                            ]}>
+                                {isSmallMobile ? "Add" : "Add Department"}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -909,47 +996,46 @@ const DepartmentsScreen: React.FC = () => {
                     />
                 </View>
 
-                {/* ── MOBILE CONTROLS CARD (search + grid/list/filter/sort) ── */}
-                {!isWeb && (
+                {/* ── CONTROLS ── */}
+                {isMobileScreen ? (
                     <View style={mob.controlsCard}>
-                        {/* Search bar */}
-                        <View style={mob.searchBox}>
-                            <Feather name="search" size={15} color={T.textHint} />
-                            <TextInput
-                                style={mob.searchInput}
-                                placeholder="Search departments…"
-                                placeholderTextColor={T.textHint}
-                                value={search}
-                                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
-                            />
-                            {search.length > 0 && (
-                                <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                                    <Feather name="x-circle" size={15} color={T.textHint} />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {/* Grid / List / Filter / Sort row */}
-                        <View style={mob.controlsRow}>
+                        {/* Row 1: Search bar + Grid/List toggle */}
+                        <View style={mob.mobileRow1}>
+                            <View style={mob.searchBox}>
+                                <Feather name="search" size={15} color={T.textHint} />
+                                <TextInput
+                                    style={mob.searchInput}
+                                    placeholder="Search departments…"
+                                    placeholderTextColor={T.textHint}
+                                    value={search}
+                                    onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+                                />
+                                {search.length > 0 && (
+                                    <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
+                                        <Feather name="x-circle" size={15} color={T.textHint} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                             <View style={mob.toggleGroup}>
                                 <TouchableOpacity
                                     style={[mob.toggleBtn, viewMode === 'grid' && mob.toggleBtnActive]}
                                     onPress={() => setViewMode('grid')}
                                     activeOpacity={0.8}
                                 >
-                                    <Feather name="grid" size={14} color={viewMode === 'grid' ? T.orange : T.textHint} />
-                                    <Text style={[mob.toggleTxt, viewMode === 'grid' && mob.toggleTxtActive]}>Grid</Text>
+                                    <Feather name="grid" size={16} color={viewMode === 'grid' ? '#fff' : '#374151'} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[mob.toggleBtn, mob.toggleBtnMid, viewMode === 'list' && mob.toggleBtnActive]}
+                                    style={[mob.toggleBtn, viewMode === 'list' && mob.toggleBtnActive]}
                                     onPress={() => setViewMode('list')}
                                     activeOpacity={0.8}
                                 >
-                                    <Feather name="list" size={14} color={viewMode === 'list' ? T.orange : T.textHint} />
-                                    <Text style={[mob.toggleTxt, viewMode === 'list' && mob.toggleTxtActive]}>List</Text>
+                                    <Feather name="list" size={16} color={viewMode === 'list' ? '#fff' : '#374151'} />
                                 </TouchableOpacity>
                             </View>
+                        </View>
 
+                        {/* Row 2: Filter and Sort buttons */}
+                        <View style={mob.mobileRow2}>
                             <TouchableOpacity
                                 style={[mob.chipBtn, filterStatus !== "All" && mob.chipBtnActive]}
                                 onPress={() => {
@@ -983,43 +1069,44 @@ const DepartmentsScreen: React.FC = () => {
                             </TouchableOpacity>
                         </View>
                     </View>
-                )}
-
-                {/* ── SEARCH + FILTERS (web only) ── */}
-                {isWeb && (
-                    <View style={s.toolBar}>
-                        <View style={s.searchBox}>
-                            <Feather name="search" size={15} color={T.textHint} />
-                            <TextInput
-                                style={s.searchInput}
-                                placeholder="Search departments…"
-                                placeholderTextColor={T.textHint}
-                                value={search}
-                                onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
-                            />
-                            {search.length > 0 && (
-                                <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                                    <Feather name="x-circle" size={15} color={T.textHint} />
+                ) : (
+                    isWeb && (
+                        <View style={s.toolBar}>
+                            <View style={s.searchBox}>
+                                <Feather name="search" size={15} color={T.textHint} />
+                                <TextInput
+                                    style={s.searchInput}
+                                    placeholder="Search departments…"
+                                    placeholderTextColor={T.textHint}
+                                    value={search}
+                                    onChangeText={(t) => { setSearch(t); setCurrentPage(1); }}
+                                />
+                                {search.length > 0 && (
+                                    <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
+                                        <Feather name="x-circle" size={15} color={T.textHint} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            <View style={s.filterGroup}>
+                                <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
+                                    <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
+                                        <Feather name="grid" size={16} color={viewMode === 'grid' ? '#fff' : '#374151'} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
+                                        <Feather name="list" size={16} color={viewMode === 'list' ? '#fff' : '#374151'} />
+                                    </TouchableOpacity>
+                                </View>
+                                <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
+                                    <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
+                                    <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
                                 </TouchableOpacity>
-                            )}
+                                <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => { setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc"); setCurrentPage(1); }}>
+                                    <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={13} color={sortOrder ? T.orange : T.textM} />
+                                    <Text style={[s.filterBtnTxt, sortOrder !== null && { color: T.orange }]}>{sortOrder === "asc" ? "Sort A-Z" : sortOrder === "desc" ? "Sort Z-A" : "Sort"}</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                        <View style={s.filterGroup}>
-                            <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
-                                <Feather name="grid" size={16} color={viewMode === 'grid' ? T.orange : T.textHint} />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
-                                <Feather name="list" size={16} color={viewMode === 'list' ? T.orange : T.textHint} />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
-                                <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
-                                <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => { setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc"); setCurrentPage(1); }}>
-                                <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={13} color={sortOrder ? T.orange : T.textM} />
-                                <Text style={[s.filterBtnTxt, sortOrder !== null && { color: T.orange }]}>{sortOrder === "asc" ? "Sort A-Z" : sortOrder === "desc" ? "Sort Z-A" : "Sort"}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                    )
                 )}
 
                 {/* ── COUNT LINE ── */}
@@ -1061,7 +1148,7 @@ const DepartmentsScreen: React.FC = () => {
                         ) : null}
                     </View>
                 ) : viewMode === "list" ? (
-                    isWeb ? (
+                    (isWeb && !isMobileScreen) ? (
                         <View style={s.tableCard}>
                             <View style={s.tableHeader}>
                                 <Text style={[s.th, { flex: 2 }]}>Department</Text>
@@ -1133,7 +1220,7 @@ const DepartmentsScreen: React.FC = () => {
                         {paginated.map(dept => (
                             <View
                                 key={dept.id}
-                                style={isWeb ? { width: "calc(25% - 11px)" as any } : undefined}
+                                style={isWeb ? { width: cardWidth } : undefined}
                             >
                                 <DeptCard
                                     dept={dept}
@@ -1176,22 +1263,6 @@ const DepartmentsScreen: React.FC = () => {
                 onCancel={() => { releaseModalFocus(); setDeleteTarget(null); }}
                 onConfirm={handleDelete}
             />
-
-            {/* ── SWEET ALERT ── */}
-            <Modal transparent animationType="fade" visible={alertConfig.visible} onRequestClose={() => { releaseModalFocus(); setAlertConfig({ ...alertConfig, visible: false }); }}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
-                        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: alertConfig.type === 'error' ? '#fee2e2' : '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                            <Feather name={alertConfig.type === 'error' ? "alert-triangle" : "check"} size={32} color={alertConfig.type === 'error' ? "#ef4444" : "#10b981"} />
-                        </View>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1f2937', marginBottom: 8, textAlign: 'center' }}>{alertConfig.title}</Text>
-                        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>{alertConfig.message}</Text>
-                        <TouchableOpacity style={{ backgroundColor: alertConfig.type === 'error' ? '#ef4444' : T.orange, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8, width: '100%', alignItems: 'center' }} onPress={() => { releaseModalFocus(); setAlertConfig({ ...alertConfig, visible: false }); }}>
-                            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </Container>
     );
 
@@ -1236,11 +1307,11 @@ const mob = StyleSheet.create({
         flex: 1,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: "800",
         color: "#FFFFFF",
-        letterSpacing: -0.4,
-        lineHeight: 22,
+        letterSpacing: -0.5,
+        lineHeight: 26,
     },
     headerSub: {
         fontSize: 11,
@@ -1267,13 +1338,14 @@ const mob = StyleSheet.create({
 
     // Search bar (light, inside white controlsCard)
     searchBox: {
+        flex: 1,
         flexDirection: "row",
         alignItems: "center",
         gap: 9,
         backgroundColor: T.bg,
         borderRadius: 10,
         paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingVertical: 3,
         borderWidth: 1,
         borderColor: T.border,
     },
@@ -1290,28 +1362,35 @@ const mob = StyleSheet.create({
         gap: 8,
     },
 
+    mobileRow1: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+    },
+    mobileRow2: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+    },
+
     // Grid/List segmented toggle (light)
     toggleGroup: {
         flexDirection: "row",
-        backgroundColor: T.bg,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: T.border,
-        overflow: "hidden",
+        backgroundColor: "#E5E7EB",
+        borderRadius: 10,
+        padding: 3,
     },
     toggleBtn: {
-        flexDirection: "row",
+        width: 36,
+        height: 36,
+        borderRadius: 8,
         alignItems: "center",
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-    },
-    toggleBtnMid: {
-        borderLeftWidth: 1,
-        borderLeftColor: T.border,
+        justifyContent: "center",
     },
     toggleBtnActive: {
-        backgroundColor: T.orangeLight,
+        backgroundColor: "#1E2B6B",
     },
     toggleTxt: {
         fontSize: 12,
@@ -1324,8 +1403,10 @@ const mob = StyleSheet.create({
 
     // Filter / Sort chip buttons (light)
     chipBtn: {
+        flex: 1,
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center",
         gap: 4,
         paddingHorizontal: 10,
         paddingVertical: 7,
@@ -1529,18 +1610,14 @@ const s = StyleSheet.create({
         color: T.textM,
     },
     viewBtn: {
-        width: 38,
-        height: 38,
+        width: 36,
+        height: 36,
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: T.border,
-        backgroundColor: T.card,
         alignItems: "center",
         justifyContent: "center",
     },
     viewBtnActive: {
-        borderColor: T.orange,
-        backgroundColor: T.orangeLight,
+        backgroundColor: "#1E2B6B",
     },
     tableCard: {
         backgroundColor: T.card,

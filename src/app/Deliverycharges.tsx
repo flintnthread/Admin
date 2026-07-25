@@ -2,6 +2,7 @@ import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import { mapDeliverySlabRow } from "@/lib/mappers";
 import {
   createDeliverySlab,
@@ -12,7 +13,6 @@ import {
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   SafeAreaView,
@@ -25,7 +25,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import Swal from "sweetalert2";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -755,44 +754,24 @@ const DeliveryChargeModal: React.FC<{
 
   const handleSave = () => {
     if (!label.trim()) {
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error", text: "Please enter a weight slab description.", confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Validation Error", "Please enter a weight slab description.");
-      }
+      void sweetWarning("Validation Error", "Please enter a weight slab description.");
       return;
     }
     if (minKg.trim() === "") {
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error", text: "Please enter a minimum weight.", confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Validation Error", "Please enter a minimum weight.");
-      }
+      void sweetWarning("Validation Error", "Please enter a minimum weight.");
       return;
     }
     if (maxKg.trim() === "") {
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error", text: "Please enter a maximum weight.", confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Validation Error", "Please enter a maximum weight.");
-      }
+      void sweetWarning("Validation Error", "Please enter a maximum weight.");
       return;
     }
     if (!isCustomPricing) {
       if (intraCity.trim() === "") {
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "error", title: "Error", text: "Please enter an intra-city charge.", confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Validation Error", "Please enter an intra-city charge.");
-        }
+        void sweetWarning("Validation Error", "Please enter an intra-city charge.");
         return;
       }
       if (metroMetro.trim() === "") {
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "error", title: "Error", text: "Please enter a metro-metro charge.", confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Validation Error", "Please enter a metro-metro charge.");
-        }
+        void sweetWarning("Validation Error", "Please enter a metro-metro charge.");
         return;
       }
     }
@@ -918,6 +897,9 @@ const DeliveryChargesScreen: React.FC = () => {
   const { token, isLoading: authLoading } = useAuth();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
+  const isDesktopWeb = isWeb && width >= 1024;
+  const isTabletMobile = width >= 600 && width < 1024;
+  const isSmallPhone = width < 380;
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [slabs, setSlabs] = useState<WeightSlab[]>([]);
   const [editingSlabId, setEditingSlabId] = useState<number | null>(null);
@@ -964,6 +946,12 @@ const DeliveryChargesScreen: React.FC = () => {
     active: boolean;
     custom: boolean;
   }) => {
+    const isUpdate = editingSlabId != null;
+    if (isUpdate) {
+      if (!(await sweetCrud.confirmUpdate("Delivery charge", data.label))) return;
+    } else {
+      if (!(await sweetCrud.confirmAdd("Delivery charge", data.label))) return;
+    }
     try {
       const payload = {
         label: data.label,
@@ -980,19 +968,13 @@ const DeliveryChargesScreen: React.FC = () => {
         await createDeliverySlab(payload);
       }
       await loadSlabs();
-      const msg = editingSlabId != null ? "Delivery charge updated successfully!" : "Delivery charge added successfully!";
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "success", title: "Success!", text: msg, confirmButtonColor: "#1E2B6B" });
+      if (isUpdate) {
+        void sweetCrud.updated("Delivery charge");
       } else {
-        Alert.alert("Success", msg);
+        void sweetCrud.added("Delivery charge");
       }
     } catch (e) {
-      const msg = getApiErrorMessage(e);
-      if (Platform.OS === "web") {
-        Swal.fire({ icon: "error", title: "Error!", text: msg, confirmButtonColor: "#1E2B6B" });
-      } else {
-        Alert.alert("Error", msg);
-      }
+      void sweetError("Error", getApiErrorMessage(e));
     }
   };
 
@@ -1011,52 +993,20 @@ const DeliveryChargesScreen: React.FC = () => {
     setEditingSlabId(id);
   };
 
-  const handleDelete = (id: number) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteDeliverySlab(id);
-        await loadSlabs();
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "success", title: "Deleted!", text: "Delivery charge deleted successfully!", confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Deleted", "Delivery charge deleted successfully!");
-        }
-      } catch (e) {
-        const msg = getApiErrorMessage(e, "Failed to delete delivery charge.");
-        if (Platform.OS === "web") {
-          Swal.fire({ icon: "error", title: "Error!", text: msg, confirmButtonColor: "#1E2B6B" });
-        } else {
-          Alert.alert("Error", msg);
-        }
-      }
-    };
-
-    if (Platform.OS === "web") {
-      Swal.fire({
-        title: "Are you sure?",
-        text: "You won't be able to revert this!",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#1E2B6B",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!"
-      }).then((result) => {
-        if (result.isConfirmed) confirmDelete();
-      });
-    } else {
-      Alert.alert(
-        "Confirm Delete",
-        "Are you sure you want to delete this delivery charge?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: confirmDelete }
-        ]
-      );
+  const handleDelete = async (id: number) => {
+    const slab = slabs.find((s) => s.id === id);
+    if (!(await sweetCrud.confirmDelete("Delivery charge", slab?.label))) return;
+    try {
+      await deleteDeliverySlab(id);
+      await loadSlabs();
+      void sweetCrud.deleted("Delivery charge");
+    } catch (e) {
+      void sweetError("Error", getApiErrorMessage(e, "Failed to delete delivery charge."));
     }
   };
 
   // ── MOBILE LAYOUT ──
-  if (!isWeb) {
+  if (!isDesktopWeb) {
     return (
       <AdminLayout>
         <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FB" }}>
@@ -1068,18 +1018,18 @@ const DeliveryChargesScreen: React.FC = () => {
             contentContainerStyle={{ paddingBottom: 32 }}
           >
             {/* Mobile Header */}
-            <View style={styles.mobileHeader}>
-              <View>
-                <Text style={styles.mobileHeaderTitle}>Delivery Charges</Text>
-                <Text style={styles.mobileHeaderSub}>Manage weight slabs and charges</Text>
+            <View style={[styles.mobileHeader, isSmallPhone && { paddingHorizontal: 16, paddingTop: 18, gap: 10 }]}>
+              <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                <Text style={[styles.mobileHeaderTitle, isSmallPhone && { fontSize: 17 }]} numberOfLines={2}>Delivery Charges</Text>
+                <Text style={styles.mobileHeaderSub} numberOfLines={2}>Manage weight slabs and charges</Text>
               </View>
               <TouchableOpacity
-                style={styles.mobileAddBtn}
+                style={[styles.mobileAddBtn, isSmallPhone && { paddingHorizontal: 12, paddingVertical: 10 }]}
                 activeOpacity={0.85}
                 onPress={() => { setEditingSlabId(null); setIsAddModalVisible(true); }}
               >
                 <Feather name="plus" size={14} color="#1E2B6B" />
-                <Text style={styles.mobileAddBtnTxt}>Add New</Text>
+                <Text style={[styles.mobileAddBtnTxt, isSmallPhone && { fontSize: 12 }]}>Add New</Text>
               </TouchableOpacity>
             </View>
 
@@ -1127,13 +1077,13 @@ const DeliveryChargesScreen: React.FC = () => {
                     style={[styles.mobileViewBtn, viewMode === "grid" && styles.mobileViewBtnActive]}
                     onPress={() => setViewMode("grid")}
                   >
-                    <Feather name="grid" size={15} color={viewMode === "grid" ? T.orange : "#94A3B8"} />
+                    <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.mobileViewBtn, viewMode === "list" && styles.mobileViewBtnActive]}
                     onPress={() => setViewMode("list")}
                   >
-                    <Feather name="list" size={15} color={viewMode === "list" ? T.orange : "#94A3B8"} />
+                    <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1153,17 +1103,18 @@ const DeliveryChargesScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               ) : viewMode === "grid" ? (
-                <View style={{ gap: 14 }}>
+                <View style={isTabletMobile ? { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginHorizontal: -7 } : { gap: 14 }}>
                   {filteredSlabs
                     .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
                     .map((item) => (
-                      <SlabCard
-                        key={item.id}
-                        slab={item}
-                        onActivate={handleActivate}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
+                      <View key={item.id} style={isTabletMobile ? { width: "48%", marginHorizontal: 7, marginBottom: 14 } : {}}>
+                        <SlabCard
+                          slab={item}
+                          onActivate={handleActivate}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      </View>
                     ))}
                 </View>
               ) : (
@@ -1244,8 +1195,14 @@ const DeliveryChargesScreen: React.FC = () => {
 
       {/* ── Page Header ── */}
       <View style={styles.pageHead}>
-        <View style={styles.pageHeadLeft}>
-          <Text style={styles.pageTitle}>Delivery Charges</Text>
+        <View style={[styles.pageHeadLeft, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
+          <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="truck" size={26} color="#FFF" />
+          </View>
+          <View>
+            <Text style={styles.pageTitle}>Delivery Charges</Text>
+            <Text style={styles.pageSub}>Manage weight slabs and charges</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.addBtnWhite}
@@ -1296,18 +1253,18 @@ const DeliveryChargesScreen: React.FC = () => {
           </View>
 
           <View style={styles.filterGroup}>
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
               <TouchableOpacity
                 style={[styles.viewBtn, viewMode === "grid" && styles.viewBtnActive]}
                 onPress={() => setViewMode("grid")}
               >
-                <Feather name="grid" size={16} color={viewMode === "grid" ? T.orange : T.textHint} />
+                <Feather name="grid" size={16} color={viewMode === "grid" ? "#fff" : "#374151"} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.viewBtn, viewMode === "list" && styles.viewBtnActive]}
                 onPress={() => setViewMode("list")}
               >
-                <Feather name="list" size={16} color={viewMode === "list" ? T.orange : T.textHint} />
+                <Feather name="list" size={16} color={viewMode === "list" ? "#fff" : "#374151"} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1438,37 +1395,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     backgroundColor: "#151D4F",
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    marginBottom: 16,
+    paddingTop: 20,
+    paddingBottom: 48,
+    marginBottom: 0,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginTop: 12,
   },
   mobileHeaderTitle: {
-    fontSize: 22,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: -0.3,
   },
   mobileHeaderSub: {
     fontSize: 12,
     color: "rgba(255,255,255,0.6)",
-    marginTop: 3,
+    marginTop: 4,
   },
   mobileAddBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 10,
+    flexShrink: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -1549,21 +1508,19 @@ const styles = StyleSheet.create({
   },
   mobileViewToggle: {
     flexDirection: "row",
-    gap: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 3,
   },
   mobileViewBtn: {
     width: 36,
     height: 36,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
   mobileViewBtnActive: {
-    borderColor: T.orange,
-    backgroundColor: T.orangeLight,
+    backgroundColor: "#1E2B6B",
   },
 
   // ── PAGE HEADER (WEB) ──────────────────────────────────────────────────────
@@ -1574,8 +1531,8 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: "#151D4F",
     paddingHorizontal: 32,
-    paddingVertical: 28,
-    paddingBottom: 68,
+    paddingVertical: 14,
+    paddingBottom: 50,
     borderRadius: 22,
     marginHorizontal: 16,
     marginTop: 16,
@@ -1607,8 +1564,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   pageTitle: {
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 22,
+    fontWeight: "400",
     color: "#FFFFFF",
     letterSpacing: -0.5,
   },
@@ -1677,7 +1634,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginBottom: 8,
-    marginTop: -52,
+    marginTop: -32,
     marginHorizontal: 16,
     zIndex: 10,
     justifyContent: "center",
@@ -1743,18 +1700,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   viewBtn: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: T.border,
-    backgroundColor: T.card,
     alignItems: "center",
     justifyContent: "center",
   },
   viewBtnActive: {
-    borderColor: T.orange,
-    backgroundColor: T.orangeLight,
+    backgroundColor: "#1E2B6B",
   },
   tableCard: {
     backgroundColor: T.card,

@@ -77,10 +77,37 @@ export async function updateCategory(
   mobileImage?: string,
   bannerImage?: string,
   status?: boolean
-): Promise<void> {
+): Promise<CategoryRow> {
   return adminApiRequest(`/api/admin/categories/${id}`, {
     method: "PUT",
     body: JSON.stringify({ categoryName, hsnCode, gstPercentage, categoryImage, mobileImage, bannerImage, status }),
+  });
+}
+
+export async function uploadCategoryImages(
+  id: number,
+  image?: Blob | File | null,
+  mobileImage?: Blob | File | null,
+  bannerImage?: Blob | File | null,
+): Promise<CategoryRow> {
+  const form = new FormData();
+  if (image) {
+    const fileName = image instanceof File && image.name ? image.name : "category.jpg";
+    form.append("image", image, fileName);
+  }
+  if (mobileImage) {
+    const fileName =
+      mobileImage instanceof File && mobileImage.name ? mobileImage.name : "category-mobile.jpg";
+    form.append("mobileImage", mobileImage, fileName);
+  }
+  if (bannerImage) {
+    const fileName =
+      bannerImage instanceof File && bannerImage.name ? bannerImage.name : "category-banner.jpg";
+    form.append("bannerImage", bannerImage, fileName);
+  }
+  return adminApiRequest(`/api/admin/categories/${id}/upload-images`, {
+    method: "POST",
+    body: form,
   });
 }
 

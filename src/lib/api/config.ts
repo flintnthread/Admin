@@ -2,8 +2,13 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 
-/** Production admin API — same domain as user app; nginx routes /api/admin/ → 8082 */
+/** Production admin API — nginx on either domain routes /api/admin/ → 8082 */
+export const PRODUCTION_ADMIN_API_URL_IN = "https://flintnthread.in";
 export const PRODUCTION_ADMIN_API_URL = "https://flintnthread.online";
+export const PRODUCTION_ADMIN_API_URLS = [
+  PRODUCTION_ADMIN_API_URL_IN,
+  PRODUCTION_ADMIN_API_URL,
+] as const;
 
 const ADMIN_API_PORT = 8082;
 const ADMIN_WEB_DEV_PORT = 8081;
@@ -91,46 +96,55 @@ function uniqueUrls(urls: string[]): string[] {
   return out;
 }
 
-function getProductionApiUrl(): string {
+/** Prefer the production domain that matches the browser host (.in vs .online). */
+function preferProductionUrlForHost(urls: string[]): string[] {
+  if (Platform.OS !== "web" || typeof window === "undefined") return urls;
+  const host = window.location.hostname?.toLowerCase() ?? "";
+  if (!host) return urls;
+  const preferIn = host === "flintnthread.in" || host.endsWith(".flintnthread.in");
+  const preferOnline =
+    host === "flintnthread.online" || host.endsWith(".flintnthread.online");
+  if (!preferIn && !preferOnline) return urls;
+  return [...urls].sort((a, b) => {
+    const aIn = a.includes("flintnthread.in");
+    const bIn = b.includes("flintnthread.in");
+    if (preferIn) return Number(bIn) - Number(aIn);
+    return Number(!bIn) - Number(!aIn);
+  });
+}
+
+function getConfiguredProductionApiUrl(): string | null {
   const fromEnv = process.env.EXPO_PUBLIC_ADMIN_API_BASE_URL?.trim().replace(/\/$/, "");
   const fromExtra = getExtra().adminApiBaseUrl?.trim().replace(/\/$/, "");
-  return fromEnv || fromExtra || PRODUCTION_ADMIN_API_URL;
+  return fromEnv || fromExtra || null;
+}
+
+function getProductionApiUrl(): string {
+  return getConfiguredProductionApiUrl() || getProductionApiUrlCandidates()[0] || PRODUCTION_ADMIN_API_URL;
+}
+
+/** Ordered production API bases: preferred host first, then the other domain. */
+export function getProductionApiUrlCandidates(): string[] {
+  const configured = getConfiguredProductionApiUrl();
+  const defaults = preferProductionUrlForHost([...PRODUCTION_ADMIN_API_URLS]);
+  if (!configured) return uniqueUrls(defaults);
+  return uniqueUrls([configured, ...defaults]);
 }
 
 function useLocalApiFallbacks(): boolean {
   return process.env.EXPO_PUBLIC_ADMIN_API_USE_LOCAL === "true";
 }
 
-/** True when the browser opened the Admin UI on the API port (8082) — login will fail. */
-export function getWebDevPortConflict(): string | null {
-  if (Platform.OS !== "web" || typeof window === "undefined") return null;
-  const port = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
-  if (port === String(ADMIN_API_PORT)) {
-    return `This page is on port ${ADMIN_API_PORT} (API port). Open http://localhost:${ADMIN_WEB_DEV_PORT}/login instead.`;
-  }
-  return null;
+/** Web app opened at localhost / 127.0.0.1 (Expo web dev). */
+export function isLocalWebDev(): boolean {
+  return (
+    Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  );
 }
 
-export function getAdminWebDevUrl(): string {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const host = window.location.hostname || "localhost";
-    return `http://${host}:${ADMIN_WEB_DEV_PORT}`;
-  }
-  return `http://localhost:${ADMIN_WEB_DEV_PORT}`;
-}
-
-/**
- * Candidate admin API base URLs (most likely first).
- * Default: https://flintnthread.online (VPS nginx → admin :8082).
- * Local fallbacks only when EXPO_PUBLIC_ADMIN_API_USE_LOCAL=true.
- */
-export function getAdminApiBaseUrlCandidates(): string[] {
-  const candidates: string[] = [getProductionApiUrl()];
-
-  if (!useLocalApiFallbacks()) {
-    return uniqueUrls(candidates);
-  }
-
+function pushLocalAdminCandidates(candidates: string[]): void {
   if (Platform.OS === "web") {
     const webOverride = process.env.EXPO_PUBLIC_ADMIN_API_WEB_BASE_URL?.trim().replace(/\/$/, "");
     if (webOverride) candidates.push(webOverride);
@@ -157,7 +171,57 @@ export function getAdminApiBaseUrlCandidates(): string[] {
   if (Platform.OS === "android") {
     candidates.push(buildLocalUrl("10.0.2.2"));
   }
+}
 
+/** True when the browser opened the Admin UI on the API port (8082) — login will fail. */
+export function getWebDevPortConflict(): string | null {
+  if (Platform.OS !== "web" || typeof window === "undefined") return null;
+  const port = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
+  if (port === String(ADMIN_API_PORT)) {
+    return `This page is on port ${ADMIN_API_PORT} (API port). Open http://localhost:${ADMIN_WEB_DEV_PORT}/login instead.`;
+  }
+  return null;
+}
+
+export function getAdminWebDevUrl(): string {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    const host = window.location.hostname || "localhost";
+    return `http://${host}:${ADMIN_WEB_DEV_PORT}`;
+  }
+  return `http://localhost:${ADMIN_WEB_DEV_PORT}`;
+}
+
+/**
+ * Candidate admin API base URLs (most likely first).
+ * Defaults: https://flintnthread.online and https://flintnthread.in (VPS nginx → admin :8082).
+ * On localhost web dev, http://localhost:8082 is tried before production.
+ */
+export function getAdminApiBaseUrlCandidates(): string[] {
+  const productionUrls = getProductionApiUrlCandidates();
+  const candidates: string[] = [];
+
+  if (useLocalApiFallbacks() || isLocalWebDev()) {
+    pushLocalAdminCandidates(candidates);
+    candidates.push(...productionUrls);
+    return uniqueUrls(candidates);
+  }
+
+  // Production web on flintnthread.* → same-origin API first (works for .online and .in).
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    const host = window.location.hostname?.toLowerCase() ?? "";
+    if (
+      host === "flintnthread.online" ||
+      host.endsWith(".flintnthread.online") ||
+      host === "flintnthread.in" ||
+      host.endsWith(".flintnthread.in") ||
+      host === "admin.flintnthread.in" ||
+      host.endsWith(".admin.flintnthread.in")
+    ) {
+      candidates.push(window.location.origin.replace(/\/$/, ""));
+    }
+  }
+
+  candidates.push(...productionUrls);
   return uniqueUrls(candidates);
 }
 
@@ -187,6 +251,10 @@ export async function ensureAdminApiReachable(): Promise<string> {
   const portConflict = getWebDevPortConflict();
   if (portConflict) {
     throw new Error(portConflict);
+  }
+
+  if (cachedWorkingBaseUrl && Date.now() < cacheExpiresAt) {
+    return cachedWorkingBaseUrl;
   }
 
   const candidates = getAdminApiBaseUrlCandidates();
@@ -226,15 +294,37 @@ export async function ensureAdminApiReachable(): Promise<string> {
   clearWorkingAdminApiBaseUrl();
   if (lastError instanceof Error) throw lastError;
   throw new Error(
-    `Admin API not reachable at ${PRODUCTION_ADMIN_API_URL}. Check VPS nginx /api/admin/ routing and flint-admin service.`
+    `Admin API not reachable at ${PRODUCTION_ADMIN_API_URLS.join(" or ")}. Check VPS nginx /api/admin/ routing and flint-admin service.`
   );
 }
 
-/** Public CDN for uploads — matches admin-backend app.media.public-base-url */
+/** Public CDN for ALL uploads (products + seller docs) — same host as product images. */
 export function resolvePublicMediaBaseUrl(): string {
-  const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  return "https://flintnthread.in";
+  // Local Admin web → seller-service serves shared files
+  if (
+    Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      useLocalApiFallbacks())
+  ) {
+    const host = window.location.hostname || "localhost";
+    return `http://${host}:8083`;
+  }
+  if (useLocalApiFallbacks()) {
+    const lan = getExpoDevLanHost();
+    return `http://${lan || "localhost"}:8083`;
+  }
+  // Production: always flintnthread.com (ignore .in / .online env mistakes)
+  const fromEnv = process.env.EXPO_PUBLIC_MEDIA_BASE_URL?.trim().replace(/\/$/, "") || "";
+  if (
+    fromEnv &&
+    !/flintnthread\.(in|online)/i.test(fromEnv) &&
+    !/localhost|127\.0\.0\.1/i.test(fromEnv)
+  ) {
+    return fromEnv;
+  }
+  return "https://flintnthread.com";
 }
 
 export const ADMIN_TOKEN_STORAGE_KEY = "admin_auth_token";

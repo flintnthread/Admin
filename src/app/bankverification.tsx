@@ -19,7 +19,6 @@ import { router, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
   FlatList,
   Modal,
   Pressable,
@@ -28,6 +27,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 
@@ -59,9 +59,21 @@ type Verification = {
 
 const COLORS = ["#F97316", "#10B981", "#8B5CF6", "#3B82F6", "#EC4899", "#06B6D4"];
 
-function mapSellerToVerification(s: SellerSummary, index: number): Verification {
-  const verified = Boolean(s.bankVerified);
-  const status: StatusKey = verified ? "Verified" : "Pending";
+function mapSellerToVerification(s: SellerSummary & { verificationStatus?: string; attempts?: number }, index: number): Verification {
+  const rawStatus = String(s.verificationStatus ?? (s.bankVerified ? "Verified" : "Pending")).trim();
+  const key = rawStatus.toLowerCase().replace(/[\s_-]+/g, "");
+  const statusMap: Record<string, StatusKey> = {
+    pending: "Pending",
+    pendingreview: "Pending",
+    processing: "Processing",
+    inprogress: "Processing",
+    verified: "Verified",
+    approved: "Verified",
+    failed: "Failed",
+    rejected: "Failed",
+    expired: "Expired",
+  };
+  const status: StatusKey = statusMap[key] ?? (s.bankVerified ? "Verified" : "Pending");
   const created = s.updatedAt ?? s.createdAt;
   return {
     id: `#S${s.id}`,
@@ -74,9 +86,9 @@ function mapSellerToVerification(s: SellerSummary, index: number): Verification 
     ifsc: s.ifscCode ?? "—",
     bank: s.bankName ?? "—",
     status,
-    attempts: 1,
+    attempts: Number(s.attempts ?? 1) || 1,
     created: created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
-    verified: verified && created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+    verified: status === "Verified" && created ? new Date(created).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
     initials: initialsFromName(s.fullName),
     color: COLORS[index % COLORS.length],
   };
@@ -157,15 +169,14 @@ function Dropdown({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const { width: screenW } = Dimensions.get("window");
+  const { width: screenW } = useWindowDimensions();
   const isDesktop = screenW >= 1024;
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
       triggerRef.current.measureInWindow((x, y, width, height) => {
-        const { width: screenWidth } = Dimensions.get("window");
-        const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(x, screenWidth - menuWidth - 16);
+        const menuWidth = Math.min(width, screenW - 32);
+        const adjustedLeft = Math.min(x, screenW - menuWidth - 16);
         setMenuPosition({ top: y + height, left: adjustedLeft, width: menuWidth });
       });
     }
@@ -239,7 +250,7 @@ function StatCard({
   iconBg: string; iconColor: string; spinning?: boolean; onPress?: () => void;
 }) {
   const rotation = useRef(new Animated.Value(0)).current;
-  const { width } = Dimensions.get("window");
+  const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
   useEffect(() => {
@@ -405,21 +416,34 @@ export default function BankVerifications() {
   const [verifications, setVerifications] = useState<Verification[]>([]);
   const [bankStats, setBankStats] = useState<Record<string, number>>({});
 
-  const { width } = Dimensions.get("window");
+  const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const isTablet = width >= 768;
   const isDesktop = width >= 1024;
 
   const loadVerifications = useCallback(async () => {
     try {
-      const [pendingRes, verifiedRes, statsRes] = await Promise.all([
+      const [pendingRes, processingRes, verifiedRes, failedRes, expiredRes, statsRes] = await Promise.all([
         fetchBankVerifications("pending", 0, 500),
+        fetchBankVerifications("processing", 0, 500),
         fetchBankVerifications("verified", 0, 500),
+        fetchBankVerifications("failed", 0, 500),
+        fetchBankVerifications("expired", 0, 500),
         fetchBankStats(),
       ]);
-      const merged = [...(pendingRes.items ?? []), ...(verifiedRes.items ?? [])];
-      setVerifications(merged.map(mapSellerToVerification));
-      setBankStats(statsRes);
+      const merged = [
+        ...(pendingRes.items ?? []),
+        ...(processingRes.items ?? []),
+        ...(verifiedRes.items ?? []),
+        ...(failedRes.items ?? []),
+        ...(expiredRes.items ?? []),
+      ];
+      const byId = new Map<number, ReturnType<typeof mapSellerToVerification>>();
+      merged.forEach((row, index) => {
+        byId.set(row.id, mapSellerToVerification(row, index));
+      });
+      setVerifications(Array.from(byId.values()));
+      setBankStats(statsRes ?? {});
     } catch (e) {
       console.warn(getApiErrorMessage(e));
       setVerifications([]);
@@ -435,14 +459,23 @@ export default function BankVerifications() {
     router.push({ pathname: "/viewbankdetails", params: { sellerId: String(sellerId) } });
   };
 
-  /* Counts from backend stats API */
+  /* Counts from backend stats API, with list fallback when stats claim empty */
+  const listCount = (status: StatusKey) => verifications.filter(v => v.status === status).length;
+  const statOr = (key: string, fallback: number) => {
+    const raw = bankStats[key];
+    if (raw == null || Number.isNaN(Number(raw))) return fallback;
+    const n = Number(raw);
+    // Prefer list when stats claim empty but the merged list has rows
+    if (n === 0 && fallback > 0) return fallback;
+    return n;
+  };
   const counts = {
-    total: bankStats.total ?? verifications.length,
-    pending: bankStats.pending ?? verifications.filter(v => v.status === "Pending").length,
-    processing: bankStats.processing ?? verifications.filter(v => v.status === "Processing").length,
-    verified: bankStats.verified ?? verifications.filter(v => v.status === "Verified").length,
-    failed: bankStats.failed ?? verifications.filter(v => v.status === "Failed").length,
-    expired: bankStats.expired ?? verifications.filter(v => v.status === "Expired").length,
+    total: statOr("total", verifications.length),
+    pending: statOr("pending", listCount("Pending")),
+    processing: statOr("processing", listCount("Processing")),
+    verified: statOr("verified", listCount("Verified")),
+    failed: statOr("failed", listCount("Failed")),
+    expired: statOr("expired", listCount("Expired")),
   };
 
   /* Filter */
@@ -537,13 +570,12 @@ export default function BankVerifications() {
                 <View style={{
                   backgroundColor: "#fff", borderRadius: 14,
                   borderWidth: 1, borderColor: BORDER,
-                  padding: isTablet ? 16 : 12, marginBottom: 14,
-                  flexDirection: "row",
-                  alignItems: "flex-end",
-                  gap: 8,
+                  padding: 12, marginBottom: 14,
+                  flexDirection: "column",
+                  gap: 12,
                 }}>
-                  {/* Search */}
-                  <View style={{ flex: 1 }}>
+                  {/* Search Row */}
+                  <View style={{ width: '100%' }}>
                     <Text style={styles.filterLabel}>Search</Text>
                     <View style={{
                       flexDirection: "row", alignItems: "center",
@@ -572,31 +604,34 @@ export default function BankVerifications() {
                     </View>
                   </View>
 
-                  {/* Status */}
-                  <View style={{ width: isTablet ? 160 : 110 }}>
-                    <Text style={styles.filterLabel}>Status</Text>
-                    <Dropdown
-                      value={statusFilter}
-                      onChange={handleStatusChange}
-                      options={STATUS_OPTIONS}
-                      minWidth={isTablet ? 160 : 110}
-                    />
-                  </View>
+                  {/* Status & Apply Row */}
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-end", width: '100%' }}>
+                    {/* Status */}
+                    <View style={{ flex: 1.5 }}>
+                      <Text style={styles.filterLabel}>Status</Text>
+                      <Dropdown
+                        value={statusFilter}
+                        onChange={handleStatusChange}
+                        options={STATUS_OPTIONS}
+                        minWidth={100}
+                      />
+                    </View>
 
-                  {/* Filter button */}
-                  <TouchableOpacity
-                    onPress={doFilter}
-                    activeOpacity={0.85}
-                    style={{
-                      backgroundColor: BLUE, borderRadius: 8,
-                      paddingVertical: 10,
-                      paddingHorizontal: 16,
-                      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}
-                  >
-                    <Ionicons name="search-outline" size={16} color="#fff" />
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Apply</Text>
-                  </TouchableOpacity>
+                    {/* Filter button */}
+                    <TouchableOpacity
+                      onPress={doFilter}
+                      activeOpacity={0.85}
+                      style={{
+                        backgroundColor: BLUE, borderRadius: 8,
+                        paddingVertical: 10,
+                        flex: 1,
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                      }}
+                    >
+                      <Ionicons name="search-outline" size={16} color="#fff" />
+                      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Apply</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* ── Results Header (Mobile/Tablet) ── */}
@@ -783,83 +818,68 @@ export default function BankVerifications() {
                 overflow: "hidden",
                 width: '100%',
               }}>
-                {/* Table Header */}
-                <View style={{
-                  flexDirection: "row",
-                  backgroundColor: "#151D4F",
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                }}>
-                  <Text style={{ flex: 0.4, fontSize: 12, fontWeight: "600", color: "#fff" }}>ID</Text>
-                  <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Seller</Text>
-                  <Text style={{ flex: 0.7, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
-                  <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
-                  <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Attempts</Text>
-                  <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Created</Text>
-                  <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Verified</Text>
-                  <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
-                </View>
-
-                {/* Table Rows */}
-                {paginated.map((item, idx) => (
-                  <View key={item.id} style={{
+                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexDirection: 'column', width: width < 1250 ? 1000 : '100%' }}>
+                  {/* Table Header */}
+                  <View style={{
                     flexDirection: "row",
+                    backgroundColor: "#151D4F",
                     paddingVertical: 12,
                     paddingHorizontal: 16,
-                    borderBottomWidth: 1,
-                    borderBottomColor: BORDER,
-                    backgroundColor: idx % 2 === 0 ? "#fff" : "#F8FAFC",
+                    width: width < 1250 ? 1000 : '100%',
                   }}>
-                    <TouchableOpacity
-                      onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
-                      style={{ flex: 0.4, justifyContent: "center", alignItems: "flex-start" }}
-                    >
-                      <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingLeft: 0, paddingRight: 12 }]}>{item.id}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
-                      style={{ flex: 1.2, justifyContent: "center" }}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: BLUE }}>{item.sellerName}</Text>
-                      <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
-                    </TouchableOpacity>
-                    <View style={{ flex: 0.7 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
-                      <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
-                    </View>
-                    <View style={{ flex: 0.6 }}>
-                      <StatusBadge status={item.status} small />
-                    </View>
-                    <View style={{ flex: 0.6 }}>
-                      <AttemptsRow attempts={item.attempts} status={item.status} />
-                    </View>
-                    <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.created}</Text>
-                    <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
-                    <View style={{ flex: 1.2, flexDirection: "row", gap: 6 }}>
+                    <Text style={{ flex: 0.4, fontSize: 12, fontWeight: "600", color: "#fff" }}>ID</Text>
+                    <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Seller</Text>
+                    <Text style={{ flex: 0.7, fontSize: 12, fontWeight: "600", color: "#fff" }}>Account</Text>
+                    <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Status</Text>
+                    <Text style={{ flex: 0.6, fontSize: 12, fontWeight: "600", color: "#fff" }}>Attempts</Text>
+                    <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Created</Text>
+                    <Text style={{ flex: 0.8, fontSize: 12, fontWeight: "600", color: "#fff" }}>Verified</Text>
+                    <Text style={{ flex: 1.2, fontSize: 12, fontWeight: "600", color: "#fff" }}>Actions</Text>
+                  </View>
+
+                  {/* Table Rows */}
+                  {paginated.map((item, idx) => (
+                    <View key={item.id} style={{
+                      flexDirection: "row",
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: BORDER,
+                      backgroundColor: idx % 2 === 0 ? "#fff" : "#F8FAFC",
+                      width: width < 1250 ? 1000 : '100%',
+                    }}>
                       <TouchableOpacity
-                        onPress={() => goToDetails(item.sellerId)}
-                        style={{
-                          backgroundColor: "#EFF6FF",
-                          borderWidth: 1,
-                          borderColor: "#BFDBFE",
-                          borderRadius: 6,
-                          paddingVertical: 6,
-                          paddingHorizontal: 10,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 4,
-                        }}
+                        onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
+                        style={{ flex: 0.4, justifyContent: "center", alignItems: "flex-start" }}
                       >
-                        <Ionicons name="eye-outline" size={12} color={BLUE} />
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: BLUE }}>View</Text>
+                        <Text style={[styles.tableCell, { color: BLUE, fontWeight: "600", paddingLeft: 0, paddingRight: 12 }]}>{item.id}</Text>
                       </TouchableOpacity>
-                      {item.status === "Pending" && (
+                      <TouchableOpacity
+                        onPress={() => router.push({ pathname: "/Viewseller", params: { sellerId: String(item.sellerId) } })}
+                        style={{ flex: 1.2, justifyContent: "center" }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: BLUE }}>{item.sellerName}</Text>
+                        <Text style={{ fontSize: 11, color: "#888" }}>{item.email}</Text>
+                      </TouchableOpacity>
+                      <View style={{ flex: 0.7 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#1a2332" }}>{item.account}</Text>
+                        <Text style={{ fontSize: 11, color: "#888" }}>{item.ifsc}</Text>
+                      </View>
+                      <View style={{ flex: 0.6 }}>
+                        <StatusBadge status={item.status} small />
+                      </View>
+                      <View style={{ flex: 0.6 }}>
+                        <AttemptsRow attempts={item.attempts} status={item.status} />
+                      </View>
+                      <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.created}</Text>
+                      <Text style={{ flex: 0.8, fontSize: 11, color: "#555" }}>{item.verified}</Text>
+                      <View style={{ flex: 1.2, flexDirection: "row", gap: 6 }}>
                         <TouchableOpacity
+                          onPress={() => goToDetails(item.sellerId)}
                           style={{
-                            backgroundColor: "#F0FDF4",
+                            backgroundColor: "#EFF6FF",
                             borderWidth: 1,
-                            borderColor: "#BBF7D0",
+                            borderColor: "#BFDBFE",
                             borderRadius: 6,
                             paddingVertical: 6,
                             paddingHorizontal: 10,
@@ -869,13 +889,32 @@ export default function BankVerifications() {
                             gap: 4,
                           }}
                         >
-                          <Ionicons name="checkmark-outline" size={12} color="#16A34A" />
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#16A34A" }}>Verify</Text>
+                          <Ionicons name="eye-outline" size={12} color={BLUE} />
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: BLUE }}>View</Text>
                         </TouchableOpacity>
-                      )}
+                        {item.status === "Pending" && (
+                          <TouchableOpacity
+                            style={{
+                              backgroundColor: "#F0FDF4",
+                              borderWidth: 1,
+                              borderColor: "#BBF7D0",
+                              borderRadius: 6,
+                              paddingVertical: 6,
+                              paddingHorizontal: 10,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <Ionicons name="checkmark-outline" size={12} color="#16A34A" />
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#16A34A" }}>Verify</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ))}
+                </ScrollView>
 
                 {/* Table Footer */}
                 <Pagination

@@ -1,23 +1,22 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
-import * as ImagePicker from "expo-image-picker";
-import React, { useState, useEffect, useCallback } from "react";
-import Swal from "sweetalert2";
+import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
+import { AdminApiError, getApiErrorMessage } from "@/lib/api/client";
+import { compressImageFile } from "@/lib/media/compressImage";
+import { sweetCrud, sweetError, sweetWarning } from "@/lib/sweetAlert";
 import {
-  fetchMainCategories,
-  fetchSubcategories,
-  fetchCategoryCounts,
   createMainCategory,
   createSubcategory,
-  updateCategory,
   deleteCategory,
-  type CategoryRow,
-  type CategoryCounts,
+  fetchMainCategories,
+  fetchSubcategories,
+  updateCategory,
+  uploadCategoryImages,
+  type CategoryRow
 } from "@/services/categoryApi";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { pickCategoryImageUrl } from "@/lib/api/categoryMedia";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -523,19 +522,26 @@ const ImagePickerField = ({
   onPick,
 }: {
   image: string | null;
-  onPick: (uri: string) => void;
+  onPick: (uri: string, file?: File | null) => void;
 }) => {
   const handlePick = async () => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/jpeg,image/png";
-      input.onchange = (e: any) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (ev) => onPick(ev.target?.result as string);
-          reader.readAsDataURL(file);
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0] as File | undefined;
+        if (!file) return;
+        // Allow larger camera photos — we compress before upload (nginx often caps at 1MB).
+        if (file.size > 15 * 1024 * 1024) {
+          void sweetWarning("Image too large", "Please choose an image under 15MB.");
+          return;
+        }
+        try {
+          const compressed = await compressImageFile(file);
+          onPick(compressed.previewUrl, compressed.file);
+        } catch {
+          void sweetError("Error", "Could not process that image. Try another JPG or PNG.");
         }
       };
       input.click();
@@ -543,9 +549,9 @@ const ImagePickerField = ({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 1,
+        quality: 0.7,
       });
-      if (!result.canceled) onPick(result.assets[0].uri);
+      if (!result.canceled) onPick(result.assets[0].uri, null);
     }
   };
 
@@ -565,7 +571,7 @@ const ImagePickerField = ({
         <View style={styles.imagePickerInner}>
           <UploadIcon />
           <Text style={styles.imagePickerTitle}>Click to upload image</Text>
-          <Text style={styles.imagePickerSub}>JPG, PNG (Max 2MB)</Text>
+          <Text style={styles.imagePickerSub}>JPG, PNG · auto-resized for upload</Text>
           <Text style={styles.imagePickerDim}>1600 × 1600 (no crop)</Text>
         </View>
       )}
@@ -641,16 +647,22 @@ const Dropdown = ({
 const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { visible: boolean; onClose: () => void; onSave: (data: any) => Promise<void>; isWeb: boolean; editData?: Category | null; }) => {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageChanged, setImageChanged] = useState(false);
   const [hsn, setHsn] = useState("");
   const [gst, setGst] = useState("");
   const [status, setStatus] = useState("Active");
+  const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setName("");
     setImage(null);
+    setImageFile(null);
+    setImageChanged(false);
     setHsn("");
     setGst("");
     setStatus("Active");
+    setSaving(false);
   };
 
   React.useEffect(() => {
@@ -658,8 +670,10 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
       if (editData) {
         setName(editData.name);
         setImage(editData.image || null);
-        setHsn(editData.hsn);
-        setGst(editData.gst);
+        setImageFile(null);
+        setImageChanged(false);
+        setHsn(editData.hsn === "—" ? "" : editData.hsn);
+        setGst(editData.gst === "—" ? "" : editData.gst);
         setStatus(editData.status);
       } else {
         reset();
@@ -667,22 +681,39 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
     }
   }, [visible, editData]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a category name.");
+      void sweetWarning("Required", "Please enter a category name.");
       return;
     }
-    if (!image) {
-      Alert.alert("Required", "Please upload a category image.");
+    if (!editData && !image) {
+      void sweetWarning("Required", "Please upload a category image.");
       return;
     }
     if (!gst) {
-      Alert.alert("Required", "Please select GST percentage.");
+      void sweetWarning("Required", "Please select GST percentage.");
       return;
     }
-    onSave({ id: editData?.id, name, image, hsn, gst, status, type: "Main Category" });
-    reset();
-    onClose();
+    setSaving(true);
+    try {
+      await onSave({
+        id: editData?.id,
+        name: name.trim(),
+        image,
+        imageFile,
+        imageChanged,
+        hsn: hsn.trim(),
+        gst,
+        status,
+        type: "Main Category",
+      });
+      reset();
+      onClose();
+    } catch {
+      // Parent shows error toast
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -743,12 +774,23 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
                 Category Image <Text style={styles.required}>* Required</Text>
               </Text>
               <Text style={styles.fieldHint}>
-                1600 × 1600 (no crop) · JPG, PNG (Max 2MB)
+                1600 × 1600 (no crop) · JPG, PNG · auto-compressed
               </Text>
-              <ImagePickerField image={image} onPick={setImage} />
+              <ImagePickerField
+                image={image}
+                onPick={(uri, file) => {
+                  setImage(uri);
+                  setImageFile(file ?? null);
+                  setImageChanged(true);
+                }}
+              />
               {image && (
                 <TouchableOpacity
-                  onPress={() => setImage(null)}
+                  onPress={() => {
+                    setImage(null);
+                    setImageFile(null);
+                    setImageChanged(true);
+                  }}
                   style={styles.removeImg}
                 >
                   <Text style={styles.removeImgText}>Remove image</Text>
@@ -820,8 +862,8 @@ const AddMainCategoryModal = ({ visible, onClose, onSave, isWeb, editData }: { v
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
+            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={() => void handleSave()} disabled={saving}>
+              <Text style={styles.saveBtnText}>{saving ? "Saving..." : editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -850,17 +892,23 @@ const AddCategoryModal = ({
   const [mainCat, setMainCat] = useState("");
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageChanged, setImageChanged] = useState(false);
   const [hsn, setHsn] = useState("");
   const [gst, setGst] = useState("");
   const [status, setStatus] = useState("Active");
+  const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setMainCat("");
     setName("");
     setImage(null);
+    setImageFile(null);
+    setImageChanged(false);
     setHsn("");
     setGst("");
     setStatus("Active");
+    setSaving(false);
   };
 
   React.useEffect(() => {
@@ -869,8 +917,10 @@ const AddCategoryModal = ({
         setMainCat(editData.parent || "");
         setName(editData.name);
         setImage(editData.image || null);
-        setHsn(editData.hsn);
-        setGst(editData.gst);
+        setImageFile(null);
+        setImageChanged(false);
+        setHsn(editData.hsn === "—" ? "" : editData.hsn);
+        setGst(editData.gst === "—" ? "" : editData.gst);
         setStatus(editData.status);
       } else {
         reset();
@@ -878,33 +928,46 @@ const AddCategoryModal = ({
     }
   }, [visible, editData]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!mainCat) {
-      Alert.alert("Required", "Please select a main category.");
+      void sweetWarning("Required", "Please select a main category.");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a category name.");
+      void sweetWarning("Required", "Please enter a category name.");
       return;
     }
     if (!gst) {
-      Alert.alert("Required", "Please select GST percentage.");
+      void sweetWarning("Required", "Please select GST percentage.");
       return;
     }
     const selectedMain = mainCategories.find(c => c.name === mainCat);
-    onSave({
-      id: editData?.id,
-      parentId: selectedMain?.id,
-      name,
-      image,
-      hsn,
-      gst,
-      status,
-      type: "Category",
-      parent: mainCat,
-    });
-    reset();
-    onClose();
+    if (!selectedMain?.id) {
+      void sweetWarning("Required", "Please select a valid main category.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        id: editData?.id,
+        parentId: selectedMain.id,
+        name: name.trim(),
+        image,
+        imageFile,
+        imageChanged,
+        hsn: hsn.trim(),
+        gst,
+        status,
+        type: "Category",
+        parent: mainCat,
+      });
+      reset();
+      onClose();
+    } catch {
+      // Parent shows error toast
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -982,12 +1045,23 @@ const AddCategoryModal = ({
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>Category Image</Text>
               <Text style={styles.fieldHint}>
-                1600 × 1600 (no crop) · JPG, PNG (Max 2MB)
+                1600 × 1600 (no crop) · JPG, PNG · auto-compressed
               </Text>
-              <ImagePickerField image={image} onPick={setImage} />
+              <ImagePickerField
+                image={image}
+                onPick={(uri, file) => {
+                  setImage(uri);
+                  setImageFile(file ?? null);
+                  setImageChanged(true);
+                }}
+              />
               {image && (
                 <TouchableOpacity
-                  onPress={() => setImage(null)}
+                  onPress={() => {
+                    setImage(null);
+                    setImageFile(null);
+                    setImageChanged(true);
+                  }}
                   style={styles.removeImg}
                 >
                   <Text style={styles.removeImgText}>Remove image</Text>
@@ -1060,10 +1134,11 @@ const AddCategoryModal = ({
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: "#F97316" }]}
-              onPress={handleSave}
+              style={[styles.saveBtn, { backgroundColor: "#F97316" }, saving && { opacity: 0.7 }]}
+              onPress={() => void handleSave()}
+              disabled={saving}
             >
-              <Text style={styles.saveBtnText}>{editData ? "Update Category" : "Save Category"}</Text>
+              <Text style={styles.saveBtnText}>{saving ? "Saving..." : editData ? "Update Category" : "Save Category"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1551,33 +1626,101 @@ export default function MainCategories() {
   };
 
   const handleSave = async (data: any) => {
+    const entityLabel = data.type === "Main Category" ? "Main category" : "Category";
+    const isUpdate = !!data.id;
     try {
-      // Convert GST percentage string to number
-      const gstValue = data.gst ? parseFloat(data.gst.replace('%', '')) : undefined;
-      const statusValue = data.status === "Active" ? true : false;
+      const gstValue = data.gst ? parseFloat(String(data.gst).replace("%", "")) : undefined;
+      const statusValue = data.status === "Active";
+      const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
+
+      let imageUploadFailed = false;
+      const uploadImageSafely = async (categoryId: number, existing: CategoryRow): Promise<CategoryRow> => {
+        if (!shouldUploadImage || !data.imageFile) return existing;
+        try {
+          // Aggressive recompress right before upload (survives nginx ~1MB defaults).
+          const compressed = await compressImageFile(data.imageFile, {
+            maxEdge: 1100,
+            maxBytes: 400_000,
+            fileName: data.imageFile instanceof File ? data.imageFile.name : "category.jpg",
+          });
+          return await uploadCategoryImages(categoryId, compressed.file);
+        } catch (uploadError) {
+          imageUploadFailed = true;
+          const is413 =
+            uploadError instanceof AdminApiError && uploadError.status === 413;
+          void sweetWarning(
+            "Category saved without image",
+            is413
+              ? "The category was saved, but the image was rejected as too large (413). Edit the category and try a smaller JPG under 500KB."
+              : getApiErrorMessage(
+                uploadError,
+                "The category was saved, but the image upload failed. You can edit and retry the image."
+              )
+          );
+          return existing;
+        }
+      };
+
+      // Never send base64 image payloads in JSON create/update — that often triggers 413.
+      // Images go only through multipart /upload-images after the category row exists.
 
       if (data.id) {
-        // Update existing category
-        await updateCategory(
+        let saved = await updateCategory(
           data.id,
           data.name,
           data.hsn,
           gstValue,
-          data.image,
-          data.mobileImage,
-          data.bannerImage,
+          undefined,
+          undefined,
+          undefined,
           statusValue
         );
+        saved = await uploadImageSafely(data.id, saved);
+        const imageUrl = pickCategoryImageUrl(saved, "categories");
         setCategories((prev) =>
-          prev.map((c) => (c.id === data.id ? { ...c, ...data } : c))
+          prev.map((c) =>
+            c.id === data.id
+              ? {
+                ...c,
+                ...data,
+                name: saved.categoryName || data.name,
+                hsn: saved.hsnCode || data.hsn || "—",
+                gst: saved.gstPercentage != null ? `${saved.gstPercentage}%` : data.gst,
+                status: saved.status ? "Active" : "Inactive",
+                image: imageUrl || data.image || c.image,
+              }
+              : c
+          )
         );
       } else {
-        // Create new category
         let newRow: CategoryRow;
         if (data.type === "Main Category") {
-          newRow = await createMainCategory(data.name, data.hsn, gstValue, data.image, data.mobileImage, data.bannerImage, statusValue);
+          newRow = await createMainCategory(
+            data.name,
+            data.hsn,
+            gstValue,
+            undefined,
+            undefined,
+            undefined,
+            statusValue
+          );
         } else {
-          newRow = await createSubcategory(data.parentId, data.name, data.hsn, gstValue, data.image, data.mobileImage, data.bannerImage, statusValue);
+          if (!data.parentId) {
+            throw new Error("Please select a main category.");
+          }
+          newRow = await createSubcategory(
+            data.parentId,
+            data.name,
+            data.hsn,
+            gstValue,
+            undefined,
+            undefined,
+            undefined,
+            statusValue
+          );
+        }
+        if (newRow.id) {
+          newRow = await uploadImageSafely(newRow.id, newRow);
         }
         const newCat: Category = {
           id: newRow.id,
@@ -1603,54 +1746,31 @@ export default function MainCategories() {
         setCurrentPage(1);
       }
       setEditCat(null);
+      if (!imageUploadFailed) {
+        setTimeout(() => {
+          if (isUpdate) {
+            void sweetCrud.updated(entityLabel);
+          } else {
+            void sweetCrud.added(entityLabel);
+          }
+        }, 250);
+      }
     } catch (error) {
       console.error("Failed to save category:", error);
-      Alert.alert("Error", "Failed to save category. Please try again.");
+      void sweetError("Error", getApiErrorMessage(error, "Failed to save category. Please try again."));
+      throw error;
     }
   };
 
   const handleDelete = async (cat: Category) => {
-    const confirmDelete = async () => {
-      try {
-        await deleteCategory(cat.id);
-        setCategories((prev) => prev.filter((c) => c.id !== cat.id));
-        if (Platform.OS === "web") {
-          Swal.fire({
-            icon: "success",
-            title: "Deleted!",
-            text: `"${cat.name}" deleted successfully!`,
-            confirmButtonColor: "#151D4F",
-          });
-        }
-      } catch (error) {
-        console.error("Failed to delete category:", error);
-        Alert.alert("Error", "Failed to delete category. Please try again.");
-      }
-    };
-
-    if (Platform.OS === "web") {
-      Swal.fire({
-        title: "Are you sure?",
-        text: `You won't be able to revert this!`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#151D4F",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!"
-      }).then((result) => {
-        if (result.isConfirmed) {
-          confirmDelete();
-        }
-      });
-    } else {
-      Alert.alert(
-        "Confirm Delete",
-        `Are you sure you want to delete "${cat.name}"?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: confirmDelete }
-        ]
-      );
+    if (!(await sweetCrud.confirmDelete("Category", cat.name))) return;
+    try {
+      await deleteCategory(cat.id);
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      void sweetCrud.deleted("Category");
+    } catch (error) {
+      console.error("Failed to delete category:", error);
+      void sweetError("Error", "Failed to delete category. Please try again.");
     }
   };
 
@@ -1667,7 +1787,7 @@ export default function MainCategories() {
             <View style={styles.pageIconWrap}>
               <LayersIcon color="#FFFFFF" />
             </View>
-            <View>
+            <View style={{ flex: 1, flexShrink: 1 }}>
               <Text style={styles.pageTitle}>Categories</Text>
               <Text style={styles.pageSubtitle}>
                 Manage main categories and sub-categories
@@ -1686,74 +1806,137 @@ export default function MainCategories() {
         ) : null}
 
         {/* ── Toolbar ── */}
-        <View style={styles.toolbar}>
-          {/* Search */}
-          <View style={styles.searchBox}>
-            <SearchIcon />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search categories..."
-              placeholderTextColor="#9CA3AF"
-              value={search}
-              onChangeText={(t) => {
-                setSearch(t);
-                setCurrentPage(1);
-              }}
-            />
-          </View>
-
-          {/* Right side controls */}
-          <View style={styles.toolbarRight}>
-            {/* View Toggle */}
-            <View style={styles.viewToggle}>
-              <TouchableOpacity
-                style={[
-                  styles.viewToggleBtn,
-                  viewMode === "grid" && styles.viewToggleBtnActive,
-                ]}
-                onPress={() => setViewMode("grid")}
-              >
-                <GridIcon active={viewMode === "grid"} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.viewToggleBtn,
-                  viewMode === "list" && styles.viewToggleBtnActive,
-                ]}
-                onPress={() => setViewMode("list")}
-              >
-                <ListIcon active={viewMode === "list"} />
-              </TouchableOpacity>
+        {!isWeb ? (
+          <View style={{ gap: 10, marginBottom: 16 }}>
+            {/* Row 1: Search & View Toggle */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={[styles.searchBox, { flex: 1, minWidth: 0 }]}>
+                <SearchIcon />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search categories..."
+                  placeholderTextColor="#9CA3AF"
+                  value={search}
+                  onChangeText={(t) => {
+                    setSearch(t);
+                    setCurrentPage(1);
+                  }}
+                />
+              </View>
+              <View style={styles.viewToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "grid" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("grid")}
+                >
+                  <GridIcon active={viewMode === "grid"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "list" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("list")}
+                >
+                  <ListIcon active={viewMode === "list"} />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Add Buttons */}
-            <TouchableOpacity
-              style={styles.addMainBtn}
-              onPress={() => {
-                setEditCat(null);
-                setMainCatModalOpen(true);
-              }}
-            >
-              <PlusIcon />
-              <Text style={styles.addMainBtnText}>
-                {isWeb ? "Add Main Category" : "Main Cat"}
-              </Text>
-            </TouchableOpacity>
+            {/* Row 2: Add Buttons */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.addMainBtn, { flex: 1, justifyContent: "center" }]}
+                onPress={() => {
+                  setEditCat(null);
+                  setMainCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addMainBtnText}>Main Cat</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.addCatBtn}
-              onPress={() => {
-                setEditCat(null);
-                setCatModalOpen(true);
-              }}
-            >
-              <PlusIcon />
-              <Text style={styles.addCatBtnText}>
-                {isWeb ? "Add Category" : "Category"}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.addCatBtn, { flex: 1, justifyContent: "center" }]}
+                onPress={() => {
+                  setEditCat(null);
+                  setCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addCatBtnText}>Category</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        ) : (
+          /* Desktop Toolbar */
+          <View style={styles.toolbar}>
+            {/* Search */}
+            <View style={styles.searchBox}>
+              <SearchIcon />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search categories..."
+                placeholderTextColor="#9CA3AF"
+                value={search}
+                onChangeText={(t) => {
+                  setSearch(t);
+                  setCurrentPage(1);
+                }}
+              />
+            </View>
+
+            {/* Right side controls */}
+            <View style={styles.toolbarRight}>
+              {/* View Toggle */}
+              <View style={styles.viewToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "grid" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("grid")}
+                >
+                  <GridIcon active={viewMode === "grid"} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.viewToggleBtn,
+                    viewMode === "list" && styles.viewToggleBtnActive,
+                  ]}
+                  onPress={() => setViewMode("list")}
+                >
+                  <ListIcon active={viewMode === "list"} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Add Buttons */}
+              <TouchableOpacity
+                style={styles.addMainBtn}
+                onPress={() => {
+                  setEditCat(null);
+                  setMainCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addMainBtnText}>Add Main Category</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.addCatBtn}
+                onPress={() => {
+                  setEditCat(null);
+                  setCatModalOpen(true);
+                }}
+              >
+                <PlusIcon />
+                <Text style={styles.addCatBtnText}>Add Category</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* ── Content ── */}
         {viewMode === "grid" ? (
@@ -1765,7 +1948,11 @@ export default function MainCategories() {
               <View
                 key={cat.id}
                 style={
-                  isWeb ? styles.gridCardWrapper : styles.gridCardWrapperMobile
+                  width >= 1024
+                    ? { flexBasis: "31%", flexGrow: 1, flexShrink: 1, minWidth: 200, maxWidth: "33%" }
+                    : width >= 768
+                      ? { flexBasis: "47%", flexGrow: 1, flexShrink: 1, minWidth: 240, maxWidth: "49%" }
+                      : styles.gridCardWrapperMobile
                 }
               >
                 <GridCard
@@ -1777,11 +1964,13 @@ export default function MainCategories() {
             ))}
           </View>
         ) : isWeb ? (
-          <ListTable
-            categories={paginated}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }} contentContainerStyle={{ minWidth: "100%" }}>
+            <ListTable
+              categories={paginated}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          </ScrollView>
         ) : (
           // Mobile list view: card-based, no horizontal scrolling
           <View style={styles.mobileCardList}>
@@ -1808,14 +1997,17 @@ export default function MainCategories() {
 
         {/* ── Pagination ── */}
         {filtered.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-            totalItems={filtered.length}
-            itemsPerPage={ITEMS_PER_PAGE}
-            itemName="categories"
-            onPageChange={setCurrentPage}
-          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: "100%", justifyContent: "center" }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+              totalItems={filtered.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              itemName="categories"
+              onPageChange={setCurrentPage}
+              compactMode={!isWeb}
+            />
+          </ScrollView>
         )}
       </ScrollView>
 
@@ -2205,6 +2397,7 @@ const styles = StyleSheet.create({
     borderColor: C.border,
     overflow: "hidden",
     width: "100%",
+    minWidth: 900,
   },
   tableHeader: {
     flexDirection: "row",

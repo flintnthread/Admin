@@ -2,9 +2,10 @@ import AdminLayout from '@/components/admin-layout';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,18 +13,19 @@ import {
   Text,
   TextInput,
   useWindowDimensions,
-  View,
+  View
 } from 'react-native';
 
+import Pagination from '@/components/Pagination';
 import {
   type ApprovalProduct,
   type ProductStatus,
 } from '@/constants/product-approval-data';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { mapProductListToApprovalRow } from '@/lib/mappers';
-import { fetchProducts, fetchProductStats, fetchSellers, fetchProductCatalog, type ProductListRow, type SellerRow } from '@/services/productApi';
+import { sweetConfirm, sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { fetchMainCategories, fetchSubcategories, type CategoryRow } from '@/services/categoryApi';
-import Pagination from '@/components/Pagination';
+import { activateProduct, deactivateProduct, fetchProducts, fetchProductStats, fetchSellers, type ProductListRow, type SellerRow } from '@/services/productApi';
 
 // ─── Theme & breakpoints ─────────────────────────────────────────────────────
 
@@ -62,6 +64,7 @@ type ProductStats = {
   review: number;
   approved: number;
   rejected: number;
+  inactive: number;
   all: number;
 };
 
@@ -70,6 +73,7 @@ const DEFAULT_STATS: ProductStats = {
   review: 0,
   approved: 0,
   rejected: 0,
+  inactive: 0,
   all: 0,
 };
 
@@ -102,6 +106,7 @@ function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>):
     category: row.category,
     status: row.status as ProductStatus,
     submittedOn: row.submittedAt,
+    price: row.price,
   };
 }
 
@@ -164,6 +169,7 @@ const STATUS_CONFIG: Record<
   review: { label: 'Review', color: PALETTE.blue, bg: PALETTE.blueLight, icon: 'magnify' },
   approved: { label: 'Approved', color: PALETTE.green, bg: PALETTE.greenLight, icon: 'check-circle-outline' },
   rejected: { label: 'Rejected', color: PALETTE.red, bg: PALETTE.redLight, icon: 'close-circle-outline' },
+  inactive: { label: 'Deactivated', color: '#64748B', bg: '#F1F5F9', icon: 'pause-circle-outline' },
 };
 
 type FilterKey = 'all' | ProductStatus;
@@ -179,6 +185,7 @@ function useBreakpoint() {
     isLaptop: width >= BREAKPOINTS.laptop && width < BREAKPOINTS.desktop,
     isDesktop: width >= BREAKPOINTS.desktop,
     isWide: width >= BREAKPOINTS.laptop,
+    isLargeDesktop: width >= 1440,
   };
 }
 
@@ -250,7 +257,7 @@ function StatCard({
             <MaterialCommunityIcons name={icon} size={22} color={color} />
           </View>
           <View style={styles.statContent}>
-            <Text style={styles.statCount}>{count}</Text>
+            <Text style={styles.statCount} adjustsFontSizeToFit numberOfLines={1}>{count}</Text>
             <Text style={styles.statLabel} numberOfLines={2}>
               {label}
             </Text>
@@ -265,11 +272,14 @@ function StatCard({
 function FilterDropdown({
   label,
   value,
-  options,
+  options = [],
   onSelect,
   wide,
   isOpen,
   onOpenChange,
+  showSearch = true,
+  searchPlaceholder,
+  totalCountText,
 }: {
   label: string;
   value: string;
@@ -278,41 +288,154 @@ function FilterDropdown({
   wide?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  showSearch?: boolean;
+  searchPlaceholder?: string;
+  totalCountText?: string;
 }) {
+  const selectRef = useRef<View>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const [search, setSearch] = useState('');
+  const { width: screenW, height: screenH } = useWindowDimensions();
+
+  const updatePosition = useCallback(() => {
+    if (selectRef.current) {
+      selectRef.current.measureInWindow((x, y, width, height) => {
+        const menuWidth = Math.min(Math.max(width, wide ? width : 240), screenW - 32);
+        const adjustedLeft = Math.max(16, Math.min(x, screenW - menuWidth - 16));
+        const top = y + height + 4; // Attached right below the select input box!
+        const availableSpace = Math.max(180, screenH - top - 24);
+        const maxHeight = Math.min(280, availableSpace);
+        setMenuPosition({ top, left: adjustedLeft, width: menuWidth, maxHeight });
+      });
+    }
+  }, [screenW, screenH, wide]);
+
+  const handlePress = () => {
+    if (!isOpen) {
+      updatePosition();
+    } else {
+      setSearch('');
+    }
+    onOpenChange(!isOpen);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+    }
+  }, [isOpen, updatePosition]);
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.trim().toLowerCase();
+    return options.filter((opt) => opt.toLowerCase().includes(q));
+  }, [options, search]);
+
+  const placeholderText = searchPlaceholder || `Search ${label.toLowerCase()}`;
+
   return (
-    <View style={[styles.filterDropdown, wide ? styles.filterDropdownWide : styles.filterDropdownCompact, isOpen && { zIndex: 100, elevation: 100 }]}>
+    <View style={[styles.filterDropdown, wide ? styles.filterDropdownWide : styles.filterDropdownCompact]}>
       <Text style={styles.filterLabel}>{label}</Text>
-      <Pressable style={styles.filterSelect} onPress={() => onOpenChange(!isOpen)}>
+      <Pressable ref={selectRef as any} style={styles.filterSelect} onPress={handlePress}>
         <Text style={styles.filterSelectText} numberOfLines={1}>
           {value}
         </Text>
         <MaterialCommunityIcons name={isOpen ? "chevron-up" : "chevron-down"} size={18} color={PALETTE.textSecondary} />
       </Pressable>
-      {isOpen && options && options.length > 0 && (
-        <View style={styles.dropdownMenu}>
-          <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled>
-            {options.map((opt, i) => (
-              <Pressable
-                key={i}
-                style={[styles.dropdownItem, value === opt && styles.dropdownItemActive]}
-                onPress={() => {
-                  if (onSelect) onSelect(opt);
-                  onOpenChange(false);
-                }}
-              >
-                <Text style={[styles.dropdownItemText, value === opt && styles.dropdownItemTextActive]}>
-                  {opt}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+
+      <Modal
+        visible={isOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          onOpenChange(false);
+          setSearch('');
+        }}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            onOpenChange(false);
+            setSearch('');
+          }}
+        />
+        {menuPosition ? (
+          <View style={[styles.dropdownOverlay, { top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }]}>
+            <View style={styles.dropdownMenu}>
+              {showSearch && (
+                <View style={styles.sellerSearchBox}>
+                  <MaterialCommunityIcons name="magnify" size={16} color="#94A3B8" />
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder={placeholderText}
+                    placeholderTextColor="#94A3B8"
+                    style={styles.sellerSearchInput}
+                    autoFocus={Platform.OS === 'web'}
+                  />
+                  {search.length > 0 && (
+                    <Pressable onPress={() => setSearch('')}>
+                      <MaterialCommunityIcons name="close-circle" size={16} color="#94A3B8" />
+                    </Pressable>
+                  )}
+                </View>
+              )}
+              <ScrollView style={{ maxHeight: menuPosition.maxHeight }} showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
+                <View style={{ paddingVertical: 4 }}>
+                  {filteredOptions.map((opt, i) => {
+                    const active = value === opt;
+                    return (
+                      <Pressable
+                        key={i}
+                        style={({ hovered }: any) => [
+                          styles.dropdownItem,
+                          active ? styles.dropdownItemActive : hovered && styles.dropdownItemHover,
+                        ]}
+                        onPress={() => {
+                          if (onSelect) onSelect(opt);
+                          onOpenChange(false);
+                          setSearch('');
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]} numberOfLines={2}>
+                          {opt}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {filteredOptions.length === 0 && (
+                    <View style={styles.dropdownEmpty}>
+                      <Text style={styles.dropdownEmptyText}>No options match your search</Text>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+              {totalCountText ? (
+                <Text style={styles.sellerDropdownCount}>{totalCountText}</Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+      </Modal>
     </View>
   );
 }
 
-function ActionButtons({ inline, productId }: { inline?: boolean; productId?: string }) {
+function ActionButtons({
+  inline,
+  productId,
+  status,
+  busy,
+  onActivate,
+  onDeactivate,
+}: {
+  inline?: boolean;
+  productId?: string;
+  status?: ProductStatus;
+  busy?: boolean;
+  onActivate?: (id: string) => void;
+  onDeactivate?: (id: string) => void;
+}) {
   const openDetails = () => {
     if (productId) router.push(`/productDetails?id=${productId}`);
   };
@@ -327,17 +450,37 @@ function ActionButtons({ inline, productId }: { inline?: boolean; productId?: st
           pressed && styles.pressed,
         ]}>
         <MaterialCommunityIcons name="eye-outline" size={inline ? 12 : 14} color={PALETTE.orange} />
-        <Text style={[styles.viewDetailsText, inline && styles.actionTextInline]}>View Details</Text>
       </Pressable>
-      <Pressable
-        style={({ pressed }) => [
-          styles.activateBtn,
-          inline && styles.activateBtnInline,
-          pressed && styles.pressed,
-        ]}>
-        <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
-        <Text style={[styles.activateText, inline && styles.actionTextInline]}>Activate</Text>
-      </Pressable>
+      {(status === 'pending' || status === 'inactive' || status === 'rejected') && (
+        <Pressable
+          disabled={busy || !productId}
+          onPress={() => productId && onActivate?.(productId)}
+          style={({ pressed }) => [
+            styles.activateBtn,
+            inline && styles.activateBtnInline,
+            (busy || pressed) && styles.pressed,
+            busy && { opacity: 0.6 },
+          ]}>
+          <MaterialCommunityIcons name="check-circle-outline" size={inline ? 12 : 14} color="#FFF" />
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>
+            {status === 'pending' ? 'Activate' : 'Reactivate'}
+          </Text>
+        </Pressable>
+      )}
+      {status === 'approved' && (
+        <Pressable
+          disabled={busy || !productId}
+          onPress={() => productId && onDeactivate?.(productId)}
+          style={({ pressed }) => [
+            styles.deactivateBtn,
+            inline && styles.activateBtnInline,
+            (busy || pressed) && styles.pressed,
+            busy && { opacity: 0.6 },
+          ]}>
+          <MaterialCommunityIcons name="close-circle-outline" size={inline ? 12 : 14} color="#FFF" />
+          <Text style={[styles.activateText, inline && styles.actionTextInline]}>Deactivate</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -387,7 +530,7 @@ function WebTopBar() {
       <View style={styles.globalSearch}>
         <MaterialCommunityIcons name="magnify" size={18} color={PALETTE.textMuted} />
         <TextInput
-          placeholder="Search anything..."
+          placeholder="Search anything"
           placeholderTextColor={PALETTE.textMuted}
           style={styles.globalSearchInput}
         />
@@ -426,24 +569,24 @@ function WebTopBar() {
   );
 }
 
-function PageHeader({ isWide, stats, onFilter, isMobile }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean }) {
+function PageHeader({ isWide, stats, onFilter, isMobile, isTablet }: { isWide: boolean; stats?: ProductStats; onFilter?: (f: FilterKey) => void; isMobile?: boolean; isTablet?: boolean }) {
   return (
     <View>
       <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
         <View style={styles.pageHeaderLeft}>
-          <View style={styles.pageIcon}>
-            <MaterialCommunityIcons name="shield-check" size={28} color="#FFF" />
+          <View style={[styles.pageIcon, isMobile && styles.pageIconMobile]}>
+            <MaterialCommunityIcons name="shield-check" size={isMobile ? 18 : 20} color="#FFF" />
           </View>
-          <View>
-            <Text style={styles.pageTitle}>Product Approvals</Text>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={[styles.pageTitle, isMobile && { fontSize: 17 }]} numberOfLines={1}>Product Approvals</Text>
           </View>
         </View>
       </View>
-      {/* Mobile: stat cards overlapping the header bottom */}
-      {isMobile && stats && onFilter && (
-        <View style={styles.mobileHeaderStats}>
+      {/* Mobile/Tablet: stat cards overlapping the header bottom */}
+      {(isMobile || isTablet) && stats && onFilter && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mobileHeaderStats} contentContainerStyle={{ paddingHorizontal: 8, flexGrow: 1, justifyContent: 'center' }}>
           <StatsRow stats={stats} onFilter={onFilter} isWide={false} />
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -493,6 +636,15 @@ function StatsRow({
       />
       <StatCard
         {...cardProps}
+        count={stats.inactive}
+        label="Deactivated Products"
+        color="#64748B"
+        bg="#F1F5F9"
+        icon="pause-circle-outline"
+        onPress={() => onFilter('inactive')}
+      />
+      <StatCard
+        {...cardProps}
         count={stats.rejected}
         label="Rejected Products"
         color={PALETTE.red}
@@ -526,6 +678,7 @@ function StatusTabs({
     { key: 'pending', label: 'Pending', count: stats.pending, color: PALETTE.orange, bg: PALETTE.orangeLight },
     { key: 'review', label: 'Review', count: stats.review, color: PALETTE.blue, bg: PALETTE.blueLight },
     { key: 'approved', label: 'Approved', count: stats.approved, color: PALETTE.green, bg: PALETTE.greenLight },
+    { key: 'inactive', label: 'Deactivated', count: stats.inactive, color: '#64748B', bg: '#F1F5F9' },
     { key: 'rejected', label: 'Rejected', count: stats.rejected, color: PALETTE.red, bg: PALETTE.redLight },
   ];
 
@@ -627,62 +780,149 @@ function FilterSection({
     if (onSellerChange) onSellerChange(value);
   };
 
+  const dbSellerCount = sellerOptions.filter(s => s !== "All Sellers" && s !== "Select").length;
+  const mainCatCount = mainCategoryOptions.filter(s => s !== "All Main Categories" && s !== "Select").length;
+  const catCount = categoryOptions.filter(s => s !== "All Categories" && s !== "Select").length;
+  const subCatCount = subcategoryOptions.filter(s => s !== "All Subcategories" && s !== "Select").length;
+
   return (
     <View style={[styles.queueCard, { zIndex: 10, elevation: 10 }]}>
       <View style={[styles.queueHeader, { zIndex: 1, elevation: 1 }]}>
         <Text style={styles.queueTitle}>Product Approval Queue</Text>
       </View>
 
-      <View
-        style={[
-          styles.filtersGrid,
-          isMobile && styles.filtersGridMobile,
-          isTablet && styles.filtersGridTablet,
-          isWide && styles.filtersGridWide,
-          { zIndex: 10, elevation: 10 }
-        ]}>
-        <FilterDropdown
-          label="Seller"
-          value={seller}
-          onSelect={handleSellerSelect}
-          options={sellerOptions}
-          wide={isWide}
-          isOpen={openDropdown === 'seller'}
-          onOpenChange={(open) => setOpenDropdown(open ? 'seller' : null)}
-        />
-        <FilterDropdown
-          label="Main Category"
-          value={mainCat}
-          onSelect={handleMainCategorySelect}
-          options={mainCategoryOptions}
-          wide={isWide}
-          isOpen={openDropdown === 'mainCat'}
-          onOpenChange={(open) => setOpenDropdown(open ? 'mainCat' : null)}
-        />
-        <FilterDropdown
-          label="Category"
-          value={category}
-          onSelect={handleCategorySelect}
-          options={categoryOptions}
-          wide={isWide}
-          isOpen={openDropdown === 'category'}
-          onOpenChange={(open) => setOpenDropdown(open ? 'category' : null)}
-        />
-        <FilterDropdown
-          label="Subcategory"
-          value={subcategory}
-          onSelect={setSubcategory}
-          options={subcategoryOptions}
-          wide={isWide}
-          isOpen={openDropdown === 'subcategory'}
-          onOpenChange={(open) => setOpenDropdown(open ? 'subcategory' : null)}
-        />
-      </View>
+      {isMobile ? (
+        <View style={styles.mobileFiltersContainer}>
+          {/* Seller: Full-width dropdown */}
+          <FilterDropdown
+            label="Seller"
+            value={seller}
+            onSelect={handleSellerSelect}
+            options={sellerOptions}
+            wide={true}
+            isOpen={openDropdown === 'seller'}
+            onOpenChange={(open) => setOpenDropdown(open ? 'seller' : null)}
+            showSearch={true}
+            searchPlaceholder="Search seller name, business, or ID"
+            totalCountText={`${dbSellerCount} sellers in database`}
+          />
+
+          {/* Main Category & Category: 2-column side-by-side grid */}
+          <View style={styles.mobileRow2Col}>
+            <FilterDropdown
+              label="Main Category"
+              value={mainCat}
+              onSelect={handleMainCategorySelect}
+              options={mainCategoryOptions}
+              wide={false}
+              isOpen={openDropdown === 'mainCat'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'mainCat' : null)}
+              showSearch={true}
+              searchPlaceholder="Search main category"
+              totalCountText={`${mainCatCount} main categories in database`}
+            />
+            <FilterDropdown
+              label="Category"
+              value={category}
+              onSelect={handleCategorySelect}
+              options={categoryOptions}
+              wide={false}
+              isOpen={openDropdown === 'category'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'category' : null)}
+              showSearch={true}
+              searchPlaceholder="Search category"
+              totalCountText={`${catCount} categories in database`}
+            />
+          </View>
+
+          {/* Subcategory: Full-width dropdown */}
+          <FilterDropdown
+            label="Subcategory"
+            value={subcategory}
+            onSelect={setSubcategory}
+            options={subcategoryOptions}
+            wide={true}
+            isOpen={openDropdown === 'subcategory'}
+            onOpenChange={(open) => setOpenDropdown(open ? 'subcategory' : null)}
+            showSearch={true}
+            searchPlaceholder="Search subcategory"
+            totalCountText={`${subCatCount} subcategories in database`}
+          />
+        </View>
+      ) : (
+        <>
+          <View
+            style={[
+              styles.filtersGrid,
+              isTablet && styles.filtersGridTablet,
+              isWide && styles.filtersGridWide,
+              { zIndex: 10, elevation: 10 }
+            ]}>
+            <FilterDropdown
+              label="Seller"
+              value={seller}
+              onSelect={handleSellerSelect}
+              options={sellerOptions}
+              wide={isWide}
+              isOpen={openDropdown === 'seller'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'seller' : null)}
+              showSearch={true}
+              searchPlaceholder="Search seller name, business, or ID"
+              totalCountText={`${dbSellerCount} sellers in database`}
+            />
+            <FilterDropdown
+              label="Main Category"
+              value={mainCat}
+              onSelect={handleMainCategorySelect}
+              options={mainCategoryOptions}
+              wide={isWide}
+              isOpen={openDropdown === 'mainCat'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'mainCat' : null)}
+              showSearch={true}
+              searchPlaceholder="Search main category"
+              totalCountText={`${mainCatCount} main categories in database`}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.filtersGrid,
+              isTablet && styles.filtersGridTablet,
+              isWide && styles.filtersGridWide,
+              { zIndex: 10, elevation: 10 }
+            ]}>
+            <FilterDropdown
+              label="Category"
+              value={category}
+              onSelect={handleCategorySelect}
+              options={categoryOptions}
+              wide={isWide}
+              isOpen={openDropdown === 'category'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'category' : null)}
+              showSearch={true}
+              searchPlaceholder="Search category"
+              totalCountText={`${catCount} categories in database`}
+            />
+            <FilterDropdown
+              label="Subcategory"
+              value={subcategory}
+              onSelect={setSubcategory}
+              options={subcategoryOptions}
+              wide={isWide}
+              isOpen={openDropdown === 'subcategory'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'subcategory' : null)}
+              showSearch={true}
+              searchPlaceholder="Search subcategory"
+              totalCountText={`${subCatCount} subcategories in database`}
+            />
+          </View>
+        </>
+      )}
 
       <View style={[styles.searchRow, isMobile && styles.searchRowMobile]}>
         <View style={styles.searchBox}>
           <TextInput
-            placeholder="Search products..."
+            placeholder="Search products"
             placeholderTextColor={PALETTE.textMuted}
             value={search}
             onChangeText={onSearchChange}
@@ -694,12 +934,42 @@ function FilterSection({
         </View>
 
         {isMobile && (
-          <View style={styles.mobileStatusDropdown}>
-            <Text style={styles.filterLabel}>Status</Text>
-            <Pressable style={styles.filterSelect}>
-              <Text style={styles.filterSelectText}>All ({stats.all})</Text>
-              <MaterialCommunityIcons name="chevron-down" size={18} color={PALETTE.textSecondary} />
-            </Pressable>
+          <View style={{ flex: 1 }}>
+            <FilterDropdown
+              label="Status"
+              value={
+                activeFilter === 'all'
+                  ? `All (${stats.all})`
+                  : activeFilter === 'pending'
+                    ? `Pending (${stats.pending})`
+                    : activeFilter === 'review'
+                      ? `Review (${stats.review})`
+                      : activeFilter === 'approved'
+                        ? `Approved (${stats.approved})`
+                        : activeFilter === 'inactive'
+                          ? `Deactivated (${stats.inactive})`
+                          : `Rejected (${stats.rejected})`
+              }
+              options={[
+                `All (${stats.all})`,
+                `Pending (${stats.pending})`,
+                `Review (${stats.review})`,
+                `Approved (${stats.approved})`,
+                `Deactivated (${stats.inactive})`,
+                `Rejected (${stats.rejected})`,
+              ]}
+              onSelect={(val) => {
+                if (val.startsWith('All')) onFilterChange('all');
+                else if (val.startsWith('Pending')) onFilterChange('pending');
+                else if (val.startsWith('Review')) onFilterChange('review');
+                else if (val.startsWith('Approved')) onFilterChange('approved');
+                else if (val.startsWith('Deactivated')) onFilterChange('inactive');
+                else if (val.startsWith('Rejected')) onFilterChange('rejected');
+              }}
+              isOpen={openDropdown === 'status'}
+              onOpenChange={(open) => setOpenDropdown(open ? 'status' : null)}
+              showSearch={false}
+            />
           </View>
         )}
       </View>
@@ -711,7 +981,17 @@ function FilterSection({
 
 // ─── Product list ────────────────────────────────────────────────────────────
 
-function ProductCard({ product }: { product: Product }) {
+function ProductCard({
+  product,
+  busy,
+  onActivate,
+  onDeactivate,
+}: {
+  product: Product;
+  busy?: boolean;
+  onActivate?: (id: string) => void;
+  onDeactivate?: (id: string) => void;
+}) {
   return (
     <View style={styles.productCard}>
       <View style={styles.productCardTop}>
@@ -726,6 +1006,9 @@ function ProductCard({ product }: { product: Product }) {
           <Text style={styles.productDesc} numberOfLines={2}>
             {product.description}
           </Text>
+          {product.price ? (
+            <Text style={styles.productPrice}>{product.price}</Text>
+          ) : null}
         </View>
         <StatusBadge status={product.status} />
       </View>
@@ -747,7 +1030,14 @@ function ProductCard({ product }: { product: Product }) {
             </Text>
           </View>
         </View>
-        <ActionButtons inline productId={product.id} />
+        <ActionButtons
+          inline
+          productId={product.id}
+          status={product.status}
+          busy={busy}
+          onActivate={onActivate}
+          onDeactivate={onDeactivate}
+        />
       </View>
     </View>
   );
@@ -758,22 +1048,31 @@ function ProductTable({
   selected,
   onToggle,
   onToggleAll,
+  actionBusyId,
+  onActivate,
+  onDeactivate,
+  isLargeDesktop,
 }: {
   products: Product[];
   selected: Set<string>;
   onToggle: (id: string) => void;
   onToggleAll: () => void;
+  actionBusyId?: string | null;
+  onActivate?: (id: string) => void;
+  onDeactivate?: (id: string) => void;
+  isLargeDesktop?: boolean;
 }) {
   const allSelected = products.length > 0 && products.every((p) => selected.has(p.id));
 
-  return (
-    <View style={styles.tableCard}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+  if (isLargeDesktop) {
+    return (
+      <View style={styles.tableCard}>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
             <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
             <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColPrice]}>Total Price</Text>
             <Text style={[styles.tableHeaderText, styles.tableColStatus]}>Status</Text>
             <Text style={[styles.tableHeaderText, styles.tableColDate]}>Submitted On</Text>
             <Text style={[styles.tableHeaderText, styles.tableColActions]}>Actions</Text>
@@ -806,6 +1105,8 @@ function ProductTable({
 
               <Text style={[styles.tableColCategory, styles.tableCellText]}>{product.category}</Text>
 
+              <Text style={[styles.tableColPrice, styles.tableCellText]}>{product.price ?? '—'}</Text>
+
               <View style={styles.tableColStatus}>
                 <StatusBadge status={product.status} />
               </View>
@@ -813,7 +1114,80 @@ function ProductTable({
               <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
 
               <View style={styles.tableColActions}>
-                <ActionButtons inline productId={product.id} />
+                <ActionButtons
+                  inline
+                  productId={product.id}
+                  status={product.status}
+                  busy={actionBusyId === product.id}
+                  onActivate={onActivate}
+                  onDeactivate={onDeactivate}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.tableCard}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+        <View style={[styles.table, { minWidth: 1000 }]}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableHeaderText, styles.tableColProduct]}>Product Details</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColSeller]}>Seller</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColCategory]}>Category</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColPrice]}>Total Price</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColStatus]}>Status</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColDate]}>Submitted On</Text>
+            <Text style={[styles.tableHeaderText, styles.tableColActions]}>Actions</Text>
+          </View>
+
+          {products.map((product) => (
+            <View key={product.id} style={styles.tableRow}>
+
+              <View style={[styles.tableColProduct, styles.tableCellProduct]}>
+                <Image
+                  source={{ uri: product.image }}
+                  style={styles.tableThumb}
+                  contentFit="cover"
+                />
+                <View style={styles.tableProductInfo}>
+                  <View style={styles.productNameRow}>
+                    <Text style={styles.productName}>{truncateWords(product.name, 4)}</Text>
+                    {product.isNew && <NewBadge />}
+                  </View>
+                  <Text style={styles.productDesc} numberOfLines={2}>
+                    {product.description}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.tableColSeller}>
+                <Text style={styles.sellerName}>{product.seller}</Text>
+                <Text style={styles.sellerEmail}>{product.email}</Text>
+              </View>
+
+              <Text style={[styles.tableColCategory, styles.tableCellText]}>{product.category}</Text>
+
+              <Text style={[styles.tableColPrice, styles.tableCellText]}>{product.price ?? '—'}</Text>
+
+              <View style={styles.tableColStatus}>
+                <StatusBadge status={product.status} />
+              </View>
+
+              <Text style={[styles.tableColDate, styles.tableCellText]}>{product.submittedOn}</Text>
+
+              <View style={styles.tableColActions}>
+                <ActionButtons
+                  inline
+                  productId={product.id}
+                  status={product.status}
+                  busy={actionBusyId === product.id}
+                  onActivate={onActivate}
+                  onDeactivate={onDeactivate}
+                />
               </View>
             </View>
           ))}
@@ -829,13 +1203,14 @@ function filterStatusForApi(filter: FilterKey): string | undefined {
   if (filter === 'all') return undefined;
   if (filter === 'approved') return 'active';
   if (filter === 'review') return 'under_review';
+  if (filter === 'inactive') return 'inactive';
   return filter;
 }
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function ProductApprovalScreen() {
-  const { isMobile, isTablet, isWide, width } = useBreakpoint();
+  const { isMobile, isTablet, isWide, width, isLaptop, isLargeDesktop } = useBreakpoint();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
@@ -847,6 +1222,7 @@ export default function ProductApprovalScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [selectedSeller, setSelectedSeller] = useState("All Sellers");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
 
@@ -927,6 +1303,7 @@ export default function ProductApprovalScreen() {
           review: Number(apiStats.underReview ?? 0),
           approved: Number(apiStats.approved ?? apiStats.active ?? 0),
           rejected: Number(apiStats.rejected ?? 0),
+          inactive: Number(apiStats.inactive ?? 0),
           all: Number(apiStats.total ?? 0),
         });
       } else {
@@ -934,7 +1311,7 @@ export default function ProductApprovalScreen() {
       }
 
       // Extract unique categories from products
-      const uniqueCategories = new Set<string>(["All Categories"]);
+      const uniqueCategories = new Set<string>(["Select"]);
       mappedProducts.forEach(p => {
         if (p.category) uniqueCategories.add(p.category);
       });
@@ -961,6 +1338,55 @@ export default function ProductApprovalScreen() {
     setSelected(new Set());
   }, []);
 
+  const handleActivate = useCallback(async (id: string) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId) || numericId <= 0) return;
+    const confirmed = await sweetConfirm({
+      title: 'Activate product?',
+      text: 'This product will become visible to buyers.',
+      confirmText: 'Yes, Activate',
+    });
+    if (!confirmed) return;
+    setActionBusyId(id);
+    setError(null);
+    try {
+      await activateProduct(numericId);
+      await loadData();
+      void sweetSuccess('Activated!', 'Product activated successfully.');
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to activate product.');
+      setError(msg);
+      void sweetError('Error', msg);
+    } finally {
+      setActionBusyId(null);
+    }
+  }, [loadData]);
+
+  const handleDeactivate = useCallback(async (id: string) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId) || numericId <= 0) return;
+    const confirmed = await sweetConfirm({
+      title: 'Deactivate product?',
+      text: 'This product will be hidden from buyers.',
+      confirmText: 'Yes, Deactivate',
+      danger: true,
+    });
+    if (!confirmed) return;
+    setActionBusyId(id);
+    setError(null);
+    try {
+      await deactivateProduct(numericId);
+      await loadData();
+      void sweetSuccess('Deactivated!', 'Product deactivated successfully.');
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to deactivate product.');
+      setError(msg);
+      void sweetError('Error', msg);
+    } finally {
+      setActionBusyId(null);
+    }
+  }, [loadData]);
+
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     setCurrentPage(1);
@@ -974,7 +1400,7 @@ export default function ProductApprovalScreen() {
   }, []);
 
   const handleMainCategoryChange = useCallback(async (selectedMainCat: string) => {
-    if (selectedMainCat === "All Main Categories") {
+    if (selectedMainCat === "All Main Categories" || selectedMainCat === "Select") {
       setCategoryOptions(["All Categories"]);
       setSubcategoryOptions(["All Subcategories"]);
       return;
@@ -998,7 +1424,7 @@ export default function ProductApprovalScreen() {
   const handleCategoryChange = useCallback(async (selectedCategory: string) => {
     // For now, subcategories will be extracted from products
     // TODO: Add dedicated subcategory API endpoint when available
-    setSubcategoryOptions(["All Subcategories"]);
+    setSubcategoryOptions(["Select"]);
   }, []);
 
   const toggleSelect = (id: string) => {
@@ -1024,13 +1450,15 @@ export default function ProductApprovalScreen() {
         style={styles.screen}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
-        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} />
+        <PageHeader isWide={isWide} stats={stats} onFilter={handleFilterChange} isMobile={isMobile} isTablet={isTablet} />
 
-        {isWide && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
+        {isWide && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsScrollWrapper} contentContainerStyle={styles.statsScrollContent}>
+            <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />
+          </ScrollView>
+        )}
 
         <View style={styles.scrollContent}>
-
-          {!isWide && !isMobile && <StatsRow stats={stats} onFilter={handleFilterChange} isWide={isWide} />}
 
           <FilterSection
             stats={stats}
@@ -1064,16 +1492,28 @@ export default function ProductApprovalScreen() {
               </Pressable>
             </View>
           ) : isWide ? (
-            <ProductTable
-              products={products}
-              selected={selected}
-              onToggle={toggleSelect}
-              onToggleAll={toggleSelectAll}
-            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={isLaptop} style={{ width: '100%' }} contentContainerStyle={{ paddingBottom: 8, minWidth: '100%' }}>
+              <ProductTable
+                products={products}
+                selected={selected}
+                onToggle={toggleSelect}
+                onToggleAll={toggleSelectAll}
+                actionBusyId={actionBusyId}
+                onActivate={handleActivate}
+                onDeactivate={handleDeactivate}
+                isLargeDesktop={isLargeDesktop}
+              />
+            </ScrollView>
           ) : (
             <View style={styles.productList}>
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  busy={actionBusyId === product.id}
+                  onActivate={handleActivate}
+                  onDeactivate={handleDeactivate}
+                />
               ))}
             </View>
           )}
@@ -1292,8 +1732,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mobileHeaderStats: {
-    marginTop: -42,
-    marginHorizontal: 8,
+    marginTop: -62,
     zIndex: 10,
     elevation: 10,
     marginBottom: 4,
@@ -1305,12 +1744,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pageIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: PALETTE.brandOrange,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pageIconMobile: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
   },
   pageTitle: {
     fontSize: 22,
@@ -1358,25 +1802,34 @@ const styles = StyleSheet.create({
   // Stats — 2×2 grid on mobile & tablet (native + web responsive)
   statsGridCompact: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 10,
-    width: '100%',
     alignSelf: 'stretch',
+    paddingBottom: 4,
+    justifyContent: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 12,
     width: '100%',
   },
   statsGridWide: {
     flexWrap: 'nowrap',
-    marginTop: -60,
-    marginHorizontal: 16,
+    minWidth: 900,
+    justifyContent: 'center',
+  },
+  statsScrollWrapper: {
+    marginTop: -62,
     zIndex: 10,
     marginBottom: 4,
-    maxWidth: 900,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
+  },
+  statsScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   statCard: {
     flexDirection: 'row',
@@ -1388,7 +1841,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.border,
     flex: 1,
-    minWidth: 220,
+    minWidth: 120,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -1396,13 +1849,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statCardGrid: {
-    width: '48%',
-    maxWidth: '48%',
-    flexBasis: '48%',
-    flexGrow: 0,
-    flexShrink: 0,
-    flex: 0,
-    minWidth: 0,
+    width: 150,
     flexDirection: 'column',
     alignItems: 'stretch',
     padding: 12,
@@ -1498,13 +1945,21 @@ const styles = StyleSheet.create({
   filtersGridWide: {
     flexDirection: 'row',
   },
+  mobileFiltersContainer: {
+    gap: 12,
+    width: '100%',
+  },
+  mobileRow2Col: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
   filterDropdown: {
     gap: 6,
   },
   filterDropdownCompact: {
-    flexBasis: '48%',
-    maxWidth: '48%',
-    minWidth: 140,
+    flex: 1,
+    minWidth: 0,
   },
   filterDropdownWide: {
     flex: 1,
@@ -1521,9 +1976,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: PALETTE.border,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 48,
+    minHeight: 48,
     backgroundColor: PALETTE.cardBg,
     gap: 8,
   },
@@ -1532,39 +1988,81 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: PALETTE.textPrimary,
   },
-  dropdownMenu: {
+  dropdownOverlay: {
     position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: PALETTE.cardBg,
+    zIndex: 9999,
+  },
+  dropdownMenu: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: PALETTE.border,
-    borderRadius: 8,
-    marginTop: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    zIndex: 1000,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  sellerSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    margin: 8,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === 'web' ? 8 : 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  sellerSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#334155',
+    padding: 0,
+    outlineStyle: 'none' as any,
   },
   dropdownItem: {
-    paddingHorizontal: 12,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: PALETTE.border,
+    paddingHorizontal: 14,
+    marginHorizontal: 6,
+    marginVertical: 1,
+    borderRadius: 8,
+  },
+  dropdownItemHover: {
+    backgroundColor: '#F8FAFC',
   },
   dropdownItemActive: {
-    backgroundColor: PALETTE.blue,
+    backgroundColor: PALETTE.brandOrange,
   },
   dropdownItemText: {
     fontSize: 13,
-    color: PALETTE.textPrimary,
+    color: '#334155',
+    fontWeight: '400',
   },
   dropdownItemTextActive: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  dropdownEmpty: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  dropdownEmptyText: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  sellerDropdownCount: {
+    fontSize: 11,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
   },
   searchRow: {
     flexDirection: 'row',
@@ -1677,6 +2175,12 @@ const styles = StyleSheet.create({
     color: PALETTE.textSecondary,
     lineHeight: 17,
   },
+  productPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PALETTE.brandOrange,
+    marginTop: 4,
+  },
   statusBadge: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -1774,6 +2278,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  deactivateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: PALETTE.red,
+    alignSelf: 'flex-start',
+  },
   viewDetailsBtnInline: {
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -1795,11 +2309,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: PALETTE.border,
-    overflow: 'hidden',
+    overflow: 'visible',
+    width: '100%',
   },
   table: {
     width: '100%',
-    minWidth: 960,
+    minWidth: 1000,
   },
   tableHeader: {
     flexDirection: 'row',
@@ -1830,33 +2345,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tableColProduct: {
-    flex: 1,
-    minWidth: 200,
+    flex: 1.2,
     paddingRight: 16,
   },
   tableColSeller: {
     flex: 1,
-    minWidth: 160,
     paddingRight: 16,
   },
   tableColCategory: {
     flex: 1.4,
-    minWidth: 220,
+    paddingRight: 16,
+  },
+  tableColPrice: {
+    flex: 0.9,
     paddingRight: 16,
   },
   tableColStatus: {
     flex: 0.8,
-    minWidth: 120,
     paddingRight: 16,
   },
   tableColDate: {
     flex: 1,
-    minWidth: 150,
     paddingRight: 16,
   },
   tableColActions: {
     flex: 1.2,
-    minWidth: 200,
   },
   checkbox: {
     width: 18,

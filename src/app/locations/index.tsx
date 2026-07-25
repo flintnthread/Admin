@@ -2,13 +2,19 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError } from '@/lib/sweetAlert';
 import {
   fetchAreas,
+  fetchAreasPage,
   fetchCities,
+  fetchCitiesPage,
   fetchCountries,
+  fetchCountriesPage,
   fetchLocationCounts,
   fetchPincodes,
+  fetchPincodesPage,
   fetchStates,
+  fetchStatesPage,
   createCountry,
   createState,
   createCity,
@@ -77,7 +83,7 @@ const LIST_COLS: Record<DetailTab, { codeLabel?: string; countLabel?: string }> 
   overview: {},
   countries: { codeLabel: 'Code' },
   states: { countLabel: 'Cities' },
-  cities: { codeLabel: 'Code', countLabel: 'Areas' },
+  cities: { codeLabel: 'State', countLabel: 'Areas' },
   areas: { codeLabel: 'City', countLabel: 'Pins' },
   pincodes: {},
 };
@@ -107,34 +113,41 @@ const TAB_META: Record<
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function mapLocationRow(row: LocationRow, index: number, tab: DetailTab): ListRow {
-  const theme = ROW_THEMES[index % ROW_THEMES.length];
-  return {
-    id: row.id,
-    name: String(row.name ?? row.pincode ?? row.id ?? '—'),
-    status: row.active === false ? 'Inactive' : 'Active',
-    code: row.code ? String(row.code) : row.stateName ? String(row.stateName) : undefined,
-    count: typeof row.cityCount === 'number' ? row.cityCount : undefined,
-    iconBg: theme.bg,
-    iconColor: theme.color,
-  };
-}
-
-function getRelationValue(row: Record<string, any> | null | undefined, keys: string[]): string | number | undefined {
-  if (!row) return undefined;
-  for (const key of keys) {
-    const value = row[key];
-    if (value !== undefined && value !== null && value !== '') return value;
+function toCount(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
   }
   return undefined;
 }
 
-function belongsTo(child: Record<string, any>, parent: Option, idKeys: string[], nameKeys: string[]): boolean {
-  const childId = getRelationValue(child, idKeys);
-  if (childId !== undefined) return String(childId) === String(parent.id);
-  const childName = getRelationValue(child, nameKeys);
-  if (childName !== undefined) return String(childName).toLowerCase() === parent.name.toLowerCase();
-  return true;
+function mapLocationRow(row: LocationRow, index: number, tab: DetailTab): ListRow {
+  const theme = ROW_THEMES[index % ROW_THEMES.length];
+  let code: string | undefined;
+  let count: number | undefined;
+
+  if (tab === 'countries') {
+    code = row.code ? String(row.code) : undefined;
+  } else if (tab === 'states') {
+    count = toCount(row.cityCount) ?? 0;
+  } else if (tab === 'cities') {
+    code = row.stateName ? String(row.stateName) : undefined;
+    count = toCount(row.areaCount) ?? 0;
+  } else if (tab === 'areas') {
+    code = row.cityName ? String(row.cityName) : undefined;
+    count = toCount(row.pincodeCount) ?? 0;
+  }
+
+  return {
+    id: row.id,
+    name: String(row.name ?? row.pincode ?? row.id ?? '—'),
+    status: row.active === false ? 'Inactive' : 'Active',
+    code,
+    count,
+    iconBg: theme.bg,
+    iconColor: theme.color,
+  };
 }
 
 type MaterialIconName = keyof typeof MaterialIcons.glyphMap;
@@ -184,20 +197,22 @@ function HeroHeader({
   countriesCount,
   statesCount,
   citiesCount,
+  areasCount,
   pincodesCount,
 }: {
   isMobile: boolean;
   countriesCount: number;
   statesCount: number;
   citiesCount: number;
+  areasCount: number;
   pincodesCount: number;
 }) {
   const stats = [
     { label: 'Countries', value: countriesCount, icon: 'public' as MaterialIconName, color: '#2563EB', bg: '#EFF6FF' },
     { label: 'Active States', value: statesCount, icon: 'map' as MaterialIconName, color: '#059669', bg: '#ECFDF5' },
-    { label: 'Inactive', value: 0, icon: 'location-off' as MaterialIconName, color: '#DC2626', bg: '#FEF2F2' },
     { label: 'Cities', value: citiesCount, icon: 'location-city' as MaterialIconName, color: '#D97706', bg: '#FFFBEB' },
-    { label: 'Pincodes', value: `${pincodesCount.toLocaleString()}+`, icon: 'mail-outline' as MaterialIconName, color: '#7C3AED', bg: '#F5F3FF' },
+    { label: 'Areas', value: areasCount.toLocaleString(), icon: 'place' as MaterialIconName, color: '#DC2626', bg: '#FEF2F2' },
+    { label: 'Pincodes', value: pincodesCount.toLocaleString(), icon: 'mail-outline' as MaterialIconName, color: '#7C3AED', bg: '#F5F3FF' },
   ];
 
   return (
@@ -210,15 +225,20 @@ function HeroHeader({
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText style={s.heroHeading}>Locations Management</ThemedText>
-            <ThemedText style={s.heroSub}>Manage all countries, states, cities and pincodes</ThemedText>
+            <ThemedText style={s.heroSub}>Manage all countries, states, cities, areas and pincodes</ThemedText>
           </View>
         </View>
       </View>
 
       {/* Stat cards */}
       {isMobile ? (
-        // ── Mobile: 2-column grid, Pincodes full width ──
-        <View style={s.statCardsMobileGrid}>
+        // ── Mobile / small-tablet: horizontally scrollable ──
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.statCardsMobileGrid}
+          contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+        >
           {stats.slice(0, 4).map((p, i) => (
             <View key={i} style={s.statCardMobile}>
               <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
@@ -232,7 +252,7 @@ function HeroHeader({
               </View>
             </View>
           ))}
-          {/* Pincodes — full width */}
+          {/* Pincodes */}
           <View style={s.statCardMobileFull}>
             <View style={[s.statCardIcon, { backgroundColor: stats[4].bg }]}>
               <MaterialIcons name={stats[4].icon} size={20} color={stats[4].color} />
@@ -244,9 +264,9 @@ function HeroHeader({
               <ThemedText style={s.statCardLabel}>{stats[4].label}</ThemedText>
             </View>
           </View>
-        </View>
+        </ScrollView>
       ) : (
-        // ── Web: original horizontal row ──
+        // ── Tablet / Web: horizontal wrapping row ──
         <View style={s.statCardsRow}>
           {stats.map((p, i) => (
             <View key={i} style={s.statCard}>
@@ -486,6 +506,7 @@ function OverviewPanel({
   statesCount,
   citiesCount,
   pincodesCount,
+  areasCount,
   countryOptions,
   stateOptions,
   cityOptions,
@@ -505,6 +526,7 @@ function OverviewPanel({
   statesCount: number;
   citiesCount: number;
   pincodesCount: number;
+  areasCount: number;
   countryOptions: Option[];
   stateOptions: Option[];
   cityOptions: Option[];
@@ -524,7 +546,8 @@ function OverviewPanel({
         { label: 'Countries', value: countriesCount || 1, color: '#2563EB' },
         { label: 'States', value: statesCount || 36, color: '#9333EA' },
         { label: 'Cities', value: citiesCount || 532, color: '#EA580C' },
-        { label: 'Pincodes', value: Math.min(pincodesCount || 100, 500), color: '#16A34A' },
+        { label: 'Areas', value: areasCount || 0, color: '#DC2626' },
+        { label: 'Pincodes', value: pincodesCount || 0, color: '#16A34A' },
       ];
     }
     if (selectedCountry && !selectedState) {
@@ -550,7 +573,7 @@ function OverviewPanel({
       ];
     }
     return [];
-  }, [selectedCountry, selectedState, selectedCity, stateOptions, cityOptions, cityPincodes, pincodesLoading, countriesCount, statesCount, citiesCount, pincodesCount]);
+  }, [selectedCountry, selectedState, selectedCity, stateOptions, cityOptions, cityPincodes, pincodesLoading, countriesCount, statesCount, citiesCount, areasCount, pincodesCount]);
 
   const breadcrumb = [selectedCountry?.name, selectedState?.name, selectedCity?.name].filter(Boolean).join(' › ');
 
@@ -715,10 +738,24 @@ function EntityCard({
         </View>
       )}
 
-      <Pressable onPress={() => onView(row)} style={s.entityCardViewBtn}>
-        <MaterialIcons name="visibility" size={14} color="#fff" />
-        <ThemedText style={s.entityCardViewBtnText}>View</ThemedText>
-      </Pressable>
+      {/* View / Edit / Delete actions */}
+      <View style={s.entityCardActions}>
+        <Pressable
+          onPress={() => onView(row)}
+          style={[s.entityActionBtn, s.entityActionBtnView]}>
+          <MaterialIcons name="visibility" size={15} color={LocationColors.accentStrong} />
+        </Pressable>
+        <Pressable
+          onPress={() => onEdit(row)}
+          style={[s.entityActionBtn, s.entityActionBtnEdit]}>
+          <MaterialIcons name="edit" size={15} color="#2563EB" />
+        </Pressable>
+        <Pressable
+          onPress={() => onDelete(row)}
+          style={[s.entityActionBtn, s.entityActionBtnDel]}>
+          <MaterialIcons name="delete" size={15} color={LocationColors.inactiveText} />
+        </Pressable>
+      </View>
     </Pressable>
   );
 }
@@ -1101,8 +1138,8 @@ function EntityModal({
                     </ThemedText>
                   </Pressable>
                   {parentOpen && parentOptions.length > 0 && (
-                    <View style={[s.fieldInput, { padding: 0, maxHeight: 180 }]}>
-                      <ScrollView nestedScrollEnabled>
+                    <View style={{ borderWidth: 1, borderColor: LocationColors.border, borderRadius: 10, backgroundColor: LocationColors.cardBg, overflow: 'hidden' }}>
+                      <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                         {parentOptions.map((opt) => (
                           <Pressable
                             key={opt.id}
@@ -1196,13 +1233,24 @@ function ConfirmDelete({ row, singular, onCancel, onConfirm }: { row: ListRow | 
 
 export default function LocationsScreen() {
   const { width } = useWindowDimensions();
-  const isWeb = Platform.OS === 'web';
-  const isMobile = !isWeb;
+
+  // ── Responsive breakpoints ──────────────────────────────────────────────
+  // Previously this screen decided "mobile vs web" purely from Platform.OS,
+  // so on web the layout stayed in "desktop mode" even at very small browser
+  // widths (and native devices always stayed in "mobile mode" even on large
+  // tablets). That's why things looked broken between phone size and 1024px.
+  // Now the layout responds to the actual viewport width instead, on every
+  // platform, so resizing a web browser (or opening on a tablet) reflows
+  // correctly all the way from mobile widths up through ~1024px and beyond.
+  const isMobile = width < 768;                 // stacked / compact layout
+  const gridColumns = width < 640 ? 1 : width < 1024 ? 2 : 3; // grid card columns
 
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [rows, setRows] = useState<ListRow[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -1223,27 +1271,57 @@ export default function LocationsScreen() {
   const [locationCounts, setLocationCounts] = useState<LocationCounts | null>(null);
 
   const meta = TAB_META[detailTab];
-  const gridColumns = isWeb ? (width < 960 ? 2 : 3) : 1;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const loadRows = useCallback(async () => {
     try {
-      if (detailTab === 'overview') { setRows([]); return; }
-      let data: LocationRow[] = [];
-      if (detailTab === 'countries') data = await fetchCountries();
-      else if (detailTab === 'states') data = await fetchStates();
-      else if (detailTab === 'cities') data = await fetchCities();
-      else if (detailTab === 'areas') data = await fetchAreas();
-      else if (detailTab === 'pincodes') data = await fetchPincodes();
-      setRows(data.map((r, i) => mapLocationRow(r, i, detailTab)));
+      if (detailTab === 'overview') {
+        setRows([]);
+        setTotalItems(0);
+        return;
+      }
+      const page = Math.max(currentPage - 1, 0);
+      const search = debouncedQuery || undefined;
+      let result;
+      if (detailTab === 'countries') result = await fetchCountriesPage({ search, page, size: itemsPerPage });
+      else if (detailTab === 'states') result = await fetchStatesPage({ search, page, size: itemsPerPage });
+      else if (detailTab === 'cities') result = await fetchCitiesPage({ search, page, size: itemsPerPage });
+      else if (detailTab === 'areas') result = await fetchAreasPage({ search, page, size: itemsPerPage });
+      else result = await fetchPincodesPage({ search, page, size: itemsPerPage });
+
+      setRows(result.items.map((r, i) => mapLocationRow(r, page * itemsPerPage + i, detailTab)));
+      setTotalItems(result.totalElements);
+      // If the current page is past the last page (e.g. after delete), snap back
+      if (result.totalPages > 0 && page >= result.totalPages) {
+        setCurrentPage(result.totalPages);
+      }
     } catch (e) {
       console.warn(getApiErrorMessage(e));
       setRows([]);
+      setTotalItems(0);
     }
-  }, [detailTab]);
+  }, [detailTab, currentPage, debouncedQuery, itemsPerPage]);
 
   useEffect(() => { loadRows(); }, [loadRows]);
-  useEffect(() => { setQuery(''); setCurrentPage(1); }, [detailTab]);
-  useEffect(() => { setCurrentPage(1); }, [query]);
+  useEffect(() => { setQuery(''); setDebouncedQuery(''); setCurrentPage(1); }, [detailTab]);
+  useEffect(() => { setCurrentPage(1); }, [debouncedQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const counts = await fetchLocationCounts();
+        if (!cancelled) setLocationCounts(counts);
+      } catch (e) {
+        console.warn(getApiErrorMessage(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (detailTab !== 'overview' || analysisCountries.length > 0) return;
@@ -1251,11 +1329,8 @@ export default function LocationsScreen() {
     (async () => {
       setOverviewLoading(true);
       try {
-        const [c, counts] = await Promise.all([fetchCountries(), fetchLocationCounts()]);
-        if (!cancelled) {
-          setAnalysisCountries(c);
-          setLocationCounts(counts);
-        }
+        const c = await fetchCountries();
+        if (!cancelled) setAnalysisCountries(c);
       }
       catch (e) { console.warn(getApiErrorMessage(e)); }
       finally { if (!cancelled) setOverviewLoading(false); }
@@ -1293,13 +1368,9 @@ export default function LocationsScreen() {
     (async () => {
       setPincodesLoading(true);
       try {
-        const all = await fetchPincodes();
-        if (cancelled) return;
-        const matches = all.filter((p) =>
-          belongsTo(p as unknown as Record<string, any>, selectedCity, ['cityId', 'city_id'], ['cityName', 'city_name', 'city'])
-        );
-        setCityPincodes(matches);
-      } catch (e) { setCityPincodes([]); }
+        const matches = await fetchPincodes(undefined, { cityId: selectedCity.id });
+        if (!cancelled) setCityPincodes(matches);
+      } catch (e) { if (!cancelled) setCityPincodes([]); }
       finally { if (!cancelled) setPincodesLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -1313,16 +1384,8 @@ export default function LocationsScreen() {
   const handleSelectState = (opt: Option) => { setSelectedState(opt); setSelectedCity(null); };
   const resetSelection = () => { setSelectedCountry(null); setSelectedState(null); setSelectedCity(null); };
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.name.toLowerCase().includes(q) || String(r.id).includes(q));
-  }, [query, rows]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-  const paginatedRows = useMemo(() => {
-    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filtered, currentPage, itemsPerPage]);
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedRows = rows;
 
   const openAdd = () => { setActiveRow(null); setModalMode('add'); setModalVisible(true); };
   const openEdit = (row: ListRow) => { setActiveRow(row); setModalMode('edit'); setModalVisible(true); };
@@ -1331,15 +1394,24 @@ export default function LocationsScreen() {
 
   const handleSave = async (data: { name: string; code: string; status: RowStatus; parentId?: number }) => {
     const active = data.status === 'Active';
+    const entityLabel =
+      detailTab === 'countries' ? 'Country'
+        : detailTab === 'states' ? 'State'
+          : detailTab === 'cities' ? 'City'
+            : detailTab === 'areas' ? 'Area'
+              : 'Pincode';
     try {
       if (modalMode === 'edit' && activeRow) {
+        if (!(await sweetCrud.confirmUpdate(entityLabel, data.name))) return;
         if (detailTab === 'countries') await updateCountry(activeRow.id, data.name, data.code, active);
         else if (detailTab === 'states') await updateState(activeRow.id, data.name, active);
         else if (detailTab === 'cities') await updateCity(activeRow.id, data.name, active);
         else if (detailTab === 'areas') await updateArea(activeRow.id, data.name, active);
         else if (detailTab === 'pincodes') await updatePincode(activeRow.id, data.name, active);
         setRows((prev) => prev.map((r) => r.id === activeRow.id ? { ...r, name: data.name, status: data.status, code: data.code } : r));
+        void sweetCrud.updated(entityLabel);
       } else {
+        if (!(await sweetCrud.confirmAdd(entityLabel, data.name))) return;
         let newRow: LocationRow;
         if (detailTab === 'countries') newRow = await createCountry(data.name, data.code, active);
         else if (detailTab === 'states') {
@@ -1363,28 +1435,43 @@ export default function LocationsScreen() {
           iconBg: theme.bg,
           iconColor: theme.color,
         }, ...prev]);
+        void sweetCrud.added(entityLabel);
       }
       closeModal();
       await loadRows();
+      try {
+        const counts = await fetchLocationCounts();
+        setLocationCounts(counts);
+      } catch { /* keep previous counts */ }
     } catch (e: unknown) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError('Error', getApiErrorMessage(e));
       throw new Error(getApiErrorMessage(e));
     }
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    const entityLabel =
+      detailTab === 'countries' ? 'Country'
+        : detailTab === 'states' ? 'State'
+          : detailTab === 'cities' ? 'City'
+            : detailTab === 'areas' ? 'Area'
+              : 'Pincode';
     try {
       if (detailTab === 'countries') await deleteCountry(deleteTarget.id);
       else if (detailTab === 'states') await deleteState(deleteTarget.id);
       else if (detailTab === 'cities') await deleteCity(deleteTarget.id);
       else if (detailTab === 'areas') await deleteArea(deleteTarget.id);
       else if (detailTab === 'pincodes') await deletePincode(deleteTarget.id);
-      setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      await loadRows();
+      const counts = await fetchLocationCounts();
+      setLocationCounts(counts);
+      void sweetCrud.deleted(entityLabel);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError('Error', getApiErrorMessage(e, `Failed to delete ${entityLabel.toLowerCase()}.`));
+      setDeleteTarget(null);
     }
-    setDeleteTarget(null);
   };
 
   return (
@@ -1399,7 +1486,8 @@ export default function LocationsScreen() {
           countriesCount={locationCounts?.countries ?? analysisCountries.length ?? 195}
           statesCount={locationCounts?.states ?? analysisStates.length ?? 36}
           citiesCount={locationCounts?.cities ?? analysisCities.length ?? 532}
-          pincodesCount={locationCounts?.pincodes ?? 19000}
+          areasCount={locationCounts?.areas ?? 0}
+          pincodesCount={locationCounts?.pincodes ?? 0}
         />
 
         <TabBar active={detailTab} onChange={setDetailTab} />
@@ -1411,7 +1499,8 @@ export default function LocationsScreen() {
             countriesCount={locationCounts?.countries ?? analysisCountries.length ?? 195}
             statesCount={locationCounts?.states ?? analysisStates.length ?? 36}
             citiesCount={locationCounts?.cities ?? analysisCities.length ?? 532}
-            pincodesCount={locationCounts?.pincodes ?? 19000}
+            areasCount={locationCounts?.areas ?? 0}
+            pincodesCount={locationCounts?.pincodes ?? 0}
             countryOptions={countryOptions}
             stateOptions={stateOptions}
             cityOptions={cityOptions}
@@ -1457,16 +1546,16 @@ export default function LocationsScreen() {
 
             {viewMode === 'grid' ? (
               <GridView rows={paginatedRows} columns={gridColumns} tab={detailTab} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
-            ) : isWeb ? (
-              <ListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
-            ) : (
+            ) : isMobile ? (
               <MobileListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            ) : (
+              <ListTable rows={paginatedRows} tab={detailTab} nameCol={meta.nameCol} onView={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
             )}
 
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={filtered.length}
+              totalItems={totalItems}
               itemsPerPage={itemsPerPage}
               itemName={meta.plural}
               onPageChange={setCurrentPage}
@@ -1489,8 +1578,8 @@ export default function LocationsScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: LocationColors.pageBg },
-  content: { padding: 20, paddingBottom: 48, maxWidth: 1200, alignSelf: 'center', width: '100%' },
+  screen: { flex: 1, width: '100%', backgroundColor: LocationColors.pageBg },
+  content: { padding: 20, paddingBottom: 48, width: '100%', flexGrow: 1 },
   contentMobile: { padding: 14, paddingBottom: 32 },
 
   // ── Hero ──
@@ -1515,7 +1604,7 @@ const s = StyleSheet.create({
   heroHeading: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', lineHeight: 28 },
   heroSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 3 },
 
-  // ── Web stat cards row ──
+  // ── Web / tablet stat cards row ──
   statCardsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1549,18 +1638,13 @@ const s = StyleSheet.create({
   statCardValue: { fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 8 },
   statCardLabel: { color: '#6B7280', fontSize: 11, marginTop: 2, fontWeight: '500' },
 
-  // ── Mobile stat cards grid (2-col + full-width Pincodes) ──
+  // ── Mobile / small-tablet stat cards ──
   statCardsMobileGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
     marginTop: -42,
     marginBottom: 16,
-    paddingHorizontal: 2,
   },
   statCardMobile: {
-    // ~48% width so 2 per row with gap
-    width: '48%',
+    width: 165,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 14,
@@ -1576,8 +1660,7 @@ const s = StyleSheet.create({
     borderColor: '#F0F0F0',
   },
   statCardMobileFull: {
-    // full width for Pincodes
-    width: '100%',
+    width: 165,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 14,
@@ -1692,11 +1775,11 @@ const s = StyleSheet.create({
   drillSub: { fontSize: 12, color: LocationColors.textMuted, marginTop: 3 },
   resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: LocationColors.accentLight, borderRadius: 8 },
   resetBtnText: { fontSize: 12, color: LocationColors.accentStrong, fontWeight: '600' },
-  selectorsRow: { flexDirection: 'row', gap: 12 },
+  selectorsRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   selectorsRowMobile: { flexDirection: 'column', gap: 10 },
   breadcrumbRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: LocationColors.accentLight, borderRadius: 8 },
   breadcrumbText: { fontSize: 13, color: LocationColors.accentStrong, fontWeight: '600' },
-  chartArea: { flexDirection: 'row', alignItems: 'flex-start', gap: 24, paddingTop: 8 },
+  chartArea: { flexDirection: 'row', alignItems: 'flex-start', gap: 24, paddingTop: 8, flexWrap: 'wrap' },
   chartAreaMobile: { flexDirection: 'column', alignItems: 'center', gap: 16 },
   drillLoading: { alignItems: 'center', gap: 10, paddingVertical: 32 },
   drillLoadingText: { color: LocationColors.textMuted, fontSize: 13 },
@@ -1704,7 +1787,7 @@ const s = StyleSheet.create({
   drillEmptyText: { color: LocationColors.textMuted, textAlign: 'center', fontSize: 13 },
 
   // Donut
-  donutWrap: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  donutWrap: { flexDirection: 'row', alignItems: 'center', gap: 24, flexWrap: 'wrap' },
   donutLegend: { gap: 10 },
   donutLegendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   donutDot: { width: 10, height: 10, borderRadius: 5 },
@@ -1712,17 +1795,17 @@ const s = StyleSheet.create({
   donutLegendVal: { fontSize: 14, fontWeight: '700' },
 
   // Pincodes
-  pincodeArea: { flex: 1 },
+  pincodeArea: { flex: 1, minWidth: 180 },
   pincodeAreaTitle: { fontSize: 13, fontWeight: '700', color: LocationColors.text, marginBottom: 10 },
   pincodeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pincodeChip: { backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   pincodeChipText: { fontSize: 12, color: LocationColors.textSecondary, fontWeight: '500' },
 
   // ── Toolbar ──
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  toolbarMobile: { flexDirection: 'row', gap: 8 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' },
+  toolbarMobile: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
+    flex: 1, minWidth: 160, flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: LocationColors.cardBg, borderWidth: 1, borderColor: LocationColors.border,
     borderRadius: 12, paddingHorizontal: 14, height: 44,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
@@ -1773,6 +1856,20 @@ const s = StyleSheet.create({
     borderRadius: 10, paddingVertical: 10,
   },
   entityCardViewBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+
+  // Entity card — view / edit / delete action row (grid view)
+  entityCardActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  entityActionBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  entityActionBtnView: { borderColor: LocationColors.accentBorder, backgroundColor: LocationColors.accentLight },
+  entityActionBtnEdit: { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
+  entityActionBtnDel: { borderColor: LocationColors.inactiveBorder, backgroundColor: LocationColors.inactiveBg },
 
   // ── Table ──
   tableCard: {
@@ -1834,7 +1931,7 @@ const s = StyleSheet.create({
   pageNumTextActive: { color: '#fff' },
 
   // ── Select ──
-  selectWrap: { flex: 1, minWidth: 0 },
+  selectWrap: { flex: 1, minWidth: 160 },
   selectLabel: { fontSize: 12, fontWeight: '600', color: LocationColors.textSecondary, marginBottom: 6 },
   selectBox: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

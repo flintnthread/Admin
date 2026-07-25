@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { getApiErrorMessage } from '@/lib/api/client';
+import { sweetCrud, sweetError, sweetWarning } from '@/lib/sweetAlert';
 import { mapCustomerSupportTicket } from '@/lib/mappers';
 import {
   fetchCustomerSupportTicket,
@@ -15,7 +16,6 @@ import {
   ScrollView,
   StyleSheet,
   useWindowDimensions,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -302,7 +302,7 @@ export default function CustomerSupportTicketDetails() {
 
   const handleSubmit = async () => {
     if (!response.trim()) {
-      Alert.alert('Required', 'Please enter a response before submitting.');
+      void sweetWarning('Required', 'Please enter a response before submitting.');
       return;
     }
     const id = Number(ticketId);
@@ -318,9 +318,9 @@ export default function CustomerSupportTicketDetails() {
       await updateCustomerSupportTicketStatus(id, statusMap[updateStatus] ?? 'in_progress');
       await loadTicket(id);
       setResponse('');
-      Alert.alert('Success', 'Response submitted and status updated.');
+      void sweetCrud.saved('Response');
     } catch (e) {
-      Alert.alert('Error', getApiErrorMessage(e));
+      void sweetError('Error', getApiErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

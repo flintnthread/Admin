@@ -9,6 +9,10 @@ export type IntegrationSettings = {
   twilioAuthTokenConfigured: boolean;
   twilioAuthTokenMasked: string;
   twilioPhoneNumber: string;
+  shiprocketEmail: string;
+  shiprocketPasswordConfigured: boolean;
+  shiprocketPasswordMasked: string;
+  shiprocketPickupLocation: string;
 };
 
 export async function fetchCommissionRates(): Promise<CommissionRates> {
@@ -31,6 +35,9 @@ export async function updateIntegrationSettings(payload: {
   twilioAccountSid?: string;
   twilioAuthToken?: string;
   twilioPhoneNumber?: string;
+  shiprocketEmail?: string;
+  shiprocketPassword?: string;
+  shiprocketPickupLocation?: string;
 }): Promise<IntegrationSettings> {
   return adminApiRequest("/api/admin/settings/integrations", {
     method: "PUT",

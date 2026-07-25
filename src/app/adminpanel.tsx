@@ -9,6 +9,7 @@ import Pagination from "@/components/Pagination";
 import { getApiErrorMessage } from "@/lib/api/client";
 import type { AdminUserRow } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
+import { sweetCrud, sweetError } from "@/lib/sweetAlert";
 import {
   createAdminUser,
   deleteAdminUser,
@@ -30,6 +31,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 const Icon = Ionicons;
@@ -131,9 +133,15 @@ function Avatar({ name, size = 48, colorIndex = 0 }: { name: string; size?: numb
 // ─── Role Badge ───────────────────────────────────────────────────────────────
 function RoleBadge({ role }: { role: Role }) {
   const col = ROLE_COLORS[role] || ROLE_COLORS["Admin"];
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 1200;
   return (
-    <View style={[styles.roleBadge, { backgroundColor: col.bg, borderColor: col.border }]}>
-      <Text style={[styles.roleBadgeText, { color: col.text }]}>{role}</Text>
+    <View style={[
+      styles.roleBadge,
+      { backgroundColor: col.bg, borderColor: col.border },
+      isNarrow && { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 }
+    ]}>
+      <Text style={[styles.roleBadgeText, { color: col.text }, isNarrow && { fontSize: 9.5 }]}>{role}</Text>
     </View>
   );
 }
@@ -141,9 +149,15 @@ function RoleBadge({ role }: { role: Role }) {
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Status }) {
   const active = status === "Active";
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 1200;
   return (
-    <View style={[styles.statusBadge, { borderColor: active ? C.green : C.red }]}>
-      <Text style={[styles.statusText, { color: active ? C.green : C.red }]}>{status}</Text>
+    <View style={[
+      styles.statusBadge,
+      { borderColor: active ? C.green : C.red },
+      isNarrow && { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 }
+    ]}>
+      <Text style={[styles.statusText, { color: active ? C.green : C.red }, isNarrow && { fontSize: 9.5 }]}>{status}</Text>
     </View>
   );
 }
@@ -153,13 +167,13 @@ function Select<T extends string>({ label, value, options, onChange, hideValue }
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<View>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const { width: screenW } = useWindowDimensions();
 
   const handlePress = () => {
     if (!open && triggerRef.current) {
       triggerRef.current.measure((x, y, width, height, pageX, pageY) => {
-        const { width: screenWidth } = Dimensions.get("window");
-        const menuWidth = Math.min(width, screenWidth - 32);
-        const adjustedLeft = Math.min(pageX, screenWidth - menuWidth - 16);
+        const menuWidth = Math.min(width, screenW - 32);
+        const adjustedLeft = Math.min(pageX, screenW - menuWidth - 16);
         setMenuPosition({ top: pageY + height, left: adjustedLeft, width: menuWidth });
       });
     }
@@ -315,6 +329,7 @@ function DeleteModal({ visible, user, onClose, onConfirm }: { visible: boolean; 
           </View>
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <Icon name="close" size={16} color={C.white} />
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.submitBtn, { backgroundColor: C.red }]} onPress={onConfirm}>
@@ -416,38 +431,57 @@ function MobileListRow({ user, index, onEdit, onDelete }: { user: User; index: n
 
 // ─── Web List Table Row ───────────────────────────────────────────────────────
 function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: User; index: number; selected: boolean; onPress: () => void; onEdit: (user: User) => void; onDelete: (user: User) => void }) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 1200;
+
+  const colId = isNarrow ? 35 : 50;
+  const colName = isNarrow ? 140 : 200;
+  const colRole = isNarrow ? 100 : 140;
+  const colStatus = isNarrow ? 70 : 100;
+  const colLastLogin = isNarrow ? 115 : 190;
+  const colActions = isNarrow ? 75 : 90;
+
+  const colIdStyle = isNarrow ? { width: colId, flexShrink: 0 } : { flex: 0.5 };
+  const colNameStyle = isNarrow ? { width: colName, flexShrink: 0 } : { flex: 2 };
+  const colEmailStyle = isNarrow ? { flex: 1 } : { flex: 3.5 };
+  const colRoleStyle = isNarrow ? { width: colRole, flexShrink: 0 } : { flex: 1.4 };
+  const colStatusStyle = isNarrow ? { width: colStatus, flexShrink: 0 } : { flex: 1 };
+  const colLastLoginStyle = isNarrow ? { width: colLastLogin, flexShrink: 0 } : { flex: 1.9 };
+  const colActionsStyle = isNarrow ? { width: colActions, flexShrink: 0 } : { flex: 0.9 };
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [
       styles.tableRow,
+      isNarrow && { paddingHorizontal: 8, paddingVertical: 10 },
       index % 2 === 1 && !selected && { backgroundColor: "#fafafa" },
       selected && { backgroundColor: C.biscuit },
       pressed && { opacity: 0.85 },
     ]}>
-      <Text style={[styles.tableCell, { width: 50, color: C.subtext, flexShrink: 0 }]}>{user.id}</Text>
-      <View style={[styles.tableCell, { width: 200, flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 0 }]}>
-        <Avatar name={user.name} size={36} colorIndex={index} />
-        <View>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={[styles.userSub, { fontSize: 11 }]}>{user.username}</Text>
+      <Text style={[styles.tableCell, colIdStyle, { color: C.subtext, fontSize: isNarrow ? 12 : 13 }]}>{user.id}</Text>
+      <View style={[styles.tableCell, colNameStyle, { flexDirection: "row", alignItems: "center", gap: isNarrow ? 6 : 10 }]}>
+        <Avatar name={user.name} size={isNarrow ? 28 : 36} colorIndex={index} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.userName, isNarrow && { fontSize: 13 }]} numberOfLines={1}>{user.name}</Text>
+          <Text style={[styles.userSub, { fontSize: isNarrow ? 10 : 11 }]} numberOfLines={1}>{user.username}</Text>
         </View>
       </View>
-      <Text style={[styles.tableCell, { flex: 1, color: C.subtext, fontSize: 13 }]}>{user.email}</Text>
-      <View style={[styles.tableCell, { width: 140, flexShrink: 0 }]}>
+      <Text style={[styles.tableCell, colEmailStyle, { color: C.subtext, fontSize: isNarrow ? 12 : 13 }]} numberOfLines={1}>{user.email}</Text>
+      <View style={[styles.tableCell, colRoleStyle]}>
         <RoleBadge role={user.role} />
       </View>
-      <View style={[styles.tableCell, { width: 100, flexShrink: 0 }]}>
+      <View style={[styles.tableCell, colStatusStyle]}>
         <StatusBadge status={user.status} />
       </View>
-      <View style={[styles.tableCell, { width: 190, flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }]}>
-        <Icon name="time-outline" size={12} color={C.subtext} />
-        <Text style={styles.timeText}>{user.lastLogin}</Text>
+      <View style={[styles.tableCell, colLastLoginStyle, { flexDirection: "row", alignItems: "center", gap: 4 }]}>
+        <Icon name="time-outline" size={isNarrow ? 11 : 12} color={C.subtext} />
+        <Text style={[styles.timeText, isNarrow && { fontSize: 10 }]} numberOfLines={1}>{user.lastLogin}</Text>
       </View>
-      <View style={[styles.tableCell, { width: 90, flexDirection: "row", gap: 8, flexShrink: 0 }]}>
-        <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(user)}>
-          <Icon name="create-outline" size={16} color={C.white} />
+      <View style={[styles.tableCell, colActionsStyle, { flexDirection: "row", gap: isNarrow ? 6 : 8 }]}>
+        <TouchableOpacity style={[styles.editBtn, isNarrow && { padding: 6 }]} onPress={() => onEdit(user)}>
+          <Icon name="create-outline" size={isNarrow ? 14 : 16} color={C.white} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(user)}>
-          <Icon name="trash-outline" size={16} color={C.white} />
+        <TouchableOpacity style={[styles.deleteBtn, isNarrow && { padding: 6 }]} onPress={() => onDelete(user)}>
+          <Icon name="trash-outline" size={isNarrow ? 14 : 16} color={C.white} />
         </TouchableOpacity>
       </View>
     </Pressable>
@@ -455,10 +489,22 @@ function TableRow({ user, index, selected, onPress, onEdit, onDelete }: { user: 
 }
 
 // ─── Web Grid Card ────────────────────────────────────────────────────────────
-function GridCard({ user, index, onEdit, onDelete }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void }) {
+function GridCard({ user, index, onEdit, onDelete, cardWidth }: { user: User; index: number; onEdit: (user: User) => void; onDelete: (user: User) => void; cardWidth?: number | string }) {
   const bg = AVATAR_BG[index % AVATAR_BG.length];
+  const { width: windowWidth } = useWindowDimensions();
+
+  let dynamicWidth = cardWidth;
+  if (!dynamicWidth && Platform.OS === 'web') {
+    if (windowWidth >= 1024) {
+      dynamicWidth = 'calc(33.33% - 14px)'; // 3 cards per row (1024px, 1440px, 2560px)
+    } else if (windowWidth >= 768) {
+      dynamicWidth = 'calc(50% - 10px)'; // 2 cards per row (768px tablet)
+    }
+    // Mobile (<768px): no changes, uses default StyleSheet width
+  }
+
   return (
-    <View style={styles.gridCard}>
+    <View style={[styles.gridCard, dynamicWidth && Platform.OS === 'web' ? { width: dynamicWidth } : null]}>
       {/* Coloured top banner */}
       <View style={[styles.gridBanner, { backgroundColor: bg }]}>
         <View style={styles.gridAvatarCircle}>
@@ -518,7 +564,8 @@ export default function AdminUsersScreen() {
   const ITEMS_PER_PAGE = 20;
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
-  const isWide = IS_WEB_WIDE;
+  const { width } = useWindowDimensions();
+  const isWide = Platform.OS === "web" && width >= 768;
 
   const loadUsers = useCallback(async () => {
     try {
@@ -565,10 +612,13 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         password: form.password,
       });
-      await loadUsers();
       setAddVisible(false);
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.added("Admin user");
+      }, 250);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to add admin user."));
     }
   }
 
@@ -581,10 +631,13 @@ export default function AdminUsersScreen() {
         active: form.status === "Active",
         ...(form.password ? { password: form.password } : {}),
       });
-      await loadUsers();
       setEditUser(null);
+      await loadUsers();
+      setTimeout(() => {
+        void sweetCrud.updated("Admin user");
+      }, 250);
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to update admin user."));
     }
   }
 
@@ -594,8 +647,9 @@ export default function AdminUsersScreen() {
       await deleteAdminUser(deleteUser.id);
       await loadUsers();
       setDeleteUser(null);
+      void sweetCrud.deleted("Admin user");
     } catch (e) {
-      console.warn(getApiErrorMessage(e));
+      void sweetError("Error", getApiErrorMessage(e, "Failed to delete admin user."));
     }
   }
 
@@ -606,22 +660,59 @@ export default function AdminUsersScreen() {
 
       {/* Content */}
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           {/* Header Card */}
           <View style={styles.mobileHeaderCard}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={styles.headerCardIcon}>
-                <Icon name="people" size={26} color={C.white} />
+            {width < 480 ? (
+              <View style={{ flexDirection: "column", gap: 10 }}>
+                {/* Row 1: Icon & Title on Left, Add User button on Right (if medium mobile) */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 8 }}>
+                    <View style={[styles.headerCardIcon, { padding: 5, borderRadius: 6 }]}>
+                      <Icon name="people" size={18} color={C.white} />
+                    </View>
+                    <Text style={[styles.headerCardTitle, { fontSize: width < 360 ? 17 : 18.5, flexShrink: 1 }]} numberOfLines={1}>
+                      Admin Panel Users
+                    </Text>
+                  </View>
+                  {width >= 360 && (
+                    <TouchableOpacity style={[styles.mobileAddBtn, { paddingVertical: 8, paddingHorizontal: 10 }]} onPress={() => setAddVisible(true)}>
+                      <Icon name="add" size={16} color={C.white} />
+                      <Text style={[styles.mobileAddBtnText, { fontSize: 12 }]}>
+                        {width >= 400 ? "Add New User" : "Add User"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Subtitle Row */}
+                <Text style={[styles.headerCardSubtitle, { marginTop: 2, marginBottom: width < 360 ? 4 : 0 }]}>
+                  Manage system administrators, roles, permissions, and account statuses
+                </Text>
+
+                {/* Row 3: Add User button at bottom for small mobile (320px) */}
+                {width < 360 && (
+                  <TouchableOpacity style={[styles.mobileAddBtn, { alignSelf: "stretch" }]} onPress={() => setAddVisible(true)}>
+                    <Icon name="add" size={18} color={C.white} />
+                    <Text style={styles.mobileAddBtnText}>Add User</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.headerCardTitle}>Admin Panel Users</Text>
-                <Text style={styles.headerCardSubtitle}>Manage system administrators, roles,{"\n"}permissions, and account statuses</Text>
+            ) : (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={styles.headerCardIcon}>
+                  <Icon name="people" size={26} color={C.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.headerCardTitle}>Admin Panel Users</Text>
+                  <Text style={styles.headerCardSubtitle}>Manage system administrators, roles,{"\n"}permissions, and account statuses</Text>
+                </View>
+                <TouchableOpacity style={styles.mobileAddBtn} onPress={() => setAddVisible(true)}>
+                  <Icon name="add" size={18} color={C.white} />
+                  <Text style={styles.mobileAddBtnText}>Add User</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.mobileAddBtn} onPress={() => setAddVisible(true)}>
-                <Icon name="add" size={18} color={C.white} />
-                <Text style={styles.mobileAddBtnText}>Add User</Text>
-              </TouchableOpacity>
-            </View>
+            )}
           </View>
 
           {/* Stats + View Toggle Card */}
@@ -680,7 +771,7 @@ export default function AdminUsersScreen() {
   // ── Web Layout (NO sidebar) ───────────────────────────────────────────────
   const WebLayout = () => (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 24 }}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 24 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Page Header ── */}
         <View style={styles.webPageHeader}>
@@ -722,36 +813,50 @@ export default function AdminUsersScreen() {
         </View>
 
         {/* ── LIST VIEW (table) ── */}
-        {viewMode === "list" && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={[styles.tableContainer, { width: Math.max(containerWidth - 48, 960), marginBottom: 20 }]}>
-              {/* Header */}
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                {[
-                  { label: "ID", w: 50 },
-                  { label: "Name", w: 200 },
-                  { label: "Email", flex: 1 },
-                  { label: "Role", w: 140 },
-                  { label: "Status", w: 100 },
-                  { label: "Last Login", w: 190 },
-                  { label: "Actions", w: 90 },
-                ].map(h => (
-                  <Text key={h.label} style={[
-                    styles.tableHeadCell,
-                    h.flex ? { flex: h.flex } : { width: h.w, flexShrink: 0 },
-                  ]}>{h.label}</Text>
-                ))}
-              </View>
-              {paginatedUsers.map((u, i) => (
-                <TableRow key={u.id} user={u} index={i}
-                  selected={selectedUserId === u.id}
-                  onPress={() => setSelectedUserId(selectedUserId === u.id ? null : u.id)}
-                  onEdit={u => setEditUser(u)}
-                  onDelete={u => setDeleteUser(u)} />
-              ))}
+        {viewMode === "list" && (() => {
+          const isNarrow = width < 1200;
+          const colId = isNarrow ? 35 : 50;
+          const colName = isNarrow ? 140 : 200;
+          const colRole = isNarrow ? 100 : 140;
+          const colStatus = isNarrow ? 70 : 100;
+          const colLastLogin = isNarrow ? 115 : 190;
+          const colActions = isNarrow ? 75 : 90;
+
+          return (
+            <View style={{ width: "100%" }}>
+              {/* @ts-ignore */}
+              <ScrollView className="orange-scrollbar" horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: "100%" }}>
+                <View style={[styles.tableContainer, { width: isNarrow ? "100%" : Math.max(containerWidth - 48, 960), minWidth: isNarrow ? 690 : undefined, marginBottom: 20 }]}>
+                  {/* Header */}
+                  <View style={[styles.tableRow, styles.tableHeader, isNarrow && { paddingHorizontal: 8, paddingVertical: 10 }]}>
+                    {[
+                      { label: "ID", w: colId, flex: !isNarrow ? 0.5 : undefined },
+                      { label: "Name", w: colName, flex: !isNarrow ? 2 : undefined },
+                      { label: "Email", flex: !isNarrow ? 3.5 : 1 },
+                      { label: "Role", w: colRole, flex: !isNarrow ? 1.4 : undefined },
+                      { label: "Status", w: colStatus, flex: !isNarrow ? 1 : undefined },
+                      { label: "Last Login", w: colLastLogin, flex: !isNarrow ? 1.9 : undefined },
+                      { label: "Actions", w: colActions, flex: !isNarrow ? 0.9 : undefined },
+                    ].map(h => (
+                      <Text key={h.label} style={[
+                        styles.tableHeadCell,
+                        h.flex ? { flex: h.flex } : { width: h.w, flexShrink: 0 },
+                        isNarrow && { fontSize: 10 },
+                      ]}>{h.label}</Text>
+                    ))}
+                  </View>
+                  {paginatedUsers.map((u, i) => (
+                    <TableRow key={u.id} user={u} index={i}
+                      selected={selectedUserId === u.id}
+                      onPress={() => setSelectedUserId(selectedUserId === u.id ? null : u.id)}
+                      onEdit={u => setEditUser(u)}
+                      onDelete={u => setDeleteUser(u)} />
+                  ))}
+                </View>
+              </ScrollView>
             </View>
-          </ScrollView>
-        )}
+          );
+        })()}
 
         {/* ── GRID VIEW ── */}
         {viewMode === "grid" && (
@@ -905,10 +1010,10 @@ const styles = StyleSheet.create({
 
   // ── Modal ──
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 16 },
-  modalCard: { backgroundColor: C.white, borderRadius: 14, width: "100%", maxWidth: 460, maxHeight: "90%", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, overflow: "visible" },
+  modalCard: { backgroundColor: C.white, borderRadius: 14, width: "100%", maxWidth: 460, maxHeight: "90%", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, overflow: "hidden", alignSelf: "center" },
   modalHeader: { backgroundColor: C.orange, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16 },
   modalTitle: { color: C.white, fontSize: 17, fontWeight: "700" },
-  modalFooter: { flexDirection: "row", gap: 12, padding: 16, borderTopWidth: 1, borderTopColor: C.border, justifyContent: "flex-end" },
+  modalFooter: { flexDirection: "row", gap: 12, padding: 16, borderTopWidth: 1, borderTopColor: C.border, justifyContent: "center" },
   cancelBtn: { backgroundColor: "#374151", borderRadius: 9, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
   cancelBtnText: { color: C.white, fontWeight: "600", fontSize: 14 },
   submitBtn: { backgroundColor: C.orange, borderRadius: 9, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 10 },
@@ -991,7 +1096,9 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderRadius: 16,
     overflow: "hidden",
-    width: 340,
+    ...(Platform.select({
+      default: { width: 393 }
+    }) as any),
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,

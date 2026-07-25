@@ -11,7 +11,7 @@ import type {
   SupportTicketSummary,
 } from "@/lib/api/types";
 import type { PendingProfileSeller } from "@/services/sellerApi";
-import { resolveMediaUrl, resolveAdminMediaUrl, buildMediaUrlCandidates, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from "@/lib/api/media";
+import { resolveMediaUrl, resolveAdminMediaUrl, buildMediaUrlCandidates, resolveSellerDocumentImageUrl, resolveSellerProfileImage, resolveProductImageUrl } from "@/lib/api/media";
 import {
   mapBusinessProofDocuments,
   mapLiveSelfieDocuments,
@@ -68,6 +68,8 @@ export type SellerDetailView = {
   kycVerifiedOn: string;
   kycRemarks: string;
   profilePicUrl: string;
+  profilePicPath?: string;
+  liveSelfiePath?: string;
   documents: SellerDocumentView[];
   liveSelfieImages: SellerDocumentView[];
   businessProofDocuments: SellerDocumentView[];
@@ -191,6 +193,8 @@ export function mapSellerDetailView(detail: Record<string, unknown>): SellerDeta
     kycVerifiedOn: formatDate(detail.kycVerifiedAt != null ? String(detail.kycVerifiedAt) : undefined),
     kycRemarks: String(detail.kycRemarks ?? ""),
     profilePicUrl: resolveSellerProfileImage(detail as never),
+    profilePicPath: detail.profilePicPath != null ? String(detail.profilePicPath) : undefined,
+    liveSelfiePath: detail.liveSelfiePath != null ? String(detail.liveSelfiePath) : undefined,
     documents,
     liveSelfieImages,
     businessProofDocuments,
@@ -333,7 +337,11 @@ export function mapSellerDetailToApprovedRow(detail: SellerDetailView): Approved
     id: detail.id,
     name: detail.fullName,
     email: detail.email,
-    avatar: detail.profilePicUrl,
+    avatar: resolveSellerProfileImage({
+      profilePicUrl: detail.profilePicUrl,
+      profilePicPath: detail.profilePicPath,
+      liveSelfiePath: detail.liveSelfiePath,
+    }),
     businessName: detail.businessName,
     businessType: detail.businessType,
     sellerCategory: detail.sellerCategory,
@@ -402,10 +410,11 @@ export function mapPendingProfileToApprovalRow(
   };
 }
 
-function mapProductStatus(status?: string): "pending" | "approved" | "rejected" | "review" {
+function mapProductStatus(status?: string): "pending" | "approved" | "rejected" | "review" | "inactive" {
   const raw = (status ?? "pending").toLowerCase().replace(/\s+/g, "_");
   if (raw === "active" || raw === "approved") return "approved";
-  if (raw === "rejected" || raw === "inactive") return "rejected";
+  if (raw === "inactive" || raw === "disabled") return "inactive";
+  if (raw === "rejected") return "rejected";
   if (raw === "under_review" || raw === "review") return "review";
   return "pending";
 }
@@ -440,7 +449,8 @@ export function mapProductListToApprovalRow(
     .filter(Boolean)
     .join(" › ") || p.categoryName || "—";
   const imagePath = String(p.imageUrl ?? raw.imagePath ?? raw.image_path ?? "");
-  const imageCandidates = buildMediaUrlCandidates(imagePath, imagePath);
+  // Exact Cloudinary / absolute URL from API — no fallback candidate rewriting.
+  const image = resolveProductImageUrl(imagePath);
   const sku = String(p.sku ?? raw.variantSku ?? "").trim();
 
   return {
@@ -451,8 +461,8 @@ export function mapProductListToApprovalRow(
     sellerEmail: p.sellerEmail ?? "",
     status: mapProductStatus(p.status ?? (p as { displayStatus?: string }).displayStatus),
     submittedAt: formatDate(p.createdAt),
-    image: imageCandidates[0] ?? resolveMediaUrl(imagePath) ?? resolveAdminMediaUrl(imagePath),
-    imageCandidates,
+    image,
+    imageCandidates: image ? [image] : [],
     category: categoryLabel,
     price: p.price != null ? formatRupee(p.price) : "—",
   };
@@ -611,16 +621,16 @@ export function mapPayoutDetailToSpdOrder(raw: Record<string, unknown>) {
     bankAccountHolder: base.accountHolderName ?? String(raw.accountHolderName ?? ""),
     bankAccountNumber: base.accountNumber ?? String(raw.accountNumber ?? ""),
     bankIfsc: base.ifscCode ?? String(raw.ifscCode ?? ""),
-    itemDescription: first?.productName ?? "",
-    hsn: first?.hsnCode ?? "",
-    sku: first?.sku ?? "",
+    itemDescription: String(first?.productName ?? "").trim(),
+    hsn: String(first?.hsnCode ?? "").trim(),
+    sku: String(first?.sku ?? "").trim(),
     qty: first?.quantity ?? 1,
     basePrice: toNum(first?.price),
     totalAmount: toNum(first?.total) || orderAmountNum,
     items: (items ?? []).map((item) => ({
-      productName: item.productName ?? "",
-      hsn: item.hsnCode ?? "",
-      sku: item.sku ?? "",
+      productName: String(item.productName ?? "").trim(),
+      hsn: String(item.hsnCode ?? "").trim(),
+      sku: String(item.sku ?? "").trim(),
       qty: item.quantity ?? 1,
       basePrice: toNum(item.price),
       total: toNum(item.total),
