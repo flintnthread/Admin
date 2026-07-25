@@ -2359,6 +2359,7 @@ const ShippingLabelModal = ({
   const gstFooterLabel = isIntraState
     ? `CGST+SGST: ${fmtCur(totalCgst + totalSgst)}`
     : `IGST: ${fmtCur(totalIgst)}`;
+  void gstFooterLabel;
 
   const customerAddress = [shipping?.line1, shipping?.line2].filter(Boolean).join(", ");
 
@@ -2399,185 +2400,277 @@ const ShippingLabelModal = ({
               <Text style={s.docErrorText}>Shipping label not available.</Text>
             </View>
           ) : (
-            <View style={[s.labelSheet, { width: sheetWidth }]}>
-              {/* Brand header + title */}
-              <View style={s.labelBrandHeader}>
-                <Image
-                  source={require("../../assets/images/flint-thread-logo.png")}
-                  style={s.labelBrandLogo}
-                  resizeMode="contain"
-                />
-                <Text style={s.labelTitleText}>SHIPPING LABEL</Text>
+          <View style={[s.labelSheet, { width: sheetWidth }]}>
+            {/* Brand header */}
+            <View style={s.labelBrandHeaderNew}>
+              <View style={s.labelBrandMark}>
+                <Text style={s.labelBrandMarkText}>FT</Text>
               </View>
-
-              {/* Courier bar */}
-              <View style={s.labelCourierBar}>
-                <Text style={s.labelCourierBarText}>{label.courierName ?? "Courier"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.labelBrandName}>FLINT & THREAD</Text>
+                <Text style={s.labelBrandTag}>The infinity and Vanguard.</Text>
               </View>
+            </View>
+            <Text style={s.labelTitleTextNew}>SHIPPING LABEL FOR FLINT & THREAD</Text>
 
-              {/* AWB barcode + QR side-by-side */}
-              <View style={s.labelAwbArea}>
-                <View style={s.labelAwbLeft}>
-                  <Text style={s.labelAwbCaption}>AWB NUMBER</Text>
+            {/* Courier + GST */}
+            <View style={s.labelCourierGstRow}>
+              <Text style={s.labelCourierNameNew}>{label.courierName ?? "Courier"}</Text>
+              <View style={s.labelGstPill}>
+                <Text style={s.labelGstPillText}>
+                  GST:{" "}
+                  {firstGroup?.seller?.gstin ||
+                    label.gstNumber ||
+                    label.company?.gstin ||
+                    "—"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Barcode + QR */}
+            <View style={s.labelAwbAreaNew}>
+              <View style={s.labelAwbLeftNew}>
+                {label.barcode?.imageDataUrl ? (
+                  <Image
+                    source={{ uri: label.barcode.imageDataUrl }}
+                    style={s.labelBarcodeImg}
+                    resizeMode="contain"
+                  />
+                ) : (
                   <View style={s.barcodeRow}>
                     {bars.map((h, i) => (
                       <View key={i} style={[s.barcodeBar, { height: `${h}%` }]} />
                     ))}
                   </View>
-                  <Text style={s.labelAwbNumber}>{trackingId}</Text>
-                </View>
-                <View style={s.labelQrBox}>
-                  {label.qrCode?.imageDataUrl ? (
-                    <Image
-                      source={{ uri: label.qrCode.imageDataUrl }}
-                      style={{ width: 62, height: 62 }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <QrPlaceholderIcon size={62} />
-                  )}
-                </View>
+                )}
+                <Text style={s.labelAwbNumber}>{trackingId}</Text>
               </View>
+              <View style={s.labelQrBox}>
+                {label.qrCode?.imageDataUrl ? (
+                  <Image
+                    source={{ uri: label.qrCode.imageDataUrl }}
+                    style={{ width: 72, height: 72 }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <QrPlaceholderIcon size={72} />
+                )}
+              </View>
+            </View>
 
-              {/* Ship To */}
-              <View style={s.labelSection}>
-                <Text style={s.labelSectionLabel}>SHIP TO</Text>
-                <Text style={s.labelShipName}>{shipping?.name ?? "—"}</Text>
-                {customerAddress ? (
-                  <Text style={s.labelShipAddress}>{customerAddress}</Text>
-                ) : null}
+            {/* Ship To */}
+            <View style={s.labelSection}>
+              <Text style={s.labelSectionLabelBold}>SHIP TO</Text>
+              <Text style={s.labelShipName}>{shipping?.name ?? "—"}</Text>
+              {customerAddress ? (
+                <Text style={s.labelShipAddress}>{customerAddress}</Text>
+              ) : null}
+              <Text style={s.labelShipAddress}>
+                {[shipping?.city, shipping?.state, shipping?.country]
+                  .filter(Boolean)
+                  .join(", ")}
+              </Text>
+              {shipping?.pincode ? (
                 <Text style={s.labelShipAddress}>
-                  {[shipping?.city, shipping?.state].filter(Boolean).join(", ")}
+                  <Text style={{ fontWeight: "800" }}>PIN: </Text>
+                  {shipping.pincode}
+                  {shipping.phone ? `  |  Ph: ${shipping.phone}` : ""}
                 </Text>
-                {shipping?.pincode ? (
-                  <Text style={s.labelShipAddress}>
-                    <Text style={{ fontWeight: "800" }}>PIN: </Text>
-                    {shipping.pincode}
-                    {shipping.phone ? `  |  Ph: ${shipping.phone}` : ""}
-                  </Text>
-                ) : null}
-              </View>
+              ) : null}
+            </View>
 
-              {/* Meta grid: Order #, Invoice, Date, Payment, Weight, Dimensions */}
-              <View style={s.labelMetaList}>
-                <View style={s.labelMetaRow}>
-                  <Text style={s.labelMetaKList}>Order #:</Text>
-                  <Text style={s.labelMetaVList}>{orderNumber}</Text>
-                </View>
-                <View style={s.labelMetaRow}>
-                  <Text style={s.labelMetaKList}>Invoice:</Text>
-                  <Text style={s.labelMetaVList}>{invoiceNum}</Text>
-                </View>
-                <View style={s.labelMetaRow}>
-                  <Text style={s.labelMetaKList}>Date:</Text>
-                  <Text style={s.labelMetaVList}>{orderDate}</Text>
-                </View>
-                <View style={s.labelMetaRow}>
-                  <Text style={s.labelMetaKList}>Payment:</Text>
-                  <Text style={s.labelMetaVList}>
-                    {paymentIsCod ? "COD" : "Prepaid"} {fmtCur(grandTotal)}
-                  </Text>
-                </View>
-                <View style={s.labelMetaRow}>
-                  <Text style={s.labelMetaKList}>Weight:</Text>
-                  <Text style={s.labelMetaVList}>{weightText}</Text>
-                </View>
-                <View style={s.labelMetaRow}>
-                  <Text style={s.labelMetaKList}>Dimensions:</Text>
-                  <Text style={s.labelMetaVList}>{dimensionsText}</Text>
-                </View>
+            {/* Meta grid */}
+            <View style={s.labelMetaList}>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Order ID:</Text>
+                <Text style={s.labelMetaVList}>{orderNumber}</Text>
               </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>AWB #:</Text>
+                <Text style={s.labelMetaVList}>{trackingId}</Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Invoice:</Text>
+                <Text style={s.labelMetaVList}>{invoiceNum}</Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Date:</Text>
+                <Text style={s.labelMetaVList}>{orderDate}</Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Payment:</Text>
+                <Text style={s.labelMetaVList}>
+                  {paymentIsCod ? "COD" : "PREPAID"} {fmtCur(grandTotal)}
+                </Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Weight:</Text>
+                <Text style={s.labelMetaVList}>{weightText}</Text>
+              </View>
+              <View style={s.labelMetaRow}>
+                <Text style={s.labelMetaKList}>Dimensions:</Text>
+                <Text style={s.labelMetaVList}>{dimensionsText}</Text>
+              </View>
+            </View>
 
-              {/* Product details table */}
-              <View style={s.labelSectionLabelBar}>
-                <Text style={s.labelSectionLabelBarText}>PRODUCT DETAILS</Text>
+            {/* Product details */}
+            <View style={s.labelSectionLabelBarNavy}>
+              <Text style={s.labelSectionLabelBarTextNavy}>PRODUCT DETAILS</Text>
+            </View>
+            <View>
+              <View style={s.labelProductHead}>
+                <Text style={[s.labelProductHeadText, { flex: 2 }]}>Item</Text>
+                <Text
+                  style={[
+                    s.labelProductHeadText,
+                    s.labelProductHeadCenter,
+                    { flex: 0.8 },
+                  ]}
+                >
+                  HSN
+                </Text>
+                <Text
+                  style={[
+                    s.labelProductHeadText,
+                    s.labelProductHeadCenter,
+                    { flex: 0.4 },
+                  ]}
+                >
+                  Q
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.8, textAlign: "right" }]}
+                >
+                  Price
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}
+                >
+                  CGST
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}
+                >
+                  SGST
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.75, textAlign: "right" }]}
+                >
+                  IGST
+                </Text>
+                <Text
+                  style={[s.labelProductHeadText, { flex: 0.9, textAlign: "right" }]}
+                >
+                  Total
+                </Text>
               </View>
-              <View style={{ width: "100%", marginTop: 8 }}>
-                {/* Header */}
-                <View style={[s.labelProductHead, { flexDirection: "row" }]}>
-                  <Text style={[s.labelProductHeadText, { flex: 2 }]}>Item</Text>
-                  <Text style={[s.labelProductHeadText, s.labelProductHeadCenter, { flex: 0.8 }]}>HSN</Text>
-                  <Text style={[s.labelProductHeadText, s.labelProductHeadCenter, { flex: 0.4 }]}>Q</Text>
-                  <Text style={[s.labelProductHeadText, { flex: 0.8, textAlign: "right" }]}>Price</Text>
-                  <Text style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}>CGST</Text>
-                  <Text style={[s.labelProductHeadText, { flex: 0.65, textAlign: "right" }]}>SGST</Text>
-                  <Text style={[s.labelProductHeadText, { flex: 0.75, textAlign: "right" }]}>IGST</Text>
-                  <Text style={[s.labelProductHeadText, { flex: 0.9, textAlign: "right" }]}>Total</Text>
-                </View>
-                {/* Rows */}
-                {lineItems.map((li, i) => (
-                  <View
-                    key={li.id}
+              {lineItems.map((li, i) => (
+                <View
+                  key={li.id}
+                  style={[
+                    s.labelProductRow,
+                    i === lineItems.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <Text
+                    style={[s.labelProductName, { flex: 2 }]}
+                    numberOfLines={2}
+                  >
+                    {li.name}
+                  </Text>
+                  <Text
                     style={[
-                      s.labelProductRow,
-                      { flexDirection: "row" },
-                      i === lineItems.length - 1 && { borderBottomWidth: 0 },
+                      s.labelProductNum,
+                      s.labelProductCenter,
+                      { flex: 0.8 },
                     ]}
                   >
-                    <Text style={[s.labelProductName, { flex: 2 }]} numberOfLines={2}>
-                      {li.name}
-                    </Text>
-                    <Text style={[s.labelProductNum, s.labelProductCenter, { flex: 0.8 }]}>
-                      {li.hsnCode ?? "—"}
-                    </Text>
-                    <Text style={[s.labelProductNum, s.labelProductCenter, { flex: 0.4 }]}>
-                      {li.qty}
-                    </Text>
-                    <Text style={[s.labelProductNum, { flex: 0.8, textAlign: "right" }]}>
-                      {fmtCur(li.unitPrice)}
-                    </Text>
-                    <Text style={[s.labelProductNum, { flex: 0.65, textAlign: "right" }]}>
-                      {li.cgst > 0 ? fmtCur(li.cgst) : "-"}
-                    </Text>
-                    <Text style={[s.labelProductNum, { flex: 0.65, textAlign: "right" }]}>
-                      {li.sgst > 0 ? fmtCur(li.sgst) : "-"}
-                    </Text>
-                    <Text style={[s.labelProductNum, { flex: 0.75, textAlign: "right" }]}>
-                      {li.igst > 0 ? `${li.taxPercent}%\n${fmtCur(li.igst)}` : "-"}
-                    </Text>
-                    <Text style={[s.labelProductNum, { flex: 0.9, textAlign: "right", fontWeight: "800" }]}>
-                      {fmtCur(li.lineTotal)}
-                    </Text>
-                  </View>
-                ))}
-                {/* Totals row */}
-                <View style={[s.labelTotalsRowFull, { flexDirection: "row" }]}>
-                  <Text style={[s.labelTotalsLabel, { flex: 4 }]}>TOTAL:</Text>
-                  <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>{fmtCur(totalCgst)}</Text>
-                  <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>{fmtCur(totalSgst)}</Text>
-                  <Text style={[s.labelTotalsValueCell, { flex: 0.75 }]}>{fmtCur(totalIgst)}</Text>
-                  <Text style={[s.labelTotalsValueCell, { flex: 0.9, color: C.orange, fontWeight: "800" }]}>
-                    {fmtCur(grandTotal)}
+                    {li.hsnCode ?? "—"}
+                  </Text>
+                  <Text
+                    style={[
+                      s.labelProductNum,
+                      s.labelProductCenter,
+                      { flex: 0.4 },
+                    ]}
+                  >
+                    {li.qty}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.8 }]}>
+                    {fmtCur(li.unitPrice)}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.65 }]}>
+                    {li.cgst > 0 ? fmtCur(li.cgst) : "₹0.00"}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.65 }]}>
+                    {li.sgst > 0 ? fmtCur(li.sgst) : "₹0.00"}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.75 }]}>
+                    {li.igst > 0 ? fmtCur(li.igst) : "₹0.00"}
+                  </Text>
+                  <Text style={[s.labelProductNum, { flex: 0.9, fontWeight: "800" }]}>
+                    {fmtCur(li.lineTotal)}
                   </Text>
                 </View>
-              </View>
-
-              {/* Return address */}
-              <View style={s.labelSection}>
-                <Text style={s.labelSectionLabel}>RETURN ADDRESS</Text>
-                <Text style={s.labelReturnName}>
-                  {firstGroup?.seller?.name?.toUpperCase() ?? "SELLER"}
+              ))}
+              <View style={s.labelTotalsRowFull}>
+                <Text style={[s.labelTotalsLabel, { flex: 3.2 }]}>TOTAL:</Text>
+                <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>
+                  {fmtCur(totalCgst)}
                 </Text>
-                <Text style={s.labelReturnAddr}>
-                  {sellerAddressLine || "Registered seller address on file"}
-                  {sellerAddr?.phone ? `  |  Ph: ${sellerAddr.phone}` : ""}
+                <Text style={[s.labelTotalsValueCell, { flex: 0.65 }]}>
+                  {fmtCur(totalSgst)}
                 </Text>
-              </View>
-
-              {/* Footer */}
-              <View style={s.labelFooterNote}>
-                <Text style={s.labelFooterGst}>GST: {gstFooterLabel}</Text>
-                <Text style={s.labelFooterAuto}>
-                  AUTO-GENERATED LABEL · NO SIGNATURE REQUIRED
+                <Text style={[s.labelTotalsValueCell, { flex: 0.75 }]}>
+                  {fmtCur(totalIgst)}
                 </Text>
-                <Text style={s.labelFooterPowered}>
-                  Powered By{" "}
-                  <Text style={{ color: C.navy, fontWeight: "800" }}>
-                    Flint & Thread
-                  </Text>
+                <Text
+                  style={[
+                    s.labelTotalsValueCell,
+                    { flex: 0.9, color: C.orange, fontWeight: "800" },
+                  ]}
+                >
+                  {fmtCur(grandTotal)}
                 </Text>
               </View>
             </View>
+
+            {/* Return address + GST */}
+            <View style={s.labelReturnSectionNew}>
+              <Text style={s.labelSectionLabelBold}>RETURN ADDRESS</Text>
+              <View style={s.labelReturnTopRow}>
+                <Text style={s.labelReturnName}>
+                  {firstGroup?.seller?.name?.toUpperCase() ?? "SELLER"}
+                </Text>
+                <View style={s.labelGstPill}>
+                  <Text style={s.labelGstPillText}>
+                    GST:{" "}
+                    {firstGroup?.seller?.gstin ||
+                      label.gstNumber ||
+                      label.company?.gstin ||
+                      "—"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={s.labelReturnAddr}>
+                {sellerAddressLine || "Registered seller address on file"}
+                {sellerAddr?.phone ? `  |  Ph: ${sellerAddr.phone}` : ""}
+              </Text>
+            </View>
+
+            {/* Footer */}
+            <View style={s.labelFooterNote}>
+              <Text style={s.labelFooterAuto}>
+                AUTO GENERATED LABEL - NO SIGNATURE REQUIRED.
+              </Text>
+              <Text style={s.labelFooterPowered}>
+                Powered By{" "}
+                <Text style={{ color: C.navy, fontWeight: "800" }}>
+                  Flint & Thread
+                </Text>
+              </Text>
+            </View>
+          </View>
           )}
         </ScrollView>
 
@@ -4441,6 +4534,35 @@ const s = StyleSheet.create({
     paddingBottom: 14,
     paddingHorizontal: 20,
   },
+  labelBrandHeaderNew: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingTop: 16,
+    paddingBottom: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  labelBrandMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: C.navy,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  labelBrandMarkText: {
+    color: C.white,
+    fontWeight: "900",
+    fontSize: 15,
+  },
+  labelBrandName: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: C.navy,
+    letterSpacing: 0.4,
+  },
   labelBrandLogo: { width: 200, height: 52, marginBottom: 6 },
   labelBrandTag: { fontSize: 10, color: C.textLight, marginTop: 2 },
   labelTitleText: {
@@ -4449,6 +4571,89 @@ const s = StyleSheet.create({
     fontWeight: "800",
     color: C.textLight,
     letterSpacing: 2,
+  },
+  labelTitleTextNew: {
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    color: C.navy,
+  },
+  labelCourierGstRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexWrap: "wrap",
+  },
+  labelCourierNameNew: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.textDark,
+  },
+  labelGstPill: {
+    backgroundColor: C.orange,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  labelGstPillText: {
+    color: C.white,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  labelAwbAreaNew: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  labelAwbLeftNew: {
+    flex: 1,
+    alignItems: "center",
+    minWidth: 0,
+  },
+  labelBarcodeImg: {
+    width: "100%",
+    height: 52,
+  },
+  labelSectionLabelBold: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+    marginBottom: 6,
+    color: C.textDark,
+  },
+  labelSectionLabelBarNavy: {
+    backgroundColor: C.navy,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  labelSectionLabelBarTextNavy: {
+    color: C.white,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  labelReturnSectionNew: {
+    padding: 14,
+    backgroundColor: "#FFF9F5",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  labelReturnTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 4,
   },
 
   labelCourierBar: {
