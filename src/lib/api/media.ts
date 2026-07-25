@@ -1,7 +1,7 @@
 import { resolveAdminApiBaseUrl, resolvePublicMediaBaseUrl } from "@/lib/api/config";
 
-/** Seller profile + KYC docs CDN — ONLY host for /uploads/seller_documents/. */
-export const SELLER_MEDIA_CDN = "https://flintnthread.com";
+/** Seller profile + KYC docs — served from seller host (flintnthread.com returns 403). */
+export const SELLER_MEDIA_CDN = "https://seller.flintnthread.in";
 
 /** Product images CDN — ONLY host for /uploads/products/. */
 export const PRODUCT_MEDIA_CDN = "https://flintnthread.com";
@@ -27,7 +27,7 @@ function isSellerDocUploadPath(pathname: string): boolean {
   );
 }
 
-/** Force seller docs onto flintnthread.com (rewrite .in / .online). */
+/** Force seller docs onto seller.flintnthread.in (rewrite .com / .online that 403). */
 function toSellerMediaCdnUrl(pathname: string): string {
   const path = normalizeMediaPath(pathname);
   return `${SELLER_MEDIA_CDN}${path.startsWith("/") ? path : `/${path}`}`;
@@ -69,7 +69,7 @@ export function normalizeMediaPath(value: string): string {
 
 /**
  * Resolve to CDN URL.
- * Seller docs/profile → https://flintnthread.com/uploads/seller_documents/...
+ * Seller docs/profile → https://seller.flintnthread.in/uploads/seller_documents/...
  * Products → https://flintnthread.com/uploads/products/...
  */
 export function resolveMediaUrl(path?: string | null): string {
