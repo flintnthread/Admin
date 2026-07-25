@@ -2,7 +2,7 @@ import AdminLayout from '@/components/admin-layout';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -55,7 +55,7 @@ const BREAKPOINTS = {
   desktop: 1280,
 } as const;
 
-type Product = ApprovalProduct;
+type Product = ApprovalProduct & { imageCandidates?: string[] };
 
 type ProductStats = {
   pending: number;
@@ -87,18 +87,59 @@ function sellerDisplayName(seller: SellerRow): string {
   );
 }
 
-function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): ApprovalProduct {
+function toApprovalProduct(row: ReturnType<typeof mapProductListToApprovalRow>): Product {
+  const skuText = row.sku !== '—' ? `SKU: ${row.sku}` : '—';
+  const candidates = row.imageCandidates?.filter(Boolean) ?? [];
+  const primaryImage = row.image || candidates[0] || '';
   return {
     id: row.id,
     name: cleanText(row.name),
-    description: row.sku !== '—' ? `SKU: ${row.sku}` : '—',
-    image: row.image || PLACEHOLDER_IMAGE,
+    description: skuText,
+    image: primaryImage || PLACEHOLDER_IMAGE,
+    imageCandidates: candidates.length > 0 ? candidates : (primaryImage ? [primaryImage] : []),
     seller: cleanText(row.seller),
     email: row.sellerEmail?.trim() || '',
     category: row.category,
     status: row.status as ProductStatus,
     submittedOn: row.submittedAt,
   };
+}
+
+function ProductApprovalThumb({
+  image,
+  imageCandidates,
+  style,
+}: {
+  image: string;
+  imageCandidates?: string[];
+  style: object;
+}) {
+  const candidates = useMemo(() => {
+    const urls = (imageCandidates?.length ? imageCandidates : [image])
+      .filter((url) => url && url !== PLACEHOLDER_IMAGE);
+    return urls.length > 0 ? urls : [PLACEHOLDER_IMAGE];
+  }, [image, imageCandidates]);
+
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [candidates.join('|')]);
+
+  const uri = candidates[index] ?? PLACEHOLDER_IMAGE;
+
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      contentFit="cover"
+      onError={() => {
+        if (index < candidates.length - 1) {
+          setIndex((current) => current + 1);
+        }
+      }}
+    />
+  );
 }
 
 function truncateWords(text: string, maxWords: number = 4): string {
@@ -674,7 +715,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <View style={styles.productCard}>
       <View style={styles.productCardTop}>
-        <Image source={{ uri: product.image }} style={styles.productThumb} contentFit="cover" />
+        <ProductApprovalThumb image={product.image} imageCandidates={product.imageCandidates} style={styles.productThumb} />
         <View style={styles.productCardInfo}>
           <View style={styles.productNameRow}>
             <Text style={styles.productName} numberOfLines={1}>
@@ -742,10 +783,10 @@ function ProductTable({
             <View key={product.id} style={styles.tableRow}>
 
               <View style={[styles.tableColProduct, styles.tableCellProduct]}>
-                <Image
-                  source={{ uri: product.image }}
+                <ProductApprovalThumb
+                  image={product.image}
+                  imageCandidates={product.imageCandidates}
                   style={styles.tableThumb}
-                  contentFit="cover"
                 />
                 <View style={styles.tableProductInfo}>
                   <View style={styles.productNameRow}>
@@ -1550,7 +1591,7 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'web' ? 10 : 8,
     fontSize: 14,
     color: PALETTE.textPrimary,
-    outlineStyle: 'none' as any,
+    ...(Platform.OS === 'web' ? { outlineWidth: 0, outlineColor: 'transparent' } : {}),
   },
   searchBtn: {
     backgroundColor: PALETTE.brandOrange,

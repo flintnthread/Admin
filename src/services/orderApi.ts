@@ -198,6 +198,10 @@ export type OrderShippingLabel = OrderInvoice & {
   trackingId?: string;
   weightKg?: number;
   dimensionsCm?: { l?: number; w?: number; h?: number };
+  barcode?: {
+    value?: string;
+    imageDataUrl?: string;
+  };
 };
 
 function parseContentDispositionFileName(header: string | null, fallback: string) {
