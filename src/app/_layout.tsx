@@ -1,10 +1,11 @@
 // @ts-nocheck
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, Component } from "react";
-import { View, Text, ScrollView } from "react-native";
+import { View, Text, ScrollView, Platform } from "react-native";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { patchComponents } from "@/lib/patch-components";
+import { ensureWebFavicon } from "@/lib/ensureWebFavicon";
 import { useFonts } from "expo-font";
 import "@/global.css";
 
@@ -87,6 +88,12 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     "bootstrap-icons": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/fonts/bootstrap-icons.woff2",
   });
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      ensureWebFavicon("/favicon.png");
+    }
+  }, []);
 
   if (!fontsLoaded) {
     return null;
