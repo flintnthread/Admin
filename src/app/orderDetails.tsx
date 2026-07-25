@@ -1325,18 +1325,25 @@ export default function OrderDetailScreen() {
     const id = Number(orderId);
     if (Number.isNaN(id)) return;
 
-    const alreadyLinked = Boolean(order.shiprocket.alreadyPushed && order.shiprocket.awb && order.shiprocket.awb !== "—");
+    const alreadyLinked = Boolean(order.shiprocket.alreadyPushed && order.shiprocket.orderId && order.shiprocket.orderId !== "—");
+    const hasAwb = Boolean(order.shiprocket.awb && order.shiprocket.awb !== "—");
     const confirmed = await sweetConfirm({
-      title: alreadyLinked ? "Shipment Already Exists" : "Push to Shiprocket",
-      text: alreadyLinked
-        ? "This order already has an AWB. Sync instead to refresh details?"
-        : "Create shipment, assign AWB/courier, and generate label documents in Shiprocket?",
-      confirmText: alreadyLinked ? "Sync Now" : "Push",
+      title: hasAwb
+        ? "Shipment Already Exists"
+        : alreadyLinked
+          ? "Sync from Shiprocket"
+          : "Retry Shiprocket Push",
+      text: hasAwb
+        ? "This order already has an AWB. Sync to refresh courier/tracking?"
+        : alreadyLinked
+          ? "Shipment exists on Shiprocket without AWB. Sync after you assign courier in Shiprocket?"
+          : "Shipment is created automatically after payment. Retry only if Shiprocket status is pending. Courier is assigned in Shiprocket (not here).",
+      confirmText: hasAwb || alreadyLinked ? "Sync Now" : "Retry Push",
       cancelText: "Cancel",
     });
     if (!confirmed) return;
 
-    if (alreadyLinked) {
+    if (hasAwb || alreadyLinked) {
       await handleSync();
       return;
     }
@@ -1361,7 +1368,7 @@ export default function OrderDetailScreen() {
     } finally {
       setPushing(false);
     }
-  }, [handleSync, loadOrder, order.shiprocket.alreadyPushed, order.shiprocket.awb, orderId, productIds, pushing, sellerName, syncing]);
+  }, [handleSync, loadOrder, order.shiprocket.alreadyPushed, order.shiprocket.awb, order.shiprocket.orderId, orderId, productIds, pushing, sellerName, syncing]);
 
   const openUrl = useCallback(async (url?: string) => {
     if (!url) return;
@@ -1553,7 +1560,9 @@ export default function OrderDetailScreen() {
                         {pushing ? (
                           <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                          <Text style={s.smBtnTxt}>Push to Shiprocket</Text>
+                          <Text style={s.smBtnTxt}>
+                            {order.shiprocket.alreadyPushed ? "Retry / Sync" : "Retry Push"}
+                          </Text>
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity

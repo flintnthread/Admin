@@ -229,12 +229,15 @@ export default function SettingsScreen() {
                 autoCorrect={false}
               />
 
-              <Text style={styles.label}>Default Pickup Location</Text>
+              <Text style={styles.label}>Default Pickup Location (unused for seller orders)</Text>
+              <Text style={[styles.cardHint, { marginBottom: 6 }]}>
+                {"Seller product orders always use that product's seller warehouse pickup (S{id}-Name). Leave blank — never set Ashvi Homes or work."}
+              </Text>
               <TextInput
                 style={styles.input}
                 value={shiprocketPickupLocation}
                 onChangeText={setShiprocketPickupLocation}
-                placeholder="ASVI HOME FOODS"
+                placeholder="Leave blank"
                 placeholderTextColor={TEXT_MUTED}
                 autoCapitalize="words"
                 autoCorrect={false}
