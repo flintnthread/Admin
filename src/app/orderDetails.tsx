@@ -35,6 +35,7 @@ import {
   downloadOrderInvoicePdf,
   downloadOrderShippingLabelPdf,
   fetchOrderDetail,
+  fetchOrderTracking,
   pushOrderToShiprocket,
   syncOrderFromShiprocket,
   updateOrderStatus,
@@ -1273,6 +1274,24 @@ export default function OrderDetailScreen() {
       const uiOrder = mapApiOrderToUi(raw as OrderDetail, sellerName, productIds);
       setOrder(uiOrder);
       setStatus(uiOrder.status);
+
+      // Fetch tracking from database (single source of truth)
+      try {
+        const trackingData = await fetchOrderTracking(id);
+        if (trackingData && trackingData.timeline) {
+          const trackingEvents: TrackingEvent[] = trackingData.timeline.map((ev: any) => ({
+            date: ev.timestamp ? new Date(ev.timestamp).toLocaleDateString() : "",
+            time: ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : "",
+            location: ev.location || "",
+            description: ev.description || ev.status || "",
+            status: ev.status as OrderStatus,
+          }));
+          setOrder(prev => ({ ...prev, tracking: trackingEvents }));
+        }
+      } catch (trackingErr) {
+        // Tracking fetch failure shouldn't break order load
+        console.warn("Failed to fetch tracking data:", trackingErr);
+      }
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {

@@ -386,3 +386,22 @@ export async function syncOrderFromShiprocket(id: number): Promise<ShiprocketAct
     method: "POST",
   });
 }
+
+export type OrderTracking = {
+  orderId?: number;
+  orderNumber?: string;
+  awbCode?: string;
+  courierName?: string;
+  trackingUrl?: string;
+  currentStatus?: string;
+  timeline?: Array<{
+    status?: string;
+    description?: string;
+    location?: string;
+    timestamp?: string;
+  }>;
+};
+
+export async function fetchOrderTracking(id: number): Promise<OrderTracking> {
+  return adminApiRequest(`/api/admin/orders/${id}/tracking`);
+}
