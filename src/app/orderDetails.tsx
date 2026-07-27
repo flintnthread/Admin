@@ -166,6 +166,10 @@ type ShiprocketInfo = {
   awb?: string;
   courier?: string;
   status?: string;
+  displayStatus?: string;
+  failureReason?: string;
+  pushFailed?: boolean;
+  canPush?: boolean;
   synced?: string;
   pushed?: string;
   url?: string;
@@ -516,14 +520,37 @@ function resolveShiprocketData(detail?: OrderDetail) {
     ?? "https://app.shiprocket.in/seller/home";
 
   const alreadyPushed = Boolean(
-    srOrderId
+    (srOrderId && shiprocketObject?.pushFailed !== true && shiprocketObject?.alreadyPushed !== false)
     || shiprocketObject?.alreadyPushed === true
   );
+  const pushFailed = Boolean(
+    shiprocketObject?.pushFailed === true
+    || (typeof status === "string" && /^pending(:|$)/i.test(status.trim()))
+  );
+  const failureReason = resolveStringValue(shiprocketObject?.failureReason)
+    ?? (pushFailed && status && status.toLowerCase().startsWith("pending:")
+      ? status.slice("pending:".length).trim()
+      : undefined);
+  const displayStatus = resolveStringValue(shiprocketObject?.displayStatus)
+    ?? (pushFailed
+      ? "Push Failed"
+      : alreadyPushed && awb
+        ? "AWB Assigned"
+        : alreadyPushed
+          ? "Shipment Created"
+          : "Not Pushed to Shiprocket");
+  const canPush = shiprocketObject?.canPush === true
+    || pushFailed
+    || (!alreadyPushed && !srOrderId);
 
   return {
     awb: awb || "—",
     courier: courier || "—",
     status: status || "—",
+    displayStatus,
+    failureReason,
+    pushFailed,
+    canPush,
     synced: formatDateTimeWithTime(syncedAt),
     pushed: formatDateTimeWithTime(pushedAt),
     url: trackingUrl,
@@ -532,7 +559,7 @@ function resolveShiprocketData(detail?: OrderDetail) {
     pickupStatus: pickupStatus || "—",
     trackingStatus: trackingStatus || "—",
     dashboardUrl,
-    alreadyPushed,
+    alreadyPushed: alreadyPushed && !pushFailed,
   };
 }
 
@@ -648,6 +675,10 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
       awb: shiprocket.awb,
       courier: shiprocket.courier,
       status: shiprocket.status,
+      displayStatus: shiprocket.displayStatus,
+      failureReason: shiprocket.failureReason,
+      pushFailed: shiprocket.pushFailed,
+      canPush: shiprocket.canPush,
       synced: shiprocket.synced,
       pushed: shiprocket.pushed,
       url: shiprocket.url,
@@ -1328,28 +1359,24 @@ export default function OrderDetailScreen() {
     const id = Number(orderId);
     if (Number.isNaN(id)) return;
 
-    const alreadyLinked = Boolean(order.shiprocket.alreadyPushed && order.shiprocket.orderId && order.shiprocket.orderId !== "—");
-    const hasAwb = Boolean(order.shiprocket.awb && order.shiprocket.awb !== "—");
+    const canPush = Boolean(order.shiprocket.canPush);
+    if (!canPush) {
+      await sweetError(
+        "Shipment Already Created",
+        "This order is already linked to Shiprocket. Use Sync Now after you assign the courier."
+      );
+      return;
+    }
+
     const confirmed = await sweetConfirm({
-      title: hasAwb
-        ? "Shipment Already Exists"
-        : alreadyLinked
-          ? "Sync from Shiprocket"
-          : "Retry Shiprocket Push",
-      text: hasAwb
-        ? "This order already has an AWB. Sync to refresh courier/tracking?"
-        : alreadyLinked
-          ? "Shipment exists on Shiprocket without AWB. Sync after you assign courier in Shiprocket?"
-          : "Shipment is created automatically after payment. Retry only if Shiprocket status is pending. Courier is assigned in Shiprocket (not here).",
-      confirmText: hasAwb || alreadyLinked ? "Sync Now" : "Retry Push",
+      title: order.shiprocket.pushFailed ? "Retry Push to Shiprocket" : "Push to Shiprocket",
+      text: order.shiprocket.pushFailed
+        ? "Previous push failed. Retry creating the Shiprocket shipment for this existing order?"
+        : "Create a Shiprocket shipment for this paid order. Courier will be assigned manually in Shiprocket (not here).",
+      confirmText: order.shiprocket.pushFailed ? "Retry Push" : "Push to Shiprocket",
       cancelText: "Cancel",
     });
     if (!confirmed) return;
-
-    if (hasAwb || alreadyLinked) {
-      await handleSync();
-      return;
-    }
 
     setPushing(true);
     try {
@@ -1371,7 +1398,7 @@ export default function OrderDetailScreen() {
     } finally {
       setPushing(false);
     }
-  }, [handleSync, loadOrder, order.shiprocket.alreadyPushed, order.shiprocket.awb, order.shiprocket.orderId, orderId, productIds, pushing, sellerName, syncing]);
+  }, [loadOrder, order.shiprocket.canPush, order.shiprocket.pushFailed, orderId, productIds, pushing, sellerName, syncing]);
 
   const openUrl = useCallback(async (url?: string) => {
     if (!url) return;
@@ -1555,62 +1582,94 @@ export default function OrderDetailScreen() {
                 <CardHeader icon={<ShiprocketIcon size={16} color={C.purple} />} title="ShipRocket Information"
                   right={
                     <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      <TouchableOpacity
-                        style={[s.smBtn, { backgroundColor: C.primary }]}
-                        onPress={handlePushToShiprocket}
-                        disabled={pushing || syncing}
-                      >
-                        {pushing ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Text style={s.smBtnTxt}>
-                            {order.shiprocket.alreadyPushed ? "Retry / Sync" : "Retry Push"}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[s.smBtn, { backgroundColor: C.navy }]}
-                        onPress={handleSync}
-                        disabled={syncing || pushing}
-                      >
-                        {syncing ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Text style={s.smBtnTxt}>Sync Now</Text>
-                        )}
-                      </TouchableOpacity>
+                      {order.shiprocket.canPush ? (
+                        <TouchableOpacity
+                          style={[s.smBtn, { backgroundColor: C.primary }]}
+                          onPress={handlePushToShiprocket}
+                          disabled={pushing || syncing}
+                        >
+                          {pushing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={s.smBtnTxt}>
+                              {order.shiprocket.pushFailed ? "Retry Push to Shiprocket" : "Push to Shiprocket"}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
+                      {order.shiprocket.alreadyPushed ? (
+                        <TouchableOpacity
+                          style={[s.smBtn, { backgroundColor: C.navy }]}
+                          onPress={handleSync}
+                          disabled={syncing || pushing}
+                        >
+                          {syncing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={s.smBtnTxt}>Sync Now</Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   }
                 />
                 <View style={s.cardBodyCompact}>
+                  <InfoRow
+                    label="Shipping Status"
+                    value={
+                      <View style={[s.badge, {
+                        backgroundColor: order.shiprocket.pushFailed
+                          ? "#FEE2E2"
+                          : order.shiprocket.alreadyPushed
+                            ? C.blueLight
+                            : "#FEF3C7",
+                      }]}>
+                        <Text style={[s.badgeTxt, {
+                          color: order.shiprocket.pushFailed
+                            ? "#B91C1C"
+                            : order.shiprocket.alreadyPushed
+                              ? C.blue
+                              : "#B45309",
+                        }]}>
+                          {order.shiprocket.displayStatus || order.shiprocket.status || "Not Pushed to Shiprocket"}
+                        </Text>
+                      </View>
+                    }
+                  />
+                  {order.shiprocket.pushFailed && order.shiprocket.failureReason ? (
+                    <InfoRow label="Reason" value={order.shiprocket.failureReason} />
+                  ) : null}
                   <InfoRow label="Shiprocket Order ID" value={order.shiprocket.orderId} />
                   <InfoRow label="Shipment ID" value={order.shiprocket.shipmentId} />
-                  <InfoRow label="AWB / Tracking #" value={order.shiprocket.awb !== "—" ? order.shiprocket.awb : "Shiprocket pending"} />
+                  <InfoRow
+                    label="AWB / Tracking #"
+                    value={order.shiprocket.awb !== "—" ? order.shiprocket.awb : (order.shiprocket.alreadyPushed ? "Assign courier in Shiprocket" : "—")}
+                  />
                   <InfoRow label="Courier Partner" value={order.shiprocket.courier} />
-                  <InfoRow label="Shipping Status" value={
-                    <View style={[s.badge, { backgroundColor: C.blueLight }]}>
-                      <Text style={[s.badgeTxt, { color: C.blue }]}>{order.shiprocket.status}</Text>
-                    </View>
-                  } />
+                  <InfoRow label="Shiprocket Raw Status" value={order.shiprocket.status} />
                   <InfoRow label="Pickup Status" value={order.shiprocket.pickupStatus || "—"} />
                   <InfoRow label="Tracking Status" value={order.shiprocket.trackingStatus || "—"} />
                   <InfoRow label="Push Date & Time" value={order.shiprocket.pushed || "—"} />
                   <InfoRow label="Last Sync Time" value={order.shiprocket.synced} />
                   {order.shiprocket.url ? (
                     <TouchableOpacity style={[s.trackBtn, { marginTop: 8 }]} onPress={() => openUrl(order.shiprocket.url)}>
-                      <Text style={s.trackBtnTxt}>Open Tracking URL</Text>
+                      <Text style={s.trackBtnTxt}>Track Shipment</Text>
                     </TouchableOpacity>
                   ) : null}
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("label")}>
-                      <Text style={s.smBtnTxt}>Shipping Label</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("invoice")}>
-                      <Text style={s.smBtnTxt}>Invoice</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("manifest")}>
-                      <Text style={s.smBtnTxt}>Manifest</Text>
-                    </TouchableOpacity>
+                    {order.shiprocket.awb && order.shiprocket.awb !== "—" ? (
+                      <>
+                        <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("label")}>
+                          <Text style={s.smBtnTxt}>Shipping Label</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("invoice")}>
+                          <Text style={s.smBtnTxt}>Invoice</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("manifest")}>
+                          <Text style={s.smBtnTxt}>Manifest</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
                     <TouchableOpacity style={[s.smBtn, { backgroundColor: "#0F766E" }]} onPress={handleOpenShiprocket}>
                       <Text style={s.smBtnTxt}>Open in Shiprocket</Text>
                     </TouchableOpacity>
