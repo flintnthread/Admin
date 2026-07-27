@@ -27,8 +27,16 @@ export default function AdminLayout({ children }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Defensive fallback for colors
+  const safeColors = colors || {
+    bg: '#F3F4F6',
+    surface: '#FFFFFF',
+    border: '#E5E7EB',
+    text: '#1F2937'
+  };
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: safeColors.bg }]}>
       {Platform.OS === "web" && (
         <style>{`
           html.swal2-shown, body.swal2-shown {
@@ -36,7 +44,7 @@ export default function AdminLayout({ children }: Props) {
           }
         `}</style>
       )}
-      <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
+      <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} backgroundColor={safeColors.surface} />
       <View style={styles.container}>
 
         {/* ── Desktop fixed sidebar ── */}
@@ -56,13 +64,13 @@ export default function AdminLayout({ children }: Props) {
             onPress={() => setMobileMenuOpen(false)}
           >
             <TouchableOpacity
-              style={[styles.drawerPanel, { backgroundColor: colors.surface }]}
+              style={[styles.drawerPanel, { backgroundColor: safeColors.surface }]}
               activeOpacity={1}
             >
               {/* Close button at top of drawer */}
-              <View style={[styles.drawerCloseBar, { borderBottomColor: colors.border }]}>
+              <View style={[styles.drawerCloseBar, { borderBottomColor: safeColors.border }]}>
                 <TouchableOpacity onPress={() => setMobileMenuOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Feather name="x" size={24} color={colors.text} />
+                  <Feather name="x" size={24} color={safeColors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -76,7 +84,7 @@ export default function AdminLayout({ children }: Props) {
         )}
 
         {/* ── Main content area (header + page body) ── */}
-        <View style={[styles.main, { backgroundColor: colors.bg }]}>
+        <View style={[styles.main, { backgroundColor: safeColors.bg }]}>
           <AdminHeader
             showMenuButton={!isLargeScreen}
             onMenuPress={() => setMobileMenuOpen(true)}
