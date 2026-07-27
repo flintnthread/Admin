@@ -92,6 +92,7 @@ type OrderStatus =
   | "Pending"
   | "Sent to Seller"
   | "Processing"
+  | "Shipped"
   | "Completed"
   | "Returned"
   | "Replacement"
@@ -267,7 +268,8 @@ type OrderDetail = Record<string, unknown> & {
 function normalizeStatus(status?: string): OrderStatus {
   const value = (status ?? "").toLowerCase().replace(/_/g, " ");
   if (value.includes("sent") && value.includes("seller")) return "Sent to Seller";
-  if (value.includes("process") || value.includes("ship") || value.includes("transit") || value.includes("packed")) {
+  if (value.includes("shipped")) return "Shipped";
+  if (value.includes("process") || value.includes("transit") || value.includes("packed")) {
     return "Processing";
   }
   if (value.includes("deliver") || value.includes("complete")) return "Completed";
@@ -753,6 +755,7 @@ const STATUS_CFG: Record<
   Pending: { bg: C.warningLight, color: C.warning, dot: C.warning },
   "Sent to Seller": { bg: C.blueLight, color: C.blue, dot: C.blue },
   Processing: { bg: C.blueLight, color: C.blue, dot: C.blue },
+  Shipped: { bg: "#F5F3FF", color: "#7C3AED", dot: "#7C3AED" },
   Completed: { bg: C.activeLight, color: C.active, dot: C.active },
   Returned: { bg: "#FEF3C7", color: "#D97706", dot: "#D97706" },
   Replacement: { bg: C.purpleLight, color: C.purple, dot: C.purple },
@@ -771,6 +774,7 @@ const STATUS_OPTIONS: {
       label: "Mark as Processing",
       icon: <ProcessingIcon />,
     },
+    { value: "Shipped", label: "Mark as Shipped", icon: <ProcessingIcon /> },
     { value: "Completed", label: "Mark as Completed", icon: <CompletedIcon /> },
     { value: "Returned", label: "Mark as Returned", icon: <ReturnedIcon /> },
     {
@@ -1055,7 +1059,7 @@ function CardHeader({
 // STATUS PILL
 // ─────────────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: OrderStatus }) {
-  const cfg = STATUS_CFG[status];
+  const cfg = STATUS_CFG[status] || { bg: C.warningLight, color: C.warning, dot: C.warning };
   return (
     <View style={[s.badge, { backgroundColor: cfg.bg }]}>
       <Text style={[s.badgeTxt, { color: cfg.color }]}>{status}</Text>
@@ -1887,7 +1891,7 @@ export default function OrderDetailScreen() {
                     showsVerticalScrollIndicator={historyExpanded}
                   >
                     {order.history.map((h, idx) => {
-                      const cfg = STATUS_CFG[h.status];
+                      const cfg = STATUS_CFG[h.status] || { bg: C.warningLight, color: C.warning, dot: C.warning };
                       return (
                         <View key={idx} style={s.histItem}>
                           <View style={s.histLeft}>
