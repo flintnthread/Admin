@@ -1403,7 +1403,10 @@ export default function OrderDetailScreen() {
 
     setPushing(true);
     try {
-      const result = await pushOrderToShiprocket(id);
+      const result = await pushOrderToShiprocket(id, {
+        productIds: typeof productIds === "string" ? productIds : undefined,
+        sellerName: typeof sellerName === "string" ? sellerName : undefined,
+      });
       if (result.order) {
         const uiOrder = mapApiOrderToUi(result.order as OrderDetail, sellerName, productIds);
         setOrder(uiOrder);
