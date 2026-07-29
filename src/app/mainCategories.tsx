@@ -2457,12 +2457,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     alignSelf: "flex-start",
+    overflow: "visible",
   },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontWeight: "600" },
+  statusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  statusText: { fontSize: 12, fontWeight: "600", lineHeight: 16, includeFontPadding: false },
 
   // ── Pagination ────────────────────────────────────────────────────────────
   pagination: {
