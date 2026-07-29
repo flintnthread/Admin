@@ -1,4 +1,4 @@
-import { resolveAdminApiBaseUrl } from "@/lib/api/config";
+import { resolvePublicMediaBaseUrl } from "@/lib/api/config";
 import { buildMediaUrlCandidates } from "@/lib/api/media";
 
 export type CategoryImageFields = {
@@ -17,7 +17,18 @@ export function resolveCatalogMediaUrl(
   if (!path?.trim()) return "";
 
   const value = path.trim();
-  if (/^(https?:\/\/|data:|blob:)/i.test(value)) return value;
+  if (/^(https?:\/\/|data:|blob:)/i.test(value)) {
+    // Rewrite broken .in/.online catalog hosts onto public CDN
+    try {
+      const u = new URL(value);
+      if (/\/uploads\/(categories|subcategories)\//i.test(u.pathname)) {
+        return `${resolvePublicMediaBaseUrl().replace(/\/$/, "")}${u.pathname}${u.search || ""}`;
+      }
+    } catch {
+      /* keep absolute */
+    }
+    return value;
+  }
 
   let normalized = value.replace(/\\/g, "/");
   if (!normalized.startsWith("/")) normalized = `/${normalized}`;
@@ -27,8 +38,8 @@ export function resolveCatalogMediaUrl(
       ? `/${bare}`
       : `/uploads/${folder}/${bare}`;
   }
-  // Catalog images live on admin media (:8082), not the seller CDN host.
-  return `${resolveAdminApiBaseUrl().replace(/\/$/, "")}${normalized}`;
+  // Catalog images are on the public CDN (flintnthread.com), not user-service (.in → 500).
+  return `${resolvePublicMediaBaseUrl().replace(/\/$/, "")}${normalized}`;
 }
 
 /** Pick the best display URL — mobile (Cloudinary) first, then desktop/banner. */
