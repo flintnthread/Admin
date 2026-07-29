@@ -2005,7 +2005,6 @@ export default function MainCategories() {
               itemsPerPage={ITEMS_PER_PAGE}
               itemName="categories"
               onPageChange={setCurrentPage}
-              compactMode={!isWeb}
             />
           </ScrollView>
         )}
@@ -2058,7 +2057,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },

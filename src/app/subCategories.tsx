@@ -1,7 +1,22 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
+import { fetchSubcategories as fetchChildCategories, fetchMainCategories, type CategoryRow } from "@/services/categoryApi";
+import {
+  createSubcategory,
+  deleteSubcategory,
+  fetchSubcategories,
+  parseMaterialSlabs,
+  serializeMaterialSlabs,
+  updateSubcategory,
+  uploadSubcategoryImages,
+  type MaterialSlab,
+  type SubcategoryRow,
+} from "@/services/subcategoryApi";
 import * as ImagePicker from "expo-image-picker";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -15,21 +30,6 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
-import {
-  fetchSubcategories,
-  createSubcategory,
-  updateSubcategory,
-  deleteSubcategory,
-  uploadSubcategoryImages,
-  parseMaterialSlabs,
-  serializeMaterialSlabs,
-  type SubcategoryRow,
-  type MaterialSlab,
-} from "@/services/subcategoryApi";
-import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
-import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
 
@@ -1764,7 +1764,7 @@ const S = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2160,7 +2160,7 @@ const S = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },

@@ -1,9 +1,16 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
 import { sweetCrud, sweetError } from '@/lib/sweetAlert';
 import {
+  createArea,
+  createCity,
+  createCountry,
+  createPincode,
+  createState,
+  deleteArea,
+  deleteCity,
+  deleteCountry,
+  deletePincode,
+  deleteState,
   fetchAreas,
   fetchAreasPage,
   fetchCities,
@@ -15,26 +22,19 @@ import {
   fetchPincodesPage,
   fetchStates,
   fetchStatesPage,
-  createCountry,
-  createState,
-  createCity,
-  createArea,
-  createPincode,
-  updateCountry,
-  updateState,
-  updateCity,
   updateArea,
+  updateCity,
+  updateCountry,
   updatePincode,
-  deleteCountry,
-  deleteState,
-  deleteCity,
-  deleteArea,
-  deletePincode,
+  updateState,
   type LocationCounts,
   type LocationRow,
 } from '@/services/locationApi';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { SymbolView } from 'expo-symbols';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -42,11 +42,10 @@ import {
   StyleSheet,
   TextInput,
   useWindowDimensions,
-  View,
-  ActivityIndicator,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, G, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 
 import AdminLayout from '@/components/admin-layout';
 import Pagination from '@/components/Pagination';
@@ -220,8 +219,8 @@ function HeroHeader({
       {/* Navy header */}
       <View style={[s.hero, isMobile && s.heroMobile]}>
         <View style={s.heroTitle}>
-          <View style={s.heroIconBadge}>
-            <MaterialIcons name="place" size={22} color="#FFFFFF" />
+          <View style={[s.heroIconBadge, { width: isMobile ? 40 : 48, height: isMobile ? 40 : 48, borderRadius: isMobile ? 12 : 14, backgroundColor: '#F97316' }]}>
+            <MaterialIcons name="place" size={isMobile ? 20 : 22} color="#FFFFFF" />
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText style={s.heroHeading}>Locations Management</ThemedText>
@@ -241,8 +240,8 @@ function HeroHeader({
         >
           {stats.slice(0, 4).map((p, i) => (
             <View key={i} style={s.statCardMobile}>
-              <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
-                <MaterialIcons name={p.icon} size={20} color={p.color} />
+              <View style={[s.statCardIcon, { width: 36, height: 36, borderRadius: 9, backgroundColor: '#F97316' }]}>
+                <MaterialIcons name={p.icon} size={18} color="#FFFFFF" />
               </View>
               <View style={{ marginLeft: 12 }}>
                 <ThemedText style={[s.statCardValue, { color: p.color }]}>
@@ -254,8 +253,8 @@ function HeroHeader({
           ))}
           {/* Pincodes */}
           <View style={s.statCardMobileFull}>
-            <View style={[s.statCardIcon, { backgroundColor: stats[4].bg }]}>
-              <MaterialIcons name={stats[4].icon} size={20} color={stats[4].color} />
+            <View style={[s.statCardIcon, { width: 36, height: 36, borderRadius: 9, backgroundColor: '#F97316' }]}>
+              <MaterialIcons name={stats[4].icon} size={18} color="#FFFFFF" />
             </View>
             <View style={{ marginLeft: 12 }}>
               <ThemedText style={[s.statCardValue, { color: stats[4].color }]}>
@@ -270,8 +269,8 @@ function HeroHeader({
         <View style={s.statCardsRow}>
           {stats.map((p, i) => (
             <View key={i} style={s.statCard}>
-              <View style={[s.statCardIcon, { backgroundColor: p.bg }]}>
-                <MaterialIcons name={p.icon} size={20} color={p.color} />
+              <View style={[s.statCardIcon, { width: 40, height: 40, borderRadius: 10, backgroundColor: '#F97316' }]}>
+                <MaterialIcons name={p.icon} size={20} color="#FFFFFF" />
               </View>
               <View style={{ marginLeft: 12 }}>
                 <ThemedText style={[s.statCardValue, { color: p.color }]}>
@@ -714,8 +713,8 @@ function EntityCard({
         {row.flag ? (
           <ThemedText style={{ fontSize: 32 }}>{row.flag}</ThemedText>
         ) : (
-          <View style={[s.entityCardIconCircle, { backgroundColor: row.iconBg ?? '#FFF7ED' }]}>
-            <MaterialIcons name="place" size={24} color={row.iconColor ?? LocationColors.accentStrong} />
+          <View style={[s.entityCardIconCircle, { width: 56, height: 56, borderRadius: 28, backgroundColor: '#F97316' }]}>
+            <MaterialIcons name="place" size={24} color="#FFFFFF" />
           </View>
         )}
         <ThemedText style={s.entityCardName} numberOfLines={2}>{row.name}</ThemedText>
@@ -860,8 +859,8 @@ function ListTable({
               {row.flag ? (
                 <ThemedText style={{ fontSize: 20 }}>{row.flag}</ThemedText>
               ) : (
-                <View style={[s.rowIcon, { backgroundColor: row.iconBg }]}>
-                  <MaterialIcons name="place" size={14} color={row.iconColor} />
+                <View style={[s.rowIcon, { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F97316' }]}>
+                  <MaterialIcons name="place" size={14} color="#FFFFFF" />
                 </View>
               )}
               <ThemedText style={s.nameText} numberOfLines={1}>{row.name}</ThemedText>
@@ -958,8 +957,8 @@ function MobileListTable({
                   {row.flag ? (
                     <ThemedText style={{ fontSize: 16 }}>{row.flag}</ThemedText>
                   ) : (
-                    <View style={[s.rowIcon, { backgroundColor: row.iconBg }]}>
-                      <MaterialIcons name="place" size={12} color={row.iconColor} />
+                    <View style={[s.rowIcon, { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F97316' }]}>
+                      <MaterialIcons name="place" size={12} color="#FFFFFF" />
                     </View>
                   )}
                   <ThemedText style={[s.nameText, { fontSize: 11 }]} numberOfLines={1}>{row.name}</ThemedText>
@@ -1093,7 +1092,7 @@ function EntityModal({
           onPress={(e) => e.stopPropagation()}>
           <View style={[s.modalBox, !isMobile && { maxHeight: Math.min(wh * 0.88, 680) }]}>
             <View style={s.modalHead}>
-              <View style={s.modalHeadIcon}>
+              <View style={[s.modalHeadIcon, { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F97316' }]}>
                 <MaterialIcons name="place" size={18} color="#fff" />
               </View>
               <ThemedText style={s.modalHeadTitle}>{heading}</ThemedText>
@@ -1209,8 +1208,8 @@ function ConfirmDelete({ row, singular, onCancel, onConfirm }: { row: ListRow | 
     <Modal visible={!!row} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={s.confirmOverlay} onPress={onCancel}>
         <Pressable style={s.confirmBox} onPress={(e) => e.stopPropagation()}>
-          <View style={s.confirmIcon}>
-            <MaterialIcons name="warning" size={24} color={LocationColors.inactiveText} />
+          <View style={[s.confirmIcon, { width: 52, height: 52, borderRadius: 26, backgroundColor: '#F97316' }]}>
+            <MaterialIcons name="warning" size={24} color="#FFFFFF" />
           </View>
           <ThemedText style={s.confirmTitle}>Delete {singular}?</ThemedText>
           <ThemedText style={s.confirmBody}>"{row?.name}" will be permanently removed.</ThemedText>
@@ -1597,8 +1596,6 @@ const s = StyleSheet.create({
   heroMobile: { padding: 18, paddingBottom: 52 },
   heroTitle: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   heroIconBadge: {
-    width: 48, height: 48, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
   },
   heroHeading: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', lineHeight: 28 },
@@ -1632,7 +1629,6 @@ const s = StyleSheet.create({
     borderColor: '#F0F0F0',
   },
   statCardIcon: {
-    width: 40, height: 40, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
   statCardValue: { fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 8 },
@@ -1760,7 +1756,7 @@ const s = StyleSheet.create({
     elevation: 2,
   },
 
-  summaryIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  summaryIcon: { alignItems: 'center', justifyContent: 'center' },
   summaryValue: { fontSize: 22, fontWeight: '700', color: LocationColors.text, lineHeight: 26 },
   summaryLabel: { fontSize: 12, color: LocationColors.textMuted, marginTop: 3 },
 
@@ -1839,7 +1835,6 @@ const s = StyleSheet.create({
   entityCardId: { fontSize: 11, color: LocationColors.textMuted },
   entityCardAvatar: { alignItems: 'center', gap: 10, marginBottom: 14 },
   entityCardIconCircle: {
-    width: 56, height: 56, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
   },
   entityCardName: { fontSize: 15, fontWeight: '700', color: LocationColors.text, textAlign: 'center' },
@@ -1900,7 +1895,7 @@ const s = StyleSheet.create({
   colActions: { width: 130, flexShrink: 0 },
   nameCell: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, paddingHorizontal: 6 },
   nameText: { fontSize: 13, color: LocationColors.text, fontWeight: '600', flexShrink: 1 },
-  rowIcon: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  rowIcon: { alignItems: 'center', justifyContent: 'center' },
   actionRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 6 },
   actionBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   actionBtnView: { borderColor: LocationColors.accentBorder, backgroundColor: LocationColors.accentLight },
@@ -1964,7 +1959,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 20, paddingVertical: 16,
   },
-  modalHeadIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  modalHeadIcon: { alignItems: 'center', justifyContent: 'center' },
   modalHeadTitle: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '700' },
   modalBody: { padding: 22, paddingBottom: 10, gap: 4 },
   modalFoot: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: LocationColors.borderLight },
@@ -1987,7 +1982,7 @@ const s = StyleSheet.create({
   // ── Confirm delete ──
   confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   confirmBox: { width: '100%', maxWidth: 340, backgroundColor: LocationColors.cardBg, borderRadius: 18, padding: 24, alignItems: 'center', gap: 8 },
-  confirmIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: LocationColors.inactiveBg, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  confirmIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   confirmTitle: { fontSize: 17, fontWeight: '700', color: LocationColors.text },
   confirmBody: { fontSize: 13, color: LocationColors.textMuted, textAlign: 'center', marginBottom: 10 },
   confirmBtns: { flexDirection: 'row', gap: 10, width: '100%' },
