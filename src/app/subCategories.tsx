@@ -1422,6 +1422,14 @@ export default function Subcategories() {
         const materials = parseMaterialSlabs(materialSlabsValue);
         const imageUrl = pickCategoryImageUrl(row, "subcategories");
 
+        // Debug: Check if mobileImage data exists
+        console.log(`Subcategory ${row.id} - ${row.subcategoryName}:`, {
+          mobileImage: row.mobileImage,
+          subcategoryImage: row.subcategoryImage,
+          hasMobileImage: !!row.mobileImage,
+          resolvedMobileImage: row.mobileImage ? resolveCatalogMediaUrl(row.mobileImage, "subcategories") : null
+        });
+
         return {
           id: row.id,
           categoryId: row.categoryId,
@@ -1438,7 +1446,7 @@ export default function Subcategories() {
           mainCat: row.mainCat,
           category: row.category,
           name: row.subcategoryName,
-          image: imageUrl || undefined,
+          image: row.mobileImage ? resolveCatalogMediaUrl(row.mobileImage, "subcategories") : imageUrl || undefined,
           created: row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",

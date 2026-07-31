@@ -23,7 +23,7 @@ import {
 } from "react-native";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type PaymentStatus = "Pending" | "Paid" | "Cancelled";
+type PaymentStatus = "Pending" | "Paid" | "Completed" | "Cancelled";
 type ReminderBucket = "green" | "orange" | "red";
 type PageTab = "payments" | "requests";
 const REQUESTS_PAGE_SIZE = 10;
@@ -85,6 +85,7 @@ const getReminderStyle = (bucket: ReminderBucket) => {
 
 const getPaymentStyle = (status: PaymentStatus) => {
     if (status === "Paid") return { bg: "#e8f7ee", color: "#1a7a45" };
+    if (status === "Completed") return { bg: "#d1fae5", color: "#059669" };
     if (status === "Cancelled") return { bg: "#fce8e8", color: "#b91c1c" };
     return { bg: PRIMARY_LIGHT, color: PRIMARY };
 };
@@ -183,6 +184,7 @@ const PayModal: React.FC<{
 
     const statusColors: Record<PaymentStatus, { bg: string; color: string; dot: string }> = {
         Paid: { bg: "#e8f7ee", color: "#1a7a45", dot: "#22c55e" },
+        Completed: { bg: "#d1fae5", color: "#059669", dot: "#10b981" },
         Pending: { bg: "#fef3c7", color: "#d97706", dot: "#f59e0b" },
         Cancelled: { bg: "#fce8e8", color: "#b91c1c", dot: "#ef4444" },
     };

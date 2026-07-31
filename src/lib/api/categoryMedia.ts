@@ -1,8 +1,10 @@
-import { resolvePublicMediaBaseUrl } from "@/lib/api/config";
+import { resolvePublicMediaBaseUrl, resolveAdminApiBaseUrl } from "@/lib/api/config";
 import { buildMediaUrlCandidates } from "@/lib/api/media";
 
 export type CategoryImageFields = {
   mobileImage?: string | null;
+  mobileimage?: string | null;
+  mobile_image?: string | null;
   categoryImage?: string | null;
   bannerImage?: string | null;
   subcategoryImage?: string | null;
@@ -30,6 +32,12 @@ export function resolveCatalogMediaUrl(
     return value;
   }
 
+  // For local development, use API origin instead of public CDN
+  const isLocalDev = typeof window !== "undefined" && 
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  
+  const baseUrl = isLocalDev ? resolveAdminApiBaseUrl() : resolvePublicMediaBaseUrl();
+  
   let normalized = value.replace(/\\/g, "/");
   if (!normalized.startsWith("/")) normalized = `/${normalized}`;
   if (!normalized.startsWith("/uploads/")) {
@@ -38,8 +46,9 @@ export function resolveCatalogMediaUrl(
       ? `/${bare}`
       : `/uploads/${folder}/${bare}`;
   }
-  // Catalog images are on the public CDN (flintnthread.com), not user-service (.in → 500).
-  return `${resolvePublicMediaBaseUrl().replace(/\/$/, "")}${normalized}`;
+  
+  // For local development, use API origin; for production, use public CDN
+  return `${baseUrl.replace(/\/$/, "")}${normalized}`;
 }
 
 /** Pick the best display URL — mobile (Cloudinary) first, then desktop/banner. */
@@ -49,8 +58,8 @@ export function pickCategoryImageUrl(
 ): string {
   const ordered =
     folder === "subcategories"
-      ? [row.mobileImage, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
-      : [row.mobileImage, row.categoryImage, row.bannerImage, row.image];
+      ? [row.mobileImage, row.mobileimage, row.mobile_image, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
+      : [row.mobileImage, row.mobileimage, row.mobile_image, row.categoryImage, row.bannerImage, row.image];
 
   for (const raw of ordered) {
     const url = resolveCatalogMediaUrl(raw, folder);
@@ -66,8 +75,8 @@ export function categoryImageCandidates(
 ): string[] {
   const ordered =
     folder === "subcategories"
-      ? [row.mobileImage, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
-      : [row.mobileImage, row.categoryImage, row.bannerImage, row.image];
+      ? [row.mobileImage, row.mobileimage, row.mobile_image, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
+      : [row.mobileImage, row.mobileimage, row.mobile_image, row.categoryImage, row.bannerImage, row.image];
 
   const urls: string[] = [];
   const push = (url: string) => {
