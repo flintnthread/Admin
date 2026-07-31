@@ -644,6 +644,9 @@ const AddModal = ({
   const [image, setImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | Blob | null>(null);
   const [imageChanged, setImageChanged] = useState(false);
+  const [mobileImage, setMobileImage] = useState<string | null>(null);
+  const [mobileImageFile, setMobileImageFile] = useState<File | Blob | null>(null);
+  const [mobileImageChanged, setMobileImageChanged] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [status, setStatus] = useState("Active");
 
@@ -655,6 +658,9 @@ const AddModal = ({
     setImage(null);
     setImageFile(null);
     setImageChanged(false);
+    setMobileImage(null);
+    setMobileImageFile(null);
+    setMobileImageChanged(false);
     setMaterials([]);
     setStatus("Active");
   };
@@ -689,6 +695,11 @@ const AddModal = ({
         );
         setImageFile(null);
         setImageChanged(false);
+        setMobileImage(
+          resolveCatalogMediaUrl(editData.mobileImage || "", "subcategories") || null
+        );
+        setMobileImageFile(null);
+        setMobileImageChanged(false);
         setMaterials(editData.materials || []);
         setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
@@ -743,6 +754,42 @@ const AddModal = ({
     }
   };
 
+  const pickMobileImage = async () => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/jpeg,image/png,image/webp";
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0] as File | undefined;
+        if (file) {
+          setMobileImageFile(file);
+          setMobileImageChanged(true);
+          const r = new FileReader();
+          r.onload = (ev) => setMobileImage(ev.target?.result as string);
+          r.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+      });
+      if (!res.canceled) {
+        const asset = res.assets[0];
+        setMobileImage(asset.uri);
+        setMobileImageChanged(true);
+        try {
+          const response = await fetch(asset.uri);
+          const blob = await response.blob();
+          setMobileImageFile(blob);
+        } catch {
+          setMobileImageFile(null);
+        }
+      }
+    }
+  };
+
   const addMaterial = () =>
     setMaterials((prev) => [
       ...prev,
@@ -773,8 +820,9 @@ const AddModal = ({
       image,
       imageFile,
       imageChanged,
-      // Keep existing mobile image unless a dedicated mobile picker is added.
-      mobileImage: undefined,
+      mobileImage,
+      mobileImageFile,
+      mobileImageChanged,
       materials,
       status,
     });
@@ -911,6 +959,53 @@ const AddModal = ({
 
                   <TouchableOpacity
                     onPress={() => setImage(null)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.inactiveLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
+                  >
+                    <TrashIcon color={C.inactive} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: C.inactive }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Mobile Image */}
+            <View style={S.fg}>
+              <Text style={S.fl}>
+                Mobile Image <Text style={S.hint}>(for mobile app)</Text>
+              </Text>
+              <TouchableOpacity
+                style={S.imgPicker}
+                onPress={pickMobileImage}
+                activeOpacity={0.7}
+              >
+                {mobileImage ? (
+                  <Image
+                    source={{ uri: mobileImage }}
+                    style={S.imgPreview}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={S.imgPickerInner}>
+                    <UploadIcon />
+                    <Text style={S.imgPickerTitle}>
+                      Drag & drop mobile image here or browse
+                    </Text>
+                    <Text style={S.imgPickerSub}>JPG, PNG · Max 2MB</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {mobileImage && (
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <TouchableOpacity
+                    onPress={pickMobileImage}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.navyLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
+                  >
+                    <RefreshIcon color={C.navy} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: C.navy }}>Retake</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setMobileImage(null)}
                     style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.inactiveLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
                   >
                     <TrashIcon color={C.inactive} />
@@ -1408,18 +1503,36 @@ export default function Subcategories() {
       const statusValue = data.status === "Active";
       const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
       const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
+      const shouldUploadMobileImage = Boolean(data.mobileImageChanged && data.mobileImageFile);
       let imageUploadFailed = false;
 
       const uploadImageSafely = async (id: number, existing: SubcategoryRow): Promise<SubcategoryRow> => {
-        if (!shouldUploadImage || !data.imageFile) return existing;
+        if (!shouldUploadImage && !shouldUploadMobileImage) return existing;
         try {
           const { compressImageFile } = await import("@/lib/media/compressImage");
-          const compressed = await compressImageFile(data.imageFile, {
-            maxEdge: 1100,
-            maxBytes: 400_000,
-            fileName: data.imageFile instanceof File ? data.imageFile.name : "subcategory.jpg",
-          });
-          return await uploadSubcategoryImages(id, compressed.file);
+          
+          let imageFile: File | Blob | undefined;
+          let mobileImageFile: File | Blob | undefined;
+          
+          if (shouldUploadImage && data.imageFile) {
+            const compressed = await compressImageFile(data.imageFile, {
+              maxEdge: 1100,
+              maxBytes: 400_000,
+              fileName: data.imageFile instanceof File ? data.imageFile.name : "subcategory.jpg",
+            });
+            imageFile = compressed.file;
+          }
+          
+          if (shouldUploadMobileImage && data.mobileImageFile) {
+            const compressed = await compressImageFile(data.mobileImageFile, {
+              maxEdge: 1100,
+              maxBytes: 400_000,
+              fileName: data.mobileImageFile instanceof File ? data.mobileImageFile.name : "subcategory-mobile.jpg",
+            });
+            mobileImageFile = compressed.file;
+          }
+          
+          return await uploadSubcategoryImages(id, imageFile, mobileImageFile);
         } catch (uploadError) {
           imageUploadFailed = true;
           void sweetWarning(
