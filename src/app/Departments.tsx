@@ -131,8 +131,8 @@ const ConfirmModal: React.FC<{
         <View style={cm.overlay}>
             <View style={cm.box}>
                 {/* Icon */}
-                <View style={cm.iconWrap}>
-                    <Feather name="trash-2" size={26} color={T.red} />
+                <View style={[cm.iconWrap, { width: 48, height: 48, borderRadius: 14, backgroundColor: T.redBg }]}>
+                    <Feather name="trash-2" size={22} color={T.red} />
                 </View>
 
                 <Text style={cm.title}>Delete Department?</Text>
@@ -150,7 +150,7 @@ const ConfirmModal: React.FC<{
                         <Text style={cm.cancelTxt}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={cm.deleteBtn} onPress={onConfirm} activeOpacity={0.8}>
-                        <Feather name="trash-2" size={14} color="#fff" />
+                        <Feather name="trash-2" size={12} color="#fff" />
                         <Text style={cm.deleteTxt}>Delete</Text>
                     </TouchableOpacity>
                 </View>
@@ -175,10 +175,6 @@ const cm = StyleSheet.create({
         maxWidth: 380,
     },
     iconWrap: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: T.redBg,
         alignItems: "center",
         justifyContent: "center",
         marginBottom: 16,
@@ -273,7 +269,7 @@ const EditModal: React.FC<{
                     <View style={em.header}>
                         <Text style={em.title}>{isAdd ? "Add Department" : "Edit Department"}</Text>
                         <TouchableOpacity style={em.closeBtn} onPress={() => { releaseModalFocus(); onCancel(); }}>
-                            <Feather name="x" size={20} color="#fff" />
+                            <Feather name="x" size={18} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
@@ -311,7 +307,7 @@ const EditModal: React.FC<{
                         <View style={{ zIndex: 1000, elevation: 1000 }}>
                             <TouchableOpacity style={[em.fieldWrap, statusOpen && { borderColor: T.orange, borderWidth: 2 }]} onPress={() => setStatusOpen(!statusOpen)} activeOpacity={0.8}>
                                 <Text style={[em.input, { color: T.textH }]}>{status}</Text>
-                                <Feather name="chevron-down" size={16} color={T.textM} />
+                                <Feather name="chevron-down" size={14} color={T.textM} />
                             </TouchableOpacity>
                             {statusOpen && (
                                 <View style={em.dropdown}>
@@ -331,7 +327,7 @@ const EditModal: React.FC<{
                     {/* Footer */}
                     <View style={em.footer}>
                         <TouchableOpacity style={em.cancelBtn} onPress={() => { releaseModalFocus(); onCancel(); }}>
-                            <Feather name="x" size={14} color="#fff" />
+                            <Feather name="x" size={12} color="#fff" />
                             <Text style={em.cancelTxt}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -362,7 +358,7 @@ const EditModal: React.FC<{
                                 }
                             }}
                         >
-                            <Feather name="save" size={14} color="#fff" />
+                            <Feather name="save" size={12} color="#fff" />
                             <Text style={em.saveTxt}>{isAdd ? "Save Department" : "Update"}</Text>
                         </TouchableOpacity>
                     </View>
@@ -538,10 +534,9 @@ const StatCard: React.FC<{
         ]}>
             <View style={[
                 sc.iconWrap,
-                { backgroundColor: iconBg },
-                isMobile && { width: 28, height: 28, borderRadius: 8 }
+                { backgroundColor: iconBg, width: isMobile ? 24 : 32, height: isMobile ? 24 : 32, borderRadius: isMobile ? 7 : 9 }
             ]}>
-                <Feather name={icon} size={isMobile ? 12 : 16} color={iconFg} />
+                <Feather name={icon} size={isMobile ? 10 : 14} color={iconFg} />
             </View>
             <View style={isMobile && { alignItems: "center" }}>
                 <Text style={[sc.value, isMobile && { fontSize: 16, lineHeight: 18 }]}>{value}</Text>
@@ -564,9 +559,6 @@ const sc = StyleSheet.create({
         borderColor: T.border,
     },
     iconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -594,6 +586,8 @@ const DeptCard: React.FC<{
     onEdit: () => void;
     onDelete: () => void;
 }> = ({ dept, onEdit, onDelete }) => {
+    const { width } = useWindowDimensions();
+    const isMobileScreen = width < 768;
     const colorKey = getColorKey(dept.name);
     const icon = getIcon(dept.name);
     const stripeBg = STRIPE_COLOR[colorKey];
@@ -608,19 +602,19 @@ const DeptCard: React.FC<{
             <View style={dc.body}>
                 {/* Icon + actions row */}
                 <View style={dc.topRow}>
-                    <View style={[dc.iconWrap, { backgroundColor: iconBg }]}>
-                        <Feather name={icon} size={20} color={iconFg} />
+                    <View style={[dc.iconWrap, { backgroundColor: iconBg, width: isMobileScreen ? 32 : 38, height: isMobileScreen ? 32 : 38, borderRadius: isMobileScreen ? 9 : 10 }]}>
+                        <Feather name={icon} size={isMobileScreen ? 15 : 18} color={iconFg} />
                     </View>
                     <View style={dc.actions}>
                         <TouchableOpacity style={dc.actBtn} onPress={onEdit} activeOpacity={0.8}>
-                            <Feather name="edit-2" size={13} color={T.textM} />
+                            <Feather name="edit-2" size={11} color={T.textM} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[dc.actBtn, { borderColor: "#FCA5A5" }]}
                             onPress={onDelete}
                             activeOpacity={0.8}
                         >
-                            <Feather name="trash-2" size={13} color={T.red} />
+                            <Feather name="trash-2" size={11} color={T.red} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -632,11 +626,11 @@ const DeptCard: React.FC<{
                 {/* Footer meta */}
                 <View style={dc.footer}>
                     <View style={dc.metaItem}>
-                        <Feather name="briefcase" size={11} color={T.textHint} />
+                        <Feather name="briefcase" size={9} color={T.textHint} />
                         <Text style={dc.metaTxt}>{dept.jobs} {dept.jobs === 1 ? "Job" : "Jobs"}</Text>
                     </View>
                     <View style={dc.metaItem}>
-                        <Feather name="calendar" size={11} color={T.textHint} />
+                        <Feather name="calendar" size={9} color={T.textHint} />
                         <Text style={dc.metaTxt}>{dept.createdAt}</Text>
                     </View>
                     <View style={[
@@ -687,9 +681,6 @@ const dc = StyleSheet.create({
         marginBottom: 12,
     },
     iconWrap: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -917,7 +908,7 @@ const DepartmentsScreen: React.FC = () => {
                     <View style={[mob.headerCard, isMobileScreen && { paddingHorizontal: 12, paddingBottom: 40 }]}>
                         <View style={mob.headerTopRow}>
                             <View style={mob.headerTitleBlock}>
-                                <Text style={[mob.headerTitle, isSmallMobile && { fontSize: 20 }]}>Manage Departments</Text>
+                                <Text style={[mob.headerTitle, isSmallMobile && { fontSize: 16 }]}>Manage Departments</Text>
                                 {!isSmallMobile && (
                                     <Text style={mob.headerSub}>Organize your workforce by department structure</Text>
                                 )}
@@ -927,8 +918,8 @@ const DepartmentsScreen: React.FC = () => {
                                 onPress={() => setAddOpen(true)}
                                 activeOpacity={0.85}
                             >
-                                <Feather name="plus" size={14} color="#fff" />
-                                <Text style={mob.addBtnTxt}>Add</Text>
+                                <Feather name="plus" size={10} color="#fff" />
+                                {!isSmallMobile && <Text style={mob.addBtnTxt}>Add</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -939,13 +930,14 @@ const DepartmentsScreen: React.FC = () => {
                         isMobileScreen && { padding: 16, paddingBottom: 40, borderRadius: 16 }
                     ]}>
                         <View style={[s.pageHeadLeft, { flexDirection: "row", alignItems: "center", gap: 14 }]}>
-                            <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
-                                <Feather name="briefcase" size={26} color="#FFF" />
+                            <View style={{ width: isMobileScreen ? 34 : 48, height: isMobileScreen ? 34 : 48, borderRadius: isMobileScreen ? 10 : 13, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                                <Feather name="briefcase" size={isMobileScreen ? 17 : 24} color="#FFF" />
                             </View>
                             <View>
                                 <Text style={[
                                     s.pageTitle,
-                                    isMobileScreen && { fontSize: 18, lineHeight: 22 }
+                                    isMobileScreen && { fontSize: 18, lineHeight: 22 },
+                                    isSmallMobile && { fontSize: 16, lineHeight: 20 }
                                 ]}>Manage Departments</Text>
                                 {!isSmallMobile && (
                                     <Text style={s.pageSub}>Organize your workforce by department structure</Text>
@@ -960,13 +952,15 @@ const DepartmentsScreen: React.FC = () => {
                             onPress={() => setAddOpen(true)}
                             activeOpacity={0.85}
                         >
-                            <Feather name="plus" size={15} color="#fff" />
-                            <Text style={[
-                                s.addBtnTxt,
-                                isMobileScreen && { fontSize: 12 }
-                            ]}>
-                                {isSmallMobile ? "Add" : "Add Department"}
-                            </Text>
+                            <Feather name="plus" size={isMobileScreen ? 13 : 15} color="#fff" />
+                            {!isSmallMobile && (
+                                <Text style={[
+                                    s.addBtnTxt,
+                                    isMobileScreen && { fontSize: 12 }
+                                ]}>
+                                    {isMobileScreen ? "Add" : "Add Department"}
+                                </Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 )}
@@ -1002,7 +996,7 @@ const DepartmentsScreen: React.FC = () => {
                         {/* Row 1: Search bar + Grid/List toggle */}
                         <View style={mob.mobileRow1}>
                             <View style={mob.searchBox}>
-                                <Feather name="search" size={15} color={T.textHint} />
+                                <Feather name="search" size={11} color={T.textHint} />
                                 <TextInput
                                     style={mob.searchInput}
                                     placeholder="Search departments…"
@@ -1012,7 +1006,7 @@ const DepartmentsScreen: React.FC = () => {
                                 />
                                 {search.length > 0 && (
                                     <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                                        <Feather name="x-circle" size={15} color={T.textHint} />
+                                        <Feather name="x-circle" size={11} color={T.textHint} />
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -1022,14 +1016,14 @@ const DepartmentsScreen: React.FC = () => {
                                     onPress={() => setViewMode('grid')}
                                     activeOpacity={0.8}
                                 >
-                                    <Feather name="grid" size={16} color={viewMode === 'grid' ? '#fff' : '#374151'} />
+                                    <Feather name="grid" size={12} color={viewMode === 'grid' ? '#fff' : '#374151'} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[mob.toggleBtn, viewMode === 'list' && mob.toggleBtnActive]}
                                     onPress={() => setViewMode('list')}
                                     activeOpacity={0.8}
                                 >
-                                    <Feather name="list" size={16} color={viewMode === 'list' ? '#fff' : '#374151'} />
+                                    <Feather name="list" size={12} color={viewMode === 'list' ? '#fff' : '#374151'} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -1044,7 +1038,7 @@ const DepartmentsScreen: React.FC = () => {
                                 }}
                                 activeOpacity={0.8}
                             >
-                                <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
+                                <Feather name="sliders" size={10} color={filterStatus !== "All" ? T.orange : T.textM} />
                                 <Text style={[mob.chipTxt, filterStatus !== "All" && mob.chipTxtActive]}>
                                     {filterStatus === "All" ? "Filter" : filterStatus}
                                 </Text>
@@ -1060,7 +1054,7 @@ const DepartmentsScreen: React.FC = () => {
                             >
                                 <Feather
                                     name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"}
-                                    size={13}
+                                    size={10}
                                     color={sortOrder ? T.orange : T.textM}
                                 />
                                 <Text style={[mob.chipTxt, sortOrder !== null && mob.chipTxtActive]}>
@@ -1073,7 +1067,7 @@ const DepartmentsScreen: React.FC = () => {
                     isWeb && (
                         <View style={s.toolBar}>
                             <View style={s.searchBox}>
-                                <Feather name="search" size={15} color={T.textHint} />
+                                <Feather name="search" size={13} color={T.textHint} />
                                 <TextInput
                                     style={s.searchInput}
                                     placeholder="Search departments…"
@@ -1083,25 +1077,25 @@ const DepartmentsScreen: React.FC = () => {
                                 />
                                 {search.length > 0 && (
                                     <TouchableOpacity onPress={() => { setSearch(""); setCurrentPage(1); }}>
-                                        <Feather name="x-circle" size={15} color={T.textHint} />
+                                        <Feather name="x-circle" size={13} color={T.textHint} />
                                     </TouchableOpacity>
                                 )}
                             </View>
                             <View style={s.filterGroup}>
                                 <View style={{ flexDirection: "row", backgroundColor: "#E5E7EB", borderRadius: 10, padding: 3 }}>
                                     <TouchableOpacity style={[s.viewBtn, viewMode === 'grid' && s.viewBtnActive]} onPress={() => setViewMode('grid')}>
-                                        <Feather name="grid" size={16} color={viewMode === 'grid' ? '#fff' : '#374151'} />
+                                        <Feather name="grid" size={14} color={viewMode === 'grid' ? '#fff' : '#374151'} />
                                     </TouchableOpacity>
                                     <TouchableOpacity style={[s.viewBtn, viewMode === 'list' && s.viewBtnActive]} onPress={() => setViewMode('list')}>
-                                        <Feather name="list" size={16} color={viewMode === 'list' ? '#fff' : '#374151'} />
+                                        <Feather name="list" size={14} color={viewMode === 'list' ? '#fff' : '#374151'} />
                                     </TouchableOpacity>
                                 </View>
                                 <TouchableOpacity style={[s.filterBtn, filterStatus !== "All" && s.viewBtnActive]} onPress={() => { setFilterStatus(prev => prev === "All" ? "Active" : prev === "Active" ? "Inactive" : "All"); setCurrentPage(1); }}>
-                                    <Feather name="sliders" size={13} color={filterStatus !== "All" ? T.orange : T.textM} />
+                                    <Feather name="sliders" size={11} color={filterStatus !== "All" ? T.orange : T.textM} />
                                     <Text style={[s.filterBtnTxt, filterStatus !== "All" && { color: T.orange }]}>{filterStatus === "All" ? "Filter" : filterStatus}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={[s.filterBtn, sortOrder !== null && s.viewBtnActive]} onPress={() => { setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc"); setCurrentPage(1); }}>
-                                    <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={13} color={sortOrder ? T.orange : T.textM} />
+                                    <Feather name={sortOrder === "asc" ? "arrow-down" : sortOrder === "desc" ? "arrow-up" : "arrow-up"} size={11} color={sortOrder ? T.orange : T.textM} />
                                     <Text style={[s.filterBtnTxt, sortOrder !== null && { color: T.orange }]}>{sortOrder === "asc" ? "Sort A-Z" : sortOrder === "desc" ? "Sort Z-A" : "Sort"}</Text>
                                 </TouchableOpacity>
                             </View>
@@ -1130,7 +1124,7 @@ const DepartmentsScreen: React.FC = () => {
                 ) : filtered.length === 0 ? (
                     <View style={s.empty}>
                         <View style={s.emptyIcon}>
-                            <Feather name="inbox" size={30} color={T.textHint} />
+                            <Feather name="inbox" size={26} color={T.textHint} />
                         </View>
                         <Text style={s.emptyTitle}>
                             {departments.length === 0 ? "No departments yet" : "No departments found"}
@@ -1142,7 +1136,7 @@ const DepartmentsScreen: React.FC = () => {
                         </Text>
                         {departments.length === 0 ? (
                             <TouchableOpacity style={[s.addBtn, { marginTop: 16 }]} onPress={() => setAddOpen(true)}>
-                                <Feather name="plus" size={14} color="#fff" />
+                                <Feather name="plus" size={13} color="#fff" />
                                 <Text style={s.addBtnTxt}>Add Department</Text>
                             </TouchableOpacity>
                         ) : null}
@@ -1172,11 +1166,11 @@ const DepartmentsScreen: React.FC = () => {
                                         </View>
                                     </View>
                                     <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                                        <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' }} onPress={() => setEditTarget(dept)}>
-                                            <Feather name="edit-2" size={13} color={T.textM} />
+                                        <TouchableOpacity style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' }} onPress={() => setEditTarget(dept)}>
+                                            <Feather name="edit-2" size={11} color={T.textM} />
                                         </TouchableOpacity>
-                                        <TouchableOpacity style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#FCA5A5" }} onPress={() => setDeleteTarget(dept)}>
-                                            <Feather name="trash-2" size={13} color={T.red} />
+                                        <TouchableOpacity style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#FCA5A5" }} onPress={() => setDeleteTarget(dept)}>
+                                            <Feather name="trash-2" size={11} color={T.red} />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1187,8 +1181,8 @@ const DepartmentsScreen: React.FC = () => {
                         <View style={{ gap: 10 }}>
                             {paginated.map(dept => (
                                 <View key={dept.id} style={{ backgroundColor: T.card, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: T.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                    <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: T.orangeLight, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Feather name="grid" size={18} color={T.orange} />
+                                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: T.orangeLight, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Feather name="grid" size={14} color={T.orange} />
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ fontSize: 15, fontWeight: '700', color: T.textH, marginBottom: 2 }}>{dept.name}</Text>
@@ -1201,10 +1195,10 @@ const DepartmentsScreen: React.FC = () => {
                                         </View>
                                         <View style={{ flexDirection: 'row', gap: 10 }}>
                                             <TouchableOpacity onPress={() => setEditTarget(dept)} style={{ padding: 4 }}>
-                                                <Feather name="edit-2" size={15} color={T.textM} />
+                                                <Feather name="edit-2" size={11} color={T.textM} />
                                             </TouchableOpacity>
                                             <TouchableOpacity onPress={() => setDeleteTarget(dept)} style={{ padding: 4 }}>
-                                                <Feather name="trash-2" size={15} color={T.red} />
+                                                <Feather name="trash-2" size={11} color={T.red} />
                                             </TouchableOpacity>
                                         </View>
                                     </View>

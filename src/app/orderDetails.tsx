@@ -69,6 +69,13 @@ const C = {
   purpleLight: "#F5F3FF",
 };
 
+/** Same flat fee as customer checkout / order-view (delivery is in line price). */
+const ORDER_HANDLING_FEE = 9;
+
+function roundMoney(n: number): number {
+  return Math.round(Math.max(0, Number(n) || 0) * 100) / 100;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYOUT HOOK
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,6 +125,7 @@ type ApiOrderItem = {
   hsnCode?: string;
   quantity?: number;
   price?: number;
+  mrpPrice?: number;
   total?: number;
   status?: string;
   imageUrl?: string;
@@ -135,6 +143,7 @@ type OrderItem = {
   hsnCode?: string;
   qty: number;
   price: number;
+  mrpPrice?: number;
   total: number;
   slug: string;
   imageUrl?: string;
@@ -200,6 +209,8 @@ type UIOrder = {
   shippingCost: number;
   tax: number;
   discount: number;
+  mrpTotal: number;
+  handlingCharges: number;
   walletDeduction: number;
   referralDiscount: number;
   total: number;
@@ -371,13 +382,16 @@ function resolveItemProductName(item: ApiOrderItem): string {
 function mapApiItemToUi(item: ApiOrderItem): OrderItem {
   const qty = Number(item.quantity ?? 0);
   const price = Number(item.price ?? 0);
+  const raw = item as Record<string, unknown>;
+  const mrpRaw = Number(item.mrpPrice ?? raw.mrp_price ?? raw.mrp ?? 0);
+  const mrpPrice =
+    Number.isFinite(mrpRaw) && mrpRaw > price + 0.009 ? mrpRaw : undefined;
   const productName = resolveItemProductName(item);
   const imageUrl = resolveItemImageUrl(item);
 
   const color = item.color?.trim() || "";
   const size = item.size?.trim() || "";
 
-  const raw = item as Record<string, unknown>;
   const productIdRaw = item.productId ?? raw.product_id ?? raw.productID;
   const productIdNum = Number(productIdRaw);
   const productId =
@@ -396,6 +410,7 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
     ...(item.hsnCode?.trim() ? { hsnCode: item.hsnCode.trim() } : {}),
     qty,
     price,
+    ...(mrpPrice != null ? { mrpPrice } : {}),
     total: Number(item.total ?? qty * price),
     slug: productName
       ? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
@@ -621,13 +636,40 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
     console.log('Filter failed, falling back to all items.');
     items = (detail.items ?? []).map(mapApiItemToUi);
   }
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const shippingCost = Number(detail.shippingAmount ?? 0);
-  const tax = Number(detail.taxAmount ?? 0);
-  const discount = Number(detail.discountAmount ?? 0);
+  const subtotal = roundMoney(items.reduce((sum, item) => sum + item.total, 0));
+  /**
+   * Match customer checkout / order-view:
+   * Line prices are admin customer TOTAL (GST + metro delivery already included).
+   * Do not re-add shipping/tax or re-subtract product discount from the payable total.
+   */
+  const discountFromLines = roundMoney(
+    items.reduce((sum, item) => {
+      const mrp = Number(item.mrpPrice) || 0;
+      const unit = Number(item.price) || 0;
+      const qty = Math.max(1, Number(item.qty) || 1);
+      if (mrp > unit + 0.009) return sum + (mrp - unit) * qty;
+      return sum;
+    }, 0)
+  );
+  const apiDiscount = Number(detail.discountAmount ?? 0);
+  const discount =
+    discountFromLines > 0.009
+      ? discountFromLines
+      : apiDiscount > 0 && apiDiscount < subtotal * 3
+        ? roundMoney(apiDiscount)
+        : 0;
+  const mrpTotal = roundMoney(subtotal + discount);
+  const shippingCost = 0;
+  const tax = 0;
+  const handlingCharges = subtotal > 0 ? ORDER_HANDLING_FEE : 0;
   const walletDeduction = Number(detail.walletDeduction ?? 0);
   const referralDiscount = Number(detail.referralDiscountAmount ?? 0);
-  const total = Number(detail.totalAmount ?? subtotal + shippingCost + tax - discount - walletDeduction - referralDiscount);
+  const total = roundMoney(
+    Math.max(
+      0,
+      subtotal + shippingCost + handlingCharges - walletDeduction - referralDiscount
+    )
+  );
   const shiprocket = resolveShiprocketData(detail);
 
   const history: StatusHistory[] =
@@ -698,6 +740,8 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
     shippingCost,
     tax,
     discount,
+    mrpTotal,
+    handlingCharges,
     walletDeduction,
     referralDiscount,
     total,
@@ -738,6 +782,8 @@ const INITIAL_ORDER: UIOrder = {
   shippingCost: 0,
   tax: 0,
   discount: 0,
+  mrpTotal: 0,
+  handlingCharges: 0,
   walletDeduction: 0,
   referralDiscount: 0,
   total: 0,
@@ -1403,7 +1449,10 @@ export default function OrderDetailScreen() {
 
     setPushing(true);
     try {
-      const result = await pushOrderToShiprocket(id);
+      const result = await pushOrderToShiprocket(id, {
+        productIds: typeof productIds === "string" ? productIds : undefined,
+        sellerName: typeof sellerName === "string" ? sellerName : undefined,
+      });
       if (result.order) {
         const uiOrder = mapApiOrderToUi(result.order as OrderDetail, sellerName, productIds);
         setOrder(uiOrder);
@@ -1847,17 +1896,28 @@ export default function OrderDetailScreen() {
                   </View>
                 </Card>
 
-                {/* Order Summary */}
+                {/* Order Summary — same math as customer checkout / order-view */}
                 <Card>
                   <CardHeader icon={<NoteIcon size={16} color={C.blue} />} title="Order Summary" />
                   <View style={s.cardBodyCompact}>
                     {[
+                      ...(order.mrpTotal > order.subtotal + 0.009
+                        ? [["MRP total", rupee(order.mrpTotal)] as const]
+                        : []),
+                      ...(order.discount > 0
+                        ? [["Product discount", `- ${rupee(order.discount)}`] as const]
+                        : []),
                       ["Subtotal", rupee(order.subtotal)],
-                      ["Shipping", order.shippingCost === 0 ? "Free" : rupee(order.shippingCost)],
-                      ["Tax", order.tax === 0 ? "₹0.00" : rupee(order.tax)],
-                      ...(order.discount > 0 ? [["Discount", `- ${rupee(order.discount)}`] as const] : []),
-                      ...(order.walletDeduction > 0 ? [["Wallet", `- ${rupee(order.walletDeduction)}`] as const] : []),
-                      ...(order.referralDiscount > 0 ? [["Referral", `- ${rupee(order.referralDiscount)}`] as const] : []),
+                      ["Delivery", "Free"],
+                      ...(order.handlingCharges > 0
+                        ? [["Handling charges", rupee(order.handlingCharges)] as const]
+                        : []),
+                      ...(order.walletDeduction > 0
+                        ? [["Wallet", `- ${rupee(order.walletDeduction)}`] as const]
+                        : []),
+                      ...(order.referralDiscount > 0
+                        ? [["Referral", `- ${rupee(order.referralDiscount)}`] as const]
+                        : []),
                     ].map(([lbl, val]) => (
                       <View key={String(lbl)} style={s.summaryLineRow}>
                         <Text style={s.summaryLineLbl}>{String(lbl)}</Text>

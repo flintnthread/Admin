@@ -1,7 +1,22 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
+import { fetchSubcategories as fetchChildCategories, fetchMainCategories, type CategoryRow } from "@/services/categoryApi";
+import {
+  createSubcategory,
+  deleteSubcategory,
+  fetchSubcategories,
+  parseMaterialSlabs,
+  serializeMaterialSlabs,
+  updateSubcategory,
+  uploadSubcategoryImages,
+  type MaterialSlab,
+  type SubcategoryRow,
+} from "@/services/subcategoryApi";
 import * as ImagePicker from "expo-image-picker";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -15,21 +30,6 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
-import {
-  fetchSubcategories,
-  createSubcategory,
-  updateSubcategory,
-  deleteSubcategory,
-  uploadSubcategoryImages,
-  parseMaterialSlabs,
-  serializeMaterialSlabs,
-  type SubcategoryRow,
-  type MaterialSlab,
-} from "@/services/subcategoryApi";
-import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
-import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
 
@@ -1877,7 +1877,7 @@ const S = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2009,9 +2009,17 @@ const S = StyleSheet.create({
     right: 10,
     borderRadius: 20,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
+    overflow: "visible",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  cardStatusText: { fontSize: 11, fontWeight: "700" },
+  cardStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 15,
+    includeFontPadding: false,
+  },
   cardBody: { padding: 14, gap: 8 },
   breadcrumb: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap", flexShrink: 1 },
   breadcrumbText: { fontSize: 11, color: C.sub, fontWeight: "500", flexShrink: 1 },
@@ -2116,12 +2124,13 @@ const S = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     alignSelf: "flex-start",
+    overflow: "visible",
   },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontWeight: "600" },
+  statusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  statusText: { fontSize: 12, fontWeight: "600", lineHeight: 16, includeFontPadding: false },
 
   // Pagination
   pagination: {
@@ -2273,7 +2282,7 @@ const S = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },

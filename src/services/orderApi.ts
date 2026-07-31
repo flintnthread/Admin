@@ -375,10 +375,35 @@ export type ShiprocketActionResponse = {
   order?: Record<string, unknown>;
 };
 
-export async function pushOrderToShiprocket(id: number): Promise<ShiprocketActionResponse> {
-  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/push`, {
+export async function pushOrderToShiprocket(
+  id: number,
+  params?: { sellerId?: number; productIds?: string; sellerName?: string }
+): Promise<ShiprocketActionResponse> {
+  const q = new URLSearchParams();
+  if (params?.sellerId != null) q.set("sellerId", String(params.sellerId));
+  if (params?.productIds) q.set("productIds", params.productIds);
+  if (params?.sellerName) q.set("sellerName", params.sellerName);
+  const qs = q.toString();
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/push${qs ? `?${qs}` : ""}`, {
     method: "POST",
   });
+}
+
+export type ShiprocketLogEntry = {
+  id?: number;
+  orderId?: number;
+  orderNumber?: string;
+  shiprocketOrderId?: string;
+  action?: string;
+  status?: string;
+  requestData?: string;
+  responseData?: string;
+  errorMessage?: string;
+  createdAt?: string;
+};
+
+export async function fetchShiprocketLogs(id: number): Promise<{ orderId: number; logs: ShiprocketLogEntry[] }> {
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/logs`);
 }
 
 export async function syncOrderFromShiprocket(id: number): Promise<ShiprocketActionResponse> {
