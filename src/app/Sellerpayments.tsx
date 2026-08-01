@@ -154,7 +154,7 @@ const OrderCard: React.FC<{
 // ─── PAY MODAL ────────────────────────────────────────────────────────────────
 const PAYMENTS_PAGE_SIZE = 7;
 
-const PAYMENT_STATUS_OPTIONS: PaymentStatus[] = ["Pending", "Paid", "Cancelled"];
+const PAYMENT_STATUS_OPTIONS: PaymentStatus[] = ["Pending", "Paid", "Completed", "Cancelled"];
 
 const PayModal: React.FC<{
     visible: boolean;
@@ -548,12 +548,12 @@ const SellerPaymentsScreen: React.FC = () => {
     const [orders, setOrders] = useState<SellerOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0, greenCount: 0, orangeCount: 0, redCount: 0 });
+    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, completed: 0, cancelled: 0, totalPaidAmount: 0, greenCount: 0, orangeCount: 0, redCount: 0 });
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
     const [search, setSearch] = useState("");
-    const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Cancelled">("All");
+    const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Completed" | "Cancelled">("All");
     const [filterReminderBucket, setFilterReminderBucket] = useState<"All" | "green" | "orange" | "red">("All");
     const [sortPriority, setSortPriority] = useState<"Priority (Red first)" | "Date: Newest First" | "Date: Oldest First">("Priority (Red first)");
     const [openDropdown, setOpenDropdown] = useState<"payment" | "reminder" | "priority" | "export" | null>(null);
@@ -581,8 +581,9 @@ const SellerPaymentsScreen: React.FC = () => {
     const apiStatus =
         filterPayment === "Pending" ? "pending" :
             filterPayment === "Paid" ? "paid" :
-                filterPayment === "Cancelled" ? "cancelled" :
-                    undefined;
+                filterPayment === "Completed" ? "completed" :
+                    filterPayment === "Cancelled" ? "cancelled" :
+                        undefined;
 
     const loadPayments = useCallback(async () => {
         if (!token) return;
@@ -603,6 +604,8 @@ const SellerPaymentsScreen: React.FC = () => {
                 total: Number(apiStats.total ?? 0),
                 pending: Number(apiStats.pending ?? 0),
                 paid: Number(apiStats.paid ?? 0),
+                completed: Number(apiStats.completed ?? 0),
+                cancelled: Number(apiStats.cancelled ?? 0),
                 totalPaidAmount: Number(apiStats.totalPaidAmount ?? 0),
                 greenCount: Number(apiStats.greenCount ?? 0),
                 orangeCount: Number(apiStats.orangeCount ?? 0),
@@ -989,8 +992,8 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "payment" && (
-                                        <View style={[styles.webDropdownMenu, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
-                                            {(["All", "Pending", "Paid", "Cancelled"] as const).map(option => (
+                                        <View style={styles.webDropdownMenu}>
+                                            {(["All", "Pending", "Paid", "Completed", "Cancelled"] as const).map(option => (
                                                 <TouchableOpacity
                                                     key={option}
                                                     style={[styles.webDropdownItem, filterPayment === option && { backgroundColor: "#1d4ed8" }]}
