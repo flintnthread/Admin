@@ -807,6 +807,7 @@ function mapStatusFilterToApi(filter: string): string | undefined {
   const map: Record<string, string> = {
     Processing: "processing",
     Pending: "pending",
+    // Backend expands delivered ↔ completed so Completed tab matches All-tab badges.
     Completed: "delivered",
     Shipped: "shipped",
     Cancelled: "cancelled",
@@ -1162,11 +1163,47 @@ function toUiOrder(
     completed: "Completed",
     delivered: "Completed",
     cancelled: "Cancelled",
+    canceled: "Cancelled",
     shipped: "Shipped",
+    in_transit: "Shipped",
+    out_for_delivery: "Shipped",
+    picked_up: "Shipped",
     returned: "Returned",
     refunded: "Returned",
+    rto_delivered: "Returned",
+    rto_initiated: "Returned",
     replacement: "Replacement",
   };
+  const rawStatus = String(raw.orderStatus ?? "").trim().toLowerCase();
+  const shipStatus = String((raw as { shiprocketStatus?: string }).shiprocketStatus ?? "").trim().toLowerCase();
+  const resolveStatus = (value: string): OrderStatus | null => {
+    if (!value) return null;
+    if (statusMap[value]) return statusMap[value];
+    if (/^\d+$/.test(value)) {
+      if (["7", "23", "26"].includes(value)) return "Completed";
+      if (["9", "10", "14", "46"].includes(value)) return "Returned";
+      if (["5", "8", "16", "45"].includes(value)) return "Cancelled";
+      if (["1", "2", "3", "4"].includes(value)) return "Processing";
+      return "Shipped";
+    }
+    if (value.includes("deliver") || value === "completed") return "Completed";
+    if (value.includes("cancel")) return "Cancelled";
+    if (value.includes("return") || value.includes("rto")) return "Returned";
+    if (value.includes("ship") || value.includes("transit") || value.includes("ofd") || value.includes("pick"))
+      return "Shipped";
+    if (value.includes("process") || value.includes("awb") || value.includes("pack")) return "Processing";
+    return null;
+  };
+  const fromOrder = resolveStatus(rawStatus);
+  const fromShip = resolveStatus(shipStatus);
+  const rank = (s: OrderStatus) =>
+    s === "Pending" ? 0 : s === "Processing" ? 1 : s === "Shipped" ? 2 : s === "Completed" ? 3 : 4;
+  let uiStatus: OrderStatus = fromOrder ?? "Pending";
+  if (fromOrder === "Cancelled") {
+    uiStatus = "Cancelled";
+  } else if (fromShip && (!fromOrder || rank(fromShip) >= rank(fromOrder))) {
+    uiStatus = fromShip;
+  }
   const paymentMap: Record<string, PaymentType> = {
     cod: "Cash on Delivery",
     cash_on_delivery: "Cash on Delivery",
@@ -1224,7 +1261,7 @@ function toUiOrder(
       paymentMap[
       (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase()
       ] ?? "Cash on Delivery",
-    status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
+    status: uiStatus,
     gstStatus: mapGstStatusFromApi(raw.gstStatus ?? row.gstStatus),
     hasInvoice: Boolean(raw.hasInvoice),
     hasShippingLabel: Boolean(raw.hasShippingLabel),
