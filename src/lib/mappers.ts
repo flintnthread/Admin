@@ -510,13 +510,13 @@ export function mapPayoutToPaymentRow(p: PayoutSummary) {
   const status = (p.status ?? "pending").toLowerCase();
   const paid = status === "paid";
   const cancelled = status === "cancelled";
-  const referenceDate = p.deliveryDate ?? p.requestedAt;
+  const referenceDate = p.deliveryDate ?? null;
   const days = paid || cancelled ? 0 : daysSinceIso(referenceDate);
   const reminderBucket = paid || cancelled
     ? ("green" as const)
-    : days >= 5
+    : days >= 7
       ? ("red" as const)
-      : days >= 3
+      : days >= 4
         ? ("orange" as const)
         : ("green" as const);
 

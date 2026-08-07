@@ -581,9 +581,8 @@ const SellerPaymentsScreen: React.FC = () => {
     const apiStatus =
         filterPayment === "Pending" ? "pending" :
             filterPayment === "Paid" ? "paid" :
-                filterPayment === "Completed" ? "completed" :
-                    filterPayment === "Cancelled" ? "cancelled" :
-                        undefined;
+                filterPayment === "Cancelled" ? "cancelled" :
+                    undefined;
 
     const loadPayments = useCallback(async () => {
         if (!token) return;
@@ -730,7 +729,8 @@ const SellerPaymentsScreen: React.FC = () => {
 
     const filtered = orders.filter((o) => {
         const ms = o.orderId.toLowerCase().includes(search.toLowerCase()) || o.sellerName.toLowerCase().includes(search.toLowerCase());
-        const mp = filterPayment === "All" || o.paymentStatus === filterPayment;
+        const mp = filterPayment === "All"
+            || (filterPayment === "Completed" ? o.orderStatus === "Completed" : o.paymentStatus === filterPayment);
         const mr = filterReminderBucket === "All" || o.reminderBucket === filterReminderBucket;
         return ms && mp && mr;
     }).sort((a, b) => {
@@ -925,13 +925,13 @@ const SellerPaymentsScreen: React.FC = () => {
                     <View style={{ gap: 6, justifyContent: "center", width: isUltraWide ? 300 : "100%" }}>
                         <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                             <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
-                                <Text style={[styles.legendText, { textAlign: "center" }]}>Green (0-2d): {stats.greenCount}</Text>
+                                <Text style={[styles.legendText, { textAlign: "center" }]}>Green (0-3d): {stats.greenCount}</Text>
                             </View>
                             <View style={[styles.legendBadge, { backgroundColor: "#fbbf24", flex: 1, minWidth: 90 }]}>
-                                <Text style={[styles.legendText, { textAlign: "center" }]}>Orange (3-4d): {stats.orangeCount}</Text>
+                                <Text style={[styles.legendText, { textAlign: "center" }]}>Orange (4-6d): {stats.orangeCount}</Text>
                             </View>
                             <View style={[styles.legendBadge, { backgroundColor: "#f87171", flex: 1, minWidth: 90 }]}>
-                                <Text style={[styles.legendText, { textAlign: "center" }]}>Red (5+d): {stats.redCount}</Text>
+                                <Text style={[styles.legendText, { textAlign: "center" }]}>Red (7+d): {stats.redCount}</Text>
                             </View>
                         </View>
                         <View style={[styles.legendBadge, { backgroundColor: "#475569" }]}>
@@ -1016,8 +1016,8 @@ const SellerPaymentsScreen: React.FC = () => {
                                     >
                                         <Text style={styles.webSelectText}>
                                             {filterReminderBucket === "All" ? "All Buckets" :
-                                                filterReminderBucket === "green" ? "Green (0-2d)" :
-                                                    filterReminderBucket === "orange" ? "Orange (3-4d)" : "Red (5+d)"}
+                                                filterReminderBucket === "green" ? "Green (0-3d)" :
+                                                    filterReminderBucket === "orange" ? "Orange (4-6d)" : "Red (7+d)"}
                                         </Text>
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
@@ -1025,9 +1025,9 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <View style={[styles.webDropdownMenu, { width: 180 }, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {[
                                                 { label: "All Buckets", value: "All" },
-                                                { label: "Green (0-2 days)", value: "green" },
-                                                { label: "Orange (3-4 days)", value: "orange" },
-                                                { label: "Red (5+ days)", value: "red" }
+                                                { label: "Green (0-3 days)", value: "green" },
+                                                { label: "Orange (4-6 days)", value: "orange" },
+                                                { label: "Red (7+ days)", value: "red" }
                                             ].map(option => (
                                                 <TouchableOpacity
                                                     key={option.value}
@@ -1069,18 +1069,18 @@ const SellerPaymentsScreen: React.FC = () => {
 
                                 {/* Export Buttons Container */}
                                 <View style={[{ flexDirection: "column", gap: 8 }, windowWidth < 550 && { width: "100%" }]}>
-                                    {/* Export row: button + >=4d side by side */}
+                                    {/* Export row: button + >=7d side by side */}
                                     <View style={{ flexDirection: "row", gap: 8 }}>
                                         {/* Export All Dropdown trigger only (fixed width, not flex) */}
                                         <ExportDropdown onExport={handleExport} isWeb={isWideWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
 
-                                        {/* Export >=4d button */}
+                                        {/* Export >=7d button — overdue after 7 days from delivery */}
                                         <TouchableOpacity
                                             style={[styles.webExportBtn, { backgroundColor: "#ef4444" }]}
-                                            onPress={() => void downloadBackendExport("pending", 4)}
+                                            onPress={() => void downloadBackendExport("pending", 7)}
                                         >
                                             <Feather name="clock" size={14} color="#fff" />
-                                            <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
+                                            <Text style={styles.webExportBtnText}>Export &gt;=7d</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
