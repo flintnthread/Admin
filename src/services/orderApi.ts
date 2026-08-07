@@ -412,6 +412,37 @@ export async function syncOrderFromShiprocket(id: number): Promise<ShiprocketAct
   });
 }
 
+export type ShiprocketSyncAllResponse = {
+  success?: boolean;
+  message?: string;
+  requestedLimit?: number;
+  lookbackHours?: number;
+  lookbackDays?: number;
+  candidates?: number;
+  synced?: number;
+  failed?: number;
+  failures?: Array<{ orderId?: number; orderNumber?: string; error?: string }>;
+};
+
+/** Bulk sync Shiprocket statuses for historical orders (default lookback ~2 years). */
+export async function syncAllOrdersFromShiprocket(params?: {
+  limit?: number;
+  lookbackHours?: number;
+  minSyncAgeMinutes?: number;
+}): Promise<ShiprocketSyncAllResponse> {
+  const limit = params?.limit ?? 2000;
+  const lookbackHours = params?.lookbackHours ?? 17520; // 2 years
+  const minSyncAgeMinutes = params?.minSyncAgeMinutes ?? 0;
+  const qs = new URLSearchParams({
+    limit: String(limit),
+    lookbackHours: String(lookbackHours),
+    minSyncAgeMinutes: String(minSyncAgeMinutes),
+  });
+  return adminApiRequest(`/api/admin/orders/shiprocket/sync-all?${qs.toString()}`, {
+    method: "POST",
+  });
+}
+
 export type OrderTracking = {
   orderId?: number;
   orderNumber?: string;
