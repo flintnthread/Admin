@@ -520,18 +520,25 @@ export function mapPayoutToPaymentRow(p: PayoutSummary) {
         ? ("orange" as const)
         : ("green" as const);
 
-  const orderStatusRaw = (p.orderStatus ?? "").toLowerCase();
-  const orderStatus =
-    orderStatusRaw === "delivered" ? ("Completed" as const) :
-    orderStatusRaw === "processing" || orderStatusRaw === "confirmed" ? ("Processing" as const) :
-    ("Processing" as const);
+  const orderStatusRaw = (p.orderStatus ?? "").toLowerCase().trim();
+  const shiprocketRaw = (p.shiprocketStatus ?? "").toLowerCase().trim();
+  const shiprocketDelivered =
+    ["7", "23", "26", "delivered", "completed", "fulfilled"].includes(shiprocketRaw) ||
+    shiprocketRaw.includes("deliver");
+  const isCompleted =
+    orderStatusRaw === "delivered" ||
+    orderStatusRaw === "completed" ||
+    shiprocketDelivered;
+  const orderStatus = isCompleted ? ("Completed" as const) : ("Processing" as const);
 
   const paymentStatus =
     paid ? ("Paid" as const) :
     cancelled ? ("Cancelled" as const) :
     ("Pending" as const);
 
-  const deliveryAt = p.deliveryDate ?? p.paidAt;
+  // Only show a real delivery timestamp — never fall back to order/paid dates
+  // (that previously made Processing rows look delivered).
+  const deliveryAt = p.deliveryDate ?? null;
   const deliveryTime = deliveryAt && deliveryAt.includes("T")
     ? deliveryAt.split("T")[1]?.slice(0, 5) ?? ""
     : "";
@@ -550,7 +557,7 @@ export function mapPayoutToPaymentRow(p: PayoutSummary) {
     customerName: p.customerName ?? "",
     customerEmail: p.customerEmail ?? "",
     customerPaid: formatRupee(p.customerPaidAmount ?? p.requestedAmount),
-    deliveryDate: formatDate(deliveryAt ?? p.requestedAt),
+    deliveryDate: deliveryAt ? formatDate(deliveryAt) : "—",
     deliveryTime,
     reminderLabel: paid ? "Paid" : cancelled ? "Cancelled" : days > 0 ? `${days}d pending` : "Pending",
     reminderDays: days,

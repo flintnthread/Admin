@@ -183,6 +183,7 @@ export type PayoutSummary = {
   orderId?: number;
   orderNumber?: string;
   orderStatus?: string;
+  shiprocketStatus?: string;
   requestedAmount?: number;
   customerPaidAmount?: number;
   customerName?: string;
