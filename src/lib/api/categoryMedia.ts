@@ -1,8 +1,10 @@
-import { resolveAdminApiBaseUrl } from "@/lib/api/config";
+import { resolvePublicMediaBaseUrl, resolveAdminApiBaseUrl } from "@/lib/api/config";
 import { buildMediaUrlCandidates } from "@/lib/api/media";
 
 export type CategoryImageFields = {
   mobileImage?: string | null;
+  mobileimage?: string | null;
+  mobile_image?: string | null;
   categoryImage?: string | null;
   bannerImage?: string | null;
   subcategoryImage?: string | null;
@@ -17,11 +19,29 @@ export function resolveCatalogMediaUrl(
   if (!path?.trim()) return "";
 
   const value = path.trim();
-  // Cloudinary / absolute CDN URLs — keep as-is (never rewrite onto admin host).
+  // Cloudinary absolute URLs — keep as-is (never rewrite onto admin / CDN hosts).
   if (/res\.cloudinary\.com/i.test(value) || /cloudinary\.com/i.test(value)) {
     return value;
   }
-  if (/^(https?:\/\/|data:|blob:)/i.test(value)) return value;
+  if (/^(https?:\/\/|data:|blob:)/i.test(value)) {
+    // Rewrite broken .in/.online catalog hosts onto public CDN
+    try {
+      const u = new URL(value);
+      if (/\/uploads\/(categories|subcategories)\//i.test(u.pathname)) {
+        return `${resolvePublicMediaBaseUrl().replace(/\/$/, "")}${u.pathname}${u.search || ""}`;
+      }
+    } catch {
+      /* keep absolute */
+    }
+    return value;
+  }
+
+  // For local development, use API origin instead of public CDN
+  const isLocalDev =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  const baseUrl = isLocalDev ? resolveAdminApiBaseUrl() : resolvePublicMediaBaseUrl();
 
   let normalized = value.replace(/\\/g, "/");
   if (!normalized.startsWith("/")) normalized = `/${normalized}`;
@@ -31,8 +51,9 @@ export function resolveCatalogMediaUrl(
       ? `/${bare}`
       : `/uploads/${folder}/${bare}`;
   }
-  // Legacy local uploads may still live on admin media (:8082).
-  return `${resolveAdminApiBaseUrl().replace(/\/$/, "")}${normalized}`;
+
+  // Local dev → admin API origin; production → public CDN
+  return `${baseUrl.replace(/\/$/, "")}${normalized}`;
 }
 
 /** Pick the best display URL — mobile (Cloudinary) first, then desktop/banner. */
@@ -42,8 +63,8 @@ export function pickCategoryImageUrl(
 ): string {
   const ordered =
     folder === "subcategories"
-      ? [row.mobileImage, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
-      : [row.mobileImage, row.categoryImage, row.bannerImage, row.image];
+      ? [row.mobileImage, row.mobileimage, row.mobile_image, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
+      : [row.mobileImage, row.mobileimage, row.mobile_image, row.categoryImage, row.bannerImage, row.image];
 
   for (const raw of ordered) {
     const url = resolveCatalogMediaUrl(raw, folder);
@@ -59,8 +80,8 @@ export function categoryImageCandidates(
 ): string[] {
   const ordered =
     folder === "subcategories"
-      ? [row.mobileImage, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
-      : [row.mobileImage, row.categoryImage, row.bannerImage, row.image];
+      ? [row.mobileImage, row.mobileimage, row.mobile_image, row.subcategoryImage, row.categoryImage, row.image, row.bannerImage]
+      : [row.mobileImage, row.mobileimage, row.mobile_image, row.categoryImage, row.bannerImage, row.image];
 
   const urls: string[] = [];
   const push = (url: string) => {
@@ -71,7 +92,7 @@ export function categoryImageCandidates(
     if (!raw?.trim()) continue;
     const value = raw.trim();
     if (/^(https?:\/\/|data:|blob:)/i.test(value)) {
-      push(value);
+      push(resolveCatalogMediaUrl(value, folder) || value);
       continue;
     }
     let path = value.replace(/\\/g, "/");

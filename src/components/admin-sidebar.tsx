@@ -117,6 +117,12 @@ export const NAV_ITEMS = {
         color: "#06B6D4",
       },
       {
+        label: "Deactivation Requests",
+        icon: "pause",
+        path: "/sellerDeactivationRequests",
+        color: "#F59E0B",
+      },
+      {
         label: "Customer Support",
         icon: "headphones",
         path: "/Customersupport",

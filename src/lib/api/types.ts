@@ -94,6 +94,7 @@ export type OrderSummary = {
   shiprocketAwbCode?: string;
   shiprocketCourierName?: string;
   shiprocketTrackingUrl?: string;
+  shiprocketStatus?: string;
   trackingId?: string;
   weightKg?: number;
   dimensionsCm?: { l?: number; w?: number; h?: number };
@@ -182,6 +183,7 @@ export type PayoutSummary = {
   orderId?: number;
   orderNumber?: string;
   orderStatus?: string;
+  shiprocketStatus?: string;
   requestedAmount?: number;
   customerPaidAmount?: number;
   customerName?: string;

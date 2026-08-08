@@ -1,7 +1,22 @@
 import AdminLayout from "@/components/admin-layout";
 import Pagination from "@/components/Pagination";
+import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
+import { fetchSubcategories as fetchChildCategories, fetchMainCategories, type CategoryRow } from "@/services/categoryApi";
+import {
+  createSubcategory,
+  deleteSubcategory,
+  fetchSubcategories,
+  parseMaterialSlabs,
+  serializeMaterialSlabs,
+  updateSubcategory,
+  uploadSubcategoryImages,
+  type MaterialSlab,
+  type SubcategoryRow,
+} from "@/services/subcategoryApi";
 import * as ImagePicker from "expo-image-picker";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -15,21 +30,6 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
-import {
-  fetchSubcategories,
-  createSubcategory,
-  updateSubcategory,
-  deleteSubcategory,
-  uploadSubcategoryImages,
-  parseMaterialSlabs,
-  serializeMaterialSlabs,
-  type SubcategoryRow,
-  type MaterialSlab,
-} from "@/services/subcategoryApi";
-import { fetchMainCategories, fetchSubcategories as fetchChildCategories, type CategoryRow } from "@/services/categoryApi";
-import { getApiErrorMessage } from "@/lib/api/client";
-import { sweetCrud, sweetError, sweetInfo, sweetWarning } from "@/lib/sweetAlert";
-import { pickCategoryImageUrl, resolveCatalogMediaUrl } from "@/lib/api/categoryMedia";
 
 const isWeb = Platform.OS === "web";
 
@@ -644,6 +644,9 @@ const AddModal = ({
   const [image, setImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | Blob | null>(null);
   const [imageChanged, setImageChanged] = useState(false);
+  const [mobileImage, setMobileImage] = useState<string | null>(null);
+  const [mobileImageFile, setMobileImageFile] = useState<File | Blob | null>(null);
+  const [mobileImageChanged, setMobileImageChanged] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [status, setStatus] = useState("Active");
 
@@ -655,6 +658,9 @@ const AddModal = ({
     setImage(null);
     setImageFile(null);
     setImageChanged(false);
+    setMobileImage(null);
+    setMobileImageFile(null);
+    setMobileImageChanged(false);
     setMaterials([]);
     setStatus("Active");
   };
@@ -689,6 +695,11 @@ const AddModal = ({
         );
         setImageFile(null);
         setImageChanged(false);
+        setMobileImage(
+          resolveCatalogMediaUrl(editData.mobileImage || "", "subcategories") || null
+        );
+        setMobileImageFile(null);
+        setMobileImageChanged(false);
         setMaterials(editData.materials || []);
         setStatus(editData.statusText || (typeof editData.status === "boolean" ? (editData.status ? "Active" : "Inactive") : "Active"));
       } else {
@@ -743,6 +754,42 @@ const AddModal = ({
     }
   };
 
+  const pickMobileImage = async () => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/jpeg,image/png,image/webp";
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0] as File | undefined;
+        if (file) {
+          setMobileImageFile(file);
+          setMobileImageChanged(true);
+          const r = new FileReader();
+          r.onload = (ev) => setMobileImage(ev.target?.result as string);
+          r.readAsDataURL(file);
+        }
+      };
+      input.click();
+    } else {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+      });
+      if (!res.canceled) {
+        const asset = res.assets[0];
+        setMobileImage(asset.uri);
+        setMobileImageChanged(true);
+        try {
+          const response = await fetch(asset.uri);
+          const blob = await response.blob();
+          setMobileImageFile(blob);
+        } catch {
+          setMobileImageFile(null);
+        }
+      }
+    }
+  };
+
   const addMaterial = () =>
     setMaterials((prev) => [
       ...prev,
@@ -773,8 +820,9 @@ const AddModal = ({
       image,
       imageFile,
       imageChanged,
-      // Keep existing mobile image unless a dedicated mobile picker is added.
-      mobileImage: undefined,
+      mobileImage,
+      mobileImageFile,
+      mobileImageChanged,
       materials,
       status,
     });
@@ -911,6 +959,53 @@ const AddModal = ({
 
                   <TouchableOpacity
                     onPress={() => setImage(null)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.inactiveLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
+                  >
+                    <TrashIcon color={C.inactive} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: C.inactive }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Mobile Image */}
+            <View style={S.fg}>
+              <Text style={S.fl}>
+                Mobile Image <Text style={S.hint}>(for mobile app)</Text>
+              </Text>
+              <TouchableOpacity
+                style={S.imgPicker}
+                onPress={pickMobileImage}
+                activeOpacity={0.7}
+              >
+                {mobileImage ? (
+                  <Image
+                    source={{ uri: mobileImage }}
+                    style={S.imgPreview}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={S.imgPickerInner}>
+                    <UploadIcon />
+                    <Text style={S.imgPickerTitle}>
+                      Drag & drop mobile image here or browse
+                    </Text>
+                    <Text style={S.imgPickerSub}>JPG, PNG · Max 2MB</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {mobileImage && (
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <TouchableOpacity
+                    onPress={pickMobileImage}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.navyLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
+                  >
+                    <RefreshIcon color={C.navy} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: C.navy }}>Retake</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setMobileImage(null)}
                     style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.inactiveLight, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
                   >
                     <TrashIcon color={C.inactive} />
@@ -1327,6 +1422,14 @@ export default function Subcategories() {
         const materials = parseMaterialSlabs(materialSlabsValue);
         const imageUrl = pickCategoryImageUrl(row, "subcategories");
 
+        // Debug: Check if mobileImage data exists
+        console.log(`Subcategory ${row.id} - ${row.subcategoryName}:`, {
+          mobileImage: row.mobileImage,
+          subcategoryImage: row.subcategoryImage,
+          hasMobileImage: !!row.mobileImage,
+          resolvedMobileImage: row.mobileImage ? resolveCatalogMediaUrl(row.mobileImage, "subcategories") : null
+        });
+
         return {
           id: row.id,
           categoryId: row.categoryId,
@@ -1343,7 +1446,7 @@ export default function Subcategories() {
           mainCat: row.mainCat,
           category: row.category,
           name: row.subcategoryName,
-          image: imageUrl || undefined,
+          image: row.mobileImage ? resolveCatalogMediaUrl(row.mobileImage, "subcategories") : imageUrl || undefined,
           created: row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -1408,18 +1511,36 @@ export default function Subcategories() {
       const statusValue = data.status === "Active";
       const materialPayload = serializeMaterialSlabs(data.materials as MaterialSlab[]);
       const shouldUploadImage = Boolean(data.imageChanged && data.imageFile);
+      const shouldUploadMobileImage = Boolean(data.mobileImageChanged && data.mobileImageFile);
       let imageUploadFailed = false;
 
       const uploadImageSafely = async (id: number, existing: SubcategoryRow): Promise<SubcategoryRow> => {
-        if (!shouldUploadImage || !data.imageFile) return existing;
+        if (!shouldUploadImage && !shouldUploadMobileImage) return existing;
         try {
           const { compressImageFile } = await import("@/lib/media/compressImage");
-          const compressed = await compressImageFile(data.imageFile, {
-            maxEdge: 1100,
-            maxBytes: 400_000,
-            fileName: data.imageFile instanceof File ? data.imageFile.name : "subcategory.jpg",
-          });
-          return await uploadSubcategoryImages(id, compressed.file);
+          
+          let imageFile: File | Blob | undefined;
+          let mobileImageFile: File | Blob | undefined;
+          
+          if (shouldUploadImage && data.imageFile) {
+            const compressed = await compressImageFile(data.imageFile, {
+              maxEdge: 1100,
+              maxBytes: 400_000,
+              fileName: data.imageFile instanceof File ? data.imageFile.name : "subcategory.jpg",
+            });
+            imageFile = compressed.file;
+          }
+          
+          if (shouldUploadMobileImage && data.mobileImageFile) {
+            const compressed = await compressImageFile(data.mobileImageFile, {
+              maxEdge: 1100,
+              maxBytes: 400_000,
+              fileName: data.mobileImageFile instanceof File ? data.mobileImageFile.name : "subcategory-mobile.jpg",
+            });
+            mobileImageFile = compressed.file;
+          }
+          
+          return await uploadSubcategoryImages(id, imageFile, mobileImageFile);
         } catch (uploadError) {
           imageUploadFailed = true;
           void sweetWarning(
@@ -1764,7 +1885,7 @@ const S = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1896,9 +2017,17 @@ const S = StyleSheet.create({
     right: 10,
     borderRadius: 20,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
+    overflow: "visible",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  cardStatusText: { fontSize: 11, fontWeight: "700" },
+  cardStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 15,
+    includeFontPadding: false,
+  },
   cardBody: { padding: 14, gap: 8 },
   breadcrumb: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap", flexShrink: 1 },
   breadcrumbText: { fontSize: 11, color: C.sub, fontWeight: "500", flexShrink: 1 },
@@ -2003,12 +2132,13 @@ const S = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     alignSelf: "flex-start",
+    overflow: "visible",
   },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontWeight: "600" },
+  statusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  statusText: { fontSize: 12, fontWeight: "600", lineHeight: 16, includeFontPadding: false },
 
   // Pagination
   pagination: {
@@ -2160,7 +2290,7 @@ const S = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "#F97316",
     alignItems: "center",
     justifyContent: "center",
   },

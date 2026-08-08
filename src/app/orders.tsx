@@ -4,8 +4,7 @@ import { getApiErrorMessage } from "@/lib/api/client";
 import { resolveMediaUrl } from "@/lib/api/media";
 import type { OrderSummary } from "@/lib/api/types";
 import { mapOrderRow } from "@/lib/mappers";
-import { sweetError } from "@/lib/sweetAlert";
-import { downloadOrderExportExcel, downloadOrderInvoicePdf, downloadOrderShippingLabelPdf, fetchOrderInvoice, fetchOrders, fetchOrderShippingLabel, fetchOrderStats, updateOrderGstStatus, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
+import { downloadOrderExportExcel, downloadOrderInvoicePdf, downloadOrderShippingLabelPdf, fetchOrderInvoice, fetchOrders, fetchOrderShippingLabel, fetchOrderStats, syncAllOrdersFromShiprocket, updateOrderGstStatus, type OrderInvoice, type OrderShippingLabel, type OrderStats } from "@/services/orderApi";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -24,6 +23,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
+import { sweetError, sweetSuccess } from "@/lib/sweetAlert";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LOGO_PNG = require("../../assets/images/flint-thread-logo.png");
@@ -807,6 +807,7 @@ function mapStatusFilterToApi(filter: string): string | undefined {
   const map: Record<string, string> = {
     Processing: "processing",
     Pending: "pending",
+    // Backend expands delivered ↔ completed so Completed tab matches All-tab badges.
     Completed: "delivered",
     Shipped: "shipped",
     Cancelled: "cancelled",
@@ -1162,11 +1163,47 @@ function toUiOrder(
     completed: "Completed",
     delivered: "Completed",
     cancelled: "Cancelled",
+    canceled: "Cancelled",
     shipped: "Shipped",
+    in_transit: "Shipped",
+    out_for_delivery: "Shipped",
+    picked_up: "Shipped",
     returned: "Returned",
     refunded: "Returned",
+    rto_delivered: "Returned",
+    rto_initiated: "Returned",
     replacement: "Replacement",
   };
+  const rawStatus = String(raw.orderStatus ?? "").trim().toLowerCase();
+  const shipStatus = String((raw as { shiprocketStatus?: string }).shiprocketStatus ?? "").trim().toLowerCase();
+  const resolveStatus = (value: string): OrderStatus | null => {
+    if (!value) return null;
+    if (statusMap[value]) return statusMap[value];
+    if (/^\d+$/.test(value)) {
+      if (["7", "23", "26"].includes(value)) return "Completed";
+      if (["9", "10", "14", "46"].includes(value)) return "Returned";
+      if (["5", "8", "16", "45"].includes(value)) return "Cancelled";
+      if (["1", "2", "3", "4"].includes(value)) return "Processing";
+      return "Shipped";
+    }
+    if (value.includes("deliver") || value === "completed") return "Completed";
+    if (value.includes("cancel")) return "Cancelled";
+    if (value.includes("return") || value.includes("rto")) return "Returned";
+    if (value.includes("ship") || value.includes("transit") || value.includes("ofd") || value.includes("pick"))
+      return "Shipped";
+    if (value.includes("process") || value.includes("awb") || value.includes("pack")) return "Processing";
+    return null;
+  };
+  const fromOrder = resolveStatus(rawStatus);
+  const fromShip = resolveStatus(shipStatus);
+  const rank = (s: OrderStatus) =>
+    s === "Pending" ? 0 : s === "Processing" ? 1 : s === "Shipped" ? 2 : s === "Completed" ? 3 : 4;
+  let uiStatus: OrderStatus = fromOrder ?? "Pending";
+  if (fromOrder === "Cancelled") {
+    uiStatus = "Cancelled";
+  } else if (fromShip && (!fromOrder || rank(fromShip) >= rank(fromOrder))) {
+    uiStatus = fromShip;
+  }
   const paymentMap: Record<string, PaymentType> = {
     cod: "Cash on Delivery",
     cash_on_delivery: "Cash on Delivery",
@@ -1224,7 +1261,7 @@ function toUiOrder(
       paymentMap[
       (raw.paymentMethod ?? raw.paymentStatus ?? "").toLowerCase()
       ] ?? "Cash on Delivery",
-    status: statusMap[(raw.orderStatus ?? "").toLowerCase()] ?? "Pending",
+    status: uiStatus,
     gstStatus: mapGstStatusFromApi(raw.gstStatus ?? row.gstStatus),
     hasInvoice: Boolean(raw.hasInvoice),
     hasShippingLabel: Boolean(raw.hasShippingLabel),
@@ -1391,6 +1428,31 @@ const ExportIcon = () => (
       strokeLinejoin="round"
     />
     <Path d="M12 15V3" stroke={C.white} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+const SyncIcon = () => (
+  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M23 4v6h-6"
+      stroke={C.white}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M1 20v-6h6"
+      stroke={C.white}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+      stroke={C.white}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </Svg>
 );
 const ChevronDownIcon = ({
@@ -3529,6 +3591,7 @@ export default function OrdersScreen() {
   const [activeAction, setActiveAction] = useState<Order | null>(null);
   const [docModal, setDocModal] = useState<DocModalType>(null);
   const [docOrder, setDocOrder] = useState<Order | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   useEffect(() => {
     if (params.status) {
@@ -3636,6 +3699,30 @@ export default function OrdersScreen() {
     }
   }, [searchQuery, statusFilter, paymentFilter, sortOption]);
 
+  const handleSyncAllStatuses = useCallback(async () => {
+    if (syncingAll) return;
+    setSyncingAll(true);
+    try {
+      const result = await syncAllOrdersFromShiprocket({
+        limit: 2000,
+        lookbackHours: 17520, // ~2 years
+        minSyncAgeMinutes: 0,
+      });
+      const synced = result.synced ?? 0;
+      const failed = result.failed ?? 0;
+      const days = result.lookbackDays ?? 730;
+      await sweetSuccess(
+        "Statuses synced",
+        `Looked back ${days} days. Synced ${synced} order(s)${failed ? `, ${failed} failed` : ""}. Refreshing list…`,
+      );
+      await loadOrders();
+    } catch (e) {
+      void sweetError("Sync All failed", getApiErrorMessage(e, "Could not sync Shiprocket statuses."));
+    } finally {
+      setSyncingAll(false);
+    }
+  }, [syncingAll, loadOrders]);
+
   const rangeStart =
     totalElements === 0 ? 0 : (currentPage - 1) * ORDERS_PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * ORDERS_PAGE_SIZE, totalElements);
@@ -3726,6 +3813,23 @@ export default function OrdersScreen() {
                   </View>
                 </View>
                 <View style={s.headerActions}>
+                  <TouchableOpacity
+                    style={[s.exportBtn, { backgroundColor: C.orange }, syncingAll && { opacity: 0.75 }]}
+                    onPress={handleSyncAllStatuses}
+                    disabled={syncingAll}
+                    activeOpacity={0.85}
+                  >
+                    {syncingAll ? (
+                      <ActivityIndicator size="small" color={C.white} />
+                    ) : (
+                      <SyncIcon />
+                    )}
+                    {!isMobile && (
+                      <Text style={s.exportBtnText}>
+                        {syncingAll ? "Syncing…" : "Sync All Status"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={s.exportBtn}
                     onPress={handleExportExcel}

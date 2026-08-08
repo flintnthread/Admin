@@ -142,9 +142,9 @@ function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || { color: C.sub, bg: C.bg, icon: 'â€¢' };
   const isBI = cfg.icon !== 'â€¢';
   return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+    <View style={[styles.badge, { backgroundColor: cfg.bg, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
       {isBI ? (
-        <BI name={cfg.icon} size={11} color={cfg.color} />
+        <BI name={cfg.icon} size={9} color={cfg.color} />
       ) : (
         <Text style={{ color: cfg.color }}>â€¢</Text>
       )}
@@ -155,7 +155,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function Avatar({ initials, color, size = 44 }: { initials: string, color: string, size?: number }) {
+function Avatar({ initials, color, size = 36 }: { initials: string, color: string, size?: number }) {
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color + '22', borderColor: color + '44' }]}>
       <Text style={[styles.avatarText, { color, fontSize: size * 0.35 }]}>{initials}</Text>
@@ -166,8 +166,8 @@ function Avatar({ initials, color, size = 44 }: { initials: string, color: strin
 function StatCard({ label, count, color, icon, isWeb }: { label: string, count: number | string, color: string, icon: string, isWeb: boolean }) {
   return (
     <View style={[styles.statCard, { borderTopColor: color }]}>
-      <View style={[styles.statIcon, { backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center' }]}>
-        <BI name={icon} size={16} color={color} />
+      <View style={[styles.statIcon, { width: isWeb ? 32 : 28, height: isWeb ? 32 : 28, borderRadius: isWeb ? 8 : 7, backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center' }]}>
+        <BI name={icon} size={isWeb ? 14 : 12} color={color} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.statCount, { color }]} numberOfLines={1}>{count}</Text>
@@ -196,7 +196,7 @@ function ApplicationCard({
         {/* Top Row: Avatar + Info (Name, Role) + Status */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-            <Avatar initials={item.avatar} color={item.avatarColor} size={46} />
+            <Avatar initials={item.avatar} color={item.avatarColor} size={38} />
             <View style={{ flex: 1 }}>
               <Text style={styles.appName} numberOfLines={1}>{item.name}</Text>
               <Text style={styles.appRole} numberOfLines={1}>{item.role}</Text>
@@ -241,15 +241,15 @@ function ApplicationCard({
         {/* Middle Row: Meta Chips */}
         <View style={[styles.appMeta, { marginTop: 4, width: '100%' }]}>
           <View style={styles.metaChip}>
-            <BI name="building" size={10} color={C.sub} />
+            <BI name="building" size={8} color={C.sub} />
             <Text style={styles.metaChipText}>{item.department}</Text>
           </View>
           <View style={styles.metaChip}>
-            <BI name="envelope-fill" size={10} color={C.sub} />
+            <BI name="envelope-fill" size={8} color={C.sub} />
             <Text style={styles.metaChipText}>{item.email}</Text>
           </View>
           <View style={styles.metaChip}>
-            <BI name="telephone-fill" size={10} color={C.sub} />
+            <BI name="telephone-fill" size={8} color={C.sub} />
             <Text style={styles.metaChipText}>{item.phone}</Text>
           </View>
         </View>
@@ -265,22 +265,22 @@ function ApplicationCard({
   // Web Layout
   return (
     <View style={[styles.appCard, styles.appCardWeb]}>
-      <Avatar initials={item.avatar} color={item.avatarColor} size={52} />
+      <Avatar initials={item.avatar} color={item.avatarColor} size={42} />
 
       <View style={styles.appInfo}>
         <Text style={styles.appName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.appRole} numberOfLines={1}>{item.role}</Text>
         <View style={styles.appMeta}>
           <View style={styles.metaChip}>
-            <BI name="building" size={10} color={C.sub} />
+            <BI name="building" size={8} color={C.sub} />
             <Text style={styles.metaChipText}>{item.department}</Text>
           </View>
           <View style={styles.metaChip}>
-            <BI name="envelope-fill" size={10} color={C.sub} />
+            <BI name="envelope-fill" size={8} color={C.sub} />
             <Text style={styles.metaChipText}>{item.email}</Text>
           </View>
           <View style={styles.metaChip}>
-            <BI name="telephone-fill" size={10} color={C.sub} />
+            <BI name="telephone-fill" size={8} color={C.sub} />
             <Text style={styles.metaChipText}>{item.phone}</Text>
           </View>
         </View>
@@ -332,7 +332,7 @@ function Dropdown({ value, options, onSelect, placeholder }: { value: string, op
     <View style={styles.dropdownWrap}>
       <TouchableOpacity style={styles.dropdownBtn} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <Text style={styles.dropdownText} numberOfLines={1}>{value || placeholder}</Text>
-        <BI name={open ? 'chevron-up' : 'chevron-down'} size={10} color={C.sub} />
+        <BI name={open ? 'chevron-up' : 'chevron-down'} size={9} color={C.sub} />
       </TouchableOpacity>
       {open && (
         <View style={styles.dropdownMenu}>
@@ -445,8 +445,8 @@ export default function JobApplicationsScreen() {
           {/* â”€â”€ Header â”€â”€ */}
           <View style={[styles.header, isWeb && styles.headerWeb]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
-                <Feather name="file-text" size={24} color="#FFF" />
+              <View style={{ width: isWeb ? 38 : 34, height: isWeb ? 38 : 34, borderRadius: isWeb ? 10 : 9, backgroundColor: "#F97316", alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="file-text" size={isWeb ? 20 : 18} color="#FFF" />
               </View>
               <Text style={styles.pageTitle}>Job Applications</Text>
             </View>
@@ -519,7 +519,7 @@ export default function JobApplicationsScreen() {
           {/* â”€â”€ Filters â”€â”€ */}
           <View style={[styles.filterRow, isWeb && styles.filterRowWeb, !isWeb && { marginTop: 16 }]}>
             <View style={[styles.searchBox, isWeb && styles.searchBoxWeb]}>
-              <BI name="search" size={14} color={C.sub} style={{ marginRight: 8 }} />
+              <BI name="search" size={12} color={C.sub} style={{ marginRight: 8 }} />
               <TextInput
                 style={[styles.searchInput, { outlineStyle: "none" as any }]}
                 placeholder="Search applicants..."
@@ -529,7 +529,7 @@ export default function JobApplicationsScreen() {
               />
               {search.length > 0 && (
                 <TouchableOpacity onPress={() => { setSearch(''); setCurrentPage(1); }}>
-                  <BI name="x-lg" size={13} color={C.sub} style={{ paddingHorizontal: 8 }} />
+                  <BI name="x-lg" size={11} color={C.sub} style={{ paddingHorizontal: 8 }} />
                 </TouchableOpacity>
               )}
             </View>
@@ -548,7 +548,7 @@ export default function JobApplicationsScreen() {
                   onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
                   activeOpacity={0.8}
                 >
-                  <BI name="arrow-counterclockwise" size={13} color={C.primary} />
+                  <BI name="arrow-counterclockwise" size={11} color={C.primary} />
                   <Text style={styles.resetBtnText}>Reset</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -567,7 +567,7 @@ export default function JobApplicationsScreen() {
                   onPress={() => { setSearch(''); setSelectedJob('All Jobs'); setSelectedStatus('All Status'); setCurrentPage(1); }}
                   activeOpacity={0.8}
                 >
-                  <BI name="arrow-counterclockwise" size={13} color={C.primary} />
+                  <BI name="arrow-counterclockwise" size={11} color={C.primary} />
                   <Text style={styles.resetBtnText}>Reset</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -596,7 +596,7 @@ export default function JobApplicationsScreen() {
             </View>
           ) : filtered.length === 0 ? (
             <View style={styles.emptyBox}>
-              <BI name="inbox" size={48} color={C.sub} style={{ marginBottom: 16 }} />
+              <BI name="inbox" size={40} color={C.sub} style={{ marginBottom: 16 }} />
               <Text style={styles.emptyTitle}>No Applications Found</Text>
               <Text style={styles.emptySub}>Try adjusting your filters to see more results.</Text>
             </View>
@@ -714,9 +714,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   statIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },

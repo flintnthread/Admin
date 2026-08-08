@@ -375,14 +375,89 @@ export type ShiprocketActionResponse = {
   order?: Record<string, unknown>;
 };
 
-export async function pushOrderToShiprocket(id: number): Promise<ShiprocketActionResponse> {
-  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/push`, {
+export async function pushOrderToShiprocket(
+  id: number,
+  params?: { sellerId?: number; productIds?: string; sellerName?: string }
+): Promise<ShiprocketActionResponse> {
+  const q = new URLSearchParams();
+  if (params?.sellerId != null) q.set("sellerId", String(params.sellerId));
+  if (params?.productIds) q.set("productIds", params.productIds);
+  if (params?.sellerName) q.set("sellerName", params.sellerName);
+  const qs = q.toString();
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/push${qs ? `?${qs}` : ""}`, {
     method: "POST",
   });
+}
+
+export type ShiprocketLogEntry = {
+  id?: number;
+  orderId?: number;
+  orderNumber?: string;
+  shiprocketOrderId?: string;
+  action?: string;
+  status?: string;
+  requestData?: string;
+  responseData?: string;
+  errorMessage?: string;
+  createdAt?: string;
+};
+
+export async function fetchShiprocketLogs(id: number): Promise<{ orderId: number; logs: ShiprocketLogEntry[] }> {
+  return adminApiRequest(`/api/admin/orders/${id}/shiprocket/logs`);
 }
 
 export async function syncOrderFromShiprocket(id: number): Promise<ShiprocketActionResponse> {
   return adminApiRequest(`/api/admin/orders/${id}/shiprocket/sync`, {
     method: "POST",
   });
+}
+
+export type ShiprocketSyncAllResponse = {
+  success?: boolean;
+  message?: string;
+  requestedLimit?: number;
+  lookbackHours?: number;
+  lookbackDays?: number;
+  candidates?: number;
+  synced?: number;
+  failed?: number;
+  failures?: Array<{ orderId?: number; orderNumber?: string; error?: string }>;
+};
+
+/** Bulk sync Shiprocket statuses for historical orders (default lookback ~2 years). */
+export async function syncAllOrdersFromShiprocket(params?: {
+  limit?: number;
+  lookbackHours?: number;
+  minSyncAgeMinutes?: number;
+}): Promise<ShiprocketSyncAllResponse> {
+  const limit = params?.limit ?? 2000;
+  const lookbackHours = params?.lookbackHours ?? 17520; // 2 years
+  const minSyncAgeMinutes = params?.minSyncAgeMinutes ?? 0;
+  const qs = new URLSearchParams({
+    limit: String(limit),
+    lookbackHours: String(lookbackHours),
+    minSyncAgeMinutes: String(minSyncAgeMinutes),
+  });
+  return adminApiRequest(`/api/admin/orders/shiprocket/sync-all?${qs.toString()}`, {
+    method: "POST",
+  });
+}
+
+export type OrderTracking = {
+  orderId?: number;
+  orderNumber?: string;
+  awbCode?: string;
+  courierName?: string;
+  trackingUrl?: string;
+  currentStatus?: string;
+  timeline?: Array<{
+    status?: string;
+    description?: string;
+    location?: string;
+    timestamp?: string;
+  }>;
+};
+
+export async function fetchOrderTracking(id: number): Promise<OrderTracking> {
+  return adminApiRequest(`/api/admin/orders/${id}/tracking`);
 }

@@ -35,6 +35,7 @@ import {
   downloadOrderInvoicePdf,
   downloadOrderShippingLabelPdf,
   fetchOrderDetail,
+  fetchOrderTracking,
   pushOrderToShiprocket,
   syncOrderFromShiprocket,
   updateOrderStatus,
@@ -68,6 +69,13 @@ const C = {
   purpleLight: "#F5F3FF",
 };
 
+/** Same flat fee as customer checkout / order-view (delivery is in line price). */
+const ORDER_HANDLING_FEE = 9;
+
+function roundMoney(n: number): number {
+  return Math.round(Math.max(0, Number(n) || 0) * 100) / 100;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYOUT HOOK
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,6 +99,7 @@ type OrderStatus =
   | "Pending"
   | "Sent to Seller"
   | "Processing"
+  | "Shipped"
   | "Completed"
   | "Returned"
   | "Replacement"
@@ -116,6 +125,7 @@ type ApiOrderItem = {
   hsnCode?: string;
   quantity?: number;
   price?: number;
+  mrpPrice?: number;
   total?: number;
   status?: string;
   imageUrl?: string;
@@ -133,6 +143,7 @@ type OrderItem = {
   hsnCode?: string;
   qty: number;
   price: number;
+  mrpPrice?: number;
   total: number;
   slug: string;
   imageUrl?: string;
@@ -166,6 +177,10 @@ type ShiprocketInfo = {
   awb?: string;
   courier?: string;
   status?: string;
+  displayStatus?: string;
+  failureReason?: string;
+  pushFailed?: boolean;
+  canPush?: boolean;
   synced?: string;
   pushed?: string;
   url?: string;
@@ -194,6 +209,8 @@ type UIOrder = {
   shippingCost: number;
   tax: number;
   discount: number;
+  mrpTotal: number;
+  handlingCharges: number;
   walletDeduction: number;
   referralDiscount: number;
   total: number;
@@ -262,7 +279,8 @@ type OrderDetail = Record<string, unknown> & {
 function normalizeStatus(status?: string): OrderStatus {
   const value = (status ?? "").toLowerCase().replace(/_/g, " ");
   if (value.includes("sent") && value.includes("seller")) return "Sent to Seller";
-  if (value.includes("process") || value.includes("ship") || value.includes("transit") || value.includes("packed")) {
+  if (value.includes("shipped")) return "Shipped";
+  if (value.includes("process") || value.includes("transit") || value.includes("packed")) {
     return "Processing";
   }
   if (value.includes("deliver") || value.includes("complete")) return "Completed";
@@ -364,13 +382,16 @@ function resolveItemProductName(item: ApiOrderItem): string {
 function mapApiItemToUi(item: ApiOrderItem): OrderItem {
   const qty = Number(item.quantity ?? 0);
   const price = Number(item.price ?? 0);
+  const raw = item as Record<string, unknown>;
+  const mrpRaw = Number(item.mrpPrice ?? raw.mrp_price ?? raw.mrp ?? 0);
+  const mrpPrice =
+    Number.isFinite(mrpRaw) && mrpRaw > price + 0.009 ? mrpRaw : undefined;
   const productName = resolveItemProductName(item);
   const imageUrl = resolveItemImageUrl(item);
 
   const color = item.color?.trim() || "";
   const size = item.size?.trim() || "";
 
-  const raw = item as Record<string, unknown>;
   const productIdRaw = item.productId ?? raw.product_id ?? raw.productID;
   const productIdNum = Number(productIdRaw);
   const productId =
@@ -389,6 +410,7 @@ function mapApiItemToUi(item: ApiOrderItem): OrderItem {
     ...(item.hsnCode?.trim() ? { hsnCode: item.hsnCode.trim() } : {}),
     qty,
     price,
+    ...(mrpPrice != null ? { mrpPrice } : {}),
     total: Number(item.total ?? qty * price),
     slug: productName
       ? productName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
@@ -516,14 +538,37 @@ function resolveShiprocketData(detail?: OrderDetail) {
     ?? "https://app.shiprocket.in/seller/home";
 
   const alreadyPushed = Boolean(
-    srOrderId
+    (srOrderId && shiprocketObject?.pushFailed !== true && shiprocketObject?.alreadyPushed !== false)
     || shiprocketObject?.alreadyPushed === true
   );
+  const pushFailed = Boolean(
+    shiprocketObject?.pushFailed === true
+    || (typeof status === "string" && /^pending(:|$)/i.test(status.trim()))
+  );
+  const failureReason = resolveStringValue(shiprocketObject?.failureReason)
+    ?? (pushFailed && status && status.toLowerCase().startsWith("pending:")
+      ? status.slice("pending:".length).trim()
+      : undefined);
+  const displayStatus = resolveStringValue(shiprocketObject?.displayStatus)
+    ?? (pushFailed
+      ? "Push Failed"
+      : alreadyPushed && awb
+        ? "AWB Assigned"
+        : alreadyPushed
+          ? "Shipment Created"
+          : "Not Pushed to Shiprocket");
+  const canPush = shiprocketObject?.canPush === true
+    || pushFailed
+    || (!alreadyPushed && !srOrderId);
 
   return {
     awb: awb || "—",
     courier: courier || "—",
     status: status || "—",
+    displayStatus,
+    failureReason,
+    pushFailed,
+    canPush,
     synced: formatDateTimeWithTime(syncedAt),
     pushed: formatDateTimeWithTime(pushedAt),
     url: trackingUrl,
@@ -532,7 +577,7 @@ function resolveShiprocketData(detail?: OrderDetail) {
     pickupStatus: pickupStatus || "—",
     trackingStatus: trackingStatus || "—",
     dashboardUrl,
-    alreadyPushed,
+    alreadyPushed: alreadyPushed && !pushFailed,
   };
 }
 
@@ -591,13 +636,40 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
     console.log('Filter failed, falling back to all items.');
     items = (detail.items ?? []).map(mapApiItemToUi);
   }
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const shippingCost = Number(detail.shippingAmount ?? 0);
-  const tax = Number(detail.taxAmount ?? 0);
-  const discount = Number(detail.discountAmount ?? 0);
+  const subtotal = roundMoney(items.reduce((sum, item) => sum + item.total, 0));
+  /**
+   * Match customer checkout / order-view:
+   * Line prices are admin customer TOTAL (GST + metro delivery already included).
+   * Do not re-add shipping/tax or re-subtract product discount from the payable total.
+   */
+  const discountFromLines = roundMoney(
+    items.reduce((sum, item) => {
+      const mrp = Number(item.mrpPrice) || 0;
+      const unit = Number(item.price) || 0;
+      const qty = Math.max(1, Number(item.qty) || 1);
+      if (mrp > unit + 0.009) return sum + (mrp - unit) * qty;
+      return sum;
+    }, 0)
+  );
+  const apiDiscount = Number(detail.discountAmount ?? 0);
+  const discount =
+    discountFromLines > 0.009
+      ? discountFromLines
+      : apiDiscount > 0 && apiDiscount < subtotal * 3
+        ? roundMoney(apiDiscount)
+        : 0;
+  const mrpTotal = roundMoney(subtotal + discount);
+  const shippingCost = 0;
+  const tax = 0;
+  const handlingCharges = subtotal > 0 ? ORDER_HANDLING_FEE : 0;
   const walletDeduction = Number(detail.walletDeduction ?? 0);
   const referralDiscount = Number(detail.referralDiscountAmount ?? 0);
-  const total = Number(detail.totalAmount ?? subtotal + shippingCost + tax - discount - walletDeduction - referralDiscount);
+  const total = roundMoney(
+    Math.max(
+      0,
+      subtotal + shippingCost + handlingCharges - walletDeduction - referralDiscount
+    )
+  );
   const shiprocket = resolveShiprocketData(detail);
 
   const history: StatusHistory[] =
@@ -648,6 +720,10 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
       awb: shiprocket.awb,
       courier: shiprocket.courier,
       status: shiprocket.status,
+      displayStatus: shiprocket.displayStatus,
+      failureReason: shiprocket.failureReason,
+      pushFailed: shiprocket.pushFailed,
+      canPush: shiprocket.canPush,
       synced: shiprocket.synced,
       pushed: shiprocket.pushed,
       url: shiprocket.url,
@@ -664,6 +740,8 @@ function mapApiOrderToUi(detail: OrderDetail, sellerNameFilter?: string, product
     shippingCost,
     tax,
     discount,
+    mrpTotal,
+    handlingCharges,
     walletDeduction,
     referralDiscount,
     total,
@@ -704,6 +782,8 @@ const INITIAL_ORDER: UIOrder = {
   shippingCost: 0,
   tax: 0,
   discount: 0,
+  mrpTotal: 0,
+  handlingCharges: 0,
   walletDeduction: 0,
   referralDiscount: 0,
   total: 0,
@@ -721,6 +801,7 @@ const STATUS_CFG: Record<
   Pending: { bg: C.warningLight, color: C.warning, dot: C.warning },
   "Sent to Seller": { bg: C.blueLight, color: C.blue, dot: C.blue },
   Processing: { bg: C.blueLight, color: C.blue, dot: C.blue },
+  Shipped: { bg: "#F5F3FF", color: "#7C3AED", dot: "#7C3AED" },
   Completed: { bg: C.activeLight, color: C.active, dot: C.active },
   Returned: { bg: "#FEF3C7", color: "#D97706", dot: "#D97706" },
   Replacement: { bg: C.purpleLight, color: C.purple, dot: C.purple },
@@ -739,6 +820,7 @@ const STATUS_OPTIONS: {
       label: "Mark as Processing",
       icon: <ProcessingIcon />,
     },
+    { value: "Shipped", label: "Mark as Shipped", icon: <ProcessingIcon /> },
     { value: "Completed", label: "Mark as Completed", icon: <CompletedIcon /> },
     { value: "Returned", label: "Mark as Returned", icon: <ReturnedIcon /> },
     {
@@ -1023,7 +1105,7 @@ function CardHeader({
 // STATUS PILL
 // ─────────────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: OrderStatus }) {
-  const cfg = STATUS_CFG[status];
+  const cfg = STATUS_CFG[status] || { bg: C.warningLight, color: C.warning, dot: C.warning };
   return (
     <View style={[s.badge, { backgroundColor: cfg.bg }]}>
       <Text style={[s.badgeTxt, { color: cfg.color }]}>{status}</Text>
@@ -1242,6 +1324,24 @@ export default function OrderDetailScreen() {
       const uiOrder = mapApiOrderToUi(raw as OrderDetail, sellerName, productIds);
       setOrder(uiOrder);
       setStatus(uiOrder.status);
+
+      // Fetch tracking from database (single source of truth)
+      try {
+        const trackingData = await fetchOrderTracking(id);
+        if (trackingData && trackingData.timeline) {
+          const trackingEvents: TrackingEvent[] = trackingData.timeline.map((ev: any) => ({
+            date: ev.timestamp ? new Date(ev.timestamp).toLocaleDateString() : "",
+            time: ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : "",
+            location: ev.location || "",
+            description: ev.description || ev.status || "",
+            status: ev.status as OrderStatus,
+          }));
+          setOrder(prev => ({ ...prev, tracking: trackingEvents }));
+        }
+      } catch (trackingErr) {
+        // Tracking fetch failure shouldn't break order load
+        console.warn("Failed to fetch tracking data:", trackingErr);
+      }
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -1328,32 +1428,31 @@ export default function OrderDetailScreen() {
     const id = Number(orderId);
     if (Number.isNaN(id)) return;
 
-    const alreadyLinked = Boolean(order.shiprocket.alreadyPushed && order.shiprocket.orderId && order.shiprocket.orderId !== "—");
-    const hasAwb = Boolean(order.shiprocket.awb && order.shiprocket.awb !== "—");
+    const canPush = Boolean(order.shiprocket.canPush);
+    if (!canPush) {
+      await sweetError(
+        "Shipment Already Created",
+        "This order is already linked to Shiprocket. Use Sync Now after you assign the courier."
+      );
+      return;
+    }
+
     const confirmed = await sweetConfirm({
-      title: hasAwb
-        ? "Shipment Already Exists"
-        : alreadyLinked
-          ? "Sync from Shiprocket"
-          : "Retry Shiprocket Push",
-      text: hasAwb
-        ? "This order already has an AWB. Sync to refresh courier/tracking?"
-        : alreadyLinked
-          ? "Shipment exists on Shiprocket without AWB. Sync after you assign courier in Shiprocket?"
-          : "Shipment is created automatically after payment. Retry only if Shiprocket status is pending. Courier is assigned in Shiprocket (not here).",
-      confirmText: hasAwb || alreadyLinked ? "Sync Now" : "Retry Push",
+      title: order.shiprocket.pushFailed ? "Retry Push to Shiprocket" : "Push to Shiprocket",
+      text: order.shiprocket.pushFailed
+        ? "Previous push failed. Retry creating the Shiprocket shipment for this existing order?"
+        : "Create a Shiprocket shipment for this paid order. Courier will be assigned manually in Shiprocket (not here).",
+      confirmText: order.shiprocket.pushFailed ? "Retry Push" : "Push to Shiprocket",
       cancelText: "Cancel",
     });
     if (!confirmed) return;
 
-    if (hasAwb || alreadyLinked) {
-      await handleSync();
-      return;
-    }
-
     setPushing(true);
     try {
-      const result = await pushOrderToShiprocket(id);
+      const result = await pushOrderToShiprocket(id, {
+        productIds: typeof productIds === "string" ? productIds : undefined,
+        sellerName: typeof sellerName === "string" ? sellerName : undefined,
+      });
       if (result.order) {
         const uiOrder = mapApiOrderToUi(result.order as OrderDetail, sellerName, productIds);
         setOrder(uiOrder);
@@ -1371,7 +1470,7 @@ export default function OrderDetailScreen() {
     } finally {
       setPushing(false);
     }
-  }, [handleSync, loadOrder, order.shiprocket.alreadyPushed, order.shiprocket.awb, order.shiprocket.orderId, orderId, productIds, pushing, sellerName, syncing]);
+  }, [loadOrder, order.shiprocket.canPush, order.shiprocket.pushFailed, orderId, productIds, pushing, sellerName, syncing]);
 
   const openUrl = useCallback(async (url?: string) => {
     if (!url) return;
@@ -1555,62 +1654,94 @@ export default function OrderDetailScreen() {
                 <CardHeader icon={<ShiprocketIcon size={16} color={C.purple} />} title="ShipRocket Information"
                   right={
                     <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      <TouchableOpacity
-                        style={[s.smBtn, { backgroundColor: C.primary }]}
-                        onPress={handlePushToShiprocket}
-                        disabled={pushing || syncing}
-                      >
-                        {pushing ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Text style={s.smBtnTxt}>
-                            {order.shiprocket.alreadyPushed ? "Retry / Sync" : "Retry Push"}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[s.smBtn, { backgroundColor: C.navy }]}
-                        onPress={handleSync}
-                        disabled={syncing || pushing}
-                      >
-                        {syncing ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Text style={s.smBtnTxt}>Sync Now</Text>
-                        )}
-                      </TouchableOpacity>
+                      {order.shiprocket.canPush ? (
+                        <TouchableOpacity
+                          style={[s.smBtn, { backgroundColor: C.primary }]}
+                          onPress={handlePushToShiprocket}
+                          disabled={pushing || syncing}
+                        >
+                          {pushing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={s.smBtnTxt}>
+                              {order.shiprocket.pushFailed ? "Retry Push to Shiprocket" : "Push to Shiprocket"}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
+                      {order.shiprocket.alreadyPushed ? (
+                        <TouchableOpacity
+                          style={[s.smBtn, { backgroundColor: C.navy }]}
+                          onPress={handleSync}
+                          disabled={syncing || pushing}
+                        >
+                          {syncing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <Text style={s.smBtnTxt}>Sync Now</Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   }
                 />
                 <View style={s.cardBodyCompact}>
+                  <InfoRow
+                    label="Shipping Status"
+                    value={
+                      <View style={[s.badge, {
+                        backgroundColor: order.shiprocket.pushFailed
+                          ? "#FEE2E2"
+                          : order.shiprocket.alreadyPushed
+                            ? C.blueLight
+                            : "#FEF3C7",
+                      }]}>
+                        <Text style={[s.badgeTxt, {
+                          color: order.shiprocket.pushFailed
+                            ? "#B91C1C"
+                            : order.shiprocket.alreadyPushed
+                              ? C.blue
+                              : "#B45309",
+                        }]}>
+                          {order.shiprocket.displayStatus || order.shiprocket.status || "Not Pushed to Shiprocket"}
+                        </Text>
+                      </View>
+                    }
+                  />
+                  {order.shiprocket.pushFailed && order.shiprocket.failureReason ? (
+                    <InfoRow label="Reason" value={order.shiprocket.failureReason} />
+                  ) : null}
                   <InfoRow label="Shiprocket Order ID" value={order.shiprocket.orderId} />
                   <InfoRow label="Shipment ID" value={order.shiprocket.shipmentId} />
-                  <InfoRow label="AWB / Tracking #" value={order.shiprocket.awb !== "—" ? order.shiprocket.awb : "Shiprocket pending"} />
+                  <InfoRow
+                    label="AWB / Tracking #"
+                    value={order.shiprocket.awb !== "—" ? order.shiprocket.awb : (order.shiprocket.alreadyPushed ? "Assign courier in Shiprocket" : "—")}
+                  />
                   <InfoRow label="Courier Partner" value={order.shiprocket.courier} />
-                  <InfoRow label="Shipping Status" value={
-                    <View style={[s.badge, { backgroundColor: C.blueLight }]}>
-                      <Text style={[s.badgeTxt, { color: C.blue }]}>{order.shiprocket.status}</Text>
-                    </View>
-                  } />
+                  <InfoRow label="Shiprocket Raw Status" value={order.shiprocket.status} />
                   <InfoRow label="Pickup Status" value={order.shiprocket.pickupStatus || "—"} />
                   <InfoRow label="Tracking Status" value={order.shiprocket.trackingStatus || "—"} />
                   <InfoRow label="Push Date & Time" value={order.shiprocket.pushed || "—"} />
                   <InfoRow label="Last Sync Time" value={order.shiprocket.synced} />
                   {order.shiprocket.url ? (
                     <TouchableOpacity style={[s.trackBtn, { marginTop: 8 }]} onPress={() => openUrl(order.shiprocket.url)}>
-                      <Text style={s.trackBtnTxt}>Open Tracking URL</Text>
+                      <Text style={s.trackBtnTxt}>Track Shipment</Text>
                     </TouchableOpacity>
                   ) : null}
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("label")}>
-                      <Text style={s.smBtnTxt}>Shipping Label</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("invoice")}>
-                      <Text style={s.smBtnTxt}>Invoice</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("manifest")}>
-                      <Text style={s.smBtnTxt}>Manifest</Text>
-                    </TouchableOpacity>
+                    {order.shiprocket.awb && order.shiprocket.awb !== "—" ? (
+                      <>
+                        <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("label")}>
+                          <Text style={s.smBtnTxt}>Shipping Label</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("invoice")}>
+                          <Text style={s.smBtnTxt}>Invoice</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.smBtn, { backgroundColor: C.navy }]} onPress={() => handleDownloadShiprocketDoc("manifest")}>
+                          <Text style={s.smBtnTxt}>Manifest</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
                     <TouchableOpacity style={[s.smBtn, { backgroundColor: "#0F766E" }]} onPress={handleOpenShiprocket}>
                       <Text style={s.smBtnTxt}>Open in Shiprocket</Text>
                     </TouchableOpacity>
@@ -1765,17 +1896,28 @@ export default function OrderDetailScreen() {
                   </View>
                 </Card>
 
-                {/* Order Summary */}
+                {/* Order Summary — same math as customer checkout / order-view */}
                 <Card>
                   <CardHeader icon={<NoteIcon size={16} color={C.blue} />} title="Order Summary" />
                   <View style={s.cardBodyCompact}>
                     {[
+                      ...(order.mrpTotal > order.subtotal + 0.009
+                        ? [["MRP total", rupee(order.mrpTotal)] as const]
+                        : []),
+                      ...(order.discount > 0
+                        ? [["Product discount", `- ${rupee(order.discount)}`] as const]
+                        : []),
                       ["Subtotal", rupee(order.subtotal)],
-                      ["Shipping", order.shippingCost === 0 ? "Free" : rupee(order.shippingCost)],
-                      ["Tax", order.tax === 0 ? "₹0.00" : rupee(order.tax)],
-                      ...(order.discount > 0 ? [["Discount", `- ${rupee(order.discount)}`] as const] : []),
-                      ...(order.walletDeduction > 0 ? [["Wallet", `- ${rupee(order.walletDeduction)}`] as const] : []),
-                      ...(order.referralDiscount > 0 ? [["Referral", `- ${rupee(order.referralDiscount)}`] as const] : []),
+                      ["Delivery", "Free"],
+                      ...(order.handlingCharges > 0
+                        ? [["Handling charges", rupee(order.handlingCharges)] as const]
+                        : []),
+                      ...(order.walletDeduction > 0
+                        ? [["Wallet", `- ${rupee(order.walletDeduction)}`] as const]
+                        : []),
+                      ...(order.referralDiscount > 0
+                        ? [["Referral", `- ${rupee(order.referralDiscount)}`] as const]
+                        : []),
                     ].map(([lbl, val]) => (
                       <View key={String(lbl)} style={s.summaryLineRow}>
                         <Text style={s.summaryLineLbl}>{String(lbl)}</Text>
@@ -1809,7 +1951,7 @@ export default function OrderDetailScreen() {
                     showsVerticalScrollIndicator={historyExpanded}
                   >
                     {order.history.map((h, idx) => {
-                      const cfg = STATUS_CFG[h.status];
+                      const cfg = STATUS_CFG[h.status] || { bg: C.warningLight, color: C.warning, dot: C.warning };
                       return (
                         <View key={idx} style={s.histItem}>
                           <View style={s.histLeft}>

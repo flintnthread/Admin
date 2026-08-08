@@ -23,7 +23,7 @@ import {
 } from "react-native";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type PaymentStatus = "Pending" | "Paid" | "Cancelled";
+type PaymentStatus = "Pending" | "Paid" | "Completed" | "Cancelled";
 type ReminderBucket = "green" | "orange" | "red";
 type PageTab = "payments" | "requests";
 const REQUESTS_PAGE_SIZE = 10;
@@ -85,6 +85,7 @@ const getReminderStyle = (bucket: ReminderBucket) => {
 
 const getPaymentStyle = (status: PaymentStatus) => {
     if (status === "Paid") return { bg: "#e8f7ee", color: "#1a7a45" };
+    if (status === "Completed") return { bg: "#d1fae5", color: "#059669" };
     if (status === "Cancelled") return { bg: "#fce8e8", color: "#b91c1c" };
     return { bg: PRIMARY_LIGHT, color: PRIMARY };
 };
@@ -153,7 +154,7 @@ const OrderCard: React.FC<{
 // ─── PAY MODAL ────────────────────────────────────────────────────────────────
 const PAYMENTS_PAGE_SIZE = 7;
 
-const PAYMENT_STATUS_OPTIONS: PaymentStatus[] = ["Pending", "Paid", "Cancelled"];
+const PAYMENT_STATUS_OPTIONS: PaymentStatus[] = ["Pending", "Paid", "Completed", "Cancelled"];
 
 const PayModal: React.FC<{
     visible: boolean;
@@ -183,6 +184,7 @@ const PayModal: React.FC<{
 
     const statusColors: Record<PaymentStatus, { bg: string; color: string; dot: string }> = {
         Paid: { bg: "#e8f7ee", color: "#1a7a45", dot: "#22c55e" },
+        Completed: { bg: "#d1fae5", color: "#059669", dot: "#10b981" },
         Pending: { bg: "#fef3c7", color: "#d97706", dot: "#f59e0b" },
         Cancelled: { bg: "#fce8e8", color: "#b91c1c", dot: "#ef4444" },
     };
@@ -546,12 +548,12 @@ const SellerPaymentsScreen: React.FC = () => {
     const [orders, setOrders] = useState<SellerOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, totalPaidAmount: 0, greenCount: 0, orangeCount: 0, redCount: 0 });
+    const [stats, setStats] = useState({ total: 0, pending: 0, paid: 0, completed: 0, cancelled: 0, totalPaidAmount: 0, greenCount: 0, orangeCount: 0, redCount: 0 });
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
     const [search, setSearch] = useState("");
-    const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Cancelled">("All");
+    const [filterPayment, setFilterPayment] = useState<"All" | "Pending" | "Paid" | "Completed" | "Cancelled">("All");
     const [filterReminderBucket, setFilterReminderBucket] = useState<"All" | "green" | "orange" | "red">("All");
     const [sortPriority, setSortPriority] = useState<"Priority (Red first)" | "Date: Newest First" | "Date: Oldest First">("Priority (Red first)");
     const [openDropdown, setOpenDropdown] = useState<"payment" | "reminder" | "priority" | "export" | null>(null);
@@ -601,6 +603,8 @@ const SellerPaymentsScreen: React.FC = () => {
                 total: Number(apiStats.total ?? 0),
                 pending: Number(apiStats.pending ?? 0),
                 paid: Number(apiStats.paid ?? 0),
+                completed: Number(apiStats.completed ?? 0),
+                cancelled: Number(apiStats.cancelled ?? 0),
                 totalPaidAmount: Number(apiStats.totalPaidAmount ?? 0),
                 greenCount: Number(apiStats.greenCount ?? 0),
                 orangeCount: Number(apiStats.orangeCount ?? 0),
@@ -725,7 +729,8 @@ const SellerPaymentsScreen: React.FC = () => {
 
     const filtered = orders.filter((o) => {
         const ms = o.orderId.toLowerCase().includes(search.toLowerCase()) || o.sellerName.toLowerCase().includes(search.toLowerCase());
-        const mp = filterPayment === "All" || o.paymentStatus === filterPayment;
+        const mp = filterPayment === "All"
+            || (filterPayment === "Completed" ? o.orderStatus === "Completed" : o.paymentStatus === filterPayment);
         const mr = filterReminderBucket === "All" || o.reminderBucket === filterReminderBucket;
         return ms && mp && mr;
     }).sort((a, b) => {
@@ -920,13 +925,13 @@ const SellerPaymentsScreen: React.FC = () => {
                     <View style={{ gap: 6, justifyContent: "center", width: isUltraWide ? 300 : "100%" }}>
                         <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                             <View style={[styles.legendBadge, { backgroundColor: "#34d399", flex: 1, minWidth: 90 }]}>
-                                <Text style={[styles.legendText, { textAlign: "center" }]}>Green (0-2d): {stats.greenCount}</Text>
+                                <Text style={[styles.legendText, { textAlign: "center" }]}>Green (0-3d): {stats.greenCount}</Text>
                             </View>
                             <View style={[styles.legendBadge, { backgroundColor: "#fbbf24", flex: 1, minWidth: 90 }]}>
-                                <Text style={[styles.legendText, { textAlign: "center" }]}>Orange (3-4d): {stats.orangeCount}</Text>
+                                <Text style={[styles.legendText, { textAlign: "center" }]}>Orange (4-6d): {stats.orangeCount}</Text>
                             </View>
                             <View style={[styles.legendBadge, { backgroundColor: "#f87171", flex: 1, minWidth: 90 }]}>
-                                <Text style={[styles.legendText, { textAlign: "center" }]}>Red (5+d): {stats.redCount}</Text>
+                                <Text style={[styles.legendText, { textAlign: "center" }]}>Red (7+d): {stats.redCount}</Text>
                             </View>
                         </View>
                         <View style={[styles.legendBadge, { backgroundColor: "#475569" }]}>
@@ -987,8 +992,8 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
                                     {openDropdown === "payment" && (
-                                        <View style={[styles.webDropdownMenu, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
-                                            {(["All", "Pending", "Paid", "Cancelled"] as const).map(option => (
+                                        <View style={styles.webDropdownMenu}>
+                                            {(["All", "Pending", "Paid", "Completed", "Cancelled"] as const).map(option => (
                                                 <TouchableOpacity
                                                     key={option}
                                                     style={[styles.webDropdownItem, filterPayment === option && { backgroundColor: "#1d4ed8" }]}
@@ -1011,8 +1016,8 @@ const SellerPaymentsScreen: React.FC = () => {
                                     >
                                         <Text style={styles.webSelectText}>
                                             {filterReminderBucket === "All" ? "All Buckets" :
-                                                filterReminderBucket === "green" ? "Green (0-2d)" :
-                                                    filterReminderBucket === "orange" ? "Orange (3-4d)" : "Red (5+d)"}
+                                                filterReminderBucket === "green" ? "Green (0-3d)" :
+                                                    filterReminderBucket === "orange" ? "Orange (4-6d)" : "Red (7+d)"}
                                         </Text>
                                         <Feather name="chevron-down" size={14} color={TEXT_MUTED} />
                                     </TouchableOpacity>
@@ -1020,9 +1025,9 @@ const SellerPaymentsScreen: React.FC = () => {
                                         <View style={[styles.webDropdownMenu, { width: 180 }, !isWideWeb && { position: "relative", top: 0, marginTop: 4, width: "100%", zIndex: 1 }]}>
                                             {[
                                                 { label: "All Buckets", value: "All" },
-                                                { label: "Green (0-2 days)", value: "green" },
-                                                { label: "Orange (3-4 days)", value: "orange" },
-                                                { label: "Red (5+ days)", value: "red" }
+                                                { label: "Green (0-3 days)", value: "green" },
+                                                { label: "Orange (4-6 days)", value: "orange" },
+                                                { label: "Red (7+ days)", value: "red" }
                                             ].map(option => (
                                                 <TouchableOpacity
                                                     key={option.value}
@@ -1064,18 +1069,18 @@ const SellerPaymentsScreen: React.FC = () => {
 
                                 {/* Export Buttons Container */}
                                 <View style={[{ flexDirection: "column", gap: 8 }, windowWidth < 550 && { width: "100%" }]}>
-                                    {/* Export row: button + >=4d side by side */}
+                                    {/* Export row: button + >=7d side by side */}
                                     <View style={{ flexDirection: "row", gap: 8 }}>
                                         {/* Export All Dropdown trigger only (fixed width, not flex) */}
                                         <ExportDropdown onExport={handleExport} isWeb={isWideWeb} isOpen={openDropdown === "export"} onToggle={() => setOpenDropdown(openDropdown === "export" ? null : "export")} />
 
-                                        {/* Export >=4d button */}
+                                        {/* Export >=7d button — overdue after 7 days from delivery */}
                                         <TouchableOpacity
                                             style={[styles.webExportBtn, { backgroundColor: "#ef4444" }]}
-                                            onPress={() => void downloadBackendExport("pending", 4)}
+                                            onPress={() => void downloadBackendExport("pending", 7)}
                                         >
                                             <Feather name="clock" size={14} color="#fff" />
-                                            <Text style={styles.webExportBtnText}>Export &gt;=4d</Text>
+                                            <Text style={styles.webExportBtnText}>Export &gt;=7d</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>

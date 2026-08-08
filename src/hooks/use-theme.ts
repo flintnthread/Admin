@@ -3,5 +3,10 @@ import { useThemeContext } from '@/context/theme-context';
 
 export function useTheme() {
   const { theme } = useThemeContext();
-  return Colors[theme];
+  const colors = Colors[theme];
+  if (!colors) {
+    console.error('useTheme: Invalid theme value:', theme);
+    return Colors.light;
+  }
+  return colors;
 }

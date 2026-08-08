@@ -204,6 +204,7 @@ export type ProductVariant = {
   displayPrice: number;
   totalPriceIntraCity: number;
   totalPriceMetroMetro: number;
+  videoUrl?: string;
 };
 
 const VARIANT_IMAGE =
