@@ -17,6 +17,10 @@ export function resolveCatalogMediaUrl(
   if (!path?.trim()) return "";
 
   const value = path.trim();
+  // Cloudinary / absolute CDN URLs — keep as-is (never rewrite onto admin host).
+  if (/res\.cloudinary\.com/i.test(value) || /cloudinary\.com/i.test(value)) {
+    return value;
+  }
   if (/^(https?:\/\/|data:|blob:)/i.test(value)) return value;
 
   let normalized = value.replace(/\\/g, "/");
@@ -27,7 +31,7 @@ export function resolveCatalogMediaUrl(
       ? `/${bare}`
       : `/uploads/${folder}/${bare}`;
   }
-  // Catalog images live on admin media (:8082), not the seller CDN host.
+  // Legacy local uploads may still live on admin media (:8082).
   return `${resolveAdminApiBaseUrl().replace(/\/$/, "")}${normalized}`;
 }
 

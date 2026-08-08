@@ -9,11 +9,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '@/lib/api/client';
-import { resolveMediaUrl } from '@/lib/api/media';
+import { isPdfMedia, resolveMediaUrl, resolveSellerDocumentImageUrl } from '@/lib/api/media';
+import SellerDocumentImage from '@/components/SellerDocumentImage';
 import { fetchPendingProfileDetail } from '@/services/sellerApi';
 import {
     Dimensions,
     Image,
+    Linking,
     Modal,
     Platform,
     SafeAreaView,
@@ -129,7 +131,7 @@ const EMPTY_SELLER = {
   area: '',
   pincode: '',
   profileImage: null as string | null,
-  documents: [] as { name: string; url?: string }[],
+  documents: [] as { name: string; url?: string; path?: string }[],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -146,7 +148,12 @@ type Props = { onBack?: () => void; seller?: SellerProp };
 
 export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props) {
   const [dim, setDim] = useState(Dimensions.get('window'));
-  const [docModal, setDocModal] = useState<{ visible: boolean; label: string; url?: string }>({ visible: false, label: '' });
+  const [docModal, setDocModal] = useState<{
+    visible: boolean;
+    label: string;
+    url?: string;
+    path?: string;
+  }>({ visible: false, label: '' });
   const [sellerState, setSellerState] = useState(EMPTY_SELLER);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -186,12 +193,15 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
           city: String(d.warehouseCity ?? d.city ?? '—'),
           area: String(d.warehouseArea ?? '—'),
           pincode: String(d.pincode ?? '—'),
-          profileImage: resolveMediaUrl(d.profilePicUrl as string) || null,
+          profileImage: resolveMediaUrl(d.profilePicUrl as string) || resolveMediaUrl(d.profilePicPath as string) || null,
           documents: Array.isArray(d.documents)
-            ? (d.documents as { name: string; url?: string }[]).map((doc) => ({
-                name: doc.name,
-                url: resolveMediaUrl(doc.url) || undefined,
-              }))
+            ? (d.documents as { name: string; url?: string; path?: string; available?: boolean }[])
+                .filter((doc) => doc.available !== false && (doc.path || doc.url))
+                .map((doc) => ({
+                  name: doc.name,
+                  path: doc.path,
+                  url: resolveSellerDocumentImageUrl(doc.path, doc.url) || doc.url || undefined,
+                }))
             : [],
         });
       } catch (e) {
@@ -480,7 +490,17 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
                     <DocRow
                       key={doc.name}
                       label={doc.name}
-                      onView={doc.url ? () => setDocModal({ visible: true, label: doc.name, url: doc.url }) : undefined}
+                      onView={
+                        doc.url || doc.path
+                          ? () =>
+                              setDocModal({
+                                visible: true,
+                                label: doc.name,
+                                url: doc.url,
+                                path: doc.path,
+                              })
+                          : undefined
+                      }
                     />
                   ))}
                 </View>
@@ -519,10 +539,35 @@ export default function ViewPendingSeller({ onBack, seller: sellerProp }: Props)
                   </TouchableOpacity>
                 </View>
 
-                {/* Modal body — placeholder document preview */}
+                {/* Modal body — document preview with CDN / Cloudinary fallbacks */}
                 <View style={mod.body}>
-                  {docModal.url ? (
-                    <Image source={{ uri: docModal.url }} style={{ width: '100%', height: 320, resizeMode: 'contain' }} />
+                  {docModal.url || docModal.path ? (
+                    isPdfMedia(docModal.url) || isPdfMedia(docModal.path) ? (
+                      <View style={mod.previewBox}>
+                        <BI name="file-earmark" size={48} color={C.border} style={{ marginBottom: 12 }} />
+                        <Text style={mod.previewTitle}>{docModal.label}</Text>
+                        <Text style={mod.previewSub}>PDF document</Text>
+                        <TouchableOpacity
+                          style={[sc.docViewBtn, { marginTop: 12 }]}
+                          onPress={() => {
+                            const href =
+                              resolveSellerDocumentImageUrl(docModal.path, docModal.url) ||
+                              docModal.url ||
+                              docModal.path;
+                            if (href) void Linking.openURL(href);
+                          }}
+                        >
+                          <Text style={sc.docViewBtnT}>Open PDF</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <SellerDocumentImage
+                        path={docModal.path}
+                        url={docModal.url}
+                        style={{ width: '100%', height: 320 }}
+                        resizeMode="contain"
+                      />
+                    )
                   ) : (
                     <View style={mod.previewBox}>
                       <BI name="file-earmark" size={48} color={C.border} style={{ marginBottom: 12 }} />

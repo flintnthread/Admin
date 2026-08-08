@@ -86,9 +86,27 @@ export function buildSellerDocumentImageCandidates(
   path?: string | null,
   url?: string | null,
 ): string[] {
-  const candidates = buildMediaUrlCandidates(path, url);
+  const urls: string[] = [];
+  const push = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u);
+  };
+
+  // Prefer Cloudinary first when either field contains it.
+  const rawPath = String(path ?? "").trim();
+  const rawUrl = String(url ?? "").trim();
+  if (/res\.cloudinary\.com/i.test(rawPath)) push(rawPath);
+  if (/res\.cloudinary\.com/i.test(rawUrl)) push(rawUrl);
+
+  // Prefer Cloudinary / flintnthread.com resolution first
+  push(resolveSellerDocumentImageUrl(path, url));
+  for (const entry of buildMediaUrlCandidates(path, url)) {
+    // Drop seller SPA host — it returns text/html for /uploads/seller_documents/*
+    if (/^https?:\/\/seller\.flintnthread\.in\//i.test(entry)) continue;
+    push(entry);
+  }
+
   const placeholder = getSellerDocumentPlaceholderUrl();
-  if (!candidates.length) return [placeholder];
-  if (!candidates.includes(placeholder)) candidates.push(placeholder);
-  return candidates;
+  if (!urls.length) return [placeholder];
+  push(placeholder);
+  return urls;
 }

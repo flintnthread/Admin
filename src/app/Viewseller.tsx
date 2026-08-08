@@ -3,6 +3,7 @@ import SellerMediaImage from "@/components/SellerMediaImage";
 import { useAuth } from "@/context/auth-context";
 import { getApiErrorMessage } from '@/lib/api/client';
 import { isPdfMedia, resolveSellerDocumentImageUrl, resolveSellerProfileImage } from '@/lib/api/media';
+import { buildSellerDocumentImageCandidates } from '@/lib/sellerDocuments';
 import { formatDate, maskAccount } from '@/lib/format';
 import {
   exportSellerOrdersCsv, exportSellerProductsCsv, fetchSellerAnalyticsChart, fetchSellerDetail, normalizeSellerGraphChart,
@@ -605,6 +606,7 @@ interface DocModalProps {
   visible: boolean;
   docName: string;
   docUrl?: string;
+  docPath?: string;
   onClose: () => void;
 }
 
@@ -716,7 +718,13 @@ const modalStyles = StyleSheet.create({
   },
 });
 
-const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl, onClose }) => {
+const DocumentViewerModal: React.FC<DocModalProps> = ({
+  visible,
+  docName,
+  docUrl,
+  docPath,
+  onClose,
+}) => {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isMobile = screenW < 600;
 
@@ -724,18 +732,18 @@ const DocumentViewerModal: React.FC<DocModalProps> = ({ visible, docName, docUrl
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
-  const candidates = React.useMemo(() => {
-    const uri = resolveSellerDocumentImageUrl(docUrl, docUrl);
-    return uri ? [uri] : [];
-  }, [docUrl]);
-  const imageUri = candidates[0] ?? "";
-  const isPdf = isPdfMedia(docUrl);
+  const candidates = React.useMemo(
+    () => buildSellerDocumentImageCandidates(docPath, docUrl),
+    [docPath, docUrl],
+  );
+  const imageUri = candidates[imageIndex] ?? candidates[0] ?? "";
+  const isPdf = isPdfMedia(docUrl) || isPdfMedia(docPath) || isPdfMedia(imageUri);
 
   useEffect(() => {
     setImageIndex(0);
     setZoomLevel(1);
     scale.setValue(1);
-  }, [docUrl, visible, scale]);
+  }, [docUrl, docPath, visible, scale]);
 
   const zoomIn = () => {
     const next = Math.min(zoomLevel + 0.25, 3);
@@ -1302,6 +1310,7 @@ export default function ViewSeller() {
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<string>('');
   const [selectedDocUrl, setSelectedDocUrl] = useState<string>('');
+  const [selectedDocPath, setSelectedDocPath] = useState<string>('');
   const [csvLoading, setCsvLoading] = useState(false);
   const [chartData, setChartData] = useState<Record<'daily' | 'weekly' | 'monthly' | 'yearly', unknown>>({
     daily: null,
@@ -1455,8 +1464,9 @@ export default function ViewSeller() {
 
   const openDoc = (name: string, url?: string, path?: string) => {
     setSelectedDoc(name);
-    // Always resolve to flintnthread.com/uploads/seller_documents/... (never .in)
-    setSelectedDocUrl(resolveSellerDocumentImageUrl(path, url));
+    setSelectedDocPath(path ?? "");
+    // Keep both raw path and resolved URL so the modal can fall back across CDN / Cloudinary.
+    setSelectedDocUrl(resolveSellerDocumentImageUrl(path, url) || url || "");
     setDocModalVisible(true);
   };
 
@@ -1941,7 +1951,7 @@ export default function ViewSeller() {
           {seller.verificationDocuments.map((doc, i) => (
             <View key={i} style={styles.docRow}>
               <View style={styles.docLeft}>
-                {doc.available && doc.url && !isPdfMedia(doc.url) ? (
+                {doc.available && doc.url && !isPdfMedia(doc.url) && !isPdfMedia(doc.path) ? (
                   <Image
                     source={{ uri: resolveSellerDocumentImageUrl(doc.path, doc.url) }}
                     style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: COLORS.border }}
@@ -1971,6 +1981,7 @@ export default function ViewSeller() {
           visible={docModalVisible}
           docName={selectedDoc}
           docUrl={selectedDocUrl}
+          docPath={selectedDocPath}
           onClose={() => setDocModalVisible(false)}
         />
 
