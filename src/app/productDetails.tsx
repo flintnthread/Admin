@@ -26,6 +26,7 @@ import {
 import { getApiErrorMessage } from '@/lib/api/client';
 import { sweetError, sweetSuccess } from '@/lib/sweetAlert';
 import { resolveMediaUrl } from '@/lib/api/media';
+import { ProductVideoPlayer } from '@/components/ProductVideoPlayer';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { approveProduct, fetchProductDetail, rejectProduct } from '@/services/productApi';
 import {
@@ -100,6 +101,9 @@ type ApiVariant = {
   customerPrice?: number;
   sellingPriceWithGst?: number;
   weight?: number;
+  videoPath?: string;
+  videoUri?: string;
+  videoUrl?: string;
 };
 
 type SpecItem = { label: string; value: string };
@@ -107,6 +111,7 @@ type SpecItem = { label: string; value: string };
 export type ProductDetailExtras = {
   specItems: SpecItem[];
   keyFeatures: string;
+  videoUrl?: string;
   package: {
     boxDimensions: string;
     grossWeight: string;
@@ -270,6 +275,19 @@ function buildExtras(data: Record<string, unknown>, variants: ProductVariant[]):
   return {
     specItems: parseSpecItems(data.specifications),
     keyFeatures: parseKeyFeatures(data.features),
+    videoUrl: (() => {
+      for (const v of variants) {
+        const raw = (v as ProductVariant & { videoUrl?: string }).videoUrl;
+        const resolved = resolveMediaUrl(String(raw ?? ''));
+        if (resolved) return resolved;
+      }
+      const fromApi = (data.variants as ApiVariant[] | undefined) ?? [];
+      for (const v of fromApi) {
+        const resolved = resolveMediaUrl(String(v.videoUri || v.videoUrl || v.videoPath || ''));
+        if (resolved) return resolved;
+      }
+      return undefined;
+    })(),
     package: {
       boxDimensions: formatDims(data.lengthCm, data.widthCm, data.heightCm),
       grossWeight: dash(data.productWeight) !== '—' ? `${dash(data.productWeight)} kg` : '—',
@@ -340,6 +358,8 @@ function mapApiProductDetail(data: Record<string, unknown>): {
     const mrpExcl = toNum(v.mrpExclGst ?? v.basePrice, sellingExcl);
     const discountPct = toNum(v.discountPercentage);
     const variantImage = resolveMediaUrl(String(v.imageUrl ?? '')) || primaryImage;
+    const videoUrl =
+      resolveMediaUrl(String(v.videoUri ?? v.videoUrl ?? v.videoPath ?? '')) || undefined;
     return {
       id: String(v.id ?? ''),
       colorName: String(v.color ?? '—'),
@@ -347,6 +367,7 @@ function mapApiProductDetail(data: Record<string, unknown>): {
       image: variantImage,
       size: String(v.size ?? '—'),
       sku: String(v.sku ?? '—'),
+      videoUrl,
       stock: toNum(v.stock),
       mrp: mrpExcl,
       discountPercent: discountPct,
@@ -1434,6 +1455,14 @@ export default function ProductDetailsScreen() {
                       <MaterialCommunityIcons name="chevron-right" size={18} color={PALETTE.textSecondary} />
                     </Pressable>
                   </View>
+                  {extras?.videoUrl ? (
+                    <View style={{ marginTop: 12, paddingHorizontal: isWide ? 0 : 14 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: PALETTE.textSecondary, marginBottom: 8 }}>
+                        Product video
+                      </Text>
+                      <ProductVideoPlayer uri={extras.videoUrl} height={240} />
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Product info */}
