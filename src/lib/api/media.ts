@@ -1,9 +1,12 @@
 import { resolveAdminApiBaseUrl, resolvePublicMediaBaseUrl } from "@/lib/api/config";
 
-/** Seller profile + KYC docs — served from seller host (flintnthread.com returns 403). */
-export const SELLER_MEDIA_CDN = "https://seller.flintnthread.in";
+/**
+ * Seller profile + KYC docs CDN.
+ * Files live on flintnthread.com — seller.flintnthread.in returns the SPA HTML (not images).
+ */
+export const SELLER_MEDIA_CDN = "https://flintnthread.com";
 
-/** Product images CDN — ONLY host for /uploads/products/. */
+/** Product images CDN — same host for /uploads/products/. */
 export const PRODUCT_MEDIA_CDN = "https://flintnthread.com";
 
 const SELLER_DOCUMENT_FILE =
@@ -27,7 +30,7 @@ function isSellerDocUploadPath(pathname: string): boolean {
   );
 }
 
-/** Force seller docs onto seller.flintnthread.in (rewrite .com / .online that 403). */
+/** Force seller docs onto flintnthread.com (never seller SPA host). */
 function toSellerMediaCdnUrl(pathname: string): string {
   const path = normalizeMediaPath(pathname);
   return `${SELLER_MEDIA_CDN}${path.startsWith("/") ? path : `/${path}`}`;
@@ -69,8 +72,9 @@ export function normalizeMediaPath(value: string): string {
 
 /**
  * Resolve to CDN URL.
- * Seller docs/profile → https://seller.flintnthread.in/uploads/seller_documents/...
+ * Seller docs/profile → https://flintnthread.com/uploads/seller_documents/...
  * Products → https://flintnthread.com/uploads/products/...
+ * Cloudinary absolute URLs are kept as-is.
  */
 export function resolveMediaUrl(path?: string | null): string {
   if (!path?.trim()) return "";
@@ -90,6 +94,7 @@ export function resolveMediaUrl(path?: string | null): string {
         return `${PRODUCT_MEDIA_CDN}${normalizeMediaPath(pathname)}`;
       }
       if (isSellerDocUploadPath(pathname) || pathname.includes("/uploads/")) {
+        // Rewrite .in / .online SPA hosts → flintnthread.com where files actually live
         return toSellerMediaCdnUrl(pathname);
       }
     } catch {
@@ -197,7 +202,11 @@ export function resolveSellerProfileImage(seller: {
 
 export function isPdfMedia(path?: string | null): boolean {
   if (!path?.trim()) return false;
-  return /\.pdf($|\?)/i.test(path.trim());
+  const value = path.trim();
+  if (/\.pdf($|\?)/i.test(value)) return true;
+  // Cloudinary stores seller PDFs under /raw/upload/ (often without .pdf in the URL).
+  if (/res\.cloudinary\.com\/[^/]+\/raw\/upload\//i.test(value)) return true;
+  return false;
 }
 
 export function getPublicMediaBaseUrl(): string {
@@ -264,25 +273,35 @@ export function resolveProductImageUrl(path?: string | null): string {
 export function getSellerDocumentPlaceholderUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_SELLER_DOCUMENT_PLACEHOLDER_URL?.trim();
   if (fromEnv) return fromEnv;
+  // Prefer a real CDN asset; components also fall back to a local require on error.
   return `${SELLER_MEDIA_CDN}/uploads/seller_documents/document_placeholder.png`;
 }
 
 /**
  * Resolve seller KYC / document / profile image to CDN URL
- * (https://flintnthread.com/uploads/seller_documents/...).
+ * (https://flintnthread.com/uploads/seller_documents/... or Cloudinary).
  */
 export function resolveSellerDocumentImageUrl(
   path?: string | null,
   backendUrl?: string | null,
 ): string {
   // Prefer absolute backend/CDN URL from API over a bare DB path.
+  // If API gives Cloudinary in `path` and a rewritten host in `url`, prefer Cloudinary.
+  const rawBackend = String(backendUrl ?? "").trim();
+  const rawPath = String(path ?? "").trim();
+  if (/res\.cloudinary\.com/i.test(rawPath)) {
+    return resolveMediaUrl(rawPath);
+  }
+  if (/res\.cloudinary\.com/i.test(rawBackend)) {
+    return resolveMediaUrl(rawBackend);
+  }
   const fromBackend = resolveMediaUrl(backendUrl);
   if (fromBackend) return fromBackend;
   const fromPath = resolveMediaUrl(path);
   if (fromPath) return fromPath;
-  // CDN-only candidates — never admin .in/.online (those 404 as "Page not found").
-  const candidates = buildMediaUrlCandidates(path, backendUrl).filter((u) =>
-    /flintnthread\.com/i.test(u),
+  // Prefer flintnthread.com / Cloudinary — never seller SPA (.in) HTML responses.
+  const candidates = buildMediaUrlCandidates(path, backendUrl).filter(
+    (u) => /flintnthread\.com/i.test(u) || /res\.cloudinary\.com/i.test(u),
   );
   return candidates[0] || "";
 }

@@ -91,6 +91,8 @@ export async function uploadCategoryImages(
   bannerImage?: Blob | File | null,
 ): Promise<CategoryRow> {
   const form = new FormData();
+  // Send whichever slots the caller provides. Backend mirrors a single file
+  // onto both categoryImage + mobileImage so the UI (mobile-first) stays in sync.
   if (image) {
     const fileName = image instanceof File && image.name ? image.name : "category.jpg";
     form.append("image", image, fileName);

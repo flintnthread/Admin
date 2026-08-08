@@ -19,6 +19,10 @@ export function resolveCatalogMediaUrl(
   if (!path?.trim()) return "";
 
   const value = path.trim();
+  // Cloudinary absolute URLs — keep as-is (never rewrite onto admin / CDN hosts).
+  if (/res\.cloudinary\.com/i.test(value) || /cloudinary\.com/i.test(value)) {
+    return value;
+  }
   if (/^(https?:\/\/|data:|blob:)/i.test(value)) {
     // Rewrite broken .in/.online catalog hosts onto public CDN
     try {
@@ -33,11 +37,12 @@ export function resolveCatalogMediaUrl(
   }
 
   // For local development, use API origin instead of public CDN
-  const isLocalDev = typeof window !== "undefined" && 
+  const isLocalDev =
+    typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  
+
   const baseUrl = isLocalDev ? resolveAdminApiBaseUrl() : resolvePublicMediaBaseUrl();
-  
+
   let normalized = value.replace(/\\/g, "/");
   if (!normalized.startsWith("/")) normalized = `/${normalized}`;
   if (!normalized.startsWith("/uploads/")) {
@@ -46,8 +51,8 @@ export function resolveCatalogMediaUrl(
       ? `/${bare}`
       : `/uploads/${folder}/${bare}`;
   }
-  
-  // For local development, use API origin; for production, use public CDN
+
+  // Local dev → admin API origin; production → public CDN
   return `${baseUrl.replace(/\/$/, "")}${normalized}`;
 }
 
@@ -87,7 +92,7 @@ export function categoryImageCandidates(
     if (!raw?.trim()) continue;
     const value = raw.trim();
     if (/^(https?:\/\/|data:|blob:)/i.test(value)) {
-      push(value);
+      push(resolveCatalogMediaUrl(value, folder) || value);
       continue;
     }
     let path = value.replace(/\\/g, "/");

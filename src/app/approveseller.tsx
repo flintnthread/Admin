@@ -61,6 +61,8 @@ type PendingSeller = {
   accountNumber?: string;
   ifscCode?: string;
   holderName?: string;
+  profilePicUrl?: string | null;
+  documents?: { name: string; path?: string; url?: string; available?: boolean }[];
 };
 
 const ACCOUNT_STATUS_OPTIONS = ["Pending", "Active", "Rejected", "Inactive"] as const;
@@ -2332,6 +2334,19 @@ export default function ApprovedSellersScreen() {
   const openPendingDetail = async (pending: PendingSeller) => {
     try {
       const detail = await fetchPendingProfileDetail(pending.id);
+      const docs = Array.isArray(detail.documents)
+        ? (detail.documents as { name?: string; path?: string; url?: string; available?: boolean }[])
+            .filter((doc) => doc?.name && doc.available !== false && (doc.path || doc.url))
+            .map((doc) => ({
+              name: String(doc.name),
+              path: doc.path != null ? String(doc.path) : undefined,
+              url: resolveSellerDocumentImageUrl(
+                doc.path != null ? String(doc.path) : undefined,
+                doc.url != null ? String(doc.url) : undefined,
+              ) || (doc.url != null ? String(doc.url) : undefined),
+              available: true,
+            }))
+        : [];
       setSelectedPendingSeller({
         ...pending,
         businessType: String(detail.businessType ?? pending.businessType ?? "—"),
@@ -2341,6 +2356,12 @@ export default function ApprovedSellersScreen() {
         accountNumber: String(detail.accountNumber ?? pending.accountNumber ?? "—"),
         ifscCode: String(detail.ifscCode ?? pending.ifscCode ?? "—"),
         holderName: String(detail.accountHolder ?? pending.holderName ?? "—"),
+        profilePicUrl:
+          resolveSellerDocumentImageUrl(
+            detail.profilePicPath != null ? String(detail.profilePicPath) : undefined,
+            detail.profilePicUrl != null ? String(detail.profilePicUrl) : undefined,
+          ) || null,
+        documents: docs,
       });
       setShowPendingModal(true);
     } catch (e) {
@@ -3793,6 +3814,49 @@ export default function ApprovedSellersScreen() {
                   <Text style={styles.detailLabel}>Holder Name:</Text>
                   <Text style={styles.detailValue}>{selectedPendingSeller.holderName}</Text>
                 </View>
+
+                <Text style={styles.modalSectionTitle}>Verification Documents</Text>
+                {(selectedPendingSeller.documents ?? []).length === 0 ? (
+                  <Text style={[styles.detailValue, { marginBottom: 12 }]}>
+                    No documents uploaded
+                  </Text>
+                ) : (
+                  (selectedPendingSeller.documents ?? []).map((doc, idx) => (
+                    <View key={`${doc.name}-${idx}`} style={stylesMobile.documentRowRedesigned}>
+                      <View style={stylesMobile.documentLeftInfoMobile}>
+                        <View
+                          style={[
+                            stylesMobile.documentThumbBoxMobile,
+                            { backgroundColor: bgColors[idx % bgColors.length] },
+                          ]}
+                        >
+                          <SellerDocumentImage
+                            path={doc.path}
+                            url={doc.url}
+                            style={stylesMobile.documentMiniThumbMobile}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={stylesMobile.docNameTitleMobile}>{doc.name}</Text>
+                          <Text style={stylesMobile.docStatusTextMobile}>Uploaded</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={stylesMobile.docRedesignedViewBtn}
+                        onPress={() =>
+                          setPreviewDoc({
+                            name: doc.name,
+                            path: doc.path,
+                            url: resolveSellerDocumentImageUrl(doc.path, doc.url) || doc.url || "",
+                          })
+                        }
+                      >
+                        <Feather name="eye" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={stylesMobile.docRedesignedViewBtnText}>View</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
               </ScrollView>
 
               <View style={styles.modalFooterActions}>
